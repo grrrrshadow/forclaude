@@ -1,0 +1,2186 @@
+[
+ {
+  "soubor": "gymnazium.glb",
+  "jmeno": "gymnazium",
+  "druh": "prumysl",
+  "prumysl": "IT_GYMNASIUM",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     13.89,
+     21.84,
+     0.7
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     13.89,
+     23.04,
+     0.7
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     19.55,
+     18.95,
+     0.7
+    ],
+    "otoceni": 45.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     20.95,
+     13.37,
+     0.03
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     15.35,
+     12.77,
+     0.03
+    ],
+    "otoceni": 131.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     14.56,
+     13.66,
+     0.03
+    ],
+    "otoceni": 311.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_hazi",
+    "poloha": [
+     24.54,
+     5.39,
+     0.03
+    ],
+    "otoceni": 14.6,
+    "meritko": 2.0
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 17,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (444 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_16 jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model gymnazium/render_gymnazium.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dívčí gymnázium 2 × 2: nízká budova s průčelím, hřiště, park s lavičkami; 27285 trojúhelníků (model 27729), atlas 2048 px jen barva bez světla, s normálami, výška 12.37 m"
+ },
+ {
+  "soubor": "socha_kamen.glb",
+  "jmeno": "socha_kamen",
+  "druh": "prumysl",
+  "prumysl": "IT_STATUE",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "varianta": "kamen",
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     0.717,
+     0.717,
+     0.0
+    ],
+    "otoceni": 22.9,
+    "meritko": [
+     5.292,
+     5.292,
+     9.975
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     6.103,
+     0.617,
+     0.0
+    ],
+    "otoceni": 171.9,
+    "meritko": [
+     4.723,
+     4.723,
+     8.778
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     8.697,
+     0.617,
+     0.0
+    ],
+    "otoceni": 234.9,
+    "meritko": [
+     5.292,
+     5.292,
+     9.376
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     0.617,
+     6.103,
+     0.0
+    ],
+    "otoceni": 126.1,
+    "meritko": [
+     5.292,
+     5.292,
+     9.177
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     0.617,
+     8.697,
+     0.0
+    ],
+    "otoceni": 74.5,
+    "meritko": [
+     4.723,
+     4.723,
+     8.578
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     2.812,
+     0.0
+    ],
+    "otoceni": 17.2,
+    "meritko": [
+     1.994,
+     1.994,
+     2.693
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     5.405,
+     0.0
+    ],
+    "otoceni": 114.6,
+    "meritko": [
+     1.994,
+     1.994,
+     2.394
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     11.988,
+     0.0
+    ],
+    "otoceni": 252.1,
+    "meritko": [
+     1.994,
+     1.994,
+     2.793
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     2.812,
+     13.943,
+     0.0
+    ],
+    "otoceni": 63.0,
+    "meritko": [
+     1.994,
+     1.994,
+     2.793
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     5.405,
+     13.943,
+     0.0
+    ],
+    "otoceni": 189.1,
+    "meritko": [
+     1.994,
+     1.994,
+     2.494
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     11.988,
+     13.943,
+     0.0
+    ],
+    "otoceni": 297.9,
+    "meritko": [
+     1.994,
+     1.994,
+     2.593
+    ]
+   }
+  ],
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     8.24,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     6.64,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     3.01,
+     7.64,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "bikini_jde",
+    "poloha": [
+     11.7,
+     8.65,
+     0.06
+    ],
+    "otoceni": 70.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_objima",
+    "poloha": [
+     7.31,
+     8.39,
+     2.79
+    ],
+    "otoceni": 275.2,
+    "meritko": 2.0
+   }
+  ],
+  "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=kamen)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "poznamka": "socha Karla Máchy z kamene s kapucí, vousy a jointem, lavičky, keře, odpadky, kytky marihuany kolem; 36000 trojúhelníků (model 69212), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny)"
+ },
+ {
+  "soubor": "socha_bronz.glb",
+  "jmeno": "socha_bronz",
+  "druh": "prumysl",
+  "prumysl": "IT_STATUE",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "varianta": "bronz",
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     0.717,
+     0.717,
+     0.0
+    ],
+    "otoceni": 22.9,
+    "meritko": [
+     5.292,
+     5.292,
+     9.975
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     6.103,
+     0.617,
+     0.0
+    ],
+    "otoceni": 171.9,
+    "meritko": [
+     4.723,
+     4.723,
+     8.778
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     8.697,
+     0.617,
+     0.0
+    ],
+    "otoceni": 234.9,
+    "meritko": [
+     5.292,
+     5.292,
+     9.376
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     0.617,
+     6.103,
+     0.0
+    ],
+    "otoceni": 126.1,
+    "meritko": [
+     5.292,
+     5.292,
+     9.177
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     0.617,
+     8.697,
+     0.0
+    ],
+    "otoceni": 74.5,
+    "meritko": [
+     4.723,
+     4.723,
+     8.578
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     2.812,
+     0.0
+    ],
+    "otoceni": 17.2,
+    "meritko": [
+     1.994,
+     1.994,
+     2.693
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     5.405,
+     0.0
+    ],
+    "otoceni": 114.6,
+    "meritko": [
+     1.994,
+     1.994,
+     2.394
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.943,
+     11.988,
+     0.0
+    ],
+    "otoceni": 252.1,
+    "meritko": [
+     1.994,
+     1.994,
+     2.793
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     2.812,
+     13.943,
+     0.0
+    ],
+    "otoceni": 63.0,
+    "meritko": [
+     1.994,
+     1.994,
+     2.793
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     5.405,
+     13.943,
+     0.0
+    ],
+    "otoceni": 189.1,
+    "meritko": [
+     1.994,
+     1.994,
+     2.494
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     11.988,
+     13.943,
+     0.0
+    ],
+    "otoceni": 297.9,
+    "meritko": [
+     1.994,
+     1.994,
+     2.593
+    ]
+   }
+  ],
+  "postavy_s_holkami": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     8.24,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     6.64,
+     3.01,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     3.01,
+     7.64,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "bikini_jde",
+    "poloha": [
+     11.7,
+     8.65,
+     0.06
+    ],
+    "otoceni": 70.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_objima",
+    "poloha": [
+     7.31,
+     8.39,
+     2.79
+    ],
+    "otoceni": 275.2,
+    "meritko": 2.0
+   }
+  ],
+  "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=bronz)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "poznamka": "socha Karla Máchy z bronzu, jinak jako kamenná; 36000 trojúhelníků (model 69212), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny)"
+ },
+ {
+  "soubor": "automat.glb",
+  "jmeno": "automat",
+  "druh": "prumysl",
+  "prumysl": "IT_WEED_MACHINE",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "postavy_s_holkami": [
+   {
+    "postava": "college_girl_plati",
+    "poloha": [
+     4.09,
+     3.35,
+     0.06
+    ],
+    "otoceni": 180.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     5.98,
+     2.49,
+     0.94
+    ],
+    "otoceni": 180.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     5.19,
+     7.28,
+     0.06
+    ],
+    "otoceni": 40.0,
+    "meritko": 2.0
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (2 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_00 jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model automat/render_automat.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "automat na marihuanu CBD MAT s lavičkou a košem v severním rohu, zbytek políčka zarostlé křovím; 35998 trojúhelníků (model 99188), atlas 2048 px jen barva bez světla, s normálami, výška 3.65 m"
+ },
+ {
+  "soubor": "chatka.glb",
+  "jmeno": "chatka",
+  "druh": "prumysl",
+  "prumysl": "IT_COFFEESHOP",
+  "dlazdic_x": 2,
+  "dlazdic_y": 1,
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     2.214,
+     13.91,
+     0.0
+    ],
+    "otoceni": 213.7,
+    "meritko": [
+     2.204,
+     2.204,
+     2.529
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     3.526,
+     13.81,
+     0.0
+    ],
+    "otoceni": 160.5,
+    "meritko": [
+     2.073,
+     2.073,
+     2.073
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     4.909,
+     13.792,
+     0.0
+    ],
+    "otoceni": 256.3,
+    "meritko": [
+     2.01,
+     2.01,
+     2.01
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     7.821,
+     13.806,
+     0.0
+    ],
+    "otoceni": 20.8,
+    "meritko": [
+     2.204,
+     2.204,
+     2.434
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.34,
+     13.824,
+     0.0
+    ],
+    "otoceni": 350.4,
+    "meritko": [
+     2.204,
+     2.204,
+     2.389
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     10.671,
+     13.865,
+     0.0
+    ],
+    "otoceni": 238.4,
+    "meritko": [
+     2.204,
+     2.204,
+     2.216
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     12.091,
+     13.703,
+     0.0
+    ],
+    "otoceni": 213.2,
+    "meritko": [
+     2.279,
+     2.279,
+     2.279
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.555,
+     13.837,
+     0.0
+    ],
+    "otoceni": 116.7,
+    "meritko": [
+     2.104,
+     2.104,
+     2.104
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     15.075,
+     13.73,
+     0.0
+    ],
+    "otoceni": 14.1,
+    "meritko": [
+     2.063,
+     2.063,
+     2.063
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     16.378,
+     13.82,
+     0.0
+    ],
+    "otoceni": 133.4,
+    "meritko": [
+     2.204,
+     2.204,
+     2.486
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     19.245,
+     13.756,
+     0.0
+    ],
+    "otoceni": 93.3,
+    "meritko": [
+     2.204,
+     2.204,
+     2.46
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     20.633,
+     13.87,
+     0.0
+    ],
+    "otoceni": 85.9,
+    "meritko": [
+     2.418,
+     2.418,
+     2.418
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     22.17,
+     13.903,
+     0.0
+    ],
+    "otoceni": 60.4,
+    "meritko": [
+     2.35,
+     2.35,
+     2.35
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     23.705,
+     13.696,
+     0.0
+    ],
+    "otoceni": 292.2,
+    "meritko": [
+     2.204,
+     2.204,
+     2.244
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     26.5,
+     13.916,
+     0.0
+    ],
+    "otoceni": 194.4,
+    "meritko": [
+     2.469,
+     2.469,
+     2.477
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     28.003,
+     13.862,
+     0.0
+    ],
+    "otoceni": 136.1,
+    "meritko": [
+     2.202,
+     2.202,
+     2.202
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     28.529,
+     1.552,
+     0.0
+    ],
+    "otoceni": 337.0,
+    "meritko": [
+     2.204,
+     2.204,
+     2.274
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     28.71,
+     2.897,
+     0.0
+    ],
+    "otoceni": 61.2,
+    "meritko": [
+     2.057,
+     2.057,
+     2.057
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     28.613,
+     4.352,
+     0.0
+    ],
+    "otoceni": 325.2,
+    "meritko": [
+     2.146,
+     2.146,
+     2.146
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     28.589,
+     5.552,
+     0.0
+    ],
+    "otoceni": 323.1,
+    "meritko": [
+     2.469,
+     2.469,
+     2.529
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     28.647,
+     9.504,
+     0.0
+    ],
+    "otoceni": 230.8,
+    "meritko": [
+     2.41,
+     2.41,
+     2.41
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     28.54,
+     10.788,
+     0.0
+    ],
+    "otoceni": 201.1,
+    "meritko": [
+     2.24,
+     2.24,
+     2.24
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     28.614,
+     12.227,
+     0.0
+    ],
+    "otoceni": 120.0,
+    "meritko": [
+     2.06,
+     2.06,
+     2.06
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     16.091,
+     1.078,
+     0.0
+    ],
+    "otoceni": 28.4,
+    "meritko": [
+     2.144,
+     2.144,
+     2.144
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     17.448,
+     1.007,
+     0.0
+    ],
+    "otoceni": 169.9,
+    "meritko": [
+     2.136,
+     2.136,
+     2.136
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     18.777,
+     1.05,
+     0.0
+    ],
+    "otoceni": 283.6,
+    "meritko": [
+     1.997,
+     1.997,
+     1.997
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     20.06,
+     1.085,
+     0.0
+    ],
+    "otoceni": 62.5,
+    "meritko": [
+     2.117,
+     2.117,
+     2.117
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     21.49,
+     0.979,
+     0.0
+    ],
+    "otoceni": 173.3,
+    "meritko": [
+     2.044,
+     2.044,
+     2.044
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     22.903,
+     1.007,
+     0.0
+    ],
+    "otoceni": 107.5,
+    "meritko": [
+     2.204,
+     2.204,
+     2.328
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     25.666,
+     0.898,
+     0.0
+    ],
+    "otoceni": 179.7,
+    "meritko": [
+     2.469,
+     2.469,
+     2.52
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     26.993,
+     1.039,
+     0.0
+    ],
+    "otoceni": 115.4,
+    "meritko": [
+     2.204,
+     2.204,
+     2.357
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     0.614,
+     9.708,
+     0.0
+    ],
+    "otoceni": 78.3,
+    "meritko": [
+     1.889,
+     1.889,
+     3.338
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     0.867,
+     12.296,
+     0.0
+    ],
+    "otoceni": 357.0,
+    "meritko": [
+     2.117,
+     2.117,
+     2.438
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     3.183,
+     12.207,
+     0.0
+    ],
+    "otoceni": 312.3,
+    "meritko": [
+     1.889,
+     1.889,
+     2.248
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     4.609,
+     12.24,
+     0.0
+    ],
+    "otoceni": 298.6,
+    "meritko": [
+     2.117,
+     2.117,
+     3.127
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     6.091,
+     12.408,
+     0.0
+    ],
+    "otoceni": 84.2,
+    "meritko": [
+     2.117,
+     2.117,
+     2.677
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     6.956,
+     12.275,
+     0.0
+    ],
+    "otoceni": 194.4,
+    "meritko": [
+     1.889,
+     1.889,
+     2.248
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     8.443,
+     12.397,
+     0.0
+    ],
+    "otoceni": 49.6,
+    "meritko": [
+     1.889,
+     1.889,
+     3.134
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.696,
+     0.927,
+     0.0
+    ],
+    "otoceni": 98.4,
+    "meritko": [
+     1.889,
+     1.889,
+     2.698
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     11.097,
+     0.744,
+     0.0
+    ],
+    "otoceni": 196.7,
+    "meritko": [
+     1.889,
+     1.889,
+     3.113
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     10.99,
+     12.369,
+     0.0
+    ],
+    "otoceni": 49.2,
+    "meritko": [
+     1.889,
+     1.889,
+     2.988
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     12.547,
+     0.841,
+     0.0
+    ],
+    "otoceni": 229.8,
+    "meritko": [
+     2.117,
+     2.117,
+     2.28
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     12.263,
+     1.83,
+     0.0
+    ],
+    "otoceni": 306.1,
+    "meritko": [
+     2.117,
+     2.117,
+     2.312
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     12.268,
+     6.045,
+     0.0
+    ],
+    "otoceni": 185.6,
+    "meritko": [
+     1.889,
+     1.889,
+     2.272
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     12.2,
+     6.951,
+     0.0
+    ],
+    "otoceni": 351.7,
+    "meritko": [
+     1.889,
+     1.889,
+     2.283
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.49,
+     0.794,
+     0.0
+    ],
+    "otoceni": 330.0,
+    "meritko": [
+     1.889,
+     1.889,
+     2.972
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.745,
+     1.99,
+     0.0
+    ],
+    "otoceni": 168.8,
+    "meritko": [
+     1.889,
+     1.889,
+     2.606
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.648,
+     5.993,
+     0.0
+    ],
+    "otoceni": 204.7,
+    "meritko": [
+     1.889,
+     1.889,
+     2.643
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.905,
+     6.953,
+     0.0
+    ],
+    "otoceni": 290.5,
+    "meritko": [
+     1.889,
+     1.889,
+     2.749
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.89,
+     8.464,
+     0.0
+    ],
+    "otoceni": 212.1,
+    "meritko": [
+     1.889,
+     1.889,
+     2.29
+    ]
+   }
+  ],
+  "postavy_stoji": [
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     17.4,
+     6.18,
+     0.01
+    ],
+    "otoceni": 325.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     9.21,
+     6.29,
+     0.01
+    ],
+    "otoceni": 45.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     24.57,
+     7.38,
+     0.01
+    ],
+    "otoceni": 120.0,
+    "meritko": 2.0
+   }
+  ],
+  "postavy_sedi": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     16.3,
+     8.74,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     16.3,
+     10.37,
+     0.94
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     22.78,
+     1.5,
+     0.94
+    ],
+    "otoceni": 90.0,
+    "meritko": 2.0
+   }
+  ],
+  "autor": "domek A little happy hut, Tigran Safaryan (Sketchfab, CC BY 4.0), dvorek a nepořádek vlastní (chatka/render_chatka.py)",
+  "licence": "CC BY 4.0 (uvést Tigran Safaryan); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "poznamka": "hulírna 2 × 1 podél x: zadní políčko domek, přední dvorek s lavicemi a nepořádkem, plot z kytek marihuany s dírami; 21439 trojúhelníků (model 21439), atlas 2048 px jen barva bez světla, s normálami, výška 12.39 m, 50 kytek zvlášť (rostliny)"
+ },
+ {
+  "soubor": "lihovar.glb",
+  "jmeno": "lihovar",
+  "druh": "prumysl",
+  "prumysl": "lihovar",
+  "dlazdic_x": 3,
+  "dlazdic_y": 3,
+  "bere": [
+   "BRAM"
+  ],
+  "dava": [
+   "BEER"
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 26,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (1304 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_25 jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model lihovar/render_lihovar.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lihovar 3 × 3: kotelna s komínem, hlavní budova s nápisem LIHOVAR, žlab s bramborami, sklady, nádrže; 25610 trojúhelníků (model 26914), atlas 2048 px jen barva bez světla, s normálami, výška 27.49 m"
+ },
+ {
+  "soubor": "hospoda.glb",
+  "jmeno": "hospoda",
+  "druh": "prumysl",
+  "prumysl": "hospoda",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "bere": [
+   "BEER"
+  ],
+  "dava": [
+   "PASS"
+  ],
+  "postavy": [
+   {
+    "postava": "mat_toci",
+    "poloha": [
+     16.56,
+     20.55,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 2.0,
+    "poznamka": "Mat točí pivo z pípy, trubka vede ze sudu (hráč: „mat za vyčep … ten moment jak tocí pivo, kouka na holku“)"
+   },
+   {
+    "postava": "college_girl_pro_pivo",
+    "poloha": [
+     17.4,
+     21.59,
+     0.0
+    ],
+    "otoceni": 214.8,
+    "meritko": 2.0,
+    "poznamka": "natahuje ruce pro pivo (hráč: „holku ktera natuhuje ruce pro to pivo, si přišla pro pivo“)"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     19.95,
+     21.25,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0,
+    "poznamka": "sedí u stolu s pivem"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     21.74,
+     23.84,
+     0.94
+    ],
+    "otoceni": 270,
+    "meritko": 2.0,
+    "poznamka": "sedí u stolu s pivem"
+   },
+   {
+    "postava": "rozen",
+    "poloha": [
+     21.94,
+     4.39,
+     1.9
+    ],
+    "otoceni": 90,
+    "meritko": 2.0,
+    "poznamka": "rožeň nad grilem: čuník, kravička a ovečka se střídají (hráč: „grilovat tvyho čunika z auta a kravičku a ovečku“)"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes budovu: svítící okna a lampy těsně před tmavými (5676 trojúhelníků, stejný atlas); uzel den je prázdný; prázdné uzly svetlo_00 až svetlo_24 jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/hospoda.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "hospoda se zahrádkou: velké květináče, úzké slunečníky u budovy, výčep se sudem, gril s rožněm, girlanda (celá scéna dvakrát větší, 2 × 2 políčka, holky 2×); 25152 trojúhelníků (model 30828), atlas 4096 px jen barva bez světla, s normálami, výška 13.37 m"
+ },
+ {
+  "soubor": "kytka_mari_mlada.glb",
+  "jmeno": "kytka_mari_mlada",
+  "druh": "rostlina",
+  "autor": "rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "licence": "CC BY 4.0",
+  "poznamka": "rostlina marihuany small_cannabis_plant, pata v počátku, výška 1 (meritko v seznamu rostliny dává metry), 972 trojúhelníků, atlas 1024 px s průhledností listů (alphaMode MASK, pod půl díra), s normálami"
+ },
+ {
+  "soubor": "kytka_mari_vysoka.glb",
+  "jmeno": "kytka_mari_vysoka",
+  "druh": "rostlina",
+  "autor": "rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "licence": "CC BY 4.0",
+  "poznamka": "rostlina marihuany cannabis_plant, pata v počátku, výška 1 (meritko v seznamu rostliny dává metry), 2796 trojúhelníků, atlas 1024 px s průhledností listů (alphaMode MASK, pod půl díra), s normálami"
+ },
+ {
+  "soubor": "kytka_mari_kosata.glb",
+  "jmeno": "kytka_mari_kosata",
+  "druh": "rostlina",
+  "autor": "rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "licence": "CC BY 4.0",
+  "poznamka": "rostlina marihuany cannabis_sativa_plant, pata v počátku, výška 1 (meritko v seznamu rostliny dává metry), 8999 trojúhelníků, atlas 1024 px s průhledností listů (alphaMode MASK, pod půl díra), s normálami"
+ },
+ {
+  "soubor": "pole_zem.glb",
+  "jmeno": "pole_zem",
+  "druh": "pole",
+  "dil": "zem",
+  "pole": "obe",
+  "prace": {
+   "marihuana": [
+    {
+     "postava": "pole_real",
+     "poloha": [
+      4.343,
+      6.489,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_sedi",
+     "poloha": [
+      10.137,
+      8.252,
+      0.0
+     ],
+     "otoceni": 135.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_punk",
+     "poloha": [
+      12.245,
+      6.255,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_pubg",
+     "poloha": [
+      8.281,
+      2.886,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_char16",
+     "poloha": [
+      6.71,
+      11.704,
+      0.0
+     ],
+     "otoceni": 135.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_chill",
+     "poloha": [
+      12.026,
+      10.216,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    }
+   ],
+   "brambory": [
+    {
+     "postava": "pole_real",
+     "poloha": [
+      2.385,
+      2.775,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_sedi",
+     "poloha": [
+      11.184,
+      5.099,
+      0.0
+     ],
+     "otoceni": 135.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_punk",
+     "poloha": [
+      5.422,
+      9.981,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_pubg",
+     "poloha": [
+      11.779,
+      13.515,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_char16",
+     "poloha": [
+      8.442,
+      4.538,
+      0.0
+     ],
+     "otoceni": 135.0,
+     "meritko": 2.0
+    },
+    {
+     "postava": "pole_chill",
+     "poloha": [
+      1.213,
+      13.776,
+      0.0
+     ],
+     "otoceni": 315.0,
+     "meritko": 2.0
+    }
+   ]
+  },
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "zem se záhony podél x, společný základ pole marihuany i brambor; jedno políčko 14,8 m, počátek v severním rohu, 28 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "soubor": "pole_cesta.glb",
+  "jmeno": "pole_cesta",
+  "druh": "pole",
+  "dil": "cesta",
+  "pole": "obe",
+  "u_cesty": [
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     4.625,
+     0.277,
+     0.0
+    ],
+    "otoceni": 60,
+    "meritko": 2.0,
+    "okraj": "sz"
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     4.625,
+     3.053,
+     0.0
+    ],
+    "otoceni": 40,
+    "meritko": 2.0,
+    "okraj": "sz"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     8.556,
+     13.875,
+     0.0
+    ],
+    "otoceni": 15,
+    "meritko": 2.0,
+    "okraj": "jv"
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     12.256,
+     13.875,
+     0.0
+    ],
+    "otoceni": 50,
+    "meritko": 2.0,
+    "okraj": "jv"
+   }
+  ],
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "polní cesta podél x přes trávu (kreslí se přes silnici hráče); jedno políčko 14,8 m, počátek v severním rohu, 52 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "soubor": "pole_bouda.glb",
+  "jmeno": "pole_bouda",
+  "druh": "pole",
+  "dil": "bouda",
+  "pole": "obe",
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "kůlna s plechovou střechou a nádrže na vodu na konci cesty; jedno políčko 14,8 m, počátek v severním rohu, 1208 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "soubor": "pole_seno.glb",
+  "jmeno": "pole_seno",
+  "druh": "pole",
+  "dil": "seno",
+  "pole": "obe",
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "stoh sena na druhé straně cesty; jedno políčko 14,8 m, počátek v severním rohu, 2613 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "soubor": "pole_brambory_male.glb",
+  "jmeno": "pole_brambory_male",
+  "druh": "pole",
+  "dil": "brambory_male",
+  "pole": "brambory",
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "mladá nať brambor na záhonech, dva řádky na záhon; jedno políčko 14,8 m, počátek v severním rohu, 6000 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "soubor": "pole_brambory_vzrostle.glb",
+  "jmeno": "pole_brambory_vzrostle",
+  "druh": "pole",
+  "dil": "brambory_vzrostle",
+  "pole": "brambory",
+  "autor": "grrrrf: vlastní model pole/render_dlazdice.py, díl prumysl/pole_dily.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "vzrostlá nať brambor, část kvete bíle a fialově; jedno políčko 14,8 m, počátek v severním rohu, 13999 trojúhelníků, atlas 1024 px, s normálami"
+ },
+ {
+  "jmeno": "pole_mari_male",
+  "druh": "pole",
+  "dil": "mari_male",
+  "pole": "marihuana",
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     1.899,
+     1.908,
+     -0.04
+    ],
+    "otoceni": 36.6,
+    "meritko": [
+     2.003,
+     2.003,
+     2.051
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     5.719,
+     1.737,
+     -0.04
+    ],
+    "otoceni": 36.9,
+    "meritko": [
+     1.821,
+     1.821,
+     1.821
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     9.41,
+     1.757,
+     -0.04
+    ],
+    "otoceni": 146.1,
+    "meritko": [
+     1.824,
+     1.824,
+     1.824
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     12.98,
+     1.733,
+     -0.04
+    ],
+    "otoceni": 157.9,
+    "meritko": [
+     1.648,
+     1.648,
+     1.648
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     1.956,
+     5.469,
+     -0.04
+    ],
+    "otoceni": 107.3,
+    "meritko": [
+     2.003,
+     2.003,
+     2.053
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     5.401,
+     5.431,
+     -0.04
+    ],
+    "otoceni": 132.7,
+    "meritko": [
+     2.003,
+     2.003,
+     2.105
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     9.442,
+     5.639,
+     -0.04
+    ],
+    "otoceni": 43.4,
+    "meritko": [
+     1.698,
+     1.698,
+     1.698
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     13.021,
+     5.479,
+     -0.04
+    ],
+    "otoceni": 305.9,
+    "meritko": [
+     2.003,
+     2.003,
+     2.153
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     2.007,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 117.0,
+    "meritko": [
+     1.748,
+     1.748,
+     1.748
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     5.376,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 58.5,
+    "meritko": [
+     1.917,
+     1.917,
+     1.917
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     9.185,
+     9.205,
+     -0.04
+    ],
+    "otoceni": 230.4,
+    "meritko": [
+     2.003,
+     2.003,
+     2.068
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     12.943,
+     9.299,
+     -0.04
+    ],
+    "otoceni": 48.3,
+    "meritko": [
+     1.536,
+     1.536,
+     1.536
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     1.95,
+     13.033,
+     -0.04
+    ],
+    "otoceni": 340.9,
+    "meritko": [
+     1.509,
+     1.509,
+     1.509
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     5.581,
+     12.832,
+     -0.04
+    ],
+    "otoceni": 122.4,
+    "meritko": [
+     1.529,
+     1.529,
+     1.529
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     9.129,
+     13.011,
+     -0.04
+    ],
+    "otoceni": 36.4,
+    "meritko": [
+     2.003,
+     2.003,
+     2.145
+    ]
+   },
+   {
+    "soubor": "kytka_mari_mlada.glb",
+    "poloha": [
+     12.892,
+     12.956,
+     -0.04
+    ],
+    "otoceni": 96.2,
+    "meritko": [
+     2.003,
+     2.003,
+     2.038
+    ]
+   }
+  ],
+  "autor": "rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "licence": "CC BY 4.0",
+  "poznamka": "mladé kytky marihuany 1,5–2,2 m: bez vlastního souboru, 16 kytek na políčko (4 řady po 4 na záhonech), na každém políčku na stejných místech"
+ },
+ {
+  "jmeno": "pole_mari_vzrostle",
+  "druh": "pole",
+  "dil": "mari_vzrostle",
+  "pole": "marihuana",
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     1.899,
+     1.908,
+     -0.04
+    ],
+    "otoceni": 339.3,
+    "meritko": [
+     3.674,
+     3.674,
+     4.742
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     5.719,
+     1.737,
+     -0.04
+    ],
+    "otoceni": 339.6,
+    "meritko": [
+     3.674,
+     3.674,
+     4.348
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.41,
+     1.757,
+     -0.04
+    ],
+    "otoceni": 88.8,
+    "meritko": [
+     3.674,
+     3.674,
+     4.352
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     12.98,
+     1.733,
+     -0.04
+    ],
+    "otoceni": 100.6,
+    "meritko": [
+     3.674,
+     3.674,
+     4.05
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     1.956,
+     5.469,
+     -0.04
+    ],
+    "otoceni": 50.0,
+    "meritko": [
+     3.674,
+     3.674,
+     4.745
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     5.401,
+     5.431,
+     -0.04
+    ],
+    "otoceni": 75.4,
+    "meritko": [
+     4.116,
+     4.116,
+     4.833
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.442,
+     5.639,
+     -0.04
+    ],
+    "otoceni": 346.1,
+    "meritko": [
+     3.674,
+     3.674,
+     4.137
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     13.021,
+     5.479,
+     -0.04
+    ],
+    "otoceni": 248.6,
+    "meritko": [
+     3.674,
+     3.674,
+     4.917
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     2.007,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 59.7,
+    "meritko": [
+     4.116,
+     4.116,
+     4.223
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     5.376,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 1.2,
+    "meritko": [
+     3.674,
+     3.674,
+     4.512
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.185,
+     9.205,
+     -0.04
+    ],
+    "otoceni": 173.1,
+    "meritko": [
+     3.674,
+     3.674,
+     4.77
+    ]
+   },
+   {
+    "soubor": "kytka_mari_vysoka.glb",
+    "poloha": [
+     12.943,
+     9.299,
+     -0.04
+    ],
+    "otoceni": 351.0,
+    "meritko": [
+     3.859,
+     3.859,
+     3.859
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     1.95,
+     13.033,
+     -0.04
+    ],
+    "otoceni": 283.6,
+    "meritko": [
+     3.674,
+     3.674,
+     3.812
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     5.581,
+     12.832,
+     -0.04
+    ],
+    "otoceni": 65.1,
+    "meritko": [
+     3.674,
+     3.674,
+     3.846
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     9.129,
+     13.011,
+     -0.04
+    ],
+    "otoceni": 339.1,
+    "meritko": [
+     3.674,
+     3.674,
+     4.903
+    ]
+   },
+   {
+    "soubor": "kytka_mari_kosata.glb",
+    "poloha": [
+     12.892,
+     12.956,
+     -0.04
+    ],
+    "otoceni": 38.9,
+    "meritko": [
+     3.674,
+     3.674,
+     4.719
+    ]
+   }
+  ],
+  "autor": "rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
+  "licence": "CC BY 4.0",
+  "poznamka": "vzrostlé kytky 3,8–5 m („smrčky“), čtvrtina štíhlých: bez vlastního souboru, 16 kytek na políčko (4 řady po 4 na záhonech), na každém políčku na stejných místech"
+ }
+]

@@ -1,0 +1,584 @@
+# Témata (hra Decouple, forclaude)
+
+Moje průběžné poznámky: co hráč chce, co jsme rozhodli, co je hotové a co zbývá. Píšu je vlastními slovy, nejnovější
+nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
+
+## Pravidla práce (trvalá)
+
+- Česky, krátce, tykat. Nejdřív domluvit, pak kódovat; dokud nejsou všechny informace, nezačínat.
+- Chyba je v kódu, ne v obrázku: žádné zalepování příznaků. Návrh hráče je návrh, ne hotová věc.
+- Build (Windows) dělá hráč, ne já. Commit a push po každém hotovém kroku.
+- Žádná vyskakovací okna s povolením (nový host, add_repo apod.).
+- **Mody a hra jsou dva oddělené světy.** GRF je mod: objekt místo spritu, jinak funguje jako dřív. Co GRF chce
+  (barva, blednutí, rez, blikání majáku), vybírá GRF svým spritem (`stavy`). Hra sama nic nerozhoduje a nic do GRF
+  nestrká. Kolega v grrrrf dělá GRF a objekty, já hru a prostředí pro ně.
+- Zabudované ve hře: náš průmysl a budovy, náhrady domů (ÚV KSČ místo divadla 0x1F), výzdoba (holky na zastávkách,
+  Mat, Tatra VB mezi budovami ÚV KSČ). Rozšíření GRF: Tatry, Sergej, V3S, divadlo MAXd – ve složce `decouple`
+  se z nich stanou zabudované neodebíratelné GRF.
+- Vanilla zůstává vanilla. Naše obrázky jen 32bpp, žádný grfcodec (jen yagl), kolegovy obrázky neupravovat.
+- Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
+- Kolegovi psát jen do `hra/...` v grrrrf.
+- **Velikost holek určuje hráč** (17. 10.: „vyser se na kolegu a udělej ty holky velikost… jestli potom někdo změní
+  velikost holky, tak ho smažu“). Holky u domů a za volantem: pravá velikost (`meritko` 1 v `objekty/mirne`).
+  Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
+  Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
+
+## 17. 10. – plynulost: hra v tiku nevyrábí obrázky aut, glb soubory hned pryč
+
+- Hráč: **„pro mě je teď každej test utrpení… škube se to, nemůžu myší trefit čudlík a obraz se kouše“** – plynulost
+  je teď první. Hlavní příčina (rig): hra při každém kroku auta počítá, kam na obrazovce auto sahá
+  (`VehicleSpriteSeq::GetBounds()`), a kvůli tomu vyráběla jeho obrázek pro 0° – v tiku hry, ať se hráč díval odkudkoli
+  (otočená mapa, pohled z očí). Tatra tahač s návěsem v zatáčce: 32 obrázků, 25,8 s práce (první typ 10 s, čtení
+  textur). Celou tu dobu stála hra i myš.
+- Teď se to počítá z rozměrů objektu (krabice všech rohů tvaru a posádka, kamerou spritů,
+  `ThreeDVehicleObjectSpriteBounds()`), obrázek se kvůli tomu nedělá. Rozměry si objekt pamatuje i po zapomenutí tvaru;
+  dokud tvar nikdo nečetl, odhad z délky (nebo 20 m). Rig: otočená mapa a pohled z očí – 0 obrázků (dřív 32); tik hry
+  průměr 0,1 ms, nejdelší 2–4 ms. Odhad vždy obklopí skutečný obrázek (log `sprite=3`: „thought …“).
+- Soubory .glb se pustí hned po přečtení (dřív se drželo až 240 MB na 15 s): drží se jen během jednoho čtení
+  (`GlbFilesScope`), aby se doplněk sdílený záznamy balíčku nečetl víckrát. Rig `test3d pamet`: držené soubory 0 MB.
+- Zbývá při 0°: obrázek auta vzniká, když se auto poprvé nakreslí v novém směru (první typ 2–3,5 s kvůli texturám,
+  další 10–20 ms), na hlavním vlákně. To řeší další krok z rozhodnutí hráče – auta kreslit objektem.
+- Rozhodnutí hráče (17. 10.): tvary všech glb ukládat menšími čísly; domy nikdy obrázky; v nastavení přepínač
+  originální domy OTTD (naše krabice) / 3D domy; textury podle potřeby („asi jo“); glb pustit hned po přečtení
+  (hotovo); velikost auta z objektu, ne z obrázku (hotovo); obrázky jen pro depo a nákupní seznam; žádných 8 směrů
+  dopředu – „udělat objekt a tím končíme“.
+- Rig: `test3d smycka` ukazuje i tiky hry (průměr, nejdelší, kolikrát nad 10 ms).
+- **Přepínač v nastavení „Domy ve městech: 3D domy / originální domy OpenTTD (jednoduché krabice)“**
+  (`gui.three_d_houses`, Grafika vedle domů při 0°). Originální: žádný dům není 3D objekt – v otočeném pohledu a
+  v pohledu z očí krabice z ručních tabulek jako dřív, při 0° původní obrázky. Rig (město 41 domů, otočený pohled,
+  myš nad mapou): 3D domy průměr 4,0 ms na snímek, originální 2,3 ms.
+- **Domy bez obrázků – změřeno, zatím neudělané, čeká na hráče.** Obrázek domu (`TurnedObjectPicture`) není 8 směrů
+  jako u aut, je to dům nakreslený jednou pro aktuální natočení a zoom; při pohybu myši nebo aut se z něj jen kopíruje.
+  Bez něj se dům kreslí trojúhelníky při každém překreslení: kreslení domů 48 ms → 648 ms na 150 snímků, průměr snímku
+  4,0 → 6,8 ms, pomalých (> 20 ms) 5 → 17, nejdelší 41 → 75 ms. Paměť těch obrázků: 15,8 MB (83 obrázků). Paměť berou
+  data domů z glb: 421 MB (40 domů).
+- **Auta bez obrázků – změřeno, čeká na hráče.** Nakreslit Tatru 148 přímo objektem trvá (jedno jádro, textury
+  hotové): 16× zoom 104 ms, 8× 48 ms, 4× 22 ms, 2× 12 ms, 1× 10 ms – za každé auto a každý snímek. Deset aut na
+  obrazovce při 4× = 220 ms na snímek (4 snímky za vteřinu). Obrázek auta je mezipaměť nakresleného objektu (0,1 MB
+  za 133 obrázků), dělá se na vlákně na pozadí.
+- Tvary vozidel po přečtení pustí rezervu, do které jejich seznamy rostly (`ShrinkShape()`).
+- **Textury podle potřeby** (hráč: „textury, jak to dělají jiné hry? tak asi jo“): textura vozidla se dělá jen od
+  nejjemnější úrovně, kterou něco kreslí (jemnější bez pixelů, jen velikost); když je potřeba jemnější (pohled z očí
+  zblízka), udělá se znovu z PNG – na pozadí, mezitím se kreslí hrubší. Každých 15 s (mezi snímky) se pustí úrovně
+  jemnější, než se od minula kreslilo; textura, která se vůbec nekreslila, si nechá jen úrovně do 256 px. Stejně masky
+  laku, rzi a doplňků a nalakované textury pohledu z očí (ty se nepouštěly nikdy). Hustota texelů se bere z hlavičky
+  PNG, ne z rozbalené textury. Rig (Tatry na mapě 0°, otočené, pohled z očí): textury 625 MB → po úklidu 10 MB, po
+  dalším kreslení z očí 170 MB; nalakované 184 MB → 0 → 73 MB.
+- Obrázky domů otočeného pohledu zaberou při zoomu 4× 16 MB, při 8× 125 MB (strop 256 MB).
+- Rig: `test3d kresli [n]` (jak dlouho trvá nakreslit objekt prvního 3D vozidla na každém zoomu), `test3d pamet`
+  ukazuje i obrázky domů otočeného pohledu.
+
+## 17. 10. – kolik paměti berou glb a kolik obrázky
+
+- Hráč: **„máme v paměti pro úhel 0 zbytečné obrázky glb objektů a tu paměť potřebujem“ … „kolik zaberou glb a kolik
+  obrázky?“** Rig `test3d pamet` (Tatra 148 tahač s návěsem, Tatra 148, 603, malé město 1990, mapa 0°, otočená, pohled
+  z očí):
+  - glb: tvary vozidel 618 MB (59 tvarů; tvar nese všechny doplňky a náklady svého souboru), textury po úrovních
+    811 MB (68; doplněk Tater je obrázek 4096×4096, rozbalený i se zmenšeninami ~85 MB), masky podrobností 61 MB,
+    obrázky textur ze souborů 61 MB, držené soubory .glb až 240 MB (pro rychlé čtení balíčku, po 15 s pryč),
+    domy 387 MB (textury, nalakované varianty, zjednodušené tvary), nalakované textury vozidel pro pohled z očí 184 MB.
+  - obrázky: sprity 8 směrů pro 0° 4 MB (33), obrázky otočeného pohledu 0,2 MB (125). Cache spritů celkem 131 MB
+    z 2048 MB.
+  - Takže obrázky pro 0° paměť neberou; berou ji tvary a textury glb (1,5–2 GB). Návrhy čekají na hráče.
+
+## 17. 10. – luk do ruky z inventáře, ulička mezi domy, holky na balkonech
+
+- Hráč: **„kliknutí na věc v inventáři nepoužije tu věc, chci vzít do ruky luk, myší i klávesnicí 1, 2, 3, 4 jako v
+  suite Morrowindu“** – v inventáři u každé zbraně `[2: vzít do ruky]`, kliknutím do ruky, u té v ruce `[2: v ruce,
+  schovat]` (zelená), kliknutím schovat. Klávesy 1–5 jdou chodci i s inventářem v popředí (`HandleKeypress()`:
+  okno chodce nebo inventáře s fokusem dostane klávesy první, před stavební lištou, která má 1, 2, … taky).
+- Hráč: **„neprojdu uličkami mezi domy, okolo domů je zbytek dlaždice volný“** (+ snímek uličky). Chodec narážel
+  kruhem o poloměru 1,4 m (široký skoro 3 m). Teď 0,4 m (`THREE_D_WALKER_RADIUS_M`), půdorys domů po 1/64 dlaždice
+  (23 cm, dřív 46 cm), chůze po kouscích 9 cm (běh nepřeskočí tenkou zeď), přední rovina oka chodce 0,25 jednotky
+  (u zdi se neprohlíží skrz). Chodec sám se nezměnil (hráč: „jakého menšího chodce?“ – jen ten neviditelný kruh).
+  Rig: `test3d chodec volno [dlaždice]` (mapa, kde chodec může stát, po 0,5 m; X = dům bez 3D objektu),
+  `chodec klavesa <c> [inventar]`, `inventar klik <n>`.
+- Hráč: **holky na balkonech nemají hlavy** („já řek všechny, ale ne tyhle všechny“). Index mírných domů měl u všech
+  70 postav `meritko` 2 – na balkonech (domy 06, 18, 1a, 02 ve výšce 3,2–6,7 m) jim na mapě hlava vjela do patra nad
+  balkonem. Hráč: „vyser se na kolegu a udělej ty holky velikost“, „hospoda nevím“ – všech 70 holek u domů má teď
+  `meritko` 1 (v rigu: holka na balkoně domu 06 celá i s hlavou). Hospoda, pole, socha, automat, Pajda beze změny.
+- Hráč: **při pohledu 0° jely Tatra VB a 138 plynule (#181), v jiných úhlech se to kouše – proč, když jsou to 3D
+  objekty**. Při 0° se z objektu udělá 8 spritů (8 směrů) jednou a dál se kreslí jako sprite. V otočeném pohledu se
+  kreslí obrázek objektu v přesném úhlu po 5° (plynulé zatáčení) – každý nový úhel, zoom a stav je nový obrázek
+  (10–60 ms, první u typu ~0,5 s textury). V #181 se dělaly na hlavním vlákně; od `82b1b7d` na vlákně na pozadí
+  (bude v #182). Kdyby se pořád kousalo: dopředu na pozadí udělat všech 72 úhlů typu najednou.
+
+## 17. 10. – pohled z očí mimo zámek hry (hráč: „udělej 1 2 3 4“)
+
+- Hráč: **„jak ti bude jedno jádro počítat hru, druhé načítat auta, když 8 jader kreslí first person view“ … „proto
+  se to kouše, všechny jádra kreslí, ale žádný nepočítá hru, co se bude kreslit“.** Pravda, ale ne kvůli jádrům:
+  kreslení drželo zámek stavu hry po celý snímek (vlákno hry stálo), a co bylo vidět poprvé, se načítalo uvnitř
+  snímku, taky pod zámkem. Změřeno v rigu (4 jádra, 1000×559): 24 ms na 4 vláknech, 35 ms na 1 – pixely jsou jen
+  část, zbytek dělalo jedno vlákno.
+- Teď (`viewport.cpp`, `EyeFrame`): **1)** pod zámkem jen sběr – dlaždice, jejich sprity do textury země, vozidla,
+  postavy, textury – do snímku: seznamy trojúhelníků s texturami a pár úloh přes celý obraz (domy po rozích, stíny,
+  opar, mlha, noc, obloha, věc v ruce), v pořadí kreslení. **2)** Zámek se pustí, hra počítá dál; snímek kreslí vlákno
+  `ottd:3d-eye` (`EyeFrameThread()`), okno ukazuje poslední hotový – o snímek (40 ms) pozadu. Další snímek se sbírá, až
+  je ten hotový převzatý, takže se nic nepíše do mezipamětí, ze kterých se kreslí; obrázky vozidel a postav jsou do
+  převzetí přišpendlené (`PinThreeDPictures()`), textury objektů se při kreslení nezahazují ani nezapomínají
+  (`EyeFrameDrawing()`), při novém načtení GRF a při konci hry se na vlákno počká. **3)** Jádra: hra 1, načítání 1
+  (vlákno obrázků vozidel), zbytek kreslí (`DrawingCores()` = jádra − 2: na 4 jádrech 2, na 8 šest).
+- **4)** Načítání na pozadí: co pohled z očí ještě nemá (tvar, textura, zjednodušený tvar, nalakovaná textura domu
+  i vozidla), si jen „zkusí“ vzít (`TryGetShape/TryGetTexture/TrySimpler`, `TryGetThreeDEyeVehicleTexture`); co není,
+  udělá vlákno obrázků vozidel (`ThreeDLoadInBackground()`, úlohy a obrázky střídavě) a věc se objeví o snímek dvě
+  později (dům zatím nenalakovaný nebo celý místo zjednodušeného, vozidlo jako plakát nebo nic). Vozidla kreslená
+  trojúhelníky (vlastní kabina, auta kolem) se teď i počítají (rohy, kola, posádka) v úloze snímku mimo zámek
+  (`CabFigureReady()` pod zámkem jen vybere hotové, `CabDrawFigureModel()` kreslí): sběr kabiny z 44 ms na jednotky.
+  Textury domů (`ThreeDObject`) jsou pod stejným zámkem jako vozidel (`MakeOnce`), zahazování nalakovaných jen mimo
+  kreslení snímku. Rig kreslí „hned“ a načítá hned (`_three_d_load_at_once`), aby snímky byly z okamžiku.
+- Zbývá: první pohled z očí ve hře, kde ještě nebyly domy objekty, čte indexy objektů (4 s) – šlo by číst při startu
+  na pozadí. Vlákno načítání je jedno a fronta města má stovku úloh; víc vláken až po buildu.
+- Rig: `test3d chodec`/`kabina` kreslí hned (obraz je z okamžiku, snímky sedí); `test3d chodec vlakno 1` zapne vlákno
+  jako u hráče. `chodec`/`kabina cas` hlásí `sber X ms, kresleni Y ms`; `chodec mereni` vypíše sběr pod zámkem zvlášť.
+
+## 17. 10. – luk a kuše od začátku; víc vláken po buildu
+
+- Hráč: **„dej tam luk, šípy, kuši a šipky“** – chodec nové firmy má od začátku kladivo, luk, 50 šípů, kuši a 50
+  šipek (`WalkerStartItems()` v `walker_inventory.h`). Meče jen přes iddqd (hráč je nejmenoval). Rozehrané hry si
+  nesou svůj inventář v savu – tam iddqd (co už je, nedá podruhé, šípy a šipky doplní na 50).
+- Hráč: **„máme všichni stroje minimálně se 4 jádry“** … **„vlákna uděláme po buildu“** – víc vláken na obrázky
+  vozidel (polovina jader, 2 až 4) až po hráčově buildu s jedním vláknem.
+
+## 17. 10. – vlákno na pozadí pro obrázky vozidel
+
+- Hráč: **„tak jedno jádro procesoru bude načítat a druhé bude dělat obraz?“ … „vlákno na pozadí dej“**. Obrázky
+  vozidel na mapě (3D objekt v úhlu pohledu, `ObjectPicture()`) se dělají na vlastním vlákně (`ottd:3d-pictures`,
+  `three_d_vehicle_object.cpp`): hlavní vlákno si o chybějící obrázek řekne a vozidlo zatím kreslí nejbližším
+  hotovým úhlem (poprvé, než se načtou textury, chvíli nic); vlákno obrázek udělá (čtení a dekódování textur, raster) a
+  časovač po 30 ms hotové obrázky převezme a vozidla, která čekala, překreslí. Nejnovější požadavek první (to, co je
+  na obrazovce teď), ve frontě nejvýš 128. Totéž pro „plakáty“ vzdálených vozidel v pohledu z kabiny a z očí; postavy,
+  kytky, efekty a náhled v nákupu se dál dělají hned (jsou malé, nebo je okno stejně čeká).
+- Co se objektu dělá poprvé (tvar z .glb, textury, masky, zjednodušené tvary, posádka, která chodí) teď dělají dvě
+  vlákna: `MakeOnce()` v `three_d_objects.cpp` – pod jedním zámkem jen pohled, jestli věc je; dělá se mimo zámek, kdo
+  se zeptal první, druhý na ni počká. Stavy složené z vrstev GRF pod stejným zámkem. Mezipaměť tvarů (`_vehicle_shapes`)
+  a hustota texelů pod zámkem; BeamNG tvary po jednom (zipy). Zapomínání nepoužitého (`ForgetUnusedThreeDObjects()`)
+  přeskočí kolo, když vlákno něco dělá; při novém načtení GRF a při konci hry (`ShutdownGame()`) se vlákno zastaví.
+- Rig: `test3d casy` ukazuje zvlášť obrázky dělané hned a na vlákně (`na vlakne … ms (n, ve fronte m)`). Ověřeno:
+  první obrázek tahače 463 ms a návěsu 795 ms na pozadí, hra kreslila dál; `quit` uprostřed dekódování počká na vlákno.
+- Co zbývá: první objevení vozidla, které ještě žádné okno neukázalo, je asi půl vteřiny neviditelné (textury se
+  teprve čtou). Postavy na mapě se poprvé dělají hned (130 ms). Zatím jedno vlákno (víc po buildu, sekce výše).
+
+## 17. 10. – tmavá auta v dálce, plynulé zatáčení na mapě, škubání, kolečka, náhled v nákupu
+
+- Hráč: **auta moc tmavá, 2 m od auta ještě modrá, dál černá (Tatra 603, 613); Tatry nad 4 m černé linky na předku;
+  Liaz bez návěsu úplně špatně** (Liaz jedoucí proti mně na 5, 8, 14 m). Dvě chyby v kódu:
+  - Zjednodušování modelu podle vzdálenosti (`Simpler()`) slučovalo rohy jen podle místa v prostoru: rohy jednoho
+    místa modelu ze dvou kousků atlasu dostaly souřadnice textury jednoho z nich a trojúhelníky mezi nimi kreslily
+    z čehokoli mezi kousky – černé a tečkované. Teď rohy z jiného místa textury (po 1/128) sloučené nejsou.
+  - Kolegovy atlasy mají každý trojúhelník na vlastním kousku na černém pozadí (u 603 81 % textury). Hra si teď
+    z celého souboru modelu spočítá, které texely trojúhelníky kreslí (`TextureCover()`), ostatní vyplní barvou
+    nejbližšího kousku (i masky laku a podrobností) a zmenšené textury pro dálku průměruje jen z kreslených texelů.
+    Pryč jsou černé čáry na hranách i zčernání v dálce.
+- Hráč: **škube to, když se přívěs nebo návěs v zatáčce láme; proč zatáčíme po 45° jako sprity**. Na mapě se vozidla
+  kreslila obrázky z modelu v 8 směrech a každý nový obrázek se kreslil hned (prvních 36 obrázků 2,6 s – načítání
+  textur, další 15–60 ms za kus). Teď vozidla na mapě mají plynulé natočení ze stopy jízdy jako pohled z očí
+  (`EyeOrigin()`), po 5°, návěs se láme na točnici postupně. Nových obrázků se za snímek (40 ms) kreslí nejvýš 12 ms;
+  ostatní se do té doby kreslí nejbližším hotovým úhlem a vozidlo se překreslí o chvíli později. První objevení
+  nového vozidla (načtení jeho textur) dál stálo asi půl vteřiny – vyřešeno vláknem na pozadí (sekce výše).
+- Hráč: **točení koleček do nastavení, výchozí vypnuto** – Nastavení › Grafika › „Kola 3D vozidel se točí“
+  (`gui.three_d_wheels`), vypnuto: kola v modelu stojí (pohled z očí a z kabiny).
+- Hráč: **3D částice efektů nejsou možné** – úkol zrušen.
+- Hráč: **náhled v nákupu přes celé pomyslné okénko** – vozidlo z 3D objektu vyplní čtverec vedle okna nákupu (strana
+  jako výška okna, kolik je místa), úhlopříčka půdorysu dílů, které stav nákupu ukazuje, přes celou šířku.
+- Hráč: **střed otáčení uprostřed objektu, ne přední nárazník (návěs Tatry)** – náhled se točí kolem středu půdorysu
+  (návěs měl počátek v čepu vpředu).
+- Hráč: **proč nemám vodu, mám mít všechny průmysly všech klimat** – průmysly jiných klimat jsou nastavení nové hry
+  (Prostředí › Průmysl › Průmysl mírného / arktického / pouštního klimatu / toylandu), výchozí vypnutá; voda je
+  pouštní (vodárna a vodojem). Se zapnutým pouštním průmyslem je WATR a Tatra na vodu má cisternu (ověřeno v rigu).
+  Do rozehrané hry se přidat nedají.
+- Rig: `test3d chodec na <n> <m> <stupně>` (chodec u vozidla, čelem k němu).
+
+## 17. 10. – luk, kuše a meče (kolegovy `LUK-SIP-PRO-HRU.md`)
+
+- Hráč: **„je tam luk a kuše“**. Kolega poslal vlastní luk a šíp (ve stylu Example Suite, GPL-2.0), kuši z Example
+  Suite se svou šipkou, oba meče z Example Suite a zvuky luku (CC0). Jsou v sadě hry `objekty/predmety/`, CMake bere
+  i `.wav` sad objektů.
+- **Klávesy 1–5**: kladivo, luk, kuše, meč, obouruční meč (jen ty, které chodec nese); druhá zbraň se tasí, až se
+  první schová. F tasí a schová. Meče se máchají jako kladivo (dosah 2,2 a 2,8 m, obouruční bere drakovi 2), držené
+  za úchyt z uzlu `uchyt` a pootočené plochou čepele k oku.
+- **Luk**: levé tlačítko držet = napnout (zvuk napnutí, za 0,8 s plně, stav `napnuto`, luk se přesune před oko),
+  pustit = výstřel (zvuk, rychlost 14–55 m/s podle napnutí); mezerník napne a podruhé vystřelí. Nový šíp na tětivě
+  za 0,5 s. **Kuše**: výstřel 70 m/s, šipka bere drakovi 2, za 1,5 s natažená znovu (stav `vystreleno`, pak
+  `natazeno` se šipkou v drážce).
+- **Šíp letí obloukem** (gravitace), natočený po dráze a kreslený v pohledu z očí trojúhelníky s náklonem (nikdy ne
+  zjednodušený, tenký dřík by zmizel). Špička v drakovi: drak dostane zásah (i letící, v jakékoli výšce); v zemi:
+  zabodne se tam, kde ji špička protne, 6 cm hluboko, a zůstane 20 s; ve zdi domu se zastaví; ve vodě zmizí.
+  Každý výstřel ubere šíp nebo šipku příkazem `ShootWalkerItem`. Vpravo dole je zbraň a kolik k ní zbývá střel.
+- Hra čte stavy předmětu jako figury `<jmeno>/<stav>` (jen ten uzel), polohy prázdných uzlů (`GetThreeDThingPlace()`)
+  a zvuky předmětu (`GetThreeDThingSound()`); zvuky hry (klakson i luk) jdou přes jednu funkci `GetGameOwnSound()`.
+- `iddqd` dá i kuši, šipky a oba meče (inventář má nové věci na konci).
+- Při pohledu dolů byl dole na obrázku pruh oblohy: zem blíž než 1,9 m od oka se ořízla. Chodec má teď blízkou rovinu
+  0,4 jednotky.
+- Rig: `test3d chodec zbran <1-5> [ms napnutí] [kroků|drzet]`, `test3d draci posli drak_hnedy 2`; `test3d` čte
+  i záporná čísla (sklon pohledu dolů). Ověřeno: drak dostal šípy 6 → 5 → 4, šipky 4 → 2 → 0 a padl.
+
+## 17. 10. – úvod bez pohybu kamery, cheat iddqd, luk a šípy v inventáři
+
+- Hráč: **úvodní obrazovka bez pohybu kamery, jen občas otočit plochu**. Kamera se postaví jednou na první místo
+  z úvodní hry a dál stojí; plocha se jen občas pootočí kolem středu obrazovky (9 s klid, 3,5 s otáčení o 30–60°).
+- Hráč: **cheat `iddqd` v konzoli dá všechny zbraně**; co už je v inventáři, nedá podruhé, šípy doplní, luk dá, když
+  chybí. Inventář má nové věci `Luk` a `Šípy` (na konci, čísla věcí se ukládají) a druh věci (zbraň, střelivo, věc).
+  `iddqd` (příkaz `WalkerCheat`, jen hra pro jednoho) dá zbraň, která chybí, a šípy doplní na 50; napíše, co dal.
+- Luk zatím nestřílel: model od kolegy přišel o chvíli později (viz výš, střelba hotová).
+
+## 17. 10. – po nástupu hned řídíš, „Jeď svou trasu“, letadlo, klakson, světla, otáčení úvodu
+
+- Hráč: **hned po nástupu do kabiny řídíš**, místo tlačítka mimo silnici je **„Jeď svou trasu“** (otočeno). Okno
+  kabiny i nástup E v pohledu z první osoby převezmou volant: vozidlo jede volně, kam ho šipky natočí (auto, loď,
+  letadlo ve vzduchu; vlak jen plyn a brzda). „Jeď svou trasu“ (klávesa T) ho vrátí k rozkazům: auto najede zpět
+  na silnici, rychlostní omezení se zruší. Znovu T nebo tlačítko „Řídit“ volant vezme zpátky.
+- Hráč: **šipky vždycky do okna kabiny nebo první osoby**, ne na mapu: berou je okno s fokusem, jinak to nejvíc vpředu
+  (`ArrowsWindow()`), mapa se se šipkami neposouvá, dokud je nějaké otevřené.
+- Hráč: **zatáčení letadla, šipky nahoru a dolů výška**. Letadlo ve vzduchu letí volně směrem z kabiny
+  (`AircraftFreeController()`), vlevo a vpravo zatáčí, nahoru a dolů mění cílovou výšku (`cab_altitude`, uložená
+  v savu, verze `CabAltitude`) v mezích letových hladin. Na kraji mapy se samo stočí. T ho pošle zpátky na trasu.
+- Hráč: **I houká a troubí, F světla**. Vlak houká, jak houká při odjezdu ze stanice (pára, diesel, elektrika,
+  monorail, maglev), loď svou sirénou, auto **klaksonem od hráče** (Pixabay, Automobile Horn 02 od Universfield,
+  Pixabay Content License) v `baseset/decouple/zvuky/klakson.wav`, načteným zavaděčem zvuků sad. F rozsvítí nebo
+  zhasne světla vozidla (i ve dne, i v noci); jen jak to kreslí tento počítač, do hry ani savu nejde. Ve vozidle
+  v pohledu z první osoby platí I a F takhle, pěšky dál inventář a kladivo.
+- Hráč: **úvodní obrazovka – občas pootočit plochu**. Při zapnutém 3D se plocha 9 s nehýbe, pak se za 3,5 s plynule
+  otočí o 30–60° (většinou stejným směrem, občas zpět). Kamera stojí (viz výš).
+- Rig: `test3d kabina klavesa <i|f|t>`, `test3d kabina klik trasa`, `testletadlo <x> <y> <x2> <y2>` (dvě letiště,
+  letadlo letí mezi nimi), `test3d titulnoc` píše i úhel.
+
+## 17. 10. – řízení šipkami, nastupování v pohledu z první osoby
+
+- Hráč: **auta nejdou řídit šipkami, posouvá se mapa**. Okno kabiny klávesy vůbec nečetlo. Teď šipky řídí kabinu,
+  když má okno kabiny fokus, nebo když je fokus na mapě a nějaká kabina je otevřená: vlevo a vpravo jako tlačítka
+  (odbočení na křižovatce, mimo silnici a u lodi zatáčení po malých úhlech, držením opakovaně), nahoru plyn (stojící
+  vozidlo se rozjede), dolů brzda. Mapa se šipkami mezitím neposouvá.
+- Hráč: **v pohledu z první osoby E nastoupí do auta**, bez dalšího okna kabiny (okno první osoby je zvláštní, hra
+  pod ním nekreslí). E u vozidla (do 5 m, auto, vlak, loď) přepne obraz okna na pohled z jeho kabiny, šipky řídí
+  stejně jako okno kabiny (cizí vozidlo: jen se veze), panel ukáže vozidlo a rychlost. Druhé E vystoupí vedle
+  (vlevo u kabiny, jinak vpravo), vozidlo se vrátí k rozkazům jako po zavření okna kabiny. Splněné #74.
+- Akce tlačítek kabiny jsou společné funkce (`CabTurn`, `CabSpeed`, `CabStartStop`, `CabLetGo`, `CabArrows`).
+- Rig: `test3d sipky <lurd|0>` (držené šipky pro `smycka`), `test3d chodec u <n>` a `test3d chodec e`; `test3d auta`
+  udělá z firmy aut místní firmu; `test3d kabina cas` píše stav řízení.
+
+## 17. 10. – náklaďáky Tatra a vagony ve 3D (kolegovy GRF MAX6 a MAX7)
+
+- Kolega poslal dva balíčky: `Nakladaky_Tatra_3D-v2` (24 záznamů, díly podle vrstev v24) a `Vagony_3D-v1`
+  (12 vozů po třech článcích). K tomu světlejší Mat (`mat.glb`, `mat_toci.glb` vyměněné) a balíčky mají vlastní
+  složky sad (posádka se hledá nejdřív ve vlastním balíčku).
+- Ve hře nově:
+  - **maska podrobností** (`maska_podrobnosti`): pixel nese index masky z 2D a natře se barvou z callbacku 1C1
+    jako maska 32bpp spritu, i s blednutím a otočením odstínu. Konfigurátor, barva podle nákladu a náhodné barvy
+    kontejnerů jdou bez jediného stavu navíc;
+  - **objekt na článek a spřáhla**: auto, přívěs i návěs jsou každý svým objektem a další visí na `spojeni`
+    předchozího. Délky článků bere hra z GRF (`delky_clanku_grf`, metry z `rozmer_m`). Sdílené konce souprav
+    (0x0126, 0x013A) se přiřadí podle sousedů;
+  - **stav ze všech článků objektu**: návěs má sady v prvním článku, ale visí za prostřední. U vagonů (stavy
+    s `clanek`) rozhoduje jen prostřední článek, jak kolega chtěl. Barvy 1C1 jsou z článku, jehož sady se kreslí;
+  - díly doplňků se svými okny (`_sklo`), světly (`noc_<díl>`) a koly (`soubor` u `kola_v_modelu`), postavy jako
+    uzly (`uzel`), kontejnery jako uzly s posunem;
+  - objekt, ze kterého není vidět ani pixel (prázdný přívěs bez přívěsového podtypu), nemá ani světla. Auto před
+    ním pak svítí zadními světly svého modelu.
+- **Start s balíčkem Tater trval asi 100 s, teď 7,5 s.** Odhad velikosti nákupních obrázků při startu kreslil všech
+  24 záznamů a každý dekódoval atlas doplňku (až 4096×3824) znovu pro každý materiál. Teď mají stejné obrázky jednu
+  kopii a jednu texturu pro všechny, kreslí se jen textury viděných dílů a soubory glb se v jedné dávce nečtou
+  třikrát. Paměť při startu 2,7 GB → 1,4 GB.
+- Rig: `test3d auta … p<podtyp>`, nové `test3d vagony <jméno> [počet] [x y] [náklad] [p<podtyp>] [plny] [v<a>:<o>]`
+  (najde si volný pruh země), `test3d okno nakup auto <text>` (filtr nákupu), `test3d stavy` píše polohu článků.
+  Extra náklady (STUD, MARI, FICR) jsou jen s `economy.extra_industries`.
+- Hráč: **předním světlům 148 jsou černé díry**. Data, ne kód: v kabinách 138 i 148 je sklo světla upečené do
+  atlasu černě (Cycles peče barvu skla černě) a leží 0,1 mm před světlým reflektorem. Kolegovi prosba o opravu
+  (sklo jako okna do `_sklo`, nebo upéct světlé). Jeho obrázky neupravuju.
+- Klíče `let` a `krok` u `lak` vagonů hra nečte: o barvě a blednutí rozhoduje GRF (1C1, registry 0x102–0x104).
+
+## 16. 10. – přenos staré hry (decouple 0.10.4 = Palo123 Decouple 2018, save verze 200)
+
+- Hráč: „dokončíme import z decouple 0.10.4, máme stejný orders, naše příkazy jsou jen podrobnější. Nech vlaky
+  v depu a já je pustím po jednom. Auta, lodě, letadla nemusí do depa.“ Starý zdroják jsem si stáhl (povolil), takže
+  rozvržení savu i význam rozkazů jsou ze zdrojáku, ne odhad.
+- Co se ve starém savu liší od vanilly: jeden bajt navíc u každého rozkazu i u rozdělaného rozkazu vozidla (sbalené
+  odpojení/spojení), 14 bajtů navíc u každého dílu vlaku (jejich účetnictví rozdělování), tři vlastní typy rozkazů
+  (9 jeď spojit, 10 čekej na spojení, 11 odpojit) a bit 6 v podtypu vozu = čelo odstavené řady mimo depo.
+- Hotovo: záznamy se čtou vlastními tabulkami polí (ORDR, VEHS – jen v režimu přenosu), rozkazy se hned po
+  načtení přeloží na naše: stanice s odpojením + následný „odpojit“ → naše stanice s odpojením a počtem vozů (jejich
+  počet počítal i mašinku), „čekej na spojení“ → přepínač na stanici před ním, „jeď spojit“ (u nich bez cíle – vlak
+  hledal nejbližší čekající řadu po kolejích) → naše „spojit ve stanici“ se stejnými filtry (plné/prázdné, náklad,
+  počet vozů). Stanice se odhaduje z okolních rozkazů (kde po spojení zastavil → hned další zastávka → poslední
+  odpojování před tím → poslední/další zastávka) a každý odhad se vypíše do konzole. Čelo řady → náš volný vůz bez
+  čísla vlaku. Všechny vlaky s mašinkou stojí zastavené v nejbližším depu (podle kolejí, u „Neviditelné“ mašinky
+  bez výkonu podle kolejí mašinky), řady vozů čekají tam, kde stály, s nakládáním, jaké měly; auta, lodě, letadla
+  jedou dál.
+- Test naprázdno mimo rig (čistý HOME, GRF ze savu stažené z BaNaNaS, 3 hráčovy vlastní GRF chybí): 74 vlaků do
+  dep, 59 řad čeká, 301 rozkazů „jeď spojit“ přeloženo bez jediného vypuštění, hra běží, uložit a znovu načíst jde.
+  Varování „invalid length“ jsou od vozů z chybějícího CZTR_Wagons_cargo.grf (jen u mě).
+- Nepřesné (hra to vypíše): rozkaz „odpojit“ s mašinkou vzadu a počtem > 0 (u nich počet zepředu, u nás od
+  mašinky; v savu se nevyskytl); řada, která u nich po odpojení neměla nakládat (u nás nakládá podle rozkazu).
+- Vyzkoušet u hráče: načíst s jeho GRF přes tlačítko v okně načtení (nebo `legacyimport on` + `load`), projít
+  konzoli (hlášky „Prenos stare hry“), pouštět vlaky po jednom.
+
+## 16. 10. – světla vozidel z modelu, levnější noc
+
+- Hráč: „auta musí mít vyznačená světla jako mají domy okna, kolem auta jsou světla metr daleko“. Kolega dal světla
+  do modelů (Tatra v7, Sergej v6, herní Tatra VB): skla v uzlu `noc`, místa světel `svetlo_predni_NN`/`svetlo_zadni_NN`.
+  Hotovo (`cd92535`): ve dne se skla nekreslí, v noci svítí, záře a kužel jsou z míst v modelu. Platí na otočené mapě,
+  na sever i v pohledu z očí. Přední svítí, když vozidlo jede v čele, zadní, když za ním nic nejede.
+- Hráč: „zlevni noční světla zblízka“. Dřív si v noci každý díl vozidla (i každý vagon) zvětšil rámeček o půldruhé
+  dlaždice. Teď jen čelo a konec o kousek a kužel před autem se značí sám. V rigu zblízka (otočeno 30°): den 15,9 ms,
+  noc dřív 28,7 ms a teď 20,0 ms na snímek, bez duchů.
+- Světlo v noci (hráč: „zapínání noci necháme, kde je, v nastavení budeme nastavovat velikost tmy… nejen úplněk jasný,
+  ale i skoro svítání“): Nastavení → Grafika, pod Nocí: tmavá noc (jako dosud), měsíc, úplněk, jasný úplněk, skoro
+  svítání. Platí na mapě i v pohledu z očí a z kabiny, čím světleji, tím míň hvězd.
+- 3D částice z OpenLoco: odloženo (hráč: „bojujeme se zpomalením hry, po buildu ti řeknu“).
+- Windows build 278 spadl na `M_SQRT2` (MSVC ho nezná) – opraveno (`91c7b4d`). Při tom tři skutečné chyby z
+  `-TILE_SIZE` (neznaménkové, vyšlo přes 4 miliardy): stěny základů v pohledu z očí se nekreslily, Mat nevybíral
+  chodník u dveří, polní cesta v náhledu průmyslu ležela navrchu.
+- Pohled z první osoby je i v nabídce nápovědy hned pod nocí (hráč: „dej to vedle přepínače noc a den“). V menu
+  mapy zůstal.
+- Simtrains: vůz a mašina byly natlačené do sebe. Příčina: hra dává vozidlu nejvýš 8/8 (asi 10,5 m), model 750 má
+  16,24 m a B 598 24,2 m, takže se kreslily přes sebe. Teď GRF podle `Size` z .eng/.wag udělá dlouhé vozidlo kloubové
+  (750 ze 2 dílů, B 598 ze 3) a model se kreslí přes všechny díly. V rigu jsou mezi vozy mezery.
+- Úvodní hra (pozadí menu) byla v 16.0-beta2 arktická, 15.3 měla toyland. Hráč: „udělej ji sám, mírné klima, s
+  kamerou; dlouhý den, pak chvilku noc a dokola“. Hotovo: nová mírná mapa 256×256 (1960, české názvy, bez poruch,
+  katastrof a růstu měst) postavená příkazem `test3d uvodnihra`. Kolem města Kamenné Pražiště je osmiúhelník trati se
+  2 stanicemi a návěstidly, jezdí parní vlak s vozy a motorák s uhlím, ve 2 městech autobusy. Kamera krouží kolem
+  okruhu, aby město a vlaky byly vidět vedle menu. Pozadí menu: minuta den, 4 s soumrak, 15 s noc, 4 s svítání,
+  dokola; noc menu je vlastní, hráčovo nastavení noci nemění. Za 20 000 tiků se nic nesrazilo.
+
+- Mody BeamNG (hráč: „zkusíme jezdit módama z BeamNG?“, poslal GAZ Volga 24 z Automation, CC BY-NC-SA 4.0). Domluva:
+  osobní auto veze 4 cestující, nákladní cokoli kromě cestujících; barva z modu; světla podle modu („BeamNG má
+  světla vyznačená a propracované jízdní vlastnosti“). Hotovo: hra čte mody rovnou ze .zip (složky modů BeamNG,
+  `beamng_path`, `newgrf/beamng/`), nic z nich nejde do repa ani buildu. GRF v `newgrf/beamng/` jen s čísly:
+  výkon z křivky momentu, hmotnost z uzlů, rychlost z převodů a vzduchu, tah z jedničky. Volga 103 kW, 142 km/h,
+  1,34 t. Kreslí se z modelu .dae, barvy z materiálů, lak jedna z 5 barev modu na každé auto, díry pro světla a
+  masku z masky BC4, svítí skla podle glowMap, světla z props. Model zjednodušený na 110 tisíc trojúhelníků
+  (bez rozdílu v obraze), šest Volg na obrazovce nic nezpomalí. Kabina z kamery řidiče.
+- Průmysly původní hry ve 3D (hráč: „máme hotový průmysl modulární“, kolega `PROSBA-PRUMYSL-VANILLA-3D.md`, sada
+  `objekty/prumysl_vanilla`): 46 společných dílů a 122 dlaždic podle gfx (128 gfx mírného, subarktického a
+  subtropického klimatu; Toyland zůstává ze spritů). Podklad, díly s polohou/otočením/měřítkem, stromy, bloky přes víc
+  dlaždic (kreslí kotva). Každý díl se čte jednou a textura je jen jedna (sdílí ji všechna umístění). Kreslí se na
+  otočené mapě, na sever (jako domy) i v pohledu z očí, v noci svítí okna. Pšenice na polích farmy: mladá při růstu,
+  zralá před sklizní, na svahu po terénu; v pohledu z očí do 10 dlaždic. Rozestavěný průmysl jen podklad, animované
+  dlaždice zatím jako klidné, okno průmyslu zatím bez 3D náhledu. Holky na polní cestě tu nejsou (pole farmy nemá cestu).
+- Hráč: „chození je pomalé u first person view“. Chyba: krok se počítal jen jednou za snímek, zmeškané kroky se
+  zahazovaly, takže při snímku 100 ms šel chodec 0,64 m/s místo 1,6 m/s, při 200 ms 0,32 m/s. Teď se udělají všechny
+  zmeškané kroky (každý zvlášť proti zdem) a pak jeden obrázek. V rigu 40, 100 i 200 ms na snímek: 1,60 m/s. Rychlost
+  sama zůstává 1,6 m/s chůze a 6,5 m/s běh (Shift); jestli je i tak pomalá, hráč řekne.
+- Hráč: „auto je při first person vidět, ale má úhly 45° spritu, i když je to objekt, jezdí divně; 45° ze spritů jen
+  tam, kde dokreslujeme z 2D“, „Mat nebyl vidět vůbec, spawnul jsem se vedle něj“, „draka taky zblízka a šetři, když
+  jsou daleko“, „všechno, je to stejný princip“. Hotovo jedním pravidlem pro všechno z modelů v pohledu z očí (holky,
+  Mat, draci, vozidla, okrasná auta): velké na obrázku (od 28 px) = skutečné trojúhelníky v pravém úhlu, menší =
+  obrázek, nad 14 dlaždic hrubší obrázek. Trojúhelníky tak podrobné, jak je model velký (slučování vrcholů po 2–64 cm),
+  textury podle vzdálenosti. Vozidla se natáčejí plynule podle toho, kudy jedou (dlouhý model od posledního dílu k
+  prvnímu). Lak, blednutí, rez, v noci sklo světel a kužely. Mat a okrasné Tatry žijí kolem chodce (dřív jen u otočené
+  mapy) a jsou v pohledu z očí vidět. Při tom opraveno: draci zblízka byli obrázek (posazený tvar neměl rozměr) a
+  příkaz rigu `auta` stavěl silnici bez spojení s depy. V rigu: Volga i Tatra 613 projíždí zatáčkou, Mat vedle
+  chodce, drak zblízka, noc. Dvě Volgy zblízka 27 ms na snímek (bez zjednodušení 52).
+- Délka vozidel v pohledu z očí: na rovné silnici či koleji zkrácená na 0,71 jako na mapě (hra řadí po krocích, na
+  úhlopříčce je krok √2 delší). Hráč chtěl plnou délku bez překryvu, po vysvětlení: „nebudem tu délku měnit, už to
+  chápu s tou úhlopříčkou“. Zůstává.
+- Praga V3S jako 3D objekt od kolegy (`hra/3d/PROSBA-V3S-3D.md`, GRF `V3S_3D` MAX4, strom přestaveb jako v3s.grf).
+  Hotovo ve hře: doplňky podle stavu (na korbě jen uzel, který stav jmenuje: uhlí, pytle, plachta, marihuana, zvířata,
+  lavice…), barva doplňku číslem přes masku, skupiny posádky podle stavu (studentky stojí / sedí), měřítko postav
+  (dvakrát všude, i v pohledu z očí), sklo průhledné, kola v modelu se v pohledu z očí točí a přední
+  zatáčí, kabina zevnitř (oko v hlavě řidičky, řidička se nekreslí, spolujezdkyně ano). Stejně jde maják Tatry VB.
+  Opraveno: první textura je první materiál souboru (u V3S bylo první sklo a lak šel na sklo). Hráč: „kolegovi musíš
+  říct, jestli má něco blbě, protože tak udělá i další“ – odpověď v `hra/3d/ODPOVED-V3S-3D.md`.
+- Holky na korbě V3S jsem v pohledu z očí zmenšoval na pravou velikost. Hráč: lavice jsou velké naschvál, je to
+  pajda V3S s velkými lavicemi pro velké holky, „nezmenšujte mi ty holky pořád“, a to ani v pohledu z první osoby,
+  když jsou jen náklad. Zmenšování je pryč, holky s `meritko` jsou dvakrát všude.
+- Special do 3D (kolegova `hra/3d/PROSBA-SPECIAL-3D.md`, GRF `SPECIAL_3D` MAX5: dvoukolák a stavební kolečko, hráč:
+  „teď předělame special do 3D“, „mužou kráčet holky“). Hotovo ve hře:
+  - holky kráčí podle ujeté dráhy, každá svým krokem (`krok_m`). Kreslí se zvlášť, ne ve tvaru vozíku, protože
+    tahající a pomocnice mají jiný krok. Platí to na mapě, v otočeném pohledu i z očí. Když vozík stojí, holka zůstane
+    v kroku;
+  - `otoceni` ve stavu otočí celý model (tlačený vozík je tažený otočený o 180°);
+  - stav z vrstev GRF: hra se zeptá na každou vrstvu jako při kreslení a stavy složí, takže kolečko má barvu korby
+    i rámu z konfigurátoru.
+  Rig: `auta … plny v1:1` (náklad a volba konfigurátoru v depu), `stav a b c` (vrstvy), `kresli … vrstvy … cm`.
+
+## 16. 10. – kolegovy domy a průmysl, hospoda 2×2, Tatra v6
+
+- Hráč kolegovi řekl, ať jsou holky v hospodě větší. Kolega proto zvětšil celou hospodu na 2×2 (hráč: „zvětšil
+  hospodu na 2x2“). Ve hře hotovo (`86440b3`): nová hospoda zabírá 2×2 (dům a zahrádka). Stará hospoda 1×1 ze
+  starých her zůstává malá a kreslí se spritem.
+- Holky u průmyslu po dovozu: socha, gymnázium a automat 30 dní po studentkách (u automatu po marihuaně). U chatky
+  stojí po studentkách a sedí, když přijde i marihuana. Platí na mapě, v náhledu průmyslu i v pohledu z očí. V den,
+  kdy odejdou, se průmysl překreslí. Rig: `test3d dovoz`.
+- Svítící okna v noci teď mají i gymnázium, lihovar, automat a hospoda (girlanda nad zahrádkou). Holky domů
+  mírného klimatu jsou dvakrát větší. Všechny klimaty a Mars mají noční okna.
+- V pohledu z očí mají postavy na budovách a polích skutečnou velikost, předmět (rožeň) zůstává velký jako budova.
+  Proti dvakrát větší hospodě proto holky vypadají malé – kolegovi jsem to napsal, ať řekne, jestli to chce jinak.
+- Tatra v6 (kolega): ověřeno v `newgrf/` i v `baseset/decouple/`, stavy se najdou. Když leží dvě verze vedle sebe,
+  bere se balíček u načteného GRF. Když GRF kreslí prázdné obrázky a balíček chybí, hra to jednou zapíše do logu
+  (s tím, kde hledala). Odpověď kolegovi: `hra/3d/ODPOVED-PRUMYSL-HOLKY-TATRA-V6.md`.
+- Čeká: víko motoru a maják VB (`dily`, `doplnky`) podle stavu z GRF; 3D částice (OpenLoco) – čekám na hráčovo
+  ano a na to, jestli zlevnit i světla v noci zblízka.
+
+## 16. 10. – OpenLoco, luk, průjezd obloukem
+
+- OpenLoco je MIT: jeho kód smí do hry (s poznámkou MIT), původní obrázky z Locomotion ne. Hráč vybral:
+  1. podvozky ano, 2. naklánění ano (i auta, ale jen ta z objektu: Sergej a Tatra VB), 3. efekty jako 3D částice
+  ano, 5. víc tvarů trati ne; 4. (cíle scénářů) bez odpovědi – nedělám.
+- Luk a šíp: objekt je v Example Suite hotový (CC0), vezmu si ho sám, nečekám na kolegu.
+- Průjezd obloukem pomalý: změřeno v rigu (`test3d obloukjizda`, `19f8ff4`). Kreslení po oblouku jde stejně
+  rychle jako vlak po koleji (rozdíl pod 1 jednotku na dlaždici). Zpomalení je pravidlo hry (realistické
+  zrychlování): vlak s vagony v těsné zatáčce (1 kus diagonály mezi rohy) smí jen 88 km/h, ze 128 km/h zabrzdí
+  na jedné dlaždici. S kulatými oblouky vypnutými je to na tik stejné. Zatáčka s 5 kusy diagonály: limit 168,
+  vlak nebrzdí. Hráč: rychlosti podle vanilly (ostrý oblouk míň, pozvolný víc), nakreslené oblouky jim fyzikálně
+  odpovídají (87/130/168 km/h). Hotovo `18d0164`: volba hry „Vlak brzdí plynule už před zatáčkou“ (vypnutá =
+  vanilla) – strojvedoucí vidí ohyby dopředu a brzdí podle brzdné tabulky, do těsné zatáčky vjede 88 km/h.
+- Simtrains (hotovo `74f95d1`): hráč dá stažené MSTS vlaky do `newgrf/simtrains/`, hra vedle každého `.eng`
+  napíše GRF jedné lokomotivy (čísla z „chování“: výkon, rychlost, váha) a kreslí ji z jejího modelu `.s` a
+  textur `.ace`. Nové vozidlo, ne převzetí vzhledu. Soubory MSTS nikdy do repa, grrrrf ani buildu (readme autorů
+  zakazuje šíření i do jiných simulátorů). Pak doplněno: DXT textury (`cdf384f`), textové (starší) modely a
+  vagony `.wag` (`132ae28`) – osobní vůz veze cestující podle PassengerCapacity, nákladní cokoli kromě cestujících.
+  Hráč poslal na pokusy vůz ČD B 598 (skutečné DXT1 textury) – jede za 750. Nečte se: náklad (freightanim),
+  světla, zvuky.
+- Kde hra vlaky hledá (`ef4e8ac`, hráč: „ať hledá obvyklou složku simtrains modelů“ + „v newgrf simtrains taky“):
+  Trains/Trainset MSTS (registr, Open Rails, obvyklé cesty), `simtrains_path` v `[misc]` openttd.cfg a
+  `newgrf/simtrains` pro hráče bez MSTS. GRF s čísly jdou do `newgrf/simtrains/`. Hráč se ptal na šíření: modely
+  ani GRF nesmí ven; save a obrázky jsou v pořádku.
+- Hráč: bez okna pískoviště je myš cukavá a všechno zpomalené. Příčina (`d608a9f`): otočený pohled při každém
+  pohybu čehokoli (vlak, Mat, holky, auto VB) překresloval skoro celou obrazovku, protože nevěděl, v jaké výšce
+  věc je. Teď každé označení nese místo ve světě. Rig 1000×700: vlak 670 000 → 61 000 px na snímek, město
+  186 000 → 4 300 px, bez duchů. Okno pískoviště jen zakrylo kus mapy (v rigu pomohlo málo).
+- Postavy jsou na mapě (mimo kabinu) schválně zvětšené, normální velikost jen v pohledu z první osoby.
+- Přepínač velikosti v nastavení grafik: jen „zvětšené / zmenšené“ (`3714835`).
+- Lokomotivy ŽSSK 750 (trainset.simtrains.eu, Miku031, modely Ondra Janiš): stránka neuvádí žádnou licenci,
+  tedy bez svolení autorů (modelu, skinů i fotek) do hry nesmí.
+
+## 16. 10. – technologie z OpenMW (hráč: „1–9 ano“)
+
+- Schváleno všech 9: kreslení na více jádrech, mezipaměť nehybných objektů kusu mapy, LOD (vzdálené věci
+  jednodušeji), kostra a plynulé animace, hledání cesty (navmesh), kolize podle tvaru, stíny a světlo po pixelech,
+  instancování (kytky, tráva), aktivní okolí jen kolem hráče. Jen principy, kód OpenMW ne.
+- **1. Více jader** (hotovo `9245a60`, `725aea1`, `013b382`): pohled z očí kreslí zem, domy, opar i noc po pásech
+  řádků na všech jádrech, pásy si vlákna berou postupně (práce je u horizontu). Domy se připravují každý na svém
+  jádru, odvrácené stěny a co je mimo obraz se vynechá. Textury domů se dělají paralelně (první pohled na město
+  dřív 2 s). Obraz je na 1 i 4 vláknech bit po bitu stejný.
+- **3. LOD domů** (hotovo `013b382`, `fdcfb9c`): kolegovy domy mají 12–25 tisíc trojúhelníků, město bylo půl
+  milionu. Vzdálený dům má zjednodušený tvar (rohy sloučené v buňkách 5 cm až 3,2 m); v pohledu z očí se roh smí
+  posunout o 1,5 pixelu (dálka je v oparu), na mapě o ¾ pixelu (při 1,5 mizely příčky oken).
+- Stálá vlákna kreslení (`baedec6`): založí se jednou a čekají na práci (na Windows je zakládání drahé). Malé domy
+  na mapě na víc jádrech pomalejší (synchronizace) – zůstávají na jednom, velké po pásech.
+- **2. Mezipaměť domů na otočené mapě** (hotovo `3bf95f4`, „object paging“): dům se pro úhel, zoom a místo vykreslí
+  jednou do obrázku s hloubkou, pak se jen kopíruje; postavy a noční okna přes něj. Nejvýš 256 MB. Při otáčení
+  a zoomu se neukládá (každý snímek jiný), naskočí 0,2 s po zastavení. Zoom 2: 106 → 22 ms, zoom 3: 141 → 17 ms.
+- **3. Vzdálená krajina** (hotovo `4f3fa98`): za 20 dlaždicemi zem až do 96 dlaždic v blocích 1–8 dlaždic, výšky
+  z mapy, barva z průměru skutečných spritů (tráva, voda, pole, poušť, popel, lesy), sukně proti škvírám. Domy
+  a průmysl jako 3D objekty do 64 dlaždic (zjednodušené), v noci jim svítí okna – města na obzoru. Opar plynule
+  s dálkou, mlha od 60 % dosahu.
+- **4. Kostra a prolínání** (hotovo `9f83df2`, `e6f4c28`): kolegovy `drak_*_kostra.glb` (klouby, váhy, animace)
+  – póza draka se počítá každý tik (chůze 64 snímků místo 8), při přechodu chůze → útok → smrt se pózy 8 tiků
+  prolínají kost po kosti. Čínský drak (bez kostry) zůstává na snímcích. Rig: `test3d postava <figura> <snimek>`.
+- **5. Hledání cesty** (hotovo `3f2145b`): draci chodí kolem domů, vody a strmých svahů (A* po dlaždicích,
+  narovnaná cesta), přistávají jen kde můžou stát. Mat už chodil po síti chodníků. Rig `test3d draci cesta`.
+- **6. Kolize podle tvaru** (hotovo `92c7556`): chodec naráží do skutečného půdorysu 3D domů ve výšce těla (park,
+  fontána, terasa průchozí; dutý vnitřek plný). Rig `test3d pudorys x y`.
+- **7. Stíny a světla** (hotovo `fe31f5f`): ve dne stíny domů od slunce (mapa stínů, přepočet jen při změně okolí),
+  v noci okna a lucerny nasvítí zeď a chodník pod sebou po pixelech. Rig `test3d stiny 0`, `test3d lampy 0`.
+- **8. Instancování** (hotovo `ecd273d`): pole v pohledu z očí jako 3D – stovky rostlin konopí sdílí jeden model
+  a pár obrázků, model jen u nohou; figury se kreslí hromadně na všech jádrech. Rig `test3d pole`.
+- **9. Aktivní okolí** (hotovo `1c81c6c`): co se 2 minuty nekreslilo (textury, tvary, pózy, přechody), se pustí
+  z paměti a při dalším pohledu vyrobí znovu. Rig `test3d zapomen`.
+- Rig (4 vlákna): pohled z očí v městě 116/61 ms → 70/32 ms (1/4 vlákna); otočená mapa nejvíc oddálená
+  102 → 68 ms. Na víc jádrech u hráče to bude rychlejší.
+
+## 16. 10. – co dál z Morrowindu
+
+- Hráč vybral: nastoupit do vozidla (ano), kouzla bez teleportů (léčení, levitace), dovednosti rostoucí používáním,
+  kompas a malá mapa; zbroj až potom; výdrž, plavání, zvuky ne; truhly později. Kytky už jsou.
+- **Mapa pod pohledem z první osoby přes celou obrazovku se nekreslí vůbec** (hotovo `fc46c5c`).
+- Hráč: **luk a šíp** z Example Suite – prosba kolegovi `hra/3d/PROSBA-LUK-SIP.md` (luk, nebo kuše se šipkou;
+  uzly `uchyt`, `zarez`, stavy `volno`/`napnuto`). Hra: 1 kladivo, 2 luk, levé tlačítko napne a vystřelí.
+- Hráč: **„já chci technologie z OpenMW, ne spánek a plavání“** – tedy techniky enginu (kreslení, výkon, animace,
+  pohyb), ne herní nápady. Kód dál nebrat (GPL 3), jen principy.
+
+## 16. 10. – oprava
+
+- Hráč: v buildu chyběl břeh pod domem na svahu u vody. Příčina v kódu (`9e6fdfc`): na sever s domy jako objekty
+  zůstala podezdívka, ale zem na ní (její děti) jsem vynechával – kolegovy domy vlastní zem nemají, tak byla díra
+  (černá, nebo prosvítala voda). Zem na podezdívce zůstává; otočený pohled byl v pořádku.
+
+## 15. 10. – Z OpenMW dál (hráč vybral)
+
+- **Ano:** klávesa E „použít“ a interiéry za dveřmi (truhly, prodavač); noční obloha v pohledu z očí (hvězdy,
+  měsíc – počasí ne); draci a boj kladivem; spánek/čekání (T), deník úkolů, tráva a kytky kolem chodce.
+- Běžná města: „všech domů“ v okně města necháváme (hráč: „necháme to být“). V mírném klimatu stejně staví jen
+  mírné domy (ověřeno v rigu).
+- Draci od kolegy (`objekty/tvorove/`) mají animace jako snímky v uzlech (klid, chůze, útok, smrt, let) – boj jde
+  udělat hned, bez kostry.
+- Hráč: interiéry zatím nejsou – plánované jako samostatný objekt, kam se chodec přesune vstupem do dveří. Draci
+  občas přilétnou kamkoli, útočí na chodce, za zabití nic (hráč má draky rád). Zdraví 0 → konec pohledu z první
+  osoby, zpět na mapu. Pohled z první osoby přes celou obrazovku (hotovo `ba62032`, obraz jen jednou za krok).
+- **Noční obloha** (hotovo): hvězdy (pevně na obloze, mihotají se) a měsíc se září, dělá je hra sama (Example Suite
+  tu nemám, stahovat z nového webu nechci).
+- **Draci** (hotovo): kolegovi draci (`objekty/tvorove/`) občas přiletí kamkoli (nejvýš 3 najednou, asi jednou za
+  dvě minuty), s otevřeným pohledem z první osoby spíš k chodci. Hnědý a černý přistanou, chodí, do 45 m jdou po
+  chodci a útočí (rána 12 zdraví), po 6 ranách kladivem padnou a chvíli leží, za zabití nic. Ledový a čínský
+  přelétají a jednou se snesou (8 zdraví). Rány jdou přes příkaz `HurtWalker`, obraz při zásahu zčervená. Na mapě
+  (otočený pohled, na sever s objekty) i v pohledu z očí, zblízka (do 3 dlaždic) jako skutečná 3D síť, ne obrázek.
+- Hráč: **spánek nebude vůbec**. Úkoly může dávat kdokoli, až je vymyslíme. Trávu a kytky domluví hráč s kolegou.
+
+## 15. 10. – Morrowind: tématická města
+
+- Hráč: tématická města Morrowind. **Hliněné domy** (dunmerské, s kopulemi) – dělá je kolega. Stromy Morrowindu jen
+  v těch městech. Obecně: kolem každého tématického města jeho stromy na jeho území; Morrowind **popelavá zem**,
+  pouštní tématická města **poušť** na svém území. Jména měst **Drakov, Houbovice, Čarodějov**. Počet přes nastavení
+  tématických měst (jako Mars).
+- Tamriel Rebuilt nebrat: jeho modely smějí jen do modů Morrowindu (licence Bethesdy). Styl napodobit smíme.
+- **Hotovo:** kolega udělal 13 hliněných domů a 4 houby (`objekty/hlinene/`). Ve hře: téma města (`Town::theme`, v savu),
+  nastavení „Hliněná města“ (výchozí 3), první tři Drakov, Houbovice, Čarodějov. Staví domy mírného klimatu jako každé
+  město, ve 3D (otočený pohled i na sever s domy jako objekty) jsou hliněné; stromy na území města (zastavěná část
+  a 4 dlaždice kolem) jsou houby podle růstu stromu.
+- **Svítící okna** (hotovo): kolega dal do hliněných domů uzel `noc` (svítící okna a lucerny), prázdný `den`
+  a body `svetlo_NN`. Hra v noci kreslí `noc` přes dům a nechá ho svítit (noc ho nezatmí), u `svetlo_NN` přidá
+  teplou záři; na mapě i v pohledu z očí. Kolega (`PROSBA-NOC-DOMY.md`) dodal noc i do 38 mírných domů (1950,
+  ÚV KSČ, po 1955, bývalé budovy3d) – převzato. Záře jen u okna, které je opravdu vidět.
+- **Popelavá zem** (hotovo): tráva a hrubá zem na území hliněného města ve 3D šedá (paleta vraků). Houby i v pohledu
+  z očí (plakáty z jejich obrázků, zblízka jemnější).
+- **Poušť** (hotovo): pouštní tématické město (staví jen pouštní domy v jiném klimatu) má na svém území písek
+  z pouštního klimatu (načtený zvlášť, v mírném klimatu jsou na jeho místě sněhové sprity) a stromy jako palmy
+  a kaktusy; ve všech pohledech, i ve 2D.
+- Území tématického města: zastavěná část (vnější zóna) a 4 dlaždice kolem, nejbližší město.
+
+## 15. 10. – Morrowind: pohled z první osoby, inventář, noc
+
+- **Pohled z první osoby** (hotovo, `251b575`, mlha `895258e`): nabídka mapy → *Pohled z první osoby*. Chodec
+  stojí, kam se dívá hlavní pohled; oko 1,55 m. W/S nebo šipky chůze, A/D úkrok, šipky ←→ otočení, pravé tlačítko
+  myši rozhlížení, Shift/Běh. Nevejde do domů, budov a vody. Mlha do dálky.
+- **Noc** (hotovo, `436ac5c`): nápověda → *Noc* pod konzolí. Mapa ztmavne, vozidla svítí (přední světla s kuželem,
+  zadní červená, letadla maják). I v pohledu z očí, světla zakrytá tím, co je před nimi.
+  Hráč: „nic nezapomeň, světla“ → zbývá: **lampy u silnic a svítící okna** (kolega dodá uzly `noc`/`den`, `svetlo_NN`).
+- **Tatra VB bliká:** rozhoduje GRF (stavy), hra sama ne. Kolega: bliká jen naložená (s 1 osobou). Hotovo u něj.
+- **Inventář** (hotovo `e56699b`, klávesa I v pohledu z první osoby): hráč: normální inventář jako v Morrowindu. Věci: **velké kladivo** (hráč prošel celý
+  Morrowind s velkým kladivem, má ho od začátku), zbroj, boty, pivo, cigarety, mari, zboží. Budeme přidávat.
+  - ukládá se do savu, **platí se penězi firmy**;
+  - pivo v hospodě, mari u automatu a v hulírně, cigarety a zboží v obchodech ve městě;
+  - **pivo léčí, mari léčí víc**; ostatní se zatím jen nosí. Oblékání a kouzla později.
+  - **kladivo v ruce** (hotovo): kolegův model z Example Suite (CC0, `objekty/predmety/`). F tasí a schová (jen když
+    ho chodec nese), levé tlačítko nebo mezerník máchne: nápřah nad hlavu, úder dolů před sebe. Truhla je taky
+    převzatá, zatím nikde nestojí.
+  - v pohledu z očí se náš průmysl (hospoda, lihovar, gymnázium…) kreslí objekty jako domy; dřív plakát ve vzduchu.
+- **Build 277: v mírném klimatu nejsou města** (hráč) – vyřešeno: hráč měl aktivní jiný, vadný GRF, který rušil
+  domy. Bez něj domy jdou. Slabina kódu zůstává: s nastavením „dělení měst podle GRF domů“ (`economy.split_house_grfs`)
+  může jedna vadná sada domů zrušit všechna města – nabídl jsem, že se město pak postaví ze všech domů.
+- Dál z OpenMW (kolegův `hra/3d/NAVRH-Z-OPENMW.md`): kostra a animace z glTF (135 animací postavy, ruce, sekání),
+  interiéry dveřmi, boj zblízka, draci na mapě (`hra/3d/PROSBA-DRACI.md`).
+
+## 15. 10. – průmysl, domy, noc
+
+- Náš průmysl z kolegových objektů (`060253b`): gymnázium, sochy, automat, chatka; plantáž z dílů pole. Sady
+  `budovy3d_5`–`8` (176 MB) i kód renderů z 8 směrů pryč. Hloubka po pixelech v objektu (prapory ÚV KSČ).
+- Domy po roce 1955 od kolegy (`82286c4`): slunečníky, deštníky.
+- Bramborové pole, lihovar, hospoda jako průmysly hry (`7ae1f57`); při 0° se náš průmysl kreslí objekty jako domy.
+- Rožeň v hospodě se točí, střídá čuníka, kravičku, ovečku (`58ca084`).
+- Podezdívky pod domy na svahu při 0° (`9e6fdfc`): na snímku byly černé díry.
+- Dům 0x1F: kreslí se jen ÚV KSČ; staré `budovy3d_*.grf` si hráč smaže ze složky hry.
+- „Gymnázium ve vodě“ byl náhled vedle okna průmyslu (průhledný podklad, tak to hráč chtěl).
+
+## Otevřené
+
+- Oblékání, kouzla, boj (zásah kladivem).
+- Města Morrowind, území tématických měst (stromy, zem).
+- Vadná sada domů nesmí zrušit všechna města (`split_house_grfs`) – jen když hráč chce.
+- Lampy u silnic v noci; svítící okna dalších domů (až je kolega dodá, hra je umí).
+- Kostra a animace glTF; draci; interiéry; boj.
+- Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.
+- Přenos staré hry: hráč zkusí svůj save se svými GRF; podle konzole doladit odhady stanic u „jeď spojit“.
+- Přední světla Tater 138 a 148 ve dne černá: čeká na kolegovu opravu kabin (`nt_kabiny`).

@@ -1,0 +1,172 @@
+// A set that changes the game and then gives up: it switches every default
+// cargo off and dies with a fatal error two sprites later. That is the shape of
+// Industries of the Caribbean next to another industry set (its header switches
+// the game's cargoes and industries off before it checks for the other sets and
+// refuses them), and a game that kept what it had done had no passengers -- and
+// a passenger ship with no cargo of its own walked into an assertion
+// (road_on_rail.cpp). The game now reads its sets again without a set that gave
+// up (GfxLoadSprites()); the battery scene grfvzdalo plays this set and counts
+// the cargoes it ends up with.
+//     yagl -e <out>/quits_late.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGQ";
+    version: GRF8;
+    name: "Rig: quits late";
+    description: "Switches every default cargo off and then gives up with a fatal error, the way a set does that checks for other sets only after it has changed things.";
+}
+properties<Cargos, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0001
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0002
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0003
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0004
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0005
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0006
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0007
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0008
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0009
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000A
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000B
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000C
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000D
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000E
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x000F
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0010
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0011
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0012
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0013
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0014
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0015
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0016
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0017
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0018
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x0019
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+    // instance_id: 0x001A
+    {
+        bit_number: 0xFF;
+        cargo_label: "\x00\x00\x00\x00";
+    }
+}
+error_message<Fatal, default, 0xFF> // Action0B <severity, language, message>
+{
+    message: "Gives up on purpose, after switching the cargoes off.";
+}

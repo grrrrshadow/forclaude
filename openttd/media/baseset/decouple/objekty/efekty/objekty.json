@@ -1,0 +1,42 @@
+[
+ {
+  "soubor": "ohnostroj.glb",
+  "jmeno": "ohnostroj",
+  "druh": "efekt",
+  "animace": {
+   "uzly": "snimek_",
+   "snimku": 4,
+   "tiky": [
+    24,
+    10,
+    14,
+    20
+   ],
+   "pauza_tiku": 32,
+   "smycka": true
+  },
+  "barvy": [
+   {
+    "cast": "jiskry",
+    "material": "jiskry",
+    "maska": "ohnostroj_maska.png",
+    "zacatek": 255,
+    "paleta": [
+     "40FF60",
+     "4080FF",
+     "FF3040",
+     "FFD020",
+     "E040FF",
+     "40FFF0",
+     "FF8020",
+     "FFFFFF"
+    ],
+    "kdy": "kazdou_fazi"
+   }
+  ],
+  "bez_svetla": true,
+  "autor": "grrrrf: hra/3d-z-obrazku/skripty/ohnostroj_glb.py (vše vlastní, nic se nerenderuje)",
+  "licence": "GPL-2.0",
+  "poznamka": "ohňostroj nad chatkou (coffeeshop): snimek_00 start (zlaté stopy, vlastní materiál, nebarví se), snimek_01..03 koule ve třech fázích (hvězdy se stopami, roste, poslední klesá); jediný materiál jiskry barví hra číslem z palety, pro každou fázi každého výstřelu jinou; bez NORMAL (svítí); počátek = bod výstřelu na zemi, koule 24 m nad ním, metry"
+ }
+]
