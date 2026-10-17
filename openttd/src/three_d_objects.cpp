@@ -4553,10 +4553,15 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 	}
 	/* Where the model draws from it, when that is known (a texture of a .glb, a mask of its layout): the rest filled. */
 	std::vector<uint8_t> drawn;
+	const auto cover_start = std::chrono::steady_clock::now();
+	double ms_drawn = 0, ms_fill = 0;
 	if (cover != nullptr && !cover->empty() && t.w > 1) {
 		drawn = TextureTexelsDrawn(t.w, t.h, *cover);
+		ms_drawn = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count();
 		FillTexelsNotDrawn(t, drawn);
+		ms_fill = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count() - ms_drawn;
 	}
+	const int w0 = t.w, h0 = t.h;
 	levels.push_back(std::move(t));
 	while (halved && (levels.back().w > 1 || levels.back().h > 1)) {
 		const ThreeDObjectTexture &a = levels.back();
@@ -4601,6 +4606,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		drawn = std::move(drawn_b);
 		levels.push_back(std::move(b));
 	}
+	if (cover != nullptr && !cover->empty() && w0 > 1) Debug(misc, 2, "3D texture {}x{}: cover of {} triangles {:.1f} ms, filled {:.1f} ms, all with the levels {:.1f} ms", w0, h0, cover->size() / 6, ms_drawn, ms_fill, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count());
 }
 
 /** The painted textures kept, bytes; past PAINTED_BUDGET all are dropped and made again as they are drawn. */

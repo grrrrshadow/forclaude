@@ -23,6 +23,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – domy až při kreslení; pokrytí atlasu a 0° rozpracované
+
+- Hráč: „jo udělej“ ke třem věcem: (1) glb domů číst až při prvním kreslení, (2) pokrytí atlasu (50–80 ms na atlas),
+  (3) obrázky aut při 0° na vlákně (první auto typu 2–3,5 s, každý další směr 10–20 ms na hlavním vlákně).
+- **(1) hotovo** (7e363be): index si u domu pamatuje jen cestu ke glb, tvar a textura se čtou při prvním kreslení
+  (`ThreeDObject::Read()`, pohled z očí přes `TryRead()` na vlákně). Dřív start četl 140 domů = 136 MB (178 MB
+  souborů), ~0,45 s i s teplým diskem. Teď po pohledu na město 23 domů, 39 MB. Obraz pixel po pixelu stejný (mapa
+  i pohled z očí). Rig: `test3d domyprecti` přečte všechny, `pamet` ukazuje „domy přečtené z glb“. Index sám
+  (průmysly, masky) dál 317–351 ms.
+- **(2) změřeno** (rig `DBG=misc=2`, řádky „3D texture … cover“, Tatra 148): atlas 4096×3824 s 936 tisíci
+  trojúhelníky: rasterizace pokrytí 125 ms, **zaplavení prázdna 345 ms**, s úrovněmi 470–620 ms; a dělá se **3×**
+  (tři textury stejné velikosti se stejným pokrytím). 4096×1712: 45 + 140–190 ms; 4096×1200: 30 + 115 ms.
+  Divný případ 512×1024 s 27 856 trojúhelníky: pokrytí 294 ms (asi opakovaná textura, obří obdélníky).
+  Plán: (a) zaplavovat jen pruh pár texelů kolem kreslených (víc nikdo nevzorkuje), ne celou prázdnou plochu, na
+  každé úrovni; (b) rasterizace pokrytí float hranami, malé trojúhelníky jen středem, opakované UV oříznout;
+  (c) zjistit, proč se stejný atlas dekóduje třikrát, a dělat jednou. Pak ověřit pixel po pixelu (černé čáry na
+  Tatrách se nesmí vrátit – kvůli nim zaplavení vzniklo).
+- **(3) neudělané**: sprite auta při 0° (`MakeThreeDVehicleObjectSprite`, ne-gui) dělat na vlákně jako ikonky
+  nákupu (`ThreeDVehicleObjectSpriteStandIn`), mezitím nejbližší hotový směr / odhad velikosti.
+
 ## 17. 10. – kostičky v pohledu z očí, nákupní menu připravené
 
 - **Auta z kostiček, divně natočená** (hráč v #283): v pohledu z očí se textura, kterou stav nijak nemaluje (kola,
