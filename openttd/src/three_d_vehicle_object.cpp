@@ -85,6 +85,8 @@ struct ObjectSpriteRequest {
 	float scale = 1.0f;                       ///< the object's metres to the game's
 	int fade = 0;                             ///< its state (StateStep())
 	uint64_t walk = 0;                        ///< the frames of its crew that walks (WalkCode())
+	int bounds_of = 0;                        ///< what its bounds before it is made were worked out of (ThreeDVehicleObjectSpriteBounds()): 0 not yet, 1 a guess, 2 its object's extent
+	Rect bounds{};
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
 /** The sprites made: by the object, the piece it is hung from, the direction, its scale (thousandths), its state (StateStep()) and the frames of its crew that walks. */
@@ -1355,9 +1357,89 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 		d.a = r.px[i].a;
 		d.m = 0;
 	}
-	Debug(sprite, 3, "3D vehicle {}: sprite of direction {}, faded {}, made, {}x{} at 16x, {} ms", req->obj->name, req->dir, req->fade, r.width, r.height,
-			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+	if (_debug_sprite_level >= 3) {
+		/* And where the game thought it would be before it was made (ThreeDVehicleObjectSpriteBounds()): around it. */
+		Rect before{};
+		ThreeDVehicleObjectSpriteBounds(request, before);
+		const bool around = before.left <= s.x_offs && before.top <= s.y_offs && before.right >= s.x_offs + s.width - 1 && before.bottom >= s.y_offs + s.height - 1;
+		Debug(sprite, 3, "3D vehicle {}: sprite of direction {}, faded {}, made, {}x{} at 16x, {} ms; at {},{}..{},{}, thought {},{}..{},{}{}", req->obj->name, req->dir, req->fade, r.width, r.height,
+				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), s.x_offs, s.y_offs, s.x_offs + s.width - 1, s.y_offs + s.height - 1,
+				before.left, before.top, before.right, before.bottom, around ? "" : " NOT AROUND IT");
+	}
 	return avail;
+}
+
+/**
+ * Where a sprite of an object not made yet lies about the point the game draws it about (MakeThreeDVehicleObjectSprite()),
+ * pixels of 16x: the box of the object's extent (and of its crew, which may walk beside it) seen with the camera of the
+ * sprites, and a pixel of the normal zoom round it (the rounding of RasterObject()). The game asks this of every vehicle as it moves, in
+ * its tick (VehicleSpriteSeq::GetBounds(): the box redrawn about it), and the sprite itself was made for it -- tens of
+ * milliseconds, the first of an object seconds -- wherever the player looked from (the player, 17. 10.: "we make
+ * pictures from the objects even when we look at them from other angles"). An object whose shape was never read
+ * (nothing drew it yet) a box as long as it is said to be, or of the longest lorry; its shape is not read for this.
+ * @return false: no such sprite
+ */
+bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds)
+{
+	if (request < 1 || request > _object_sprite_requests.size()) return false;
+	ObjectSpriteRequest &req = _object_sprite_requests[request - 1];
+	if (req.obj == nullptr) {
+		/* The empty picture: a transparent pixel. */
+		bounds = {0, 0, 0, 0};
+		return true;
+	}
+	if (req.bounds_of == 2) {
+		bounds = req.bounds;
+		return true;
+	}
+	const ThreeDVehicleObject &obj = *req.obj;
+	float e[6];
+	const bool known = obj.KnownExtent(e);
+	if (!known && req.bounds_of == 1) {
+		bounds = req.bounds;
+		return true;
+	}
+	if (!known) {
+		/* Its origin is in its middle (ThreeDVehicleShape). */
+		const float half = (obj.length_m > 0 ? obj.length_m : 20.0f) / 2 + 1.0f;
+		const float guess[6] = {-half, half, -2.0f, 2.0f, -0.5f, 5.0f};
+		std::copy(std::begin(guess), std::end(guess), e);
+	}
+	const ThreeDVehicleState *st = obj.State(req.fade);
+	const float tp = (st != nullptr ? st->turn : 0.0f) * static_cast<float>(M_PI) / 180.0f, tc = std::cos(tp), ts = std::sin(tp);
+	const float along = (SqueezedType(obj.type) && (req.dir & 1)) ? SQUEEZE : 1.0f;
+	const float az = ViewAzimuth(req.dir) * static_cast<float>(M_PI) / 180.0f, ca = std::cos(az), sa = std::sin(az);
+	float minx = std::numeric_limits<float>::infinity(), miny = minx, maxx = -minx, maxy = -minx;
+	/* The corners of a box in the object's frame on the picture, as RasterObject() places them. */
+	auto add_box = [&](const float b[6]) {
+		for (int c = 0; c < 8; c++) {
+			const float px = b[c & 1], py = b[2 + ((c >> 1) & 1)], pz = b[4 + ((c >> 2) & 1)];
+			const float x = (px * tc - py * ts) * req.scale * along, y = (px * ts + py * tc) * req.scale, z = pz * req.scale;
+			const float xr = x * ca - y * sa, yr = x * sa + y * ca;
+			const float sx = xr * PXM_16X, sy = (-yr * CAM_SIN - z * CAM_COS) * PXM_16X;
+			minx = std::min(minx, sx); maxx = std::max(maxx, sx);
+			miny = std::min(miny, sy); maxy = std::max(maxy, sy);
+		}
+	};
+	add_box(e);
+	auto add_crew = [&](const ThreeDVehicleCrew &c) {
+		const float r = 0.6f * c.scale, h = 2.2f * c.scale;
+		const float b[6] = {c.at[0] - r, c.at[0] + r, c.at[1] - r, c.at[1] + r, c.at[2], c.at[2] + h};
+		add_box(b);
+	};
+	for (const ThreeDVehicleCrew &c : obj.crew) add_crew(c);
+	for (const auto &group : obj.crew_groups) {
+		for (const ThreeDVehicleCrew &c : group.second) add_crew(c);
+	}
+	const double ox = (req.off_y - req.off_x) * 2.0 * ZOOM_BASE, oy = (req.off_x + req.off_y) * static_cast<double>(ZOOM_BASE);
+	const int pad = ZOOM_BASE;
+	req.bounds.left = static_cast<int>(std::floor(minx)) + static_cast<int>(std::lround(ox)) - pad;
+	req.bounds.top = static_cast<int>(std::floor(miny)) + static_cast<int>(std::lround(oy)) - pad;
+	req.bounds.right = static_cast<int>(std::ceil(maxx)) + static_cast<int>(std::lround(ox)) + pad;
+	req.bounds.bottom = static_cast<int>(std::ceil(maxy)) + static_cast<int>(std::lround(oy)) + pad;
+	req.bounds_of = known ? 2 : 1;
+	bounds = req.bounds;
+	return true;
 }
 
 /** Time spent making pictures of objects for the turned view, and how many, for the rig (test3d casy): at once, and on the thread. */

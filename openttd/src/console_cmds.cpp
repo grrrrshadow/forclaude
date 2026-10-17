@@ -9772,7 +9772,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		uint64_t rects = 0, pixels = 0;
 		std::string slow_frames;
 		using Clock = std::chrono::steady_clock;
-		std::vector<double> times;
+		std::vector<double> times, ticks;
 		Clock::time_point last = Clock::now();
 		for (int i = 0; i < *frames; i++) {
 			while (Clock::now() - last < std::chrono::milliseconds(27)) {}
@@ -9781,7 +9781,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			extern double _turned_dirty_area[3];
 			const uint64_t kinds_before[3] = {_turned_dirty_count[0], _turned_dirty_count[1], _turned_dirty_count[2]};
 			const double areas_before[3] = {_turned_dirty_area[0], _turned_dirty_area[1], _turned_dirty_area[2]};
+			const Clock::time_point tick_start = Clock::now();
 			StateGameLoop();
+			if (i > 0) ticks.push_back(std::chrono::duration<double, std::milli>(Clock::now() - tick_start).count());
 			if (mouse) _cursor.UpdateCursorPosition(vp->left + (i * 13) % vp->width, vp->top + vp->height / 3 + (i * 7) % (vp->height / 3));
 			InputLoop();
 			if (i == 1) {
@@ -9817,6 +9819,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: smycka{}{} {} snimku: prvni {:.1f} ms, prumer {:.1f}, median {:.1f}, nejdelsi {:.1f} ms, nad 20 ms {}x",
 				window ? " okno" : "", mouse ? " mys" : "", times.size(), first, times.empty() ? 0.0 : sum / times.size(),
 				times.empty() ? 0.0 : times[times.size() / 2], times.empty() ? 0.0 : times.back(), slow);
+		if (!ticks.empty()) {
+			/* And the game's ticks between them (StateGameLoop()): what stops the pointer when it is slow. */
+			std::sort(ticks.begin(), ticks.end());
+			double tick_sum = 0;
+			for (double t : ticks) tick_sum += t;
+			IConsolePrint(CC_DEFAULT, "test3d: smycka tiky hry: prumer {:.2f} ms, median {:.2f}, nejdelsi {:.1f} ms, nad 10 ms {}x", tick_sum / ticks.size(), ticks[ticks.size() / 2], ticks.back(),
+					std::count_if(ticks.begin(), ticks.end(), [](double t) { return t > 10; }));
+		}
 		IConsolePrint(CC_DEFAULT, "test3d: smycka na snimek {:.1f} kusu obrazovky, {:.0f} pixelu (obrazovka {})", static_cast<double>(rects) / times.size(),
 				static_cast<double>(pixels) / times.size(), _screen.width * _screen.height);
 		extern uint64_t _turned_dirty_count[3];

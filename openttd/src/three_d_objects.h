@@ -201,6 +201,7 @@ struct ThreeDVehicleShape {
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
 	std::vector<std::string> tex_names; ///< for each texture, the name of its material
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
+	float all[6] = {};          ///< the extent of all its corners, what the states show among them: x0, x1, y0, y1, z0, z1, metres; all 0 not known
 	/* Its lights at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): the glass of the node "noc" of its
 	 * file, never drawn by day, and the places "svetlo_predni_NN" and "svetlo_zadni_NN" the light shines from. */
 	std::vector<float> night_pos;       ///< x, y, z of each corner of the glass, metres
@@ -466,6 +467,7 @@ struct ThreeDVehicleObject {
 	const ThreeDVehicleShape *GetShape(int frame) const;
 	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
 	bool ShapeKnown() const;
+	bool KnownExtent(float extent[6]) const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
@@ -485,6 +487,8 @@ struct ThreeDVehicleObject {
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
+	mutable float extent[6] = {};   ///< its shape's extent of all its corners (ThreeDVehicleShape::all), kept when the shape is forgotten
+	mutable bool extent_known = false;
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
 	mutable std::map<std::pair<std::vector<int>, uint16_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers and the vehicle's colours

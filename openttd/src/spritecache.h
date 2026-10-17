@@ -73,6 +73,7 @@ std::string DescribeSpriteFilter(SpriteID sprite);
 std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 
 size_t GetSpriteCacheBytesUsed();
+bool GetThreeDObjectSpriteBounds(SpriteID sprite, Rect &bounds);
 std::string DescribeSpriteLevels(SpriteID sprite);
 
 #endif /* SPRITECACHE_H */

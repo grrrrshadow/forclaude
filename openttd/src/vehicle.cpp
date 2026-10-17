@@ -135,19 +135,23 @@ void VehicleSpriteSeq::GetBounds(Rect *bounds) const
 {
 	bounds->left = bounds->top = bounds->right = bounds->bottom = 0;
 	for (uint i = 0; i < this->count; ++i) {
-		const Sprite *spr = GetSprite(this->seq[i].sprite, SpriteType::Normal);
+		/* A vehicle drawn from its 3D object: not its sprite made for this, but where it will be from the object's
+		 * size (asked in the game's tick, wherever the player looks from). */
+		Rect r;
+		if (!GetThreeDObjectSpriteBounds(this->seq[i].sprite, r)) {
+			const Sprite *spr = GetSprite(this->seq[i].sprite, SpriteType::Normal);
+			r.left = spr->x_offs;
+			r.top = spr->y_offs;
+			r.right = spr->width + spr->x_offs - 1;
+			r.bottom = spr->height + spr->y_offs - 1;
+		}
 		if (i == 0) {
-			bounds->left = spr->x_offs;
-			bounds->top  = spr->y_offs;
-			bounds->right  = spr->width  + spr->x_offs - 1;
-			bounds->bottom = spr->height + spr->y_offs - 1;
+			*bounds = r;
 		} else {
-			if (spr->x_offs < bounds->left) bounds->left = spr->x_offs;
-			if (spr->y_offs < bounds->top)  bounds->top  = spr->y_offs;
-			int right  = spr->width  + spr->x_offs - 1;
-			int bottom = spr->height + spr->y_offs - 1;
-			if (right  > bounds->right)  bounds->right  = right;
-			if (bottom > bounds->bottom) bounds->bottom = bottom;
+			if (r.left < bounds->left) bounds->left = r.left;
+			if (r.top < bounds->top) bounds->top = r.top;
+			if (r.right > bounds->right) bounds->right = r.right;
+			if (r.bottom > bounds->bottom) bounds->bottom = r.bottom;
 		}
 	}
 }

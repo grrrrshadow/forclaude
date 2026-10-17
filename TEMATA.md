@@ -23,6 +23,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – plynulost: hra v tiku nevyrábí obrázky aut, glb soubory hned pryč
+
+- Hráč: **„pro mě je teď každej test utrpení… škube se to, nemůžu myší trefit čudlík a obraz se kouše“** – plynulost
+  je teď první. Hlavní příčina (rig): hra při každém kroku auta počítá, kam na obrazovce auto sahá
+  (`VehicleSpriteSeq::GetBounds()`), a kvůli tomu vyráběla jeho obrázek pro 0° – v tiku hry, ať se hráč díval odkudkoli
+  (otočená mapa, pohled z očí). Tatra tahač s návěsem v zatáčce: 32 obrázků, 25,8 s práce (první typ 10 s, čtení
+  textur). Celou tu dobu stála hra i myš.
+- Teď se to počítá z rozměrů objektu (krabice všech rohů tvaru a posádka, kamerou spritů,
+  `ThreeDVehicleObjectSpriteBounds()`), obrázek se kvůli tomu nedělá. Rozměry si objekt pamatuje i po zapomenutí tvaru;
+  dokud tvar nikdo nečetl, odhad z délky (nebo 20 m). Rig: otočená mapa a pohled z očí – 0 obrázků (dřív 32); tik hry
+  průměr 0,1 ms, nejdelší 2–4 ms. Odhad vždy obklopí skutečný obrázek (log `sprite=3`: „thought …“).
+- Soubory .glb se pustí hned po přečtení (dřív se drželo až 240 MB na 15 s): drží se jen během jednoho čtení
+  (`GlbFilesScope`), aby se doplněk sdílený záznamy balíčku nečetl víckrát. Rig `test3d pamet`: držené soubory 0 MB.
+- Zbývá při 0°: obrázek auta vzniká, když se auto poprvé nakreslí v novém směru (první typ 2–3,5 s kvůli texturám,
+  další 10–20 ms), na hlavním vlákně. To řeší další krok z rozhodnutí hráče – auta kreslit objektem.
+- Rozhodnutí hráče (17. 10.): tvary všech glb ukládat menšími čísly; domy nikdy obrázky; v nastavení přepínač
+  originální domy OTTD (naše krabice) / 3D domy; textury podle potřeby („asi jo“); glb pustit hned po přečtení
+  (hotovo); velikost auta z objektu, ne z obrázku (hotovo); obrázky jen pro depo a nákupní seznam; žádných 8 směrů
+  dopředu – „udělat objekt a tím končíme“.
+- Rig: `test3d smycka` ukazuje i tiky hry (průměr, nejdelší, kolikrát nad 10 ms).
+
 ## 17. 10. – kolik paměti berou glb a kolik obrázky
 
 - Hráč: **„máme v paměti pro úhel 0 zbytečné obrázky glb objektů a tu paměť potřebujem“ … „kolik zaberou glb a kolik

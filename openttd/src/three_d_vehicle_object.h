@@ -43,6 +43,7 @@ bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state
 uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineImageType image_type);
 void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageType image_type, std::vector<uint32_t> &ids);
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
+bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds);
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v);

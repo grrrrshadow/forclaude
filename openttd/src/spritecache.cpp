@@ -1391,6 +1391,20 @@ void DupSprite(SpriteID old_spr, SpriteID new_spr)
 }
 
 /**
+ * Where a sprite of a vehicle drawn from its 3D object (SetThreeDVehicleObjectSprite()) lies, without making it when it
+ * is not made yet (ThreeDVehicleObjectSpriteBounds()): the game asks for the bounds of every vehicle as it moves.
+ * @param[out] bounds as VehicleSpriteSeq::GetBounds() takes them from a sprite
+ * @return false: not such a sprite, or it is made (its own bounds then)
+ */
+bool GetThreeDObjectSpriteBounds(SpriteID sprite, Rect &bounds)
+{
+	if (sprite >= _spritecache.size()) return false;
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	if (sc->object_sprite == 0 || sc->ptr != nullptr) return false;
+	return ThreeDVehicleObjectSpriteBounds(sc->object_sprite, bounds);
+}
+
+/**
  * Make a sprite the picture of a vehicle drawn from its 3D object (three_d_vehicle_object.h): no file, made when
  * it is read (MakeThreeDVehicleObjectSprite()), and made again when the cache has let it go.
  * @param sprite the sprite to make (AllocateDerivedSpriteID())

@@ -155,42 +155,43 @@ static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 	return data;
 }
 
-/**
- * The .glb files read a moment ago (GlbFileBytes()), the latest last: an add-on of a vehicle is read for its shape, its
- * lamps and its red lights, and the next record of the package has the same add-ons (a file of the colleague's
- * lorries is forty megabytes). Let go of every fifteen seconds (ForgetUnusedThreeDObjects()).
+/*
+ * The .glb files are kept only while something is read from them (GlbFilesScope): an add-on of a vehicle is read for
+ * its shape, its lamps and its red lights, the records of a package have the same add-ons (a file of the colleague's
+ * lorries is forty megabytes) -- read once for all of them. When it is read, the file is let go of at once, as the other
+ * games do (the player, 17. 10.: "when do the other games let go of the glb"); what was made of it stays.
  */
-static std::deque<std::pair<std::string, std::shared_ptr<const std::vector<uint8_t>>>> _glb_files_kept;
-static size_t _glb_files_kept_bytes = 0;
-static constexpr size_t GLB_FILES_KEPT_BYTES = static_cast<size_t>(256) << 20;
-static std::mutex _glb_files_mutex;
+/** The files kept by the reading of this thread, and how deep its reading is. */
+static thread_local std::vector<std::pair<std::string, std::shared_ptr<const std::vector<uint8_t>>>> _glb_files_kept;
+static thread_local int _glb_files_scope = 0;
+/** The bytes of the files kept by all the threads now (the rig, test3d pamet). */
+static std::atomic<size_t> _glb_files_kept_bytes = 0;
 
-/** A .glb file whole (ReadWholeFile()), or as it was read a moment ago. */
+/** While it lives, the .glb files read on this thread are kept for each other reading of them; at the end let go of. */
+struct GlbFilesScope {
+	GlbFilesScope() { _glb_files_scope++; }
+	~GlbFilesScope()
+	{
+		if (--_glb_files_scope > 0) return;
+		for (const auto &[path, bytes] : _glb_files_kept) _glb_files_kept_bytes -= bytes->size();
+		_glb_files_kept.clear();
+	}
+	GlbFilesScope(const GlbFilesScope &) = delete;
+	GlbFilesScope &operator=(const GlbFilesScope &) = delete;
+};
+
+/** A .glb file whole (ReadWholeFile()), or as it was read already by the reading going on (GlbFilesScope). */
 static std::shared_ptr<const std::vector<uint8_t>> GlbFileBytes(const std::string &path)
 {
-	{
-		std::lock_guard lock(_glb_files_mutex);
-		for (const auto &[kept, bytes] : _glb_files_kept) {
-			if (kept == path) return bytes;
-		}
+	for (const auto &[kept, bytes] : _glb_files_kept) {
+		if (kept == path) return bytes;
 	}
 	auto made = std::make_shared<const std::vector<uint8_t>>(ReadWholeFile(path));
-	std::lock_guard lock(_glb_files_mutex);
-	_glb_files_kept.emplace_back(path, made);
-	_glb_files_kept_bytes += made->size();
-	while (_glb_files_kept_bytes > GLB_FILES_KEPT_BYTES && _glb_files_kept.size() > 1) {
-		_glb_files_kept_bytes -= _glb_files_kept.front().second->size();
-		_glb_files_kept.pop_front();
+	if (_glb_files_scope > 0) {
+		_glb_files_kept.emplace_back(path, made);
+		_glb_files_kept_bytes += made->size();
 	}
 	return made;
-}
-
-/** Let go of the .glb files read (GlbFileBytes()). */
-static void ForgetGlbFiles()
-{
-	std::lock_guard lock(_glb_files_mutex);
-	_glb_files_kept.clear();
-	_glb_files_kept_bytes = 0;
 }
 
 /** The little-endian 32 bits at an offset. */
@@ -1766,6 +1767,7 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 static void ReadThreeDObjects()
 {
 	_three_d_objects_read = true;
+	GlbFilesScope files;
 	std::vector<std::string> indices = FindObjectIndices();
 	for (const std::string &index : indices) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
@@ -1916,6 +1918,7 @@ static VehicleType ParseIndexVehicleType(const std::string &text)
 static void ReadThreeDVehicleObjects()
 {
 	_vehicle_objects_read = true;
+	GlbFilesScope files;
 	for (const std::string &index : FindObjectIndices()) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
@@ -2768,6 +2771,22 @@ static std::shared_ptr<const ThreeDVehicleShape> KnownVehicleShape(const std::st
 	return it != _vehicle_shapes.end() ? it->second : nullptr;
 }
 
+/** The extent of all the corners of a shape read (ThreeDVehicleShape::all). */
+static void ExtentOfAll(ThreeDVehicleShape &s)
+{
+	if (s.pos.size() < 3) return;
+	for (int k = 0; k < 3; k++) {
+		s.all[k * 2] = std::numeric_limits<float>::infinity();
+		s.all[k * 2 + 1] = -std::numeric_limits<float>::infinity();
+	}
+	for (size_t i = 0; i + 2 < s.pos.size(); i += 3) {
+		for (int k = 0; k < 3; k++) {
+			s.all[k * 2] = std::min(s.all[k * 2], s.pos[i + k]);
+			s.all[k * 2 + 1] = std::max(s.all[k * 2 + 1], s.pos[i + k]);
+		}
+	}
+}
+
 /** Keep a shape read for its key (MakeShape()). */
 static void KeepVehicleShape(const std::string &key, const std::shared_ptr<const ThreeDVehicleShape> &made)
 {
@@ -2796,8 +2815,24 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 	MakeOnce(this, LAZY_SHAPE, [this] { return this->shape != nullptr || this->shape_tried; }, [this] { return this->MakeShape(0); }, [this](std::shared_ptr<const ThreeDVehicleShape> made) {
 		this->shape = std::move(made);
 		this->shape_tried = true;
+		if (this->shape != nullptr && this->shape->all[1] > this->shape->all[0]) {
+			std::copy(std::begin(this->shape->all), std::end(this->shape->all), this->extent);
+			this->extent_known = true;
+		}
 	});
 	return this->shape.get();
+}
+
+/**
+ * The extent of all the corners of the object's shape (ThreeDVehicleShape::all) if it was ever read: how big its
+ * sprite is before it is made (ThreeDVehicleObjectSpriteBounds()). Never reads it: asked in the game's tick.
+ */
+bool ThreeDVehicleObject::KnownExtent(float extent[6]) const
+{
+	std::lock_guard lock(_lazy_mutex);
+	if (!this->extent_known) return false;
+	std::copy(std::begin(this->extent), std::end(this->extent), extent);
+	return true;
 }
 
 /** Whether the object's shape was read (or tried): a Try... getter that gives nothing then gives nothing for good. */
@@ -2964,6 +2999,7 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
  */
 std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(int frame) const
 {
+	GlbFilesScope files;
 	std::string key = fmt::format("{}#{}#{}/{}{}", this->skeleton_file, this->skeleton_anim, frame, this->frames, this->loop ? "o" : "-");
 	if (this->blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", this->blend_from->skeleton_anim, this->blend_from_frame, this->blend_from->frames, this->blend_ticks);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
@@ -3009,6 +3045,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 		}
 	}
+	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);
 	return made;
 }
@@ -3016,6 +3053,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 /** Read the object's shape (a frame of it), or the one read already for the same file, wheels, crew and frame. */
 std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame) const
 {
+	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
 	std::string key = this->file;
 	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
@@ -3084,6 +3122,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		}
 		Debug(misc, 1, "3D vehicle {}: {} triangles, {} materials, {:.2f}..{:.2f} x {:.2f}..{:.2f} x {:.2f}..{:.2f} m", this->name, made->tri.size() / 3, made->pngs.size(),
 				made->x0, made->x1, made->y0, made->y1, made->z0, made->z1);
+		ExtentOfAll(*made);
 		KeepVehicleShape(key, made);
 		return made;
 	}
@@ -3395,6 +3434,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
 			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
+	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);
 	return made;
 }
@@ -4634,7 +4674,6 @@ static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
  */
 static void ForgetUnusedThreeDObjects()
 {
-	ForgetGlbFiles();
 	_three_d_clock += 15;
 	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
 	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
@@ -4737,11 +4776,7 @@ std::string DescribeThreeDObjectMemory()
 			}
 		}
 	}
-	size_t glb_files = 0;
-	{
-		std::lock_guard lock(_glb_files_mutex);
-		glb_files = _glb_files_kept_bytes;
-	}
+	const size_t glb_files = _glb_files_kept_bytes;
 	size_t houses = 0, house_count = 0;
 	{
 		std::lock_guard lock(_lazy_mutex);
