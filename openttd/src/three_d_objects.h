@@ -36,6 +36,7 @@
 #include <algorithm>
 #include <array>
 #include <deque>
+#include <functional>
 #include <map>
 #include <memory>
 #include <optional>
@@ -166,8 +167,11 @@ struct ThreeDObject {
 
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	ThreeDObjectShapeView GetShape(int level) const;
+	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
+	ThreeDObjectShapeView TryGetShape(int level) const;
 	bool Blocks(double x, double y) const;
 	void Forget() const;
+	ThreeDObjectTexture Painted(const ThreeDObjectTexture &plain, uint32_t paint) const;
 
 	mutable uint32_t used = 0;              ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
 
@@ -228,6 +232,7 @@ struct ThreeDVehicleShape {
 	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
 	static constexpr int SIMPLER_LEVELS = 6;
 	const ThreeDVehicleShape *Simpler(double cell_m) const;
+	const ThreeDVehicleShape *TrySimpler(double cell_m) const;
 private:
 	/** Its simpler shapes, made the first time each is asked for; a copy of the shape has none of its own yet. */
 	struct SimplerShapes {
@@ -452,8 +457,11 @@ struct ThreeDVehicleObject {
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
+	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
+	bool ShapeKnown() const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
+	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
 	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
@@ -576,6 +584,15 @@ struct ThreeDTextureWanted {
 };
 void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
 void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted);
+
+/*
+ * Loading in the background (the player, 17. 10., 4): what the view from the eyes has not got yet -- a shape, a
+ * texture, a simpler shape, a painted texture -- it asks for (the Try... getters above: nullptr, or what stands in
+ * meanwhile) and draws without it this frame; the thread making the pictures of the vehicles
+ * (three_d_vehicle_object.cpp) makes it, and the next frame has it.
+ */
+void ThreeDLoadInBackground(std::function<void()> job);
+extern bool _three_d_load_at_once; ///< the rig: a job is run the moment it is asked for, so a picture is of the moment
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();

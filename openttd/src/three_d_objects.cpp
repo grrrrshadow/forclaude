@@ -2679,17 +2679,23 @@ static std::mutex _lazy_mutex;
 static std::condition_variable _lazy_made;
 /** The things being made now: the object (or the shape) and which thing of it (LazyThing). */
 static std::set<std::pair<const void *, int>> _lazy_making;
-/** Which thing of an object is made (MakeOnce()): of a vehicle object, or of a shape its simpler ones. */
+/** The things asked of the thread in the background and not made yet (MadeOrAsked()). */
+static std::set<std::pair<const void *, int>> _lazy_asked;
+/** Which thing of an object is made (MakeOnce()): of a vehicle object, of a shape its simpler ones, of a building its textures and shapes. */
 enum LazyThing : int {
 	LAZY_SHAPE = 0,
 	LAZY_WALKING = 1,
 	LAZY_PAINT_MASK = 2,
 	LAZY_RUST_MASK = 3,
+	LAZY_HOUSE_LEVELS = 4,   ///< a building's texture at all its levels
 	LAZY_FRAME = 1000,       ///< + the frame
 	LAZY_TEXTURE = 2000,     ///< + the texture's index
 	LAZY_ADDON_MASK = 3000,  ///< + the add-on
 	LAZY_DETAIL_MASK = 4000, ///< + the add-on + 1
 	LAZY_SIMPLER = 5000,     ///< + the level
+	LAZY_HOUSE_SHAPE = 6000, ///< + the level
+	LAZY_HOUSE_MASK = 7000,  ///< + the part painted a colour
+	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its low sixteen bits)
 };
 
 /**
@@ -2719,11 +2725,35 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 	} catch (...) {
 		if (!lock.owns_lock()) lock.lock();
 		_lazy_making.erase(key);
+		_lazy_asked.erase(key);
 		_lazy_made.notify_all();
 		throw;
 	}
 	_lazy_making.erase(key);
+	_lazy_asked.erase(key);
 	_lazy_made.notify_all();
+}
+
+/**
+ * Whether a thing of an object is made; if not, it is asked of the thread in the background (once, ThreeDLoadInBackground()),
+ * to be there a frame or two on -- the view from the eyes draws without it meanwhile (the Try... getters).
+ * @param made whether it is there: under the lock, as MakeOnce()'s
+ * @param make the job that makes it (a getter that does)
+ */
+template <typename Made>
+static bool MadeOrAsked(const void *of, int thing, Made &&made, std::function<void()> make)
+{
+	const std::pair<const void *, int> key(of, thing);
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (made()) return true;
+		if (!_lazy_asked.insert(key).second) return false; // asked already
+	}
+	ThreeDLoadInBackground(std::move(make));
+	if (!_three_d_load_at_once) return false;
+	/* The rig: made now, so it is there. */
+	std::lock_guard lock(_lazy_mutex);
+	return made();
 }
 
 /** The shapes read, by their file and wheels: the paints of a vehicle share one. Read on both threads (MakeOnce()). */
@@ -2768,6 +2798,30 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 		this->shape_tried = true;
 	});
 	return this->shape.get();
+}
+
+/** Whether the object's shape was read (or tried): a Try... getter that gives nothing then gives nothing for good. */
+bool ThreeDVehicleObject::ShapeKnown() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	return this->shape != nullptr || this->shape_tried;
+}
+
+/**
+ * The object's shape (a frame of it) if it is read already; else nullptr, and it is read in the background
+ * (MadeOrAsked()). A figure's frame that cannot be read: its shape, as GetShape(int) gives it.
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
+{
+	MarkThreeDUsed(this->used);
+	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) {
+		if (!MadeOrAsked(this, LAZY_SHAPE, [this] { return this->shape != nullptr || this->shape_tried; }, [this] { this->GetShape(); })) return nullptr;
+		return this->shape.get();
+	}
+	frame = std::max(frame, 0);
+	frame %= this->frames;
+	if (!MadeOrAsked(this, LAZY_FRAME + frame, [this, frame] { return static_cast<size_t>(frame) < this->frame_shapes.size() && this->frame_shapes[frame] != nullptr; }, [this, frame] { this->GetShape(frame); })) return nullptr;
+	return this->frame_shapes[frame].get();
 }
 
 /** The simpler shape of a shape at a level (ThreeDVehicleShape::Simpler()): its corners joined in cells of 2 cm times two to the level. */
@@ -2874,6 +2928,16 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
 	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
+	return made.get();
+}
+
+/** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */
+const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m) const
+{
+	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
+	const std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
+	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m] { this->Simpler(cell_m); })) return this;
 	return made.get();
 }
 
@@ -3375,6 +3439,19 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat);
 		return lv;
 	}, [this, index](ThreeDTextureLevels made) { this->levels[index] = std::move(made); });
+	const ThreeDTextureLevels &lv = this->levels[index];
+	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
+}
+
+/** One of the object's textures at a level of detail if it is made already; else nullptr, and it is made in the background. */
+const ThreeDObjectTexture *ThreeDVehicleObject::TryGetTexture(int level, int index) const
+{
+	MarkThreeDUsed(this->used);
+	const ThreeDVehicleShape *s = this->TryGetShape();
+	if (s == nullptr && !this->ShapeKnown()) return nullptr;
+	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
+	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
+	if (!MadeOrAsked(this, LAZY_TEXTURE + index, [this, index] { return static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr; }, [this, level, index] { this->GetTexture(level, index); })) return nullptr;
 	const ThreeDTextureLevels &lv = this->levels[index];
 	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
 }
@@ -4078,6 +4155,62 @@ int ThreeDShapeLevel(double pixels_per_metre, double shift)
 	return level;
 }
 
+/** A building's shape simplified for a level (ThreeDObject::GetShape()): its corners merged in the cells of the level. */
+static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObject &o, int level)
+{
+	const size_t corners = o.pos.size() / 3;
+	const bool lit = o.light.size() == corners;
+	const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
+	const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
+	/* A texture about a tile across: a corner's place in it moves as far as the corner; but never more than a
+	 * 48th of it, so the parts of the texture (a wall, a roof) do not run into each other. */
+	const double cell_uv = std::min(cell_xy / TILE_SIZE, 1.0 / 48);
+	auto cell = [](double v, double size, int bits) {
+		const int64_t half = int64_t{1} << (bits - 1);
+		return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));
+	};
+	struct Sum {
+		double x = 0, y = 0, z = 0, u = 0, v = 0, l = 0;
+		uint32_t n = 0;
+	};
+	std::unordered_map<uint64_t, uint32_t> cells;
+	std::vector<Sum> sums;
+	std::vector<uint32_t> to(corners);
+	for (size_t i = 0; i < corners; i++) {
+		const double x = o.pos[i * 3], y = o.pos[i * 3 + 1], z = o.pos[i * 3 + 2];
+		const double u = o.uv[i * 2], v = o.uv[i * 2 + 1];
+		const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
+		auto [it, added] = cells.try_emplace(key, static_cast<uint32_t>(sums.size()));
+		if (added) sums.emplace_back();
+		Sum &sum = sums[it->second];
+		sum.x += x;
+		sum.y += y;
+		sum.z += z;
+		sum.u += u;
+		sum.v += v;
+		sum.l += lit ? o.light[i] : 256;
+		sum.n++;
+		to[i] = it->second;
+	}
+	auto shape = std::make_shared<ThreeDObjectShape>();
+	for (const Sum &sum : sums) {
+		shape->pos.insert(shape->pos.end(), {static_cast<float>(sum.x / sum.n), static_cast<float>(sum.y / sum.n), static_cast<float>(sum.z / sum.n)});
+		shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
+		if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
+	}
+	std::unordered_set<uint64_t> had;
+	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+		std::array<uint32_t, 3> c = {to[o.tri[t]], to[o.tri[t + 1]], to[o.tri[t + 2]]};
+		if (c[0] == c[1] || c[1] == c[2] || c[0] == c[2]) continue;
+		/* The same triangle however its corners are counted round (fewer than 2^21 corners). */
+		std::ranges::rotate(c, std::ranges::min_element(c));
+		if (!had.insert(static_cast<uint64_t>(c[0]) | static_cast<uint64_t>(c[1]) << 21 | static_cast<uint64_t>(c[2]) << 42).second) continue;
+		shape->tri.insert(shape->tri.end(), c.begin(), c.end());
+		shape->facing.push_back(t / 3 < o.facing.size() ? o.facing[t / 3] : 0);
+	}
+	return shape;
+}
+
 /**
  * The shape of a building at a level of detail. Its corners in a cell of the level's size, at about the same place in
  * the texture, are one corner: in the middle of them, their texture's place and light their average. A seam of the
@@ -4092,59 +4225,18 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	/* Its own: wanted so, or too many corners to count the triangles below. */
 	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
-	if (this->shapes[level] == nullptr) {
-		const size_t corners = this->pos.size() / 3;
-		const bool lit = this->light.size() == corners;
-		const double cell_xy = ShapeCellMetres(level) * OBJECT_UNITS_PER_METRE;
-		const double cell_z = ShapeCellMetres(level) * OBJECT_HEIGHT_PER_METRE;
-		/* A texture about a tile across: a corner's place in it moves as far as the corner; but never more than a
-		 * 48th of it, so the parts of the texture (a wall, a roof) do not run into each other. */
-		const double cell_uv = std::min(cell_xy / TILE_SIZE, 1.0 / 48);
-		auto cell = [](double v, double size, int bits) {
-			const int64_t half = int64_t{1} << (bits - 1);
-			return static_cast<uint64_t>(std::clamp<int64_t>(static_cast<int64_t>(std::floor(v / size)) + half, 0, 2 * half - 1));
-		};
-		struct Sum {
-			double x = 0, y = 0, z = 0, u = 0, v = 0, l = 0;
-			uint32_t n = 0;
-		};
-		std::unordered_map<uint64_t, uint32_t> cells;
-		std::vector<Sum> sums;
-		std::vector<uint32_t> to(corners);
-		for (size_t i = 0; i < corners; i++) {
-			const double x = this->pos[i * 3], y = this->pos[i * 3 + 1], z = this->pos[i * 3 + 2];
-			const double u = this->uv[i * 2], v = this->uv[i * 2 + 1];
-			const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
-			auto [it, added] = cells.try_emplace(key, static_cast<uint32_t>(sums.size()));
-			if (added) sums.emplace_back();
-			Sum &sum = sums[it->second];
-			sum.x += x;
-			sum.y += y;
-			sum.z += z;
-			sum.u += u;
-			sum.v += v;
-			sum.l += lit ? this->light[i] : 256;
-			sum.n++;
-			to[i] = it->second;
-		}
-		auto shape = std::make_shared<ThreeDObjectShape>();
-		for (const Sum &sum : sums) {
-			shape->pos.insert(shape->pos.end(), {static_cast<float>(sum.x / sum.n), static_cast<float>(sum.y / sum.n), static_cast<float>(sum.z / sum.n)});
-			shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
-			if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
-		}
-		std::unordered_set<uint64_t> had;
-		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
-			std::array<uint32_t, 3> c = {to[this->tri[t]], to[this->tri[t + 1]], to[this->tri[t + 2]]};
-			if (c[0] == c[1] || c[1] == c[2] || c[0] == c[2]) continue;
-			/* The same triangle however its corners are counted round (fewer than 2^21 corners). */
-			std::ranges::rotate(c, std::ranges::min_element(c));
-			if (!had.insert(static_cast<uint64_t>(c[0]) | static_cast<uint64_t>(c[1]) << 21 | static_cast<uint64_t>(c[2]) << 42).second) continue;
-			shape->tri.insert(shape->tri.end(), c.begin(), c.end());
-			shape->facing.push_back(t / 3 < this->facing.size() ? this->facing[t / 3] : 0);
-		}
-		this->shapes[level] = std::move(shape);
-	}
+	MakeOnce(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { return MakeHouseShape(*this, level); }, [this, level](std::shared_ptr<const ThreeDObjectShape> made) { this->shapes[level] = std::move(made); });
+	const ThreeDObjectShape &s = *this->shapes[level];
+	return {s.pos, s.uv, s.light, s.tri, s.facing};
+}
+
+/** The building's shape simplified for a level if it is made already; else its own shape stands in, and the simpler one is made in the background. */
+ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
+{
+	MarkThreeDUsed(this->used);
+	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
+	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing};
 	const ThreeDObjectShape &s = *this->shapes[level];
 	return {s.pos, s.uv, s.light, s.tri, s.facing};
 }
@@ -4296,9 +4388,12 @@ bool ThreeDObject::Blocks(double x, double y) const
 void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted)
 {
 	std::vector<std::pair<const ThreeDObject *, int>> jobs;
-	for (const auto &[o, level] : wanted) {
-		if (o == nullptr || level <= 0 || level >= THREE_D_SHAPE_LEVELS || o->shapes[level] != nullptr) continue;
-		if (std::ranges::find(jobs, std::make_pair(o, level)) == jobs.end()) jobs.emplace_back(o, level);
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const auto &[o, level] : wanted) {
+			if (o == nullptr || level <= 0 || level >= THREE_D_SHAPE_LEVELS || o->shapes[level] != nullptr) continue;
+			if (std::ranges::find(jobs, std::make_pair(o, level)) == jobs.end()) jobs.emplace_back(o, level);
+		}
 	}
 	if (jobs.empty()) return;
 	const size_t threads = std::min<size_t>(jobs.size(), std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16));
@@ -4323,27 +4418,86 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  * @param may_drop whether the painted textures of every object may be dropped here when they take too much memory;
  *                 not while textures are made on several cores at once (PrepareThreeDObjectTextures())
  */
+/** Which thing of a building a painted texture is (MakeOnce()): its level and paint. */
+static int LazyHousePaint(int level, uint32_t paint)
+{
+	return LAZY_HOUSE_PAINT + level + 16 * static_cast<int>(paint & 0xFFFF);
+}
+
+/**
+ * Let the painted textures of every building go when they take too much memory (PAINTED_BUDGET): not while a frame of
+ * the view from the eyes is drawn from them (EyeFrameDrawing()).
+ */
+static void DropPaintedTextures()
+{
+	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing()) return;
+	std::lock_guard lock(_lazy_mutex);
+	for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
+	_painted_bytes = 0;
+}
+
+/** The building's texture at all its levels of detail, read from its PNG the first time (on either thread, MakeOnce()). */
+static void MakeHouseLevels(const ThreeDObject &o)
+{
+	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o] { return !o.levels.empty(); }, [&o] {
+		std::vector<ThreeDObjectTexture> made;
+		DecodeTextureLevels(o.png, made);
+		return made;
+	}, [&o](std::vector<ThreeDObjectTexture> made) { o.levels = std::move(made); });
+}
+
 const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
 {
 	MarkThreeDUsed(this->used);
 	/* A part placed on a tile of an original industry: the part's texture, once for all its places. */
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].GetTexture(level, paint, may_drop);
-	if (this->levels.empty()) DecodeTextureLevels(this->png, this->levels);
+	MakeHouseLevels(*this);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
 	const ThreeDObjectTexture *plain = &this->levels[level];
 	if (paint == 0 || this->colours.empty()) return plain;
-	auto it = this->painted.find({level, paint});
-	if (it != this->painted.end()) return &it->second;
+	if (may_drop) DropPaintedTextures();
+	const std::pair<int, uint32_t> key(level, paint);
+	MakeOnce(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, plain, paint] { return this->Painted(*plain, paint); }, [this, key](ThreeDObjectTexture t) {
+		_painted_bytes += t.px.size() * sizeof(uint32_t);
+		this->painted.emplace(key, std::move(t));
+	});
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : plain;
+}
 
-	/* Not while a frame of the view from the eyes is drawn from them (EyeFrameDrawing()). */
-	if (may_drop && _painted_bytes > PAINTED_BUDGET && !EyeFrameDrawing()) {
-		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
-		_painted_bytes = 0;
-	}
-	ThreeDObjectTexture t = *plain;
+/**
+ * The building's texture at a level of detail if it is read already, painted (PaintAt()) if that is made already;
+ * else nullptr (nothing read yet) or the texture unpainted (its paint not made yet), and what is missing is made in the
+ * background (MadeOrAsked()).
+ */
+const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint) const
+{
+	MarkThreeDUsed(this->used);
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
+	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this] { return !this->levels.empty(); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return nullptr;
+	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	const ThreeDObjectTexture *plain = &this->levels[level];
+	if (paint == 0 || this->colours.empty()) return plain;
+	const std::pair<int, uint32_t> key(level, paint);
+	if (!MadeOrAsked(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return plain;
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : plain;
+}
+
+/** The texture painted by number (PaintAt()): each pixel of a part's mask the part's colour at the texture's lightness, its own where the texture is "zacatek" light. */
+ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint32_t paint) const
+{
+	ThreeDObjectTexture t = plain;
 	for (size_t k = 0; k < this->colours.size(); k++) {
 		const ThreeDObjectColourPart &part = this->colours[k];
-		if (part.levels.empty()) DecodeTextureLevels(part.mask_png, part.levels);
+		/* The mask, read the first time (on either thread). */
+		MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
+			std::vector<ThreeDObjectTexture> made;
+			DecodeTextureLevels(part.mask_png, made);
+			return made;
+		}, [&part](std::vector<ThreeDObjectTexture> made) { part.levels = std::move(made); });
 		/* The mask's level nearest the texture's, read at the same place. */
 		const ThreeDObjectTexture *mask = &part.levels.back();
 		for (const ThreeDObjectTexture &m : part.levels) {
@@ -4370,8 +4524,7 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 			}
 		}
 	}
-	_painted_bytes += t.px.size() * sizeof(uint32_t);
-	return &this->painted.emplace(std::make_pair(level, paint), std::move(t)).first->second;
+	return t;
 }
 
 /**
@@ -4385,24 +4538,24 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 {
 	/* What is not made yet, by object. */
 	std::vector<std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>> jobs;
-	for (const ThreeDTextureWanted &w : wanted) {
-		const ThreeDObject *o = w.obj;
-		if (o == nullptr) continue;
-		/* A part placed on an industry's tile: its part's texture, made once for all its places (one thread a texture). */
-		if (o->texture_of < _three_d_objects.size()) o = &_three_d_objects[o->texture_of];
-		if (!o->levels.empty()) {
-			const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
-			if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const ThreeDTextureWanted &w : wanted) {
+			const ThreeDObject *o = w.obj;
+			if (o == nullptr) continue;
+			/* A part placed on an industry's tile: its part's texture, made once for all its places (one thread a texture). */
+			if (o->texture_of < _three_d_objects.size()) o = &_three_d_objects[o->texture_of];
+			if (!o->levels.empty()) {
+				const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
+				if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
+			}
+			auto it = std::ranges::find(jobs, o, &std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>::first);
+			if (it == jobs.end()) it = jobs.insert(jobs.end(), {o, {}});
+			if (std::ranges::find(it->second, std::make_pair(w.level, w.paint)) == it->second.end()) it->second.emplace_back(w.level, w.paint);
 		}
-		auto it = std::ranges::find(jobs, o, &std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>::first);
-		if (it == jobs.end()) it = jobs.insert(jobs.end(), {o, {}});
-		if (std::ranges::find(it->second, std::make_pair(w.level, w.paint)) == it->second.end()) it->second.emplace_back(w.level, w.paint);
 	}
 	if (jobs.size() < 2) return; // as it comes, when drawn
-	if (_painted_bytes > PAINTED_BUDGET && !EyeFrameDrawing()) {
-		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
-		_painted_bytes = 0;
-	}
+	DropPaintedTextures();
 	std::atomic<size_t> next = 0;
 	auto work = [&]() {
 		for (size_t j; (j = next++) < jobs.size();) {
@@ -4436,6 +4589,7 @@ std::string DescribeThreeDObjects()
 /** Forget what was made of the building to draw it -- its textures, painted or not, its simplified shapes -- to be made again when it is drawn. */
 void ThreeDObject::Forget() const
 {
+	std::lock_guard lock(_lazy_mutex);
 	this->levels.clear();
 	this->levels.shrink_to_fit();
 	size_t painted = 0;
@@ -4452,6 +4606,7 @@ void ThreeDObject::Forget() const
 /** Forget what was made of the vehicle or figure to draw it: its textures and the shapes of its frames (a dragon's poses). */
 void ThreeDVehicleObject::Forget() const
 {
+	std::lock_guard lock(_lazy_mutex);
 	this->levels.clear();
 	this->mask_levels.reset();
 	this->mask_tried = false;

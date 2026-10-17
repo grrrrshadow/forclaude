@@ -8066,7 +8066,8 @@ static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 /** A car of the game's own driving about (three_d_walkers.h) in the view from the eyes. */
 void AddCabCar(const ThreeDVehicleObject *obj, float scale, double x, double y, double z, float facing, bool lit)
 {
-	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
+	/* Its shape if it is read; else read in the background, the car there the next frame. */
+	const ThreeDVehicleShape *shape = obj != nullptr ? obj->TryGetShape() : nullptr;
 	if (shape == nullptr) return;
 	ThreeDEyeVehicle ev;
 	ev.obj = obj;
@@ -8106,37 +8107,99 @@ static void AddCabPlant(std::string_view name, float scale, float stretch, doubl
 	_cab_figures.push_back({std::string(name), scale, x, y, z, facing, 0, stretch, true});
 }
 
-static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg)
+/** What a figure drawn by its triangles needs, resolved while collecting (CabFigureReady(), the Try... getters): drawn as a job of the frame (CabDrawFigureModel()). */
+struct CabFigureModel {
+	const ThreeDVehicleObject *fig = nullptr;
+	const ThreeDVehicleShape *whole = nullptr; ///< its shape
+	const ThreeDVehicleShape *shape = nullptr; ///< as simple as its distance allows
+	std::vector<const ThreeDObjectTexture *> texs; ///< its textures at that detail, painted as its state has them
+	uint64_t parts = 1;   ///< the parts its state shows
+	double turn = 0;      ///< how far its state turns the whole model, degrees
+	/** Its crew that walks, each at its frame. */
+	struct Crew {
+		const ThreeDWalkingCrew *w;
+		const ThreeDVehicleShape *shape; ///< as simple as its distance allows
+		std::vector<const ThreeDObjectTexture *> texs;
+	};
+	std::vector<Crew> crew;
+};
+
+/**
+ * A figure near the eye by its triangles (a dragon before the walker, a mushroom by the way): in the world where it
+ * stands, turned to where it faces, its frame, its textures, lit from its normals -- a billboard of its picture would
+ * be coarse this near, and seen from above as the map sees it. What it needs is looked for here, under the lock, and
+ * only if it is there already (the player, 17. 10., 4: "load in the background"): a shape or a texture not read yet is
+ * read by the thread in the background, and the figure is drawn as its picture, or not at all, this frame.
+ * @param[out] model what to draw it from
+ * @return whether it can be drawn so this frame
+ */
+static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureModel &model)
 {
 	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
-	const ThreeDVehicleShape *whole = fig->GetShape(fg.frame);
+	const ThreeDVehicleShape *whole = fig->TryGetShape(fg.frame);
 	if (whole == nullptr || whole->tri.empty()) return false;
-	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
-	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
-	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
+	const double across = fg.size * OBJECT_UNITS_PER_METRE;
 	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()); the cab the eye
 	 * is in whole, and an arrow (its shaft thinner than that would leave nothing of it). */
 	const CabPoint mid = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 	const double pixels_per_metre = eye.focal * across / std::max(mid.f, CAB_NEAR);
-	const ThreeDVehicleShape *shape = fg.own_cab || fg.missile ? whole : whole->Simpler(_cab_detail_pixels / pixels_per_metre);
+	model.fig = fig;
+	model.whole = whole;
+	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre);
+	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
+	 * a vehicle's body painted as its state has it, its add-ons coloured. */
+	model.texs.assign(std::max<size_t>(1, whole->pngs.size()), nullptr);
+	for (size_t i = 0; i < model.texs.size(); i++) {
+		model.texs[i] = TryGetThreeDEyeVehicleTexture(fig, fg.state, _cab_full_textures ? 1e9 : pixels_per_metre, static_cast<int>(i));
+		if (model.texs[i] == nullptr) return false;
+	}
+	/* The parts its state shows (an add-on's node, a group of the crew; the colleague's hra/3d/PROSBA-V3S-3D.md), and
+	 * how far it turns the whole model about its origin (the colleague's hra/3d/PROSBA-SPECIAL-3D.md: a cart pushed). */
+	model.parts = fig->PartsOf(fg.state);
+	const ThreeDVehicleState *st = fig->State(fg.state);
+	model.turn = st != nullptr ? st->turn : 0.0;
+	/* Its crew that walks (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): each figure the state shows at its frame of the
+	 * way gone; one not read yet is left out this frame. */
+	model.crew.clear();
+	const std::vector<ThreeDWalkingCrew> &walking = fig->WalkingCrew();
+	for (size_t k = 0; k < walking.size(); k++) {
+		const ThreeDWalkingCrew &w = walking[k];
+		if (w.part != 0 && (w.part >= 64 || ((model.parts >> w.part) & 1) == 0)) continue;
+		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(k < 8 ? static_cast<int>((fg.walk >> (8 * k)) & 0xFF) : 0);
+		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
+		const double crew_ppm = pixels_per_metre * w.scale;
+		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}};
+		crew.texs.assign(std::max<size_t>(1, frame_shape->pngs.size()), nullptr);
+		bool ready = true;
+		for (size_t i = 0; i < crew.texs.size() && ready; i++) {
+			crew.texs[i] = TryGetThreeDEyeVehicleTexture(w.figure, 0, _cab_full_textures ? 1e9 : crew_ppm, static_cast<int>(i));
+			ready = crew.texs[i] != nullptr;
+		}
+		if (ready) model.crew.push_back(std::move(crew));
+	}
+	return true;
+}
+
+/**
+ * Draw a figure by its triangles from what was resolved for it (CabFigureReady()): a job of the frame, off the lock.
+ * @param wheels_turn whether the wheels of the models turn (gui.three_d_wheels)
+ */
+static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg, const CabFigureModel &model, bool wheels_turn)
+{
+	const ThreeDVehicleObject *fig = model.fig;
+	const ThreeDVehicleShape *shape = model.shape;
+	const std::vector<const ThreeDObjectTexture *> &texs = model.texs;
+	const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
+	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
+	const double across = fg.size * OBJECT_UNITS_PER_METRE, up = fg.size * fg.stretch * OBJECT_HEIGHT_PER_METRE;
 	/* A vehicle foreshortened along itself as the game spaces its vehicles. */
 	const double length = across * fg.along;
 	const bool lit = shape->nrm.size() == shape->pos.size();
 	/* The light from above, a little from the south-east of the map, as the houses have it. */
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
-	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
-	 * a vehicle's body painted as its state has it, its add-ons coloured. */
-	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, whole->pngs.size()));
-	for (size_t i = 0; i < texs.size(); i++) {
-		texs[i] = GetThreeDEyeVehicleTexture(fig, fg.state, _cab_full_textures ? 1e9 : pixels_per_metre, static_cast<int>(i));
-		if (texs[i] == nullptr) texs[i] = fig->GetTexture(0, static_cast<int>(i));
-	}
-	/* The parts its state shows (an add-on's node, a group of the crew; the colleague's hra/3d/PROSBA-V3S-3D.md), and
-	 * how far it turns the whole model about its origin (the colleague's hra/3d/PROSBA-SPECIAL-3D.md: a cart pushed). */
-	const uint64_t parts = fig->PartsOf(fg.state);
-	const ThreeDVehicleState *st = fig->State(fg.state);
-	const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
+	const uint64_t parts = model.parts;
+	const double ta = model.turn * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
 	auto turned = [&](double &x, double &y) {
 		const double tx = x * tc - y * ts, ty = x * ts + y * tc;
 		x = tx;
@@ -8150,7 +8213,7 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 	};
 	std::vector<WheelTurn> wheel_turn;
 	/* Only as the player has them turning (gui.three_d_wheels, off by default): else they stand in the model. */
-	if (_settings_client.gui.three_d_wheels && !shape->corner_wheel.empty() && !fig->model_wheels.empty()) {
+	if (wheels_turn && !shape->corner_wheel.empty() && !fig->model_wheels.empty()) {
 		double front = -1e9, back_sum = 0;
 		int backs = 0;
 		for (const ThreeDModelWheel &w : fig->model_wheels) {
@@ -8265,21 +8328,11 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 		}
 	};
 	draw(*shape, place, texs);
-	/* Its crew that walks (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): each figure the state shows at its frame of the
-	 * way gone, turned, sized and stood at its place in the model's frame, as detailed as it is big on the picture. */
-	const std::vector<ThreeDWalkingCrew> &walking = fig->WalkingCrew();
-	for (size_t k = 0; k < walking.size(); k++) {
-		const ThreeDWalkingCrew &w = walking[k];
-		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
-		const ThreeDVehicleShape *frame_shape = w.figure->GetShape(k < 8 ? static_cast<int>((fg.walk >> (8 * k)) & 0xFF) : 0);
-		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
-		const double crew_ppm = pixels_per_metre * w.scale;
-		const ThreeDVehicleShape &cs = fg.own_cab ? *frame_shape : *frame_shape->Simpler(_cab_detail_pixels / crew_ppm);
-		std::vector<const ThreeDObjectTexture *> crew_texs(std::max<size_t>(1, frame_shape->pngs.size()));
-		for (size_t i = 0; i < crew_texs.size(); i++) {
-			crew_texs[i] = GetThreeDEyeVehicleTexture(w.figure, 0, _cab_full_textures ? 1e9 : crew_ppm, static_cast<int>(i));
-			if (crew_texs[i] == nullptr) crew_texs[i] = w.figure->GetTexture(0, static_cast<int>(i));
-		}
+	/* Its crew that walks: each figure at its frame of the way gone, turned, sized and stood at its place in the
+	 * model's frame, as detailed as it is big on the picture. */
+	for (const CabFigureModel::Crew &crew : model.crew) {
+		const ThreeDWalkingCrew &w = *crew.w;
+		const ThreeDVehicleShape &cs = *crew.shape;
 		const double wa = w.turn * M_PI / 180.0, wc = std::cos(wa), ws = std::sin(wa);
 		const bool crew_lit = cs.nrm.size() == cs.pos.size();
 		auto crew_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
@@ -8294,10 +8347,9 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 				nz = cs.nrm[i * 3 + 2];
 			}
 		};
-		draw(cs, crew_place, crew_texs);
+		draw(cs, crew_place, crew.texs);
 	}
 	_cab_glass_alpha = 256;
-	return true;
 }
 
 /**
@@ -8366,14 +8418,6 @@ static constexpr double CAB_COARSE = 14.0 * TILE_SIZE;
 static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
 /** The wheat of the farm's fields is drawn this many tiles about the eye; farther, the field's ground. */
 static constexpr double CAB_WHEAT_TILES = 10.0;
-
-/**
- * A figure near the eye by its triangles (a dragon before the walker, a mushroom by the way): in the world where it
- * stands, turned to where it faces, its frame, its textures, lit from its normals -- a billboard of its picture would
- * be coarse this near, and seen from above as the map sees it.
- * @return whether it was drawn (it has a shape)
- */
-static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const struct CabFigure &fg);
 
 /**
  * The night sky in the view from an eye (the player, 15. 10.: "only the night sky", as OpenMW has it): the stars, fixed
@@ -9650,13 +9694,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		ThreeDObjectShapeView shape;
 	};
 	std::vector<ObjectJob> jobs;
-	std::vector<ThreeDTextureWanted> wanted;
 	for (const CabObject &co : objects) {
 		const ThreeDObject &o = *co.obj;
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
 		CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 		if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y)) continue;
-		const ThreeDObjectTexture *full = o.GetTexture(0);
+		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
+		const ThreeDObjectTexture *full = o.TryGetTexture(0);
+		if (full == nullptr) continue;
 		double texels_per_unit = full->w / static_cast<double>(TILE_SIZE);
 		double pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 		int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
@@ -9665,15 +9710,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
 		const int shape_level = ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5);
 		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}});
-		wanted.push_back({&o, level, jobs.back().paint});
 	}
-	PrepareThreeDObjectTextures(wanted);
-	std::vector<std::pair<const ThreeDObject *, int>> shapes;
-	for (const ObjectJob &j : jobs) shapes.emplace_back(j.o, j.shape_level);
-	PrepareThreeDObjectShapes(shapes);
+	/* Its texture painted and its shape simplified if they are made; else unpainted and whole meanwhile, made in the background. */
 	for (ObjectJob &j : jobs) {
-		j.tex = j.o->GetTexture(j.level, j.paint);
-		j.shape = j.o->GetShape(j.shape_level);
+		j.tex = j.o->TryGetTexture(j.level, j.paint);
+		j.shape = j.o->TryGetShape(j.shape_level);
 	}
 	/* As a job of the frame, off the lock: each object on a core of its own: every corner to the eye once, the
 	 * triangles turned away left out (as the engines do), those wholly before the eye straight to its list, the others
@@ -9854,21 +9895,24 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * are, further billboards of their pictures as the turned map shows them, from the eye's side (the angle in steps,
 	 * so that a few pictures serve every heading). */
 	/* All of them drawn at once on every core with the frame: their pictures kept till it is taken (PinThreeDPictures()). */
+	std::vector<std::pair<CabFigure, CabFigureModel>> solid_figures;
 	for (CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
-		/* How big it is: its longest side, world units (a field's plant: hundreds of them, only at the walker's feet). */
+		/* How big it is: its longest side, world units (a field's plant: hundreds of them, only at the walker's feet);
+		 * a shape not read yet is read in the background, the figure a billboard or nothing this frame. */
 		const ThreeDVehicleObject *model = fg.obj != nullptr ? fg.obj : (fg.plant ? nullptr : GetThreeDFigure(fg.name));
-		const ThreeDVehicleShape *model_shape = model != nullptr ? model->GetShape(fg.frame) : nullptr;
+		const ThreeDVehicleShape *model_shape = model != nullptr ? model->TryGetShape(fg.frame) : nullptr;
 		const double extent = model_shape == nullptr ? 0.0 : std::max({(model_shape->x1 - model_shape->x0) * fg.along, model_shape->y1 - model_shape->y0, model_shape->z1 - model_shape->z0}) * fg.size * OBJECT_UNITS_PER_METRE;
 		if (foot.f < -extent) continue; // all of it behind the eye
 		fg.solid = fg.own_cab || fg.missile || (fg.plant ? foot.f < CAB_PLANT_SOLID : extent * eye.focal >= _cab_solid_pixels * std::max(foot.f, CAB_NEAR));
 		if (fg.solid) {
-			/* Its textures stay: collected, drawn on every core after the billboards (the depth sorts them out). */
-			_cab_batching = true;
-			fg.solid = CabDrawFigure(dst, zb, width, height, eye, fg);
-			_cab_batching = false;
+			/* What it needs, if it is there (CabFigureReady()): drawn by its triangles as a job of the frame, after the
+			 * billboards, all of them at once on every core (the depth sorts them out). */
+			CabFigureModel model;
+			fg.solid = CabFigureReady(eye, fg, model);
 			if (fg.solid) {
+				solid_figures.emplace_back(fg, std::move(model));
 				camera.billboards++;
 				continue;
 			}
@@ -9896,8 +9940,18 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		_cab_batching = false;
 		camera.billboards++;
 	}
-	CabFlushBatch(); // the figures, collected above
-	CabFlushGlass(); // and the vehicles' glass over them
+	CabFlushBatch(); // the figures' billboards, collected above
+	CabFlushGlass();
+	/* The figures by their triangles: a job of the frame, their glass over them after (CabFlushGlass()); inside a
+	 * model's cab the near plane is the cab's. */
+	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures)](uint32_t *dst, float *zb) {
+		AutoRestoreBackup near_backup(_cab_near, near);
+		{
+			CabBatchScope batch;
+			for (const auto &[fg, model] : solid_figures) CabDrawFigureModel(dst, zb, width, height, eye, fg, model, wheels_turn);
+		}
+		CabFlushGlass();
+	});
 	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
 	for (const CabBillboard &b : bills) {
 		const CabTexture *tex = CabSpriteTexture(b.ps);
@@ -9961,10 +10015,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		if (!casters.empty()) {
 			const int level = ThreeDShapeLevel(OBJECT_UNITS_PER_METRE / CAB_SHADOW_TEXEL, 1.0);
-			std::vector<std::pair<const ThreeDObject *, int>> wanted;
-			for (const CabShadowCaster &c : casters) wanted.emplace_back(c.obj, level);
-			PrepareThreeDObjectShapes(wanted);
-			for (CabShadowCaster &c : casters) c.shape = c.obj->GetShape(level);
+			for (CabShadowCaster &c : casters) c.shape = c.obj->TryGetShape(level);
 			out.Job([eye, width, height, casters = std::move(casters)](uint32_t *dst, float *zb) { DrawEyeShadows(eye, dst, zb, width, height, casters); });
 		}
 	}
@@ -10051,10 +10102,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 			/* Near and on the far land: the lights of the towns on the horizon. */
 			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_FAR_OBJECT_TILES * TILE_SIZE) continue;
-			/* The texture at the level of detail of its distance, as the house (4b. above). */
-			const double texels_per_unit = o.GetTexture(0)->w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
+			/* The texture at the level of detail of its distance, as the house (4b. above); one not read yet, not this frame. */
+			const ThreeDObjectTexture *full = o.TryGetTexture(0);
+			if (full == nullptr) continue;
+			const double texels_per_unit = full->w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
-			const ThreeDObjectTexture *tex = o.GetTexture(level, o.PaintAt(co.origin));
+			const ThreeDObjectTexture *tex = o.TryGetTexture(level, o.PaintAt(co.origin));
 			for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
 				std::vector<CabPoint> poly;
 				for (int k = 0; k < 3; k++) {
@@ -10275,6 +10328,8 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 {
 	camera.fresh = false;
 	if (_eye_synchronous || _eye_thread_failed) {
+		/* What is not read yet is read now (the rig: a picture is of the moment). */
+		AutoRestoreBackup at_once(_three_d_load_at_once, true);
 		std::unique_ptr<EyeFrame> f = NewEyeFrame(&camera);
 		if (!CollectEyeFrame(v, walker, width, height, camera, *f)) {
 			FreeEyeFrame(std::move(f));

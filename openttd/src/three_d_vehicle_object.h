@@ -68,6 +68,7 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
 void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);
 struct ThreeDObjectTexture;
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
+const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy);

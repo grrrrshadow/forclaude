@@ -41,6 +41,7 @@
 #include <cmath>
 #include <condition_variable>
 #include <deque>
+#include <functional>
 #include <map>
 #include <mutex>
 #include <set>
@@ -1437,9 +1438,11 @@ struct PictureMade {
 };
 /** Only so many wait to be made: the oldest asked for go when more come (a vehicle long gone round its curve). */
 static constexpr size_t PICTURES_WAITING = 128;
-static std::mutex _pictures_mutex; ///< of _pictures_to_make, _pictures_done, _picture_in_hand and _pictures_stop
+static std::mutex _pictures_mutex; ///< of _pictures_to_make, _loads_to_do, _pictures_done, _picture_in_hand and _pictures_stop
 static std::condition_variable _pictures_wake;
 static std::deque<PictureToMake> _pictures_to_make;
+/** What the view from the eyes asked to be made in the background (ThreeDLoadInBackground()): before the pictures, which may need it too. */
+static std::deque<std::function<void()>> _loads_to_do;
 static std::vector<PictureMade> _pictures_done;
 static bool _picture_in_hand = false; ///< the thread is making one now
 static bool _pictures_stop = false;
@@ -1450,13 +1453,26 @@ static std::set<ObjectPictureKey> _pictures_asked;
 /** The vehicles drawn with a picture not their own: drawn again when pictures come. */
 static std::set<VehicleID> _vehicles_owed_pictures;
 
-/** The thread: the newest asked for first (what is on the screen now), each into _pictures_done. */
+/** The thread: the loads first, then the pictures, the newest asked for first (what is on the screen now), each into _pictures_done. */
 static void MakePicturesInBackground()
 {
 	std::unique_lock lock(_pictures_mutex);
 	for (;;) {
-		_pictures_wake.wait(lock, [] { return _pictures_stop || !_pictures_to_make.empty(); });
+		_pictures_wake.wait(lock, [] { return _pictures_stop || !_loads_to_do.empty() || !_pictures_to_make.empty(); });
 		if (_pictures_stop) return;
+		/* A load and a picture in turn when both wait: a town coming into view asks for a hundred loads. */
+		static bool load_turn = true;
+		load_turn = !load_turn;
+		if (!_loads_to_do.empty() && (load_turn || _pictures_to_make.empty())) {
+			std::function<void()> load = std::move(_loads_to_do.front());
+			_loads_to_do.pop_front();
+			_picture_in_hand = true;
+			lock.unlock();
+			load();
+			lock.lock();
+			_picture_in_hand = false;
+			continue;
+		}
 		const PictureToMake p = std::move(_pictures_to_make.back());
 		_pictures_to_make.pop_back();
 		_picture_in_hand = true;
@@ -1478,17 +1494,39 @@ static void MakePicturesInBackground()
 	}
 }
 
+/** The thread, started the first time it is wanted; false when it cannot be (the pictures are made at once then, the loads here). */
+static bool StartPictureThread()
+{
+	if (_pictures_thread_failed) return false;
+	if (_pictures_thread.joinable()) return true;
+	if (!StartNewThread(&_pictures_thread, "ottd:3d-pictures", &MakePicturesInBackground)) {
+		_pictures_thread_failed = true;
+		Debug(misc, 0, "3D vehicles: the thread making their pictures cannot be started; they are made as asked for");
+		return false;
+	}
+	return true;
+}
+
+bool _three_d_load_at_once = false;
+
+/** A job for the thread in the background (three_d_objects.h): what the view from the eyes has not got yet is made; without the thread (or for the rig), here. */
+void ThreeDLoadInBackground(std::function<void()> job)
+{
+	if (_three_d_load_at_once || !StartPictureThread()) {
+		job();
+		return;
+	}
+	{
+		std::lock_guard lock(_pictures_mutex);
+		_loads_to_do.push_back(std::move(job));
+	}
+	_pictures_wake.notify_one();
+}
+
 /** Ask the thread for a picture (started the first time); false when there is none (it could not be started): made at once then. */
 static bool AskForPicture(PictureToMake &&p)
 {
-	if (_pictures_thread_failed) return false;
-	if (!_pictures_thread.joinable()) {
-		if (!StartNewThread(&_pictures_thread, "ottd:3d-pictures", &MakePicturesInBackground)) {
-			_pictures_thread_failed = true;
-			Debug(misc, 0, "3D vehicles: the thread making their pictures cannot be started; they are made as asked for");
-			return false;
-		}
-	}
+	if (!StartPictureThread()) return false;
 	if (!_pictures_asked.insert(p.key).second) return true; // asked already
 	{
 		std::lock_guard lock(_pictures_mutex);
@@ -1529,14 +1567,14 @@ static bool TakePicturesMade()
 bool ThreeDPicturesBeingMade()
 {
 	std::lock_guard lock(_pictures_mutex);
-	return _picture_in_hand || !_pictures_to_make.empty();
+	return _picture_in_hand || !_pictures_to_make.empty() || !_loads_to_do.empty();
 }
 
-/** How many pictures of vehicles wait for the thread, the one in hand among them (the rig, test3d casy). */
+/** How many pictures of vehicles and loads wait for the thread, the one in hand among them (the rig, test3d casy). */
 size_t ThreeDPicturesWaiting()
 {
 	std::lock_guard lock(_pictures_mutex);
-	return _pictures_to_make.size() + (_picture_in_hand ? 1 : 0);
+	return _pictures_to_make.size() + _loads_to_do.size() + (_picture_in_hand ? 1 : 0);
 }
 
 /**
@@ -1555,6 +1593,7 @@ void StopThreeDPictureThread()
 	}
 	_pictures_stop = false;
 	_pictures_to_make.clear();
+	_loads_to_do.clear();
 	_pictures_done.clear();
 	_picture_in_hand = false;
 	_pictures_asked.clear();
@@ -2021,14 +2060,27 @@ bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorld
 	return true;
 }
 
-/** The body's textures painted as their states have them, the add-ons' coloured, for the view from the eyes (GetThreeDEyeVehicleTexture()). */
+/** The body's textures painted as their states have them, the add-ons' coloured, for the view from the eyes (GetThreeDEyeVehicleTexture()); made on either thread. */
 static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int>, ThreeDObjectTexture> _eye_painted;
+static std::mutex _eye_painted_mutex;
+/** Those asked to be made in the background and not made yet (TryGetThreeDEyeVehicleTexture()). */
+static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_asked;
 
 /** The objects are read anew: their painted textures go with them. */
 static void ForgetEyePainted()
 {
+	std::lock_guard lock(_eye_painted_mutex);
 	_eye_painted.clear();
+	_eye_painted_asked.clear();
 	_eye_trails.clear();
+}
+
+/** The level of detail of an object's textures for the view from the eyes: about a texel to a pixel. */
+static int EyeTextureLevel(const ThreeDVehicleObject *obj, const ThreeDVehicleShape *shape, double pixels_per_metre)
+{
+	int level = 0;
+	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
+	return level;
 }
 
 /**
@@ -2041,10 +2093,22 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 {
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr) return nullptr;
-	int level = 0;
-	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
+	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
 	if (state == 0 || raw == nullptr) return raw;
+	const std::tuple<const ThreeDVehicleObject *, int, int, int> key(obj, state, level, index);
+	{
+		std::lock_guard lock(_eye_painted_mutex);
+		auto it = _eye_painted.find(key);
+		if (it != _eye_painted.end()) return &it->second;
+	}
+	/* Made outside the lock (a texture of millions of texels), kept under it: whichever thread is first. */
+	ThreeDObjectTexture t;
+	auto keep = [&]() -> const ThreeDObjectTexture * {
+		std::lock_guard lock(_eye_painted_mutex);
+		_eye_painted_asked.erase(key);
+		return &_eye_painted.emplace(key, std::move(t)).first->second;
+	};
 	const ThreeDVehicleState *st = obj->State(state);
 	/* The mask of details of the texture in the vehicle's colours of its set (callback 1C1), as RasterObject() paints it. */
 	const ObjectDetailPaint details(*obj, *shape, st, std::max<size_t>(1, shape->pngs.size()));
@@ -2055,8 +2119,6 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		const bool coloured = addon >= 0 && st != nullptr && static_cast<size_t>(addon) < st->addon_colours.size() && st->addon_colours[addon] != 0;
 		const ThreeDObjectTexture *mask = coloured ? obj->GetAddonMask(addon, level) : nullptr;
 		if (mask == nullptr && detail == nullptr) return raw;
-		ThreeDObjectTexture &t = _eye_painted[{obj, state, level, index}];
-		if (!t.px.empty()) return &t;
 		const Colour colour(coloured ? st->addon_colours[addon] : 0);
 		const float start = addon >= 0 && obj->addons[addon].start > 0 ? static_cast<float>(obj->addons[addon].start) : 255.0f;
 		t.w = raw->w;
@@ -2084,12 +2146,10 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 				texel = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b), c.a).data;
 			}
 		}
-		return &t;
+		return keep();
 	}
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
 	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return raw;
-	ThreeDObjectTexture &t = _eye_painted[{obj, state, level, 0}];
-	if (!t.px.empty()) return &t;
 	t.w = raw->w;
 	t.h = raw->h;
 	t.px.resize(raw->px.size());
@@ -2107,7 +2167,43 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 			t.px[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)), col.a).data;
 		}
 	}
-	return &t;
+	return keep();
+}
+
+/**
+ * A texture of an object for the view from the eyes (GetThreeDEyeVehicleTexture()) if it is made already; else
+ * nullptr, and it is made in the background (ThreeDLoadInBackground()) -- its shape and its textures read, painted --
+ * for the frames to come. The textures of a state that paints nothing are the object's own.
+ */
+const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index)
+{
+	const ThreeDVehicleShape *shape = obj->TryGetShape();
+	if (shape == nullptr) return nullptr;
+	/* The textures themselves first (and the texel density, which reads the first). */
+	if (obj->TryGetTexture(0, 0) == nullptr) return nullptr;
+	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
+	const ThreeDObjectTexture *raw = obj->TryGetTexture(level, index);
+	if (raw == nullptr) return nullptr;
+	if (state == 0) return raw;
+	const std::tuple<const ThreeDVehicleObject *, int, int, int> key(obj, state, level, index);
+	{
+		std::lock_guard lock(_eye_painted_mutex);
+		auto it = _eye_painted.find(key);
+		if (it != _eye_painted.end()) return &it->second;
+		if (!_eye_painted_asked.insert(key).second) return nullptr; // asked already
+	}
+	ThreeDLoadInBackground([obj, state, pixels_per_metre, index, key] {
+		/* The painting may find nothing to paint: then the texture is the object's own, and the asking is over. */
+		if (GetThreeDEyeVehicleTexture(obj, state, pixels_per_metre, index) != nullptr) {
+			std::lock_guard lock(_eye_painted_mutex);
+			_eye_painted_asked.erase(key);
+		}
+	});
+	if (!_three_d_load_at_once) return nullptr;
+	/* The rig: made now. The texture of a state that paints nothing is the object's own. */
+	std::lock_guard lock(_eye_painted_mutex);
+	auto it = _eye_painted.find(key);
+	return it != _eye_painted.end() ? &it->second : raw;
 }
 
 /**
@@ -2332,13 +2428,17 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	if (fig == nullptr) return nullptr;
 	const bool by_tick = frame < 0;
 	if (by_tick) frame = fig->FrameAt(TimerGameTick::counter, phase);
-	const ThreeDVehicleShape *shape = fig->GetShape(frame);
+	/* For the view from the eyes nothing is read now: its frame draws without the figure till it is read (TryGetShape()). */
+	const bool for_eye = ViewportDrawingEye();
+	const ThreeDVehicleShape *shape = for_eye ? fig->TryGetShape(frame) : fig->GetShape(frame);
 	if (shape == nullptr) return nullptr;
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
 	const int spin_step = fig->spin_ticks > 0 ? static_cast<int>((TimerGameTick::counter % fig->spin_ticks) * SPIN_STEPS / fig->spin_ticks) : 0;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
+	_object_picture_may_wait = for_eye;
 	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step);
+	_object_picture_may_wait = false;
 	if (pic == nullptr) return nullptr;
 	const int tall = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	if (height != nullptr) *height = tall;
@@ -2391,7 +2491,8 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
 	static constexpr float PLANT_STEP = 10.0f;
 	const ThreeDVehicleObject *plant = GetThreeDFigure(name);
 	if (plant == nullptr) return nullptr;
-	const ThreeDVehicleShape *shape = plant->GetShape(0);
+	const bool for_eye = ViewportDrawingEye();
+	const ThreeDVehicleShape *shape = for_eye ? plant->TryGetShape(0) : plant->GetShape(0);
 	if (shape == nullptr) return nullptr;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	float world_az = std::round((facing - 135.0f) / PLANT_STEP) * PLANT_STEP;
@@ -2399,7 +2500,9 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
 	/* Sizes in steps of a twentieth: the plants of a list are each a little other. */
 	scale = std::max(0.05f, std::round(scale * 20.0f) / 20.0f);
 	stretch = std::max(0.05f, std::round(stretch * 20.0f) / 20.0f);
+	_object_picture_may_wait = for_eye;
 	const ThreeDModelPicture *pic = ObjectPicture(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch);
+	_object_picture_may_wait = false;
 	if (pic == nullptr) return nullptr;
 	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * stretch * 8.0 / 3.0)));
 	return pic;

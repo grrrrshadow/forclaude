@@ -34,7 +34,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   převzetí přišpendlené (`PinThreeDPictures()`), textury objektů se při kreslení nezahazují ani nezapomínají
   (`EyeFrameDrawing()`), při novém načtení GRF a při konci hry se na vlákno počká. **3)** Jádra: hra 1, načítání 1
   (vlákno obrázků vozidel), zbytek kreslí (`DrawingCores()` = jádra − 2: na 4 jádrech 2, na 8 šest).
-- **4)** Načítání textur a tvarů pro pohled z očí na pozadí – další krok (viz níže).
+- **4)** Načítání na pozadí: co pohled z očí ještě nemá (tvar, textura, zjednodušený tvar, nalakovaná textura domu
+  i vozidla), si jen „zkusí“ vzít (`TryGetShape/TryGetTexture/TrySimpler`, `TryGetThreeDEyeVehicleTexture`); co není,
+  udělá vlákno obrázků vozidel (`ThreeDLoadInBackground()`, úlohy a obrázky střídavě) a věc se objeví o snímek dvě
+  později (dům zatím nenalakovaný nebo celý místo zjednodušeného, vozidlo jako plakát nebo nic). Vozidla kreslená
+  trojúhelníky (vlastní kabina, auta kolem) se teď i počítají (rohy, kola, posádka) v úloze snímku mimo zámek
+  (`CabFigureReady()` pod zámkem jen vybere hotové, `CabDrawFigureModel()` kreslí): sběr kabiny z 44 ms na jednotky.
+  Textury domů (`ThreeDObject`) jsou pod stejným zámkem jako vozidel (`MakeOnce`), zahazování nalakovaných jen mimo
+  kreslení snímku. Rig kreslí „hned“ a načítá hned (`_three_d_load_at_once`), aby snímky byly z okamžiku.
+- Zbývá: první pohled z očí ve hře, kde ještě nebyly domy objekty, čte indexy objektů (4 s) – šlo by číst při startu
+  na pozadí. Vlákno načítání je jedno a fronta města má stovku úloh; víc vláken až po buildu.
 - Rig: `test3d chodec`/`kabina` kreslí hned (obraz je z okamžiku, snímky sedí); `test3d chodec vlakno 1` zapne vlákno
   jako u hráče. `chodec`/`kabina cas` hlásí `sber X ms, kresleni Y ms`; `chodec mereni` vypíše sběr pod zámkem zvlášť.
 
