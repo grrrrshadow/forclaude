@@ -9617,6 +9617,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string DescribeThreeDPictureMemory();
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDObjectMemory());
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDPictureMemory());
+	} else if (what == "kresli") {
+		/* 'kresli [times]': how long drawing the first vehicle drawn from a 3D object takes, at each zoom, with its
+		 * shape and textures made: what drawing it anew every frame instead of keeping its picture would cost. */
+		auto times = number(2);
+		extern std::string RigTimeThreeDObjectRaster(int times);
+		IConsolePrint(CC_DEFAULT, "test3d: kresli {}", RigTimeThreeDObjectRaster(times.value_or(10)));
 	} else if (what == "zapomen") {
 		/* 'zapomen [seconds]': the clock of the 3D objects on by so many seconds (120 without), what was not drawn since forgotten. */
 		extern std::string RigForgetThreeDObjects(uint seconds);

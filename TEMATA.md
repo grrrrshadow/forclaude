@@ -43,6 +43,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   (hotovo); velikost auta z objektu, ne z obrázku (hotovo); obrázky jen pro depo a nákupní seznam; žádných 8 směrů
   dopředu – „udělat objekt a tím končíme“.
 - Rig: `test3d smycka` ukazuje i tiky hry (průměr, nejdelší, kolikrát nad 10 ms).
+- **Přepínač v nastavení „Domy ve městech: 3D domy / originální domy OpenTTD (jednoduché krabice)“**
+  (`gui.three_d_houses`, Grafika vedle domů při 0°). Originální: žádný dům není 3D objekt – v otočeném pohledu a
+  v pohledu z očí krabice z ručních tabulek jako dřív, při 0° původní obrázky. Rig (město 41 domů, otočený pohled,
+  myš nad mapou): 3D domy průměr 4,0 ms na snímek, originální 2,3 ms.
+- **Domy bez obrázků – změřeno, zatím neudělané, čeká na hráče.** Obrázek domu (`TurnedObjectPicture`) není 8 směrů
+  jako u aut, je to dům nakreslený jednou pro aktuální natočení a zoom; při pohybu myši nebo aut se z něj jen kopíruje.
+  Bez něj se dům kreslí trojúhelníky při každém překreslení: kreslení domů 48 ms → 648 ms na 150 snímků, průměr snímku
+  4,0 → 6,8 ms, pomalých (> 20 ms) 5 → 17, nejdelší 41 → 75 ms. Paměť těch obrázků: 15,8 MB (83 obrázků). Paměť berou
+  data domů z glb: 421 MB (40 domů).
+- **Auta bez obrázků – změřeno, čeká na hráče.** Nakreslit Tatru 148 přímo objektem trvá (jedno jádro, textury
+  hotové): 16× zoom 104 ms, 8× 48 ms, 4× 22 ms, 2× 12 ms, 1× 10 ms – za každé auto a každý snímek. Deset aut na
+  obrazovce při 4× = 220 ms na snímek (4 snímky za vteřinu). Obrázek auta je mezipaměť nakresleného objektu (0,1 MB
+  za 133 obrázků), dělá se na vlákně na pozadí.
+- Tvary vozidel po přečtení pustí rezervu, do které jejich seznamy rostly (`ShrinkShape()`).
+- Rig: `test3d kresli [n]` (jak dlouho trvá nakreslit objekt prvního 3D vozidla na každém zoomu), `test3d pamet`
+  ukazuje i obrázky domů otočeného pohledu.
 
 ## 17. 10. – kolik paměti berou glb a kolik obrázky
 

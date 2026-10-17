@@ -37,6 +37,7 @@
 #include "3rdparty/nlohmann/json.hpp"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
+#include "settings_type.h"
 
 #include <algorithm>
 #include <array>
@@ -2771,6 +2772,30 @@ static std::shared_ptr<const ThreeDVehicleShape> KnownVehicleShape(const std::st
 	return it != _vehicle_shapes.end() ? it->second : nullptr;
 }
 
+/**
+ * A shape read let go of the room its lists grew into as it was read (each up to twice what it holds: the vehicles'
+ * shapes took a third more than their corners and triangles).
+ */
+static void ShrinkShape(ThreeDVehicleShape &s)
+{
+	s.pos.shrink_to_fit();
+	s.nrm.shrink_to_fit();
+	s.uv.shrink_to_fit();
+	s.tri.shrink_to_fit();
+	s.tri_tex.shrink_to_fit();
+	s.night_pos.shrink_to_fit();
+	s.night_tri.shrink_to_fit();
+	s.night_colour.shrink_to_fit();
+	s.night_back.shrink_to_fit();
+	s.tri_part.shrink_to_fit();
+	s.tex_addon.shrink_to_fit();
+	s.corner_wheel.shrink_to_fit();
+	s.tri_glass.shrink_to_fit();
+	s.night_part.shrink_to_fit();
+	s.front_part.shrink_to_fit();
+	s.back_part.shrink_to_fit();
+}
+
 /** The extent of all the corners of a shape read (ThreeDVehicleShape::all). */
 static void ExtentOfAll(ThreeDVehicleShape &s)
 {
@@ -2945,6 +2970,7 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 	out->tex_addon = shape.tex_addon;
 	out->glass_alpha = shape.glass_alpha;
 	out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
+	ShrinkShape(*out);
 	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, shape.tri.size() / 3);
 	return out;
 }
@@ -3045,6 +3071,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 		}
 	}
+	ShrinkShape(*made);
 	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);
 	return made;
@@ -3122,6 +3149,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		}
 		Debug(misc, 1, "3D vehicle {}: {} triangles, {} materials, {:.2f}..{:.2f} x {:.2f}..{:.2f} x {:.2f}..{:.2f} m", this->name, made->tri.size() / 3, made->pngs.size(),
 				made->x0, made->x1, made->y0, made->y1, made->z0, made->z1);
+		ShrinkShape(*made);
 		ExtentOfAll(*made);
 		KeepVehicleShape(key, made);
 		return made;
@@ -3434,6 +3462,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
 			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
+	ShrinkShape(*made);
 	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);
 	return made;
@@ -3901,6 +3930,8 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, 
 	 * "I am nostalgic, the white house of many storeys, tall, I would keep"): the tall office block. */
 	static constexpr HouseID KEPT_AS_HAND_TABLE[] = {0x1c};
 	if (std::ranges::find(KEPT_AS_HAND_TABLE, north_house) != std::end(KEPT_AS_HAND_TABLE)) return nullptr;
+	/* The original houses of OpenTTD wanted instead (gui.three_d_houses): no house is a 3D object. */
+	if (_settings_client.gui.three_d_houses != 0) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	if (theme != 0) {
 		auto themed = _three_d_house_objects.find(std::make_tuple(theme, north_house, colour_slot & 3));
@@ -3919,6 +3950,7 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, 
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme)
 {
 	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot, theme);
+	if (_settings_client.gui.three_d_houses != 0) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	const HouseSpec *hs = HouseSpec::Get(north_house);
 	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;

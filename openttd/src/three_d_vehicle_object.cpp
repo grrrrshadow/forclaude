@@ -2772,10 +2772,46 @@ std::string DescribeThreeDPictureMemory()
 	}
 	extern size_t GetThreeDObjectSpriteBytes(size_t &count);
 	extern size_t GetSpriteCacheBytesUsed();
-	size_t sprite_count = 0;
+	extern size_t GetTurnedObjectPictureBytes(size_t &count);
+	size_t sprite_count = 0, house_count = 0;
 	const size_t sprites = GetThreeDObjectSpriteBytes(sprite_count);
-	return fmt::format("obrazky: otoceny pohled {:.1f} MB ({} obrazku), lakovane textury pohledu z oci {:.1f} MB ({}), sprity 8 smeru v cache spritu {:.1f} MB ({} nactenych z {} pozadanych), cache spritu celkem {:.1f} MB z {} MB",
-			mb(turned), _object_pictures.size(), mb(painted), _eye_painted.size(), mb(sprites), sprite_count, _object_sprites.size(), mb(GetSpriteCacheBytesUsed()), _settings_client.gui.sprite_cache_size_mb);
+	const size_t houses = GetTurnedObjectPictureBytes(house_count);
+	return fmt::format("obrazky: domy otoceneho pohledu {:.1f} MB ({}), otoceny pohled {:.1f} MB ({} obrazku), lakovane textury pohledu z oci {:.1f} MB ({}), sprity 8 smeru v cache spritu {:.1f} MB ({} nactenych z {} pozadanych), cache spritu celkem {:.1f} MB z {} MB",
+			mb(houses), house_count, mb(turned), _object_pictures.size(), mb(painted), _eye_painted.size(), mb(sprites), sprite_count, _object_sprites.size(), mb(GetSpriteCacheBytesUsed()), _settings_client.gui.sprite_cache_size_mb);
+}
+
+/**
+ * The rig ('test3d kresli'): how long drawing the object of the first vehicle drawn from one takes at each zoom of the
+ * map (RasterObject() at 30 degrees, its shape and textures made by the first drawing, which is not counted).
+ */
+std::string RigTimeThreeDObjectRaster(int times)
+{
+	const Vehicle *found = nullptr;
+	const ThreeDVehicleObject *obj = nullptr;
+	for (const Vehicle *v : Vehicle::Iterate()) {
+		int piece = 0;
+		obj = v->IsPrimaryVehicle() ? ThreeDVehicleObjectOf(v, &piece) : nullptr;
+		if (obj != nullptr) {
+			found = v;
+			break;
+		}
+	}
+	if (found == nullptr) return "no vehicle drawn from a 3D object";
+	const int state = StateStep(obj, found->engine_type, found, EngineImageType::OnMap);
+	std::string out = obj->name;
+	times = std::clamp(times, 1, 1000);
+	for (ZoomLevel zoom : {ZoomLevel::In16x, ZoomLevel::In8x, ZoomLevel::In4x, ZoomLevel::In2x, ZoomLevel::Normal}) {
+		const float pxm = PXM_16X / (1 << to_underlying(zoom));
+		ObjectRaster r;
+		RasterObject(*obj, ObjectScale(obj), 30.0f, 30.0f, 1.0f, pxm, FadeAmount(obj, state), r, 0, RustTime(obj, state), 0, PaletteColour(obj, state), 1.0f, 0.0f, 0.0f, 0.0f, 0, state);
+		const auto start = std::chrono::steady_clock::now();
+		for (int i = 0; i < times; i++) {
+			RasterObject(*obj, ObjectScale(obj), 30.0f, 30.0f, 1.0f, pxm, FadeAmount(obj, state), r, 0, RustTime(obj, state), 0, PaletteColour(obj, state), 1.0f, 0.0f, 0.0f, 0.0f, 0, state);
+		}
+		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / times;
+		out += fmt::format(", zoom {} ({}x{} px) {:.2f} ms", to_underlying(zoom), r.width, r.height, ms);
+	}
+	return out;
 }
 
 /** The rig: the objects' sprites made. */

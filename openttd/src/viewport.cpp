@@ -3553,6 +3553,13 @@ static const TurnedObjectPicture *GetTurnedObjectPicture(const ObjectLay &lay, c
 	return &_turned_object_pictures.emplace(key, std::move(pic)).first->second;
 }
 
+/** How much memory the pictures of the buildings take now (GetTurnedObjectPicture()), for the rig (test3d pamet). */
+size_t GetTurnedObjectPictureBytes(size_t &count)
+{
+	count = _turned_object_pictures.size();
+	return _turned_object_bytes;
+}
+
 /** Draw a part of a building drawn as a 3D object: from its picture when it is kept (GetTurnedObjectPicture()). */
 static void DrawTurnedObjectPart(const DrawPixelInfo &frame, const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z, uint32_t paint, std::span<const ThreeDObjectFigure> more)
 {
