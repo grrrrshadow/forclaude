@@ -73,6 +73,7 @@
 #include "viewport_func.h"
 #include "zoom_func.h"
 #include "window_func.h"
+#include "gfx_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
 #include "company_func.h"
@@ -8989,6 +8990,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
 			const double metres = RigFirstPersonHoldW(frame_ms, frames);
 			IConsolePrint(CC_DEFAULT, "test3d: drzeni W {} snimku po {} ms ({:.2f} s): usel {:.2f} m, {:.2f} m/s", frames, frame_ms, frames * frame_ms / 1000.0, metres, metres / (frames * frame_ms / 1000.0));
+		} else if (argv.size() > 3 && argv[2] == "klavesa") {
+			/* 'chodec klavesa <c> [inventar]': a key as the player presses it (HandleKeypress()), the focus on the view
+			 * from the first person, or on its inventory; what is in the hand after. */
+			extern WalkerItem FirstPersonWeaponInHand();
+			Window *focus = FindWindowById(argv.size() > 4 && argv[4] == "inventar" ? WindowClass::WalkerInventory : WindowClass::FirstPerson, 0);
+			if (focus != nullptr) SetFocusedWindow(focus);
+			{
+				AutoRestoreBackup cur_company(_current_company, _local_company);
+				const char32_t c = static_cast<char32_t>(argv[3][0]);
+				HandleKeypress(c >= 'a' && c <= 'z' ? c - 'a' + 'A' : c, c);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: chodec klavesa {} (fokus {}): v ruce {}", argv[3], focus == nullptr ? "zadny" : argv.size() > 4 ? argv[4] : "chodec", to_underlying(FirstPersonWeaponInHand()));
+		} else if (argv.size() > 2 && argv[2] == "volno") {
+			/* 'chodec volno [tiles]': where the walker can stand about it (RigFirstPersonFreeMap()). */
+			extern std::string RigFirstPersonFreeMap(int tiles);
+			const std::string map = RigFirstPersonFreeMap(number(3).value_or(1));
+			for (size_t at = 0, next; at < map.size(); at = next + 1) {
+				next = map.find('\n', at);
+				if (next == std::string::npos) next = map.size();
+				IConsolePrint(CC_DEFAULT, "test3d: {}", map.substr(at, next - at));
+			}
 		} else if (argv.size() > 2 && argv[2] == "mereni") {
 			/* 'chodec mereni <times> <threads>': how long a picture from the eyes takes, on so many threads (0 all). */
 			const int times = number(3).value_or(10), threads = number(4).value_or(0);
@@ -9104,6 +9126,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			/* A dragon's blow, through the command, as the game deals it. */
 			AutoRestoreBackup cur_company(_current_company, _local_company);
 			Command<Commands::HurtWalker>::Do(DoCommandFlag::Execute, static_cast<uint8_t>(std::clamp(*n, 0, 255)));
+		} else if (argv.size() > 3 && argv[2] == "klik" && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
+			/* 'inventar klik <n>': a click on the line of thing n in the window, as the player clicks. */
+			extern std::string RigWalkerInventoryClick(WalkerItem item);
+			extern WalkerItem FirstPersonWeaponInHand();
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			const std::string did = RigWalkerInventoryClick(static_cast<WalkerItem>(*n));
+			IConsolePrint(CC_DEFAULT, "test3d: inventar klik {}: {}, v ruce {}", *n, did.empty() ? "zadny radek" : did, to_underlying(FirstPersonWeaponInHand()));
 		} else if (argv.size() > 3 && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
 			const WalkerItem item = static_cast<WalkerItem>(*n);
 			AutoRestoreBackup cur_company(_current_company, _local_company);
@@ -9575,9 +9604,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (int r = 0; r < obj->tiles_y * 16; r++) {
 			std::string line;
 			for (int c = 0; c < obj->tiles_x * 16; c++) {
-				/* A character for four cells of the footprint (32 a tile). */
+				/* A character for sixteen cells of the footprint (64 a tile): # where any of them is a wall. */
 				bool wall = false;
-				for (int k = 0; k < 4; k++) wall |= obj->Blocks((c + 0.25 + (k & 1) * 0.5) * step, (r + 0.25 + (k >> 1) * 0.5) * step);
+				for (int k = 0; k < 16; k++) wall |= obj->Blocks((c + 0.125 + (k & 3) * 0.25) * step, (r + 0.125 + (k >> 2) * 0.25) * step);
 				line += wall ? '#' : '.';
 			}
 			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);

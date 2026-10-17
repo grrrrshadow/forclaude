@@ -2377,6 +2377,8 @@ STR_WALKER_HEALTH                                               :Zdraví: {NUM}/
 STR_WALKER_CARRIED                                              :Neseš:
 STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
 STR_WALKER_USE                                                  :[použít, +{NUM} zdraví]
+STR_WALKER_TAKE                                                 :[{NUM}: vzít do ruky]
+STR_WALKER_IN_HAND                                              :[{NUM}: v ruce, schovat]
 STR_WALKER_FOR_SALE                                             :Tady se prodává ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Tady se nic neprodává. Dojdi do hospody, k automatu, do hulírny nebo do obchodu ve městě.
 STR_WALKER_BUY                                                  :[koupit za {CURRENCY_LONG}]

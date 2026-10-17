@@ -9235,7 +9235,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* Inside a model's cab its windscreen is a step from the eye: the near plane a few centimetres off. The walker
 	 * looking down sees the ground at its feet, nearer than the cab's near plane: a ground cut off there showed the
 	 * sky under it at the bottom of the picture. */
-	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.4 : CAB_NEAR);
+	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.25 : CAB_NEAR);
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
 	if (walker != nullptr) eye.cy += std::tan(walker->pitch) * eye.focal;

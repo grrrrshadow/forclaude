@@ -48,6 +48,12 @@
 static constexpr double OBJECT_UNITS_PER_METRE = 16.0 / 14.83765;
 /** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
 static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
+/**
+ * How far the walker of the view from the first person keeps from a wall, metres: half a body across and a little
+ * (first_person_gui.cpp; ThreeDObject::Blocks() shuts a door narrower than that). It was 1.4 m, a walker three metres
+ * wide: it did not get through an alley between two houses (the player, 17. 10.).
+ */
+static constexpr double THREE_D_WALKER_RADIUS_M = 0.4;
 
 /** A texture of an object at one level of detail: 32bpp pixels in the blitter's colours, 0 where it is transparent. */
 struct ThreeDObjectTexture {
@@ -175,7 +181,7 @@ struct ThreeDObject {
 
 	mutable uint32_t used = 0;              ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
 
-	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 32nd of a tile (Blocks()), made the first time
+	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 64th of a tile (Blocks()), made the first time
 	mutable int footprint_w = 0;            ///< the cells across x, 0 not made yet
 	uint32_t PaintAt(TileIndex origin) const;
 };

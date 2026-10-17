@@ -4241,8 +4241,8 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 	return {s.pos, s.uv, s.light, s.tri, s.facing};
 }
 
-/** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about half a metre. */
-static constexpr int FOOTPRINT_CELLS = 32;
+/** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */
+static constexpr int FOOTPRINT_CELLS = 64;
 
 /**
  * Whether a building stands at a place as high as a walker's body, from its knees to over its head (the
@@ -4313,7 +4313,8 @@ bool ThreeDObject::Blocks(double x, double y) const
 		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
 		 * a walker's half-width (WALKER_CELLS) from every wall, a door narrower than a walker shut -- is solid too.
 		 */
-		static constexpr int WALKER_CELLS = 3;
+		static constexpr double WALKER_CELLS_EXACT = THREE_D_WALKER_RADIUS_M * OBJECT_UNITS_PER_METRE * FOOTPRINT_CELLS / TILE_SIZE;
+		static constexpr int WALKER_CELLS = static_cast<int>(WALKER_CELLS_EXACT) + (WALKER_CELLS_EXACT > static_cast<int>(WALKER_CELLS_EXACT) ? 1 : 0);
 		/* On a grid with a margin round the tiles, free: the walker comes from there. */
 		static constexpr int MARGIN = WALKER_CELLS + 1;
 		const int ew = w + 2 * MARGIN, eh = h + 2 * MARGIN;

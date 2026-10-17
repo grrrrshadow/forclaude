@@ -19,6 +19,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – luk do ruky z inventáře, ulička mezi domy, holky na balkonech
+
+- Hráč: **„kliknutí na věc v inventáři nepoužije tu věc, chci vzít do ruky luk, myší i klávesnicí 1, 2, 3, 4 jako v
+  suite Morrowindu“** – v inventáři u každé zbraně `[2: vzít do ruky]`, kliknutím do ruky, u té v ruce `[2: v ruce,
+  schovat]` (zelená), kliknutím schovat. Klávesy 1–5 jdou chodci i s inventářem v popředí (`HandleKeypress()`:
+  okno chodce nebo inventáře s fokusem dostane klávesy první, před stavební lištou, která má 1, 2, … taky).
+- Hráč: **„neprojdu uličkami mezi domy, okolo domů je zbytek dlaždice volný“** (+ snímek uličky). Chodec narážel
+  kruhem o poloměru 1,4 m (široký skoro 3 m). Teď 0,4 m (`THREE_D_WALKER_RADIUS_M`), půdorys domů po 1/64 dlaždice
+  (23 cm, dřív 46 cm), chůze po kouscích 9 cm (běh nepřeskočí tenkou zeď), přední rovina oka chodce 0,25 jednotky
+  (u zdi se neprohlíží skrz). Chodec sám se nezměnil (hráč: „jakého menšího chodce?“ – jen ten neviditelný kruh).
+  Rig: `test3d chodec volno [dlaždice]` (mapa, kde chodec může stát, po 0,5 m; X = dům bez 3D objektu),
+  `chodec klavesa <c> [inventar]`, `inventar klik <n>`.
+- Hráč: **holky na balkonech nemají hlavy** („já řek všechny, ale ne tyhle všechny“). Index mírných domů (kolegův)
+  má u všech 70 postav `meritko` 2 – na balkonech (domy 06, 18, 1a, 02 ve výšce 3,2–6,7 m) jim na mapě hlava vjede
+  do patra nad balkonem. V pohledu z očí jsou postavy na domech v pravé velikosti. Čeká na hráče: kterým holkám dát
+  zpět 1 (balkony, nebo všem u domů) – pak to napíšu kolegovi (index je jeho).
+- Hráč: **při pohledu 0° jely Tatra VB a 138 plynule (#181), v jiných úhlech se to kouše – proč, když jsou to 3D
+  objekty**. Při 0° se z objektu udělá 8 spritů (8 směrů) jednou a dál se kreslí jako sprite. V otočeném pohledu se
+  kreslí obrázek objektu v přesném úhlu po 5° (plynulé zatáčení) – každý nový úhel, zoom a stav je nový obrázek
+  (10–60 ms, první u typu ~0,5 s textury). V #181 se dělaly na hlavním vlákně; od `82b1b7d` na vlákně na pozadí
+  (bude v #182). Kdyby se pořád kousalo: dopředu na pozadí udělat všech 72 úhlů typu najednou.
+
 ## 17. 10. – pohled z očí mimo zámek hry (hráč: „udělej 1 2 3 4“)
 
 - Hráč: **„jak ti bude jedno jádro počítat hru, druhé načítat auta, když 8 jader kreslí first person view“ … „proto

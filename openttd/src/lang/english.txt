@@ -2272,6 +2272,8 @@ STR_WALKER_HEALTH                                               :Health: {NUM}/{
 STR_WALKER_CARRIED                                              :You carry:
 STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
 STR_WALKER_USE                                                  :[use, +{NUM} health]
+STR_WALKER_TAKE                                                 :[{NUM}: take in hand]
+STR_WALKER_IN_HAND                                              :[{NUM}: in hand, put away]
 STR_WALKER_FOR_SALE                                             :For sale here ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Nothing for sale here. Walk to a pub, a vending machine, a coffeeshop or a shop of a town.
 STR_WALKER_BUY                                                  :[buy for {CURRENCY_LONG}]

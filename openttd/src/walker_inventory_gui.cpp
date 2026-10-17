@@ -7,7 +7,8 @@
 
 /**
  * @file walker_inventory_gui.cpp The window of the walker's inventory (walker_inventory.h): its health, the things it
- * carries -- a click uses the beer or the marijuana -- and the things sold where it stands -- a click buys one.
+ * carries -- a click uses the beer or the marijuana, takes a weapon in the hand or puts it away -- and the things sold
+ * where it stands -- a click buys one.
  */
 
 #include "stdafx.h"
@@ -29,6 +30,11 @@
 TileIndex FirstPersonShopNearby();
 /** The tile the walker of the view from the first person stands on, or INVALID_TILE (first_person_gui.cpp). */
 TileIndex FirstPersonWalkerTile();
+/** The weapons of the walker of the view from the first person (first_person_gui.cpp): a weapon's key, the one in the hand, one taken. */
+int FirstPersonWeaponKey(WalkerItem item);
+WalkerItem FirstPersonWeaponInHand();
+void FirstPersonTakeWeapon(WalkerItem item);
+bool FirstPersonOpen();
 
 static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
@@ -45,14 +51,21 @@ static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 
 /** The window of the walker's inventory; there is one, number 0. */
 struct WalkerInventoryWindow : Window {
+	/** What a click on a line does. */
+	enum class LineDoes : uint8_t {
+		Use,  ///< use one (the beer, the marijuana)
+		Buy,  ///< buy one here
+		Hand, ///< a weapon into the hand, or put away
+	};
 	/** A line of the list a click acts on. */
 	struct Line {
 		int top, bottom;
 		WalkerItem item;
-		bool buy; ///< buy one here, else use one
+		LineDoes does;
 	};
 	mutable std::vector<Line> lines; ///< where the clickable lines were drawn
 	TileIndex shop = INVALID_TILE;   ///< where things are sold near the walker, as last seen
+	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
 
 	WalkerInventoryWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
@@ -61,12 +74,14 @@ struct WalkerInventoryWindow : Window {
 		this->shop = FirstPersonShopNearby();
 	}
 
-	/** The walker walks on: what is sold where it stands now. */
+	/** The walker walks on: what is sold where it stands now; and the weapon in its hand. */
 	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
 	{
 		TileIndex now = FirstPersonShopNearby();
-		if (now != this->shop) {
+		const WalkerItem hand = FirstPersonWeaponInHand();
+		if (now != this->shop || hand != this->in_hand) {
 			this->shop = now;
+			this->in_hand = hand;
 			this->SetWidgetDirty(WID_WI_LIST);
 		}
 	}
@@ -96,18 +111,24 @@ struct WalkerInventoryWindow : Window {
 		GfxFillRect(bar_left, bar_top, bar_left + (ir.right - bar_left) * c->walker_health / WALKER_HEALTH_MAX, bar_bottom, GetColourGradient(Colours::Red, Shade::Light));
 		y += lh + 4;
 
-		/* What it carries; the beer and the marijuana used with a click. */
+		/* What it carries; the beer and the marijuana used with a click, a weapon taken in the hand (as its key 1 to 5
+		 * does in the view from the first person, Morrowind's quick keys) or put away. */
 		DrawString(ir.left, ir.right, y, STR_WALKER_CARRIED, TextColour::Yellow);
 		y += lh;
+		const WalkerItem hand = FirstPersonWeaponInHand();
 		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
 			const WalkerItem item = static_cast<WalkerItem>(i);
 			const uint count = c->walker_items[i];
 			if (count == 0) continue;
 			const WalkerItemSpec &spec = GetWalkerItemSpec(item);
-			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_ITEM_COUNT, spec.name, count), TextColour::White);
+			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_ITEM_COUNT, spec.name, count), item == hand ? TextColour::Yellow : TextColour::White);
+			const int key = FirstPersonWeaponKey(item);
 			if (spec.heal != 0) {
 				DrawString(ir.left, ir.right, y, GetString(STR_WALKER_USE, spec.heal), TextColour::Orange, AlignmentH::End);
-				this->lines.push_back({y, y + lh, item, false});
+				this->lines.push_back({y, y + lh, item, LineDoes::Use});
+			} else if (key != 0 && FirstPersonOpen()) {
+				DrawString(ir.left, ir.right, y, GetString(item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, key), item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
+				this->lines.push_back({y, y + lh, item, LineDoes::Hand});
 			}
 			y += lh;
 		}
@@ -126,7 +147,7 @@ struct WalkerInventoryWindow : Window {
 			if (!IsWalkerItemSoldAt(item, this->shop)) continue;
 			DrawString(ir.left + 8, ir.right, y, GetWalkerItemSpec(item).name, TextColour::White);
 			DrawString(ir.left, ir.right, y, GetString(STR_WALKER_BUY, WalkerItemPrice(item)), TextColour::Green, AlignmentH::End);
-			this->lines.push_back({y, y + lh, item, true});
+			this->lines.push_back({y, y + lh, item, LineDoes::Buy});
 			y += lh;
 		}
 	}
@@ -136,11 +157,20 @@ struct WalkerInventoryWindow : Window {
 		if (widget != WID_WI_LIST) return;
 		for (const Line &l : this->lines) {
 			if (pt.y < l.top || pt.y >= l.bottom) continue;
-			if (l.buy) {
-				Command<Commands::BuyWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, this->shop, l.item);
-			} else {
-				const TileIndex here = FirstPersonWalkerTile();
-				Command<Commands::UseWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_USE, IsValidTile(here) ? here : TileIndex{}, l.item);
+			switch (l.does) {
+				case LineDoes::Buy:
+					Command<Commands::BuyWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, this->shop, l.item);
+					break;
+				case LineDoes::Use: {
+					const TileIndex here = FirstPersonWalkerTile();
+					Command<Commands::UseWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_USE, IsValidTile(here) ? here : TileIndex{}, l.item);
+					break;
+				}
+				case LineDoes::Hand:
+					FirstPersonTakeWeapon(l.item);
+					this->in_hand = FirstPersonWeaponInHand();
+					this->SetWidgetDirty(WID_WI_LIST);
+					break;
 			}
 			return;
 		}
@@ -158,4 +188,21 @@ static WindowDesc _walker_inventory_desc(
 void ShowWalkerInventoryWindow()
 {
 	AllocateWindowDescFront<WalkerInventoryWindow>(_walker_inventory_desc, 0);
+}
+
+/**
+ * The rig: a click on the line of a thing in the inventory open, as drawn last (its window focused, as a click does).
+ * @return what the line said a click does: "pouzit", "koupit", "ruka", or "" for no such line
+ */
+std::string RigWalkerInventoryClick(WalkerItem item)
+{
+	WalkerInventoryWindow *w = static_cast<WalkerInventoryWindow *>(FindWindowById(WindowClass::WalkerInventory, 0));
+	if (w == nullptr) return {};
+	for (const WalkerInventoryWindow::Line &l : w->lines) {
+		if (l.item != item) continue;
+		SetFocusedWindow(w);
+		w->OnClick({w->width / 2, l.top + 1}, WID_WI_LIST, 1);
+		return l.does == WalkerInventoryWindow::LineDoes::Buy ? "koupit" : l.does == WalkerInventoryWindow::LineDoes::Use ? "pouzit" : "ruka";
+	}
+	return {};
 }

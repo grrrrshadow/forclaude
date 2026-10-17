@@ -66,8 +66,10 @@ static constexpr double FIRST_PERSON_TURN = 2.0;
 static constexpr double FIRST_PERSON_PITCH_MAX = 1.0;
 /** How much a pixel of the mouse turns it, radians. */
 static constexpr double FIRST_PERSON_MOUSE = 0.005;
-/** How far from a wall it stops, world units. */
-static constexpr double FIRST_PERSON_RADIUS = 1.5;
+/** How far from a wall it stops, world units (THREE_D_WALKER_RADIUS_M). */
+static constexpr double FIRST_PERSON_RADIUS = THREE_D_WALKER_RADIUS_M * OBJECT_UNITS_PER_METRE;
+/** The longest move checked against the walls at once, world units: running a step goes in pieces, so no wall is stepped over. */
+static constexpr double FIRST_PERSON_SUBSTEP = 0.1;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
 /** How long taking a weapon out or putting it away takes, and a swing of it, seconds. */
@@ -510,16 +512,22 @@ struct FirstPersonWindow : Window {
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
 		const double rx = fy, ry = -fx;
 		const double dx = (fx * ahead + rx * aside) * speed, dy = (fy * ahead + ry * aside) * speed;
-		/* Along a wall, sliding: each way on its own where both together would go into it (FirstPersonFree()). */
-		auto free = FirstPersonFree;
-		const double x = this->walker.x, y = this->walker.y;
-		if (free(x + dx, y + dy)) {
-			this->walker.x = x + dx;
-			this->walker.y = y + dy;
-		} else if (free(x + dx, y)) {
-			this->walker.x = x + dx;
-		} else if (free(x, y + dy)) {
-			this->walker.y = y + dy;
+		/* Along a wall, sliding: each way on its own where both together would go into it (FirstPersonFree()); in
+		 * pieces, so that a run does not step over a thin wall. */
+		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
+		for (int i = 0; i < pieces; i++) {
+			const double px = dx / pieces, py = dy / pieces;
+			const double x = this->walker.x, y = this->walker.y;
+			if (FirstPersonFree(x + px, y + py)) {
+				this->walker.x = x + px;
+				this->walker.y = y + py;
+			} else if (FirstPersonFree(x + px, y)) {
+				this->walker.x = x + px;
+			} else if (FirstPersonFree(x, y + py)) {
+				this->walker.y = y + py;
+			} else {
+				break;
+			}
 		}
 	}
 
@@ -758,6 +766,12 @@ struct FirstPersonWindow : Window {
 		if (k < 0 || k >= static_cast<int>(std::size(_first_person_weapons)) || Carried(_first_person_weapons[k].item) == 0) return;
 		this->wanted = k;
 		this->weapon_out = true;
+	}
+
+	/** The weapon in the hand or being taken there (out, Choose()), End for none. */
+	WalkerItem InHand() const
+	{
+		return this->weapon_out ? _first_person_weapons[this->wanted].item : WalkerItem::End;
 	}
 
 	EventState OnKeyPress(char32_t key, uint16_t keycode) override
@@ -1025,6 +1039,12 @@ double FirstPersonWalkerHeading()
 	return w != nullptr ? w->walker.heading : 0.0;
 }
 
+/** Whether the view from the first person is open. */
+bool FirstPersonOpen()
+{
+	return FindWindowById(WindowClass::FirstPerson, 0) != nullptr;
+}
+
 /** The tile the walker of the view from the first person stands on, or INVALID_TILE without the window. */
 TileIndex FirstPersonWalkerTile()
 {
@@ -1106,6 +1126,38 @@ void AddFirstPersonMissilesToEye()
 	for (const FirstPersonMissile &m : w->missiles) AddCabMissile(m.thing, m.x, m.y, m.z, m.facing, m.pitch);
 }
 
+/** The key of a weapon of the walker (1 to 5, as Choose() counts them from 0), 0 for a thing that is not one. */
+int FirstPersonWeaponKey(WalkerItem item)
+{
+	for (size_t k = 0; k < std::size(_first_person_weapons); k++) {
+		if (_first_person_weapons[k].item == item) return static_cast<int>(k) + 1;
+	}
+	return 0;
+}
+
+/** The weapon in the hand of the walker of the view from the first person, End for none or no such view open. */
+WalkerItem FirstPersonWeaponInHand()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr ? w->InHand() : WalkerItem::End;
+}
+
+/**
+ * A weapon clicked in the inventory (walker_inventory_gui.cpp; the player, 17. 10.: "a click on a thing in the inventory
+ * does not use it, I want to take the bow in my hand"): into the hand, as its key does; the one in the hand put away.
+ */
+void FirstPersonTakeWeapon(WalkerItem item)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	const int key = FirstPersonWeaponKey(item);
+	if (w == nullptr || key == 0) return;
+	if (w->InHand() == item) {
+		w->weapon_out = false;
+	} else {
+		w->Choose(key - 1);
+	}
+}
+
 /** The rig: make the picture so many times on so many threads (0 every core); the milliseconds a picture took. */
 double RigFirstPersonMeasure(int times, int threads)
 {
@@ -1179,6 +1231,38 @@ void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
 	w->SetDirty();
 }
 
+/**
+ * The rig: where the walker can stand about it, so many tiles each way, a character a half metre: '.' it can, '#' it
+ * cannot (a house's wall), 'X' a house that is not a 3D object (all its tile), 'o' where it stands; the walker's circle
+ * (FirstPersonFree()), as it walks.
+ */
+std::string RigFirstPersonFreeMap(int tiles)
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	const double step = 0.5 * OBJECT_UNITS_PER_METRE;
+	const int n = static_cast<int>(tiles * TILE_SIZE / step);
+	std::string out = fmt::format("volno kolem {:.1f},{:.1f} (x doprava, y dolu, po 0,5 m, polomer chodce {:.2f} m)", w->walker.x, w->walker.y, FIRST_PERSON_RADIUS / OBJECT_UNITS_PER_METRE);
+	for (int r = -n; r <= n; r++) {
+		std::string line = "\n";
+		for (int c = -n; c <= n; c++) {
+			const double px = w->walker.x + c * step, py = w->walker.y + r * step;
+			char ch = FirstPersonFree(px, py) ? '.' : '#';
+			if (ch == '#' && px >= 0 && py >= 0 && px < Map::SizeX() * TILE_SIZE && py < Map::SizeY() * TILE_SIZE) {
+				const TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
+				if (IsTileType(tile, TileType::House)) {
+					HouseID north = GetHouseType(tile);
+					const TileIndex origin = tile + GetHouseNorthPart(north);
+					if (GetThreeDHouseObjectAt(north, origin) == nullptr) ch = 'X';
+				}
+			}
+			line += (r == 0 && c == 0) ? 'o' : ch;
+		}
+		out += line;
+	}
+	return out;
+}
+
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {
@@ -1191,7 +1275,8 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 		const double speed = FIRST_PERSON_WALK_MS * OBJECT_UNITS_PER_METRE * FIRST_PERSON_TICK_MS / 1000.0;
 		const double fx = std::cos(w->walker.heading), fy = std::sin(w->walker.heading);
 		const double nx = w->walker.x + (fx * ahead + fy * aside) * speed, ny = w->walker.y + (fy * ahead - fx * aside) * speed;
-		if (FirstPersonWalkable(nx, ny)) {
+		/* As the walker walks: its circle against the walls (FirstPersonFree()). */
+		if (FirstPersonFree(nx, ny)) {
 			w->walker.x = nx;
 			w->walker.y = ny;
 		}
