@@ -49,6 +49,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <atomic>
+#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -96,12 +97,12 @@ static std::map<std::string, std::string> _thing_sounds;
 static std::map<std::string, std::optional<std::array<float, 3>>> _thing_places;
 
 /** The clock of the objects, seconds (ForgetUnusedThreeDObjects()): what was drawn when. */
-static uint32_t _three_d_clock = 1;
+static std::atomic<uint32_t> _three_d_clock = 1;
 
-/** Mark a thing drawn now; from the threads making textures too, so as an atomic. */
+/** Mark a thing drawn now; from the threads making textures and the one making the pictures of the vehicles too, so as an atomic. */
 static inline void MarkThreeDUsed(uint32_t &used)
 {
-	std::atomic_ref<uint32_t>(used).store(_three_d_clock, std::memory_order_relaxed);
+	std::atomic_ref<uint32_t>(used).store(_three_d_clock.load(std::memory_order_relaxed), std::memory_order_relaxed);
 }
 /** The effects of the indices ("druh": "efekt"): the fireworks over the hut. */
 static std::vector<ThreeDVehicleObject> _effect_objects;
@@ -991,6 +992,9 @@ static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bi
  */
 static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 {
+	/* One at a time: a shape may be made on the thread making the pictures of the vehicles too (MakeOnce()). */
+	static std::mutex kept_mutex;
+	std::lock_guard lock(kept_mutex);
 	static std::map<std::string, std::unique_ptr<GlbSkeleton>> kept;
 	auto found = kept.find(path);
 	if (found != kept.end()) return found->second.get();
@@ -2660,8 +2664,92 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 	return nullptr;
 }
 
-/** The shapes read, by their file and wheels: the paints of a vehicle share one. */
+/*
+ * What is made of a vehicle object the first time it is drawn -- its shape read, its textures and its masks decoded,
+ * its simpler shapes, its crew that walks -- is made on two threads: the main one (the view from the eyes, the
+ * sprites, the previews) and the one making the pictures of the vehicles of the map in the background
+ * (three_d_vehicle_object.cpp; the player, 17. 10.: "put a thread in the background"). MakeOnce(): under one lock
+ * whether a thing is made; if not, the first thread to ask makes it outside the lock (a texture of sixteen million
+ * pixels takes half a second) and stores it under the lock, the other waits for it. Nothing made is replaced while
+ * a thread may hold it: what is forgotten (ThreeDVehicleObject::Forget()) is forgotten only while no picture is
+ * being made, and the objects are read anew only after that thread is stopped (ResetThreeDVehicleObjectSprites()).
+ */
+static std::mutex _lazy_mutex;
+static std::condition_variable _lazy_made;
+/** The things being made now: the object (or the shape) and which thing of it (LazyThing). */
+static std::set<std::pair<const void *, int>> _lazy_making;
+/** Which thing of an object is made (MakeOnce()): of a vehicle object, or of a shape its simpler ones. */
+enum LazyThing : int {
+	LAZY_SHAPE = 0,
+	LAZY_WALKING = 1,
+	LAZY_PAINT_MASK = 2,
+	LAZY_RUST_MASK = 3,
+	LAZY_FRAME = 1000,       ///< + the frame
+	LAZY_TEXTURE = 2000,     ///< + the texture's index
+	LAZY_ADDON_MASK = 3000,  ///< + the add-on
+	LAZY_DETAIL_MASK = 4000, ///< + the add-on + 1
+	LAZY_SIMPLER = 5000,     ///< + the level
+};
+
+/**
+ * Make a thing of an object once, on whichever thread asks for it first; the other waits for it.
+ * @param of the object (or the shape) it is of
+ * @param thing which of its things (LazyThing)
+ * @param made whether it is there: looked at under the lock, so it must not ask for another thing
+ * @param make make it: outside the lock, so it may ask for the others (the shape of a crew's figure)
+ * @param store keep what was made (even nothing, when it could not be made): under the lock, as made()
+ */
+template <typename Made, typename Make, typename Store>
+static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
+{
+	const std::pair<const void *, int> key(of, thing);
+	std::unique_lock lock(_lazy_mutex);
+	for (;;) {
+		if (made()) return;
+		if (_lazy_making.insert(key).second) break;
+		/* Another thread is making it: wait for it. */
+		_lazy_made.wait(lock);
+	}
+	lock.unlock();
+	try {
+		auto result = make();
+		lock.lock();
+		store(std::move(result));
+	} catch (...) {
+		if (!lock.owns_lock()) lock.lock();
+		_lazy_making.erase(key);
+		_lazy_made.notify_all();
+		throw;
+	}
+	_lazy_making.erase(key);
+	_lazy_made.notify_all();
+}
+
+/** The shapes read, by their file and wheels: the paints of a vehicle share one. Read on both threads (MakeOnce()). */
 static std::map<std::string, std::shared_ptr<const ThreeDVehicleShape>> _vehicle_shapes;
+static std::mutex _vehicle_shapes_mutex;
+
+/** The shape read already for a key (MakeShape()), nullptr none. */
+static std::shared_ptr<const ThreeDVehicleShape> KnownVehicleShape(const std::string &key)
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	auto it = _vehicle_shapes.find(key);
+	return it != _vehicle_shapes.end() ? it->second : nullptr;
+}
+
+/** Keep a shape read for its key (MakeShape()). */
+static void KeepVehicleShape(const std::string &key, const std::shared_ptr<const ThreeDVehicleShape> &made)
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	_vehicle_shapes.emplace(key, made);
+}
+
+/** How many shapes are kept (the rig). */
+static size_t VehicleShapesKept()
+{
+	std::lock_guard lock(_vehicle_shapes_mutex);
+	return _vehicle_shapes.size();
+}
 
 /** The frame of a figure that moves at a tick of the game: one every frame_ticks, from phase on, round and round. */
 int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
@@ -2670,14 +2758,105 @@ int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
 	return static_cast<int>((tick / this->frame_ticks + phase) % this->frames);
 }
 
-/** The object's shape, read from its .glb the first time; nullptr when it cannot be. A figure that moves: its first frame. */
+/** The object's shape, read from its .glb the first time (on either thread, MakeOnce()); nullptr when it cannot be. A figure that moves: its first frame. */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
 	MarkThreeDUsed(this->used);
-	if (this->shape != nullptr || this->shape_tried) return this->shape.get();
-	this->shape_tried = true;
-	this->shape = this->MakeShape(0);
+	MakeOnce(this, LAZY_SHAPE, [this] { return this->shape != nullptr || this->shape_tried; }, [this] { return this->MakeShape(0); }, [this](std::shared_ptr<const ThreeDVehicleShape> made) {
+		this->shape = std::move(made);
+		this->shape_tried = true;
+	});
 	return this->shape.get();
+}
+
+/** The simpler shape of a shape at a level (ThreeDVehicleShape::Simpler()): its corners joined in cells of 2 cm times two to the level. */
+static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVehicleShape &shape, int level)
+{
+	const double cell = 0.02 * (1 << level);
+	const size_t corners = shape.pos.size() / 3;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size(), has_uv = shape.uv.size() == corners * 2;
+	/* Each corner's texture and part: its first triangle's. */
+	std::vector<uint8_t> material(corners, 0), part(corners, 0);
+	for (size_t t = shape.tri.size(); t >= 3; t -= 3) {
+		const uint8_t m = (t - 3) / 3 < shape.tri_tex.size() ? shape.tri_tex[(t - 3) / 3] : 0;
+		const uint8_t p = (t - 3) / 3 < shape.tri_part.size() ? shape.tri_part[(t - 3) / 3] : 0;
+		for (int k = 0; k < 3; k++) {
+			material[shape.tri[t - 3 + k]] = m;
+			part[shape.tri[t - 3 + k]] = p;
+		}
+	}
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and where they
+	 * are in the texture, in steps of a 128th of it: corners of one place of the model in two places of the texture
+	 * (the islands of an atlas, a seam) joined took one's place for both, and the triangles between them drew from
+	 * anywhere between the islands -- a car black and speckled from a few metres on (the player, 17. 10.). */
+	auto apart_of = [&](size_t i) {
+		uint32_t uv_cell = 0;
+		if (has_uv) {
+			const uint32_t u = static_cast<uint32_t>(static_cast<int32_t>(std::floor(shape.uv[i * 2] * 128.0f))) & 127;
+			const uint32_t v = static_cast<uint32_t>(static_cast<int32_t>(std::floor(shape.uv[i * 2 + 1] * 128.0f))) & 127;
+			uv_cell = u | v << 7;
+		}
+		return static_cast<uint32_t>(part[i]) | (i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | uv_cell << 16;
+	};
+	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
+	auto key_of = [&](size_t i) {
+		uint64_t k = 0;
+		for (int a = 0; a < 3; a++) k = k * 4096 + static_cast<uint64_t>(static_cast<int64_t>(std::floor(shape.pos[i * 3 + a] / cell)) & 4095);
+		int face = 0;
+		if (has_nrm) {
+			const float nx = shape.nrm[i * 3], ny = shape.nrm[i * 3 + 1], nz = shape.nrm[i * 3 + 2];
+			const float ax = std::abs(nx), ay = std::abs(ny), az = std::abs(nz);
+			face = ax >= ay && ax >= az ? (nx < 0 ? 1 : 2) : (ay >= az ? (ny < 0 ? 3 : 4) : (nz < 0 ? 5 : 6));
+		}
+		return (k * 8 + face) * 256 + material[i];
+	};
+	auto out = std::make_shared<ThreeDVehicleShape>();
+	struct CellHash {
+		size_t operator()(const std::pair<uint64_t, uint32_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
+	};
+	std::unordered_map<std::pair<uint64_t, uint32_t>, uint32_t, CellHash> cells;
+	std::vector<uint32_t> joined(corners);
+	std::vector<uint32_t> count;
+	const bool wheels = !shape.corner_wheel.empty();
+	for (size_t i = 0; i < corners; i++) {
+		auto [it, added] = cells.emplace(std::make_pair(key_of(i), apart_of(i)), static_cast<uint32_t>(count.size()));
+		joined[i] = it->second;
+		if (added) {
+			count.push_back(0);
+			out->pos.insert(out->pos.end(), 3, 0.0f);
+			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
+			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
+			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[i]);
+		}
+		const uint32_t c = it->second;
+		count[c]++;
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] += shape.pos[i * 3 + a];
+		if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[c * 3 + a] += shape.nrm[i * 3 + a];
+		/* The places in the texture of its corners, all in one small piece of it (apart_of()): their middle. */
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] += shape.uv[i * 2 + a];
+	}
+	for (size_t c = 0; c < count.size(); c++) {
+		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] /= count[c];
+		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] /= count[c];
+		if (has_nrm) {
+			float *n = &out->nrm[c * 3];
+			const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (l > 0) for (int a = 0; a < 3; a++) n[a] /= l;
+		}
+	}
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		const uint32_t a = joined[shape.tri[t]], b = joined[shape.tri[t + 1]], c = joined[shape.tri[t + 2]];
+		if (a == b || b == c || a == c) continue;
+		out->tri.insert(out->tri.end(), {a, b, c});
+		out->tri_tex.push_back(t / 3 < shape.tri_tex.size() ? shape.tri_tex[t / 3] : 0);
+		if (!shape.tri_part.empty()) out->tri_part.push_back(t / 3 < shape.tri_part.size() ? shape.tri_part[t / 3] : 0);
+		if (!shape.tri_glass.empty()) out->tri_glass.push_back(t / 3 < shape.tri_glass.size() ? shape.tri_glass[t / 3] : 0);
+	}
+	out->tex_addon = shape.tex_addon;
+	out->glass_alpha = shape.glass_alpha;
+	out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
+	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, shape.tri.size() / 3);
+	return out;
 }
 
 /**
@@ -2693,108 +2872,23 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	if (made != nullptr) return made.get();
-	const double cell = 0.02 * (1 << level);
-	const size_t corners = this->pos.size() / 3;
-	const bool has_nrm = this->nrm.size() == this->pos.size(), has_uv = this->uv.size() == corners * 2;
-	/* Each corner's texture and part: its first triangle's. */
-	std::vector<uint8_t> material(corners, 0), part(corners, 0);
-	for (size_t t = this->tri.size(); t >= 3; t -= 3) {
-		const uint8_t m = (t - 3) / 3 < this->tri_tex.size() ? this->tri_tex[(t - 3) / 3] : 0;
-		const uint8_t p = (t - 3) / 3 < this->tri_part.size() ? this->tri_part[(t - 3) / 3] : 0;
-		for (int k = 0; k < 3; k++) {
-			material[this->tri[t - 3 + k]] = m;
-			part[this->tri[t - 3 + k]] = p;
-		}
-	}
-	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and where they
-	 * are in the texture, in steps of a 128th of it: corners of one place of the model in two places of the texture
-	 * (the islands of an atlas, a seam) joined took one's place for both, and the triangles between them drew from
-	 * anywhere between the islands -- a car black and speckled from a few metres on (the player, 17. 10.). */
-	auto apart_of = [&](size_t i) {
-		uint32_t uv_cell = 0;
-		if (has_uv) {
-			const uint32_t u = static_cast<uint32_t>(static_cast<int32_t>(std::floor(this->uv[i * 2] * 128.0f))) & 127;
-			const uint32_t v = static_cast<uint32_t>(static_cast<int32_t>(std::floor(this->uv[i * 2 + 1] * 128.0f))) & 127;
-			uv_cell = u | v << 7;
-		}
-		return static_cast<uint32_t>(part[i]) | (i < this->corner_wheel.size() ? this->corner_wheel[i] : 0u) << 8 | uv_cell << 16;
-	};
-	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
-	auto key_of = [&](size_t i) {
-		uint64_t k = 0;
-		for (int a = 0; a < 3; a++) k = k * 4096 + static_cast<uint64_t>(static_cast<int64_t>(std::floor(this->pos[i * 3 + a] / cell)) & 4095);
-		int face = 0;
-		if (has_nrm) {
-			const float nx = this->nrm[i * 3], ny = this->nrm[i * 3 + 1], nz = this->nrm[i * 3 + 2];
-			const float ax = std::abs(nx), ay = std::abs(ny), az = std::abs(nz);
-			face = ax >= ay && ax >= az ? (nx < 0 ? 1 : 2) : (ay >= az ? (ny < 0 ? 3 : 4) : (nz < 0 ? 5 : 6));
-		}
-		return (k * 8 + face) * 256 + material[i];
-	};
-	auto out = std::make_shared<ThreeDVehicleShape>();
-	struct CellHash {
-		size_t operator()(const std::pair<uint64_t, uint32_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
-	};
-	std::unordered_map<std::pair<uint64_t, uint32_t>, uint32_t, CellHash> cells;
-	std::vector<uint32_t> joined(corners);
-	std::vector<uint32_t> count;
-	const bool wheels = !this->corner_wheel.empty();
-	for (size_t i = 0; i < corners; i++) {
-		auto [it, added] = cells.emplace(std::make_pair(key_of(i), apart_of(i)), static_cast<uint32_t>(count.size()));
-		joined[i] = it->second;
-		if (added) {
-			count.push_back(0);
-			out->pos.insert(out->pos.end(), 3, 0.0f);
-			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
-			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
-			if (wheels) out->corner_wheel.push_back(this->corner_wheel[i]);
-		}
-		const uint32_t c = it->second;
-		count[c]++;
-		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] += this->pos[i * 3 + a];
-		if (has_nrm) for (int a = 0; a < 3; a++) out->nrm[c * 3 + a] += this->nrm[i * 3 + a];
-		/* The places in the texture of its corners, all in one small piece of it (apart_of()): their middle. */
-		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] += this->uv[i * 2 + a];
-	}
-	for (size_t c = 0; c < count.size(); c++) {
-		for (int a = 0; a < 3; a++) out->pos[c * 3 + a] /= count[c];
-		if (has_uv) for (int a = 0; a < 2; a++) out->uv[c * 2 + a] /= count[c];
-		if (has_nrm) {
-			float *n = &out->nrm[c * 3];
-			const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-			if (l > 0) for (int a = 0; a < 3; a++) n[a] /= l;
-		}
-	}
-	for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
-		const uint32_t a = joined[this->tri[t]], b = joined[this->tri[t + 1]], c = joined[this->tri[t + 2]];
-		if (a == b || b == c || a == c) continue;
-		out->tri.insert(out->tri.end(), {a, b, c});
-		out->tri_tex.push_back(t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0);
-		if (!this->tri_part.empty()) out->tri_part.push_back(t / 3 < this->tri_part.size() ? this->tri_part[t / 3] : 0);
-		if (!this->tri_glass.empty()) out->tri_glass.push_back(t / 3 < this->tri_glass.size() ? this->tri_glass[t / 3] : 0);
-	}
-	out->tex_addon = this->tex_addon;
-	out->glass_alpha = this->glass_alpha;
-	out->x0 = this->x0; out->x1 = this->x1; out->y0 = this->y0; out->y1 = this->y1; out->z0 = this->z0; out->z1 = this->z1;
-	Debug(misc, 3, "3D shape simpler at {} cm: {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, this->tri.size() / 3);
-	made = std::move(out);
+	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
 	return made.get();
 }
 
-/** A frame of a figure that moves (FrameAt()), read the first time it is drawn; the others as GetShape(). */
+/** A frame of a figure that moves (FrameAt()), read the first time it is drawn (MakeOnce()); the others as GetShape(). */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 {
 	MarkThreeDUsed(this->used);
 	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) return this->GetShape();
 	frame = std::max(frame, 0);
 	frame %= this->frames;
-	if (this->frame_shapes.size() < static_cast<size_t>(this->frames)) this->frame_shapes.resize(this->frames);
-	if (this->frame_shapes[frame] == nullptr) {
-		this->frame_shapes[frame] = this->MakeShape(frame);
-		if (this->frame_shapes[frame] == nullptr) return this->GetShape();
-	}
-	return this->frame_shapes[frame].get();
+	MakeOnce(this, LAZY_FRAME + frame, [this, frame] {
+		if (this->frame_shapes.size() < static_cast<size_t>(this->frames)) this->frame_shapes.resize(this->frames);
+		return this->frame_shapes[frame] != nullptr;
+	}, [this, frame] { return this->MakeShape(frame); }, [this, frame](std::shared_ptr<const ThreeDVehicleShape> made) { this->frame_shapes[frame] = std::move(made); });
+	const ThreeDVehicleShape *made = this->frame_shapes[frame].get();
+	return made != nullptr ? made : this->GetShape();
 }
 
 /**
@@ -2807,8 +2901,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 {
 	std::string key = fmt::format("{}#{}#{}/{}{}", this->skeleton_file, this->skeleton_anim, frame, this->frames, this->loop ? "o" : "-");
 	if (this->blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", this->blend_from->skeleton_anim, this->blend_from_frame, this->blend_from->frames, this->blend_ticks);
-	auto it = _vehicle_shapes.find(key);
-	if (it != _vehicle_shapes.end()) return it->second;
+	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	const GlbSkeleton *sk = ReadGlbSkeleton(this->skeleton_file);
 	if (sk == nullptr) return nullptr;
 	/* The time of a frame of a figure, seconds. */
@@ -2851,7 +2944,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 			made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 		}
 	}
-	_vehicle_shapes.emplace(key, made);
+	KeepVehicleShape(key, made);
 	return made;
 }
 
@@ -2878,11 +2971,13 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
 	if (!this->only_node.empty()) key += "|u" + this->only_node;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
-	auto it = _vehicle_shapes.find(key);
-	if (it != _vehicle_shapes.end()) return it->second;
+	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	GlbMesh mesh;
 	if (this->file.starts_with("beamng:")) {
-		/* A car of a mod of BeamNG (beamng.h): its materials as they are, the paint first, white; its lights of the mod. */
+		/* A car of a mod of BeamNG (beamng.h): its materials as they are, the paint first, white; its lights of the mod.
+		 * One at a time: the zips of the mods are opened as they are read (beamng.cpp), and this may be either thread. */
+		static std::mutex beamng_mutex;
+		std::lock_guard beamng_lock(beamng_mutex);
 		const BeamngVehicle *car = nullptr;
 		for (const BeamngVehicle &b : FindBeamngVehicles()) {
 			if (this->file == "beamng:" + b.Package() + "|" + b.folder) car = &b;
@@ -2924,7 +3019,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		}
 		Debug(misc, 1, "3D vehicle {}: {} triangles, {} materials, {:.2f}..{:.2f} x {:.2f}..{:.2f} x {:.2f}..{:.2f} m", this->name, made->tri.size() / 3, made->pngs.size(),
 				made->x0, made->x1, made->y0, made->y1, made->z0, made->z1);
-		_vehicle_shapes.emplace(key, made);
+		KeepVehicleShape(key, made);
 		return made;
 	}
 	if (this->file.ends_with(".s") || this->file.ends_with(".S")) {
@@ -3235,7 +3330,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
 			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
-	_vehicle_shapes.emplace(key, made);
+	KeepVehicleShape(key, made);
 	return made;
 }
 
@@ -3262,11 +3357,13 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 {
 	MarkThreeDUsed(this->used);
 	const ThreeDVehicleShape *s = this->GetShape();
-	size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
+	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
-	if (this->levels.size() < count) this->levels.resize(count);
-	ThreeDTextureLevels &lv = this->levels[index];
-	if (lv == nullptr) {
+	MakeOnce(this, LAZY_TEXTURE + index, [this, count, index] {
+		if (this->levels.size() < count) this->levels.resize(count);
+		return this->levels[index] != nullptr;
+	}, [this, s, index] {
+		ThreeDTextureLevels lv;
 		ThreeDTextureBytes png;
 		uint32_t flat = 0;
 		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0, PictureUnder(s, -1));
@@ -3275,7 +3372,9 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 			flat = s->flats[index];
 		}
 		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat);
-	}
+		return lv;
+	}, [this, index](ThreeDTextureLevels made) { this->levels[index] = std::move(made); });
+	const ThreeDTextureLevels &lv = this->levels[index];
 	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
 }
 
@@ -3283,10 +3382,10 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 {
 	if (this->rust.mask_file.empty()) return nullptr;
-	if (!this->rust_tried) {
+	MakeOnce(this, LAZY_RUST_MASK, [this] { return this->rust_tried; }, [this] { return MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1)); }, [this](ThreeDTextureLevels made) {
+		this->rust_levels = std::move(made);
 		this->rust_tried = true;
-		this->rust_levels = MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1));
-	}
+	});
 	if (this->rust_levels == nullptr) return nullptr;
 	return &(*this->rust_levels)[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels->size()) - 1)];
 }
@@ -3294,10 +3393,10 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 {
 	if (this->paint.mask_file.empty()) return nullptr;
-	if (!this->mask_tried) {
+	MakeOnce(this, LAZY_PAINT_MASK, [this] { return this->mask_tried; }, [this] { return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1)); }, [this](ThreeDTextureLevels made) {
+		this->mask_levels = std::move(made);
 		this->mask_tried = true;
-		this->mask_levels = MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1));
-	}
+	});
 	if (this->mask_levels == nullptr) return nullptr;
 	return &(*this->mask_levels)[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels->size()) - 1)];
 }
@@ -3306,14 +3405,16 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int level) const
 {
 	if (addon >= this->addons.size() || this->addons[addon].mask_file.empty()) return nullptr;
-	if (this->addon_mask_levels.size() < this->addons.size()) {
-		this->addon_mask_levels.resize(this->addons.size());
-		this->addon_mask_tried.resize(this->addons.size(), false);
-	}
-	if (!this->addon_mask_tried[addon]) {
+	MakeOnce(this, LAZY_ADDON_MASK + static_cast<int>(addon), [this, addon] {
+		if (this->addon_mask_levels.size() < this->addons.size()) {
+			this->addon_mask_levels.resize(this->addons.size());
+			this->addon_mask_tried.resize(this->addons.size(), false);
+		}
+		return static_cast<bool>(this->addon_mask_tried[addon]);
+	}, [this, addon] { return MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon))); }, [this, addon](ThreeDTextureLevels made) {
+		this->addon_mask_levels[addon] = std::move(made);
 		this->addon_mask_tried[addon] = true;
-		this->addon_mask_levels[addon] = MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon)));
-	}
+	});
 	const ThreeDTextureLevels &lv = this->addon_mask_levels[addon];
 	if (lv == nullptr) return nullptr;
 	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
@@ -3330,17 +3431,21 @@ const ThreeDDetailMask *ThreeDVehicleObject::GetDetailMask(int addon) const
 	if (addon < -1 || at > this->addons.size()) return nullptr;
 	const std::string &file = addon < 0 ? this->detail_file : this->addons[addon].detail_file;
 	if (file.empty()) return nullptr;
-	if (this->detail_masks.size() <= this->addons.size()) {
-		this->detail_masks.resize(this->addons.size() + 1);
-		this->detail_tried.resize(this->addons.size() + 1, false);
-	}
-	std::shared_ptr<const ThreeDDetailMask> &mask = this->detail_masks[at];
-	if (!this->detail_tried[at]) {
-		this->detail_tried[at] = true;
-		mask = DetailMaskOfFile(file, PictureUnder(this->GetShape(), addon));
+	MakeOnce(this, LAZY_DETAIL_MASK + static_cast<int>(at), [this, at] {
+		if (this->detail_masks.size() <= this->addons.size()) {
+			this->detail_masks.resize(this->addons.size() + 1);
+			this->detail_tried.resize(this->addons.size() + 1, false);
+		}
+		return static_cast<bool>(this->detail_tried[at]);
+	}, [this, &file, addon] {
+		std::shared_ptr<const ThreeDDetailMask> mask = DetailMaskOfFile(file, PictureUnder(this->GetShape(), addon));
 		if (mask == nullptr) Debug(misc, 0, "3D vehicle {}: the mask of details {} cannot be read", this->name, file);
-	}
-	return mask.get();
+		return mask;
+	}, [this, at](std::shared_ptr<const ThreeDDetailMask> made) {
+		this->detail_masks[at] = std::move(made);
+		this->detail_tried[at] = true;
+	});
+	return this->detail_masks[at].get();
 }
 
 /** Whether any of its textures has a mask of details: then its states carry the vehicle's colours of its set (ComposeState()). */
@@ -3381,6 +3486,8 @@ const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
 	if (step <= 0) return nullptr;
 	if (static_cast<size_t>(step) <= this->states.size()) return &this->states[step - 1];
 	const size_t k = static_cast<size_t>(step) - this->states.size() - 1;
+	/* The composed ones under the lock: made on the main thread as the pictures are made on theirs (a state once made stays where it is). */
+	std::lock_guard lock(_lazy_mutex);
 	return k < this->composed.size() ? &this->composed[k] : nullptr;
 }
 
@@ -3405,6 +3512,7 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 		}
 	}
 	if (count <= 1 && true_colours == 0) return only;
+	std::lock_guard lock(_lazy_mutex);
 	auto it = this->composed_steps.find({layers, true_colours});
 	if (it != this->composed_steps.end()) return it->second;
 	ThreeDVehicleState made;
@@ -3443,25 +3551,30 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
  */
 const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 {
-	if (this->walking_found) return this->walking;
-	this->walking_found = true;
-	auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
-		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-		if (fig == nullptr || !fig->Walks()) return;
-		ThreeDWalkingCrew w;
-		w.figure = fig;
-		std::copy(std::begin(c.at), std::end(c.at), w.at);
-		w.turn = c.turn;
-		w.scale = c.scale;
-		w.part = part;
-		this->walking.push_back(w);
-	};
-	for (const ThreeDVehicleCrew &c : this->crew) add(c, 0);
-	for (const auto &[group, list] : this->crew_groups) {
-		auto p = std::ranges::find(this->part_names, "posadky/" + group);
-		if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64) continue;
-		for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
-	}
+	MakeOnce(this, LAZY_WALKING, [this] { return this->walking_found; }, [this] {
+		std::vector<ThreeDWalkingCrew> found;
+		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
+			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+			if (fig == nullptr || !fig->Walks()) return;
+			ThreeDWalkingCrew w;
+			w.figure = fig;
+			std::copy(std::begin(c.at), std::end(c.at), w.at);
+			w.turn = c.turn;
+			w.scale = c.scale;
+			w.part = part;
+			found.push_back(w);
+		};
+		for (const ThreeDVehicleCrew &c : this->crew) add(c, 0);
+		for (const auto &[group, list] : this->crew_groups) {
+			auto p = std::ranges::find(this->part_names, "posadky/" + group);
+			if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64) continue;
+			for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
+		}
+		return found;
+	}, [this](std::vector<ThreeDWalkingCrew> made) {
+		this->walking = std::move(made);
+		this->walking_found = true;
+	});
 	return this->walking;
 }
 
@@ -4366,6 +4479,9 @@ static void ForgetUnusedThreeDObjects()
 	ForgetGlbFiles();
 	_three_d_clock += 15;
 	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
+	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp): it holds
+	 * what the objects made; the next time, a quarter of a minute on. */
+	if (ThreeDPicturesBeingMade()) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;
 	for (const ThreeDObject &o : _three_d_objects) {
@@ -4389,11 +4505,14 @@ static void ForgetUnusedThreeDObjects()
 		}
 	}
 	/* The shapes read that nothing keeps any more (the poses of a passage gone, a vehicle's frames). */
-	for (auto it = _vehicle_shapes.begin(); it != _vehicle_shapes.end();) {
-		if (it->second.use_count() == 1) {
-			it = _vehicle_shapes.erase(it);
-		} else {
-			++it;
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (auto it = _vehicle_shapes.begin(); it != _vehicle_shapes.end();) {
+			if (it->second.use_count() == 1) {
+				it = _vehicle_shapes.erase(it);
+			} else {
+				++it;
+			}
 		}
 	}
 	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
@@ -4411,5 +4530,5 @@ std::string RigForgetThreeDObjects(uint seconds)
 		if (!o.levels.empty()) textures++;
 		for (const auto &p : o.shapes) shapes += p != nullptr;
 	}
-	return fmt::format("hodiny {} s, domu s texturou {}, zjednodusenych tvaru {}, prechodu {}, tvaru vozidel {}", _three_d_clock, textures, shapes, _passages.size(), _vehicle_shapes.size());
+	return fmt::format("hodiny {} s, domu s texturou {}, zjednodusenych tvaru {}, prechodu {}, tvaru vozidel {}", _three_d_clock.load(), textures, shapes, _passages.size(), VehicleShapesKept());
 }

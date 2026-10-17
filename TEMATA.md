@@ -19,6 +19,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – vlákno na pozadí pro obrázky vozidel
+
+- Hráč: **„tak jedno jádro procesoru bude načítat a druhé bude dělat obraz?“ … „vlákno na pozadí dej“**. Obrázky
+  vozidel na mapě (3D objekt v úhlu pohledu, `ObjectPicture()`) se dělají na vlastním vlákně (`ottd:3d-pictures`,
+  `three_d_vehicle_object.cpp`): hlavní vlákno si o chybějící obrázek řekne a vozidlo zatím kreslí nejbližším
+  hotovým úhlem (poprvé, než se načtou textury, chvíli nic); vlákno obrázek udělá (čtení a dekódování textur, raster) a
+  časovač po 30 ms hotové obrázky převezme a vozidla, která čekala, překreslí. Nejnovější požadavek první (to, co je
+  na obrazovce teď), ve frontě nejvýš 128. Totéž pro „plakáty“ vzdálených vozidel v pohledu z kabiny a z očí; postavy,
+  kytky, efekty a náhled v nákupu se dál dělají hned (jsou malé, nebo je okno stejně čeká).
+- Co se objektu dělá poprvé (tvar z .glb, textury, masky, zjednodušené tvary, posádka, která chodí) teď dělají dvě
+  vlákna: `MakeOnce()` v `three_d_objects.cpp` – pod jedním zámkem jen pohled, jestli věc je; dělá se mimo zámek, kdo
+  se zeptal první, druhý na ni počká. Stavy složené z vrstev GRF pod stejným zámkem. Mezipaměť tvarů (`_vehicle_shapes`)
+  a hustota texelů pod zámkem; BeamNG tvary po jednom (zipy). Zapomínání nepoužitého (`ForgetUnusedThreeDObjects()`)
+  přeskočí kolo, když vlákno něco dělá; při novém načtení GRF a při konci hry (`ShutdownGame()`) se vlákno zastaví.
+- Rig: `test3d casy` ukazuje zvlášť obrázky dělané hned a na vlákně (`na vlakne … ms (n, ve fronte m)`). Ověřeno:
+  první obrázek tahače 463 ms a návěsu 795 ms na pozadí, hra kreslila dál; `quit` uprostřed dekódování počká na vlákno.
+- Co zbývá: první objevení vozidla, které ještě žádné okno neukázalo, je asi půl vteřiny neviditelné (textury se
+  teprve čtou). Postavy na mapě se poprvé dělají hned (130 ms). Jedno vlákno; na strojích s více jádry by šla dvě.
+
 ## 17. 10. – tmavá auta v dálce, plynulé zatáčení na mapě, škubání, kolečka, náhled v nákupu
 
 - Hráč: **auta moc tmavá, 2 m od auta ještě modrá, dál černá (Tatra 603, 613); Tatry nad 4 m černé linky na předku;
@@ -35,7 +54,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   textur, další 15–60 ms za kus). Teď vozidla na mapě mají plynulé natočení ze stopy jízdy jako pohled z očí
   (`EyeOrigin()`), po 5°, návěs se láme na točnici postupně. Nových obrázků se za snímek (40 ms) kreslí nejvýš 12 ms;
   ostatní se do té doby kreslí nejbližším hotovým úhlem a vozidlo se překreslí o chvíli později. První objevení
-  nového vozidla (načtení jeho textur) dál stojí asi půl vteřiny.
+  nového vozidla (načtení jeho textur) dál stálo asi půl vteřiny – vyřešeno vláknem na pozadí (sekce výše).
 - Hráč: **točení koleček do nastavení, výchozí vypnuto** – Nastavení › Grafika › „Kola 3D vozidel se točí“
   (`gui.three_d_wheels`), vypnuto: kola v modelu stojí (pohled z očí a z kabiny).
 - Hráč: **3D částice efektů nejsou možné** – úkol zrušen.

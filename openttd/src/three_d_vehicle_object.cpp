@@ -33,13 +33,18 @@
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "cab_view.h"
+#include "thread.h"
 
 #include <array>
 #include <bit>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
+#include <deque>
 #include <map>
+#include <mutex>
 #include <set>
+#include <thread>
 
 #include "fileio_func.h"
 
@@ -90,7 +95,9 @@ struct ObjectPictureEntry {
 	uint64_t used;
 	ThreeDModelPicture picture;
 };
-static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int, int, uint64_t>, ObjectPictureEntry> _object_pictures;
+/** What a picture is of (ObjectPicture()): the object, the zoom, the angles seen and stood at, the size, the state (and the lean), the frame (and the spin, tint, lights), the stretch, the foreshortening, the crew's frames. */
+using ObjectPictureKey = std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int, int, uint64_t>;
+static std::map<ObjectPictureKey, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
 
 static void ForgetEyePainted();
@@ -98,6 +105,8 @@ static void ForgetEyePainted();
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
 void ResetThreeDVehicleObjectSprites()
 {
+	/* The thread making the pictures first: the objects it draws from go. */
+	StopThreeDPictureThread();
 	_object_sprite_requests.clear();
 	_object_sprites.clear();
 	_object_empty_sprite = 0;
@@ -713,9 +722,14 @@ static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2;
 /** The texels to a metre of a shape's texture at its full size: how fine a level of it a picture needs. */
 static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape)
 {
+	/* Asked on the thread making the pictures of the vehicles too (RasterObject()). */
 	static std::map<const ThreeDVehicleShape *, float> known;
-	auto it = known.find(&shape);
-	if (it != known.end()) return it->second;
+	static std::mutex known_mutex;
+	{
+		std::lock_guard lock(known_mutex);
+		auto it = known.find(&shape);
+		if (it != known.end()) return it->second;
+	}
 	const ThreeDObjectTexture *t = obj.GetTexture(0);
 	double uv_area = 0, area = 0;
 	for (size_t i = 0; i + 2 < shape.tri.size(); i += 3) {
@@ -729,6 +743,7 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 		area += std::sqrt(cx * cx + cy * cy + cz * cz) / 2;
 	}
 	float density = area > 0 ? static_cast<float>(std::sqrt(uv_area / area)) : 1.0f;
+	std::lock_guard lock(known_mutex);
 	known.emplace(&shape, density);
 	return density;
 }
@@ -1343,11 +1358,10 @@ ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteC
 	return avail;
 }
 
-/** Time spent making pictures of objects for the turned view, and how many, for the rig (test3d casy). */
-double _object_picture_ms = 0;
-uint64_t _object_pictures_made = 0;
+/** Time spent making pictures of objects for the turned view, and how many, for the rig (test3d casy): at once, and on the thread. */
+double _object_picture_ms = 0, _object_picture_thread_ms = 0;
+uint64_t _object_pictures_made = 0, _object_pictures_made_thread = 0;
 
-/** A picture of an object in the turned view at an angle and zoom, kept (RasterObject()). */
 /** The pictures asked for since this clock stay (PinThreeDPictures()). */
 static uint64_t _pictures_pinned_from = UINT64_MAX;
 
@@ -1360,111 +1374,279 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
+/** Room for one more picture kept: at PICTURES_KEPT the older half goes. */
+static void MakeRoomForPicture()
+{
+	if (_object_pictures.size() < PICTURES_KEPT) return;
+	std::vector<uint64_t> ages;
+	for (const auto &e : _object_pictures) ages.push_back(e.second.used);
+	std::nth_element(ages.begin(), ages.begin() + ages.size() / 2, ages.end());
+	/* Never those of the picture being drawn (PinThreeDPictures()): their pixels are still to be drawn. */
+	uint64_t limit = std::min(ages[ages.size() / 2], _pictures_pinned_from - 1);
+	for (auto i = _object_pictures.begin(); i != _object_pictures.end();) {
+		if (i->second.used <= limit) {
+			i = _object_pictures.erase(i);
+		} else {
+			++i;
+		}
+	}
+}
+
+/** A picture of the turned view from an object drawn into pixels (RasterObject()). */
+static void PictureOfRaster(ThreeDModelPicture &picture, ObjectRaster &r)
+{
+	picture.width = r.width;
+	picture.height = r.height;
+	picture.left = r.left;
+	picture.top = r.top;
+	picture.pixels.resize(r.px.size());
+	for (size_t i = 0; i < r.px.size(); i++) picture.pixels[i] = r.px[i].a == 0 ? 0 : r.px[i].data;
+	picture.lit.clear();
+	for (size_t i = 0; i < r.lit.size(); i++) {
+		if (r.lit[i] != 0) picture.lit.push_back(static_cast<uint32_t>(i));
+	}
+	picture.lights = std::move(r.lights);
+}
+
 /*
- * The pictures of the vehicles on the map made a few at a time (the player, 17. 10.: "it bites as the trailer bends in a
- * curve"): each a few or tens of milliseconds, the first of an object seconds (its textures read), all made the moment
- * they were asked for -- a lorry with its trailer through a curve asked for a dozen at once. In every frame (a window of
- * PICTURES_WINDOW) only PICTURES_BUDGET of them are made for those that may wait; the others are drawn as the nearest
- * one made, and their vehicles drawn again a moment later (_vehicles_owed_pictures).
+ * The pictures of the vehicles on the map are made on a thread of their own (the player, 17. 10.: "put a thread in
+ * the background"): each is a few or tens of milliseconds, the first of an object half a second (its textures read),
+ * and all were made the moment they were asked for, on the thread that draws -- the game stood still as a lorry came
+ * out of its depot or bent its trailer in a curve (a dozen pictures at once). Now the main thread asks the thread for
+ * a picture it has not got and draws the vehicle as the nearest one made of it (or not at all, the first time), the
+ * thread makes it (RasterObject()), and the vehicle is drawn again the moment it is there (_owed_pictures_timer).
+ * The pictures of all else -- the figures, the plants, the effects, the previews, the view from the eyes -- are
+ * made as they were, at once. What the thread makes of the objects on the way (their shapes, their textures) is
+ * made under the locks of three_d_objects.cpp (MakeOnce() there).
  */
-static constexpr auto PICTURES_WINDOW = std::chrono::milliseconds(40);
-static constexpr double PICTURES_BUDGET_MS = 12.0;
-static std::chrono::steady_clock::time_point _pictures_window_start{};
-static double _pictures_window_ms = 0;
-/** Whether the picture asked for now may wait (a vehicle on the map), and whether it waited: the nearest made was given. */
+/** A picture to make: what ObjectPicture() was asked for, as RasterObject() takes it. */
+struct PictureToMake {
+	ObjectPictureKey key;
+	const ThreeDVehicleObject *obj = nullptr;
+	float scale = 1, cam_az = 0, world_az = 0, along = 1, pxm = PXM_16X, fade = 0, rust_time = 0, stretch = 1, spin = 0, pitch = 0, roll = 0;
+	uint32_t tint = 0, paint_colour = 0;
+	int frame = 0, lights = 0, state = 0;
+	uint64_t walk = 0;
+};
+/** A picture made, for the main thread to keep. */
+struct PictureMade {
+	ObjectPictureKey key;
+	ThreeDModelPicture picture; ///< width 0: the object draws nothing so
+	double ms = 0;              ///< how long it took
+};
+/** Only so many wait to be made: the oldest asked for go when more come (a vehicle long gone round its curve). */
+static constexpr size_t PICTURES_WAITING = 128;
+static std::mutex _pictures_mutex; ///< of _pictures_to_make, _pictures_done, _picture_in_hand and _pictures_stop
+static std::condition_variable _pictures_wake;
+static std::deque<PictureToMake> _pictures_to_make;
+static std::vector<PictureMade> _pictures_done;
+static bool _picture_in_hand = false; ///< the thread is making one now
+static bool _pictures_stop = false;
+static std::thread _pictures_thread;
+static bool _pictures_thread_failed = false; ///< it could not be started: the pictures are made at once, as before
+/** The pictures asked of the thread and not kept yet (the main thread's own). */
+static std::set<ObjectPictureKey> _pictures_asked;
+/** The vehicles drawn with a picture not their own: drawn again when pictures come. */
+static std::set<VehicleID> _vehicles_owed_pictures;
+
+/** The thread: the newest asked for first (what is on the screen now), each into _pictures_done. */
+static void MakePicturesInBackground()
+{
+	std::unique_lock lock(_pictures_mutex);
+	for (;;) {
+		_pictures_wake.wait(lock, [] { return _pictures_stop || !_pictures_to_make.empty(); });
+		if (_pictures_stop) return;
+		const PictureToMake p = std::move(_pictures_to_make.back());
+		_pictures_to_make.pop_back();
+		_picture_in_hand = true;
+		lock.unlock();
+
+		PictureMade made;
+		made.key = p.key;
+		const auto start = std::chrono::steady_clock::now();
+		ObjectRaster r;
+		if (RasterObject(*p.obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, r, p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk)) {
+			PictureOfRaster(made.picture, r);
+		}
+		made.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {:.0f} ms, in the background", p.obj->name, std::get<2>(p.key), std::get<1>(p.key), made.picture.width, made.picture.height, made.ms);
+
+		lock.lock();
+		_pictures_done.push_back(std::move(made));
+		_picture_in_hand = false;
+	}
+}
+
+/** Ask the thread for a picture (started the first time); false when there is none (it could not be started): made at once then. */
+static bool AskForPicture(PictureToMake &&p)
+{
+	if (_pictures_thread_failed) return false;
+	if (!_pictures_thread.joinable()) {
+		if (!StartNewThread(&_pictures_thread, "ottd:3d-pictures", &MakePicturesInBackground)) {
+			_pictures_thread_failed = true;
+			Debug(misc, 0, "3D vehicles: the thread making their pictures cannot be started; they are made as asked for");
+			return false;
+		}
+	}
+	if (!_pictures_asked.insert(p.key).second) return true; // asked already
+	{
+		std::lock_guard lock(_pictures_mutex);
+		while (_pictures_to_make.size() >= PICTURES_WAITING) {
+			_pictures_asked.erase(_pictures_to_make.front().key);
+			_pictures_to_make.pop_front();
+		}
+		_pictures_to_make.push_back(std::move(p));
+	}
+	_pictures_wake.notify_one();
+	return true;
+}
+
+/**
+ * Keep the pictures the thread has made (the main thread).
+ * @return whether there were any
+ */
+static bool TakePicturesMade()
+{
+	std::vector<PictureMade> done;
+	{
+		std::lock_guard lock(_pictures_mutex);
+		done.swap(_pictures_done);
+	}
+	for (PictureMade &made : done) {
+		_pictures_asked.erase(made.key);
+		_object_picture_thread_ms += made.ms;
+		_object_pictures_made_thread++;
+		MakeRoomForPicture();
+		ObjectPictureEntry &e = _object_pictures[made.key];
+		e.used = ++_object_pictures_clock;
+		e.picture = std::move(made.picture);
+	}
+	return !done.empty();
+}
+
+/** Whether the thread is making a picture of a vehicle or has some to make: what the objects made is held then (ForgetUnusedThreeDObjects()). */
+bool ThreeDPicturesBeingMade()
+{
+	std::lock_guard lock(_pictures_mutex);
+	return _picture_in_hand || !_pictures_to_make.empty();
+}
+
+/** How many pictures of vehicles wait for the thread, the one in hand among them (the rig, test3d casy). */
+size_t ThreeDPicturesWaiting()
+{
+	std::lock_guard lock(_pictures_mutex);
+	return _pictures_to_make.size() + (_picture_in_hand ? 1 : 0);
+}
+
+/**
+ * Stop the thread making the pictures of the vehicles and forget what it was asked for: the objects are read anew
+ * (ResetThreeDVehicleObjectSprites()), or the game ends (ShutdownGame()). Started again the next time one is asked for.
+ */
+void StopThreeDPictureThread()
+{
+	if (_pictures_thread.joinable()) {
+		{
+			std::lock_guard lock(_pictures_mutex);
+			_pictures_stop = true;
+		}
+		_pictures_wake.notify_all();
+		_pictures_thread.join();
+	}
+	_pictures_stop = false;
+	_pictures_to_make.clear();
+	_pictures_done.clear();
+	_picture_in_hand = false;
+	_pictures_asked.clear();
+	_vehicles_owed_pictures.clear();
+}
+
+/** Whether the picture asked for now may wait for the thread (a vehicle on the map), and whether it waited: the nearest made was given. */
 static bool _object_picture_may_wait = false;
 static bool _object_picture_waited = false;
-/** The vehicles drawn with a picture that waited: drawn again in a moment. */
-static std::vector<VehicleID> _vehicles_owed_pictures;
 
+/** The pictures made come in, and the vehicles that waited for them are drawn again. */
 static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::milliseconds(30), [](auto) {
-	if (_vehicles_owed_pictures.empty()) return;
-	std::vector<VehicleID> owed;
+	if (!TakePicturesMade() || _vehicles_owed_pictures.empty()) return;
+	std::set<VehicleID> owed;
 	owed.swap(_vehicles_owed_pictures);
-	std::sort(owed.begin(), owed.end());
-	owed.erase(std::unique(owed.begin(), owed.end()), owed.end());
 	for (VehicleID id : owed) {
 		const Vehicle *v = Vehicle::GetIfValid(id);
 		if (v != nullptr) v->MarkAllViewportsDirty();
 	}
 });
 
+/**
+ * A picture of an object in the turned view at an angle and zoom, kept (RasterObject()): made now, or, for a vehicle
+ * of the map (_object_picture_may_wait), asked of the thread and the nearest made given meanwhile.
+ */
 static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f, uint64_t walk = 0)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
 	pitch = std::clamp(pitch, -60, 60);
 	roll = std::clamp(roll, -60, 60);
-	auto key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
+	const ObjectPictureKey key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
 	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
 		return it->second.picture.width > 0 ? &it->second.picture : nullptr;
 	}
-	/* Out of the frame's time: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
-	const auto now = std::chrono::steady_clock::now();
-	if (now - _pictures_window_start > PICTURES_WINDOW) {
-		_pictures_window_start = now;
-		_pictures_window_ms = 0;
-	}
-	if (_object_picture_may_wait && _pictures_window_ms >= PICTURES_BUDGET_MS) {
-		const ThreeDModelPicture *nearest = nullptr;
-		int best = INT_MAX;
-		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
-				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
-			if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
-			auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
-			const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
-			if (off < best) {
-				best = off;
-				nearest = &n->second.picture;
-			}
-		}
-		_object_picture_waited = true;
-		return nearest;
-	}
-	if (_object_pictures.size() >= PICTURES_KEPT) {
-		/* The older half goes. */
-		std::vector<uint64_t> ages;
-		for (const auto &e : _object_pictures) ages.push_back(e.second.used);
-		std::nth_element(ages.begin(), ages.begin() + ages.size() / 2, ages.end());
-		/* Never those of the picture being drawn (PinThreeDPictures()): their pixels are still to be drawn. */
-		uint64_t limit = std::min(ages[ages.size() / 2], _pictures_pinned_from - 1);
-		for (auto i = _object_pictures.begin(); i != _object_pictures.end();) {
-			if (i->second.used <= limit) {
-				i = _object_pictures.erase(i);
-			} else {
-				++i;
-			}
-		}
-	}
-	ObjectPictureEntry &e = _object_pictures[key];
-	e.used = ++_object_pictures_clock;
 	/* On the track foreshortened along itself as the map does, smoothly between the directions (as the likeness, RenderThreeDVehicle()). */
 	float f = cam_step * static_cast<float>(M_PI) / 180.0f;
 	float along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
+	const float pxm = PXM_16X / (1 << to_underlying(zoom));
+	if (_object_picture_may_wait) {
+		PictureToMake p;
+		p.key = key;
+		p.obj = obj;
+		p.scale = scale;
+		p.cam_az = static_cast<float>(cam_step);
+		p.world_az = static_cast<float>(world_step);
+		p.along = along;
+		p.pxm = pxm;
+		p.fade = FadeAmount(obj, fade);
+		p.rust_time = RustTime(obj, fade);
+		p.tint = tint;
+		p.paint_colour = PaletteColour(obj, fade);
+		p.stretch = stretch;
+		p.spin = spin_step * 360.0f / SPIN_STEPS;
+		p.pitch = static_cast<float>(pitch);
+		p.roll = static_cast<float>(roll);
+		p.frame = frame;
+		p.lights = lights;
+		p.state = fade;
+		p.walk = walk;
+		if (AskForPicture(std::move(p))) {
+			/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
+			const ThreeDModelPicture *nearest = nullptr;
+			int best = INT_MAX;
+			for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
+					n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
+				if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
+				auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
+				const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
+				if (off < best) {
+					best = off;
+					nearest = &n->second.picture;
+				}
+			}
+			_object_picture_waited = true;
+			return nearest;
+		}
+	}
+	MakeRoomForPicture();
+	ObjectPictureEntry &e = _object_pictures[key];
+	e.used = ++_object_pictures_clock;
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
-	auto timed = [&]() { _object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count(); };
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, PXM_16X / (1 << to_underlying(zoom)), FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights, fade, walk)) {
+	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, pxm, FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights, fade, walk)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
-		e.picture.width = r.width;
-		e.picture.height = r.height;
-		e.picture.left = r.left;
-		e.picture.top = r.top;
-		e.picture.pixels.resize(r.px.size());
-		for (size_t i = 0; i < r.px.size(); i++) e.picture.pixels[i] = r.px[i].a == 0 ? 0 : r.px[i].data;
-		e.picture.lit.clear();
-		for (size_t i = 0; i < r.lit.size(); i++) {
-			if (r.lit[i] != 0) e.picture.lit.push_back(static_cast<uint32_t>(i));
-		}
-		e.picture.lights = std::move(r.lights);
+		PictureOfRaster(e.picture, r);
 	}
-	timed();
-	_pictures_window_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+	_object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	return e.picture.width > 0 ? &e.picture : nullptr;
 }
 
@@ -1565,7 +1747,7 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	_object_picture_waited = false;
 	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, 0, 0, lights, along, WalkCode(obj, state, WalkedOf(v, obj), scale));
 	_object_picture_may_wait = false;
-	if (_object_picture_waited) _vehicles_owed_pictures.push_back(v->index);
+	if (_object_picture_waited) _vehicles_owed_pictures.insert(v->index);
 	place.ax = static_cast<int>(std::lround(ox));
 	place.ay = static_cast<int>(std::lround(oy));
 	place.az = v->z_pos;
@@ -1939,7 +2121,12 @@ const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev,
 	const float world_az = std::round((ev.facing - 135.0f) / 5.0f) * 5.0f;
 	const float cam = std::round(yaw / 5.0f) * 5.0f;
 	const float along = std::round(ev.along * 20.0f) / 20.0f;
-	return ObjectPicture(ev.obj, ev.scale, zoom, world_az + cam, world_az, false, ev.state, 0, -1, 1.0f, 0, 0, 0, ev.lights, along, ev.walk);
+	/* On the thread too (as the vehicles of the map): the view draws again every frame as it goes, and the nearest made
+	 * stands in meanwhile. */
+	_object_picture_may_wait = true;
+	const ThreeDModelPicture *pic = ObjectPicture(ev.obj, ev.scale, zoom, world_az + cam, world_az, false, ev.state, 0, -1, 1.0f, 0, 0, 0, ev.lights, along, ev.walk);
+	_object_picture_may_wait = false;
+	return pic;
 }
 
 /**

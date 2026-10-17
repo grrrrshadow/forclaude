@@ -96,6 +96,7 @@
 #endif
 
 #include "anomaly_log.h"
+#include "three_d_vehicle_object.h"
 
 #if defined(_WIN32)
 #	include "os/windows/win32.h"
@@ -312,6 +313,8 @@ static void ShutdownGame()
 {
 	IConsoleFree();
 	CloseAnomalyLog();
+	/* The thread making the pictures of the 3D vehicles, before what it draws from is gone. */
+	StopThreeDPictureThread();
 
 	if (_network_available) NetworkShutDown(); // Shut down the network and close any open connections
 
