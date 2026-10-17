@@ -19,6 +19,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – luk a kuše od začátku; víc vláken po buildu
+
+- Hráč: **„dej tam luk, šípy, kuši a šipky“** – chodec nové firmy má od začátku kladivo, luk, 50 šípů, kuši a 50
+  šipek (`WalkerStartItems()` v `walker_inventory.h`). Meče jen přes iddqd (hráč je nejmenoval). Rozehrané hry si
+  nesou svůj inventář v savu – tam iddqd (co už je, nedá podruhé, šípy a šipky doplní na 50).
+- Hráč: **„máme všichni stroje minimálně se 4 jádry“** … **„vlákna uděláme po buildu“** – víc vláken na obrázky
+  vozidel (polovina jader, 2 až 4) až po hráčově buildu s jedním vláknem.
+
 ## 17. 10. – vlákno na pozadí pro obrázky vozidel
 
 - Hráč: **„tak jedno jádro procesoru bude načítat a druhé bude dělat obraz?“ … „vlákno na pozadí dej“**. Obrázky
@@ -36,7 +44,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Rig: `test3d casy` ukazuje zvlášť obrázky dělané hned a na vlákně (`na vlakne … ms (n, ve fronte m)`). Ověřeno:
   první obrázek tahače 463 ms a návěsu 795 ms na pozadí, hra kreslila dál; `quit` uprostřed dekódování počká na vlákno.
 - Co zbývá: první objevení vozidla, které ještě žádné okno neukázalo, je asi půl vteřiny neviditelné (textury se
-  teprve čtou). Postavy na mapě se poprvé dělají hned (130 ms). Jedno vlákno; na strojích s více jádry by šla dvě.
+  teprve čtou). Postavy na mapě se poprvé dělají hned (130 ms). Zatím jedno vlákno (víc po buildu, sekce výše).
 
 ## 17. 10. – tmavá auta v dálce, plynulé zatáčení na mapě, škubání, kolečka, náhled v nákupu
 

@@ -13,7 +13,8 @@
  * hammer", "we will add more". It is the company's (CompanyProperties::walker_items), saved with the game, and paid
  * for with the company's money: beer at the pub, marijuana at the vending machine and the coffeeshop, cigarettes and
  * goods at a shop of a town (a house that takes goods). Beer heals, marijuana heals more; the rest is carried for now
- * (dressing and spells later). The hammer is there from the start.
+ * (dressing and spells later). The hammer is there from the start, and the bow and the crossbow with fifty arrows and
+ * fifty bolts (the player, 17. 10.: "put the bow, arrows, crossbow and bolts there"; WalkerStartItems()).
  */
 
 #ifndef WALKER_INVENTORY_H
@@ -22,6 +23,8 @@
 #include "economy_type.h"
 #include "strings_type.h"
 #include "tile_type.h"
+
+#include <array>
 
 /** The things the walker can carry. Their numbers are saved: new ones go at the end. */
 enum class WalkerItem : uint8_t {
@@ -32,10 +35,10 @@ enum class WalkerItem : uint8_t {
 	Cigarettes, ///< cigarettes
 	Marijuana,  ///< marijuana: heals more
 	Goods,      ///< goods bought in a town
-	Bow,        ///< the bow (the colleague's, objekty/predmety/luk.glb): drawn and shot
-	Arrows,     ///< arrows for the bow, used up as they are shot
-	Crossbow,   ///< the crossbow: shot, then drawn again
-	Bolts,      ///< bolts for the crossbow
+	Bow,        ///< the bow (the colleague's, objekty/predmety/luk.glb): drawn and shot; from the start
+	Arrows,     ///< arrows for the bow, used up as they are shot; fifty from the start
+	Crossbow,   ///< the crossbow: shot, then drawn again; from the start
+	Bolts,      ///< bolts for the crossbow; fifty from the start
 	Sword,      ///< the sword, swung as the hammer
 	TwoHandedSword, ///< the two-handed sword, swung as the hammer
 	End,        ///< the end of the known things
@@ -56,6 +59,18 @@ static constexpr uint16_t WALKER_ITEM_MAX = 999;
 static constexpr uint16_t WALKER_AMMUNITION_FULL = 50;
 /** The walker's full health. */
 static constexpr uint8_t WALKER_HEALTH_MAX = 100;
+
+/** What a new company's walker carries (CompanyProperties::walker_items): the hammer, the bow and the crossbow, a quiver of each. */
+constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
+{
+	std::array<uint16_t, WALKER_ITEM_SLOTS> items{};
+	items[static_cast<size_t>(WalkerItem::Hammer)] = 1;
+	items[static_cast<size_t>(WalkerItem::Bow)] = 1;
+	items[static_cast<size_t>(WalkerItem::Arrows)] = WALKER_AMMUNITION_FULL;
+	items[static_cast<size_t>(WalkerItem::Crossbow)] = 1;
+	items[static_cast<size_t>(WalkerItem::Bolts)] = WALKER_AMMUNITION_FULL;
+	return items;
+}
 
 /** What a thing of the inventory is. */
 struct WalkerItemSpec {

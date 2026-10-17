@@ -114,7 +114,7 @@ struct CompanyProperties {
 	uint32_t tree_limit = 0; ///< Amount of trees we can (still) plant (times 65536).
 	uint32_t build_object_limit = 0; ///< Amount of tiles we can (still) build objects on (times 65536). Also applies to buying land and placing houses.
 
-	std::array<uint16_t, WALKER_ITEM_SLOTS> walker_items{1}; ///< The inventory of the walker of the view from the first person: how many of each WalkerItem (the hammer from the start; walker_inventory.h).
+	std::array<uint16_t, WALKER_ITEM_SLOTS> walker_items = WalkerStartItems(); ///< The inventory of the walker of the view from the first person: how many of each WalkerItem (the hammer, the bow and the crossbow from the start; walker_inventory.h).
 	uint8_t walker_health = WALKER_HEALTH_MAX; ///< And its health, 0 to WALKER_HEALTH_MAX.
 
 	/**
