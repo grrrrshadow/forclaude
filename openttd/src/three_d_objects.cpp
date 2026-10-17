@@ -46,6 +46,7 @@
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <numeric>
 #include <set>
 #include <tuple>
 #include <unordered_map>
@@ -131,11 +132,14 @@ static constexpr std::string_view IN_TAR = "tar:";
 /** And of one in a tar in baseset/decouple/, beside the game's own sets. */
 static constexpr std::string_view IN_BASESET_TAR = "btar:";
 
-/** A whole file: a path on the disk, or IN_TAR and the name of a file in a tar of the NewGRF folders (a package of a GRF). */
-static std::vector<uint8_t> ReadWholeFile(const std::string &path)
+/**
+ * Open a file of the objects at its first byte: a path on the disk, or IN_TAR and the name of a file in a tar of the
+ * NewGRF folders (a package of a GRF), IN_BASESET_TAR one in a tar of baseset/decouple/.
+ * @param[out] len its length
+ */
+static std::optional<FileHandle> OpenObjectFile(const std::string &path, size_t &len)
 {
-	std::vector<uint8_t> data;
-	size_t len = 0;
+	len = 0;
 	std::optional<FileHandle> f;
 	if (path.starts_with(IN_TAR)) {
 		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
@@ -150,6 +154,15 @@ static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 			len = end > 0 ? static_cast<size_t>(end) : 0;
 		}
 	}
+	return f;
+}
+
+/** A whole file of the objects (OpenObjectFile()). */
+static std::vector<uint8_t> ReadWholeFile(const std::string &path)
+{
+	std::vector<uint8_t> data;
+	size_t len = 0;
+	std::optional<FileHandle> f = OpenObjectFile(path, len);
 	if (!f.has_value() || len == 0 || len > 64 * 1024 * 1024) return data;
 	data.resize(len);
 	if (fread(data.data(), len, 1, *f) != 1) data.clear();
@@ -171,12 +184,7 @@ static std::atomic<size_t> _glb_files_kept_bytes = 0;
 /** While it lives, the .glb files read on this thread are kept for each other reading of them; at the end let go of. */
 struct GlbFilesScope {
 	GlbFilesScope() { _glb_files_scope++; }
-	~GlbFilesScope()
-	{
-		if (--_glb_files_scope > 0) return;
-		for (const auto &[path, bytes] : _glb_files_kept) _glb_files_kept_bytes -= bytes->size();
-		_glb_files_kept.clear();
-	}
+	~GlbFilesScope();
 	GlbFilesScope(const GlbFilesScope &) = delete;
 	GlbFilesScope &operator=(const GlbFilesScope &) = delete;
 };
@@ -200,15 +208,7 @@ static std::vector<uint8_t> ReadFileHead(const std::string &path, size_t most)
 {
 	std::vector<uint8_t> data;
 	size_t len = 0;
-	std::optional<FileHandle> f;
-	if (path.starts_with(IN_TAR)) {
-		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
-	} else if (path.starts_with(IN_BASESET_TAR)) {
-		f = FioFOpenFile(std::string_view(path).substr(IN_BASESET_TAR.size()), "rb", Subdirectory::Baseset, &len);
-	} else {
-		f = FileHandle::Open(path, "rb");
-		len = most;
-	}
+	std::optional<FileHandle> f = OpenObjectFile(path, len);
 	if (!f.has_value()) return data;
 	data.resize(std::min(len, most));
 	data.resize(fread(data.data(), 1, data.size(), *f));
@@ -219,6 +219,124 @@ static std::vector<uint8_t> ReadFileHead(const std::string &path, size_t most)
 static uint32_t ReadU32(std::span<const uint8_t> d, size_t at)
 {
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
+}
+
+/**
+ * A .glb as its meshes are read from it (ReadGlbMesh()): its JSON parsed once, and of its binary buffer only the
+ * pieces the meshes and pictures read need (Piece()), read from the file as they are wanted. A file of the colleague's
+ * add-ons is forty megabytes of ten trailers, a lorry shows one of them, and all of it was read (on a cold disk five
+ * seconds for one lorry). Kept, with what was read of it, while a reading goes on on its thread (GlbFilesScope).
+ */
+struct GlbFile {
+	std::string path;
+	nlohmann::json json;
+	std::string error;              ///< why it cannot be read; empty when it can
+	size_t bin_at = 0, bin_len = 0; ///< its binary chunk: where in the file, how long
+	size_t bytes = 0;               ///< the bytes of the pieces read
+
+	explicit GlbFile(const std::string &path) : path(path)
+	{
+		if (!this->Open()) {
+			this->error = "cannot be opened";
+			return;
+		}
+		uint8_t head[20];
+		if (this->length < sizeof(head) || fread(head, sizeof(head), 1, *this->file) != 1 || ReadU32(head, 0) != 0x46546C67 || ReadU32(head, 4) != 2 || ReadU32(head, 16) != 0x4E4F534A) {
+			this->error = "not a glTF binary";
+			return;
+		}
+		/* The chunks: the JSON, then the binary buffer. */
+		const size_t json_len = ReadU32(head, 12);
+		if (20 + json_len > this->length) {
+			this->error = "its JSON is past its end";
+			return;
+		}
+		std::string text(json_len, '\0');
+		if (json_len > 0 && fread(text.data(), json_len, 1, *this->file) != 1) {
+			this->error = "its JSON cannot be read";
+			return;
+		}
+		try {
+			this->json = nlohmann::json::parse(text);
+		} catch (const std::exception &e) {
+			this->error = e.what();
+			return;
+		}
+		const size_t bin_head = 20 + ((json_len + 3) & ~size_t{3});
+		uint8_t chunk[8];
+		if (bin_head + 8 <= this->length && fseek(*this->file, static_cast<long>(this->base + bin_head), SEEK_SET) == 0 && fread(chunk, sizeof(chunk), 1, *this->file) == 1 && ReadU32(chunk, 4) == 0x004E4942) {
+			this->bin_at = bin_head + 8;
+			this->bin_len = std::min<size_t>(ReadU32(chunk, 0), this->length - this->bin_at);
+		}
+	}
+
+	~GlbFile()
+	{
+		_glb_files_kept_bytes -= this->bytes;
+	}
+
+	/**
+	 * Bytes of its binary buffer, read the first time they are wanted.
+	 * @throw std::out_of_range when they are past its end
+	 */
+	std::span<const uint8_t> Piece(size_t offset, size_t len)
+	{
+		if (offset > this->bin_len || len > this->bin_len - offset) throw std::out_of_range("past the buffer");
+		for (const auto &[at, piece] : this->pieces) {
+			if (at <= offset && offset + len <= at + piece.size()) return std::span<const uint8_t>(piece).subspan(offset - at, len);
+		}
+		std::vector<uint8_t> piece(len);
+		if (len > 0) {
+			if (!this->file.has_value() && !this->Open()) throw std::runtime_error("cannot be opened again");
+			if (fseek(*this->file, static_cast<long>(this->base + this->bin_at + offset), SEEK_SET) != 0 || fread(piece.data(), len, 1, *this->file) != 1) throw std::runtime_error("cannot be read");
+		}
+		this->bytes += len;
+		_glb_files_kept_bytes += len;
+		return this->pieces.emplace_back(offset, std::move(piece)).second;
+	}
+
+	/** Let go of the open file (between the readings): what was read of it stays. */
+	void Close()
+	{
+		this->file.reset();
+	}
+
+private:
+	std::optional<FileHandle> file;
+	size_t base = 0;   ///< where its first byte is in what was opened (a file in a tar)
+	size_t length = 0;
+	std::vector<std::pair<size_t, std::vector<uint8_t>>> pieces;
+
+	bool Open()
+	{
+		this->file = OpenObjectFile(this->path, this->length);
+		if (!this->file.has_value()) return false;
+		const long at = ftell(*this->file);
+		this->base = at > 0 ? static_cast<size_t>(at) : 0;
+		return true;
+	}
+};
+
+/** The .glb files being read on this thread (GlbFileOf()), kept while the reading goes on (GlbFilesScope). */
+static thread_local std::vector<std::shared_ptr<GlbFile>> _glb_read_kept;
+
+/** A .glb to read the meshes of (GlbFile), or as it is being read already by the reading going on. */
+static std::shared_ptr<GlbFile> GlbFileOf(const std::string &path)
+{
+	for (const auto &kept : _glb_read_kept) {
+		if (kept->path == path) return kept;
+	}
+	auto made = std::make_shared<GlbFile>(path);
+	if (_glb_files_scope > 0) _glb_read_kept.push_back(made);
+	return made;
+}
+
+GlbFilesScope::~GlbFilesScope()
+{
+	if (--_glb_files_scope > 0) return;
+	for (const auto &[path, bytes] : _glb_files_kept) _glb_files_kept_bytes -= bytes->size();
+	_glb_files_kept.clear();
+	_glb_read_kept.clear();
 }
 
 /*
@@ -445,6 +563,7 @@ struct GlbReadOptions {
 	bool only_night = false;      ///< only the meshes under the nodes "noc" and "noc_<...>"
 	const std::vector<std::string> *marks = nullptr; ///< a second marking of nodes by name, as groups (GlbMesh::tri_mark): a part's wheels
 	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
+	bool points_only = false;     ///< only the places (points), no mesh read: the lights at the back of an add-on's parts
 };
 
 /** Whether a node is of the lights at night: "noc", or "noc_<part>" of an add-on's part. */
@@ -497,52 +616,81 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 	const std::string_view skip_node = o.skip_node;
 	const std::vector<std::string> *groups = o.groups;
 	const std::vector<std::string> *marks = o.marks;
-	const std::shared_ptr<const std::vector<uint8_t>> file = GlbFileBytes(path);
-	const std::vector<uint8_t> &d = *file;
-	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
-		Debug(misc, 0, "3D object {}: not a glTF binary", path);
+	const std::shared_ptr<GlbFile> glb = GlbFileOf(path);
+	/* Its file let go of when this reading is done; what was read of it stays while the reading goes on. */
+	struct CloseAfter {
+		GlbFile &glb;
+		~CloseAfter() { this->glb.Close(); }
+	} close_after{*glb};
+	if (!glb->error.empty()) {
+		Debug(misc, 0, "3D object {}: {}", path, glb->error);
 		return false;
-	}
-	/* The chunks: the JSON, then the binary buffer. */
-	std::string json_text;
-	/* (Where it is in the file: a file of the colleague's add-ons is tens of megabytes.) */
-	std::span<const uint8_t> bin;
-	for (size_t at = 12; at + 8 <= d.size();) {
-		uint32_t len = ReadU32(d, at), type = ReadU32(d, at + 4);
-		if (at + 8 + len > d.size()) break;
-		if (type == 0x4E4F534A) json_text.assign(reinterpret_cast<const char *>(&d[at + 8]), len);
-		if (type == 0x004E4942) bin = std::span<const uint8_t>(d).subspan(at + 8, len);
-		at += 8 + ((len + 3) & ~3u);
 	}
 	using Matrix = std::array<double, 16>; // column-major
 	try {
-		nlohmann::json j = nlohmann::json::parse(json_text);
+		const nlohmann::json &j = glb->json;
 		const auto &accessors = j.at("accessors");
 		const auto &views = j.at("bufferViews");
-		/* An accessor's elements as floats (or whole numbers for the indices). */
-		auto read = [&](int index, int comps, std::vector<double> &out) {
+		/* An accessor's bytes, read from the file when first wanted (GlbFile::Piece()), and how they lie. */
+		struct AccessorBytes {
+			std::span<const uint8_t> bytes;
+			int type = 0;
+			size_t count = 0, stride = 0, size = 0;
+		};
+		auto accessor_bytes = [&](int index, int comps) {
 			const auto &a = accessors.at(index);
 			const auto &v = views.at(a.at("bufferView").get<int>());
-			size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
-			int type = a.at("componentType").get<int>();
-			size_t count = a.at("count").get<size_t>();
-			size_t size = type == 5126 || type == 5125 ? 4 : type == 5123 || type == 5122 ? 2 : 1;
-			size_t stride = v.value("byteStride", 0);
-			if (stride == 0) stride = size * comps;
-			out.resize(count * comps);
-			for (size_t i = 0; i < count; i++) {
+			AccessorBytes r;
+			r.type = a.at("componentType").get<int>();
+			r.count = a.at("count").get<size_t>();
+			r.size = r.type == 5126 || r.type == 5125 ? 4 : r.type == 5123 || r.type == 5122 ? 2 : 1;
+			r.stride = v.value("byteStride", 0);
+			if (r.stride == 0) r.stride = r.size * comps;
+			const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
+			r.bytes = glb->Piece(offset, r.count == 0 ? 0 : (r.count - 1) * r.stride + r.size * comps);
+			return r;
+		};
+		/* An accessor's elements as floats: copied as they are when they are floats one after the other. */
+		auto read = [&](int index, int comps, std::vector<float> &out) {
+			const AccessorBytes a = accessor_bytes(index, comps);
+			out.resize(a.count * comps);
+			if constexpr (std::endian::native == std::endian::little) {
+				if (a.type == 5126 && a.stride == 4 * static_cast<size_t>(comps)) {
+					std::copy_n(a.bytes.data(), out.size() * sizeof(float), reinterpret_cast<uint8_t *>(out.data()));
+					return;
+				}
+			}
+			for (size_t i = 0; i < a.count; i++) {
 				for (int c = 0; c < comps; c++) {
-					size_t at = offset + i * stride + c * size;
-					if (at + size > bin.size()) throw std::out_of_range("accessor past the buffer");
-					double value;
-					switch (type) {
-						case 5126: value = std::bit_cast<float>(ReadU32(bin, at)); break;
-						case 5125: value = ReadU32(bin, at); break;
-						case 5123: value = bin[at] | (bin[at + 1] << 8); break;
-						case 5121: value = bin[at]; break;
+					const size_t at = i * a.stride + c * a.size;
+					float value;
+					switch (a.type) {
+						case 5126: value = std::bit_cast<float>(ReadU32(a.bytes, at)); break;
+						case 5125: value = static_cast<float>(ReadU32(a.bytes, at)); break;
+						case 5123: value = static_cast<float>(a.bytes[at] | (a.bytes[at + 1] << 8)); break;
+						case 5121: value = a.bytes[at]; break;
 						default: throw std::invalid_argument("component type");
 					}
 					out[i * comps + c] = value;
+				}
+			}
+		};
+		/* The corners of a primitive's triangles: its indices, or each corner once without them. */
+		auto read_indices = [&](const nlohmann::json &p, size_t corners, std::vector<uint32_t> &out) {
+			if (!p.contains("indices")) {
+				out.resize(corners);
+				std::iota(out.begin(), out.end(), 0u);
+				return;
+			}
+			const AccessorBytes a = accessor_bytes(p.at("indices").get<int>(), 1);
+			out.resize(a.count);
+			for (size_t i = 0; i < a.count; i++) {
+				const size_t at = i * a.stride;
+				switch (a.type) {
+					case 5125: out[i] = ReadU32(a.bytes, at); break;
+					case 5123: out[i] = a.bytes[at] | (a.bytes[at + 1] << 8); break;
+					case 5121: out[i] = a.bytes[at]; break;
+					default: throw std::invalid_argument("component type of the indices");
 				}
 			}
 		};
@@ -614,7 +762,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 						} else if (img.contains("bufferView")) {
 							const auto &v = views.at(img.at("bufferView").get<int>());
 							size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
-							if (offset + len <= bin.size()) t.png = InternThreeDTextureBytes(bin.subspan(offset, len));
+							if (offset <= glb->bin_len && len <= glb->bin_len - offset) t.png = InternThreeDTextureBytes(glb->Piece(offset, len));
 							image_bytes.emplace(image, t.png);
 						}
 					}
@@ -633,18 +781,15 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
 			for (const auto &p : prims) {
 				if (p.value("mode", 4) != 4) continue; // triangles only
-				std::vector<double> pos, nrm, uv, idx;
+				std::vector<float> pos, nrm, uv;
+				std::vector<uint32_t> idx;
 				read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
 				if (p.at("attributes").contains("TEXCOORD_0")) read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
 				if (p.at("attributes").contains("NORMAL")) read(p.at("attributes").at("NORMAL").get<int>(), 3, nrm);
 				size_t corners = pos.size() / 3;
-				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
+				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0f);
 				if (nrm.size() != corners * 3) normals = false;
-				if (p.contains("indices")) {
-					read(p.at("indices").get<int>(), 1, idx);
-				} else {
-					for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
-				}
+				read_indices(p, corners, idx);
 				int material = p.value("material", -1);
 				if (first_material < 0 && material >= 0) first_material = material;
 				uint8_t tex = texture_of(material);
@@ -687,7 +832,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		const Matrix identity{1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
 		/* The file's first material is the first texture -- a vehicle's body, the one its paint is for -- whatever
 		 * node is read first (the V3S's glass was, and its paint went on the glass). */
-		if (all_nodes && j.contains("materials") && !j.at("materials").empty()) texture_of(0);
+		if (all_nodes && !o.points_only && j.contains("materials") && !j.at("materials").empty()) texture_of(0);
 		if (all_nodes && j.contains("nodes")) {
 			/* The scene's nodes, each with its parents' transforms; a node only reached as a child is not a root. */
 			const auto &nodes = j.at("nodes");
@@ -752,7 +897,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					points->push_back(static_cast<float>(m[13]));
 					if (o.point_groups != nullptr) o.point_groups->push_back(group);
 				}
-				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group, mark, glass);
+				if (inside && !o.points_only && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group, mark, glass);
 				if (node.contains("children")) for (const auto &c : node.at("children")) todo.push_back({c.get<int>(), m, inside, group, mark, glass});
 			}
 		} else {
@@ -784,14 +929,11 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			for (const auto &me : j.at("meshes")) {
 				for (const auto &p : me.at("primitives")) {
 					if (p.value("mode", 4) != 4 || !p.at("attributes").contains("TEXCOORD_0") || image_of(p.value("material", -1)) != image) continue;
-					std::vector<double> uv, idx;
+					std::vector<float> uv;
+					std::vector<uint32_t> idx;
 					read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
 					const size_t corners = uv.size() / 2;
-					if (p.contains("indices")) {
-						read(p.at("indices").get<int>(), 1, idx);
-					} else {
-						for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
-					}
+					read_indices(p, corners, idx);
 					for (size_t i = 0; i + 2 < idx.size(); i += 3) {
 						for (int k = 0; k < 3; k++) {
 							const size_t c = static_cast<size_t>(idx[i + k]);
@@ -3136,6 +3278,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 {
 	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
+	const auto started = std::chrono::steady_clock::now();
 	std::string key = this->file;
 	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
 	for (const ThreeDVehicleWheels &w : this->wheels) {
@@ -3423,6 +3566,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			GlbMesh night;
 			ReadGlbMesh(addon.file, night, lamps);
 			GlbReadOptions rear = lamps;
+			rear.points_only = true;
 			rear.only_night = false;
 			rear.only_node = "\x01";
 			rear.point_prefix = "svetlo_zadni_";
@@ -3513,9 +3657,10 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
 		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 	}
-	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m", this->name,
+	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m, read in {} ms", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
-			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0);
+			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0,
+			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
 	ShrinkShape(*made);
 	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);
