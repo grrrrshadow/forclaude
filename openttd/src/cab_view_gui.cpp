@@ -332,6 +332,7 @@ struct CabViewWindow : Window {
 	{
 		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
 		CabLetGo(Vehicle::GetIfValid(this->window_number));
+		DropEyeFrame(&this->camera);
 		this->Window::Close(data);
 	}
 
@@ -620,8 +621,8 @@ std::string DescribeCabViews()
 	for (const Window *w : Window::Iterate()) {
 		if (w->window_class != WindowClass::CabView) continue;
 		const CabViewWindow *cw = static_cast<const CabViewWindow *>(w);
-		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu, smer {:.0f} stupnu", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
-				cw->camera.ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
+		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu, smer {:.0f} stupnu", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
+				cw->camera.ms, cw->camera.collect_ms, cw->camera.draw_ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
 		const Vehicle *v = Vehicle::GetIfValid(w->window_number);
 		if (v != nullptr) {
 			s += fmt::format(", zatoceni {} volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_turn, v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");

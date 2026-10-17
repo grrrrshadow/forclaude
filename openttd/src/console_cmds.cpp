@@ -8974,6 +8974,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool RigFirstPersonHold(bool out, float swing);
 		extern double RigFirstPersonMeasure(int times, int threads);
 		extern double RigFirstPersonHoldW(int frame_ms, int frames);
+		/* The rig's pictures are of the moment (collected and drawn at once), unless 'chodec vlakno 1' asks for the
+		 * thread of the frames, a frame behind as the player has it; 'chodec vlakno 0' back. */
+		static bool thread_chosen = false;
+		if (argv.size() > 3 && argv[2] == "vlakno") {
+			_eye_synchronous = number(3).value_or(1) == 0;
+			thread_chosen = true;
+			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {}", _eye_synchronous ? "hned" : "na vlakne, o snimek pozadu");
+			return true;
+		}
+		if (!thread_chosen) _eye_synchronous = true;
 		if (argv.size() > 4 && argv[2] == "drzeni") {
 			/* 'chodec drzeni <frame ms> <frames>': W held so many frames of the game so long each; how far it walked. */
 			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
@@ -9879,6 +9889,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "kabina") {
 		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
 		extern std::string DescribeCabViews();
+		/* As 'chodec': the rig's pictures at once, unless 'kabina vlakno 1'. */
+		static bool thread_chosen = false;
+		if (argv.size() > 3 && argv[2] == "vlakno") {
+			_eye_synchronous = number(3).value_or(1) == 0;
+			thread_chosen = true;
+			IConsolePrint(CC_DEFAULT, "test3d: obraz z kabiny {}", _eye_synchronous ? "hned" : "na vlakne, o snimek pozadu");
+			return true;
+		}
+		if (!thread_chosen) _eye_synchronous = true;
 		if (argv.size() > 2 && argv[2] == "cas") {
 			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
 			return true;

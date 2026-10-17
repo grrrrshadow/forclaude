@@ -43,11 +43,24 @@ struct CabViewCamera {
 	double heading = 0.0; ///< radians, the world direction the eye looks along (atan2 of the direction's y, x)
 	bool valid = false;   ///< whether heading is set
 	double eye_dz = -1.0; ///< how high the eye is over the vehicle, units of height: it bows under a low bridge; -1 not yet
-	double ms = 0.0;      ///< rig: how long the last picture took, milliseconds
+	double ms = 0.0;      ///< rig: how long the last picture took, milliseconds: collecting and drawing
+	double collect_ms = 0.0; ///< rig: of it, collecting what to draw, under the lock of the game (CollectEyeFrame())
+	double draw_ms = 0.0; ///< rig: and drawing it, on the thread of the frames (EyeFrameThread())
+	bool fresh = false;   ///< a picture drawn anew was taken by the last call (DrawCabView(), DrawFirstPersonView())
 	int tiles = 0;        ///< rig: tiles drawn in the last picture
 	int billboards = 0;   ///< rig: billboards drawn in the last picture
-	double stage[7] = {}; ///< rig: the milliseconds of the stages of the last picture (DrawEyeView())
+	double stage[7] = {}; ///< rig: the milliseconds of the stages of collecting the last picture (CollectEyeFrame())
 };
+
+/*
+ * The pictures are collected under the lock of the game and drawn on a thread of their own, one frame behind
+ * (viewport.cpp, EyeFrame): what a window holds is the last one drawn, taken as it asks for the next.
+ */
+bool EyeFrameDrawing();                ///< a frame is being drawn: what it draws from must stay as it is
+void WaitEyeFrame();                   ///< wait for it (the objects are read anew)
+void StopEyeFrameThread();             ///< at the end of the game
+void DropEyeFrame(const void *client); ///< a window closes: its frame goes
+extern bool _eye_synchronous;          ///< the rig: drawn at once on the thread that asked, as before
 
 struct Vehicle;
 struct Window;

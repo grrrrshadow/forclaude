@@ -410,6 +410,7 @@ struct FirstPersonWindow : Window {
 	{
 		/* Out of the vehicle the walker was in: let go of it, as the cab view closing does. */
 		CabLetGo(this->Riding());
+		DropEyeFrame(&this->camera);
 		this->Window::Close(data);
 	}
 
@@ -421,7 +422,8 @@ struct FirstPersonWindow : Window {
 		if (w <= 0 || h <= 0) return;
 		const Vehicle *rv = this->Riding();
 		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
-		if (this->picture_ok && this->hurt_steps > 0) {
+		/* (Over a picture drawn anew only: the one shown is the last drawn, a frame behind.) */
+		if (this->picture_ok && this->camera.fresh && this->hurt_steps > 0) {
 			/* Hurt: red over the picture, fading. */
 			const uint a = 30 + this->hurt_steps * 18;
 			for (uint32_t &p : this->picture.pixels) {
@@ -1038,9 +1040,9 @@ std::string DescribeFirstPerson()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu",
+	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
 			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE,
-			w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.tiles, w->camera.billboards);
+			w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards);
 }
 
 /**
@@ -1110,17 +1112,21 @@ double RigFirstPersonMeasure(int times, int threads)
 	extern int _cab_threads;
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr || times <= 0) return 0;
+	/* At once, each picture collected and drawn here: the time of one. */
+	AutoRestoreBackup at_once(_eye_synchronous, true);
 	_cab_threads = threads;
-	double total = 0;
+	double total = 0, collect = 0, draw = 0;
 	for (int i = 0; i < times; i++) {
 		w->MakePicture();
 		total += w->camera.ms;
+		collect += w->camera.collect_ms;
+		draw += w->camera.draw_ms;
 	}
 	_cab_threads = 0;
 	uint64_t sum = 0;
 	for (uint32_t p : w->picture.pixels) sum = sum * 1000003u + p;
-	Debug(misc, 0, "rig: first person picture checksum {:016x}; stages ms: tiles {:.1f}, collect {:.1f}, ground texture {:.1f}, ground {:.1f}, bridges and objects {:.1f}, billboards and figures {:.1f}, haze and night {:.1f}", sum,
-			w->camera.stage[0], w->camera.stage[1], w->camera.stage[2], w->camera.stage[3], w->camera.stage[4], w->camera.stage[5], w->camera.stage[6]);
+	Debug(misc, 0, "rig: first person picture checksum {:016x}; collecting {:.1f} ms under the lock, drawing {:.1f} ms; stages of collecting ms: tiles {:.1f}, collect {:.1f}, ground texture {:.1f}, ground {:.1f}, bridges and objects {:.1f}, billboards and figures {:.1f}, haze and night {:.1f}", sum,
+			collect / times, draw / times, w->camera.stage[0], w->camera.stage[1], w->camera.stage[2], w->camera.stage[3], w->camera.stage[4], w->camera.stage[5], w->camera.stage[6]);
 	return total / times;
 }
 

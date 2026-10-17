@@ -19,6 +19,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – pohled z očí mimo zámek hry (hráč: „udělej 1 2 3 4“)
+
+- Hráč: **„jak ti bude jedno jádro počítat hru, druhé načítat auta, když 8 jader kreslí first person view“ … „proto
+  se to kouše, všechny jádra kreslí, ale žádný nepočítá hru, co se bude kreslit“.** Pravda, ale ne kvůli jádrům:
+  kreslení drželo zámek stavu hry po celý snímek (vlákno hry stálo), a co bylo vidět poprvé, se načítalo uvnitř
+  snímku, taky pod zámkem. Změřeno v rigu (4 jádra, 1000×559): 24 ms na 4 vláknech, 35 ms na 1 – pixely jsou jen
+  část, zbytek dělalo jedno vlákno.
+- Teď (`viewport.cpp`, `EyeFrame`): **1)** pod zámkem jen sběr – dlaždice, jejich sprity do textury země, vozidla,
+  postavy, textury – do snímku: seznamy trojúhelníků s texturami a pár úloh přes celý obraz (domy po rozích, stíny,
+  opar, mlha, noc, obloha, věc v ruce), v pořadí kreslení. **2)** Zámek se pustí, hra počítá dál; snímek kreslí vlákno
+  `ottd:3d-eye` (`EyeFrameThread()`), okno ukazuje poslední hotový – o snímek (40 ms) pozadu. Další snímek se sbírá, až
+  je ten hotový převzatý, takže se nic nepíše do mezipamětí, ze kterých se kreslí; obrázky vozidel a postav jsou do
+  převzetí přišpendlené (`PinThreeDPictures()`), textury objektů se při kreslení nezahazují ani nezapomínají
+  (`EyeFrameDrawing()`), při novém načtení GRF a při konci hry se na vlákno počká. **3)** Jádra: hra 1, načítání 1
+  (vlákno obrázků vozidel), zbytek kreslí (`DrawingCores()` = jádra − 2: na 4 jádrech 2, na 8 šest).
+- **4)** Načítání textur a tvarů pro pohled z očí na pozadí – další krok (viz níže).
+- Rig: `test3d chodec`/`kabina` kreslí hned (obraz je z okamžiku, snímky sedí); `test3d chodec vlakno 1` zapne vlákno
+  jako u hráče. `chodec`/`kabina cas` hlásí `sber X ms, kresleni Y ms`; `chodec mereni` vypíše sběr pod zámkem zvlášť.
+
 ## 17. 10. – luk a kuše od začátku; víc vláken po buildu
 
 - Hráč: **„dej tam luk, šípy, kuši a šipky“** – chodec nové firmy má od začátku kladivo, luk, 50 šípů, kuši a 50

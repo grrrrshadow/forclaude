@@ -105,8 +105,9 @@ static void ForgetEyePainted();
 /** Forget the sprites made: the sprite cache they were in is gone (GfxInitSpriteMem()). */
 void ResetThreeDVehicleObjectSprites()
 {
-	/* The thread making the pictures first: the objects it draws from go. */
+	/* The thread making the pictures first, and the frame of the view from the eyes being drawn: the objects they draw from go. */
 	StopThreeDPictureThread();
+	WaitEyeFrame();
 	_object_sprite_requests.clear();
 	_object_sprites.clear();
 	_object_empty_sprite = 0;

@@ -14,6 +14,7 @@
 #include "industry.h"
 #include "climate_industries.h"
 #include "three_d_vehicle_object.h"
+#include "cab_view.h"
 #include "debug.h"
 #include "fileio_func.h"
 #include "sound_func.h"
@@ -4334,7 +4335,8 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 	auto it = this->painted.find({level, paint});
 	if (it != this->painted.end()) return &it->second;
 
-	if (may_drop && _painted_bytes > PAINTED_BUDGET) {
+	/* Not while a frame of the view from the eyes is drawn from them (EyeFrameDrawing()). */
+	if (may_drop && _painted_bytes > PAINTED_BUDGET && !EyeFrameDrawing()) {
 		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
 		_painted_bytes = 0;
 	}
@@ -4397,7 +4399,7 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 		if (std::ranges::find(it->second, std::make_pair(w.level, w.paint)) == it->second.end()) it->second.emplace_back(w.level, w.paint);
 	}
 	if (jobs.size() < 2) return; // as it comes, when drawn
-	if (_painted_bytes > PAINTED_BUDGET) {
+	if (_painted_bytes > PAINTED_BUDGET && !EyeFrameDrawing()) {
 		for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
 		_painted_bytes = 0;
 	}
@@ -4479,9 +4481,10 @@ static void ForgetUnusedThreeDObjects()
 	ForgetGlbFiles();
 	_three_d_clock += 15;
 	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
-	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp): it holds
-	 * what the objects made; the next time, a quarter of a minute on. */
-	if (ThreeDPicturesBeingMade()) return;
+	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
+	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; the next time, a
+	 * quarter of a minute on. */
+	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;
 	for (const ThreeDObject &o : _three_d_objects) {
