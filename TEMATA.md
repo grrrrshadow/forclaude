@@ -23,6 +23,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – 3D GRF: rychlejší načítání a menší balíčky (návrh), hranice podrobnosti kolegovi
+
+- Hráč: **„potřebujem GRF optimalizovat, aby je hra načítala snadno, připravený musí být, a šetřit při tom místo“**,
+  „3D GRF“, „od načítání po zobrazení na displej“, „co formát a jak to zpracovává hra“.
+- Změřeno: 3D GRF samy jsou malé (bez obrázků), váhu mají balíčky objektů. Glb jsou z 85–98 % geometrie v plné
+  podrobnosti (32bitová čísla), textury jsou malá část. Tahač Tatry 148 čte při prvním zobrazení `nt_navesy`,
+  `nt_tahace`, `nt_podvozky` (120 MB, tvar 408 tisíc trojúhelníků): 2 s z teplého disku, 10,5 s ze studeného.
+  Při startu hra čte glb všech domů a průmyslu (170 souborů, 178 MB).
+- Rekordy: vagon BMZ 692 761 trojúhelníků, M810 518 522, tahač benzína 191 742, návěs otevřený 185 248, jedno kolo
+  podvozku 41 175 (řidička College 11 778, holka PUBG 51 211, holka u vozíku 60 413). Domy průměr 18 tisíc, nejvíc
+  36 tisíc – v pořádku.
+- Hráč: **„nastav mu hranice, ale u holek jsem mu řek, že je chci hezký… zadek u Tatry nemůže být hezčí než holky“**.
+  Kolegovi `hra/3d/HRANICE-PODROBNOSTI.md`: holka do 60 000 (nesahat), díl vozidla 10 000, celé vozidlo 40 000
+  (z jedné sítě 25 000), kolo 1 000, sklo 2 000, budova 40 000, atlas vozidla 2048². Spočteno na dnešních balíčcích:
+  vozidla 5,38 M → 1,22 M trojúhelníků (−77 %), glb 304 → asi 142 MB.
+- Návrh pro hru (čeká na hráče): číst z glb jen díly, které stav ukazuje; geometrie menšími čísly (glTF
+  KHR_mesh_quantization + EXT_meshopt_compression, nástroj gltfpack, knihovna meshoptimizer – MIT); textury připravené
+  po úrovních; kontrolní součty GRF si pamatovat, glb domů číst až při prvním kreslení.
+
 ## 17. 10. – plynulost: hra v tiku nevyrábí obrázky aut, glb soubory hned pryč
 
 - Hráč: **„pro mě je teď každej test utrpení… škube se to, nemůžu myší trefit čudlík a obraz se kouše“** – plynulost
