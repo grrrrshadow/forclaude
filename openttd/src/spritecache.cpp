@@ -47,6 +47,23 @@ size_t GetSpriteCacheBytesUsed()
 {
 	return _spritecache_bytes_used;
 }
+
+/**
+ * How much of the sprite cache the sprites made of the 3D vehicles take now (SetThreeDVehicleObjectSprite()), for the rig.
+ * @param[out] count how many of them are loaded
+ * @return their bytes
+ */
+size_t GetThreeDObjectSpriteBytes(size_t &count)
+{
+	size_t bytes = 0;
+	count = 0;
+	for (const SpriteCache &sc : _spritecache) {
+		if (sc.object_sprite == 0 || sc.ptr == nullptr) continue;
+		bytes += sc.length;
+		count++;
+	}
+	return bytes;
+}
 static uint32_t _sprite_lru_counter;
 static std::vector<std::unique_ptr<SpriteFile>> _sprite_files;
 

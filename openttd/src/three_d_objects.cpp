@@ -4680,6 +4680,87 @@ static void ForgetUnusedThreeDObjects()
 /** The clock of the objects goes on in real time, every fifteen seconds (ForgetUnusedThreeDObjects()). */
 static IntervalTimer<TimerWindow> _forget_timer(std::chrono::seconds(15), [](auto) { ForgetUnusedThreeDObjects(); });
 
+/** The memory of a vector's elements. */
+template <typename T>
+static size_t VectorBytes(const std::vector<T> &v)
+{
+	return v.capacity() * sizeof(T);
+}
+
+/** The memory of a vehicle's shape and of its simpler shapes made: its corners, triangles and lights (its textures apart). */
+size_t ThreeDVehicleShape::Bytes() const
+{
+	size_t b = VectorBytes(this->pos) + VectorBytes(this->nrm) + VectorBytes(this->uv) + VectorBytes(this->tri) + VectorBytes(this->tri_tex);
+	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_back);
+	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
+	for (const auto &simpler : this->simpler.shapes) {
+		if (simpler != nullptr) b += simpler->Bytes();
+	}
+	return b;
+}
+
+/**
+ * The rig ('test3d pamet'): how much memory what was made of the 3D objects takes -- the vehicles' shapes, their
+ * textures halved for each level of detail, the pictures of the textures as they are in the files, the .glb files kept
+ * a moment, the buildings' textures (painted too) and simplified shapes.
+ */
+std::string DescribeThreeDObjectMemory()
+{
+	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
+	size_t shapes = 0, shape_count = 0;
+	{
+		std::lock_guard lock(_vehicle_shapes_mutex);
+		for (const auto &[key, shape] : _vehicle_shapes) {
+			if (shape == nullptr) continue;
+			shapes += shape->Bytes();
+			shape_count++;
+		}
+	}
+	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0;
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		std::set<const void *> seen;
+		auto levels_bytes = [&](const std::shared_ptr<const std::vector<ThreeDObjectTexture>> &lv) {
+			if (lv == nullptr || !seen.insert(lv.get()).second) return;
+			for (const ThreeDObjectTexture &t : *lv) textures += VectorBytes(t.px);
+			texture_count++;
+		};
+		for (const auto &[key, made] : _texture_levels) levels_bytes(made.levels.lock());
+		for (const auto &[key, made] : _file_texture_levels) levels_bytes(made.lock());
+		for (const auto &[key, made] : _detail_masks_made) {
+			if (auto m = made.lock(); m != nullptr) masks += VectorBytes(m->index);
+		}
+		for (const auto &[hash, bytes] : _texture_bytes) {
+			if (auto b = bytes.lock(); b != nullptr) {
+				pngs += b->size();
+				png_count++;
+			}
+		}
+	}
+	size_t glb_files = 0;
+	{
+		std::lock_guard lock(_glb_files_mutex);
+		glb_files = _glb_files_kept_bytes;
+	}
+	size_t houses = 0, house_count = 0;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const ThreeDObject &o : _three_d_objects) {
+			size_t b = 0;
+			for (const ThreeDObjectTexture &t : o.levels) b += VectorBytes(t.px);
+			for (const auto &[key, t] : o.painted) b += VectorBytes(t.px);
+			for (const auto &shape : o.shapes) {
+				if (shape != nullptr) b += VectorBytes(shape->pos) + VectorBytes(shape->uv) + VectorBytes(shape->light) + VectorBytes(shape->tri) + VectorBytes(shape->facing);
+			}
+			if (b == 0) continue;
+			houses += b;
+			house_count++;
+		}
+	}
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({})",
+			mb(shapes), shape_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count);
+}
+
 /** The rig: the clock of the objects on by so many seconds, and what is not drawn since forgotten. */
 std::string RigForgetThreeDObjects(uint seconds)
 {

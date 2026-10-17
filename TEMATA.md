@@ -23,6 +23,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 17. 10. – kolik paměti berou glb a kolik obrázky
+
+- Hráč: **„máme v paměti pro úhel 0 zbytečné obrázky glb objektů a tu paměť potřebujem“ … „kolik zaberou glb a kolik
+  obrázky?“** Rig `test3d pamet` (Tatra 148 tahač s návěsem, Tatra 148, 603, malé město 1990, mapa 0°, otočená, pohled
+  z očí):
+  - glb: tvary vozidel 618 MB (59 tvarů; tvar nese všechny doplňky a náklady svého souboru), textury po úrovních
+    811 MB (68; doplněk Tater je obrázek 4096×4096, rozbalený i se zmenšeninami ~85 MB), masky podrobností 61 MB,
+    obrázky textur ze souborů 61 MB, držené soubory .glb až 240 MB (pro rychlé čtení balíčku, po 15 s pryč),
+    domy 387 MB (textury, nalakované varianty, zjednodušené tvary), nalakované textury vozidel pro pohled z očí 184 MB.
+  - obrázky: sprity 8 směrů pro 0° 4 MB (33), obrázky otočeného pohledu 0,2 MB (125). Cache spritů celkem 131 MB
+    z 2048 MB.
+  - Takže obrázky pro 0° paměť neberou; berou ji tvary a textury glb (1,5–2 GB). Návrhy čekají na hráče.
+
 ## 17. 10. – luk do ruky z inventáře, ulička mezi domy, holky na balkonech
 
 - Hráč: **„kliknutí na věc v inventáři nepoužije tu věc, chci vzít do ruky luk, myší i klávesnicí 1, 2, 3, 4 jako v

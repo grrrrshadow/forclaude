@@ -2673,6 +2673,29 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 	return drawn;
 }
 
+/**
+ * The rig ('test3d pamet'): how much memory the pictures made of the 3D objects take -- those of the turned view
+ * (ObjectPicture()), the textures painted for the view from the eyes, and the sprites of the eight directions in the
+ * sprite cache (the view facing north, the lists, the depots), of all the sprite cache.
+ */
+std::string DescribeThreeDPictureMemory()
+{
+	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
+	size_t turned = 0;
+	for (const auto &[key, e] : _object_pictures) turned += e.picture.pixels.capacity() * sizeof(uint32_t) + e.picture.lit.capacity() * sizeof(uint32_t);
+	size_t painted = 0;
+	{
+		std::lock_guard lock(_eye_painted_mutex);
+		for (const auto &[key, t] : _eye_painted) painted += t.px.capacity() * sizeof(uint32_t);
+	}
+	extern size_t GetThreeDObjectSpriteBytes(size_t &count);
+	extern size_t GetSpriteCacheBytesUsed();
+	size_t sprite_count = 0;
+	const size_t sprites = GetThreeDObjectSpriteBytes(sprite_count);
+	return fmt::format("obrazky: otoceny pohled {:.1f} MB ({} obrazku), lakovane textury pohledu z oci {:.1f} MB ({}), sprity 8 smeru v cache spritu {:.1f} MB ({} nactenych z {} pozadanych), cache spritu celkem {:.1f} MB z {} MB",
+			mb(turned), _object_pictures.size(), mb(painted), _eye_painted.size(), mb(sprites), sprite_count, _object_sprites.size(), mb(GetSpriteCacheBytesUsed()), _settings_client.gui.sprite_cache_size_mb);
+}
+
 /** The rig: the objects' sprites made. */
 std::string DescribeThreeDVehicleObjectSprites()
 {

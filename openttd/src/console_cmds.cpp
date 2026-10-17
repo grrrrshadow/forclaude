@@ -9611,6 +9611,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
 		}
+	} else if (what == "pamet") {
+		/* 'pamet': how much memory the 3D objects (glb) and the pictures made of them take. */
+		extern std::string DescribeThreeDObjectMemory();
+		extern std::string DescribeThreeDPictureMemory();
+		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDObjectMemory());
+		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDPictureMemory());
 	} else if (what == "zapomen") {
 		/* 'zapomen [seconds]': the clock of the 3D objects on by so many seconds (120 without), what was not drawn since forgotten. */
 		extern std::string RigForgetThreeDObjects(uint seconds);
