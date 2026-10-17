@@ -40,6 +40,7 @@
 #include <map>
 #include <memory>
 #include <optional>
+#include <set>
 #include <span>
 #include <string>
 #include <vector>
@@ -68,7 +69,10 @@ struct ThreeDObjectTexture {
  * million pixels for tens of materials, in every record of the package.
  */
 using ThreeDTextureBytes = std::shared_ptr<const std::vector<uint8_t>>;
-/** A texture halved for each level of detail, made once for all that have the same picture (ThreeDTextureLevelsOf()). */
+/**
+ * A texture halved for each level of detail, made once for all that have the same picture (ThreeDTextureLevelsOf()):
+ * the levels finer than any drawn are without their pixels (their sizes kept), made when one is drawn.
+ */
 using ThreeDTextureLevels = std::shared_ptr<const std::vector<ThreeDObjectTexture>>;
 ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes);
 
@@ -471,6 +475,7 @@ struct ThreeDVehicleObject {
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
+	bool TextureSize(int index, int &w, int &h) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
 	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
@@ -482,6 +487,7 @@ struct ThreeDVehicleObject {
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void Forget() const;
+	size_t TrimTextures(std::set<const void *> &seen) const;
 
 	mutable uint32_t used = 0;      ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects
 

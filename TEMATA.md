@@ -57,6 +57,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   obrazovce při 4× = 220 ms na snímek (4 snímky za vteřinu). Obrázek auta je mezipaměť nakresleného objektu (0,1 MB
   za 133 obrázků), dělá se na vlákně na pozadí.
 - Tvary vozidel po přečtení pustí rezervu, do které jejich seznamy rostly (`ShrinkShape()`).
+- **Textury podle potřeby** (hráč: „textury, jak to dělají jiné hry? tak asi jo“): textura vozidla se dělá jen od
+  nejjemnější úrovně, kterou něco kreslí (jemnější bez pixelů, jen velikost); když je potřeba jemnější (pohled z očí
+  zblízka), udělá se znovu z PNG – na pozadí, mezitím se kreslí hrubší. Každých 15 s (mezi snímky) se pustí úrovně
+  jemnější, než se od minula kreslilo; textura, která se vůbec nekreslila, si nechá jen úrovně do 256 px. Stejně masky
+  laku, rzi a doplňků a nalakované textury pohledu z očí (ty se nepouštěly nikdy). Hustota texelů se bere z hlavičky
+  PNG, ne z rozbalené textury. Rig (Tatry na mapě 0°, otočené, pohled z očí): textury 625 MB → po úklidu 10 MB, po
+  dalším kreslení z očí 170 MB; nalakované 184 MB → 0 → 73 MB.
+- Obrázky domů otočeného pohledu zaberou při zoomu 4× 16 MB, při 8× 125 MB (strop 256 MB).
 - Rig: `test3d kresli [n]` (jak dlouho trvá nakreslit objekt prvního 3D vozidla na každém zoomu), `test3d pamet`
   ukazuje i obrázky domů otočeného pohledu.
 

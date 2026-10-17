@@ -44,6 +44,7 @@ uint32_t GetVehicleSetSpriteLocalID(EngineID engine, const Vehicle *v, EngineIma
 void GetVehicleSetSpriteLocalIDs(EngineID engine, const Vehicle *v, EngineImageType image_type, std::vector<uint32_t> &ids);
 ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite);
 bool ThreeDVehicleObjectSpriteBounds(uint32_t request, Rect &bounds);
+void TrimThreeDEyePainted();
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v);

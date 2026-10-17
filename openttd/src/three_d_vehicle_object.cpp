@@ -734,13 +734,15 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 		auto it = known.find(&shape);
 		if (it != known.end()) return it->second;
 	}
-	const ThreeDObjectTexture *t = obj.GetTexture(0);
+	/* The texture's size at its finest, not the texture: its finest level is made only when drawn (the textures by need). */
+	int tw = 1, th = 1;
+	obj.TextureSize(0, tw, th);
 	double uv_area = 0, area = 0;
 	for (size_t i = 0; i + 2 < shape.tri.size(); i += 3) {
 		const uint32_t a = shape.tri[i], b = shape.tri[i + 1], c = shape.tri[i + 2];
 		double ux = shape.uv[b * 2] - shape.uv[a * 2], uy = shape.uv[b * 2 + 1] - shape.uv[a * 2 + 1];
 		double vx = shape.uv[c * 2] - shape.uv[a * 2], vy = shape.uv[c * 2 + 1] - shape.uv[a * 2 + 1];
-		uv_area += std::abs(ux * vy - uy * vx) / 2 * t->w * t->h;
+		uv_area += std::abs(ux * vy - uy * vx) / 2 * tw * th;
 		double px = shape.pos[b * 3] - shape.pos[a * 3], py = shape.pos[b * 3 + 1] - shape.pos[a * 3 + 1], pz = shape.pos[b * 3 + 2] - shape.pos[a * 3 + 2];
 		double qx = shape.pos[c * 3] - shape.pos[a * 3], qy = shape.pos[c * 3 + 1] - shape.pos[a * 3 + 1], qz = shape.pos[c * 3 + 2] - shape.pos[a * 3 + 2];
 		double cx = py * qz - pz * qy, cy = pz * qx - px * qz, cz = px * qy - py * qx;
@@ -2147,6 +2149,8 @@ static std::map<std::tuple<const ThreeDVehicleObject *, int, int, int>, ThreeDOb
 static std::mutex _eye_painted_mutex;
 /** Those asked to be made in the background and not made yet (TryGetThreeDEyeVehicleTexture()). */
 static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_asked;
+/** Those drawn since the last trimming (TrimThreeDEyePainted()). */
+static std::set<std::tuple<const ThreeDVehicleObject *, int, int, int>> _eye_painted_seen;
 
 /** The objects are read anew: their painted textures go with them. */
 static void ForgetEyePainted()
@@ -2154,7 +2158,28 @@ static void ForgetEyePainted()
 	std::lock_guard lock(_eye_painted_mutex);
 	_eye_painted.clear();
 	_eye_painted_asked.clear();
+	_eye_painted_seen.clear();
 	_eye_trails.clear();
+}
+
+/**
+ * Between the frames (ForgetUnusedThreeDObjects()): the painted textures not drawn since the last time let go of -- a
+ * texture of a lorry close is sixty four megabytes --, made again when drawn (the textures by need).
+ */
+void TrimThreeDEyePainted()
+{
+	std::lock_guard lock(_eye_painted_mutex);
+	size_t freed = 0;
+	for (auto it = _eye_painted.begin(); it != _eye_painted.end();) {
+		if (_eye_painted_seen.contains(it->first)) {
+			++it;
+			continue;
+		}
+		freed += it->second.px.capacity() * sizeof(uint32_t);
+		it = _eye_painted.erase(it);
+	}
+	_eye_painted_seen.clear();
+	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB painted for the view from the eyes and not drawn let go of", freed / (1024.0 * 1024.0));
 }
 
 /** The level of detail of an object's textures for the view from the eyes: about a texel to a pixel. */
@@ -2182,13 +2207,17 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 	{
 		std::lock_guard lock(_eye_painted_mutex);
 		auto it = _eye_painted.find(key);
-		if (it != _eye_painted.end()) return &it->second;
+		if (it != _eye_painted.end()) {
+			_eye_painted_seen.insert(key);
+			return &it->second;
+		}
 	}
 	/* Made outside the lock (a texture of millions of texels), kept under it: whichever thread is first. */
 	ThreeDObjectTexture t;
 	auto keep = [&]() -> const ThreeDObjectTexture * {
 		std::lock_guard lock(_eye_painted_mutex);
 		_eye_painted_asked.erase(key);
+		_eye_painted_seen.insert(key);
 		return &_eye_painted.emplace(key, std::move(t)).first->second;
 	};
 	const ThreeDVehicleState *st = obj->State(state);
@@ -2261,8 +2290,6 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
 {
 	const ThreeDVehicleShape *shape = obj->TryGetShape();
 	if (shape == nullptr) return nullptr;
-	/* The textures themselves first (and the texel density, which reads the first). */
-	if (obj->TryGetTexture(0, 0) == nullptr) return nullptr;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->TryGetTexture(level, index);
 	if (raw == nullptr) return nullptr;
@@ -2271,7 +2298,10 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
 	{
 		std::lock_guard lock(_eye_painted_mutex);
 		auto it = _eye_painted.find(key);
-		if (it != _eye_painted.end()) return &it->second;
+		if (it != _eye_painted.end()) {
+			_eye_painted_seen.insert(key);
+			return &it->second;
+		}
 		if (!_eye_painted_asked.insert(key).second) return nullptr; // asked already
 	}
 	ThreeDLoadInBackground([obj, state, pixels_per_metre, index, key] {

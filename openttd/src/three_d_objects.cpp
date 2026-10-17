@@ -195,10 +195,61 @@ static std::shared_ptr<const std::vector<uint8_t>> GlbFileBytes(const std::strin
 	return made;
 }
 
+/** The first bytes of a file (as ReadWholeFile() finds it): the header of a picture. */
+static std::vector<uint8_t> ReadFileHead(const std::string &path, size_t most)
+{
+	std::vector<uint8_t> data;
+	size_t len = 0;
+	std::optional<FileHandle> f;
+	if (path.starts_with(IN_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_TAR.size()), "rb", Subdirectory::NewGrf, &len);
+	} else if (path.starts_with(IN_BASESET_TAR)) {
+		f = FioFOpenFile(std::string_view(path).substr(IN_BASESET_TAR.size()), "rb", Subdirectory::Baseset, &len);
+	} else {
+		f = FileHandle::Open(path, "rb");
+		len = most;
+	}
+	if (!f.has_value()) return data;
+	data.resize(std::min(len, most));
+	data.resize(fread(data.data(), 1, data.size(), *f));
+	return data;
+}
+
 /** The little-endian 32 bits at an offset. */
 static uint32_t ReadU32(std::span<const uint8_t> d, size_t at)
 {
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
+}
+
+/*
+ * The textures by need (the player, 17. 10.: "textures, how do the other games do it? then probably yes"): a texture of
+ * the colleague's lorries is a picture of sixteen million pixels, halved for each level of detail 85 MB, and the map
+ * draws a level two or three coarser. A texture is made with only the levels from the finest asked for down (the finer
+ * ones without their pixels, their sizes kept); one asked for finer is made again from its picture (the view from the
+ * eyes close to it), what is not asked for any more let go of every quarter of a minute (TrimThreeDTextures()).
+ */
+/** The finest level of a texture that has its pixels. */
+static int FinestLevel(const std::vector<ThreeDObjectTexture> &lv)
+{
+	for (size_t i = 0; i < lv.size(); i++) {
+		if (!lv[i].px.empty()) return static_cast<int>(i);
+	}
+	return static_cast<int>(lv.size()) - 1;
+}
+
+/** Whether a texture has a level with its pixels (or a coarser one, the coarsest there is). */
+static bool HasLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
+{
+	return FinestLevel(lv) <= std::min(level, static_cast<int>(lv.size()) - 1);
+}
+
+/** Let go of the pixels of the levels finer than a level; their sizes stay. */
+static void DropFinerLevels(std::vector<ThreeDObjectTexture> &lv, int finest)
+{
+	for (int i = 0; i < finest && i + 1 < static_cast<int>(lv.size()); i++) {
+		lv[i].px.clear();
+		lv[i].px.shrink_to_fit();
+	}
 }
 
 /** The pictures of the textures as one copy each (InternThreeDTextureBytes()), by a hash of their bytes; and those made. */
@@ -263,8 +314,9 @@ ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes)
  * A texture made of a picture (DecodeTextureLevels()), one for all the objects that have the same picture.
  * @param png the picture (InternThreeDTextureBytes()), nullptr none: the material's colour
  * @param flat the material's colour where it has no picture
+ * @param finest the finest level wanted: those finer are made without their pixels
  */
-static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat)
+static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat, int finest = 0)
 {
 	const TextureCoverTriangles cover = TextureCover(png);
 	const auto key = std::make_pair(png.get(), flat);
@@ -273,12 +325,13 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 		auto it = _texture_levels.find(key);
 		if (it != _texture_levels.end()) {
 			ThreeDTextureLevels known = it->second.levels.lock();
-			if (known != nullptr && it->second.bytes.lock() == png) return known;
+			if (known != nullptr && it->second.bytes.lock() == png && HasLevel(*known, finest)) return known;
 		}
 	}
 	static const std::vector<uint8_t> none;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
 	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get());
+	DropFinerLevels(*made, finest);
 	std::lock_guard lock(_texture_bytes_mutex);
 	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
 	_texture_levels[key] = TextureLevelsMade{png, made};
@@ -291,14 +344,14 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
  * @param of the picture of the model whose layout it has (the body's, an add-on's): where its triangles draw from (TextureCover())
  * @return nullptr when it cannot be read
  */
-static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat, const ThreeDTextureBytes &of = nullptr)
+static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat, const ThreeDTextureBytes &of = nullptr, int finest = 0)
 {
 	const auto key = std::make_pair(file, flat);
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		auto it = _file_texture_levels.find(key);
 		if (it != _file_texture_levels.end()) {
-			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr) return known;
+			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
 		}
 	}
 	std::vector<uint8_t> png = ReadWholeFile(file);
@@ -306,6 +359,7 @@ static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
 	const TextureCoverTriangles cover = TextureCover(of);
 	DecodeTextureLevels(png, *made, flat, true, cover.get());
+	DropFinerLevels(*made, finest);
 	std::lock_guard lock(_texture_bytes_mutex);
 	_file_texture_levels[key] = made;
 	return made;
@@ -315,9 +369,9 @@ static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t
  * A mask of a file ("lak" "maska", "rez" "maska", an add-on's "barva" "maska"), its grey in the red; nullptr without it.
  * @param of the picture of the model it is the mask of (TextureLevelsOfFile())
  */
-static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr)
+static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file, const ThreeDTextureBytes &of = nullptr, int finest = 0)
 {
-	return TextureLevelsOfFile(file, Colour(0, 0, 0).data, of);
+	return TextureLevelsOfFile(file, Colour(0, 0, 0).data, of, finest);
 }
 
 /**
@@ -3483,9 +3537,54 @@ static ThreeDTextureBytes PictureUnder(const ThreeDVehicleShape *s, int addon)
 	return nullptr;
 }
 
+/** The size of a picture from its first bytes: a PNG's header, or the mark of pixels as they are (RAW_TEXTURE_MARK). */
+static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h)
+{
+	static constexpr uint8_t PNG_SIGNATURE[8] = {0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+	auto be32 = [&head](size_t at) { return static_cast<uint32_t>(head[at]) << 24 | head[at + 1] << 16 | head[at + 2] << 8 | head[at + 3]; };
+	if (head.size() >= 24 && std::equal(std::begin(PNG_SIGNATURE), std::end(PNG_SIGNATURE), head.begin())) {
+		w = static_cast<int>(std::min<uint32_t>(be32(16), 1 << 16));
+		h = static_cast<int>(std::min<uint32_t>(be32(20), 1 << 16));
+		return w > 0 && h > 0;
+	}
+	const size_t at = RAW_TEXTURE_MARK.size();
+	if (head.size() >= at + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), head.begin())) {
+		w = static_cast<int>(std::min<uint32_t>(ReadU32(head, at), 1 << 16));
+		h = static_cast<int>(std::min<uint32_t>(ReadU32(head, at + 4), 1 << 16));
+		return w > 0 && h > 0;
+	}
+	return false;
+}
+
 /**
- * One of the object's textures at a level of detail, read the first time: the body's (0) is the paint
- * ("textura") when there is one, else the file's; the others the file's and the wheels'.
+ * The textures made again finer in the place of others (KeepTexture()): a thread may draw from those yet, so they are
+ * let go of only between the frames (ThreeDVehicleObject::TrimTextures()). Under _lazy_mutex.
+ */
+static std::vector<ThreeDTextureLevels> _textures_replaced;
+/** The finest level of each texture drawn since the last trimming, by the texture. Under _lazy_mutex. */
+static std::unordered_map<const void *, int> _texture_levels_asked;
+
+/** Keep a texture made in the place of the one there (under _lazy_mutex): that one is kept a while yet. */
+static void KeepTexture(ThreeDTextureLevels &place, ThreeDTextureLevels made)
+{
+	if (place != nullptr && place != made) _textures_replaced.push_back(std::move(place));
+	place = std::move(made);
+}
+
+/** A level of a texture kept, or its finest there when it has not that one (a coarser one); noted as drawn. Under _lazy_mutex. */
+static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, int level)
+{
+	if (place == nullptr || place->empty()) return nullptr;
+	const std::vector<ThreeDObjectTexture> &lv = *place;
+	auto [it, added] = _texture_levels_asked.try_emplace(&lv, level);
+	if (!added) it->second = std::min(it->second, level);
+	return &lv[std::clamp<int>(level, FinestLevel(lv), static_cast<int>(lv.size()) - 1)];
+}
+
+/**
+ * One of the object's textures at a level of detail, made the first time and again when a finer level is wanted than it
+ * has (the textures by need): the body's (0) is the paint ("textura") when there is one, else the file's; the others
+ * the file's and the wheels'.
  */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index) const
 {
@@ -3493,26 +3592,30 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 	const ThreeDVehicleShape *s = this->GetShape();
 	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
-	MakeOnce(this, LAZY_TEXTURE + index, [this, count, index] {
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_TEXTURE + index, [this, count, index, level] {
 		if (this->levels.size() < count) this->levels.resize(count);
-		return this->levels[index] != nullptr;
-	}, [this, s, index] {
+		return this->levels[index] != nullptr && HasLevel(*this->levels[index], level);
+	}, [this, s, index, level] {
 		ThreeDTextureLevels lv;
 		ThreeDTextureBytes png;
 		uint32_t flat = 0;
-		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0, PictureUnder(s, -1));
+		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0, PictureUnder(s, -1), level);
 		if (lv == nullptr && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
 			png = s->pngs[index];
 			flat = s->flats[index];
 		}
-		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat);
+		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat, level);
 		return lv;
-	}, [this, index](ThreeDTextureLevels made) { this->levels[index] = std::move(made); });
-	const ThreeDTextureLevels &lv = this->levels[index];
-	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
+	}, [this, index](ThreeDTextureLevels made) { KeepTexture(this->levels[index], std::move(made)); });
+	std::lock_guard lock(_lazy_mutex);
+	return static_cast<size_t>(index) < this->levels.size() ? LevelOfKept(this->levels[index], level) : nullptr;
 }
 
-/** One of the object's textures at a level of detail if it is made already; else nullptr, and it is made in the background. */
+/**
+ * One of the object's textures at a level of detail if it is made already; else made in the background, and till
+ * then its finest level there is (a coarser one), or nullptr when there is none.
+ */
 const ThreeDObjectTexture *ThreeDVehicleObject::TryGetTexture(int level, int index) const
 {
 	MarkThreeDUsed(this->used);
@@ -3520,51 +3623,127 @@ const ThreeDObjectTexture *ThreeDVehicleObject::TryGetTexture(int level, int ind
 	if (s == nullptr && !this->ShapeKnown()) return nullptr;
 	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
-	if (!MadeOrAsked(this, LAZY_TEXTURE + index, [this, index] { return static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr; }, [this, level, index] { this->GetTexture(level, index); })) return nullptr;
-	const ThreeDTextureLevels &lv = this->levels[index];
-	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
+	level = std::max(level, 0);
+	MadeOrAsked(this, LAZY_TEXTURE + index, [this, index, level] { return static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr && HasLevel(*this->levels[index], level); }, [this, level, index] { this->GetTexture(level, index); });
+	std::lock_guard lock(_lazy_mutex);
+	return static_cast<size_t>(index) < this->levels.size() ? LevelOfKept(this->levels[index], level) : nullptr;
 }
 
-/** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
+/**
+ * The size of one of the object's textures at its finest without making it: of the texture made, else of its picture
+ * (the header of the PNG). How fine a level a picture of the object needs (TexelsPerMetre() of three_d_vehicle_object.cpp).
+ * @return false: not known (1 x 1 then)
+ */
+bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
+{
+	w = h = 1;
+	ThreeDTextureBytes png;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (index >= 0 && static_cast<size_t>(index) < this->levels.size() && this->levels[index] != nullptr && !this->levels[index]->empty()) {
+			w = this->levels[index]->front().w;
+			h = this->levels[index]->front().h;
+			return true;
+		}
+		if (this->shape != nullptr && index >= 0 && static_cast<size_t>(index) < this->shape->pngs.size()) png = this->shape->pngs[index];
+	}
+	std::vector<uint8_t> head;
+	if (index == 0 && !this->paint_file.empty()) {
+		head = ReadFileHead(this->paint_file, 32);
+	} else if (png != nullptr) {
+		head.assign(png->begin(), png->begin() + std::min<size_t>(png->size(), 32));
+	}
+	return ImageSizeOfHead(head, w, h);
+}
+
+/** The rust mask ("rez": "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 {
 	if (this->rust.mask_file.empty()) return nullptr;
-	MakeOnce(this, LAZY_RUST_MASK, [this] { return this->rust_tried; }, [this] { return MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1)); }, [this](ThreeDTextureLevels made) {
-		this->rust_levels = std::move(made);
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_RUST_MASK, [this, level] { return this->rust_tried && (this->rust_levels == nullptr || HasLevel(*this->rust_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->rust_levels, std::move(made));
 		this->rust_tried = true;
 	});
-	if (this->rust_levels == nullptr) return nullptr;
-	return &(*this->rust_levels)[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels->size()) - 1)];
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->rust_levels, level);
 }
 
+/** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 {
 	if (this->paint.mask_file.empty()) return nullptr;
-	MakeOnce(this, LAZY_PAINT_MASK, [this] { return this->mask_tried; }, [this] { return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1)); }, [this](ThreeDTextureLevels made) {
-		this->mask_levels = std::move(made);
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_PAINT_MASK, [this, level] { return this->mask_tried && (this->mask_levels == nullptr || HasLevel(*this->mask_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->mask_levels, std::move(made));
 		this->mask_tried = true;
 	});
-	if (this->mask_levels == nullptr) return nullptr;
-	return &(*this->mask_levels)[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels->size()) - 1)];
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->mask_levels, level);
 }
 
 /** An add-on's colour mask ("doplnky" "barva" "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int level) const
 {
 	if (addon >= this->addons.size() || this->addons[addon].mask_file.empty()) return nullptr;
-	MakeOnce(this, LAZY_ADDON_MASK + static_cast<int>(addon), [this, addon] {
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_ADDON_MASK + static_cast<int>(addon), [this, addon, level] {
 		if (this->addon_mask_levels.size() < this->addons.size()) {
 			this->addon_mask_levels.resize(this->addons.size());
 			this->addon_mask_tried.resize(this->addons.size(), false);
 		}
-		return static_cast<bool>(this->addon_mask_tried[addon]);
-	}, [this, addon] { return MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon))); }, [this, addon](ThreeDTextureLevels made) {
-		this->addon_mask_levels[addon] = std::move(made);
+		return this->addon_mask_tried[addon] && (this->addon_mask_levels[addon] == nullptr || HasLevel(*this->addon_mask_levels[addon], level));
+	}, [this, addon, level] { return MaskLevelsOfFile(this->addons[addon].mask_file, PictureUnder(this->GetShape(), static_cast<int>(addon)), level); }, [this, addon](ThreeDTextureLevels made) {
+		KeepTexture(this->addon_mask_levels[addon], std::move(made));
 		this->addon_mask_tried[addon] = true;
 	});
-	const ThreeDTextureLevels &lv = this->addon_mask_levels[addon];
-	if (lv == nullptr) return nullptr;
-	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
+	std::lock_guard lock(_lazy_mutex);
+	return addon < this->addon_mask_levels.size() ? LevelOfKept(this->addon_mask_levels[addon], level) : nullptr;
+}
+
+/**
+ * Between the frames (ForgetUnusedThreeDObjects()): of each of the object's textures and masks not trimmed yet the
+ * levels finer than any drawn since the last time let go of -- of one not drawn at all, all but those of 256 texels
+ * and less. Under _lazy_mutex.
+ * @param seen the textures trimmed already (they are shared)
+ * @return the bytes let go of
+ */
+size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
+{
+	size_t freed = 0;
+	auto trim = [&](const ThreeDTextureLevels &place) {
+		if (place == nullptr || place->empty() || !seen.insert(place.get()).second) return;
+		/* Nothing draws from it now (between the frames): its pixels may go. */
+		std::vector<ThreeDObjectTexture> &lv = const_cast<std::vector<ThreeDObjectTexture> &>(*place);
+		int keep = static_cast<int>(lv.size()) - 1;
+		auto it = _texture_levels_asked.find(&lv);
+		if (it != _texture_levels_asked.end()) {
+			keep = std::min(keep, it->second);
+		} else {
+			while (keep > 0 && std::max(lv[keep - 1].w, lv[keep - 1].h) <= 256) keep--;
+		}
+		for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
+		DropFinerLevels(lv, keep);
+	};
+	for (const ThreeDTextureLevels &place : this->levels) trim(place);
+	trim(this->mask_levels);
+	trim(this->rust_levels);
+	for (const ThreeDTextureLevels &place : this->addon_mask_levels) trim(place);
+	return freed;
+}
+
+/** Between the frames: the textures replaced let go of, those of the vehicles and the figures trimmed (TrimTextures()). */
+static void TrimThreeDTextures()
+{
+	std::lock_guard lock(_lazy_mutex);
+	_textures_replaced.clear();
+	std::set<const void *> seen;
+	size_t freed = 0;
+	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) freed += v.TrimTextures(seen);
+	}
+	_texture_levels_asked.clear();
+	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB of levels finer than drawn let go of", freed / (1024.0 * 1024.0));
 }
 
 /**
@@ -4707,11 +4886,13 @@ static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
 static void ForgetUnusedThreeDObjects()
 {
 	_three_d_clock += 15;
-	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
 	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
 	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; the next time, a
 	 * quarter of a minute on. */
 	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) return;
+	TrimThreeDTextures();
+	TrimThreeDEyePainted();
+	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;
 	for (const ThreeDObject &o : _three_d_objects) {
