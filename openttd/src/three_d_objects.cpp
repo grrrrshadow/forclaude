@@ -24,6 +24,7 @@
 #include "map_func.h"
 #include "core/bitmath_func.hpp"
 #include "engine_base.h"
+#include "vehicle_base.h"
 #include "core/string_consumer.hpp"
 #include "three_d.h"
 #include "town.h"
@@ -47,6 +48,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <atomic>
+#include <mutex>
 #include <thread>
 
 #ifdef WITH_PNG
@@ -78,7 +80,7 @@ static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house
 static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0);
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
 static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
@@ -102,6 +104,12 @@ static std::vector<ThreeDVehicleObject> _effect_objects;
 static std::vector<ThreeDVehicleObject> _driving_objects;
 /** The vehicle objects by the set's id, the vehicle type and the engine's number in the set: the object and which of its pieces. */
 static std::unordered_map<uint64_t, std::pair<uint32_t, int>> _vehicle_object_pieces;
+/**
+ * Every object a piece is of, by the same key, where it is of more than one (the colleague's lorries: the two ends of
+ * the trains of lorries, the same two pieces behind every one of five semi-trailers): which of them a vehicle's piece
+ * is of is told by the pieces around it (ThreeDVehicleObjectOf()).
+ */
+static std::unordered_map<uint64_t, std::vector<std::pair<uint32_t, int>>> _vehicle_object_shared_pieces;
 
 /** The key of an engine of a set in _vehicle_object_pieces. */
 static inline uint64_t VehiclePieceKey(uint32_t grfid, VehicleType type, uint16_t local_id)
@@ -140,16 +148,172 @@ static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 	return data;
 }
 
+/**
+ * The .glb files read a moment ago (GlbFileBytes()), the latest last: an add-on of a vehicle is read for its shape, its
+ * lamps and its red lights, and the next record of the package has the same add-ons (a file of the colleague's
+ * lorries is forty megabytes). Let go of every fifteen seconds (ForgetUnusedThreeDObjects()).
+ */
+static std::deque<std::pair<std::string, std::shared_ptr<const std::vector<uint8_t>>>> _glb_files_kept;
+static size_t _glb_files_kept_bytes = 0;
+static constexpr size_t GLB_FILES_KEPT_BYTES = static_cast<size_t>(256) << 20;
+static std::mutex _glb_files_mutex;
+
+/** A .glb file whole (ReadWholeFile()), or as it was read a moment ago. */
+static std::shared_ptr<const std::vector<uint8_t>> GlbFileBytes(const std::string &path)
+{
+	{
+		std::lock_guard lock(_glb_files_mutex);
+		for (const auto &[kept, bytes] : _glb_files_kept) {
+			if (kept == path) return bytes;
+		}
+	}
+	auto made = std::make_shared<const std::vector<uint8_t>>(ReadWholeFile(path));
+	std::lock_guard lock(_glb_files_mutex);
+	_glb_files_kept.emplace_back(path, made);
+	_glb_files_kept_bytes += made->size();
+	while (_glb_files_kept_bytes > GLB_FILES_KEPT_BYTES && _glb_files_kept.size() > 1) {
+		_glb_files_kept_bytes -= _glb_files_kept.front().second->size();
+		_glb_files_kept.pop_front();
+	}
+	return made;
+}
+
+/** Let go of the .glb files read (GlbFileBytes()). */
+static void ForgetGlbFiles()
+{
+	std::lock_guard lock(_glb_files_mutex);
+	_glb_files_kept.clear();
+	_glb_files_kept_bytes = 0;
+}
+
 /** The little-endian 32 bits at an offset. */
-static uint32_t ReadU32(const std::vector<uint8_t> &d, size_t at)
+static uint32_t ReadU32(std::span<const uint8_t> d, size_t at)
 {
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
+}
+
+/** The pictures of the textures as one copy each (InternThreeDTextureBytes()), by a hash of their bytes; and those made. */
+static std::unordered_multimap<size_t, std::weak_ptr<const std::vector<uint8_t>>> _texture_bytes;
+static size_t _texture_bytes_made = 0;
+/** The textures made of the pictures (ThreeDTextureLevelsOf()), by the picture and the colour of a material without one. */
+struct TextureLevelsMade {
+	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it (its place cannot be another's then)
+	std::weak_ptr<const std::vector<ThreeDObjectTexture>> levels;
+};
+static std::map<std::pair<const std::vector<uint8_t> *, uint32_t>, TextureLevelsMade> _texture_levels;
+/** The textures of files made (TextureLevelsOfFile()), by the file and the colour of what is not in the picture. */
+static std::map<std::pair<std::string, uint32_t>, std::weak_ptr<const std::vector<ThreeDObjectTexture>>> _file_texture_levels;
+/** The masks of details made (DetailMaskOfFile()), by their file. */
+static std::map<std::string, std::weak_ptr<const ThreeDDetailMask>, std::less<>> _detail_masks_made;
+static std::mutex _texture_bytes_mutex;
+
+/**
+ * A texture's picture as one copy for all that have the same: the materials of an add-on of the colleague's lorries are
+ * tens, all of one picture of sixteen million pixels, and every record of the package has the add-on. Each copy had
+ * its own bytes, and each was made into its own texture (the twenty four lorries took four seconds each, at the start).
+ * @return nullptr for no bytes
+ */
+ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes)
+{
+	if (bytes.empty()) return nullptr;
+	const size_t hash = std::hash<std::string_view>{}(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()));
+	std::lock_guard lock(_texture_bytes_mutex);
+	auto [first, last] = _texture_bytes.equal_range(hash);
+	for (auto it = first; it != last; ++it) {
+		ThreeDTextureBytes known = it->second.lock();
+		if (known != nullptr && std::ranges::equal(*known, bytes)) return known;
+	}
+	/* Now and then those nothing has any more go. */
+	if (++_texture_bytes_made % 256 == 0) std::erase_if(_texture_bytes, [](const auto &e) { return e.second.expired(); });
+	auto made = std::make_shared<const std::vector<uint8_t>>(bytes.begin(), bytes.end());
+	_texture_bytes.emplace(hash, made);
+	return made;
+}
+
+/**
+ * A texture made of a picture (DecodeTextureLevels()), one for all the objects that have the same picture.
+ * @param png the picture (InternThreeDTextureBytes()), nullptr none: the material's colour
+ * @param flat the material's colour where it has no picture
+ */
+static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat)
+{
+	const auto key = std::make_pair(png.get(), flat);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _texture_levels.find(key);
+		if (it != _texture_levels.end()) {
+			ThreeDTextureLevels known = it->second.levels.lock();
+			if (known != nullptr && it->second.bytes.lock() == png) return known;
+		}
+	}
+	static const std::vector<uint8_t> none;
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat);
+	std::lock_guard lock(_texture_bytes_mutex);
+	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
+	_texture_levels[key] = TextureLevelsMade{png, made};
+	return made;
+}
+
+/**
+ * A texture of a file of its own (a paint, "textura"), one for all the objects that have the file.
+ * @param flat the colour of the pixels the picture has not
+ * @return nullptr when it cannot be read
+ */
+static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t flat)
+{
+	const auto key = std::make_pair(file, flat);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _file_texture_levels.find(key);
+		if (it != _file_texture_levels.end()) {
+			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr) return known;
+		}
+	}
+	std::vector<uint8_t> png = ReadWholeFile(file);
+	if (png.empty()) return nullptr;
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	DecodeTextureLevels(png, *made, flat);
+	std::lock_guard lock(_texture_bytes_mutex);
+	_file_texture_levels[key] = made;
+	return made;
+}
+
+/** A mask of a file ("lak" "maska", "rez" "maska", an add-on's "barva" "maska"), its grey in the red; nullptr without it. */
+static ThreeDTextureLevels MaskLevelsOfFile(const std::string &file)
+{
+	return TextureLevelsOfFile(file, Colour(0, 0, 0).data);
+}
+
+/** A mask of details of a file (ThreeDDetailMask), one for all the objects that have it; nullptr when it cannot be read. */
+static std::shared_ptr<const ThreeDDetailMask> DetailMaskOfFile(const std::string &file)
+{
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = _detail_masks_made.find(file);
+		if (it != _detail_masks_made.end()) {
+			if (auto known = it->second.lock(); known != nullptr) return known;
+		}
+	}
+	std::vector<ThreeDObjectTexture> levels;
+	std::vector<uint8_t> png = ReadWholeFile(file);
+	/* Only as it is: a mask index is not halved. */
+	if (!png.empty()) DecodeTextureLevels(png, levels, Colour(0, 0, 0).data, false);
+	if (levels.empty() || levels[0].w <= 1) return nullptr;
+	auto mask = std::make_shared<ThreeDDetailMask>();
+	mask->w = levels[0].w;
+	mask->h = levels[0].h;
+	mask->index.resize(levels[0].px.size());
+	for (size_t i = 0; i < mask->index.size(); i++) mask->index[i] = levels[0].px[i] == 0 ? 0 : Colour(levels[0].px[i]).r;
+	std::lock_guard lock(_texture_bytes_mutex);
+	_detail_masks_made[file] = mask;
+	return mask;
 }
 
 /** A texture of a .glb: the PNG as it is in the file, or a plain colour where a material has none. */
 struct GlbTexture {
 	std::string name;          ///< the material's name
-	std::vector<uint8_t> png;
+	ThreeDTextureBytes png;    ///< its picture, nullptr none
 	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
 	bool double_sided = false; ///< the material's "doubleSided": its triangles are seen from behind too
 };
@@ -164,7 +328,37 @@ struct GlbMesh {
 	std::vector<GlbTexture> textures;  ///< the textures of the materials
 	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's one texture)
 	std::vector<uint16_t> tri_group;   ///< with groups, each triangle's: n the node groups[n - 1] it is under, 0 none
+	std::vector<uint16_t> tri_mark;    ///< with marks, each triangle's: n the node marks[n - 1] it is under, 0 none
+	std::vector<uint8_t> tri_glass;    ///< with a glass suffix, each triangle: 1 under a node whose name ends so
 };
+
+/**
+ * What of a .glb ReadGlbMesh() reads, beyond its meshes: see there. The parts of a vehicle's add-ons (the colleague's
+ * hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md) need more of it than a building does -- only the nodes the states show, each
+ * part's windows, lamps and wheels told apart within it.
+ */
+struct GlbReadOptions {
+	bool all_nodes = false;
+	std::string_view frame_prefix;
+	int frame = 0;
+	std::string_view only_node;
+	std::string_view point_prefix;
+	std::vector<float> *points = nullptr;
+	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
+	std::string_view skip_node;
+	const std::vector<std::string> *groups = nullptr;
+	bool only_groups = false;     ///< with groups, only the meshes under the groups' nodes (an add-on: the nodes no state shows not read at all)
+	bool skip_night = false;      ///< the nodes "noc" and "noc_<...>" and their children left out (lit only at night)
+	bool only_night = false;      ///< only the meshes under the nodes "noc" and "noc_<...>"
+	const std::vector<std::string> *marks = nullptr; ///< a second marking of nodes by name, as groups (GlbMesh::tri_mark): a part's wheels
+	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
+};
+
+/** Whether a node is of the lights at night: "noc", or "noc_<part>" of an add-on's part. */
+static inline bool IsNightNode(std::string_view name)
+{
+	return name == "noc" || name.starts_with("noc_");
+}
 
 /**
  * Read the meshes of a .glb: their triangles, their corners' positions, normals and texture coordinates, the
@@ -183,21 +377,48 @@ struct GlbMesh {
  * @return whether there is something to draw
  * @param groups with all_nodes, the nodes whose triangles (and their children's) are marked (GlbMesh::tri_group)
  */
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOptions &o);
 static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes = false, std::string_view frame_prefix = {}, int frame = 0, std::string_view only_node = {}, std::string_view point_prefix = {}, std::vector<float> *points = nullptr, std::string_view skip_node = {}, const std::vector<std::string> *groups = nullptr)
 {
-	std::vector<uint8_t> d = ReadWholeFile(path);
+	GlbReadOptions o;
+	o.all_nodes = all_nodes;
+	o.frame_prefix = frame_prefix;
+	o.frame = frame;
+	o.only_node = only_node;
+	o.point_prefix = point_prefix;
+	o.points = points;
+	o.skip_node = skip_node;
+	o.groups = groups;
+	return ReadGlbMesh(path, mesh, o);
+}
+
+/** @copydoc ReadGlbMesh() */
+static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOptions &o)
+{
+	const bool all_nodes = o.all_nodes;
+	const std::string_view frame_prefix = o.frame_prefix;
+	const int frame = o.frame;
+	const std::string_view only_node = o.only_node;
+	const std::string_view point_prefix = o.point_prefix;
+	std::vector<float> *points = o.points;
+	const std::string_view skip_node = o.skip_node;
+	const std::vector<std::string> *groups = o.groups;
+	const std::vector<std::string> *marks = o.marks;
+	const std::shared_ptr<const std::vector<uint8_t>> file = GlbFileBytes(path);
+	const std::vector<uint8_t> &d = *file;
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
 		Debug(misc, 0, "3D object {}: not a glTF binary", path);
 		return false;
 	}
 	/* The chunks: the JSON, then the binary buffer. */
 	std::string json_text;
-	std::vector<uint8_t> bin;
+	/* (Where it is in the file: a file of the colleague's add-ons is tens of megabytes.) */
+	std::span<const uint8_t> bin;
 	for (size_t at = 12; at + 8 <= d.size();) {
 		uint32_t len = ReadU32(d, at), type = ReadU32(d, at + 4);
 		if (at + 8 + len > d.size()) break;
 		if (type == 0x4E4F534A) json_text.assign(reinterpret_cast<const char *>(&d[at + 8]), len);
-		if (type == 0x004E4942) bin.assign(d.begin() + at + 8, d.begin() + at + 8 + len);
+		if (type == 0x004E4942) bin = std::span<const uint8_t>(d).subspan(at + 8, len);
 		at += 8 + ((len + 3) & ~3u);
 	}
 	using Matrix = std::array<double, 16>; // column-major
@@ -270,8 +491,10 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 			return c;
 		};
 
-		/* The textures, by the material: a picture in the buffer, or the material's colour. */
+		/* The textures, by the material: a picture in the buffer, or the material's colour. The materials of a picture
+		 * share its bytes, and so do the files and shapes with the same picture (InternThreeDTextureBytes()). */
 		std::map<int, uint8_t> material_texture;
+		std::map<int, ThreeDTextureBytes> image_bytes;
 		auto texture_of = [&](int material) -> uint8_t {
 			auto it = material_texture.find(material);
 			if (it != material_texture.end()) return it->second;
@@ -292,10 +515,14 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 						int tex = pbr.at("baseColorTexture").at("index").get<int>();
 						int image = j.at("textures").at(tex).at("source").get<int>();
 						const auto &img = j.at("images").at(image);
-						if (img.contains("bufferView")) {
+						auto known = image_bytes.find(image);
+						if (known != image_bytes.end()) {
+							t.png = known->second;
+						} else if (img.contains("bufferView")) {
 							const auto &v = views.at(img.at("bufferView").get<int>());
 							size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
-							if (offset + len <= bin.size()) t.png.assign(bin.begin() + offset, bin.begin() + offset + len);
+							if (offset + len <= bin.size()) t.png = InternThreeDTextureBytes(bin.subspan(offset, len));
+							image_bytes.emplace(image, t.png);
 						}
 					}
 				}
@@ -309,7 +536,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 		bool normals = true;
 		int first_material = -1;
 		/* One mesh's primitives, transformed. */
-		auto add_mesh = [&](int mesh_index, const Matrix &m, uint16_t group) {
+		auto add_mesh = [&](int mesh_index, const Matrix &m, uint16_t group, uint16_t mark = 0, bool glass = false) {
 			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
 			for (const auto &p : prims) {
 				if (p.value("mode", 4) != 4) continue; // triangles only
@@ -358,6 +585,8 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					mesh.tri.push_back(base + c);
 					mesh.tri_tex.push_back(tex);
 					if (groups != nullptr) mesh.tri_group.push_back(group);
+					if (marks != nullptr) mesh.tri_mark.push_back(mark);
+					if (!o.glass_suffix.empty()) mesh.tri_glass.push_back(glass ? 1 : 0);
 				}
 			}
 		};
@@ -380,20 +609,41 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 				}
 				for (size_t i = 0; i < nodes.size(); i++) if (!child[i]) roots.push_back(static_cast<int>(i));
 			}
-			std::vector<std::tuple<int, Matrix, bool, uint16_t>> todo;
-			for (int r : roots) todo.emplace_back(r, identity, only_node.empty(), 0);
+			/* A node to visit: its parent's transform, whether its meshes are read, its group, its mark, its glass. */
+			struct NodeToVisit {
+				int n;
+				Matrix parent;
+				bool inside;
+				uint16_t group;
+				uint16_t mark;
+				bool glass;
+			};
+			std::vector<NodeToVisit> todo;
+			const bool inside_at_first = only_node.empty() && !o.only_night && !(o.only_groups && groups != nullptr);
+			for (int r : roots) todo.push_back({r, identity, inside_at_first, 0, 0, false});
 			size_t visited = 0;
 			while (!todo.empty() && visited++ < 100000) {
-				auto [n, parent, inside, group] = todo.back();
+				auto [n, parent, inside, group, mark, glass] = todo.back();
 				todo.pop_back();
 				const auto &node = nodes.at(n);
 				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
 				if (!skip_node.empty() && node_name == skip_node) continue;
+				if (o.skip_night && IsNightNode(node_name)) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
 				if (groups != nullptr) {
 					auto g = std::ranges::find(*groups, node_name);
-					if (g != groups->end()) group = static_cast<uint16_t>(g - groups->begin() + 1);
+					if (g != groups->end()) {
+						group = static_cast<uint16_t>(g - groups->begin() + 1);
+						if (o.only_groups && !o.only_night) inside = true;
+					}
 				}
+				/* Only the lights at night: inside the node "noc" of the part's node (with groups, a group's only). */
+				if (o.only_night && IsNightNode(node_name) && (!o.only_groups || group != 0)) inside = true;
+				if (marks != nullptr) {
+					auto g = std::ranges::find(*marks, node_name);
+					if (g != marks->end()) mark = static_cast<uint16_t>(g - marks->begin() + 1);
+				}
+				if (!o.glass_suffix.empty() && node_name.ends_with(o.glass_suffix)) glass = true;
 				if (!frame_prefix.empty() && node.contains("name") && node.at("name").is_string()) {
 					std::string name = node.at("name").get<std::string>();
 					if (name.starts_with(frame_prefix)) {
@@ -407,9 +657,10 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 					points->push_back(static_cast<float>(m[12]));
 					points->push_back(static_cast<float>(-m[14]));
 					points->push_back(static_cast<float>(m[13]));
+					if (o.point_groups != nullptr) o.point_groups->push_back(group);
 				}
-				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group);
-				if (node.contains("children")) for (const auto &c : node.at("children")) todo.emplace_back(c.get<int>(), m, inside, group);
+				if (inside && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group, mark, glass);
+				if (node.contains("children")) for (const auto &c : node.at("children")) todo.push_back({c.get<int>(), m, inside, group, mark, glass});
 			}
 		} else {
 			/* The first node with a mesh, its own transform. */
@@ -429,7 +680,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, bool all_nodes =
 		/* A building's one texture: the first material's. */
 		if (first_material >= 0) {
 			auto it = material_texture.find(first_material);
-			if (it != material_texture.end() && it->second < mesh.textures.size()) mesh.png = mesh.textures[it->second].png;
+			if (it != material_texture.end() && it->second < mesh.textures.size() && mesh.textures[it->second].png != nullptr) mesh.png = *mesh.textures[it->second].png;
 		}
 	} catch (const std::exception &e) {
 		Debug(misc, 0, "3D object {}: {}", path, e.what());
@@ -633,7 +884,7 @@ struct GlbSkeleton {
 };
 
 /** An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers (normalised ones as they are stored). */
-static void ReadGlbAccessor(const nlohmann::json &j, const std::vector<uint8_t> &bin, int index, int comps, std::vector<double> &out)
+static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bin, int index, int comps, std::vector<double> &out)
 {
 	const auto &a = j.at("accessors").at(index);
 	const auto &v = j.at("bufferViews").at(a.at("bufferView").get<int>());
@@ -672,18 +923,20 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 	if (found != kept.end()) return found->second.get();
 	std::unique_ptr<GlbSkeleton> &slot = kept[path];
 
-	std::vector<uint8_t> d = ReadWholeFile(path);
+	const std::shared_ptr<const std::vector<uint8_t>> file = GlbFileBytes(path);
+	const std::vector<uint8_t> &d = *file;
 	if (d.size() < 20 || ReadU32(d, 0) != 0x46546C67 || ReadU32(d, 4) != 2) {
 		Debug(misc, 0, "3D skeleton {}: not a glTF binary", path);
 		return nullptr;
 	}
 	std::string json_text;
-	std::vector<uint8_t> bin;
+	/* (Where it is in the file: a file of the colleague's add-ons is tens of megabytes.) */
+	std::span<const uint8_t> bin;
 	for (size_t at = 12; at + 8 <= d.size();) {
 		uint32_t len = ReadU32(d, at), type = ReadU32(d, at + 4);
 		if (at + 8 + len > d.size()) break;
 		if (type == 0x4E4F534A) json_text.assign(reinterpret_cast<const char *>(&d[at + 8]), len);
-		if (type == 0x004E4942) bin.assign(d.begin() + at + 8, d.begin() + at + 8 + len);
+		if (type == 0x004E4942) bin = std::span<const uint8_t>(d).subspan(at + 8, len);
 		at += 8 + ((len + 3) & ~3u);
 	}
 	auto sk = std::make_unique<GlbSkeleton>();
@@ -724,8 +977,9 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				}
 			}
 		}
-		/* The textures by the material: the picture in the buffer, else its colour. */
+		/* The textures by the material: the picture in the buffer, else its colour (shared, InternThreeDTextureBytes()). */
 		std::map<int, uint8_t> material_texture;
+		std::map<int, ThreeDTextureBytes> image_bytes;
 		auto texture_of = [&](int material) -> uint8_t {
 			auto it = material_texture.find(material);
 			if (it != material_texture.end()) return it->second;
@@ -744,10 +998,14 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
 						const int image = j.at("textures").at(pbr.at("baseColorTexture").at("index").get<int>()).at("source").get<int>();
 						const auto &img = j.at("images").at(image);
-						if (img.contains("bufferView")) {
+						auto known = image_bytes.find(image);
+						if (known != image_bytes.end()) {
+							t.png = known->second;
+						} else if (img.contains("bufferView")) {
 							const auto &v = j.at("bufferViews").at(img.at("bufferView").get<int>());
 							const size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
-							if (offset + len <= bin.size()) t.png.assign(bin.begin() + offset, bin.begin() + offset + len);
+							if (offset + len <= bin.size()) t.png = InternThreeDTextureBytes(bin.subspan(offset, len));
+							image_bytes.emplace(image, t.png);
 						}
 					}
 				}
@@ -1661,6 +1919,8 @@ static void ReadThreeDVehicleObjects()
 					fig.file = folder + e.at("soubor").get<std::string>();
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = figure_kind == "predmet";
+					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
+					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
 					if (e.value("druh", std::string()) == "rostlina") {
 						fig.name = e.at("soubor").get<std::string>();
 						if (fig.name.ends_with(".glb")) fig.name.resize(fig.name.size() - 4);
@@ -1751,10 +2011,41 @@ static void ReadThreeDVehicleObjects()
 					Debug(misc, 0, "3D vehicle {}: no engine", obj.name);
 					continue;
 				}
-				/* The piece it hangs from: the middle one, the first, or the one named. */
+				/* The lengths of its pieces in its set its object's length is for (the colleague's lorries: the snout 4 and
+				 * the lorry 8, a trailer 8 and its bumper 4): its metres to a length of its set, the set saying how long
+				 * each piece is now (ThreeDVehicleObjectPieceLengthOf()). */
+				if (e.contains("delky_clanku_grf") && e.at("delky_clanku_grf").is_array() && e.at("delky_clanku_grf").size() == obj.pieces.size()) {
+					for (const auto &l : e.at("delky_clanku_grf")) obj.grf_lengths.push_back(l.is_number_integer() ? std::clamp(l.get<int>(), 1, static_cast<int>(VEHICLE_LENGTH)) : static_cast<int>(VEHICLE_LENGTH));
+				}
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_object()) obj.length_m = std::clamp(e.at("rozmer_m").value("delka", 0.0f), 0.0f, 200.0f);
+				/* The piece it hangs from: the middle one, the first, or the one named. The middle of an even count of
+				 * pieces is the one the middle of its length is in (a lorry: its snout 4, itself 8 -- the lorry). */
 				std::string anchor = e.contains("kotva") && e.at("kotva").is_string() ? e.at("kotva").get<std::string>() : "stred";
 				obj.anchor = anchor == "prvni" || anchor == "predni" ? 0 : (static_cast<int>(obj.pieces.size()) - 1) / 2;
+				if (anchor == "stred" && !obj.grf_lengths.empty()) {
+					int total = 0, at = 0;
+					for (int l : obj.grf_lengths) total += l;
+					for (size_t k = 0; k < obj.grf_lengths.size(); k++) {
+						if (2 * (at + obj.grf_lengths[k]) > total) {
+							obj.anchor = static_cast<int>(k);
+							break;
+						}
+						at += obj.grf_lengths[k];
+					}
+				}
 				if (e.contains("kotva") && e.at("kotva").is_number_integer()) obj.anchor = std::clamp(e.at("kotva").get<int>(), 0, static_cast<int>(obj.pieces.size()) - 1);
+				/* Its couplings: where the one after it hangs, where it hangs from the one before. */
+				if (e.contains("spojeni") && e.at("spojeni").is_object()) {
+					auto point = [&](const char *key, bool &has, float *at) {
+						const auto &s = e.at("spojeni");
+						if (!s.contains(key) || !s.at(key).is_array() || s.at(key).size() != 3) return;
+						for (int k = 0; k < 3; k++) at[k] = s.at(key).at(k).get<float>();
+						has = true;
+					};
+					point("vpredu", obj.has_couple_front, obj.couple_front);
+					point("vzadu", obj.has_couple_back, obj.couple_back);
+				}
+				if (e.contains("maska_podrobnosti") && e.at("maska_podrobnosti").is_string()) obj.detail_file = folder + e.at("maska_podrobnosti").get<std::string>();
 				/* No "meritko": the object is in true metres, and the size it is drawn at is its set's parameter
 				 * ("velikost") or else the game's setting (the player, 14. 10.: "the game can make it bigger, so there
 				 * need not be two files"). */
@@ -1843,6 +2134,7 @@ static void ReadThreeDVehicleObjects()
 							if (b.contains("maska") && b.at("maska").is_string()) addon.mask_file = folder + b.at("maska").get<std::string>();
 							addon.start = std::clamp(b.value("zacatek", 0), 0, 255);
 						}
+						if (a.contains("maska_podrobnosti") && a.at("maska_podrobnosti").is_string()) addon.detail_file = folder + a.at("maska_podrobnosti").get<std::string>();
 						for (const std::string &n : addon.nodes) obj.part_names.push_back(addon.key + "/" + n);
 						obj.addons.push_back(std::move(addon));
 					}
@@ -1869,6 +2161,7 @@ static void ReadThreeDVehicleObjects()
 						if (!k.is_object() || !k.contains("uzel") || !k.contains("stred") || !k.at("stred").is_array() || k.at("stred").size() != 3) continue;
 						ThreeDModelWheel w;
 						w.node = k.at("uzel").get<std::string>();
+						if (k.contains("soubor") && k.at("soubor").is_string()) w.addon = k.at("soubor").get<std::string>();
 						for (int a = 0; a < 3; a++) w.centre[a] = k.at("stred").at(a).get<float>();
 						w.radius = std::clamp(k.value("polomer_m", 0.5f), 0.05f, 5.0f);
 						w.steers = k.value("rizeni", false);
@@ -1904,6 +2197,12 @@ static void ReadThreeDVehicleObjects()
 						if (st.contains("rez")) state.given |= ThreeDVehicleState::GIVEN_RUST;
 						/* Its layer of the GRF's sprites; the whole object turned. */
 						state.layer = std::clamp(st.value("vrstva", 0), 0, 255);
+						/* The piece whose sets it is of (the colleague's wagons: "the middle's sets decide"). */
+						if (st.contains("clanek") && st.at("clanek").is_string()) {
+							const std::string piece = st.at("clanek").get<std::string>();
+							state.piece = piece == "hlava" ? 0 : piece == "stred" ? 1 : piece == "zad" ? 2 : -1;
+							obj.states_of_anchor = true;
+						}
 						if (st.contains("otoceni") && st.at("otoceni").is_number()) {
 							state.turn = static_cast<float>(std::remainder(st.at("otoceni").get<double>(), 360.0));
 							state.given |= ThreeDVehicleState::GIVEN_TURN;
@@ -2038,6 +2337,13 @@ static void ReadThreeDVehicleObjects()
 		const bool here = PackageBesideLoadedGrf(o.package, o.grfid);
 		for (size_t k = 0; k < o.pieces.size(); k++) {
 			auto [it, added] = _vehicle_object_pieces.emplace(VehiclePieceKey(o.grfid, o.type, o.pieces[k]), std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k)));
+			/* A piece of several objects of the same package: all of them, the pieces around it to tell which. */
+			if (!added && _vehicle_objects[it->second.first].package == o.package) {
+				auto &all = _vehicle_object_shared_pieces[it->first];
+				if (all.empty()) all.push_back(it->second);
+				all.emplace_back(static_cast<uint32_t>(i), static_cast<int>(k));
+				continue;
+			}
 			if (added || !here || PackageBesideLoadedGrf(_vehicle_objects[it->second.first].package, o.grfid)) continue;
 			Debug(misc, 1, "3D vehicles: {} of {} beside its loaded GRF, not of {}", o.name, o.package, _vehicle_objects[it->second.first].package);
 			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
@@ -2081,6 +2387,55 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	return &_vehicle_objects[it->second.first];
 }
 
+/** The key of a vehicle's piece in _vehicle_object_pieces, 0 for none of a set. */
+static uint64_t PieceKeyOf(const Vehicle *v)
+{
+	const Engine *e = v != nullptr ? Engine::GetIfValid(v->engine_type) : nullptr;
+	if (e == nullptr || e->grf_prop.grffile == nullptr) return 0;
+	return VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id);
+}
+
+/**
+ * The object a piece of a vehicle on the map is of, and which of its pieces it is: as its engine says
+ * (GetThreeDVehicleObject()) -- unless the engine is a piece of several objects (the colleague's lorries: the ends of
+ * the trains of lorries behind each of five semi-trailers, PROSBA-NAKLADAKY-TATRA-3D.md point 3: "take them to the
+ * semi-trailer that goes before them"), and then the one whose pieces the pieces before and after it are.
+ * @param v the piece, a part of an articulated vehicle or a wagon
+ * @param[out] piece which of the object's pieces it is
+ */
+const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece)
+{
+	if (v == nullptr) return nullptr;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, piece);
+	if (obj == nullptr || _vehicle_object_shared_pieces.empty()) return obj;
+	auto all = _vehicle_object_shared_pieces.find(PieceKeyOf(v));
+	if (all == _vehicle_object_shared_pieces.end()) return obj;
+	/* The one whose pieces before and after match the vehicle's the furthest. */
+	int best_score = -1;
+	for (const auto &[index, k] : all->second) {
+		const ThreeDVehicleObject &o = _vehicle_objects[index];
+		int score = 0;
+		const Vehicle *u = v;
+		for (int b = k - 1; b >= 0; b--) {
+			u = u->Previous();
+			if (u == nullptr || PieceKeyOf(u) != VehiclePieceKey(o.grfid, o.type, o.pieces[b])) break;
+			score++;
+		}
+		u = v;
+		for (size_t f = k + 1; f < o.pieces.size(); f++) {
+			u = u->Next();
+			if (u == nullptr || PieceKeyOf(u) != VehiclePieceKey(o.grfid, o.type, o.pieces[f])) break;
+			score++;
+		}
+		if (score > best_score) {
+			best_score = score;
+			obj = &o;
+			if (piece != nullptr) *piece = k;
+		}
+	}
+	return obj;
+}
+
 /**
  * Forget the vehicles and figures read from the indices, to read them again the next time one is looked for: the
  * GRFs are loaded anew (GfxInitSpriteMem()), and the packages beside them may have come or gone since -- read the
@@ -2093,6 +2448,7 @@ void ResetThreeDVehicleObjects()
 	_effect_objects.clear();
 	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
+	_vehicle_object_shared_pieces.clear();
 	_three_d_theme_trees.clear();
 	_creatures.clear();
 	_vehicle_objects_read = false;
@@ -2268,6 +2624,7 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 		out->tri.insert(out->tri.end(), {a, b, c});
 		out->tri_tex.push_back(t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0);
 		if (!this->tri_part.empty()) out->tri_part.push_back(t / 3 < this->tri_part.size() ? this->tri_part[t / 3] : 0);
+		if (!this->tri_glass.empty()) out->tri_glass.push_back(t / 3 < this->tri_glass.size() ? this->tri_glass[t / 3] : 0);
 	}
 	out->tex_addon = this->tex_addon;
 	out->glass_alpha = this->glass_alpha;
@@ -2369,8 +2726,9 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		key += fmt::format("|+{}@{},{},{}", a.file, a.at[0], a.at[1], a.at[2]);
 		for (const std::string &n : a.nodes) key += "/" + n;
 	}
-	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.node;
+	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.addon + "/" + w.node;
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
+	if (!this->only_node.empty()) key += "|u" + this->only_node;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	auto it = _vehicle_shapes.find(key);
 	if (it != _vehicle_shapes.end()) return it->second;
@@ -2398,7 +2756,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 				}
 				png.insert(png.end(), m.rgba.begin(), m.rgba.end());
 			}
-			made->pngs.push_back(std::move(png));
+			made->pngs.push_back(InternThreeDTextureBytes(png));
 			made->flats.push_back(m.flat);
 			made->tex_names.push_back(std::move(m.name));
 		}
@@ -2434,19 +2792,21 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			GlbTexture g;
 			g.name = t.name;
 			if (!t.rgba.empty()) {
-				g.png.assign(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+				std::vector<uint8_t> raw(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
 				for (uint32_t v : {static_cast<uint32_t>(t.w), static_cast<uint32_t>(t.h)}) {
-					for (int k = 0; k < 4; k++) g.png.push_back(static_cast<uint8_t>(v >> (8 * k)));
+					for (int k = 0; k < 4; k++) raw.push_back(static_cast<uint8_t>(v >> (8 * k)));
 				}
-				g.png.insert(g.png.end(), t.rgba.begin(), t.rgba.end());
+				raw.insert(raw.end(), t.rgba.begin(), t.rgba.end());
+				g.png = InternThreeDTextureBytes(raw);
 			}
 			mesh.textures.push_back(std::move(g));
 		}
 	} else {
 		/* Its glass and the wheels of its model that turn, each its nodes marked (tri_group: 1 the glass, then the wheels). */
 		std::vector<std::string> marked{this->glass_node.empty() ? std::string("\x01") : this->glass_node};
-		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.node);
-		if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, {}, {}, nullptr, "noc", &marked)) return nullptr;
+		/* (A wheel of an add-on is marked in the add-on: a name never found here keeps the numbering of the wheels.) */
+		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.addon.empty() ? w.node : std::string("\x01"));
+		if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) return nullptr;
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
@@ -2594,10 +2954,82 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	 * the add-on's, for the colour a state gives it). */
 	for (size_t ai = 0; ai < this->addons.size(); ai++) {
 		const ThreeDVehicleAddon &addon = this->addons[ai];
+		/* Only the nodes a state may show (the others not read at all: a file of the loads has seventy five), without
+		 * the glass of their lamps; their windows ("<dil>_sklo") and their wheels marked (the colleague's
+		 * hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, points 6 and 10). */
+		std::vector<std::string> wheel_nodes;
+		std::vector<uint8_t> wheel_of;
+		for (size_t w = 0; w < this->model_wheels.size(); w++) {
+			if (this->model_wheels[w].addon != addon.key) continue;
+			wheel_nodes.push_back(this->model_wheels[w].node);
+			wheel_of.push_back(static_cast<uint8_t>(std::min<size_t>(w + 1, 255)));
+		}
+		/* Each node's part (once: the triangles of an add-on are a million). */
+		std::vector<uint8_t> node_part;
+		for (const std::string &node : addon.nodes) node_part.push_back(part_of(addon.key + "/" + node));
+		GlbReadOptions read;
+		read.all_nodes = true;
+		read.groups = &addon.nodes;
+		read.only_groups = true;
+		read.skip_night = true;
+		read.marks = &wheel_nodes;
+		read.glass_suffix = "_sklo";
 		GlbMesh am;
-		if (!ReadGlbMesh(addon.file, am, true, {}, 0, {}, {}, nullptr, {}, &addon.nodes)) {
+		if (!ReadGlbMesh(addon.file, am, read)) {
 			Debug(misc, 0, "3D vehicle {}: the add-on {} cannot be read", this->name, addon.file);
 			continue;
+		}
+		/* The lamps of its parts (point 5): the glass of each part's "noc_<dil>", the places its lights shine from. */
+		{
+			GlbReadOptions lamps;
+			lamps.all_nodes = true;
+			lamps.groups = &addon.nodes;
+			lamps.only_groups = true;
+			lamps.only_night = true;
+			std::vector<float> front, back;
+			std::vector<uint16_t> front_group, back_group;
+			lamps.point_prefix = "svetlo_predni_";
+			lamps.points = &front;
+			lamps.point_groups = &front_group;
+			GlbMesh night;
+			ReadGlbMesh(addon.file, night, lamps);
+			GlbReadOptions rear = lamps;
+			rear.only_night = false;
+			rear.only_node = "\x01";
+			rear.point_prefix = "svetlo_zadni_";
+			rear.points = &back;
+			rear.point_groups = &back_group;
+			GlbMesh none;
+			ReadGlbMesh(addon.file, none, rear);
+			auto group_part = [&](uint16_t g) { return g > 0 && g <= node_part.size() ? node_part[g - 1] : uint8_t{0}; };
+			/* The body's own lamps so far: always (part 0). */
+			made->night_part.resize(made->night_tri.size() / 3, 0);
+			made->front_part.resize(made->front_lights.size() / 3, 0);
+			made->back_part.resize(made->back_lights.size() / 3, 0);
+			const uint32_t night_base = static_cast<uint32_t>(made->night_pos.size() / 3);
+			for (size_t i = 0; i + 2 < night.pos.size(); i += 3) {
+				for (int k = 0; k < 3; k++) made->night_pos.push_back(night.pos[i + k] + addon.at[k]);
+			}
+			for (size_t t = 0; t + 2 < night.tri.size(); t += 3) {
+				const uint8_t part = group_part(t / 3 < night.tri_group.size() ? night.tri_group[t / 3] : 0);
+				if (part == 0) continue; // a part no state shows
+				for (int k = 0; k < 3; k++) made->night_tri.push_back(night_base + night.tri[t + k]);
+				const uint8_t tx = night.tri_tex[t / 3];
+				const GlbTexture *tex = tx < night.textures.size() ? &night.textures[tx] : nullptr;
+				made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
+				made->night_back.push_back(tex != nullptr && tex->name.find("zadni") != std::string::npos ? 1 : 0);
+				made->night_part.push_back(part);
+			}
+			auto add_points = [&](const std::vector<float> &points, const std::vector<uint16_t> &groups, std::vector<float> &to, std::vector<uint8_t> &to_part) {
+				for (size_t p = 0; p * 3 + 2 < points.size(); p++) {
+					const uint8_t part = group_part(p < groups.size() ? groups[p] : 0);
+					if (part == 0) continue;
+					for (int k = 0; k < 3; k++) to.push_back(points[p * 3 + k] + addon.at[k]);
+					to_part.push_back(part);
+				}
+			};
+			add_points(front, front_group, made->front_lights, made->front_part);
+			add_points(back, back_group, made->back_lights, made->back_part);
 		}
 		const bool lit = !made->nrm.empty() && !am.nrm.empty();
 		if (!lit) made->nrm.clear();
@@ -2611,6 +3043,10 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->tex_addon.push_back(static_cast<int8_t>(std::min<size_t>(ai, 127)));
 		}
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
+		made->pos.reserve(made->pos.size() + am.pos.size());
+		if (lit) made->nrm.reserve(made->nrm.size() + am.nrm.size());
+		made->tri.reserve(made->tri.size() + am.tri.size());
+		made->tri_tex.reserve(made->tri_tex.size() + am.tri.size() / 3);
 		for (size_t i = 0; i + 2 < am.pos.size(); i += 3) {
 			for (int k = 0; k < 3; k++) made->pos.push_back(am.pos[i + k] + addon.at[k]);
 			if (lit) for (int k = 0; k < 3; k++) made->nrm.push_back(am.nrm[i + k]);
@@ -2618,14 +3054,26 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->uv.insert(made->uv.end(), am.uv.begin(), am.uv.end());
 		for (size_t t = 0; t + 2 < am.tri.size(); t += 3) {
 			const uint16_t g = t / 3 < am.tri_group.size() ? am.tri_group[t / 3] : 0;
-			const uint8_t part = g > 0 && g <= addon.nodes.size() ? part_of(addon.key + "/" + addon.nodes[g - 1]) : 0;
+			const uint8_t part = g > 0 && g <= node_part.size() ? node_part[g - 1] : 0;
 			if (part == 0) continue; // a node no state shows
 			const size_t first_triangle = made->tri.size() / 3;
 			for (int k = 0; k < 3; k++) made->tri.push_back(base + am.tri[t + k]);
 			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + am.tri_tex[t / 3])));
 			mark_part(part, first_triangle);
+			/* Its window: see-through, shown with its part. */
+			if (t / 3 < am.tri_glass.size() && am.tri_glass[t / 3] != 0) {
+				made->tri_glass.resize(first_triangle, 0);
+				made->tri_glass.push_back(1);
+			}
+			/* Its wheel: the corners turn about the wheel's middle (the colleague's point 10). */
+			const uint16_t m = t / 3 < am.tri_mark.size() ? am.tri_mark[t / 3] : 0;
+			if (m > 0 && m <= wheel_of.size()) {
+				if (made->corner_wheel.size() < made->pos.size() / 3) made->corner_wheel.resize(made->pos.size() / 3, 0);
+				for (int k = 0; k < 3; k++) made->corner_wheel[base + am.tri[t + k]] = wheel_of[m - 1];
+			}
 		}
 	}
+	if (!made->tri_glass.empty()) made->tri_glass.resize(made->tri.size() / 3, 0);
 	if (!made->corner_wheel.empty()) made->corner_wheel.resize(made->pos.size() / 3, 0);
 	if (!made->tex_addon.empty()) made->tex_addon.resize(made->pngs.size(), -1);
 	if (!made->tri_part.empty()) made->tri_part.resize(made->tri.size() / 3, 0);
@@ -2654,18 +3102,18 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 	size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
 	if (this->levels.size() < count) this->levels.resize(count);
-	std::vector<ThreeDObjectTexture> &lv = this->levels[index];
-	if (lv.empty()) {
-		std::vector<uint8_t> png;
+	ThreeDTextureLevels &lv = this->levels[index];
+	if (lv == nullptr) {
+		ThreeDTextureBytes png;
 		uint32_t flat = 0;
-		if (index == 0 && !this->paint_file.empty()) png = ReadWholeFile(this->paint_file);
-		if (png.empty() && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
+		if (index == 0 && !this->paint_file.empty()) lv = TextureLevelsOfFile(this->paint_file, 0);
+		if (lv == nullptr && s != nullptr && static_cast<size_t>(index) < s->pngs.size()) {
 			png = s->pngs[index];
 			flat = s->flats[index];
 		}
-		DecodeTextureLevels(png, lv, flat);
+		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat);
 	}
-	return &lv[std::clamp<int>(level, 0, static_cast<int>(lv.size()) - 1)];
+	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
 }
 
 /** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
@@ -2674,11 +3122,10 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 	if (this->rust.mask_file.empty()) return nullptr;
 	if (!this->rust_tried) {
 		this->rust_tried = true;
-		std::vector<uint8_t> png = ReadWholeFile(this->rust.mask_file);
-		if (!png.empty()) DecodeTextureLevels(png, this->rust_levels, Colour(0, 0, 0).data);
+		this->rust_levels = MaskLevelsOfFile(this->rust.mask_file);
 	}
-	if (this->rust_levels.empty()) return nullptr;
-	return &this->rust_levels[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels.size()) - 1)];
+	if (this->rust_levels == nullptr) return nullptr;
+	return &(*this->rust_levels)[std::clamp<int>(level, 0, static_cast<int>(this->rust_levels->size()) - 1)];
 }
 
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
@@ -2686,11 +3133,10 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 	if (this->paint.mask_file.empty()) return nullptr;
 	if (!this->mask_tried) {
 		this->mask_tried = true;
-		std::vector<uint8_t> png = ReadWholeFile(this->paint.mask_file);
-		if (!png.empty()) DecodeTextureLevels(png, this->mask_levels, Colour(0, 0, 0).data);
+		this->mask_levels = MaskLevelsOfFile(this->paint.mask_file);
 	}
-	if (this->mask_levels.empty()) return nullptr;
-	return &this->mask_levels[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels.size()) - 1)];
+	if (this->mask_levels == nullptr) return nullptr;
+	return &(*this->mask_levels)[std::clamp<int>(level, 0, static_cast<int>(this->mask_levels->size()) - 1)];
 }
 
 /** An add-on's colour mask ("doplnky" "barva" "maska") at a level of detail, its grey in the red; nullptr without one. */
@@ -2703,12 +3149,54 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int l
 	}
 	if (!this->addon_mask_tried[addon]) {
 		this->addon_mask_tried[addon] = true;
-		std::vector<uint8_t> png = ReadWholeFile(this->addons[addon].mask_file);
-		if (!png.empty()) DecodeTextureLevels(png, this->addon_mask_levels[addon], Colour(0, 0, 0).data);
+		this->addon_mask_levels[addon] = MaskLevelsOfFile(this->addons[addon].mask_file);
 	}
-	const std::vector<ThreeDObjectTexture> &lv = this->addon_mask_levels[addon];
-	if (lv.empty()) return nullptr;
-	return &lv[std::clamp<int>(level, 0, static_cast<int>(lv.size()) - 1)];
+	const ThreeDTextureLevels &lv = this->addon_mask_levels[addon];
+	if (lv == nullptr) return nullptr;
+	return &(*lv)[std::clamp<int>(level, 0, static_cast<int>(lv->size()) - 1)];
+}
+
+/**
+ * A mask of details (ThreeDDetailMask, "maska_podrobnosti"), read whole the first time: its red as the mask index.
+ * @param addon -1 the body's (its first texture), else the add-on's
+ * @return nullptr without one
+ */
+const ThreeDDetailMask *ThreeDVehicleObject::GetDetailMask(int addon) const
+{
+	const size_t at = static_cast<size_t>(addon + 1);
+	if (addon < -1 || at > this->addons.size()) return nullptr;
+	const std::string &file = addon < 0 ? this->detail_file : this->addons[addon].detail_file;
+	if (file.empty()) return nullptr;
+	if (this->detail_masks.size() <= this->addons.size()) {
+		this->detail_masks.resize(this->addons.size() + 1);
+		this->detail_tried.resize(this->addons.size() + 1, false);
+	}
+	std::shared_ptr<const ThreeDDetailMask> &mask = this->detail_masks[at];
+	if (!this->detail_tried[at]) {
+		this->detail_tried[at] = true;
+		mask = DetailMaskOfFile(file);
+		if (mask == nullptr) Debug(misc, 0, "3D vehicle {}: the mask of details {} cannot be read", this->name, file);
+	}
+	return mask.get();
+}
+
+/** Whether any of its textures has a mask of details: then its states carry the vehicle's colours of its set (ComposeState()). */
+bool ThreeDVehicleObject::HasDetails() const
+{
+	if (!this->detail_file.empty()) return true;
+	return std::ranges::any_of(this->addons, [](const ThreeDVehicleAddon &a) { return !a.detail_file.empty(); });
+}
+
+/**
+ * Its length, metres: "rozmer_m" when the index gives it (a lorry's main file is only its length, PROSBA point 4 --
+ * and the length is asked for every engine of a set the moment it is loaded, long before any is drawn: its add-ons
+ * are not read for it), else its shape's.
+ */
+float ThreeDVehicleObject::Length() const
+{
+	if (this->length_m > 0) return this->length_m;
+	const ThreeDVehicleShape *shape = this->GetShape();
+	return shape != nullptr ? shape->x1 - shape->x0 : 0.0f;
 }
 
 /**
@@ -2737,10 +3225,14 @@ const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
  * The state of the states the GRF picks for the layers of its sprites (the colleague's hra/3d/PROSBA-SPECIAL-3D.md):
  * the keys of a later layer replace those of an earlier one, the add-ons' nodes ("doplnky") and colours
  * ("barvy_doplnku") each add-on by itself. Made the first time, kept by the steps of the layers.
+ * The vehicle's colours of its set (callback 1C1, true_colour.h) go into the state made, for its masks of details
+ * (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, point 2): a vehicle in other colours is another state, so
+ * its pictures are made apart (ObjectPicture()) as its sprites are in 2D.
  * @param layers the step of each layer's state, the first layer first, 0 for a layer of no state
- * @return its step: the one state itself when only one layer has a state, 0 when none has
+ * @param true_colours the vehicle's colours (GetVehicleTrueColours()), 0 none
+ * @return its step: the one state itself when only one layer has a state and there are no colours, 0 when there is nothing
  */
-int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers) const
+int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t true_colours) const
 {
 	int only = 0, count = 0;
 	for (int step : layers) {
@@ -2749,10 +3241,11 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers) const
 			count++;
 		}
 	}
-	if (count <= 1) return only;
-	auto it = this->composed_steps.find(layers);
+	if (count <= 1 && true_colours == 0) return only;
+	auto it = this->composed_steps.find({layers, true_colours});
 	if (it != this->composed_steps.end()) return it->second;
 	ThreeDVehicleState made;
+	made.true_colours = true_colours;
 	made.addon_parts.assign(this->addons.size(), -1);
 	made.addon_colours.assign(this->addons.size(), 0);
 	for (int step : layers) {
@@ -2777,7 +3270,7 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers) const
 	if (made.crew_part > 0 && made.crew_part < 64) made.parts |= uint64_t{1} << made.crew_part;
 	this->composed.push_back(std::move(made));
 	const int step = static_cast<int>(this->states.size() + this->composed.size());
-	this->composed_steps.emplace(layers, step);
+	this->composed_steps.emplace(std::make_pair(layers, true_colours), step);
 	return step;
 }
 
@@ -3090,7 +3583,7 @@ std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
  * a pixel transparent when most of its four are). A texture that cannot be read is a plain grey, so the shape still
  * shows.
  */
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat)
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved)
 {
 	ThreeDObjectTexture t;
 	if (png.size() >= RAW_TEXTURE_MARK.size() + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), png.begin())) {
@@ -3133,7 +3626,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		t.px.assign(1, flat != 0 ? flat : Colour(150, 150, 150).data);
 	}
 	levels.push_back(std::move(t));
-	while (levels.back().w > 1 || levels.back().h > 1) {
+	while (halved && (levels.back().w > 1 || levels.back().h > 1)) {
 		const ThreeDObjectTexture &a = levels.back();
 		ThreeDObjectTexture b;
 		b.w = std::max(1, a.w / 2);
@@ -3579,12 +4072,14 @@ void ThreeDObject::Forget() const
 void ThreeDVehicleObject::Forget() const
 {
 	this->levels.clear();
-	this->mask_levels.clear();
+	this->mask_levels.reset();
 	this->mask_tried = false;
-	this->rust_levels.clear();
+	this->rust_levels.reset();
 	this->rust_tried = false;
 	this->addon_mask_levels.clear();
 	this->addon_mask_tried.clear();
+	this->detail_masks.clear();
+	this->detail_tried.clear();
 	this->frame_shapes.clear();
 	this->frame_shapes.shrink_to_fit();
 	this->shape.reset();
@@ -3602,6 +4097,7 @@ static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
  */
 static void ForgetUnusedThreeDObjects()
 {
+	ForgetGlbFiles();
 	_three_d_clock += 15;
 	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;

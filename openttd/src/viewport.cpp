@@ -8081,7 +8081,7 @@ static bool CabDrawFigure(uint32_t *dst, float *zb, int width, int height, const
 			corner(ic);
 			const uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
 			/* The glass: see-through, laid over the rest after it (CabFlushGlass()). */
-			_cab_glass_alpha = part == ThreeDVehicleShape::PART_GLASS ? std::max(1u, glass_alpha) : 256;
+			_cab_glass_alpha = s.IsGlass(t / 3) ? std::max(1u, glass_alpha) : 256;
 			/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
 			auto in_tex = [&](CabPoint p) {
 				p.tu *= tex->w;
@@ -8415,9 +8415,12 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 		const double a = fg.facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
 		const double across = fg.size * OBJECT_UNITS_PER_METRE, length = across * fg.along, up = fg.size * OBJECT_HEIGHT_PER_METRE;
 		const size_t corners = shape->night_pos.size() / 3;
+		/* The lamps of the parts its state shows only (the colleague's lorries: the cab's on the cab shown). */
+		const uint64_t parts = fg.obj->PartsOf(fg.state);
 		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
 			if ((fg.lights & (tn < shape->night_back.size() && shape->night_back[tn] ? 2 : 1)) == 0) continue;
+			if (!ThreeDVehicleShape::Shown(tn < shape->night_part.size() ? shape->night_part[tn] : 0, parts)) continue;
 			uint32_t glass = tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data;
 			std::vector<CabPoint> poly;
 			for (int k = 0; k < 3; k++) {

@@ -255,7 +255,7 @@ static uint GetRoadVehLength(const RoadVehicle *v)
 	}
 
 	/* A road vehicle drawn from its 3D object is as long as the object (three_d_vehicle_object.h). */
-	return ThreeDVehicleObjectPieceLength(v->engine_type, length);
+	return ThreeDVehicleObjectPieceLengthOf(v, length);
 }
 
 /**

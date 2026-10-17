@@ -125,6 +125,7 @@
 #include "vehicle_gui.h"
 #include "widgets/cheat_widget.h"
 #include "querystring_gui.h"
+#include "widgets/build_vehicle_widget.h"
 #include "cheat_func.h"
 #include "settings_gui.h"
 #include "openttd.h"
@@ -8791,6 +8792,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				if (argv[3] == "letadlo") type = VehicleType::Aircraft;
 			}
 			ShowBuildVehicleWindow(INVALID_TILE, type);
+			/* 'okno nakup auto <text>': its list filtered by the name, as typed into its box. */
+			if (argv.size() > 4) {
+				Window *bw = FindWindowById(WindowClass::BuildVehicle, to_underlying(type));
+				QueryString *box = bw != nullptr ? bw->GetQueryString(WID_BV_FILTER) : nullptr;
+				if (box != nullptr) {
+					box->text.Assign(argv[4]);
+					bw->OnEditboxChanged(WID_BV_FILTER);
+				}
+			}
 		} else if (argv[2] == "prumysl") {
 			auto x = number(3), y = number(4);
 			if (x.has_value() && y.has_value() && IsTileType(TileXY(*x, *y), TileType::Industry)) {
@@ -9022,13 +9032,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 	} else if (what == "auta" && argv.size() > 2) {
-		/* 'auta <jmeno> [pocet] [x y] [zatacka] [naklad] [plny] [v<podrobnost>:<volba> ...]': a straight road along x with a
-		 * shed at each end and so many road vehicles of the first engine whose name has the text in it, driving between
-		 * them (3D cars of a GRF package); with 'zatacka' the road turns along y halfway, a bend to drive through; a
-		 * cargo's label (four letters) refits them to it; 'plny' fills them with it; 'v1:1' chooses the option 1 of the
-		 * detail 1 of the configurator in the shed (the special: pushed). */
+		/* 'auta <jmeno> [pocet] [x y] [zatacka] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight road
+		 * along x with a shed at each end and so many road vehicles of the first engine whose name has the text in it,
+		 * driving between them (3D cars of a GRF package); with 'zatacka' the road turns along y halfway, a bend to drive
+		 * through; a cargo's label (four letters) refits them to it, 'p2' to its subtype 2 (a lorry of the Tatras with
+		 * its trailer, the bricks with the crane); 'plny' fills them with it; 'v1:1' chooses the option 1 of the detail 1
+		 * of the configurator in the shed (the special: pushed). */
 		std::string wanted(argv[2]);
 		bool bend = false, full = false;
+		uint8_t subtype = 0;
 		CargoType refit_to = INVALID_CARGO;
 		std::vector<std::pair<uint8_t, uint8_t>> choices;
 		std::string_view label_wanted;
@@ -9038,6 +9050,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				bend = true;
 			} else if (argv[k] == "plny") {
 				full = true;
+			} else if (argv[k].size() >= 2 && argv[k].starts_with("p") && ParseInteger<uint8_t>(argv[k].substr(1)).has_value()) {
+				subtype = *ParseInteger<uint8_t>(argv[k].substr(1));
 			} else if (argv[k].starts_with("v") && colon != std::string_view::npos) {
 				auto a = ParseInteger<uint8_t>(argv[k].substr(1, colon - 1)), o = ParseInteger<uint8_t>(argv[k].substr(colon + 1));
 				if (a.has_value() && o.has_value()) choices.emplace_back(*a, *o);
@@ -9105,7 +9119,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, k % 2 == 0 ? depot_a : depot_b, engine->index, true, INVALID_CARGO, ClientID::Invalid);
 			if (cost.Failed()) continue;
 			if (IsValidCargoType(refit_to)) {
-				CommandCost refit = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh, refit_to, 0, false, false, 0));
+				CommandCost refit = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh, refit_to, subtype, false, false, 0));
 				if (refit.Failed()) IConsolePrint(CC_DEFAULT, "test3d: auta: prestavba {}", RefusalReason(refit));
 			}
 			for (const auto &[aspect, option] : choices) {
@@ -9120,7 +9134,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			const Vehicle *bought_v = Vehicle::Get(veh);
 			const CargoLabel label = CargoSpec::Get(bought_v->cargo_type)->label;
-			IConsolePrint(CC_DEFAULT, "test3d: auta: vozidlo {} naklad {}{}{}{} {}/{}", bought_v->unitnumber, static_cast<char>(label.base() >> 24), static_cast<char>(label.base() >> 16), static_cast<char>(label.base() >> 8), static_cast<char>(label.base()), bought_v->cargo.StoredCount(), bought_v->cargo_cap);
+			IConsolePrint(CC_DEFAULT, "test3d: auta: vozidlo {} naklad {}{}{}{} {}/{} podtyp {}{}", bought_v->unitnumber, static_cast<char>(label.base() >> 24), static_cast<char>(label.base() >> 16), static_cast<char>(label.base() >> 8), static_cast<char>(label.base()), bought_v->cargo.StoredCount(), bought_v->cargo_cap, bought_v->cargo_subtype, GetString(GetCargoSubtypeText(bought_v)));
 			Order there{};
 			there.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_b : depot_a)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, there);
@@ -9132,6 +9146,145 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
 		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
+	} else if (what == "vagony" && argv.size() > 2) {
+		/* 'vagony <jmeno> [pocet] [x y] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight railway along
+		 * x with a shed at each end and a train between them: the fastest engine and so many wagons whose name has the
+		 * text in it (the colleague's wagons as 3D objects), or so many of the engine so named; refitted, filled and
+		 * configured as 'auta' does. */
+		std::string wanted(argv[2]);
+		bool full = false;
+		uint8_t subtype = 0;
+		CargoType refit_to = INVALID_CARGO;
+		std::vector<std::pair<uint8_t, uint8_t>> choices;
+		for (size_t k = 6; k < argv.size(); k++) {
+			const size_t colon = argv[k].find(':');
+			if (argv[k] == "plny") {
+				full = true;
+			} else if (argv[k].size() >= 2 && argv[k].starts_with("p") && ParseInteger<uint8_t>(argv[k].substr(1)).has_value()) {
+				subtype = *ParseInteger<uint8_t>(argv[k].substr(1));
+			} else if (argv[k].starts_with("v") && colon != std::string_view::npos) {
+				auto a = ParseInteger<uint8_t>(argv[k].substr(1, colon - 1)), o = ParseInteger<uint8_t>(argv[k].substr(colon + 1));
+				if (a.has_value() && o.has_value()) choices.emplace_back(*a, *o);
+			} else if (argv[k].size() == 4) {
+				refit_to = GetCargoTypeByLabel(CargoLabel{static_cast<uint32_t>(argv[k][0]) << 24 | static_cast<uint32_t>(argv[k][1]) << 16 | static_cast<uint32_t>(argv[k][2]) << 8 | static_cast<uint32_t>(argv[k][3])});
+				if (!IsValidCargoType(refit_to)) IConsolePrint(CC_DEFAULT, "test3d: vagony: naklad {} ve hre neni", argv[k]);
+			}
+		}
+		const int count = std::clamp(number(3).value_or(2), 1, 8);
+		const uint len = 20;
+		/* The first strip of clear land from the place asked for on (a town or water in the way, the next). */
+		uint x0 = 0, y0 = 0;
+		const uint from_x = static_cast<uint>(std::max(2, number(4).value_or(static_cast<int>(Map::SizeX() / 2) - 10)));
+		const uint from_y = static_cast<uint>(std::max(2, number(5).value_or(static_cast<int>(Map::SizeY() / 2))));
+		for (uint ty = from_y; ty + 3 < Map::SizeY() && x0 == 0; ty++) {
+			for (uint tx = from_x; tx + len + 3 < Map::SizeX() && x0 == 0; tx++) {
+				bool good = true;
+				for (uint dy = 0; dy < 3 && good; dy++) {
+					for (uint dx = 0; dx <= len && good; dx++) {
+						const TileIndex t = TileXY(tx + dx, ty - 1 + dy);
+						if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) good = false;
+					}
+				}
+				if (good) {
+					x0 = tx;
+					y0 = ty;
+				}
+			}
+		}
+		if (x0 == 0) {
+			IConsolePrint(CC_ERROR, "test3d: vagony: no clear land from {},{}", from_x, from_y);
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: vagony: no company");
+			return true;
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		/* Flat at the height of its first tile, a strip at a time (a command levels so much), as 'auta'. */
+		for (uint x = x0; x <= x0 + len; x += 4) {
+			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(std::min(x + 3, x0 + len), y0 + 1), TileXY(x0, y0 - 1), false, LevelMode::Level);
+		}
+		const TileIndex depot_a = TileXY(x0, y0), depot_b = TileXY(x0 + len, y0);
+		int failed = 0;
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_a, RAILTYPE_RAIL, DiagDirection::SW).Failed()) failed++;
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot_b, RAILTYPE_RAIL, DiagDirection::NE).Failed()) failed++;
+		std::string why;
+		for (uint i = 1; i < len; i++) {
+			CommandCost rail = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x0 + i, y0), RAILTYPE_RAIL, Track::X, false);
+			if (rail.Failed()) {
+				failed++;
+				if (why.empty()) why = fmt::format(" ({},{}: {})", x0 + i, y0, RefusalReason(rail));
+			}
+		}
+		if (failed > 0) {
+			IConsolePrint(CC_ERROR, "test3d: vagony: trat u {},{} nepostavena ({} kusu){}", x0, y0, failed, why);
+			return true;
+		}
+		/* The engine or wagon asked for; for wagons, the fastest engine for plain rail before them. */
+		const Engine *asked = nullptr, *loco = nullptr;
+		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company)) continue;
+			const bool is_wagon = e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+			if (asked == nullptr && GetString(STR_ENGINE_NAME, e->index).find(wanted) != std::string::npos) asked = e;
+			if (!is_wagon && HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL) && CountArticulatedParts(e->index) == 0 && (loco == nullptr || e->GetDisplayMaxSpeed() > loco->GetDisplayMaxSpeed())) loco = e;
+		}
+		if (asked == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: vagony: zadny vuz '{}'", wanted);
+			return true;
+		}
+		const bool asked_wagon = asked->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
+		auto buy = [&](const Engine *e) {
+			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot_a, e->index, true, INVALID_CARGO, ClientID::Invalid);
+			return cost.Succeeded() ? veh : VehicleID::Invalid();
+		};
+		VehicleID train = asked_wagon ? (loco != nullptr ? buy(loco) : VehicleID::Invalid()) : buy(asked);
+		if (train == VehicleID::Invalid()) {
+			IConsolePrint(CC_ERROR, "test3d: vagony: vlak nejde koupit");
+			return true;
+		}
+		std::vector<VehicleID> units;
+		if (!asked_wagon) units.push_back(train);
+		for (int i = asked_wagon ? 0 : 1; i < count; i++) {
+			VehicleID veh = buy(asked);
+			if (veh == VehicleID::Invalid()) continue;
+			Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, veh, train, false);
+			units.push_back(veh);
+		}
+		if (IsValidCargoType(refit_to)) {
+			CommandCost refit = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, train, refit_to, subtype, false, false, 0));
+			if (refit.Failed()) IConsolePrint(CC_DEFAULT, "test3d: vagony: prestavba {}", RefusalReason(refit));
+		}
+		for (VehicleID unit : units) {
+			for (const auto &[aspect, option] : choices) {
+				CommandCost chosen = Command<Commands::ConfigureVehicle>::Do(DoCommandFlag::Execute, unit, UINT8_MAX, aspect, option);
+				if (chosen.Failed()) IConsolePrint(CC_DEFAULT, "test3d: vagony: volba {}={} {}", aspect, option, RefusalReason(chosen));
+			}
+		}
+		for (Vehicle *u = Vehicle::Get(train); u != nullptr; u = u->Next()) {
+			if (full && u->cargo_cap > 0 && CargoPacket::CanAllocateItem()) AppendConsoleCargo(u, CargoPacket::Create(StationID::Invalid(), u->cargo_cap, Source{}));
+			u->sprite_cache.last_direction = Direction::Invalid;
+		}
+		for (VehicleID unit : units) {
+			const Vehicle *w = Vehicle::Get(unit);
+			const CargoLabel label = CargoSpec::Get(w->cargo_type)->label;
+			IConsolePrint(CC_DEFAULT, "test3d: vagony: vuz {} naklad {}{}{}{} {}/{} podtyp {}{}", w->index.base(), static_cast<char>(label.base() >> 24), static_cast<char>(label.base() >> 16), static_cast<char>(label.base() >> 8), static_cast<char>(label.base()), w->cargo.StoredCount(), w->cargo_cap, w->cargo_subtype, GetString(GetCargoSubtypeText(w)));
+		}
+		Order there{};
+		there.MakeGoToDepot(DestinationID(Depot::GetByTile(depot_b)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, train, 0, there);
+		Order back{};
+		back.MakeGoToDepot(DestinationID(Depot::GetByTile(depot_a)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+		Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, train, 1, back);
+		Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, train, false);
+		UpdateSignalsInBuffer();
+		ScrollMainWindowToTile(TileXY(x0 + len / 2, y0), true);
+		IConsolePrint(CC_DEFAULT, "test3d: vagony {} '{}' za '{}' na trati {},{}..{},{}", units.size(), GetString(STR_ENGINE_NAME, asked->index), asked_wagon && loco != nullptr ? GetString(STR_ENGINE_NAME, loco->index) : std::string("-"), x0, y0, x0 + len, y0);
 	} else if (what == "stav") {
 		/* 'stav <n> [<n> ...]': every vehicle object with states drawn in its state n, 0 as its GRF picks (the rig: a
 		 * state the cars do not get here); several, the states of its layers made one (the first layer first). */
@@ -9184,21 +9337,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "stavy") {
 		/* 'stavy': each vehicle drawn as a 3D object, the sprite number its GRF picks for each layer and the state of the
 		 * layer it means ("stavy", "vrstva"). */
-		for (const Vehicle *v : Vehicle::Iterate()) {
-			int piece = 0;
-			const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
-			if (obj == nullptr || !v->IsPrimaryVehicle()) continue;
-			std::vector<uint32_t> ids;
-			GetVehicleSetSpriteLocalIDs(v->engine_type, v, EngineImageType::OnMap, ids);
-			std::string list;
-			for (size_t l = 0; l < ids.size(); l++) {
-				int state = 0;
-				for (size_t i = 0; i < obj->states.size(); i++) {
-					if (static_cast<size_t>(obj->states[i].layer) == l && ids[l] >= obj->states[i].first && ids[l] <= obj->states[i].last) state = static_cast<int>(i) + 1;
+		for (const Vehicle *front : Vehicle::Iterate()) {
+			if (!front->IsPrimaryVehicle()) continue;
+			/* Every piece of it: which object it is a piece of (by the pieces around it, ThreeDVehicleObjectOf()), the
+			 * sets its GRF picks for its layers, and the state of each layer they mean in that object. */
+			int k = 0;
+			for (const Vehicle *v = front; v != nullptr; v = v->Next(), k++) {
+				int piece = 0;
+				const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
+				if (obj == nullptr) continue;
+				std::vector<uint32_t> ids;
+				GetVehicleSetSpriteLocalIDs(v->engine_type, v, EngineImageType::OnMap, ids);
+				std::string list;
+				for (size_t l = 0; l < ids.size(); l++) {
+					int state = 0;
+					for (size_t i = 0; i < obj->states.size(); i++) {
+						if (static_cast<size_t>(obj->states[i].layer) == l && ids[l] >= obj->states[i].first && ids[l] <= obj->states[i].last) state = static_cast<int>(i) + 1;
+					}
+					list += fmt::format(" vrstva {}: sprite GRF {} stav {};", l, ids[l] == UINT32_MAX ? -1 : static_cast<int64_t>(ids[l]), state);
 				}
-				list += fmt::format(" vrstva {}: sprite GRF {} stav {};", l, ids[l] == UINT32_MAX ? -1 : static_cast<int64_t>(ids[l]), state);
+				const Engine *e = Engine::GetIfValid(v->engine_type);
+				IConsolePrint(CC_DEFAULT, "test3d: stav vozidla {} dil {} (motor {:#06x}, {} kus {}{}, delka {}, na {},{}):{} stavu {}", front->unitnumber, k, e != nullptr ? e->grf_prop.local_id : 0,
+						obj->name, piece, piece == obj->anchor ? " kotva" : "", v->type == VehicleType::Train ? Train::From(v)->gcache.cached_veh_length : RoadVehicle::From(v)->gcache.cached_veh_length, v->x_pos, v->y_pos, list, obj->states.size());
 			}
-			IConsolePrint(CC_DEFAULT, "test3d: stav vozidla {} ({}):{} stavu {}", v->unitnumber, obj->name, list, obj->states.size());
 		}
 	} else if (what == "auta3d") {
 		/* 'auta3d [stred]': the cars of the game's own driving about (three_d_walkers.h) and the stops near the view;

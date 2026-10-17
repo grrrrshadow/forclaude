@@ -25,6 +25,9 @@
 #include "debug.h"
 #include "settings_type.h"
 #include "newgrf/newgrf_internal.h"
+#include "vehicle_config.h"
+#include "true_colour.h"
+#include "roadveh.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_tick.h"
 #include "timer/timer.h"
@@ -136,30 +139,71 @@ std::vector<int> _three_d_rig_states;
  * chooses for the layer, by its own rules; the states of the layers made one (ThreeDVehicleObject::ComposeState()).
  * @return its step (ThreeDVehicleObject::State()); 0 none: the object as it is, its paint new, no rust
  */
+static const Vehicle *PieceAway(const Vehicle *v, int steps);
+
 static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
-	if (obj->states.empty()) return 0;
+	/* The vehicle's colours of its set for its masks of details (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
+	 * point 2): as its 2D pictures are painted (GetCustomEngineSprite()), the default ones in the purchase list. */
+	const uint16_t colours = obj->HasDetails() ? (v != nullptr ? GetVehicleTrueColours(v) : GetEngineTrueColours(engine, {})) : 0;
+	if (obj->states.empty() && colours == 0) return 0;
 	if (!_three_d_rig_states.empty()) {
 		std::vector<int> layers;
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
-		return obj->ComposeState(layers);
+		return obj->ComposeState(layers, colours);
 	}
 	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list. */
 	if (obj->paint_random) return v == nullptr ? 1 : 1 + static_cast<int>(v->random_bits % obj->states.size());
-	std::vector<uint32_t> ids;
-	GetVehicleSetSpriteLocalIDs(engine, v, image_type, ids);
-	std::vector<int> layers(ids.size(), 0);
-	for (size_t l = 0; l < ids.size(); l++) {
-		if (ids[l] == UINT32_MAX) continue;
-		for (size_t i = 0; i < obj->states.size(); i++) {
-			const ThreeDVehicleState &s = obj->states[i];
-			if (static_cast<size_t>(s.layer) == l && ids[l] >= s.first && ids[l] <= s.last) {
-				layers[l] = static_cast<int>(i) + 1;
-				break;
+	/* The sets of the layers of its pieces, each piece's after the one before: of every piece of it (the colleague's
+	 * semi-trailer has its sets in its first piece and hangs from its middle one, the lesovoz has them in its second,
+	 * PROSBA-NAKLADAKY-TATRA-3D.md point 3), or of its anchor alone when its states name their piece ("clanek": "the
+	 * middle's sets decide", PROSBA-VAGONY-3D.md point 2). In the purchase list and the news the engine's own. */
+	struct Source {
+		EngineID engine;
+		const Vehicle *v;
+		int role; ///< the piece's "clanek" (ThreeDVehicleState::piece), -1 any
+	};
+	std::vector<Source> sources{{engine, v, -1}};
+	if (v != nullptr && v->engine_type == engine && image_type != EngineImageType::Purchase && image_type != EngineImageType::Preview) {
+		int piece = 0;
+		if (ThreeDVehicleObjectOf(v, &piece) == obj) {
+			const int last = static_cast<int>(obj->pieces.size()) - 1;
+			auto role = [&](int k) { return k == obj->anchor ? 1 : k == 0 ? 0 : k == last ? 2 : -1; };
+			sources.clear();
+			for (int k = 0; k <= last; k++) {
+				if (obj->states_of_anchor && k != piece) continue;
+				const Vehicle *u = PieceAway(v, k - piece);
+				if (u != nullptr) sources.push_back({u->engine_type, u, role(k)});
 			}
 		}
 	}
-	return obj->ComposeState(layers);
+	std::vector<int> layers;
+	std::vector<uint32_t> ids;
+	/* The vehicle's colours of its set (callback 1C1) are those of the piece whose sets it shows, as in 2D each piece
+	 * paints its own picture: the semi-trailer of the Terrno hangs from a piece of its own cargo, the marijuana on its
+	 * first one. */
+	const Source *painted_by = nullptr;
+	for (const Source &src : sources) {
+		ids.clear();
+		GetVehicleSetSpriteLocalIDs(src.engine, src.v, image_type, ids);
+		for (size_t l = 0; l < ids.size(); l++) {
+			int found = 0;
+			for (size_t i = 0; i < obj->states.size() && ids[l] != UINT32_MAX; i++) {
+				const ThreeDVehicleState &s = obj->states[i];
+				if (src.role >= 0 && s.piece >= 0 && s.piece != src.role) continue;
+				if (static_cast<size_t>(s.layer) == l && ids[l] >= s.first && ids[l] <= s.last) {
+					found = static_cast<int>(i) + 1;
+					break;
+				}
+			}
+			if (found != 0 && painted_by == nullptr) painted_by = &src;
+			/* (A state its pieces all pick, Sergej's paint, once.) */
+			if (found != 0 && std::ranges::find(layers, found) != layers.end()) found = 0;
+			layers.push_back(found);
+		}
+	}
+	const uint16_t painted = painted_by != nullptr && painted_by->v != nullptr && obj->HasDetails() ? GetVehicleTrueColours(painted_by->v) : colours;
+	return obj->ComposeState(layers, painted);
 }
 
 /** The state of a step (StateStep()), nullptr for none. */
@@ -338,13 +382,42 @@ static std::vector<int> SetPieceLengths(const ThreeDVehicleObject *obj)
  * proportions of its set, each a whole vehicle at most (the player: "do it from the object"). A ship or an
  * aircraft keeps its set's.
  */
+/** A step of the chain to a metre of a vehicle's object as drawn: a metre along a vehicle on the map, foreshortened as the sets draw. */
+static constexpr double CHAIN_STEPS_PER_METRE = UNITS_PER_METRE / 1.41421356237;
+
+/**
+ * The steps of the chain to a length of its set of an object whose index gives the lengths its object is for
+ * ("delky_clanku_grf", the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md point 3: "the metres to a unit from the
+ * object, the lengths of the pieces from the GRF"); 0 for one that does not.
+ */
+static double StepsPerSetLength(const ThreeDVehicleObject *obj)
+{
+	if (obj->grf_lengths.empty() || !SqueezedType(obj->type)) return 0;
+	int total = 0;
+	for (int l : obj->grf_lengths) total += l;
+	const float length = obj->Length();
+	if (total <= 0 || length < 0.1f) return 0;
+	return length * ObjectScale(obj) * CHAIN_STEPS_PER_METRE / total;
+}
+
+/** A piece's length on the map as its set's length makes it (StepsPerSetLength()), a whole vehicle at most. */
+static int PieceLengthOfSet(const ThreeDVehicleObject *obj, int set_length)
+{
+	return std::clamp(static_cast<int>(std::lround(set_length * StepsPerSetLength(obj))), 1, static_cast<int>(VEHICLE_LENGTH));
+}
+
 static std::vector<int> PieceLengths(const ThreeDVehicleObject *obj)
 {
 	std::vector<int> lengths = SetPieceLengths(obj);
-	const ThreeDVehicleShape *shape = SqueezedType(obj->type) ? obj->GetShape() : nullptr;
-	if (shape == nullptr || lengths.empty() || shape->x1 - shape->x0 < 0.1f) return lengths;
+	/* A lorry of the colleague's: each piece as long as its set says, at the object's metres to a length. */
+	if (StepsPerSetLength(obj) > 0) {
+		for (int &l : lengths) l = PieceLengthOfSet(obj, l);
+		return lengths;
+	}
+	const float object_length = SqueezedType(obj->type) ? obj->Length() : 0.0f;
+	if (lengths.empty() || object_length < 0.1f) return lengths;
 	const int n = static_cast<int>(lengths.size()), most = static_cast<int>(VEHICLE_LENGTH);
-	int total = static_cast<int>(std::lround((shape->x1 - shape->x0) * ObjectScale(obj) * UNITS_PER_METRE / std::sqrt(2.0)));
+	int total = static_cast<int>(std::lround(object_length * ObjectScale(obj) * UNITS_PER_METRE / std::sqrt(2.0)));
 	total = std::clamp(total, n, n * most);
 	int set_total = 0;
 	for (int l : lengths) set_total += l;
@@ -372,17 +445,156 @@ int ThreeDVehicleObjectPieceLength(EngineID engine, int set_length)
 	int piece = 0;
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
 	if (obj == nullptr || !SqueezedType(obj->type)) return set_length;
+	if (StepsPerSetLength(obj) > 0) return PieceLengthOfSet(obj, set_length);
 	std::vector<int> lengths = PieceLengths(obj);
 	return piece >= 0 && piece < static_cast<int>(lengths.size()) ? lengths[piece] : set_length;
 }
 
-/** Where the object's origin is from a piece's position, steps forward along the vehicle: the middle of the chain. */
+/**
+ * The length of a piece of a vehicle on the map (Train::ConsistChanged(), GetRoadVehLength()), as
+ * ThreeDVehicleObjectPieceLength() -- the object it is a piece of told by the pieces around it (a piece of several,
+ * ThreeDVehicleObjectOf()), and its length its set's now, the refit's (callback 36: a lorry without a trailer has a
+ * shorter snout and an empty trailer of length 1, the colleague's point 3).
+ * @param v the piece, linked into its vehicle
+ * @param set_length its length as its set says now
+ */
+int ThreeDVehicleObjectPieceLengthOf(const Vehicle *v, int set_length)
+{
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
+	if (obj == nullptr || !SqueezedType(obj->type)) return set_length;
+	if (StepsPerSetLength(obj) > 0) return PieceLengthOfSet(obj, set_length);
+	std::vector<int> lengths = PieceLengths(obj);
+	return piece >= 0 && piece < static_cast<int>(lengths.size()) ? lengths[piece] : set_length;
+}
+
+/**
+ * Where the object's origin is from a piece's position, steps forward along the vehicle: the middle of the chain.
+ * An object whose index gives its lengths of its set (the colleague's lorries and wagons) the middle of what its
+ * pieces cover, so that the objects of a vehicle's articles lie one after another as its pieces do ("the end of an
+ * object exactly at the coupling"): a road vehicle's piece reaching a whole vehicle's half ahead of its position and
+ * its length back (the next piece follows it at its length), a train's piece its half each way.
+ */
 static double MiddleFromPiece(const ThreeDVehicleObject *obj, const std::vector<int> &lengths, int piece)
 {
 	std::vector<double> pos;
 	double middle = ThreeDChainPositions(obj->type, lengths, pos);
 	if (piece < 0 || static_cast<size_t>(piece) >= pos.size()) return 0.0;
+	if (!obj->grf_lengths.empty() && !lengths.empty()) {
+		if (obj->type == VehicleType::Road) {
+			middle += (static_cast<double>(VEHICLE_LENGTH) - lengths.back()) / 2.0;
+		} else if (obj->type == VehicleType::Train) {
+			middle += (lengths.front() - lengths.back()) / 4.0;
+		}
+	}
 	return middle - pos[piece];
+}
+
+/** Whether a piece of a vehicle drawn from its object faces the other way: a train turned round, the rear head of a double-headed engine. */
+static bool PieceReversed(const Vehicle *v)
+{
+	bool reversed = false;
+	if (v->type == VehicleType::Train) {
+		const Train *t = Train::From(v);
+		if (t->flags.Test(VehicleRailFlag::Flipped)) reversed = !reversed;
+		if (t->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) reversed = !reversed;
+	}
+	return reversed;
+}
+
+/** The direction a piece is drawn facing (PieceReversed()). */
+static int PieceDirection(const Vehicle *v)
+{
+	return to_underlying(PieceReversed(v) ? ReverseDir(v->direction) : v->direction) & 7;
+}
+
+/** A piece of a vehicle so many pieces before (negative) or after it, nullptr past the vehicle's ends. */
+static const Vehicle *PieceAway(const Vehicle *v, int steps)
+{
+	for (; v != nullptr && steps < 0; steps++) v = v->Previous();
+	for (; v != nullptr && steps > 0; steps--) v = v->Next();
+	return v;
+}
+
+/** The length of a piece on the map now, eighths of a tile. */
+static int CachedLength(const Vehicle *v)
+{
+	if (v->type == VehicleType::Train) return Train::From(v)->gcache.cached_veh_length;
+	if (v->type == VehicleType::Road) return RoadVehicle::From(v)->gcache.cached_veh_length;
+	return static_cast<int>(VEHICLE_LENGTH);
+}
+
+/**
+ * The lengths of an object's pieces as they are on the map, eighths of a tile: a vehicle's pieces' own (the refit
+ * makes them other than its set's in the purchase list, callback 36), of the object of its index's lengths; else as
+ * the object makes them (PieceLengths()).
+ * @param v a piece of the vehicle, the object's piece piece; nullptr for the purchase list
+ */
+static std::vector<int> ObjectLengths(const ThreeDVehicleObject *obj, const Vehicle *v, int piece)
+{
+	std::vector<int> lengths = PieceLengths(obj);
+	if (v == nullptr || obj->grf_lengths.empty()) return lengths;
+	for (size_t k = 0; k < lengths.size(); k++) {
+		const Vehicle *u = PieceAway(v, static_cast<int>(k) - piece);
+		if (u != nullptr) lengths[k] = CachedLength(u);
+	}
+	return lengths;
+}
+
+/**
+ * The object a vehicle's article is coupled behind ("spojeni", the colleague's point 3): the one of the piece just
+ * before its first, when it has a front coupling and that one a back coupling, both facing the same way.
+ * @param anchor the object's anchor piece
+ * @param[out] before that object, and its anchor piece
+ */
+static bool CoupledBehind(const ThreeDVehicleObject *obj, const Vehicle *anchor, const ThreeDVehicleObject *&before, const Vehicle *&before_anchor)
+{
+	if (!obj->has_couple_front) return false;
+	const Vehicle *first = PieceAway(anchor, -obj->anchor);
+	const Vehicle *prev = first != nullptr ? first->Previous() : nullptr;
+	if (prev == nullptr) return false;
+	int piece = 0;
+	before = ThreeDVehicleObjectOf(prev, &piece);
+	if (before == nullptr || before == obj || !before->has_couple_back) return false;
+	before_anchor = PieceAway(prev, before->anchor - piece);
+	return before_anchor != nullptr && PieceReversed(before_anchor) == PieceReversed(anchor);
+}
+
+/**
+ * Where on the map an object hung from its anchor piece has its origin, world units: from the anchor piece along the
+ * way it faces as far as the middle of its pieces (MiddleFromPiece()) -- or, an article coupled behind another
+ * (CoupledBehind()), with its front coupling on the back coupling of that one, which is placed so in its turn: the
+ * train of lorries bends at its couplings as the pieces turn, each article facing as its own anchor piece.
+ * @param d the direction the anchor piece is drawn facing (PieceDirection())
+ * @param depth how many articles before it are placed so (a few at most)
+ */
+static void ObjectOriginOnMap(const ThreeDVehicleObject *obj, const Vehicle *anchor, int d, double &x, double &y, int depth = 0)
+{
+	const double along = MiddleFromPiece(obj, ObjectLengths(obj, anchor, obj->anchor), obj->anchor);
+	x = anchor->x_pos + along * DIR_DX[d];
+	y = anchor->y_pos + along * DIR_DY[d];
+	const ThreeDVehicleObject *before = nullptr;
+	const Vehicle *before_anchor = nullptr;
+	if (depth >= 4 || !CoupledBehind(obj, anchor, before, before_anchor)) return;
+	const int bd = PieceDirection(before_anchor);
+	double bx, by;
+	ObjectOriginOnMap(before, before_anchor, bd, bx, by, depth + 1);
+	const double back = before->couple_back[0] * ObjectScale(before) * CHAIN_STEPS_PER_METRE;
+	const double front = obj->couple_front[0] * ObjectScale(obj) * CHAIN_STEPS_PER_METRE;
+	x = bx + back * DIR_DX[bd] - front * DIR_DX[d];
+	y = by + back * DIR_DY[bd] - front * DIR_DY[d];
+}
+
+/**
+ * How far along its direction from its anchor piece an object is drawn on the map (ObjectOriginOnMap()), steps of the
+ * chain: what its sprite of the direction is made about.
+ */
+static double ObjectAlongOnMap(const ThreeDVehicleObject *obj, const Vehicle *anchor, int d)
+{
+	double x, y;
+	ObjectOriginOnMap(obj, anchor, d, x, y);
+	const double dx = DIR_DX[d], dy = DIR_DY[d];
+	return ((x - anchor->x_pos) * dx + (y - anchor->y_pos) * dy) / (dx * dx + dy * dy);
 }
 
 /** The empty picture of the pieces that draw nothing. */
@@ -397,22 +609,27 @@ static SpriteID EmptyObjectSprite()
 	return made;
 }
 
-/** The sprite of an object facing a direction, hung from one of its pieces, its crew that walks at its frames: made when it is first drawn. */
-static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir, int fade, uint64_t walk)
+/**
+ * The sprite of an object facing a direction, hung from one of its pieces, its crew that walks at its frames: made when it is first drawn.
+ * @param along how far along its direction from the piece its origin is, steps of the chain (MiddleFromPiece(), ObjectAlongOnMap())
+ * @param length the piece's length on the map, eighths of a tile
+ */
+static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir, int fade, uint64_t walk, double along, int length)
 {
-	auto key = std::make_tuple(obj, piece, dir, static_cast<int>(std::lround(ObjectScale(obj) * 1000)), fade, walk);
+	/* (The piece and the place along in eighths of a step: the article of a train of lorries is hung where its
+	 * coupling puts it, and a refit changes its pieces' lengths.) */
+	const uint32_t where = static_cast<uint32_t>(piece & 0xFF) | (static_cast<uint32_t>(std::lround(along * 8)) & 0xFFFF) << 8 | static_cast<uint32_t>(length & 0x7F) << 24;
+	auto key = std::make_tuple(obj, static_cast<int>(where), dir, static_cast<int>(std::lround(ObjectScale(obj) * 1000)), fade, walk);
 	auto it = _object_sprites.find(key);
 	if (it != _object_sprites.end()) return it->second;
 
-	std::vector<int> lengths = PieceLengths(obj);
 	ObjectSpriteRequest req;
 	req.obj = obj;
 	req.dir = dir;
 	req.scale = ObjectScale(obj);
 	req.fade = fade;
 	req.walk = walk;
-	double along = MiddleFromPiece(obj, lengths, piece);
-	Point anchor = ThreeDSpriteAnchor(obj->type, lengths[std::clamp<int>(piece, 0, static_cast<int>(lengths.size()) - 1)], static_cast<Direction>(dir));
+	Point anchor = ThreeDSpriteAnchor(obj->type, length, static_cast<Direction>(dir));
 	req.off_x = static_cast<float>(along * DIR_DX[dir] - anchor.x);
 	req.off_y = static_cast<float>(along * DIR_DY[dir] - anchor.y);
 
@@ -433,15 +650,21 @@ static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir,
 bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction direction, EngineImageType image_type, VehicleSpriteSeq *result)
 {
 	int piece = 0;
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
+	const ThreeDVehicleObject *obj = (v != nullptr && v->engine_type == engine) ? ThreeDVehicleObjectOf(v, &piece) : GetThreeDVehicleObject(engine, &piece);
 	if (obj == nullptr || direction == Direction::Invalid) return false;
-	int from = (image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview) ? 0 : obj->anchor;
+	const bool alone = image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview || v == nullptr || v->engine_type != engine;
+	int from = alone ? 0 : obj->anchor;
 	SpriteID sprite = EmptyObjectSprite();
 	if (piece == from) {
 		const int state = StateStep(obj, engine, v, image_type);
 		/* Its crew that walks at its step of the way gone (on the map, as it moves). */
 		const uint64_t walk = image_type == EngineImageType::OnMap ? WalkCode(obj, state, WalkedOf(v, obj), ObjectScale(obj)) : 0;
-		sprite = ObjectSprite(obj, from, to_underlying(direction) & 7, state, walk);
+		const int d = to_underlying(direction) & 7;
+		/* Hung from the middle of its pieces as they are, or where its coupling puts it (an article of a train of
+		 * lorries on the map); alone from its first piece as its set's lengths make it. */
+		const std::vector<int> lengths = ObjectLengths(obj, alone ? nullptr : v, from);
+		const double along = !alone && image_type == EngineImageType::OnMap ? ObjectAlongOnMap(obj, v, d) : MiddleFromPiece(obj, lengths, from);
+		sprite = ObjectSprite(obj, from, d, state, walk, along, lengths[std::clamp<int>(from, 0, static_cast<int>(lengths.size()) - 1)]);
 	}
 	if (sprite == 0) return false;
 	result->Set(sprite);
@@ -575,6 +798,62 @@ struct ObjectPaintOfState {
 };
 
 /**
+ * The masks of details of an object's textures painted in the vehicle's colours of its set (the colleague's
+ * hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, point 2): a texel whose mask index is of a detail the set colours by callback
+ * 1C1 (the configurator, the colour by the load, by chance) in the colour of the detail at the texel's lightness, as a
+ * 32bpp sprite's mask is painted (ShadeTrueColour()); a detail that is turned (a heap of marijuana to hay) its own
+ * colours turned (ShiftTrueColourHue()). Faded with age as the set gives it (AgeTrueColour()). A texel of no such
+ * detail stays as it is, for the colours of the states ("barvy_doplnku", "lak") -- what the colleague's index gives
+ * "until then".
+ */
+struct ObjectDetailPaint {
+	const TrueColourSet *colours = nullptr; ///< the vehicle's colours, nullptr none
+	std::vector<const ThreeDDetailMask *> masks; ///< each texture's mask of details, nullptr none
+
+	/** @param drawn the textures drawn (RasterObject()), nullptr those not: their masks are not read; empty all */
+	ObjectDetailPaint(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, const ThreeDVehicleState *st, size_t textures, std::span<const ThreeDObjectTexture *const> drawn = {})
+	{
+		if (st == nullptr || st->true_colours == 0 || st->true_colours > GetTrueColourSetCount()) return;
+		this->colours = &GetTrueColourSet(st->true_colours);
+		this->masks.assign(textures, nullptr);
+		bool any = false;
+		for (size_t i = 0; i < textures; i++) {
+			const int addon = i < shape.tex_addon.size() ? shape.tex_addon[i] : -1;
+			if (!drawn.empty() && (i >= drawn.size() || drawn[i] == nullptr)) continue;
+			if (i == 0 || addon >= 0) this->masks[i] = obj.GetDetailMask(i == 0 ? -1 : addon);
+			any |= this->masks[i] != nullptr;
+		}
+		if (!any) this->colours = nullptr;
+	}
+
+	/** The mask of a texture, nullptr when nothing is painted by it. */
+	const ThreeDDetailMask *MaskOf(size_t texture) const
+	{
+		return this->colours != nullptr && texture < this->masks.size() ? this->masks[texture] : nullptr;
+	}
+
+	/**
+	 * Paint a texel at u, v of a texture with a mask.
+	 * @return whether its detail is one the set colours (the colours of the states then leave it as it is)
+	 */
+	bool Paint(const ThreeDDetailMask *mask, float u, float v, float &cr, float &cg, float &cb) const
+	{
+		const uint8_t m = mask->At(u, v);
+		if (m == 0) return false;
+		for (const TrueColourRange &range : *this->colours) {
+			if (m < range.first || m >= range.first + TRUE_COLOUR_RANGE_SIZE) continue;
+			const Colour own(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)));
+			const Colour c = range.hue ? ShiftTrueColourHue(range, own) : ShadeTrueColour(range, std::max({own.r, own.g, own.b}));
+			cr = c.r;
+			cg = c.g;
+			cb = c.b;
+			return true;
+		}
+		return false;
+	}
+};
+
+/**
  * Draw an object with the camera of the sprites, turned: the triangles through a depth buffer, each pixel the
  * texture's, lit from the corners' normals by one light fixed to the world (the colleague's: from the left above
  * as the sprites of the original game and the sets, the brightness 0.55 + 0.45 max(0, n . L), L = (-0.55, 0.35,
@@ -598,8 +877,12 @@ struct ObjectPaintOfState {
  */
 static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0, int state = 0, uint64_t walk = 0)
 {
-	const ThreeDVehicleShape *shape = obj.GetShape(frame);
-	if (shape == nullptr) return false;
+	const ThreeDVehicleShape *whole = obj.GetShape(frame);
+	if (whole == nullptr) return false;
+	/* As detailed as the picture is fine (the colleague's lorries and wagons are in full detail, PROSBA point 12: "the
+	 * game makes fewer triangles when it is far"): its corners joined about one and a half pixels apart (Simpler()).
+	 * Its textures, lamps and glass stay the whole shape's. */
+	const ThreeDVehicleShape *shape = whole->Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
 	/* The parts the state shows; the whole object turned about z at its origin as the state has it (a cart pushed). */
 	const uint64_t parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
@@ -666,7 +949,19 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const float d = (wx * L[0] + wy * L[1] + nz * L[2]) / ll;
 		return 0.55f + 0.45f * std::max(0.0f, d);
 	};
+	/* The triangles drawn: of the parts the state shows (an object of seventy five loads draws one), the glass after
+	 * the rest; only their corners are placed, and the picture is as big as they are. */
+	std::vector<size_t> drawn_triangles, glass_triangles;
+	std::vector<uint8_t> used(n, 0);
+	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
+		const bool glass = shape->IsGlass(t / 3);
+		if (part != ThreeDVehicleShape::PART_GLASS && part != ThreeDVehicleShape::PART_DRIVER && !ThreeDVehicleShape::Shown(part, parts)) continue;
+		(glass ? glass_triangles : drawn_triangles).push_back(t);
+		for (int c = 0; c < 3; c++) used[shape->tri[t + c]] = 1;
+	}
 	for (size_t i = 0; i < n; i++) {
+		if (used[i] == 0) continue;
 		float px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
 		if (spin != 0.0f) {
 			px -= kc[0]; py -= kc[1]; pz -= kc[2];
@@ -728,16 +1023,26 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	/* The level of the textures: about a texel to a pixel. */
 	int level = 0;
 	for (float d = TexelsPerMetre(obj, *shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
-	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, shape->pngs.size()));
-	for (size_t i = 0; i < texs.size(); i++) texs[i] = obj.GetTexture(level, static_cast<int>(i));
+	/* Only the textures of the triangles drawn (and the body's, for a triangle without one): those of the add-ons the
+	 * state does not show are not made at all (an add-on's picture is of sixteen million pixels). */
+	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, whole->pngs.size()), nullptr);
+	texs[0] = obj.GetTexture(level, 0);
+	for (const std::vector<size_t> *list : {&drawn_triangles, &glass_triangles}) {
+		for (size_t t : *list) {
+			const size_t ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+			if (ti < texs.size() && texs[ti] == nullptr) texs[ti] = obj.GetTexture(level, static_cast<int>(ti));
+		}
+	}
 	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6); the rust after
 	 * the paint has faded (the colleague: the paint fades, the rust grows over it). */
-	const ObjectPaintOfState painted(obj, *shape, level, fade, rust_time, paint_colour);
+	const ObjectPaintOfState painted(obj, *whole, level, fade, rust_time, paint_colour);
+	/* The masks of details in the vehicle's colours of its set (callback 1C1). */
+	const ObjectDetailPaint details(obj, *whole, st, texs.size(), texs);
 	/* The textures an effect is coloured in: those of its material ("barvy"), the texture times the colour. */
 	const Colour tint_colour(tint);
 	std::vector<bool> tinted(texs.size(), false);
 	if (tint != 0) {
-		for (size_t i = 0; i < texs.size() && i < shape->tex_names.size(); i++) tinted[i] = shape->tex_names[i] == obj.tint_material;
+		for (size_t i = 0; i < texs.size() && i < whole->tex_names.size(); i++) tinted[i] = whole->tex_names[i] == obj.tint_material;
 	}
 
 	/* The add-ons' colours the state gives, each over its mask at the texture's lightness. */
@@ -747,14 +1052,14 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		float start = 255.0f;
 	};
 	std::vector<AddonPaint> addon_paint(texs.size());
-	for (size_t i = 0; i < texs.size() && i < shape->tex_addon.size(); i++) {
-		const int a = shape->tex_addon[i];
+	for (size_t i = 0; i < texs.size() && i < whole->tex_addon.size(); i++) {
+		const int a = whole->tex_addon[i];
+		if (texs[i] == nullptr) continue; // not drawn
 		if (a < 0 || st == nullptr || static_cast<size_t>(a) >= st->addon_colours.size() || st->addon_colours[a] == 0) continue;
 		addon_paint[i].mask = obj.GetAddonMask(a, level);
 		addon_paint[i].colour = Colour(st->addon_colours[a]);
 		addon_paint[i].start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
 	}
-	std::vector<size_t> glass_triangles;
 
 	std::vector<float> zb(static_cast<size_t>(width) * height, std::numeric_limits<float>::infinity());
 	std::vector<Colour> buf(static_cast<size_t>(width) * height, Colour(0, 0, 0, 0));
@@ -797,8 +1102,11 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 					buf[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr * k)), static_cast<uint8_t>(std::min(255.0f, cg * k)), static_cast<uint8_t>(std::min(255.0f, cb * k)));
 					continue;
 				}
-				if (ti == 0) painted.Paint(u, v, cr, cg, cb);
-				if (static_cast<size_t>(ti) < addon_paint.size() && addon_paint[ti].mask != nullptr) {
+				/* A detail the set colours in the vehicle's colours; else the colours of the state. */
+				const ThreeDDetailMask *dm = details.MaskOf(ti);
+				const bool by_detail = dm != nullptr && details.Paint(dm, u, v, cr, cg, cb);
+				if (ti == 0 && !by_detail) painted.Paint(u, v, cr, cg, cb);
+				if (!by_detail && static_cast<size_t>(ti) < addon_paint.size() && addon_paint[ti].mask != nullptr) {
 					const AddonPaint &ap = addon_paint[ti];
 					const int mx = std::min(ap.mask->w - 1, static_cast<int>(u * ap.mask->w)), my = std::min(ap.mask->h - 1, static_cast<int>(v * ap.mask->h));
 					const float m = Colour(ap.mask->px[static_cast<size_t>(my) * ap.mask->w + mx]).r / 255.0f;
@@ -820,15 +1128,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 			}
 		}
 	};
-	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
-		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
-		if (part == ThreeDVehicleShape::PART_GLASS) {
-			glass_triangles.push_back(t);
-			continue;
-		}
-		if (part != 0 && part != ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
-		fill(*shape, sx, sy, depth, light, texs, t, true);
-	}
+	for (size_t t : drawn_triangles) fill(*shape, sx, sy, depth, light, texs, t, true);
 	for (const CrewPiece &c : crew) {
 		/* Its textures at about a texel to a pixel, as big as it is drawn. */
 		int crew_level = 0;
@@ -840,7 +1140,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 
 	/* The glass of its windows ("sklo"), after all else: see-through, each layer of it laying its colour over what is
 	 * behind by its alpha, not hiding what is behind it (no depth written); over nothing, a pane of that alpha. */
-	const float glass_alpha = shape->glass_alpha;
+	const float glass_alpha = whole->glass_alpha;
 	for (size_t t : glass_triangles) {
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
@@ -886,17 +1186,19 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	 * body as it is turned and leant, in its material's colour unshaded, through the depth (it lies a few millimetres
 	 * before the body), each subpixel of it marked lit; and where its lights are, the pool of the headlights ahead. */
 	std::vector<uint8_t> litbuf;
-	if (lights != 0 && !shape->night_tri.empty()) {
+	if (lights != 0 && !whole->night_tri.empty()) {
 		litbuf.assign(static_cast<size_t>(width) * height, 0);
-		const size_t corners = shape->night_pos.size() / 3;
+		const size_t corners = whole->night_pos.size() / 3;
 		std::vector<float> nx(corners), ny(corners), nd(corners);
-		for (size_t i = 0; i < corners; i++) place(shape->night_pos[i * 3], shape->night_pos[i * 3 + 1], shape->night_pos[i * 3 + 2], nx[i], ny[i], nd[i]);
+		for (size_t i = 0; i < corners; i++) place(whole->night_pos[i * 3], whole->night_pos[i * 3 + 1], whole->night_pos[i * 3 + 2], nx[i], ny[i], nd[i]);
 		const float bias = 0.03f * scale; // a few centimetres: the glass is drawn over the lamp it lies on
-		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
+		for (size_t t = 0; t + 2 < whole->night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
-			if ((lights & (tn < shape->night_back.size() && shape->night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
-			const Colour glass(tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data);
-			const uint32_t a = shape->night_tri[t], b = shape->night_tri[t + 1], c = shape->night_tri[t + 2];
+			if ((lights & (tn < whole->night_back.size() && whole->night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
+			/* The lamps of a part only where the part is (the cab's headlights only on the cab shown). */
+			if (!ThreeDVehicleShape::Shown(tn < whole->night_part.size() ? whole->night_part[tn] : 0, parts)) continue;
+			const Colour glass(tn < whole->night_colour.size() ? whole->night_colour[tn] : Colour(255, 244, 216).data);
+			const uint32_t a = whole->night_tri[t], b = whole->night_tri[t + 1], c = whole->night_tri[t + 2];
 			if (a >= corners || b >= corners || c >= corners) continue;
 			const float ax = nx[a] - left, ay = ny[a] - top, bx = nx[b] - left, by = ny[b] - top, cx = nx[c] - left, cy = ny[c] - top;
 			const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
@@ -929,20 +1231,27 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 			place(px, py, pz, lx, ly, ld);
 			out.lights.push_back({lx / ss, ly / ss, kind});
 		};
-		if ((lights & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
+		if ((lights & LIGHTS_FRONT) != 0 && !whole->front_lights.empty()) {
 			float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
-			const size_t n_front = shape->front_lights.size() / 3;
-			for (size_t i = 0; i < n_front; i++) {
-				add_light(shape->front_lights[i * 3], shape->front_lights[i * 3 + 1], shape->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
-				ahead = std::max(ahead, shape->front_lights[i * 3]);
-				mid += shape->front_lights[i * 3 + 1] / n_front;
+			size_t n_front = 0;
+			for (size_t i = 0; i < whole->front_lights.size() / 3; i++) n_front += ThreeDVehicleShape::Shown(i < whole->front_part.size() ? whole->front_part[i] : 0, parts) ? 1 : 0;
+			for (size_t i = 0; i < whole->front_lights.size() / 3; i++) {
+				if (!ThreeDVehicleShape::Shown(i < whole->front_part.size() ? whole->front_part[i] : 0, parts)) continue;
+				add_light(whole->front_lights[i * 3], whole->front_lights[i * 3 + 1], whole->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
+				ahead = std::max(ahead, whole->front_lights[i * 3]);
+				mid += whole->front_lights[i * 3 + 1] / n_front;
 			}
 			/* The pool on the way, on the ground before the lamps (not over the bonnet): near, and further on. */
-			add_light(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
-			add_light(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+			if (n_front > 0) {
+				add_light(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+				add_light(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+			}
 		}
 		if ((lights & LIGHTS_BACK) != 0) {
-			for (size_t i = 0; i + 2 < shape->back_lights.size(); i += 3) add_light(shape->back_lights[i], shape->back_lights[i + 1], shape->back_lights[i + 2], ThreeDPictureLight::Kind::Back);
+			for (size_t i = 0; i * 3 + 2 < whole->back_lights.size(); i++) {
+				if (!ThreeDVehicleShape::Shown(i < whole->back_part.size() ? whole->back_part[i] : 0, parts)) continue;
+				add_light(whole->back_lights[i * 3], whole->back_lights[i * 3 + 1], whole->back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
+			}
 		}
 	}
 
@@ -954,6 +1263,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	out.top = top / ss;
 	out.px.assign(static_cast<size_t>(out.width) * out.height, Colour(0, 0, 0, 0));
 	out.lit.assign(litbuf.empty() ? 0 : out.px.size(), 0);
+	bool any = false;
 	for (int y = 0; y < out.height; y++) {
 		for (int x = 0; x < out.width; x++) {
 			uint r = 0, g = 0, bl = 0, cover = 0, glass = 0;
@@ -967,10 +1277,14 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				}
 			}
 			if (cover == 0) continue;
+			any = true;
 			out.px[static_cast<size_t>(y) * out.width + x] = Colour(r / cover, g / cover, bl / cover, static_cast<uint8_t>(cover / (ss * ss)));
 			if (glass > 0) out.lit[static_cast<size_t>(y) * out.width + x] = 1;
 		}
 	}
+	/* Not a pixel of it seen (the colleague's lorry without its trailer: the trailer's main file is two transparent
+	 * triangles of a millimetre, its state shows nothing): no picture, and no lights of it. */
+	if (!any) return false;
 	return true;
 }
 
@@ -1106,15 +1420,28 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
  * has its red lights ahead and its headlights at the back of where it goes: none then.
  * @param front,last its first and its last piece
  */
-static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed)
+static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
+
+static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed, ZoomLevel zoom)
 {
 	if (!IsNightNow() || reversed) return 0;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	int lights = 0;
 	if (front->Previous() == nullptr) lights |= LIGHTS_FRONT;
-	if (last->Next() == nullptr) lights |= LIGHTS_BACK;
+	/* Its red lights when nothing follows it, or nothing seen: a lorry of the colleague's without its trailer has the
+	 * trailer's pieces behind it, drawn as nothing. */
+	if (last->Next() == nullptr || NothingSeenAfter(last, zoom)) lights |= LIGHTS_BACK;
 	return lights;
+}
+
+/** The first and the last piece of a vehicle an object hung from its anchor piece covers (an article of a train of lorries its own). */
+static void ObjectEnds(const ThreeDVehicleObject *obj, const Vehicle *anchor, const Vehicle *&front, const Vehicle *&last)
+{
+	front = PieceAway(anchor, -obj->anchor);
+	if (front == nullptr) front = anchor;
+	last = front;
+	for (size_t k = 1; k < obj->pieces.size() && last->Next() != nullptr; k++) last = last->Next();
 }
 
 /** Where a vehicle drawn as an object is drawn on the map (PlaceVehicleObject()). */
@@ -1134,25 +1461,20 @@ struct VehicleObjectPlace {
 static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place)
 {
 	int piece = 0;
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr || piece != obj->anchor) return obj;
 
 	/* The way it faces: a train turned round, the rear head of a double-headed engine, the other way. */
-	bool reversed = false;
-	if (v->type == VehicleType::Train) {
-		const Train *t = Train::From(v);
-		if (t->flags.Test(VehicleRailFlag::Flipped)) reversed = !reversed;
-		if (t->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) reversed = !reversed;
-	}
-	Direction dir = reversed ? ReverseDir(v->direction) : v->direction;
-	int d = to_underlying(dir) & 7;
+	const bool reversed = PieceReversed(v);
+	const int d = PieceDirection(v);
 
-	/* The box of the pieces for the sorting. */
-	const Vehicle *front = v;
-	while (front->IsArticulatedPart() && front->Previous() != nullptr) front = front->Previous();
+	/* The box of its own pieces for the sorting (an article of a train of lorries its own, not the whole train's). */
+	const Vehicle *front = PieceAway(v, -piece);
+	if (front == nullptr) front = v;
 	const Vehicle *last = front;
 	int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
-	for (const Vehicle *u = front; u != nullptr; u = u->HasArticulatedPart() ? u->GetNextArticulatedPart() : nullptr) {
+	const Vehicle *u = front;
+	for (size_t k = 0; u != nullptr && k < obj->pieces.size(); k++, u = u->Next()) {
 		last = u;
 		xmin = std::min(xmin, u->x_pos + u->bounds.origin.x);
 		ymin = std::min(ymin, u->y_pos + u->bounds.origin.y);
@@ -1162,18 +1484,18 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 		zmax = std::max(zmax, u->z_pos + u->bounds.origin.z + u->bounds.extent.z - 1);
 	}
 
-	const int lights = VehicleObjectLightsOn(obj, front, last, reversed);
+	const int lights = VehicleObjectLightsOn(obj, front, last, reversed, zoom);
 
-	std::vector<int> lengths = PieceLengths(obj);
 	float scale = ObjectScale(obj);
-	double along = MiddleFromPiece(obj, lengths, piece);
 	float world_az = pose != nullptr ? pose->azimuth + (reversed ? 180.0f : 0.0f) : ViewAzimuth(d);
 	const int state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, SqueezedType(obj->type), state, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, WalkCode(obj, state, WalkedOf(v, obj), scale));
 
-	/* Hung from the middle of the chain: from the anchor piece that far along. */
-	place.ax = v->x_pos + static_cast<int>(std::lround(along * DIR_DX[d]));
-	place.ay = v->y_pos + static_cast<int>(std::lround(along * DIR_DY[d]));
+	/* Hung from the middle of its pieces (or where its coupling puts it, ObjectOriginOnMap()). */
+	double ox, oy;
+	ObjectOriginOnMap(obj, v, d, ox, oy);
+	place.ax = static_cast<int>(std::lround(ox));
+	place.ay = static_cast<int>(std::lround(oy));
 	place.az = v->z_pos;
 	if (pose != nullptr) {
 		int nx = static_cast<int>(std::lround(pose->x)), ny = static_cast<int>(std::lround(pose->y));
@@ -1184,6 +1506,28 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	place.xmin = xmin; place.ymin = ymin; place.zmin = zmin;
 	place.xmax = xmax; place.ymax = ymax; place.zmax = zmax;
 	return obj;
+}
+
+/** Whether the object a piece of a vehicle is a piece of draws nothing now (not a pixel of its picture, RasterObject()). */
+static bool ObjectDrawsNothing(const ThreeDVehicleObject *obj, const Vehicle *v, int piece, ZoomLevel zoom)
+{
+	const Vehicle *anchor = PieceAway(v, obj->anchor - piece);
+	if (anchor == nullptr) return false;
+	VehicleObjectPlace place;
+	PlaceVehicleObject(anchor, zoom, nullptr, place);
+	return place.pic == nullptr;
+}
+
+/** Whether all that follows a piece of a vehicle is drawn as objects that draw nothing now (ObjectDrawsNothing()). */
+static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom)
+{
+	for (const Vehicle *u = last->Next(); u != nullptr;) {
+		int piece = 0;
+		const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(u, &piece);
+		if (obj == nullptr || !ObjectDrawsNothing(obj, u, piece, zoom)) return false;
+		u = PieceAway(u, static_cast<int>(obj->pieces.size()) - piece);
+	}
+	return true;
 }
 
 /**
@@ -1207,7 +1551,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v)
 {
 	if (!IsNightNow()) return false;
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type);
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v);
 	if (obj == nullptr) return false;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	return shape != nullptr && shape->HasLights();
@@ -1224,8 +1568,11 @@ bool ThreeDVehicleObjectLitAtNight(const Vehicle *v)
 bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az)
 {
 	lights.clear();
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type);
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr) return false;
+	/* An object that draws nothing now has no lights either (not those about its box: a lorry's trailer it has not). */
+	if (ObjectDrawsNothing(obj, v, piece, zoom)) return true;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return false;
 	VehicleObjectPlace place;
@@ -1300,41 +1647,61 @@ static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *l
  * @param[out] out where and how; out.obj nullptr for a piece drawn with its anchor piece (nothing of its own)
  * @return whether the vehicle is drawn from its object
  */
+/**
+ * Where an object hung from its anchor piece is in the view from the eyes, and the way it faces (EyeFacing()): as on
+ * the map (ObjectOriginOnMap()), its front coupling on the back one of the article before it, each at its own
+ * heading, foreshortened along as it is drawn.
+ * @param[out] x,y its origin, world units
+ * @param[out] facing its heading, radians
+ * @param depth how many articles before it are placed so (a few at most)
+ */
+static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth = 0)
+{
+	const bool reversed = PieceReversed(anchor);
+	const Vehicle *front, *last;
+	ObjectEnds(obj, anchor, front, last);
+	facing = EyeFacing(anchor, reversed ? last : front, reversed ? front : last, DirectionAngle(PieceDirection(anchor)), SqueezedType(obj->type), rolled, curvature);
+	/* Hung from the middle of its pieces, as on the map: from the anchor piece that many steps along. */
+	const double along = MiddleFromPiece(obj, ObjectLengths(obj, anchor, obj->anchor), obj->anchor) * ChainStep(facing);
+	x = anchor->x_pos + along * std::cos(facing);
+	y = anchor->y_pos + along * std::sin(facing);
+	const ThreeDVehicleObject *before = nullptr;
+	const Vehicle *before_anchor = nullptr;
+	if (depth >= 4 || !CoupledBehind(obj, anchor, before, before_anchor)) return;
+	double bx, by, bf, br, bc;
+	EyeOrigin(before, before_anchor, bx, by, bf, br, bc, depth + 1);
+	const bool squeezed = SqueezedType(obj->type);
+	const double back = before->couple_back[0] * ObjectScale(before) * UNITS_PER_METRE * (squeezed ? SqueezeAt(bf) : 1.0f);
+	const double ahead = obj->couple_front[0] * ObjectScale(obj) * UNITS_PER_METRE * (squeezed ? SqueezeAt(facing) : 1.0f);
+	x = bx + back * std::cos(bf) - ahead * std::cos(facing);
+	y = by + back * std::sin(bf) - ahead * std::sin(facing);
+}
+
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 {
 	out = {};
 	int piece = 0;
-	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(v->engine_type, &piece);
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
 	if (obj == nullptr || obj->GetShape() == nullptr) return false;
 	if (piece != obj->anchor) return true;
-	bool reversed = false;
-	if (v->type == VehicleType::Train) {
-		const Train *t = Train::From(v);
-		if (t->flags.Test(VehicleRailFlag::Flipped)) reversed = !reversed;
-		if (t->spritenum == CUSTOM_VEHICLE_SPRITENUM_REVERSED) reversed = !reversed;
-	}
-	const Vehicle *front = v;
-	while (front->IsArticulatedPart() && front->Previous() != nullptr) front = front->Previous();
-	const Vehicle *last = front;
-	while (last->HasArticulatedPart()) last = last->GetNextArticulatedPart();
-	const int d = to_underlying(reversed ? ReverseDir(v->direction) : v->direction) & 7;
-	double rolled = 0, curvature = 0;
-	const double facing = EyeFacing(v, reversed ? last : front, reversed ? front : last, DirectionAngle(d), SqueezedType(obj->type), rolled, curvature);
+	const bool reversed = PieceReversed(v);
+	const Vehicle *front, *last;
+	ObjectEnds(obj, v, front, last);
+	double x, y, facing, rolled = 0, curvature = 0;
+	EyeOrigin(obj, v, x, y, facing, rolled, curvature);
 	out.rolled = reversed ? -rolled : rolled;
 	out.curvature = curvature;
 
 	out.obj = obj;
 	out.scale = ObjectScale(obj);
 	out.along = SqueezedType(obj->type) ? SqueezeAt(facing) : 1.0f;
-	/* Hung from the middle of the chain, as on the map: from the anchor piece that many steps along. */
-	const double along = MiddleFromPiece(obj, PieceLengths(obj), piece) * ChainStep(facing);
-	out.x = v->x_pos + along * std::cos(facing);
-	out.y = v->y_pos + along * std::sin(facing);
+	out.x = x;
+	out.y = y;
 	out.z = v->z_pos;
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);
 	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale);
-	out.lights = VehicleObjectLightsOn(obj, front, last, reversed);
+	out.lights = VehicleObjectLightsOn(obj, front, last, reversed, ZoomLevel::Normal);
 	return true;
 }
 
@@ -1357,19 +1724,28 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 		const double x = px * ev.scale * ev.along * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE;
 		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind});
 	};
+	/* The lamps of the parts its state shows only (the cab's on the cab shown). */
+	const uint64_t parts = ev.obj->PartsOf(ev.state);
+	auto shown = [&](const std::vector<uint8_t> &of, size_t i) { return ThreeDVehicleShape::Shown(i < of.size() ? of[i] : 0, parts); };
 	if ((ev.lights & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
 		float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
-		const size_t n = shape->front_lights.size() / 3;
-		for (size_t i = 0; i < n; i++) {
+		size_t n = 0;
+		for (size_t i = 0; i < shape->front_lights.size() / 3; i++) n += shown(shape->front_part, i) ? 1 : 0;
+		for (size_t i = 0; i < shape->front_lights.size() / 3; i++) {
+			if (!shown(shape->front_part, i)) continue;
 			add(shape->front_lights[i * 3], shape->front_lights[i * 3 + 1], shape->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
 			ahead = std::max(ahead, shape->front_lights[i * 3]);
 			mid += shape->front_lights[i * 3 + 1] / n;
 		}
-		add(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
-		add(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+		if (n > 0) {
+			add(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+			add(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+		}
 	}
 	if ((ev.lights & LIGHTS_BACK) != 0) {
-		for (size_t i = 0; i + 2 < shape->back_lights.size(); i += 3) add(shape->back_lights[i], shape->back_lights[i + 1], shape->back_lights[i + 2], ThreeDPictureLight::Kind::Back);
+		for (size_t i = 0; i * 3 + 2 < shape->back_lights.size(); i++) {
+			if (shown(shape->back_part, i)) add(shape->back_lights[i * 3], shape->back_lights[i * 3 + 1], shape->back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
+		}
 	}
 }
 
@@ -1414,29 +1790,40 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
 	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
 	if (state == 0 || raw == nullptr) return raw;
+	const ThreeDVehicleState *st = obj->State(state);
+	/* The mask of details of the texture in the vehicle's colours of its set (callback 1C1), as RasterObject() paints it. */
+	const ObjectDetailPaint details(*obj, *shape, st, std::max<size_t>(1, shape->pngs.size()));
+	const ThreeDDetailMask *detail = details.MaskOf(static_cast<size_t>(index));
 	if (index != 0) {
 		/* An add-on's texture: the colour its state gives it over its mask, at the texture's lightness. */
 		const int addon = static_cast<size_t>(index) < shape->tex_addon.size() ? shape->tex_addon[index] : -1;
-		const ThreeDVehicleState *st = obj->State(state);
-		if (addon < 0 || st == nullptr || static_cast<size_t>(addon) >= st->addon_colours.size() || st->addon_colours[addon] == 0) return raw;
-		const ThreeDObjectTexture *mask = obj->GetAddonMask(addon, level);
-		if (mask == nullptr) return raw;
+		const bool coloured = addon >= 0 && st != nullptr && static_cast<size_t>(addon) < st->addon_colours.size() && st->addon_colours[addon] != 0;
+		const ThreeDObjectTexture *mask = coloured ? obj->GetAddonMask(addon, level) : nullptr;
+		if (mask == nullptr && detail == nullptr) return raw;
 		ThreeDObjectTexture &t = _eye_painted[{obj, state, level, index}];
 		if (!t.px.empty()) return &t;
-		const Colour colour(st->addon_colours[addon]);
-		const float start = obj->addons[addon].start > 0 ? static_cast<float>(obj->addons[addon].start) : 255.0f;
+		const Colour colour(coloured ? st->addon_colours[addon] : 0);
+		const float start = addon >= 0 && obj->addons[addon].start > 0 ? static_cast<float>(obj->addons[addon].start) : 255.0f;
 		t.w = raw->w;
 		t.h = raw->h;
 		t.px = raw->px;
 		for (int y = 0; y < raw->h; y++) {
-			const int my = std::min(mask->h - 1, static_cast<int>((y + 0.5f) / raw->h * mask->h));
+			const float v = (y + 0.5f) / raw->h;
+			const int my = mask != nullptr ? std::min(mask->h - 1, static_cast<int>(v * mask->h)) : 0;
 			for (int x = 0; x < raw->w; x++) {
 				uint32_t &texel = t.px[static_cast<size_t>(y) * raw->w + x];
 				if (texel == 0) continue;
-				const int mx = std::min(mask->w - 1, static_cast<int>((x + 0.5f) / raw->w * mask->w));
+				const float u = (x + 0.5f) / raw->w;
+				const Colour c(texel);
+				float cr = c.r, cg = c.g, cb = c.b;
+				if (detail != nullptr && details.Paint(detail, u, v, cr, cg, cb)) {
+					texel = Colour(static_cast<uint8_t>(cr), static_cast<uint8_t>(cg), static_cast<uint8_t>(cb), c.a).data;
+					continue;
+				}
+				if (mask == nullptr) continue;
+				const int mx = std::min(mask->w - 1, static_cast<int>(u * mask->w));
 				const float m = Colour(mask->px[static_cast<size_t>(my) * mask->w + mx]).r / 255.0f;
 				if (m <= 0) continue;
-				const Colour c(texel);
 				const float l = std::max({c.r, c.g, c.b}) / start;
 				auto mix = [&](uint8_t from, uint8_t to) { return static_cast<uint8_t>(from + (std::min(255.0f, to * l) - from) * m); };
 				texel = Colour(mix(c.r, colour.r), mix(c.g, colour.g), mix(c.b, colour.b), c.a).data;
@@ -1445,7 +1832,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		return &t;
 	}
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
-	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr) return raw;
+	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return raw;
 	ThreeDObjectTexture &t = _eye_painted[{obj, state, level, 0}];
 	if (!t.px.empty()) return &t;
 	t.w = raw->w;
@@ -1460,7 +1847,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 			const float u = (x + 0.5f) / raw->w;
 			const Colour col(texel);
 			float cr = col.r, cg = col.g, cb = col.b;
-			painted.Paint(u, v, cr, cg, cb);
+			if (detail == nullptr || !details.Paint(detail, u, v, cr, cg, cb)) painted.Paint(u, v, cr, cg, cb);
 			painted.Rust(u, v, cr, cg, cb);
 			t.px[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)), col.a).data;
 		}

@@ -259,7 +259,7 @@ void Train::ConsistChanged(ConsistChangeFlags allowed_changes)
 		if (veh_len == CALLBACK_FAILED) veh_len = rvi_u->shorten_factor;
 		veh_len = VEHICLE_LENGTH - Clamp(veh_len, 0, VEHICLE_LENGTH - 1);
 		/* A piece of a vehicle drawn from its 3D object is as long as the object (three_d_vehicle_object.h). */
-		veh_len = ThreeDVehicleObjectPieceLength(u->engine_type, veh_len);
+		veh_len = ThreeDVehicleObjectPieceLengthOf(u, veh_len);
 
 		if (allowed_changes.Test(ConsistChangeFlag::Length)) {
 			/* Update vehicle length. */

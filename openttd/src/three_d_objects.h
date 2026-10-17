@@ -55,6 +55,16 @@ struct ThreeDObjectTexture {
 };
 
 /**
+ * The bytes of a texture's picture as they are in its file (a PNG), one copy for every material, shape and object that
+ * has the same picture (InternThreeDTextureBytes()): an add-on of the colleague's lorries is one picture of sixteen
+ * million pixels for tens of materials, in every record of the package.
+ */
+using ThreeDTextureBytes = std::shared_ptr<const std::vector<uint8_t>>;
+/** A texture halved for each level of detail, made once for all that have the same picture (ThreeDTextureLevelsOf()). */
+using ThreeDTextureLevels = std::shared_ptr<const std::vector<ThreeDObjectTexture>>;
+ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes);
+
+/**
  * A part of a building painted a colour by number, each house on the map its own ("barvy", the colleague's
  * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md): the roof, the plaster, the fence.
  */
@@ -176,7 +186,7 @@ struct ThreeDVehicleShape {
 	std::vector<float> uv;     ///< u, v of each corner in its texture
 	std::vector<uint32_t> tri; ///< three corners a triangle
 	std::vector<uint8_t> tri_tex; ///< the texture of each triangle: 0 the body's (the one painted, "textura", and the one the paint mask is for), then the others of the file and of the wheels
-	std::vector<std::vector<uint8_t>> pngs; ///< the textures, as they are in the files
+	std::vector<ThreeDTextureBytes> pngs; ///< the textures, as they are in the files (nullptr: none, the material's colour)
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
 	std::vector<std::string> tex_names; ///< for each texture, the name of its material
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
@@ -197,8 +207,22 @@ struct ThreeDVehicleShape {
 	std::vector<int8_t> tex_addon;      ///< each texture's add-on (ThreeDVehicleObject::addons), -1 none
 	std::vector<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
 	float glass_alpha = 0.15f;          ///< how much of the glass's colour a layer of it lays over
+	/* The parts of its add-ons (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, points 5, 6 and 10): the windows,
+	 * the lamps and the wheels are in each part's node, shown with it -- the cab's windows and its headlights only
+	 * where the cab is. */
+	std::vector<uint8_t> tri_glass;     ///< each triangle: 1 of the glass of an add-on's node ("<dil>_sklo"), drawn see-through with its part (tri_part); empty none
+	std::vector<uint8_t> night_part;    ///< each triangle of the glass of the lights: its part (0 always: the body's "noc")
+	std::vector<uint8_t> front_part;    ///< each headlight: its part (0 always)
+	std::vector<uint8_t> back_part;     ///< each light at the back: its part (0 always)
 	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
+	/** Whether a triangle is of the glass: the body's ("sklo") or an add-on's node's. */
+	bool IsGlass(size_t triangle) const
+	{
+		return (triangle < this->tri_part.size() && this->tri_part[triangle] == PART_GLASS) || (triangle < this->tri_glass.size() && this->tri_glass[triangle] != 0);
+	}
+	/** Whether a part of the object is shown with these parts (ThreeDVehicleObject::PartsOf()): 0 always. */
+	static bool Shown(uint8_t part, uint64_t parts) { return part == 0 || (part < 64 && ((parts >> part) & 1) != 0); }
 
 	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
 	static constexpr int SIMPLER_LEVELS = 6;
@@ -274,10 +298,17 @@ struct ThreeDVehicleState {
 	/* A state of layers (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): the GRF picks a set for each layer of its
 	 * sprites, as for its pictures, and the states of the layers make one (ThreeDVehicleObject::ComposeState()). */
 	int layer = 0;              ///< "vrstva": the layer of the GRF's sprites it is of
+	int8_t piece = -1;          ///< "clanek": the piece whose sets it is of, 0 the first ("hlava"), 1 the anchor ("stred"), 2 the last ("zad"); -1 any
 	float turn = 0;             ///< "otoceni": the whole object turned so many degrees about z at its origin (a cart pushed: the cart pulled turned round)
 	uint8_t given = 0;          ///< the keys it gives (GIVEN_*): those of a later layer replace an earlier one's
 	std::vector<int16_t> addon_parts; ///< "doplnky": the part of each add-on it shows (its node), -1 where it names none of the add-on
 	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
+	/**
+	 * The colours of the vehicle's set, detail by detail (true_colour.h, callback 1C1: the configurator, the colour by
+	 * the load, by chance, faded with age), its masks of details ("maska_podrobnosti") painted in them; 0 none. Not of
+	 * the index: the game puts the vehicle's own into the state it draws (ThreeDVehicleObject::ComposeState()).
+	 */
+	uint16_t true_colours = 0;
 	static constexpr uint8_t GIVEN_COLOUR = 1, GIVEN_FADE = 2, GIVEN_RUST = 4, GIVEN_TURN = 8;
 };
 
@@ -313,11 +344,34 @@ struct ThreeDVehicleAddon {
 	std::vector<std::string> nodes; ///< "uzly": the nodes the states pick from
 	std::string mask_file;      ///< "barva" "maska": where it takes the state's colour ("barvy_doplnku"), its path; empty nowhere
 	int start = 0;              ///< "barva" "zacatek": the texture's lightness where the colour is its own
+	std::string detail_file;    ///< "maska_podrobnosti": its mask of details (ThreeDDetailMask), its path; empty none
+};
+
+/**
+ * A mask of details of a texture ("maska_podrobnosti", the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, point 2):
+ * a grey PNG of the texture's layout whose value is the mask index of the vehicle's 2D pictures there -- the cab 0xC6,
+ * the body 0x60, the load 0xB0, 0 none --, painted as a 32bpp sprite's mask is (true_colour.h): the colour of the
+ * detail its set gives by callback 1C1, at the texture's lightness. Read whole, never halved: a mask index is not a
+ * colour, a mean of two is neither.
+ */
+struct ThreeDDetailMask {
+	int w = 0;
+	int h = 0;
+	std::vector<uint8_t> index; ///< each pixel's mask index
+
+	/** The mask index at u, v of the texture, the nearest pixel's. */
+	uint8_t At(float u, float v) const
+	{
+		if (this->w <= 0 || this->h <= 0) return 0;
+		const int x = std::clamp(static_cast<int>(u * this->w), 0, this->w - 1), y = std::clamp(static_cast<int>(v * this->h), 0, this->h - 1);
+		return this->index[static_cast<size_t>(y) * this->w + x];
+	}
 };
 
 /** A wheel of the vehicle's own model that turns as it goes ("kola_v_modelu"), the front ones steering. */
 struct ThreeDModelWheel {
 	std::string node;           ///< "uzel": the wheel's node
+	std::string addon;          ///< "soubor": the add-on the node is in (the colleague's Tatras: the front wheels in the cab, the back ones in the chassis of the body); empty the vehicle's own file
 	float centre[3] = {};       ///< "stred": its middle, metres in the vehicle's frame
 	float radius = 0.5f;        ///< "polomer_m"
 	bool steers = false;        ///< "rizeni"
@@ -346,6 +400,7 @@ struct ThreeDVehicleObject {
 	uint32_t grfid = 0;             ///< the set's id as the game keeps it
 	std::vector<uint16_t> pieces;   ///< the engines (their numbers in the set, Action 0) of the pieces it covers, front first
 	int anchor = 0;                 ///< the piece it is drawn by: the middle one ("kotva": "stred")
+	bool states_of_anchor = false;  ///< its states name their piece ("clanek"): only the anchor's sets pick them (the colleague's wagons), else every piece's (StateStep())
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	float cab[3] = {};              ///< x, y, z, metres
 	ThreeDVehiclePaint paint;       ///< "lak"
@@ -382,6 +437,17 @@ struct ThreeDVehicleObject {
 	int blend_ticks = 0;            ///< the passage's ticks: a frame of a passage is the frame of the one it goes to times them, plus its tick
 	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
 	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
+	std::string only_node;          ///< a figure of one node of a file of several ("uzel", the colleague's girls of the lorries: a pose a node, the textures once): only that node of it is drawn
+	/* An articulated vehicle of several objects, one an article (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
+	 * point 3): where an article is coupled to the one before it and the one after, the next one drawn with its front
+	 * coupling on the back one of the one before, turned as its own article. */
+	bool has_couple_front = false;  ///< "spojeni" "vpredu": the kingpin of a semi-trailer, the eye of a trailer's drawbar
+	float couple_front[3] = {};     ///< there, metres in its frame
+	bool has_couple_back = false;   ///< "spojeni" "vzadu": the fifth wheel of a tractor, the hook of a lorry
+	float couple_back[3] = {};      ///< there, metres in its frame
+	std::vector<int> grf_lengths;   ///< "delky_clanku_grf": its pieces' lengths in its set the object's length is for, eighths of a tile; empty: as the set says now
+	float length_m = 0;             ///< "rozmer_m" "delka": its length, metres; 0 from its shape (Length())
+	std::string detail_file;        ///< "maska_podrobnosti": the mask of details of its body's texture (ThreeDDetailMask), its path; empty none
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
@@ -390,9 +456,12 @@ struct ThreeDVehicleObject {
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
 	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
+	const ThreeDDetailMask *GetDetailMask(int addon) const;
+	bool HasDetails() const;
+	float Length() const;
 	uint64_t PartsOf(int state) const;
 	const ThreeDVehicleState *State(int step) const;
-	int ComposeState(const std::vector<int> &layers) const;
+	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void Forget() const;
 
@@ -402,23 +471,26 @@ struct ThreeDVehicleObject {
 	mutable bool shape_tried = false;
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
-	mutable std::map<std::vector<int>, int> composed_steps; ///< the step each was made for, by the steps of its layers
+	mutable std::map<std::pair<std::vector<int>, uint16_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers and the vehicle's colours
 	mutable std::vector<ThreeDWalkingCrew> walking; ///< its crew that walks (WalkingCrew()), found the first time asked for
 	mutable bool walking_found = false;
 
 private:
 	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame) const;
 	std::shared_ptr<const ThreeDVehicleShape> MakePosedShape(int frame) const;
-	mutable std::vector<std::vector<ThreeDObjectTexture>> levels; ///< the textures, each halved for each level of detail
-	mutable std::vector<ThreeDObjectTexture> mask_levels;         ///< the paint mask likewise (its grey in the red)
+	mutable std::vector<ThreeDTextureLevels> levels; ///< the textures, each halved for each level of detail
+	mutable ThreeDTextureLevels mask_levels;         ///< the paint mask likewise (its grey in the red)
 	mutable bool mask_tried = false;
-	mutable std::vector<ThreeDObjectTexture> rust_levels;         ///< the rust mask likewise
+	mutable ThreeDTextureLevels rust_levels;         ///< the rust mask likewise
 	mutable bool rust_tried = false;
-	mutable std::vector<std::vector<ThreeDObjectTexture>> addon_mask_levels; ///< each add-on's colour mask likewise
+	mutable std::vector<ThreeDTextureLevels> addon_mask_levels; ///< each add-on's colour mask likewise
 	mutable std::vector<bool> addon_mask_tried;
+	mutable std::vector<std::shared_ptr<const ThreeDDetailMask>> detail_masks; ///< the masks of details: [0] the body's, [1 + n] the add-on n's (GetDetailMask())
+	mutable std::vector<bool> detail_tried;
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
+const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 
 /**

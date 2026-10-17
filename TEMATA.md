@@ -19,6 +19,36 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – náklaďáky Tatra a vagony ve 3D (kolegovy GRF MAX6 a MAX7)
+
+- Kolega poslal dva balíčky: `Nakladaky_Tatra_3D-v2` (24 záznamů, díly podle vrstev v24) a `Vagony_3D-v1`
+  (12 vozů po třech článcích). K tomu světlejší Mat (`mat.glb`, `mat_toci.glb` vyměněné) a balíčky mají vlastní
+  složky sad (posádka se hledá nejdřív ve vlastním balíčku).
+- Ve hře nově:
+  - **maska podrobností** (`maska_podrobnosti`): pixel nese index masky z 2D a natře se barvou z callbacku 1C1
+    jako maska 32bpp spritu, i s blednutím a otočením odstínu. Konfigurátor, barva podle nákladu a náhodné barvy
+    kontejnerů jdou bez jediného stavu navíc;
+  - **objekt na článek a spřáhla**: auto, přívěs i návěs jsou každý svým objektem a další visí na `spojeni`
+    předchozího. Délky článků bere hra z GRF (`delky_clanku_grf`, metry z `rozmer_m`). Sdílené konce souprav
+    (0x0126, 0x013A) se přiřadí podle sousedů;
+  - **stav ze všech článků objektu**: návěs má sady v prvním článku, ale visí za prostřední. U vagonů (stavy
+    s `clanek`) rozhoduje jen prostřední článek, jak kolega chtěl. Barvy 1C1 jsou z článku, jehož sady se kreslí;
+  - díly doplňků se svými okny (`_sklo`), světly (`noc_<díl>`) a koly (`soubor` u `kola_v_modelu`), postavy jako
+    uzly (`uzel`), kontejnery jako uzly s posunem;
+  - objekt, ze kterého není vidět ani pixel (prázdný přívěs bez přívěsového podtypu), nemá ani světla. Auto před
+    ním pak svítí zadními světly svého modelu.
+- **Start s balíčkem Tater trval asi 100 s, teď 7,5 s.** Odhad velikosti nákupních obrázků při startu kreslil všech
+  24 záznamů a každý dekódoval atlas doplňku (až 4096×3824) znovu pro každý materiál. Teď mají stejné obrázky jednu
+  kopii a jednu texturu pro všechny, kreslí se jen textury viděných dílů a soubory glb se v jedné dávce nečtou
+  třikrát. Paměť při startu 2,7 GB → 1,4 GB.
+- Rig: `test3d auta … p<podtyp>`, nové `test3d vagony <jméno> [počet] [x y] [náklad] [p<podtyp>] [plny] [v<a>:<o>]`
+  (najde si volný pruh země), `test3d okno nakup auto <text>` (filtr nákupu), `test3d stavy` píše polohu článků.
+  Extra náklady (STUD, MARI, FICR) jsou jen s `economy.extra_industries`.
+- Hráč: **předním světlům 148 jsou černé díry**. Data, ne kód: v kabinách 138 i 148 je sklo světla upečené do
+  atlasu černě (Cycles peče barvu skla černě) a leží 0,1 mm před světlým reflektorem. Kolegovi prosba o opravu
+  (sklo jako okna do `_sklo`, nebo upéct světlé). Jeho obrázky neupravuju.
+- Klíče `let` a `krok` u `lak` vagonů hra nečte: o barvě a blednutí rozhoduje GRF (1C1, registry 0x102–0x104).
+
 ## 16. 10. – přenos staré hry (decouple 0.10.4 = Palo123 Decouple 2018, save verze 200)
 
 - Hráč: „dokončíme import z decouple 0.10.4, máme stejný orders, naše příkazy jsou jen podrobnější. Nech vlaky
@@ -314,3 +344,4 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kostra a animace glTF; draci; interiéry; boj.
 - Klínek sousedního domu přes průčelí (#41). Domy z GRF objektem z balíčku (MAXd, #47). Doplňky (maják) podle stavu GRF.
 - Přenos staré hry: hráč zkusí svůj save se svými GRF; podle konzole doladit odhady stanic u „jeď spojit“.
+- Přední světla Tater 138 a 148 ve dne černá: čeká na kolegovu opravu kabin (`nt_kabiny`).
