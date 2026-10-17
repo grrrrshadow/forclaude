@@ -26,7 +26,9 @@
 #define CAB_VIEW_H
 
 #include "vehicle_type.h"
+#include "gfx_type.h"
 
+#include <array>
 #include <vector>
 
 /** The picture of the cab view: 32bpp, a pixel's alpha 255 where something is drawn. */
@@ -50,6 +52,26 @@ struct CabViewCamera {
 struct Vehicle;
 bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 void ShowCabViewWindow(const Vehicle *v);
+bool CabViewTakesArrows();
+
+/* What the cab does to its vehicle (cab_view_gui.cpp): its buttons, its arrows, the walker riding in it. */
+bool CabTurn(const Vehicle *v, bool left);
+void CabSpeed(const Vehicle *v, bool faster);
+void CabStartStop(const Vehicle *v);
+void CabLetGo(const Vehicle *v);
+
+/**
+ * The arrows driving a vehicle from its cab (the player, 17. 10.: "while the cab view is open the arrows are for
+ * driving, as in the view from the first person"): left and right turn it as the cab's buttons do, up is the throttle
+ * (and off, a vehicle that stands), down the brake. Held, again every so often: the throttle and the brake, and a
+ * heading driven freely or a ship's; the turn at the next junction once. The view from the cab and the walker riding
+ * in the view from the first person each have one.
+ */
+struct CabArrows {
+	DirectionKeys held{};           ///< the arrows held at the last look
+	std::array<int, 4> repeat_in{}; ///< for each arrow held, milliseconds till it does it again
+	void Drive(const Vehicle *v, DirectionKeys now, int ms);
+};
 
 /**
  * The walker of the view from the first person (first_person_gui.cpp; the player, 15. 10.: "let's make Morrowind,

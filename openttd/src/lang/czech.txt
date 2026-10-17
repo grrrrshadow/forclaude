@@ -2358,11 +2358,15 @@ STR_FIRST_PERSON_RUN                                            :Běh
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Zdraví {NUM} · u města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
-STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · F: tasit a schovat kladivo · levé tlačítko nebo mezerník: máchnout
+STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · F: tasit a schovat kladivo · levé tlačítko nebo mezerník: máchnout
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
 STR_FIRST_PERSON_SHOP_HERE                                      :Tady: {STRING} · I: inventář, nákup a použití
+STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
+STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY}
+STR_FIRST_PERSON_RIDING_KEYS                                    :E: vystoupit · šipky vlevo a vpravo: řízení (mimo silnici zatáčení) · nahoru: rychleji, stojící vozidlo se rozjede · dolů: brzda
+STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: vystoupit · jedeš jako cestující: vozidlo není tvé firmy
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventář
 STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
 STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}

@@ -19,6 +19,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – řízení šipkami, nastupování v pohledu z první osoby
+
+- Hráč: **auta nejdou řídit šipkami, posouvá se mapa**. Okno kabiny klávesy vůbec nečetlo. Teď šipky řídí kabinu,
+  když má okno kabiny fokus, nebo když je fokus na mapě a nějaká kabina je otevřená: vlevo a vpravo jako tlačítka
+  (odbočení na křižovatce, mimo silnici a u lodi zatáčení po malých úhlech, držením opakovaně), nahoru plyn (stojící
+  vozidlo se rozjede), dolů brzda. Mapa se šipkami mezitím neposouvá.
+- Hráč: **v pohledu z první osoby E nastoupí do auta**, bez dalšího okna kabiny (okno první osoby je zvláštní, hra
+  pod ním nekreslí). E u vozidla (do 5 m, auto, vlak, loď) přepne obraz okna na pohled z jeho kabiny, šipky řídí
+  stejně jako okno kabiny (cizí vozidlo: jen se veze), panel ukáže vozidlo a rychlost. Druhé E vystoupí vedle
+  (vlevo u kabiny, jinak vpravo), vozidlo se vrátí k rozkazům jako po zavření okna kabiny. Splněné #74.
+- Akce tlačítek kabiny jsou společné funkce (`CabTurn`, `CabSpeed`, `CabStartStop`, `CabLetGo`, `CabArrows`).
+- Rig: `test3d sipky <lurd|0>` (držené šipky pro `smycka`), `test3d chodec u <n>` a `test3d chodec e`; `test3d auta`
+  udělá z firmy aut místní firmu; `test3d kabina cas` píše stav řízení.
+
 ## 17. 10. – náklaďáky Tatra a vagony ve 3D (kolegovy GRF MAX6 a MAX7)
 
 - Kolega poslal dva balíčky: `Nakladaky_Tatra_3D-v2` (24 záznamů, díly podle vrstev v24) a `Vagony_3D-v1`

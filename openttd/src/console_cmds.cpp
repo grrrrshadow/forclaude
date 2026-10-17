@@ -8919,6 +8919,23 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const bool away = argv.size() > 3 && argv[3] == "pryc";
 			auto swing = argv.size() > 3 && !away ? number(3) : std::optional<int>(0);
 			IConsolePrint(CC_DEFAULT, "test3d: kladivo {}", RigFirstPersonHold(!away, static_cast<float>(swing.value_or(0))) ? "v ruce" : "schovane");
+		} else if (argv.size() > 2 && (argv[2] == "u" || argv[2] == "e")) {
+			/* 'chodec u <n>': the walker beside the n-th visible vehicle (as 'vozidlo' counts them); 'chodec e': E pressed
+			 * (into the vehicle near, or out of it). */
+			extern VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e);
+			const Vehicle *beside = nullptr;
+			if (argv[2] == "u") {
+				int want = number(3).value_or(0), seen = 0;
+				for (const Vehicle *u : Vehicle::Iterate()) {
+					if (!u->IsPrimaryVehicle() || u->vehstatus.Test(VehState::Hidden)) continue;
+					if (seen++ == want) {
+						beside = u;
+						break;
+					}
+				}
+			}
+			const VehicleID in = RigFirstPersonBoard(beside, argv[2] == "e");
+			IConsolePrint(CC_DEFAULT, "test3d: chodec {}", in == VehicleID::Invalid() ? std::string("pesky") : fmt::format("ve vozidle {}", Vehicle::Get(in)->unitnumber));
 		} else if (argv.size() > 6 && argv[2] == "krok") {
 			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
 			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
@@ -9070,6 +9087,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: auta: no company");
 			return true;
 		}
+		/* The cars the player's: steered from the cab as the player would (the null driver's game starts as a spectator). */
+		if (_local_company == COMPANY_SPECTATOR) SetLocalCompany(CompanyID::Begin());
 		if (refit_to == INVALID_CARGO && !label_wanted.empty()) IConsolePrint(CC_DEFAULT, "test3d: auta: naklad {} ve hre neni", label_wanted);
 		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
 		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
@@ -9146,6 +9165,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
 		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
+	} else if (what == "sipky" && argv.size() > 2) {
+		/* 'sipky <lurd|0>': the arrows held from now on as the keyboard would hold them (l left, u up, r right, d down;
+		 * 0 none), for the rig's frames ('smycka'): the walker and the view from the cab read them. */
+		_dirkeys.Reset();
+		for (char c : argv[2]) {
+			if (c == 'l') _dirkeys.Set(DirectionKey::Left);
+			if (c == 'u') _dirkeys.Set(DirectionKey::Up);
+			if (c == 'r') _dirkeys.Set(DirectionKey::Right);
+			if (c == 'd') _dirkeys.Set(DirectionKey::Down);
+		}
+		extern bool CabViewTakesArrows();
+		IConsolePrint(CC_DEFAULT, "test3d: sipky {:#x}, ridi kabina {}", _dirkeys.base(), CabViewTakesArrows() ? "ano" : "ne");
 	} else if (what == "vagony" && argv.size() > 2) {
 		/* 'vagony <jmeno> [pocet] [x y] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight railway along
 		 * x with a shed at each end and a train between them: the fastest engine and so many wagons whose name has the

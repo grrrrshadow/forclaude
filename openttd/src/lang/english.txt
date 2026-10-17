@@ -2253,11 +2253,15 @@ STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Health {NUM} · near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
-STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · F: the hammer out and away · left button or Space: swing it
+STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · F: the hammer out and away · left button or Space: swing it
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
 STR_FIRST_PERSON_SHOP_HERE                                      :Here: {STRING} · I: the inventory, buy and use
+STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
+STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY}
+STR_FIRST_PERSON_RIDING_KEYS                                    :E: get out · the arrows left and right: steer (off the road: turn) · up: faster, a standing vehicle starts · down: brake
+STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: get out · you ride along: it is not your company's vehicle
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory
 STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
 STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}

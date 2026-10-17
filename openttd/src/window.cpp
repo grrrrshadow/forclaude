@@ -2922,8 +2922,11 @@ static void HandleKeyScrolling()
 	 * Check that any of the dirkeys is pressed and that the focused window
 	 * doesn't have an edit-box as focused widget.
 	 */
-	/* The arrows walk the walker of the view from the first person while its window has the focus (first_person_gui.cpp). */
+	/* The arrows walk the walker of the view from the first person while its window has the focus (first_person_gui.cpp),
+	 * and drive the vehicle of a view from the cab while one is open (cab_view_gui.cpp). */
 	if (_focused_window != nullptr && _focused_window->window_class == WindowClass::FirstPerson) return;
+	extern bool CabViewTakesArrows();
+	if (CabViewTakesArrows()) return;
 	if (_dirkeys.Any() && !EditBoxInGlobalFocus()) {
 		int factor = _shift_pressed ? 50 : 10;
 

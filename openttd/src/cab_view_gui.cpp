@@ -40,10 +40,13 @@
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "blitter/factory.hpp"
+#include "core/backup_type.hpp"
 #include "widgets/cab_view_widget.h"
 
 #include "table/strings.h"
 
+#include <array>
+#include <climits>
 #include <cmath>
 
 #include "safeguards.h"
@@ -77,6 +80,116 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 	EndContainer(),
 };
 
+Window *CabViewDriving();
+
+/**
+ * Left or right from the cab (its buttons, its arrows): a heading driven freely or a ship's a small angle; a road
+ * vehicle on the road the turn at the next junction, like a blinker, the other way back to straight on.
+ * @return whether it turns by a step again while held (a heading)
+ */
+bool CabTurn(const Vehicle *v, bool left)
+{
+	if (v->cab_free || v->type == VehicleType::Ship) {
+		/* Driven freely, or a ship: the heading a small angle left or right (cab_drive.h). */
+		Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(left ? CabDriveOp::Left : CabDriveOp::Right));
+		return true;
+	}
+	if (v->type == VehicleType::Road) {
+		DirDiff now = v->cab_turn != Vehicle::CAB_TURN_NONE ? static_cast<DirDiff>(v->cab_turn) : DirDiff::Same;
+		DirDiff asked = left ? DirDiff::Left90 : DirDiff::Right90;
+		DirDiff opposite = left ? DirDiff::Right90 : DirDiff::Left90;
+		DirDiff next = now == opposite ? DirDiff::Same : asked;
+		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(next)));
+	}
+	return false;
+}
+
+/**
+ * The throttle or the brake from the cab: the brake lowers the speed the vehicle is held to by a step from where it is
+ * now; the throttle raises it, and past the vehicle's own top speed lets it go free again (the limit 0).
+ */
+void CabSpeed(const Vehicle *v, bool faster)
+{
+	int max_speed = std::max(1, v->GetDisplayMaxSpeed());
+	int step = std::max(5, max_speed / 10);
+	int now = v->GetDisplaySpeed();
+	int limit = v->cab_speed_limit;
+	int base = limit != 0 ? std::min(limit, now) : now;
+	int next;
+	if (!faster) {
+		next = std::max(5, base - step);
+	} else {
+		base = limit != 0 ? limit : now;
+		next = base + step;
+		if (next >= max_speed) next = 0;
+	}
+	Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(next));
+}
+
+/** The vehicle started or stopped from the cab. */
+void CabStartStop(const Vehicle *v)
+{
+	Command<Commands::StartStopVehicle>::Post(STR_ERROR_CAN_T_STOP_START_TRAIN + to_underlying(v->type), v->tile, v->index, false);
+}
+
+/**
+ * Whoever steers from the cab lets go when leaving it (the cab view closed, the walker getting out): a ship or a road
+ * vehicle goes back to its orders; driven freely, back from the next road or course, and a road vehicle out in the
+ * fields stops there, not to wander off without anyone at the wheel.
+ */
+void CabLetGo(const Vehicle *v)
+{
+	if (_game_mode != GameMode::Normal || _exit_game || _switch_mode != SwitchMode::None || v == nullptr || v->owner != _local_company || !v->IsCabSteered()) return;
+	if (v->cab_free) {
+		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
+		if (v->type == VehicleType::Road && !IsTileType(v->tile, TileType::Road) && !v->vehstatus.Test(VehState::Stopped)) {
+			Command<Commands::StartStopVehicle>::Post(v->tile, v->index, false);
+		}
+	} else {
+		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
+	}
+}
+
+/** The arrows held: what is pressed now does it, what is held does it again in its time. Only the owner drives. */
+void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
+{
+	if (v == nullptr || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) now = {};
+	/* As the player's click: the local company's command (the windows' timers run where nobody is). */
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	auto arrow = [&](DirectionKey key) {
+		switch (key) {
+			case DirectionKey::Left:
+			case DirectionKey::Right:
+				/* A train follows its rails, an aircraft its route. */
+				if (v->type != VehicleType::Road && v->type != VehicleType::Ship) return false;
+				return CabTurn(v, key == DirectionKey::Left);
+			case DirectionKey::Up:
+				if (v->vehstatus.Test(VehState::Stopped)) {
+					CabStartStop(v);
+					return false;
+				}
+				CabSpeed(v, true);
+				return true;
+			case DirectionKey::Down:
+				CabSpeed(v, false);
+				return true;
+		}
+		return false;
+	};
+	for (DirectionKey key : {DirectionKey::Left, DirectionKey::Up, DirectionKey::Right, DirectionKey::Down}) {
+		int &left = this->repeat_in[to_underlying(key)];
+		if (!now.Test(key)) continue;
+		/* Turning: about seven steps a second (a quarter turn held a second and a quarter); the speed three. */
+		const int again = key == DirectionKey::Left || key == DirectionKey::Right ? 150 : 300;
+		if (!this->held.Test(key)) {
+			left = arrow(key) ? again + 150 : INT_MAX;
+		} else if (left != INT_MAX && (left -= ms) <= 0) {
+			left = arrow(key) ? again : INT_MAX;
+		}
+	}
+	this->held = now;
+}
+
 /** The window of the view from a vehicle's cab; the window number is the vehicle. */
 struct CabViewWindow : Window {
 	mutable CabViewCamera camera{};   ///< the eye between frames
@@ -91,6 +204,14 @@ struct CabViewWindow : Window {
 		this->SetWidgetDirty(WID_CV_STOP);
 	}};
 
+	/* The arrows drive (CabArrows), looked at this often. */
+	CabArrows arrows{};
+	static constexpr int DRIVE_MS = 30;
+	IntervalTimer<TimerWindow> drive{std::chrono::milliseconds(DRIVE_MS), [this](auto) {
+		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
+		if (v != nullptr) this->arrows.Drive(v, CabViewDriving() == this ? _dirkeys : DirectionKeys{}, DRIVE_MS);
+	}};
+
 	CabViewWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
 		this->CreateNestedTree();
@@ -102,19 +223,7 @@ struct CabViewWindow : Window {
 	void Close(int data = 0) override
 	{
 		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (_game_mode == GameMode::Normal && !_exit_game && _switch_mode == SwitchMode::None && v != nullptr && v->owner == _local_company && v->IsCabSteered()) {
-			if (v->cab_free) {
-				/* Driven freely: back to the orders from the next road or course; a road vehicle out in the fields
-				 * stops there, not to wander off without anyone at the wheel. */
-				if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
-				if (v->type == VehicleType::Road && !IsTileType(v->tile, TileType::Road) && !v->vehstatus.Test(VehState::Stopped)) {
-					Command<Commands::StartStopVehicle>::Post(v->tile, v->index, false);
-				}
-			} else {
-				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
-			}
-		}
+		CabLetGo(Vehicle::GetIfValid(this->window_number));
 		this->Window::Close(data);
 	}
 
@@ -292,6 +401,17 @@ struct CabViewWindow : Window {
 		if (percent > 0) GfxFillRect(lx, by, lx + (lw * percent) / 100, by + 4, blue);
 	}
 
+	EventState OnKeyPress([[maybe_unused]] char32_t key, uint16_t keycode) override
+	{
+		/* The arrows are the driver's, read as held (Drive()). */
+		switch (keycode & ~WKC_SPECIAL_KEYS) {
+			case WKC_UP: case WKC_DOWN: case WKC_LEFT: case WKC_RIGHT:
+				return EventState::Handled;
+			default:
+				return EventState::NotHandled;
+		}
+	}
+
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
@@ -304,7 +424,7 @@ struct CabViewWindow : Window {
 				ScrollMainWindowTo(v->x_pos, v->y_pos, v->z_pos);
 				break;
 			case WID_CV_STOP:
-				Command<Commands::StartStopVehicle>::Post(STR_ERROR_CAN_T_STOP_START_TRAIN + to_underlying(v->type), v->tile, v->index, false);
+				CabStartStop(v);
 				break;
 			case WID_CV_FULL: {
 				/* Over the whole screen, and back where it was (the player: a button beside the pin, as big as the screen). */
@@ -324,29 +444,9 @@ struct CabViewWindow : Window {
 				break;
 			}
 			case WID_CV_LEFT:
-			case WID_CV_RIGHT: {
-				if (v->cab_free || v->type == VehicleType::Ship) {
-					/* Driven freely, or a ship: the heading a small angle left or right (cab_drive.h). */
-					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(widget == WID_CV_LEFT ? CabDriveOp::Left : CabDriveOp::Right));
-					break;
-				}
-				if (v->type == VehicleType::Road) {
-					/* A road vehicle: the turn at the next junction, like a blinker; the other way back to straight on. */
-					DirDiff now = v->cab_turn != Vehicle::CAB_TURN_NONE ? static_cast<DirDiff>(v->cab_turn) : DirDiff::Same;
-					DirDiff asked = widget == WID_CV_LEFT ? DirDiff::Left90 : DirDiff::Right90;
-					DirDiff opposite = widget == WID_CV_LEFT ? DirDiff::Right90 : DirDiff::Left90;
-					DirDiff next = now == opposite ? DirDiff::Same : asked;
-					Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(next)));
-					break;
-				}
-				/* A ship: an eighth of a turn from the heading so far, or from the way it goes now. */
-				if (v->type != VehicleType::Ship) break;
-				Direction from = v->cab_heading != Direction::Invalid ? v->cab_heading : v->direction;
-				if (from == Direction::Invalid) break;
-				Direction to = ChangeDir(from, widget == WID_CV_LEFT ? DirDiff::Left45 : DirDiff::Right45);
-				Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(to)));
+			case WID_CV_RIGHT:
+				CabTurn(v, widget == WID_CV_LEFT);
 				break;
-			}
 			case WID_CV_AUTO:
 				if (v->cab_free) {
 					/* Back to the orders from the next road or course it comes onto. */
@@ -359,25 +459,9 @@ struct CabViewWindow : Window {
 				Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Free));
 				break;
 			case WID_CV_BRAKE:
-			case WID_CV_THROTTLE: {
-				/* The brake lowers the speed the vehicle is held to by a step from where it is now; the throttle
-				 * raises it, and past the vehicle's own top speed lets it go free again (the limit 0). */
-				int max_speed = std::max(1, v->GetDisplayMaxSpeed());
-				int step = std::max(5, max_speed / 10);
-				int now = v->GetDisplaySpeed();
-				int limit = v->cab_speed_limit;
-				int base = limit != 0 ? std::min(limit, now) : now;
-				int next;
-				if (widget == WID_CV_BRAKE) {
-					next = std::max(5, base - step);
-				} else {
-					base = limit != 0 ? limit : now;
-					next = base + step;
-					if (next >= max_speed) next = 0;
-				}
-				Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(next));
+			case WID_CV_THROTTLE:
+				CabSpeed(v, widget == WID_CV_THROTTLE);
 				break;
-			}
 			default:
 				break;
 		}
@@ -390,6 +474,27 @@ static WindowDesc _cab_view_desc(
 	{},
 	_nested_cab_view_widgets
 );
+
+/**
+ * The view from the cab whose vehicle the arrows drive: the one with the focus; with the map focused, or nothing, the
+ * front one open. None while another window has the focus (a list of its own arrows, the walker's view) or an edit box.
+ */
+Window *CabViewDriving()
+{
+	if (_game_mode != GameMode::Normal || EditBoxInGlobalFocus()) return nullptr;
+	if (_focused_window != nullptr && _focused_window->window_class == WindowClass::CabView) return _focused_window;
+	if (_focused_window != nullptr && _focused_window->window_class != WindowClass::MainWindow) return nullptr;
+	for (Window *w : Window::IterateFromFront()) {
+		if (w->window_class == WindowClass::CabView) return w;
+	}
+	return nullptr;
+}
+
+/** Whether the arrows drive from a view from the cab now, not move the map (HandleKeyScrolling()). */
+bool CabViewTakesArrows()
+{
+	return CabViewDriving() != nullptr;
+}
 
 /** Open the view from the cab of a vehicle, or bring it to the front. */
 void ShowCabViewWindow(const Vehicle *v)
@@ -405,8 +510,13 @@ std::string DescribeCabViews()
 	for (const Window *w : Window::Iterate()) {
 		if (w->window_class != WindowClass::CabView) continue;
 		const CabViewWindow *cw = static_cast<const CabViewWindow *>(w);
-		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu, smer {:.0f} stupnu; ", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
+		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms, {} dlazdic, {} plakatu, smer {:.0f} stupnu", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
 				cw->camera.ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
+		const Vehicle *v = Vehicle::GetIfValid(w->window_number);
+		if (v != nullptr) {
+			s += fmt::format(", zatoceni {} volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_turn, v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
+		}
+		s += "; ";
 	}
 	return s.empty() ? "zadna kabina" : s;
 }

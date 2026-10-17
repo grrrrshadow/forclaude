@@ -44,6 +44,8 @@
 #include "command_func.h"
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
+#include "vehicle_base.h"
+#include "cab_drive.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -75,6 +77,8 @@ static constexpr double FIRST_PERSON_BLOW_S = 0.27;
 static constexpr double FIRST_PERSON_REACH_M = 2.5;
 /** The thing of the indices the walker holds ("predmet", objekty/predmety/: the colleague's hammer). */
 static constexpr std::string_view FIRST_PERSON_HAMMER = "kladivo";
+/** How near a vehicle the walker gets into it (E), metres from a piece of it. */
+static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 
 /**
  * The angle of a swing of the hammer a time into it, degrees (DrawThreeDHeldThing()): raised back over the shoulder,
@@ -149,6 +153,20 @@ static bool FirstPersonWalkable(double x, double y)
 	}
 }
 
+/**
+ * Whether the walker, a circle, can stand on a world point: its middle and eight points round it, so that the thin
+ * walls of a house's shape (ThreeDObject::Blocks()) slip between none of them.
+ */
+static bool FirstPersonFree(double x, double y)
+{
+	if (!FirstPersonWalkable(x, y)) return false;
+	for (int k = 0; k < 8; k++) {
+		const double a = k * M_PI / 4;
+		if (!FirstPersonWalkable(x + FIRST_PERSON_RADIUS * std::cos(a), y + FIRST_PERSON_RADIUS * std::sin(a))) return false;
+	}
+	return true;
+}
+
 void ShowWalkerInventoryWindow();
 TileIndex FirstPersonShopNearby();
 void RedrawFirstPersonPicture();
@@ -165,6 +183,102 @@ struct FirstPersonWindow : Window {
 	bool hammer_out = false;              ///< the hammer taken out (F), in the hand
 	double swing_time = -1;               ///< seconds into a swing of the hammer, -1 when it is not swung
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
+	/*
+	 * In a vehicle (the player, 17. 10.: "in the first person game, E gets into the car, into the cab view; no other
+	 * window of the cab view should open, it stays in the window of the first person -- a special window, the game
+	 * under it is not drawn"): the picture is the view from its cab, the arrows drive it as from the cab view when it
+	 * is the company's (else the walker rides along), E again gets out beside it.
+	 */
+	VehicleID riding = VehicleID::Invalid(); ///< the vehicle the walker is in, Invalid on foot
+	CabArrows arrows{};                      ///< the arrows driving it
+
+	/** The vehicle the walker is in, nullptr on foot. */
+	const Vehicle *Riding() const
+	{
+		return this->riding != VehicleID::Invalid() ? Vehicle::GetIfValid(this->riding) : nullptr;
+	}
+
+	/**
+	 * The vehicle near enough to get into: the nearest going about (a car, a train, a ship, not in its depot), a piece
+	 * of it within reach and about as high as the ground under the walker (not on a bridge overhead).
+	 */
+	const Vehicle *VehicleToBoard() const
+	{
+		const Vehicle *best = nullptr;
+		double best_d = FIRST_PERSON_BOARD_M * OBJECT_UNITS_PER_METRE;
+		const double ground = FirstPersonGroundZ(this->walker.x, this->walker.y);
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship) continue;
+			if (u->vehstatus.Any({VehState::Hidden, VehState::Crashed})) continue;
+			if (std::abs(u->z_pos - ground) > 2 * TILE_HEIGHT) continue;
+			const double d = std::hypot(u->x_pos - this->walker.x, u->y_pos - this->walker.y);
+			if (d < best_d) {
+				best_d = d;
+				best = u->First();
+			}
+		}
+		return best;
+	}
+
+	/** Into a vehicle: the picture from its cab from now on, the hammer away. */
+	void GetIn(const Vehicle *v)
+	{
+		this->riding = v->index;
+		this->hammer_out = false;
+		this->swing_time = -1;
+		this->arrows = {};
+		this->camera = {};
+		this->walker.x = v->x_pos;
+		this->walker.y = v->y_pos;
+		this->MakePicture();
+		this->SetDirty();
+	}
+
+	/**
+	 * Out of the vehicle: the cab lets go of it as when the cab view closes (CabLetGo()), and the walker stands beside
+	 * its front, on its left (the driver's door), else on its right, else at the nearest place it can stand, facing
+	 * the way the vehicle goes.
+	 */
+	void GetOut()
+	{
+		const Vehicle *v = this->Riding();
+		this->riding = VehicleID::Invalid();
+		this->arrows = {};
+		this->camera = {};
+		if (v != nullptr) {
+			CabLetGo(v);
+			const int yaw = v->cab_free ? v->cab_yaw : (v->direction != Direction::Invalid ? DirectionToCabYaw(v->direction) : 0);
+			const double heading = yaw * 2 * M_PI / CAB_YAW_TURN, fx = std::cos(heading), fy = std::sin(heading);
+			this->walker.heading = std::remainder(heading, 2 * M_PI);
+			bool placed = false;
+			for (double side : {1.0, -1.0}) {
+				for (double metres : {2.5, 3.5, 5.0}) {
+					const double d = metres * OBJECT_UNITS_PER_METRE;
+					const double x = v->x_pos - fy * d * side, y = v->y_pos + fx * d * side;
+					if (!placed && FirstPersonFree(x, y)) {
+						this->walker.x = x;
+						this->walker.y = y;
+						placed = true;
+					}
+				}
+			}
+			if (!placed) this->PutNear(v->x_pos, v->y_pos);
+		}
+		this->MakePicture();
+		this->SetDirty();
+	}
+
+	/** E: into the vehicle near, or out of the one the walker is in. */
+	void BoardOrLeave()
+	{
+		if (this->Riding() != nullptr) {
+			this->GetOut();
+			return;
+		}
+		this->riding = VehicleID::Invalid();
+		const Vehicle *v = this->VehicleToBoard();
+		if (v != nullptr) this->GetIn(v);
+	}
 
 	/*
 	 * Moves while the keys are held and makes the picture anew, twenty-five times a second -- only here: a paint of
@@ -184,9 +298,21 @@ struct FirstPersonWindow : Window {
 	void Step(uint count)
 	{
 		const uint steps = std::min(count, 1000u / FIRST_PERSON_TICK_MS);
+		/* In a vehicle: where it is (gone or crashed, the walker is out where it was); the arrows drive it. */
+		const Vehicle *rv = this->Riding();
+		if (rv != nullptr && rv->vehstatus.Test(VehState::Crashed)) {
+			this->GetOut();
+			rv = nullptr;
+		}
+		if (rv == nullptr) this->riding = VehicleID::Invalid();
 		for (uint i = 0; i < steps; i++) {
-			this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
+			if (rv == nullptr) this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
+		}
+		if (rv != nullptr) {
+			this->walker.x = rv->x_pos;
+			this->walker.y = rv->y_pos;
+			this->arrows.Drive(rv, _focused_window == this && !EditBoxInGlobalFocus() ? _dirkeys : DirectionKeys{}, static_cast<int>(steps) * FIRST_PERSON_TICK_MS);
 		}
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
@@ -217,13 +343,21 @@ struct FirstPersonWindow : Window {
 		this->ToggleFull();
 	}
 
+	void Close(int data = 0) override
+	{
+		/* Out of the vehicle the walker was in: let go of it, as the cab view closing does. */
+		CabLetGo(this->Riding());
+		this->Window::Close(data);
+	}
+
 	/** The picture from the walker's eyes, as big as the canvas is now. */
 	void MakePicture() const
 	{
 		const NWidgetBase *canvas = this->GetWidget<NWidgetBase>(WID_FP_CANVAS);
 		const int w = canvas->current_x, h = canvas->current_y;
 		if (w <= 0 || h <= 0) return;
-		this->picture_ok = DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
+		const Vehicle *rv = this->Riding();
+		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
 		if (this->picture_ok && this->hurt_steps > 0) {
 			/* Hurt: red over the picture, fading. */
 			const uint a = 30 + this->hurt_steps * 18;
@@ -266,6 +400,12 @@ struct FirstPersonWindow : Window {
 			InverseTurnedFlatF(vx, vy, z, x, y);
 			z = FirstPersonGroundZ(x, y);
 		}
+		this->PutNear(x, y);
+	}
+
+	/** The walker to the nearest place it can stand from a world point. */
+	void PutNear(double x, double y)
+	{
 		/* The nearest place to stand, in rings a quarter of a tile apart. */
 		for (int ring = 0; ring < 24; ring++) {
 			for (int k = 0; k < std::max(1, ring * 8); k++) {
@@ -301,17 +441,8 @@ struct FirstPersonWindow : Window {
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
 		const double rx = fy, ry = -fx;
 		const double dx = (fx * ahead + rx * aside) * speed, dy = (fy * ahead + ry * aside) * speed;
-		/* Along a wall, sliding: each way on its own where both together would go into it. The walker a circle: its
-		 * middle and eight points round it, so that the thin walls of a house's shape (ThreeDObject::Blocks()) slip
-		 * between none of them. */
-		auto free = [](double x, double y) {
-			if (!FirstPersonWalkable(x, y)) return false;
-			for (int k = 0; k < 8; k++) {
-				const double a = k * M_PI / 4;
-				if (!FirstPersonWalkable(x + FIRST_PERSON_RADIUS * std::cos(a), y + FIRST_PERSON_RADIUS * std::sin(a))) return false;
-			}
-			return true;
-		};
+		/* Along a wall, sliding: each way on its own where both together would go into it (FirstPersonFree()). */
+		auto free = FirstPersonFree;
 		const double x = this->walker.x, y = this->walker.y;
 		if (free(x + dx, y + dy)) {
 			this->walker.x = x + dx;
@@ -366,6 +497,11 @@ struct FirstPersonWindow : Window {
 				break;
 		}
 		if (key == 'w' || key == 'a' || key == 's' || key == 'd' || key == 'W' || key == 'A' || key == 'S' || key == 'D') return EventState::Handled;
+		/* E: into the vehicle near, or out of it (as using a thing in Morrowind). */
+		if (key == 'e' || key == 'E') {
+			this->BoardOrLeave();
+			return EventState::Handled;
+		}
 		/* I: the inventory (as in Morrowind). */
 		if (key == 'i' || key == 'I') {
 			ShowWalkerInventoryWindow();
@@ -451,6 +587,13 @@ struct FirstPersonWindow : Window {
 			case WID_FP_PANEL: {
 				GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
 				const Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
+				const int second = ir.top + GetCharacterHeight(FontSize::Normal) + 2;
+				/* In a vehicle: which, how fast, and the keys of its cab. */
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
+					DrawStringMultiLine(ir.left, ir.right, second, ir.bottom, rv->owner == _local_company ? STR_FIRST_PERSON_RIDING_KEYS : STR_FIRST_PERSON_PASSENGER_KEYS, TextColour::Silver);
+					break;
+				}
 				const TileIndex tile = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
 				const Town *town = ClosestTownFromTile(tile, UINT_MAX);
 				const int deg = static_cast<int>(std::lround(std::fmod(this->walker.heading * 180.0 / M_PI + 360.0, 360.0)));
@@ -462,10 +605,14 @@ struct FirstPersonWindow : Window {
 				}
 				/* Near a place that sells things: said instead of the keys. */
 				const StringID shop = WalkerShopName(FirstPersonShopNearby());
+				const Vehicle *near = this->VehicleToBoard();
 				if (shop != INVALID_STRING_ID) {
-					DrawString(ir.left, ir.right, ir.top + GetCharacterHeight(FontSize::Normal) + 2, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
+					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
+				} else if (near != nullptr) {
+					/* Beside a vehicle: E gets into it. */
+					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_BOARD_HERE, near->index), TextColour::Yellow);
 				} else {
-					DrawStringMultiLine(ir.left, ir.right, ir.top + GetCharacterHeight(FontSize::Normal) + 2, ir.bottom, STR_FIRST_PERSON_KEYS, TextColour::Silver);
+					DrawStringMultiLine(ir.left, ir.right, second, ir.bottom, STR_FIRST_PERSON_KEYS, TextColour::Silver);
 				}
 				break;
 			}
@@ -481,6 +628,9 @@ struct FirstPersonWindow : Window {
 				this->Swing();
 				break;
 			case WID_FP_HERE:
+				/* Out of a vehicle first. */
+				if (this->Riding() != nullptr) this->GetOut();
+				this->riding = VehicleID::Invalid();
 				this->PutWhereTheMainViewLooks();
 				this->SetDirty();
 				break;
@@ -638,6 +788,28 @@ void RedrawFirstPersonPicture()
 	if (w == nullptr) return;
 	w->MakePicture();
 	w->SetDirty();
+}
+
+/**
+ * The rig: the walker beside a vehicle (on foot, a few metres off its left), or E pressed (into the vehicle near, out
+ * of the one it is in).
+ * @return what the walker is in now, or VehicleID::Invalid() on foot
+ */
+VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return VehicleID::Invalid();
+	if (beside != nullptr) {
+		const double heading = DirectionToCabYaw(beside->direction) * 2 * M_PI / CAB_YAW_TURN, d = 3.0 * OBJECT_UNITS_PER_METRE;
+		w->walker.x = beside->x_pos - std::sin(heading) * d;
+		w->walker.y = beside->y_pos + std::cos(heading) * d;
+	}
+	if (press_e) {
+		SetFocusedWindow(w);
+		w->OnKeyPress('e', 'E');
+	}
+	w->SetDirty();
+	return w->riding;
 }
 
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
