@@ -889,13 +889,20 @@ static bool ConTestLevelCrossing(std::span<std::string_view> argv)
 
 static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 {
-	if (argv.size() != 3) {
-		IConsolePrint(CC_HELP, "Build an airport and an aircraft in it. Usage: 'testletadlo <x> <y>'.");
+	if (argv.size() != 3 && argv.size() != 5) {
+		IConsolePrint(CC_HELP, "Build an airport and an aircraft in it, with a second airport also flown to. Usage: 'testletadlo <x> <y> [<x2> <y2>]'.");
 		return true;
 	}
 	auto px = ParseInteger(argv[1]);
 	auto py = ParseInteger(argv[2]);
 	if (!px.has_value() || !py.has_value()) return false;
+	/* A second airport: the aircraft flies between the two, started -- in the air to be flown from its cab. */
+	std::optional<int> qx, qy;
+	if (argv.size() == 5) {
+		qx = ParseInteger(argv[3]);
+		qy = ParseInteger(argv[4]);
+		if (!qx.has_value() || !qy.has_value()) return false;
+	}
 
 	TileIndex tile = TileXY((uint)*px, (uint)*py);
 
@@ -904,11 +911,19 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 	if (!Company::IsValidID(CompanyID::Begin())) {
 		Command<Commands::CompanyControl>::Do(DoCommandFlag::Execute, CompanyCtrlAction::New, CompanyID::Invalid(), CompanyRemoveReason{}, ClientID::Invalid);
 		if (!Company::IsValidID(CompanyID::Begin())) {
+			/* The null driver's game has no client to make one for: made as a new game does (test3d auta). */
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			DoStartupNewCompany(false, CompanyID::Invalid());
+		}
+		if (!Company::IsValidID(CompanyID::Begin())) {
 			IConsolePrint(CC_ERROR, "testletadlo: nejde zalozit firma.");
 			return true;
 		}
 	}
+	/* The aircraft the player's: flown from the cab as the player would. */
+	if (_local_company == COMPANY_SPECTATOR) SetLocalCompany(CompanyID::Begin());
 	AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+	Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
 
 	/* An airport wants flat ground; the rig levels what it was pointed at
 	 * rather than making the player hunt for a spot. */
@@ -918,6 +933,16 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 	if (port.Failed()) {
 		IConsolePrint(CC_ERROR, "testletadlo: letiste na ({},{}) nejde postavit - {}", *px, *py, RefusalReason(port));
 		return true;
+	}
+	TileIndex other = INVALID_TILE;
+	if (qx.has_value()) {
+		other = TileXY((uint)*qx, (uint)*qy);
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY((uint)*qx + 5, (uint)*qy + 5), other, false, LevelMode::Level);
+		CommandCost second = Command<Commands::BuildAirport>::Do(DoCommandFlag::Execute, other, 0, 0, StationID::Invalid(), true);
+		if (second.Failed()) {
+			IConsolePrint(CC_ERROR, "testletadlo: druhe letiste na ({},{}) nejde postavit - {}", *qx, *qy, RefusalReason(second));
+			return true;
+		}
 	}
 
 	/* The first aircraft the year offers; the rig does not care which. The
@@ -947,6 +972,13 @@ static bool ConTestBuildAircraft(std::span<std::string_view> argv)
 			 * window sets this for the player and the rig has to as well. */
 			o.SetStopLocation(OrderStopLocation::FarEnd);
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, o);
+			if (other != INVALID_TILE && Station::GetByTile(other) != nullptr) {
+				Order there{};
+				there.MakeGoToStation(Station::GetByTile(other)->index);
+				there.SetStopLocation(OrderStopLocation::FarEnd);
+				Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, there);
+				Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+			}
 		}
 
 		IConsolePrint(CC_DEFAULT, "testletadlo: letiste na ({},{}), hangar ({},{}), letadlo {} koupeno, rozkazu {}.", *px, *py,
@@ -9175,8 +9207,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (c == 'r') _dirkeys.Set(DirectionKey::Right);
 			if (c == 'd') _dirkeys.Set(DirectionKey::Down);
 		}
-		extern bool CabViewTakesArrows();
-		IConsolePrint(CC_DEFAULT, "test3d: sipky {:#x}, ridi kabina {}", _dirkeys.base(), CabViewTakesArrows() ? "ano" : "ne");
+		extern Window *ArrowsWindow();
+		const Window *aw = ArrowsWindow();
+		IConsolePrint(CC_DEFAULT, "test3d: sipky {:#x}, okno sipek {}", _dirkeys.base(), aw == nullptr ? "mapa" : aw->window_class == WindowClass::CabView ? "kabina" : "chodec");
 	} else if (what == "vagony" && argv.size() > 2) {
 		/* 'vagony <jmeno> [pocet] [x y] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight railway along
 		 * x with a shed at each end and a train between them: the fastest engine and so many wagons whose name has the
@@ -9573,7 +9606,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'titulnoc <ms>': the title screen's day and night that much on (intro_gui.cpp), for its pictures. */
 		extern void AdvanceTitleDayAndNight(uint delta_ms);
 		AdvanceTitleDayAndNight(std::max(0, number(2).value_or(0)));
-		IConsolePrint(CC_DEFAULT, "test3d: titulnoc {:.2f}", _title_night);
+		IConsolePrint(CC_DEFAULT, "test3d: titulnoc {:.2f} uhel {:.1f}", _title_night, GetViewYaw());
 	} else if (what == "snimek" && argv.size() > 2) {
 		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
 		CloseWindowByClass(WindowClass::ModalProgress);
@@ -9794,10 +9827,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klik") {
-			/* A click on a button of the cab view open: 'test3d kabina klik <vlevo|vpravo|auto|mimo|stop|brzda|plyn|cely>',
+			/* A click on a button of the cab view open: 'test3d kabina klik <vlevo|vpravo|trasa|stop|brzda|plyn|cely>',
 			 * the way the player steers from it (the player: "the car cannot be steered from the cab any more"). */
 			static const std::pair<std::string_view, WidgetID> buttons[] = {
-				{"vlevo", WID_CV_LEFT}, {"vpravo", WID_CV_RIGHT}, {"auto", WID_CV_AUTO}, {"mimo", WID_CV_OFFROAD},
+				{"vlevo", WID_CV_LEFT}, {"vpravo", WID_CV_RIGHT}, {"trasa", WID_CV_AUTO},
 				{"stop", WID_CV_STOP}, {"brzda", WID_CV_BRAKE}, {"plyn", WID_CV_THROTTLE}, {"cely", WID_CV_FULL},
 			};
 			WidgetID id = -1;
@@ -9817,6 +9850,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} zatoceni {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
 						to_underlying(cv->direction), cv->cab_turn, to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
 			}
+			return true;
+		}
+		if (argv.size() > 3 && argv[2] == "klavesa") {
+			/* A key pressed in the window the arrows go to: 'test3d kabina klavesa <i|f|t|e>' -- the horn, the lights,
+			 * the route, getting in or out (the player, 17. 10.). */
+			extern std::string DescribeCarHorn();
+			Window *kw = ArrowsWindow();
+			if (kw == nullptr || argv[3].empty()) {
+				IConsolePrint(CC_ERROR, "test3d kabina klavesa: no cab view nor first person view open.");
+				return true;
+			}
+			EventState state;
+			{
+				AutoRestoreBackup cur_company(_current_company, _local_company);
+				state = kw->OnKeyPress(static_cast<char32_t>(argv[3][0]), 0);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: kabina klavesa {}: {} v okne {}", argv[3], state == EventState::Handled ? "vzata" : "nevzata", kw->window_class == WindowClass::CabView ? "kabina" : "chodec");
+			if (argv[3] == "i" || argv[3] == "I") IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCarHorn());
+			for (const Window *w : Window::Iterate()) {
+				if (w->window_class != WindowClass::CabView) continue;
+				const Vehicle *kv = Vehicle::GetIfValid(static_cast<VehicleID>(w->window_number));
+				if (kv != nullptr) IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} svetla {} (prani {})", kv->unitnumber, VehicleLightsOn(kv) ? "sviti" : "nesviti", kv->First()->cab_lights);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
 			return true;
 		}
 		auto n = number(2);

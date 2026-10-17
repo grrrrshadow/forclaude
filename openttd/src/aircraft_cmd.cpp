@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "aircraft.h"
+#include "cab_drive.h"
 #include "industry.h"
 #include "landscape.h"
 #include "news_func.h"
@@ -953,11 +954,61 @@ static bool AircraftRaidController(Aircraft *v)
 	return true;
 }
 
+/**
+ * A tick of an aircraft flown freely from its cab (cab_drive.h; the player, 17. 10.: "make the turning for the little
+ * aeroplane too; the arrows the height instead of the speed"): as far along its heading as its speed takes it,
+ * climbing or sinking a unit a step towards the height asked for; at the edge of the map it turns round. Asked back
+ * to its orders -- or no longer in the air -- it flies on to its airport from where it is (the ordinary flying climbs
+ * back to its flight level by itself).
+ * @return whether it flies freely: the airport's movement table has nothing to say then
+ */
+static bool AircraftFreeController(Aircraft *v)
+{
+	if (!v->cab_free) return false;
+	if (v->state != FLYING || v->cab_rejoin) {
+		for (Vehicle *u = v; u != nullptr; u = u->Next()) {
+			u->cab_free = false;
+			u->cab_rejoin = false;
+		}
+		SetWindowDirty(WindowClass::CabView, v->index);
+		return false;
+	}
+	if (v->cab_px / CAB_SUBUNIT != v->x_pos || v->cab_py / CAB_SUBUNIT != v->y_pos) {
+		v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+		v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+	}
+	int count = UpdateAircraftSpeed(v);
+	if (count == 0) return true;
+	int low, high;
+	GetAircraftFlightLevelBounds(v, &low, &high);
+	const int want = Clamp<int>(v->cab_altitude, low - AIRCRAFT_MIN_FLYING_ALTITUDE / 2, high);
+	const int max_x = static_cast<int>(Map::MaxX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::MaxY() * TILE_SIZE) - 1;
+	while (count-- > 0) {
+		const int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+		const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
+		if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) || x > max_x || y > max_y) {
+			/* The edge of the map: round, back over it. */
+			v->cab_yaw = static_cast<uint8_t>((v->cab_yaw + CAB_YAW_TURN / 2) & (CAB_YAW_TURN - 1));
+			continue;
+		}
+		v->cab_px = px;
+		v->cab_py = py;
+		v->direction = CabYawToDirection(v->cab_yaw);
+		v->tile = TileVirtXY(x, y);
+		int z = v->z_pos;
+		if (z != want) z += Clamp(want - z, -1, 1);
+		SetAircraftPosition(v, x, y, z);
+	}
+	return true;
+}
+
 static bool AircraftController(Aircraft *v)
 {
 	/* An aircraft on an errand of its own flies itself; the airport's
 	 * movement table has nothing to say about a spot in the open country. */
 	if (AircraftRaidController(v)) return false;
+	/* So does one flown freely from its cab. */
+	if (AircraftFreeController(v)) return false;
 
 	/* nullptr if station is invalid */
 	const Station *st = Station::GetIfValid(v->targetairport);

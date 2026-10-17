@@ -312,7 +312,7 @@ struct FirstPersonWindow : Window {
 		if (rv != nullptr) {
 			this->walker.x = rv->x_pos;
 			this->walker.y = rv->y_pos;
-			this->arrows.Drive(rv, _focused_window == this && !EditBoxInGlobalFocus() ? _dirkeys : DirectionKeys{}, static_cast<int>(steps) * FIRST_PERSON_TICK_MS);
+			this->arrows.Drive(rv, ArrowsWindow() == this ? _dirkeys : DirectionKeys{}, static_cast<int>(steps) * FIRST_PERSON_TICK_MS);
 		}
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
@@ -422,11 +422,15 @@ struct FirstPersonWindow : Window {
 		this->walker.y = y;
 	}
 
-	/** A step of the walker: the keys held while its window has the focus. */
+	/**
+	 * A step of the walker: the arrows held while they are its window's (ArrowsWindow(): the player, 17. 10.: "the
+	 * arrows always to that window, not to the map"), W, A, S and D while its window has the focus.
+	 */
 	void Walk(double dt)
 	{
-		if (_focused_window != this) return;
-		const DirectionKeys arrows = _dirkeys, wasd = _walkkeys;
+		const DirectionKeys arrows = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
+		const DirectionKeys wasd = _focused_window == this && !EditBoxInGlobalFocus() ? _walkkeys : DirectionKeys{};
+		if (arrows.None() && wasd.None()) return;
 		if (arrows.Test(DirectionKey::Left)) this->walker.heading += FIRST_PERSON_TURN * dt;
 		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= FIRST_PERSON_TURN * dt;
 		this->walker.heading = std::remainder(this->walker.heading, 2 * M_PI);
@@ -501,6 +505,22 @@ struct FirstPersonWindow : Window {
 		if (key == 'e' || key == 'E') {
 			this->BoardOrLeave();
 			return EventState::Handled;
+		}
+		/* In a vehicle, as in its cab: I the horn, F the lights, T its route or the wheel again. */
+		if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+			if (key == 'i' || key == 'I') {
+				CabHorn(rv);
+				return EventState::Handled;
+			}
+			if (key == 'f' || key == 'F') {
+				CabToggleLights(rv);
+				return EventState::Handled;
+			}
+			if (key == 't' || key == 'T') {
+				CabToggleRoute(rv, this->arrows);
+				this->SetWidgetDirty(WID_FP_PANEL);
+				return EventState::Handled;
+			}
 		}
 		/* I: the inventory (as in Morrowind). */
 		if (key == 'i' || key == 'I') {
@@ -590,7 +610,7 @@ struct FirstPersonWindow : Window {
 				const int second = ir.top + GetCharacterHeight(FontSize::Normal) + 2;
 				/* In a vehicle: which, how fast, and the keys of its cab. */
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
-					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
+					DrawString(ir.left, ir.right, ir.top, GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
 					DrawStringMultiLine(ir.left, ir.right, second, ir.bottom, rv->owner == _local_company ? STR_FIRST_PERSON_RIDING_KEYS : STR_FIRST_PERSON_PASSENGER_KEYS, TextColour::Silver);
 					break;
 				}

@@ -7,7 +7,7 @@
 
 /**
  * @file cab_drive.h Driving freely from the cab (cab_view.h): a road vehicle off the road, a ship anywhere on the
- * water, at any angle.
+ * water, an aircraft anywhere in the air, at any angle; the aircraft at the height asked for too.
  *
  * The player (14. 10.): "can a car leave the road? we are 3D, drive in every direction"; "trees it drives through,
  * at houses it stops"; "the ship too, turning gently by small angles". A vehicle driven freely keeps a heading in
@@ -29,6 +29,8 @@ static constexpr int CAB_YAW_TURN = 128;
 static constexpr int CAB_YAW_STEP = 4;
 /** The exact position's parts of a unit. */
 static constexpr int CAB_SUBUNIT = 256;
+/** One press of up or down changes the height an aircraft flown freely climbs or sinks to this much, units of z. */
+static constexpr int CAB_ALTITUDE_STEP = 8;
 
 /** What the cab asks of a vehicle driven freely (CmdCabDrive()). */
 enum class CabDriveOp : uint8_t {
@@ -36,6 +38,8 @@ enum class CabDriveOp : uint8_t {
 	Left = 1,  ///< turn the heading left a step
 	Right = 2, ///< turn the heading right a step
 	Rejoin = 3, ///< back to the orders, on the next tile the vehicle can go on as usual
+	Up = 4,     ///< an aircraft flown freely: higher a step
+	Down = 5,   ///< an aircraft flown freely: lower a step
 };
 
 /**

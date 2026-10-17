@@ -1424,7 +1424,8 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
 
 static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed, ZoomLevel zoom)
 {
-	if (!IsNightNow() || reversed) return 0;
+	/* At night, or as the player switched them from the cab (VehicleLightsOn()). */
+	if (!VehicleLightsOn(front) || reversed) return 0;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	int lights = 0;
@@ -1550,7 +1551,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
  */
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v)
 {
-	if (!IsNightNow()) return false;
+	if (!VehicleLightsOn(v)) return false;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v);
 	if (obj == nullptr) return false;
 	const ThreeDVehicleShape *shape = obj->GetShape();

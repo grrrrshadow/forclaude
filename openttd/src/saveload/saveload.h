@@ -429,6 +429,7 @@ enum class SaveLoadVersion : uint16_t {
 	CabDriving, ///< Saveload version: 375\n The steering from a vehicle's cab: the speed it is held to, the heading or turn asked for, and the free drive's heading and exact position (Vehicle::cab_speed_limit .. cab_py, cab_drive.h).
 	WalkerInventory, ///< Saveload version: 376\n The inventory of the walker of the view from the first person and its health, the company's (CompanyProperties::walker_items, walker_health; walker_inventory.h).
 	TownTheme, ///< Saveload version: 377\n How a town looks in the 3D views: the clay town (Town::theme, TownTheme).
+	CabAltitude, ///< Saveload version: 378\n The height an aircraft flown freely from its cab climbs or sinks to (Vehicle::cab_altitude, cab_drive.h).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

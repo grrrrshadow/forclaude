@@ -2364,8 +2364,9 @@ STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
 STR_FIRST_PERSON_SHOP_HERE                                      :Tady: {STRING} · I: inventář, nákup a použití
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
-STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY}
-STR_FIRST_PERSON_RIDING_KEYS                                    :E: vystoupit · šipky vlevo a vpravo: řízení (mimo silnici zatáčení) · nahoru: rychleji, stojící vozidlo se rozjede · dolů: brzda
+STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš
+STR_FIRST_PERSON_RIDING_ROUTE                                   :Ve vozidle {VEHICLE} · {VELOCITY} · jede svou trasu
+STR_FIRST_PERSON_RIDING_KEYS                                    :E: vystoupit · šipky: vlevo a vpravo řízení, nahoru rychleji (stojící vozidlo se rozjede), dolů brzda; letadlo nahoru a dolů výš a níž · T: jeď svou trasu nebo řídit · I: houkačka · F: světla
 STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: vystoupit · jedeš jako cestující: vozidlo není tvé firmy
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventář
 STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
@@ -2406,18 +2407,17 @@ STR_CAB_VIEW_LIMIT                                              :{YELLOW}drženo
 STR_CAB_VIEW_STEERED                                            :{YELLOW}řízeno ručně
 STR_CAB_VIEW_STEERED_STRAIGHT                                   :{YELLOW}ručně: rovně
 STR_CAB_VIEW_STEERED_RIGHT                                      :{YELLOW}ručně: příště vpravo
-STR_CAB_VIEW_OFFROAD                                            :{BLACK}Sjet ze silnice
-STR_CAB_VIEW_OFFROAD_TOOLTIP                                    :{BLACK}Sjet ze silnice a jet volně krajinou: doleva a doprava pak zatáčí po malých úhlech; stromy projede, u domů, vody a kolejí zastaví. Podle rozkazů ho vrátí na příští silnici, na kterou najede
 STR_CAB_VIEW_FREE                                               :{YELLOW}ručně: volně
 STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}zpět k rozkazům
 STR_CAB_VIEW_STEERED_LEFT                                       :{YELLOW}ručně: příště vlevo
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled přes celou obrazovku, a zpět
 STR_CAB_VIEW_LEFT                                               :{BLACK}< Doleva
-STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Řídit doleva: loď a auto mimo silnici zatočí o malý úhel (loď kvůli tomu vyjede z doku i bez rozkazů); auto na silnici odbočí vlevo na příští křižovatce
+STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Řídit doleva: auto, loď a letadlo ve vzduchu zatočí o malý úhel (loď kvůli tomu vyjede z doku); výšku letadla mění šipky nahoru a dolů
 STR_CAB_VIEW_RIGHT                                              :{BLACK}Doprava >
-STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Řídit doprava: loď a auto mimo silnici zatočí o malý úhel; auto na silnici odbočí vpravo na příští křižovatce
-STR_CAB_VIEW_AUTO                                               :{BLACK}Podle rozkazů
-STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo zase jet podle rozkazů: samo si k nim najde cestu; mimo silnici z příští silnice, na kterou najede
+STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Řídit doprava: auto, loď a letadlo ve vzduchu zatočí o malý úhel
+STR_CAB_VIEW_AUTO                                               :{BLACK}Jeď svou trasu
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; znovu stisknuté: řídíš ty
+STR_CAB_VIEW_DRIVE                                              :{BLACK}Řídit
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Příští zastávka: {STATION}

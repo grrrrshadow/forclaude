@@ -129,3 +129,8 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 - Hra je kreslí v otočeném pohledu a v pohledu z kabiny; vozidla i na sever.
 
 Kód: `src/three_d_objects.cpp`, popis v `docs/decouple_three_d.md`.
+
+## zvuky/ – zvuky hry
+
+Každý `.wav` v `zvuky/` hra čte z `baseset/decouple/zvuky/`: klakson auta
+(`klakson.wav`, klávesa I ve vozidle). Původ a licence v `zvuky/README.md`.

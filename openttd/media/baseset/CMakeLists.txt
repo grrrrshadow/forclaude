@@ -136,6 +136,25 @@ foreach(OBJECT_FILE IN LISTS BASESET_OBJECT_FILES)
     list(APPEND BASESET_BINARY_FILES ${OBJECT_BINARY_FILE})
 endforeach()
 
+# Sounds of the game's own (src/cab_view_gui.cpp): every .wav in decouple/zvuky/
+# -- the car's horn -- is read by the game from baseset/decouple/zvuky/.
+file(GLOB BASESET_SOUND_FILES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/decouple/zvuky/*.wav)
+foreach(SOUND_FILE IN LISTS BASESET_SOUND_FILES)
+    get_filename_component(SOUND_NAME "${SOUND_FILE}" NAME)
+    set(SOUND_BINARY_FILE "${CMAKE_BINARY_DIR}/baseset/decouple/zvuky/${SOUND_NAME}")
+
+    add_custom_command_timestamp(OUTPUT ${SOUND_BINARY_FILE}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/baseset/decouple/zvuky
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    ${SOUND_FILE}
+                    ${SOUND_BINARY_FILE}
+            MAIN_DEPENDENCY ${SOUND_FILE}
+            COMMENT "Copying ${SOUND_NAME}, a sound of the game's own"
+    )
+
+    list(APPEND BASESET_BINARY_FILES ${SOUND_BINARY_FILE})
+endforeach()
+
 # Create a new target which generates all baseset metadata files
 add_custom_target_timestamp(baseset_files
         DEPENDS

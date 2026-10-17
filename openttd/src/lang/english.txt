@@ -2259,8 +2259,9 @@ STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
 STR_FIRST_PERSON_SHOP_HERE                                      :Here: {STRING} · I: the inventory, buy and use
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
-STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY}
-STR_FIRST_PERSON_RIDING_KEYS                                    :E: get out · the arrows left and right: steer (off the road: turn) · up: faster, a standing vehicle starts · down: brake
+STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
+STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
+STR_FIRST_PERSON_RIDING_KEYS                                    :E: get out · the arrows: left and right steer, up faster (a standing vehicle starts), down brake; an aircraft up and down higher and lower · T: go its route or take the wheel · I: horn · F: lights
 STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: get out · you ride along: it is not your company's vehicle
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory
 STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
@@ -2301,18 +2302,17 @@ STR_CAB_VIEW_LIMIT                                              :{YELLOW}held to
 STR_CAB_VIEW_STEERED                                            :{YELLOW}steered by hand
 STR_CAB_VIEW_STEERED_STRAIGHT                                   :{YELLOW}by hand: straight
 STR_CAB_VIEW_STEERED_RIGHT                                      :{YELLOW}by hand: next right
-STR_CAB_VIEW_OFFROAD                                            :{BLACK}Off road
-STR_CAB_VIEW_OFFROAD_TOOLTIP                                    :{BLACK}Leave the road and drive freely across the land: left and right then turn by small angles; it drives through trees and stops at buildings, water and rails. As ordered takes it back onto the next road it comes onto
 STR_CAB_VIEW_FREE                                               :{YELLOW}by hand: free
 STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}back to the orders
 STR_CAB_VIEW_STEERED_LEFT                                       :{YELLOW}by hand: next left
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view over the whole screen, and back
 STR_CAB_VIEW_LEFT                                               :{BLACK}< Left
-STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Steer to the left: a ship and a road vehicle off the road by a small angle (a ship leaves its depot for it without orders); a road vehicle on the road turns left at the next junction
+STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Steer left: a car, a ship and an aircraft in the air turn by a small angle (a car on the road as long as it is driven freely; a ship leaves its dock for it); an aircraft's height the arrows up and down
 STR_CAB_VIEW_RIGHT                                              :{BLACK}Right >
-STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Steer to the right: a ship and a road vehicle off the road by a small angle; a road vehicle on the road turns right at the next junction
-STR_CAB_VIEW_AUTO                                               :{BLACK}As ordered
-STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go as its orders say again: it finds its way back to them; off the road from the next road it comes onto
+STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Steer right: a car, a ship and an aircraft in the air turn by a small angle
+STR_CAB_VIEW_AUTO                                               :{BLACK}Go your route
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; pressed again you take the wheel
+STR_CAB_VIEW_DRIVE                                              :{BLACK}Drive
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Next stop: {STATION}

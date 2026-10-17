@@ -4351,6 +4351,16 @@ static NightLight GetNightLight()
 float _title_night = 0;
 
 /** Whether the night is drawn: the player's (gui.night) in a game, on the title screen its own day and night. */
+/**
+ * Whether a vehicle's lights are on: at night, unless the player switched them off from its cab; by day too when the
+ * player switched them on (F, Vehicle::cab_lights).
+ */
+bool VehicleLightsOn(const Vehicle *v)
+{
+	const uint8_t asked = v->First()->cab_lights;
+	return asked == Vehicle::CAB_LIGHTS_ON || (asked == Vehicle::CAB_LIGHTS_AUTO && IsNightNow());
+}
+
 bool IsNightNow()
 {
 	if (_game_mode == GameMode::Menu) return _title_night > 0;
@@ -4477,6 +4487,8 @@ static void DrawNight(bool turned)
 	std::vector<ThreeDPictureLight> model_lights;
 	for (const Vehicle *v : Vehicle::Iterate()) {
 		if (v->vehstatus.Test(VehState::Hidden)) continue;
+		/* Switched off from its cab (F, VehicleLightsOn()). */
+		if (!VehicleLightsOn(v)) continue;
 		const bool front = v->Previous() == nullptr;
 		const bool last = v->Next() == nullptr;
 		if (v->type != VehicleType::Road && v->type != VehicleType::Train && v->type != VehicleType::Ship && v->type != VehicleType::Aircraft) continue;
@@ -8361,6 +8373,8 @@ static void DrawEyeNight(const CabEye &eye, const Vehicle *own, int width, int h
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
 		if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship && u->type != VehicleType::Aircraft) continue;
 		if (u->type == VehicleType::Aircraft && !Aircraft::From(u)->IsNormalAircraft()) continue;
+		/* Switched off from its cab (F, VehicleLightsOn()). */
+		if (!VehicleLightsOn(u)) continue;
 		const bool front = u->Previous() == nullptr, last = u->Next() == nullptr;
 		const double dx = u->x_pos - eye.x, dy = u->y_pos - eye.y;
 		if (dx * dx + dy * dy > reach * reach) continue;

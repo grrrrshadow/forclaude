@@ -32,6 +32,8 @@
 #include "highscore.h"
 #include "signs_base.h"
 #include "viewport_func.h"
+#include "three_d.h"
+#include "core/random_func.hpp"
 #include "vehicle_base.h"
 #include <cmath>
 #include <regex>
@@ -50,6 +52,7 @@
 struct IntroGameViewportCommand {
 	int command_index = 0;               ///< Sequence number of the command (order they are performed in).
 	Point position{ 0, 0 };              ///< Calculated world coordinate to position viewport top-left at.
+	int world_x = 0, world_y = 0, world_z = 0; ///< The world point of its sign: drawn where the turned view has it.
 	VehicleID vehicle = VehicleID::Invalid(); ///< Vehicle to follow, or VehicleID::Invalid() if not following a vehicle.
 	uint delay = 0;                      ///< Delay until next command.
 	int zoom_adjust = 0;                 ///< Adjustment to zoom level from base zoom level.
@@ -64,9 +67,12 @@ struct IntroGameViewportCommand {
 	 */
 	Point PositionForViewport(const Viewport &vp)
 	{
+		/* Where the view has it as it is turned now (the title screen turns it, AdvanceTurn()). */
 		if (this->vehicle != VehicleID::Invalid()) {
 			const Vehicle *v = Vehicle::Get(this->vehicle);
-			this->position = RemapCoords(v->x_pos, v->y_pos, v->z_pos);
+			this->position = ProjectTurned(v->x_pos, v->y_pos, v->z_pos);
+		} else {
+			this->position = ProjectTurned(this->world_x, this->world_y, this->world_z);
 		}
 
 		Point p;
@@ -89,10 +95,18 @@ struct IntroGameViewportCommand {
 /** The title screen's day and night (the player, 16. 10.: "a long day and then a while of night, and round and round
  * between the day and the night"), milliseconds: the day, the dusk, the night and the dawn. */
 static constexpr uint TITLE_DAY_MS = 60000, TITLE_DUSK_MS = 4000, TITLE_NIGHT_MS = 15000, TITLE_DAWN_MS = 4000;
+/** The title screen's turns of the map (the player, 17. 10.: "the camera moves, but at right angles; better turn the
+ * game's ground a little now and then, a while nothing and again"), milliseconds: still, and a turn. */
+static constexpr uint TITLE_STILL_MS = 9000, TITLE_TURN_MS = 3500;
 
 struct SelectGameWindow : public Window {
 	/** Where in the title screen's day and night it is, milliseconds (TITLE_DAY_MS ...). */
 	uint day_night_time = 0;
+	/** The turn of the map: how long it has been still or turning, milliseconds, and the turn going on. */
+	uint turn_time = 0;
+	bool turning = false;
+	float turn_from = 0;
+	float turn_by = 0;
 	/** Vector of viewport commands parsed. */
 	std::vector<IntroGameViewportCommand> intro_viewport_commands{};
 	/** Index of currently active viewport command. */
@@ -130,6 +144,9 @@ struct SelectGameWindow : public Window {
 			}
 			/* Sign coordinates for positioning. */
 			vc.position = RemapCoords(sign->x, sign->y, sign->z);
+			vc.world_x = sign->x;
+			vc.world_y = sign->y;
+			vc.world_z = sign->z;
 			/* Delay from the third matching group. */
 			if (auto value = ParseInteger<uint>(match[3].str()); value.has_value()) {
 				vc.delay = *value * 1000; // milliseconds
@@ -208,9 +225,34 @@ struct SelectGameWindow : public Window {
 		MarkWholeScreenDirty();
 	}
 
+	/**
+	 * The title screen's turns of the map: still a while, then a slow turn of 30 to 60 degrees, easing in and out --
+	 * mostly the same way round, now and then back. Only with the 3D on (SetViewYaw() keeps it north else); the
+	 * camera's places are where the turned view has them (IntroGameViewportCommand::PositionForViewport()).
+	 */
+	void AdvanceTurn(uint delta_ms)
+	{
+		if (!ThreeDEnabled()) return;
+		this->turn_time += delta_ms;
+		if (!this->turning) {
+			if (this->turn_time < TITLE_STILL_MS) return;
+			this->turning = true;
+			this->turn_time = 0;
+			this->turn_from = GetViewYaw();
+			this->turn_by = static_cast<float>(30 + InteractiveRandomRange(31)) * (InteractiveRandomRange(4) == 0 ? -1.0f : 1.0f);
+		}
+		const float t = std::min(1.0f, static_cast<float>(this->turn_time) / TITLE_TURN_MS);
+		SetViewYaw(this->turn_from + this->turn_by * t * t * (3 - 2 * t));
+		if (t >= 1.0f) {
+			this->turning = false;
+			this->turn_time = 0;
+		}
+	}
+
 	void OnRealtimeTick(uint delta_ms) override
 	{
 		this->AdvanceDayAndNight(delta_ms);
+		this->AdvanceTurn(delta_ms);
 
 		/* Move the main game viewport according to intro viewport commands. */
 

@@ -323,6 +323,14 @@ public:
 	/** The exact position when driven freely, 256ths of a unit (x_pos and y_pos are its whole units). */
 	int32_t cab_px = 0;
 	int32_t cab_py = 0;
+	/** The height an aircraft flown freely from its cab climbs or sinks to (cab_drive.h), units of z. */
+	uint16_t cab_altitude = 0;
+	/** The lights as the player switches them from the cab (F): at night (#CAB_LIGHTS_AUTO), on or off. Not saved:
+	 * only how this computer draws the vehicle (VehicleLightsOn()). */
+	uint8_t cab_lights = 0;
+	static constexpr uint8_t CAB_LIGHTS_AUTO = 0; ///< #cab_lights: on at night
+	static constexpr uint8_t CAB_LIGHTS_ON = 1;   ///< #cab_lights: on, by day too
+	static constexpr uint8_t CAB_LIGHTS_OFF = 2;  ///< #cab_lights: off, at night too
 
 	/** Whether the player steers the vehicle from its cab, instead of its orders. */
 	inline bool IsCabSteered() const

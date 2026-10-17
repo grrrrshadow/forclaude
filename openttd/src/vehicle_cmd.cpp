@@ -1352,8 +1352,9 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 }
 
 /**
- * Drive a vehicle freely from its cab (cab_drive.h): a road vehicle off the road and a ship anywhere on the water, at
- * any angle, a step left or right at a time; asked back to its orders it goes on as usual from the next tile it can.
+ * Drive a vehicle freely from its cab (cab_drive.h): a road vehicle off the road, a ship anywhere on the water and an
+ * aircraft anywhere in the air, at any angle, a step left or right at a time (an aircraft a step higher or lower too);
+ * asked back to its orders it goes on as usual from the next tile it can (an aircraft at once, to its airport).
  * @param flags type of operation
  * @param veh_id the vehicle
  * @param op what to do, a CabDriveOp
@@ -1362,24 +1363,35 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Rejoin)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Down)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
+	const bool height = what == CabDriveOp::Up || what == CabDriveOp::Down;
 
 	if (v->type == VehicleType::Road) {
 		const RoadVehicle *rv = RoadVehicle::From(v);
+		if (height) return CMD_ERROR;
 		if (what == CabDriveOp::Free) {
 			/* On the road: not a tram, not in its depot, a tunnel or a bay; its trailers come after it (RoadVehPullChain()). */
 			if (RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
-			if (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried()) return CMD_ERROR;
-			if (v->cab_free) return CommandCost();
+			if (!v->cab_free && (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried())) return CMD_ERROR;
 		} else if (!v->cab_free) {
 			return CMD_ERROR; // on the road, left and right are the next junction's turn (CmdSetCabHeading())
 		}
 	} else if (v->type == VehicleType::Ship) {
-		if (what == CabDriveOp::Free) return CMD_ERROR; // a ship goes freely with its first turn
+		const Ship *s = Ship::From(v);
+		if (height) return CMD_ERROR;
+		/* Anywhere on the water, not in its shed or a tunnel; with its first turn too. */
+		if (what == CabDriveOp::Free && !v->cab_free && (s->IsInDepot() || s->state == Track::Wormhole)) return CMD_ERROR;
 		if (what == CabDriveOp::Rejoin && !v->cab_free) return CMD_ERROR;
+	} else if (v->type == VehicleType::Aircraft) {
+		/* In the air, on its way or circling its airport; not taking off or landing. */
+		if (what == CabDriveOp::Rejoin) {
+			if (!v->cab_free) return CMD_ERROR;
+		} else if (!v->cab_free && Aircraft::From(v)->state != FLYING) {
+			return CMD_ERROR;
+		}
 	} else {
 		return CMD_ERROR;
 	}
@@ -1395,14 +1407,31 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 				u->cab_yaw = static_cast<uint8_t>(DirectionToCabYaw(u->direction));
 				u->cab_px = u->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
 				u->cab_py = u->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+				u->cab_altitude = static_cast<uint16_t>(std::clamp(u->z_pos, 0, static_cast<int>(UINT16_MAX)));
 			}
 			if (v->type == VehicleType::Road) RoadVehicle::From(v)->path.clear();
 			if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
 		};
 		switch (what) {
 			case CabDriveOp::Free:
-				start();
+				/* Driven freely already and on the way back to the orders: driven again. */
+				if (v->cab_free) {
+					for (Vehicle *u = v; u != nullptr; u = u->Next()) u->cab_rejoin = false;
+				} else {
+					start();
+				}
 				break;
+			case CabDriveOp::Up:
+			case CabDriveOp::Down: {
+				/* As high as its flight levels go, as low as half the lowest (as a raid comes down). */
+				if (!v->cab_free) start();
+				int low, high;
+				GetAircraftFlightLevelBounds(v, &low, &high);
+				low -= AIRCRAFT_MIN_FLYING_ALTITUDE / 2;
+				const int want = std::clamp(static_cast<int>(v->cab_altitude) + (what == CabDriveOp::Up ? CAB_ALTITUDE_STEP : -CAB_ALTITUDE_STEP), low, high);
+				v->cab_altitude = static_cast<uint16_t>(want);
+				break;
+			}
 			case CabDriveOp::Left:
 			case CabDriveOp::Right:
 				if (!v->cab_free) start();

@@ -19,6 +19,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – po nástupu hned řídíš, „Jeď svou trasu“, letadlo, klakson, světla, otáčení úvodu
+
+- Hráč: **hned po nástupu do kabiny řídíš**, místo tlačítka mimo silnici je **„Jeď svou trasu“** (otočeno). Okno
+  kabiny i nástup E v pohledu z první osoby převezmou volant: vozidlo jede volně, kam ho šipky natočí (auto, loď,
+  letadlo ve vzduchu; vlak jen plyn a brzda). „Jeď svou trasu“ (klávesa T) ho vrátí k rozkazům: auto najede zpět
+  na silnici, rychlostní omezení se zruší. Znovu T nebo tlačítko „Řídit“ volant vezme zpátky.
+- Hráč: **šipky vždycky do okna kabiny nebo první osoby**, ne na mapu: berou je okno s fokusem, jinak to nejvíc vpředu
+  (`ArrowsWindow()`), mapa se se šipkami neposouvá, dokud je nějaké otevřené.
+- Hráč: **zatáčení letadla, šipky nahoru a dolů výška**. Letadlo ve vzduchu letí volně směrem z kabiny
+  (`AircraftFreeController()`), vlevo a vpravo zatáčí, nahoru a dolů mění cílovou výšku (`cab_altitude`, uložená
+  v savu, verze `CabAltitude`) v mezích letových hladin. Na kraji mapy se samo stočí. T ho pošle zpátky na trasu.
+- Hráč: **I houká a troubí, F světla**. Vlak houká, jak houká při odjezdu ze stanice (pára, diesel, elektrika,
+  monorail, maglev), loď svou sirénou, auto **klaksonem od hráče** (Pixabay, Automobile Horn 02 od Universfield,
+  Pixabay Content License) v `baseset/decouple/zvuky/klakson.wav`, načteným zavaděčem zvuků sad. F rozsvítí nebo
+  zhasne světla vozidla (i ve dne, i v noci); jen jak to kreslí tento počítač, do hry ani savu nejde. Ve vozidle
+  v pohledu z první osoby platí I a F takhle, pěšky dál inventář a kladivo.
+- Hráč: **úvodní obrazovka – občas pootočit plochu**. Při zapnutém 3D se plocha 9 s nehýbe, pak se za 3,5 s plynule
+  otočí o 30–60° (většinou stejným směrem, občas zpět); místa kamery z úvodní hry se kreslí tam, kde je otočený
+  pohled má.
+- Rig: `test3d kabina klavesa <i|f|t>`, `test3d kabina klik trasa`, `testletadlo <x> <y> <x2> <y2>` (dvě letiště,
+  letadlo letí mezi nimi), `test3d titulnoc` píše i úhel.
+
 ## 17. 10. – řízení šipkami, nastupování v pohledu z první osoby
 
 - Hráč: **auta nejdou řídit šipkami, posouvá se mapa**. Okno kabiny klávesy vůbec nečetlo. Teď šipky řídí kabinu,
