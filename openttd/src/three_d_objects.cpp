@@ -3161,18 +3161,32 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 			part[shape.tri[t - 3 + k]] = p;
 		}
 	}
-	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and where they
-	 * are in the texture, in steps of a 128th of it: corners of one place of the model in two places of the texture
-	 * (the islands of an atlas, a seam) joined took one's place for both, and the triangles between them drew from
-	 * anywhere between the islands -- a car black and speckled from a few metres on (the player, 17. 10.). */
-	auto apart_of = [&](size_t i) {
-		uint32_t uv_cell = 0;
-		if (has_uv) {
-			const uint32_t u = static_cast<uint32_t>(static_cast<int32_t>(std::floor(shape.uv[i * 2] * 128.0f))) & 127;
-			const uint32_t v = static_cast<uint32_t>(static_cast<int32_t>(std::floor(shape.uv[i * 2 + 1] * 128.0f))) & 127;
-			uv_cell = u | v << 7;
+	/* The islands of the texture: the corners joined by triangles, a piece of the model drawn from one piece of the
+	 * texture (a file splits its corners where the texture does, at a seam, between the islands of an atlas). */
+	std::vector<uint32_t> island(corners);
+	std::iota(island.begin(), island.end(), 0u);
+	auto root = [&island](uint32_t i) {
+		while (island[i] != i) {
+			island[i] = island[island[i]];
+			i = island[i];
 		}
-		return static_cast<uint32_t>(part[i]) | (i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | uv_cell << 16;
+		return i;
+	};
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		const uint32_t a = root(shape.tri[t]);
+		for (int k = 1; k < 3; k++) {
+			const uint32_t b = root(shape.tri[t + k]);
+			if (a != b) island[b] = a;
+		}
+	}
+	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and their island
+	 * of the texture: corners of one place of the model in two places of the texture (two islands, a seam) joined took
+	 * one's place for both, and the triangles between them drew from anywhere between the islands -- a car black and
+	 * speckled from a few metres on (the player, 17. 10.). Within an island they join: it is one piece of the texture.
+	 * (It was a 128th of the texture before: the colleague's lorries, their corners far apart in their atlases, kept
+	 * 374 of 692 thousand triangles at the farthest zoom.) */
+	auto apart_of = [&](size_t i) {
+		return static_cast<uint64_t>(part[i]) | static_cast<uint64_t>(i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | static_cast<uint64_t>(root(static_cast<uint32_t>(i))) << 16;
 	};
 	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
 	auto key_of = [&](size_t i) {
@@ -3188,9 +3202,9 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 	};
 	auto out = std::make_shared<ThreeDVehicleShape>();
 	struct CellHash {
-		size_t operator()(const std::pair<uint64_t, uint32_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
+		size_t operator()(const std::pair<uint64_t, uint64_t> &k) const { return std::hash<uint64_t>{}(k.first * 0x9E3779B97F4A7C15ull ^ k.second); }
 	};
-	std::unordered_map<std::pair<uint64_t, uint32_t>, uint32_t, CellHash> cells;
+	std::unordered_map<std::pair<uint64_t, uint64_t>, uint32_t, CellHash> cells;
 	std::vector<uint32_t> joined(corners);
 	std::vector<uint32_t> count;
 	const bool wheels = !shape.corner_wheel.empty();

@@ -2845,6 +2845,17 @@ std::string RigTimeThreeDObjectRaster(int times)
 		}
 		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count() / times;
 		out += fmt::format(", zoom {} ({}x{} px) {:.2f} ms", to_underlying(zoom), r.width, r.height, ms);
+		/* The picture too, over grey (kresli_<object>_<zoom>.ppm where the game runs): to look at what each zoom draws. */
+		if (auto f = FileHandle::Open(fmt::format("kresli_{}_{}.ppm", obj->name, to_underlying(zoom)), "wb"); f.has_value() && r.width > 0) {
+			const std::string head = fmt::format("P6\n{} {}\n255\n", r.width, r.height);
+			fwrite(head.data(), 1, head.size(), *f);
+			std::vector<uint8_t> rgb;
+			rgb.reserve(r.px.size() * 3);
+			for (const Colour &c : r.px) {
+				for (uint8_t v : {c.r, c.g, c.b}) rgb.push_back(static_cast<uint8_t>((v * c.a + 128 * (255 - c.a)) / 255));
+			}
+			fwrite(rgb.data(), 1, rgb.size(), *f);
+		}
 	}
 	return out;
 }
