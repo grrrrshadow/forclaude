@@ -2280,6 +2280,8 @@ STR_WALKER_ITEM_BEER                                            :Beer
 STR_WALKER_ITEM_CIGARETTES                                      :Cigarettes
 STR_WALKER_ITEM_MARIJUANA                                       :Marijuana
 STR_WALKER_ITEM_GOODS                                           :Goods
+STR_WALKER_ITEM_BOW                                             :Bow
+STR_WALKER_ITEM_ARROWS                                          :Arrows
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

@@ -32,13 +32,24 @@ enum class WalkerItem : uint8_t {
 	Cigarettes, ///< cigarettes
 	Marijuana,  ///< marijuana: heals more
 	Goods,      ///< goods bought in a town
+	Bow,        ///< the bow (shot when the colleague's model is in, objekty/predmety/)
+	Arrows,     ///< arrows for the bow
 	End,        ///< the end of the known things
+};
+
+/** What kind of thing it is, for the cheat (CmdWalkerCheat()): a weapon is given once, ammunition filled up. */
+enum class WalkerItemKind : uint8_t {
+	Thing,      ///< carried, bought, used
+	Weapon,     ///< a weapon: one is enough
+	Ammunition, ///< shot by a weapon, used up
 };
 
 /** The places of the inventory kept and saved: room for the things to come. */
 static constexpr size_t WALKER_ITEM_SLOTS = 32;
 /** The most of one thing carried. */
 static constexpr uint16_t WALKER_ITEM_MAX = 999;
+/** The arrows the cheat fills the quiver up to. */
+static constexpr uint16_t WALKER_ARROWS_FULL = 50;
 /** The walker's full health. */
 static constexpr uint8_t WALKER_HEALTH_MAX = 100;
 
@@ -47,11 +58,13 @@ struct WalkerItemSpec {
 	StringID name;    ///< its name
 	int64_t price;    ///< what it costs, base currency before inflation; 0 not sold
 	uint8_t heal;     ///< the health it gives used, 0 not usable
+	WalkerItemKind kind; ///< a weapon, ammunition or a thing
 };
 
 const WalkerItemSpec &GetWalkerItemSpec(WalkerItem item);
 bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile);
 Money WalkerItemPrice(WalkerItem item);
 StringID WalkerShopName(TileIndex tile);
+uint16_t WalkerCheatCount(WalkerItem item, uint16_t carried, uint16_t quiver);
 
 #endif /* WALKER_INVENTORY_H */

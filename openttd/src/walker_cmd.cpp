@@ -27,13 +27,15 @@
 
 /** The things of the inventory, in the order of WalkerItem. */
 static const WalkerItemSpec _walker_items[] = {
-	{STR_WALKER_ITEM_HAMMER, 0, 0},
-	{STR_WALKER_ITEM_ARMOUR, 0, 0},
-	{STR_WALKER_ITEM_BOOTS, 0, 0},
-	{STR_WALKER_ITEM_BEER, 3, 10},
-	{STR_WALKER_ITEM_CIGARETTES, 5, 0},
-	{STR_WALKER_ITEM_MARIJUANA, 15, 25},
-	{STR_WALKER_ITEM_GOODS, 40, 0},
+	{STR_WALKER_ITEM_HAMMER, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_ARMOUR, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_BOOTS, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_BEER, 3, 10, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_CIGARETTES, 5, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_MARIJUANA, 15, 25, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_GOODS, 40, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_BOW, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_ARROWS, 0, 0, WalkerItemKind::Ammunition},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -170,6 +172,43 @@ CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health)
 	if (c == nullptr || c->walker_health != 0 || health == 0) return CMD_ERROR;
 	if (flags.Test(DoCommandFlag::Execute)) {
 		c->walker_health = std::min<uint8_t>(health, WALKER_HEALTH_MAX);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * How many of a thing the walker carries after the cheat (the player, 17. 10.: "the cheat iddqd at the console gives
+ * me all the weapons; what is in the inventory it will not give a second time, it fills up the arrows; when there is
+ * no bow it gives the bow too"): a weapon not carried one, the ammunition up to a full quiver, the rest as it is.
+ * @param item the thing
+ * @param carried how many of it the walker carries
+ * @param quiver the ammunition filled up to
+ */
+uint16_t WalkerCheatCount(WalkerItem item, uint16_t carried, uint16_t quiver)
+{
+	switch (GetWalkerItemSpec(item).kind) {
+		case WalkerItemKind::Weapon: return std::max<uint16_t>(carried, 1);
+		case WalkerItemKind::Ammunition: return std::max(carried, quiver);
+		default: return carried;
+	}
+}
+
+/**
+ * The cheat iddqd (the console): every weapon the walker has not, the arrows filled up (WalkerCheatCount()).
+ * @param flags operation to perform
+ * @param quiver the arrows filled up to (WALKER_ARROWS_FULL)
+ * @return nothing, or an error
+ */
+CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || quiver > WALKER_ITEM_MAX) return CMD_ERROR;
+	if (flags.Test(DoCommandFlag::Execute)) {
+		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
+			c->walker_items[i] = WalkerCheatCount(static_cast<WalkerItem>(i), c->walker_items[i], quiver);
+		}
 		InvalidateWindowData(WindowClass::FirstPerson, 0);
 		InvalidateWindowData(WindowClass::WalkerInventory, 0);
 	}

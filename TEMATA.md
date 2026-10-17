@@ -19,6 +19,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
 
+## 17. 10. – úvod bez pohybu kamery, cheat iddqd, luk a šípy v inventáři
+
+- Hráč: **úvodní obrazovka bez pohybu kamery, jen občas otočit plochu**. Kamera se postaví jednou na první místo
+  z úvodní hry a dál stojí; plocha se jen občas pootočí kolem středu obrazovky (9 s klid, 3,5 s otáčení o 30–60°).
+- Hráč: **cheat `iddqd` v konzoli dá všechny zbraně**; co už je v inventáři, nedá podruhé, šípy doplní, luk dá, když
+  chybí. Inventář má nové věci `Luk` a `Šípy` (na konci, čísla věcí se ukládají) a druh věci (zbraň, střelivo, věc).
+  `iddqd` (příkaz `WalkerCheat`, jen hra pro jednoho) dá zbraň, která chybí, a šípy doplní na 50; napíše, co dal.
+- **Luk zatím nestřílí**: model luku a šípu od kolegy ještě není (`PROSBA-LUK-SIP.md` z 16. 10., 17. 10. jsem dopsal
+  stav). Střelba (napnout, pustit, šíp obloukem, zásah draka, ubývání šípů) přijde s modelem. Otevřené #75.
+
 ## 17. 10. – po nástupu hned řídíš, „Jeď svou trasu“, letadlo, klakson, světla, otáčení úvodu
 
 - Hráč: **hned po nástupu do kabiny řídíš**, místo tlačítka mimo silnici je **„Jeď svou trasu“** (otočeno). Okno
@@ -36,8 +46,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   zhasne světla vozidla (i ve dne, i v noci); jen jak to kreslí tento počítač, do hry ani savu nejde. Ve vozidle
   v pohledu z první osoby platí I a F takhle, pěšky dál inventář a kladivo.
 - Hráč: **úvodní obrazovka – občas pootočit plochu**. Při zapnutém 3D se plocha 9 s nehýbe, pak se za 3,5 s plynule
-  otočí o 30–60° (většinou stejným směrem, občas zpět); místa kamery z úvodní hry se kreslí tam, kde je otočený
-  pohled má.
+  otočí o 30–60° (většinou stejným směrem, občas zpět). Kamera stojí (viz výš).
 - Rig: `test3d kabina klavesa <i|f|t>`, `test3d kabina klik trasa`, `testletadlo <x> <y> <x2> <y2>` (dvě letiště,
   letadlo letí mezi nimi), `test3d titulnoc` píše i úhel.
 

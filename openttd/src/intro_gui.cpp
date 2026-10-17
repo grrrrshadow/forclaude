@@ -52,7 +52,6 @@
 struct IntroGameViewportCommand {
 	int command_index = 0;               ///< Sequence number of the command (order they are performed in).
 	Point position{ 0, 0 };              ///< Calculated world coordinate to position viewport top-left at.
-	int world_x = 0, world_y = 0, world_z = 0; ///< The world point of its sign: drawn where the turned view has it.
 	VehicleID vehicle = VehicleID::Invalid(); ///< Vehicle to follow, or VehicleID::Invalid() if not following a vehicle.
 	uint delay = 0;                      ///< Delay until next command.
 	int zoom_adjust = 0;                 ///< Adjustment to zoom level from base zoom level.
@@ -67,12 +66,9 @@ struct IntroGameViewportCommand {
 	 */
 	Point PositionForViewport(const Viewport &vp)
 	{
-		/* Where the view has it as it is turned now (the title screen turns it, AdvanceTurn()). */
 		if (this->vehicle != VehicleID::Invalid()) {
 			const Vehicle *v = Vehicle::Get(this->vehicle);
-			this->position = ProjectTurned(v->x_pos, v->y_pos, v->z_pos);
-		} else {
-			this->position = ProjectTurned(this->world_x, this->world_y, this->world_z);
+			this->position = RemapCoords(v->x_pos, v->y_pos, v->z_pos);
 		}
 
 		Point p;
@@ -109,12 +105,6 @@ struct SelectGameWindow : public Window {
 	float turn_by = 0;
 	/** Vector of viewport commands parsed. */
 	std::vector<IntroGameViewportCommand> intro_viewport_commands{};
-	/** Index of currently active viewport command. */
-	size_t cur_viewport_command_index = SIZE_MAX;
-	/** Time spent (milliseconds) on current viewport command. */
-	uint cur_viewport_command_time = 0;
-	uint mouse_idle_time = 0;
-	Point mouse_idle_pos{};
 
 	/**
 	 * Find and parse all viewport command signs.
@@ -144,9 +134,6 @@ struct SelectGameWindow : public Window {
 			}
 			/* Sign coordinates for positioning. */
 			vc.position = RemapCoords(sign->x, sign->y, sign->z);
-			vc.world_x = sign->x;
-			vc.world_y = sign->y;
-			vc.world_z = sign->z;
 			/* Delay from the third matching group. */
 			if (auto value = ParseInteger<uint>(match[3].str()); value.has_value()) {
 				vc.delay = *value * 1000; // milliseconds
@@ -188,7 +175,7 @@ struct SelectGameWindow : public Window {
 		}
 	}
 
-	SelectGameWindow(WindowDesc &desc) : Window(desc), mouse_idle_pos(_cursor.pos)
+	SelectGameWindow(WindowDesc &desc) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->FinishInitNested(0);
@@ -227,8 +214,8 @@ struct SelectGameWindow : public Window {
 
 	/**
 	 * The title screen's turns of the map: still a while, then a slow turn of 30 to 60 degrees, easing in and out --
-	 * mostly the same way round, now and then back. Only with the 3D on (SetViewYaw() keeps it north else); the
-	 * camera's places are where the turned view has them (IntroGameViewportCommand::PositionForViewport()).
+	 * mostly the same way round, now and then back, about the middle of the screen. Only with the 3D on (SetViewYaw()
+	 * keeps it north else).
 	 */
 	void AdvanceTurn(uint delta_ms)
 	{
@@ -254,70 +241,19 @@ struct SelectGameWindow : public Window {
 		this->AdvanceDayAndNight(delta_ms);
 		this->AdvanceTurn(delta_ms);
 
-		/* Move the main game viewport according to intro viewport commands. */
-
+		/* The camera stays where the title game puts it first (the player, 17. 10.: "the title screen without the
+		 * camera moving, only the map turned now and then"): the first of its places, once; the turns keep the
+		 * middle of the screen in place (SetViewYaw()). */
 		if (intro_viewport_commands.empty()) return;
-
-		bool suppress_panning = true;
-		if (this->mouse_idle_pos.x != _cursor.pos.x || this->mouse_idle_pos.y != _cursor.pos.y) {
-			this->mouse_idle_pos = _cursor.pos;
-			this->mouse_idle_time = 2000;
-		} else if (this->mouse_idle_time > delta_ms) {
-			this->mouse_idle_time -= delta_ms;
-		} else {
-			this->mouse_idle_time = 0;
-			suppress_panning = false;
-		}
-
-		/* Determine whether to move to the next command or stay at current. */
-		bool changed_command = false;
-		if (this->cur_viewport_command_index >= intro_viewport_commands.size()) {
-			/* Reached last, rotate back to start of the list. */
-			this->cur_viewport_command_index = 0;
-			changed_command = true;
-		} else {
-			/* Check if current command has elapsed and switch to next. */
-			this->cur_viewport_command_time += delta_ms;
-			if (this->cur_viewport_command_time >= intro_viewport_commands[this->cur_viewport_command_index].delay) {
-				this->cur_viewport_command_index = (this->cur_viewport_command_index + 1) % intro_viewport_commands.size();
-				this->cur_viewport_command_time = 0;
-				changed_command = true;
-			}
-		}
-
-		IntroGameViewportCommand &vc = intro_viewport_commands[this->cur_viewport_command_index];
+		IntroGameViewportCommand &vc = intro_viewport_commands.front();
 		Window *mw = GetMainWindow();
-
-		/* Early exit if the current command hasn't elapsed and isn't animated. */
-		if (!changed_command && !vc.pan_to_next && vc.vehicle == VehicleID::Invalid()) return;
-
-		/* Suppress panning commands, while user interacts with GUIs. */
-		if (!changed_command && suppress_panning) return;
-
-		/* Reset the zoom level. */
-		if (changed_command) FixTitleGameZoom(vc.zoom_adjust);
-
-		/* Calculate current command position (updates followed vehicle coordinates). */
+		FixTitleGameZoom(vc.zoom_adjust);
 		Point pos = vc.PositionForViewport(*mw->viewport);
-
-		/* Calculate panning (linear interpolation between current and next command position). */
-		if (vc.pan_to_next) {
-			size_t next_command_index = (this->cur_viewport_command_index + 1) % intro_viewport_commands.size();
-			IntroGameViewportCommand &nvc = intro_viewport_commands[next_command_index];
-			Point pos2 = nvc.PositionForViewport(*mw->viewport);
-			const double t = this->cur_viewport_command_time / (double)vc.delay;
-			pos.x = pos.x + (int)(t * (pos2.x - pos.x));
-			pos.y = pos.y + (int)(t * (pos2.y - pos.y));
-		}
-
-		/* Update the viewport position. */
 		mw->viewport->dest_scrollpos_x = mw->viewport->scrollpos_x = pos.x;
 		mw->viewport->dest_scrollpos_y = mw->viewport->scrollpos_y = pos.y;
 		UpdateViewportPosition(mw, delta_ms);
-		mw->SetDirty(); // Required during panning, otherwise logo graphics disappears
-
-		/* If there is only one command, we just executed it and don't need to do any more */
-		if (intro_viewport_commands.size() == 1 && vc.vehicle == VehicleID::Invalid()) intro_viewport_commands.clear();
+		mw->SetDirty();
+		intro_viewport_commands.clear();
 	}
 
 	void OnInit() override

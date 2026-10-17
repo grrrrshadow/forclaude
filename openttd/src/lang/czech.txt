@@ -2385,6 +2385,8 @@ STR_WALKER_ITEM_BEER                                            :Pivo
 STR_WALKER_ITEM_CIGARETTES                                      :Cigarety
 STR_WALKER_ITEM_MARIJUANA                                       :Mari
 STR_WALKER_ITEM_GOODS                                           :Zboží
+STR_WALKER_ITEM_BOW                                             :Luk
+STR_WALKER_ITEM_ARROWS                                          :Šípy
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

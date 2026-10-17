@@ -6538,6 +6538,43 @@ static bool ConNote(std::span<std::string_view> argv)
 }
 
 /**
+ * The cheat iddqd (the player, 17. 10.: "the cheat iddqd at the console gives me all the weapons"): every weapon the
+ * walker of the view from the first person has not, the arrows filled up; what it carries is not given again
+ * (CmdWalkerCheat()). A single player game only.
+ * Usage: iddqd
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConIddqd(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "Every weapon to the walker of the view from the first person, the arrows filled up. Usage: 'iddqd'.");
+		return true;
+	}
+	const Company *c = Company::GetIfValid(_local_company);
+	if (_game_mode != GameMode::Normal || c == nullptr) {
+		IConsolePrint(CC_ERROR, "iddqd: only in a game, as a company.");
+		return true;
+	}
+	if (_networking) {
+		IConsolePrint(CC_ERROR, "iddqd: only in a single player game.");
+		return true;
+	}
+	std::string given;
+	for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
+		const WalkerItem item = static_cast<WalkerItem>(i);
+		const uint16_t now = c->walker_items[i], after = WalkerCheatCount(item, now, WALKER_ARROWS_FULL);
+		if (after > now) given += fmt::format("{}{} +{}", given.empty() ? "" : ", ", GetString(GetWalkerItemSpec(item).name), after - now);
+	}
+	if (given.empty()) {
+		IConsolePrint(CC_DEFAULT, "iddqd: nothing to give, every weapon is carried and the arrows are full.");
+		return true;
+	}
+	Command<Commands::WalkerCheat>::Post(WALKER_ARROWS_FULL);
+	IConsolePrint(CC_DEFAULT, "iddqd: {}", given);
+	return true;
+}
+
+/**
  * Switch the mirror drawing of flipped articulated pieces (PieceDrawnAs()) on
  * or off, so the two can be compared on the same coupling: with it off, the
  * record's picture check (PictureKeptAfterJoin()) says what the old drawing
@@ -16951,6 +16988,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testclanky",              ConTestMakePieces);
 	IConsole::CmdRegister("testzrcadlo",             ConTestMirrorDrawing);
 	IConsole::CmdRegister("pozn",                    ConNote);
+	IConsole::CmdRegister("iddqd",                   ConIddqd);
 	IConsole::CmdRegister("testpaluba",              ConTestDeckHeight);
 	IConsole::CmdRegister("testkotva",               ConTestSpriteAnchor);
 	/* The same three under short names. They are typed by hand, with the mouse,
