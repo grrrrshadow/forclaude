@@ -36,10 +36,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   trojúhelníky: rasterizace pokrytí 125 ms, **zaplavení prázdna 345 ms**, s úrovněmi 470–620 ms; a dělá se **3×**
   (tři textury stejné velikosti se stejným pokrytím). 4096×1712: 45 + 140–190 ms; 4096×1200: 30 + 115 ms.
   Divný případ 512×1024 s 27 856 trojúhelníky: pokrytí 294 ms (asi opakovaná textura, obří obdélníky).
-  Plán: (a) zaplavovat jen pruh pár texelů kolem kreslených (víc nikdo nevzorkuje), ne celou prázdnou plochu, na
-  každé úrovni; (b) rasterizace pokrytí float hranami, malé trojúhelníky jen středem, opakované UV oříznout;
-  (c) zjistit, proč se stejný atlas dekóduje třikrát, a dělat jednou. Pak ověřit pixel po pixelu (černé čáry na
-  Tatrách se nesmí vrátit – kvůli nim zaplavení vzniklo).
+  **Hotovo (a)**: zaplavuje se jen pruh 8 texelů kolem kreslených, ne celé prázdno: 4096×3824 zaplavení 162 ms
+  místo 345, 4096×1712 72 místo 140–190, 4096×1200 41 místo 115. Obraz Tatry 148: rozdíl 9 pixelů z 100 tisíc
+  (jen odstín, žádná černá ani díry; s pruhem 4 by bylo 43 px). Pokrytí jednoho rozměru a pokrytí se pamatuje pro
+  texturu a masky stejného rozvržení (3 poslední); trojúhelník přes celou opakovanou texturu = všechno kreslené.
+  Zbývá: (b) rasterizace pokrytí sama (4096×3824: ~150 ms; 512×1024 s opakovanou texturou pořád ~280 ms – trojúhelníky
+  přes opakování jen v jednom směru), (c) proč se tři textury 4096×3824 dělají souběžně (pamatování pak nepomůže).
 - **(3) neudělané**: sprite auta při 0° (`MakeThreeDVehicleObjectSprite`, ne-gui) dělat na vlákně jako ikonky
   nákupu (`ThreeDVehicleObjectSpriteStandIn`), mezitím nejbližší hotový směr / odhad velikosti.
 

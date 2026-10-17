@@ -4438,6 +4438,16 @@ std::optional<std::string> GetThreeDHouseTitle(TileIndex tile)
 static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<float> &cover)
 {
 	std::vector<uint8_t> drawn(static_cast<size_t>(w) * h, 0);
+	/* A triangle over more than the texture repeated draws from all of it: no texel to fill (a 512 x 1024 of the
+	 * colleague's took 300 ms, each such triangle tried at every texel). */
+	for (size_t t = 0; t + 5 < cover.size(); t += 6) {
+		const float u0 = std::min({cover[t], cover[t + 2], cover[t + 4]}), u1 = std::max({cover[t], cover[t + 2], cover[t + 4]});
+		const float v0 = std::min({cover[t + 1], cover[t + 3], cover[t + 5]}), v1 = std::max({cover[t + 1], cover[t + 3], cover[t + 5]});
+		if (u1 - u0 >= 1.0f && v1 - v0 >= 1.0f) {
+			std::fill(drawn.begin(), drawn.end(), 1);
+			return drawn;
+		}
+	}
 	auto mark = [&](double x, double y) {
 		const int px = static_cast<int>(std::floor(x)), py = static_cast<int>(std::floor(y));
 		if (px >= 0 && py >= 0 && px < w && py < h) drawn[static_cast<size_t>(py) * w + px] = 1;
@@ -4473,40 +4483,79 @@ static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<f
 	return drawn;
 }
 
+/** How far from the texels drawn from those not are filled (FillTexelsNotDrawn()): a triangle reads a texel or two past its edge, no more. */
+static constexpr int FILL_BAND = 8;
+
 /**
  * The texels no triangle draws from filled from the nearest that one does, its colour (or its index, a mask's) --
  * the colleague's atlases put every triangle on a piece of its own on black, and a triangle drew black at its edges
  * (a texel's middle just past it) and in the smaller textures of the distance (the black mixed in): the cars black
- * lines, then black from a few metres on (the player, 17. 10.).
+ * lines, then black from a few metres on (the player, 17. 10.). Only a band of FILL_BAND texels about them: the whole
+ * of the empty atlas filled was most of the time a texture took (a 4096 x 3824 one 345 ms; the player, 17. 10.:
+ * "the atlas cover, 50 to 80 ms an atlas").
  * @param drawn which texels are drawn from (TextureTexelsDrawn())
  */
 static void FillTexelsNotDrawn(ThreeDObjectTexture &t, const std::vector<uint8_t> &drawn)
 {
-	const size_t n = t.px.size();
-	std::vector<uint8_t> done(n, 0);
-	std::vector<uint32_t> queue;
-	queue.reserve(n / 4);
-	for (size_t i = 0; i < n; i++) {
-		if (drawn[i] && t.px[i] != 0) {
-			done[i] = 1;
-			queue.push_back(static_cast<uint32_t>(i));
-		} else if (drawn[i]) {
-			done[i] = 1; // a hole of the texture where it is drawn: stays one, gives nothing
+	const int w = t.w, h = t.h;
+	/* Done: drawn from (a hole of the texture where it is drawn stays one, and gives nothing), or filled. */
+	std::vector<uint8_t> done(drawn);
+	std::vector<uint32_t> queue, next;
+	/* The first: those drawn from with a colour beside one that is not. */
+	for (int y = 0; y < h; y++) {
+		const size_t row = static_cast<size_t>(y) * w;
+		for (int x = 0; x < w; x++) {
+			const size_t i = row + x;
+			if (!drawn[i] || t.px[i] == 0) continue;
+			if ((x > 0 && !drawn[i - 1]) || (x + 1 < w && !drawn[i + 1]) || (y > 0 && !drawn[i - w]) || (y + 1 < h && !drawn[i + w])) queue.push_back(static_cast<uint32_t>(i));
 		}
 	}
-	for (size_t q = 0; q < queue.size(); q++) {
-		const uint32_t i = queue[q];
-		const int x = static_cast<int>(i % t.w), y = static_cast<int>(i / t.w);
-		const int nx[4] = {x - 1, x + 1, x, x}, ny[4] = {y, y, y - 1, y + 1};
-		for (int k = 0; k < 4; k++) {
-			if (nx[k] < 0 || ny[k] < 0 || nx[k] >= t.w || ny[k] >= t.h) continue;
-			const size_t j = static_cast<size_t>(ny[k]) * t.w + nx[k];
-			if (done[j]) continue;
-			done[j] = 1;
-			t.px[j] = t.px[i];
-			queue.push_back(static_cast<uint32_t>(j));
+	for (int band = 0; band < FILL_BAND && !queue.empty(); band++) {
+		next.clear();
+		for (const uint32_t i : queue) {
+			const int x = static_cast<int>(i % w), y = static_cast<int>(i / w);
+			const int nx[4] = {x - 1, x + 1, x, x}, ny[4] = {y, y, y - 1, y + 1};
+			for (int k = 0; k < 4; k++) {
+				if (nx[k] < 0 || ny[k] < 0 || nx[k] >= w || ny[k] >= h) continue;
+				const size_t j = static_cast<size_t>(ny[k]) * w + nx[k];
+				if (done[j]) continue;
+				done[j] = 1;
+				t.px[j] = t.px[i];
+				next.push_back(static_cast<uint32_t>(j));
+			}
+		}
+		queue.swap(next);
+	}
+}
+
+/** The texels drawn from of the last textures of a size and a cover (TextureTexelsDrawn()): a texture and its masks share the layout. */
+struct TexelsDrawnKept {
+	const std::vector<float> *cover;
+	size_t size;     ///< and its size and a print of its numbers: another cover may come to its place
+	uint64_t print;
+	int w, h;
+	std::shared_ptr<const std::vector<uint8_t>> drawn;
+};
+static std::deque<TexelsDrawnKept> _texels_drawn_kept;
+static std::mutex _texels_drawn_mutex;
+
+/** The texels drawn from (TextureTexelsDrawn()), once for a texture and the masks of its layout. */
+static std::shared_ptr<const std::vector<uint8_t>> TexelsDrawnOf(int w, int h, const std::vector<float> &cover)
+{
+	uint64_t print = 1469598103934665603ULL;
+	for (size_t i = 0; i < cover.size(); i += 97) print = (print ^ std::bit_cast<uint32_t>(cover[i])) * 1099511628211ULL;
+	{
+		std::lock_guard lock(_texels_drawn_mutex);
+		for (const TexelsDrawnKept &k : _texels_drawn_kept) {
+			if (k.cover == &cover && k.size == cover.size() && k.print == print && k.w == w && k.h == h) return k.drawn;
 		}
 	}
+	auto made = std::make_shared<const std::vector<uint8_t>>(TextureTexelsDrawn(w, h, cover));
+	std::lock_guard lock(_texels_drawn_mutex);
+	_texels_drawn_kept.push_back({&cover, cover.size(), print, w, h, made});
+	/* A few: they are of the textures of one object being made. */
+	while (_texels_drawn_kept.size() > 3) _texels_drawn_kept.pop_front();
+	return made;
 }
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover)
@@ -4556,7 +4605,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 	const auto cover_start = std::chrono::steady_clock::now();
 	double ms_drawn = 0, ms_fill = 0;
 	if (cover != nullptr && !cover->empty() && t.w > 1) {
-		drawn = TextureTexelsDrawn(t.w, t.h, *cover);
+		drawn = *TexelsDrawnOf(t.w, t.h, *cover);
 		ms_drawn = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count();
 		FillTexelsNotDrawn(t, drawn);
 		ms_fill = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count() - ms_drawn;
