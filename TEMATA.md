@@ -27,6 +27,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – odpověď kolegovi na `PROSBA-TATRY-DOMY-POSTAVY.md` (hráč odsouhlasil)
+
+- Kolegovi `hra/3d/ODPOVED-TATRY-DOMY-POSTAVY.md`. Hasičská nástavba 138/148 jako podtyp vody (dá se koupit), na
+  stadion `"tatra": {"zaznam": "nt_t148", "sada": "nastavba hasici", …}`, **řídí ji Mat** (`poza` `ridi`).
+  **Žádný hasič** (ani v `akce`). Zvláštní vozy do `Zvlastni_vozy_3D` (MAX8) – savy nevadí. **Světla nezapomenout.**
+  Liaz MTS s kabinou 706. Okraje 16 px (hráč: „proč si hra neudělá sama?“ – dělá, značka jen ušetří čas při čtení).
+  Masky nejbližší texel (hra je nemíchá). Maska na díl podle materiálu `<materiál>_maska.png` / `_lak.png`.
+  `interier_<díl>`, instance, LOD a) `<díl>_lod1/_lod2`. Jména póz beru; **zachovat pózu College Girl za volantem
+  Tatry** (`ridi`); řidiči později v konfigurátoru. Doplňky už hra umí. Open world: ulička 3 m (1,5 m u okraje),
+  stadion `interier: false` + mezery + `pruchody`.
+- **Hra dodělá (hráč 18. 10.: „běž dělat kvantování a co je potřeba“):** čtení `KHR_mesh_quantization` (gltfpack),
+  značka `okraje_textur` (přeskočit vyplňování), masky podle materiálu, `interier_<díl>` jen z kabiny, LOD uzly,
+  stojící Tatra v `akce` (záznam + sada).
+
 ## 18. 10. – myš podruhé: ukazatel se zase vrací, ale pod ClipCursor (build #284: naráží na kraj okna)
 
 - Hráč (#284): pod kurzorem hry se pohybuje kurzor Windows, naráží na kraj okna a mapa stojí. Winlator má starší
