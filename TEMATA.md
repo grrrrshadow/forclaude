@@ -60,7 +60,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Jak často: „zhruba od do pozpátku“ – tedy zhruba od dvakrát za měsíc do jednou za týden (náhodně 7–15 dní).
 - Jen na našem 3D stadionu (ne s vanilla grafikou). Bude tam i **Mat, který točí pivo**, a **holky z hospody si tam
   sednou** (stejné postavy jako v hospodě).
-- **Nejasné:** oba 3D stadiony (`dum_20_stadion`, `dum_14_stadion_stary`), nebo jen jeden? Jak dlouho akce trvá?
+- Jen **nový stadion `dum_20_stadion`** (holky na tribuně), starý ne. Akce trvá **jeden herní den**.
+- Kolegovi: `hra/3d/POSTAVY-MODULARNI-A-STADION.md` (prosba o místa akce v záznamu stadionu, klíč `akce`).
 
 ## 18. 10. – modulární postavy (hráč, domlouváme)
 
@@ -69,8 +70,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - „Postavy budeme dávat skrz 3D GRF modulárně“: zabudované (ingame) postavy jsou výchozí a nezbytné pro Tatry;
   **GRF Tater si jen zavolá postavy do kabiny** (žádné vlastní kopie holek v balíčku).
 - Později v konfigurátoru **jiní řidiči**, které nabídnou tvůrci GRF – postavy zasunovací do hry.
-- Kolegovi zatím jen návrh „jedna holka, víc póz, `poza`“ (`DOPLNKY-DOMU-A-POSTAVY.md`); zbytek mu napsat, až hráč
-  potvrdí.
+- Kolegovi napsáno (`hra/3d/POSTAVY-MODULARNI-A-STADION.md`): balíček postav ve hře, jeden glb s kostrou a pózami
+  jako pojmenovanými animacemi, stejná jména póz u všech postav, odkaz `{"postava", "poza", …}` všude, kopie holek
+  z balíčku Tater pryč, později konfigurátor řidičů. Bez `poza` jako dřív.
+- **Hra dál:** (1) `poza` a doplňky domů, (2) akce na stadionu, (3) domy na grafické kartě.
 
 ## 18. 10. – 3D na grafické kartě, krok 1: obrázky vozidel, postav a efektů
 
