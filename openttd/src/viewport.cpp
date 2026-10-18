@@ -3269,16 +3269,21 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 {
 	static std::vector<TurnedVertex> verts;
 	static std::vector<std::pair<double, size_t>> order;
+	/* Its textures: its own (painted) and its add-ons' (ThreeDObject::GetTextureOf()), by the triangles' texture. */
+	static std::vector<const ThreeDObjectTexture *> texs;
 	const double t_start = TurnedNow();
 	_turned_times.models_drawn++;
 	order.clear();
 	verts.clear();
+	texs.clear();
 	const ThreeDObjectTexture *tex = nullptr;
 	/* Its shape as simple as the zoom allows; none of it when it is drawn already. */
 	const ThreeDObjectShapeView shape = o != nullptr && picture == nullptr ? TurnedObjectShape(o, lay) : ThreeDObjectShapeView{};
 	if (o != nullptr && picture != nullptr) tex = o->GetTexture(to_underlying(lay.zoom), paint);
 	if (o != nullptr && !shape.tri.empty()) {
 		tex = o->GetTexture(to_underlying(lay.zoom), paint);
+		texs.push_back(tex);
+		for (uint8_t k = 1; k < o->Textures(); k++) texs.push_back(o->GetTextureOf(k, to_underlying(lay.zoom)));
 		const bool lit = shape.light.size() == shape.pos.size() / 3;
 		const size_t corners = shape.pos.size() / 3;
 		verts.resize(corners);
@@ -3286,7 +3291,10 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			double sx, sy, xr, yr;
 			lay.Project(ox + shape.pos[i * 3], oy + shape.pos[i * 3 + 1], oz + shape.pos[i * 3 + 2], sx, sy);
 			lay.Turn(ox + shape.pos[i * 3], oy + shape.pos[i * 3 + 1], xr, yr);
-			verts[i] = {sx, sy, shape.uv[i * 2] * tex->w, shape.uv[i * 2 + 1] * tex->h, lit ? static_cast<double>(shape.light[i]) : 256.0, xr + yr + 2 * shape.pos[i * 3 + 2]};
+			/* Its place in its own texture: the building's or an add-on's. */
+			const uint8_t k = shape.CornerTexture(i);
+			const ThreeDObjectTexture *ct = k < texs.size() ? texs[k] : tex;
+			verts[i] = {sx, sy, shape.uv[i * 2] * ct->w, shape.uv[i * 2 + 1] * ct->h, lit ? static_cast<double>(shape.light[i]) : 256.0, xr + yr + 2 * shape.pos[i * 3 + 2]};
 		}
 		/* Far first: by the middle of each triangle, as the faces of the boxes. */
 		for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
@@ -3429,7 +3437,9 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			}
 			continue;
 		}
-		DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, verts[shape.tri[t]], verts[shape.tri[t + 1]], verts[shape.tri[t + 2]], true, zb.data(), nullptr, row_lo, row_hi);
+		const uint8_t k = shape.TriangleTexture(t);
+		const ThreeDObjectTexture *tt = k < texs.size() ? texs[k] : tex;
+		DrawTexturedTriangle(dst, pitch, fw, fh, tt->px.data(), tt->w, tt->h, verts[shape.tri[t]], verts[shape.tri[t + 1]], verts[shape.tri[t + 2]], true, zb.data(), nullptr, row_lo, row_hi);
 	}
 	};
 	const int rows = zy1 - zy0 + 1;
@@ -9702,6 +9712,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const ThreeDObjectTexture *tex;
 		int shape_level;
 		ThreeDObjectShapeView shape;
+		std::vector<const ThreeDObjectTexture *> texs; ///< its textures by the triangles' (ThreeDObject::GetTextureOf()): [0] tex; nullptr not made yet
 	};
 	std::vector<ObjectJob> jobs;
 	for (const CabObject &co : objects) {
@@ -9719,12 +9730,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double reach = TILE_SIZE * std::hypot(o.tiles_x, o.tiles_y) / 2 + o.top * CAB_Z_SCALE;
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
 		const int shape_level = ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5);
-		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}});
+		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}, {}});
 	}
 	/* Its texture painted and its shape simplified if they are made; else unpainted and whole meanwhile, made in the background. */
 	for (ObjectJob &j : jobs) {
 		j.tex = j.o->TryGetTexture(j.level, j.paint);
 		j.shape = j.o->TryGetShape(j.shape_level);
+		/* Its add-ons' textures too; one not made yet, its triangles not this frame. */
+		j.texs.assign(1, j.tex);
+		for (uint8_t k = 1; k < j.o->Textures(); k++) j.texs.push_back(j.o->TryGetTextureOf(k, j.level));
 	}
 	/* As a job of the frame, off the lock: each object on a core of its own: every corner to the eye once, the
 	 * triangles turned away left out (as the engines do), those wholly before the eye straight to its list, the others
@@ -9746,11 +9760,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				pts.resize(corners);
 				scr.resize(corners);
 				for (size_t i = 0; i < corners; i++) {
-					pts[i] = CabToEye(eye, job.ox + o.pos[i * 3], job.oy + o.pos[i * 3 + 1], job.oz + o.pos[i * 3 + 2], o.uv[i * 2] * tex->w, o.uv[i * 2 + 1] * tex->h);
+					/* Its place in its own texture: the building's or an add-on's. */
+					const uint8_t k = o.CornerTexture(i);
+					const ThreeDObjectTexture *ct = k < job.texs.size() && job.texs[k] != nullptr ? job.texs[k] : tex;
+					pts[i] = CabToEye(eye, job.ox + o.pos[i * 3], job.oy + o.pos[i * 3 + 1], job.oz + o.pos[i * 3 + 2], o.uv[i * 2] * ct->w, o.uv[i * 2 + 1] * ct->h);
 					if (pts[i].f >= CAB_NEAR) scr[i] = CabProject(eye, pts[i]);
 				}
 				std::vector<CabBatchTriangle> &out_list = lists[j];
 				for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
+					const uint8_t k = o.TriangleTexture(t);
+					if (k >= job.texs.size() || job.texs[k] == nullptr) continue;
+					const ThreeDObjectTexture *tt = job.texs[k];
 					const uint32_t ia = o.tri[t], ib = o.tri[t + 1], ic = o.tri[t + 2];
 					const uint light = lit ? (o.light[ia] + o.light[ib] + o.light[ic]) / 3 : 256;
 					if (pts[ia].f >= CAB_NEAR && pts[ib].f >= CAB_NEAR && pts[ic].f >= CAB_NEAR) {
@@ -9759,7 +9779,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						/* Turned away: a back wall, hidden behind the front anyway (y down: seen from outside it goes round clockwise). */
 						const int8_t facing = t / 3 < o.facing.size() ? o.facing[t / 3] : 0;
 						if (facing != 0 && ((b.sx - a.sx) * (c.sy - a.sy) - (b.sy - a.sy) * (c.sx - a.sx)) * facing >= 0) continue;
-						out_list.push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, a, b, c, false, light});
+						out_list.push_back({dst, zb, width, height, tt->px.data(), tt->w, tt->h, a, b, c, false, light});
 						continue;
 					}
 					std::vector<CabPoint> poly = {pts[ia], pts[ib], pts[ic]};
@@ -9769,7 +9789,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					CabVertex prev = CabProject(eye, poly[1]);
 					for (size_t k = 2; k < poly.size(); k++) {
 						const CabVertex cur = CabProject(eye, poly[k]);
-						out_list.push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, v0, prev, cur, false, light});
+						out_list.push_back({dst, zb, width, height, tt->px.data(), tt->w, tt->h, v0, prev, cur, false, light});
 						prev = cur;
 					}
 				}

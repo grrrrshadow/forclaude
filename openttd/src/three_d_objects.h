@@ -140,6 +140,8 @@ struct ThreeDObjectShape {
 	std::vector<uint16_t> light;
 	std::vector<uint32_t> tri;
 	std::vector<int8_t> facing;
+	std::vector<uint8_t> tri_tex;    ///< as ThreeDObject's
+	std::vector<uint8_t> corner_tex; ///< as ThreeDObject's
 };
 
 /** A shape of a building to draw: its own (level 0) or simplified (ThreeDObject::GetShape()). */
@@ -149,6 +151,12 @@ struct ThreeDObjectShapeView {
 	std::span<const uint16_t> light;
 	std::span<const uint32_t> tri;
 	std::span<const int8_t> facing;
+	std::span<const uint8_t> tri_tex;    ///< each triangle's texture (ThreeDObject::GetTextureOf()); empty all the building's own
+	std::span<const uint8_t> corner_tex; ///< each corner's texture, the texture its u, v are of; empty all the building's own
+
+	/** The texture of a triangle (its first index) and of a corner: 0 the building's own, n its add-on n's (ThreeDObject::GetTextureOf()). */
+	uint8_t TriangleTexture(size_t t) const { return t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0; }
+	uint8_t CornerTexture(size_t i) const { return i < this->corner_tex.size() ? this->corner_tex[i] : 0; }
 };
 
 /** The levels of the shapes: 0 the building's own, then its corners merged in cells of 5 cm, 10 cm, ... 3.2 m. */
@@ -203,6 +211,14 @@ struct ThreeDObject {
 	std::vector<ThreeDObjectFigure> girls;       ///< "postavy_s_holkami" of an industry: drawn so too while its girls are there (HasGirls(): the statue, the school, the machine)
 	std::array<std::vector<ThreeDObjectFigure>, 2> hut_girls; ///< "postavy_stoji" [0] and "postavy_sedi" [1] of the hut: drawn as HutGirlsAt() says
 	std::vector<ThreeDObjectFigure> plants;      ///< "rostliny": plants standing on it ("druh": "rostlina" of the index, a figure 1 m high), drawn so too
+	/* Its add-ons (hra/3d/DOPLNKY-DOMU-A-POSTAVY.md: a parasol, a bench, a bicycle, each once for all the buildings):
+	 * laid into its shape when it is read (Read()), their triangles with their own textures. */
+	std::vector<ThreeDObjectFigure> addon_places; ///< "doplnky": each add-on's name ("jmeno", as figure), place, turn and size
+	std::vector<size_t> addon_objects; ///< the add-ons of its textures 1, 2, ... (objects of the add-ons' index, "druh": "doplnek")
+	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s; empty all its own
+	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
+	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
+	std::vector<float> nrm;           ///< an add-on's normals, metres, to light it as it is turned at a place
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
 	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
@@ -224,6 +240,10 @@ struct ThreeDObject {
 	/** Whether its shape and texture are read (Read()): what is read of it may be looked at then, on any thread. */
 	bool IsRead() const { return this->glb_path.empty() || this->glb_state.value.load(std::memory_order_acquire) == 1; }
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
+	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
+	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
+	/** How many textures its triangles have: its own and its add-ons'. */
+	size_t Textures() const { return 1 + this->addon_objects.size(); }
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
 	ThreeDObjectShapeView TryGetShape(int level) const;

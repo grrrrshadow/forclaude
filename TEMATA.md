@@ -48,6 +48,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: „kolega se může pustit do budov optimalizovaných, že jo, co chybí?“ Chybí: kolegovo potvrzení formátu
   doplňků (`hra/3d/DOPLNKY-DOMU-A-POSTAVY.md`, zatím neodpověděl) a **podpora ve hře** (doplňky u domů, `poza`
   u postav) – moje práce. Slité domy nechat, dokud hra doplňky neumí.
+- **Hotovo (doplňky):** `"druh": "doplnek"` v indexu (glb jako dům, jedna textura, počátek pod patou, předek +x);
+  v domě `"doplnky": [{jmeno, poloha, otoceni, meritko}]`. Při `ThreeDObject::Read()` se doplněk vloží do tvaru domu
+  (`LayAddons()`: otočený, zvětšený, světlo z otočených normál), trojúhelníky mají texturu `tri_tex` (0 dům, n doplněk
+  n), rohy `corner_tex`; zjednodušené tvary (LOD) rohy různých textur nespojí; kreslí mapa, otočený pohled i pohled
+  z očí (`GetTextureOf`/`TryGetTextureOf`), půdorys pro chodce je zahrnuje. Ověřeno v rigu (zkušební doplněk na všech
+  domech mírného klimatu, mapa 200°/75° a z očí; bez doplňků se obraz nezmění). Neumí: doplňky průmyslu, `noc`
+  a světla doplňku, `barvy` doplňku. Kolegovi doplněno do `DOPLNKY-DOMU-A-POSTAVY.md`.
 
 ## 18. 10. – stadion: prase na rožni a hasičská Tatra (domluvit, pak kódovat)
 

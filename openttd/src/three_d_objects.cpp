@@ -84,6 +84,8 @@ static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house
 /** The game's own industries' objects by the industry and the variant (-1 any), and the parts of the fields by their name ("dil"). */
 static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
+/** The add-ons of the buildings ("druh": "doplnek"), by their name: their objects in _three_d_objects (ThreeDObject::addon_places). */
+static std::map<std::string, size_t, std::less<>> _three_d_addons;
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
@@ -1497,6 +1499,11 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		obj.lights.push_back(static_cast<float>(lights[i + 2] * OBJECT_HEIGHT_PER_METRE));
 	}
 	if (!mesh.nrm.empty()) obj.light = CornerLight(mesh.nrm);
+	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
+	if (obj.addon) {
+		obj.nrm = std::move(mesh.nrm);
+		return true;
+	}
 
 	/* It should lie on its plot: say so in the log when it does not. */
 	float x0 = 1e9f, x1 = -1e9f, y0 = 1e9f, y1 = -1e9f, z0 = 1e9f;
@@ -1752,6 +1759,20 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
 		ThreeDObjectFigure fig;
 		if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
+	}
+	/* Its add-ons ("doplnky"): an add-on of the index by its name ("jmeno"), where its foot stands (metres in the
+	 * building's frame, as "postavy"), turned about it ("otoceni", degrees, 0 as it is made, 90 its +x to +y), sized
+	 * ("meritko"). Laid into its shape when it is read (LayAddons()). */
+	if (e.contains("doplnky") && e.at("doplnky").is_array()) for (const auto &a : e.at("doplnky")) {
+		if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha")) continue;
+		const auto &at = a.at("poloha");
+		if (!at.is_array() || at.size() != 3) continue;
+		ThreeDObjectFigure place;
+		place.figure = a.at("jmeno").get<std::string>();
+		for (int k = 0; k < 3; k++) place.at[k] = at.at(k).get<float>();
+		place.facing = a.value("otoceni", 0.0f);
+		place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+		obj.addon_places.push_back(std::move(place));
 	}
 	/* Its doors (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md): people come out and go in there. */
 	if (e.contains("dvere") && e.at("dvere").is_array()) {
@@ -2015,6 +2036,22 @@ static void ReadThreeDObjects()
 				}
 				if (kind == "prumysl_dlazdice") {
 					ReadOriginalIndustryTile(e, parts);
+					continue;
+				}
+				if (kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
+					/* An add-on of the buildings (a parasol, a bench): one file, its foot at the origin, facing +x, read
+					 * the first time a building with it is drawn (LayAddons()); never a house of its own (variants 0). */
+					ThreeDObject addon;
+					addon.file = e.at("soubor").get<std::string>();
+					addon.name = e.value("jmeno", addon.file);
+					addon.glb_path = folder + addon.file;
+					addon.addon = true;
+					addon.variants = 0;
+					if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) {
+						Debug(misc, 0, "3D objects: add-on {} has two records, the first is used", addon.name);
+						continue;
+					}
+					_three_d_objects.push_back(std::move(addon));
 					continue;
 				}
 				if (kind != "dum") continue;
@@ -4777,16 +4814,19 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
 	struct Sum {
 		double x = 0, y = 0, z = 0, u = 0, v = 0, l = 0;
 		uint32_t n = 0;
+		uint8_t tex = 0;
 	};
-	std::unordered_map<uint64_t, uint32_t> cells;
+	/* The cells of each texture apart: a corner of an add-on is never one with the building's (ThreeDObject::tri_tex). */
+	std::vector<std::unordered_map<uint64_t, uint32_t>> cells(o.Textures());
 	std::vector<Sum> sums;
 	std::vector<uint32_t> to(corners);
 	for (size_t i = 0; i < corners; i++) {
 		const double x = o.pos[i * 3], y = o.pos[i * 3 + 1], z = o.pos[i * 3 + 2];
 		const double u = o.uv[i * 2], v = o.uv[i * 2 + 1];
+		const uint8_t tex = i < o.corner_tex.size() && o.corner_tex[i] < cells.size() ? o.corner_tex[i] : 0;
 		const uint64_t key = cell(x, cell_xy, 13) | cell(y, cell_xy, 13) << 13 | cell(z, cell_z, 13) << 26 | cell(u, cell_uv, 12) << 39 | cell(v, cell_uv, 12) << 51;
-		auto [it, added] = cells.try_emplace(key, static_cast<uint32_t>(sums.size()));
-		if (added) sums.emplace_back();
+		auto [it, added] = cells[tex].try_emplace(key, static_cast<uint32_t>(sums.size()));
+		if (added) sums.emplace_back().tex = tex;
 		Sum &sum = sums[it->second];
 		sum.x += x;
 		sum.y += y;
@@ -4798,10 +4838,12 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
 		to[i] = it->second;
 	}
 	auto shape = std::make_shared<ThreeDObjectShape>();
+	const bool textures = !o.tri_tex.empty();
 	for (const Sum &sum : sums) {
 		shape->pos.insert(shape->pos.end(), {static_cast<float>(sum.x / sum.n), static_cast<float>(sum.y / sum.n), static_cast<float>(sum.z / sum.n)});
 		shape->uv.insert(shape->uv.end(), {static_cast<float>(sum.u / sum.n), static_cast<float>(sum.v / sum.n)});
 		if (lit) shape->light.push_back(static_cast<uint16_t>(sum.l / sum.n + 0.5));
+		if (textures) shape->corner_tex.push_back(sum.tex);
 	}
 	std::unordered_set<uint64_t> had;
 	for (size_t t = 0; t + 2 < o.tri.size(); t += 3) {
@@ -4812,6 +4854,7 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
 		if (!had.insert(static_cast<uint64_t>(c[0]) | static_cast<uint64_t>(c[1]) << 21 | static_cast<uint64_t>(c[2]) << 42).second) continue;
 		shape->tri.insert(shape->tri.end(), c.begin(), c.end());
 		shape->facing.push_back(t / 3 < o.facing.size() ? o.facing[t / 3] : 0);
+		if (textures) shape->tri_tex.push_back(t / 3 < o.tri_tex.size() ? o.tri_tex[t / 3] : 0);
 	}
 	return shape;
 }
@@ -4824,6 +4867,74 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
  * @param level 0 its own shape, else simplified: made the first time (not on several cores at once but by
  *              PrepareThreeDObjectShapes())
  */
+/**
+ * Lay a building's add-ons into its shape as it is read (hra/3d/DOPLNKY-DOMU-A-POSTAVY.md, the player: "these things
+ * shared by all the objects we will call add-ons"): each add-on of the index read once (its own Read()), at each of
+ * its places turned about its foot, sized and stood there, its corners' light from its normals as turned (the light is
+ * the world's), its triangles with its own texture (tri_tex) -- drawn among the building's own through the same depth,
+ * whatever draws the building.
+ * @param house the building, its places of add-ons
+ * @param read what is read of it, the add-ons laid in
+ */
+static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
+{
+	if (house.addon_places.empty()) return;
+	read.tri_tex.assign(read.tri.size() / 3, 0);
+	read.corner_tex.assign(read.pos.size() / 3, 0);
+	size_t laid = 0;
+	for (const ThreeDObjectFigure &place : house.addon_places) {
+		auto found = _three_d_addons.find(place.figure);
+		if (found == _three_d_addons.end()) {
+			Debug(misc, 1, "3D object {}: no add-on '{}' in the indices", house.name, place.figure);
+			continue;
+		}
+		const ThreeDObject &a = _three_d_objects[found->second];
+		if (!a.Read() || a.tri.empty()) continue;
+		auto slot = std::ranges::find(read.addon_objects, found->second);
+		if (slot == read.addon_objects.end()) {
+			if (read.addon_objects.size() >= UINT8_MAX - 1) continue;
+			read.addon_objects.push_back(found->second);
+			slot = read.addon_objects.end() - 1;
+		}
+		const uint8_t tex = static_cast<uint8_t>(1 + (slot - read.addon_objects.begin()));
+		const double turn = place.facing * M_PI / 180.0, c = std::cos(turn), s = std::sin(turn);
+		const uint32_t base = static_cast<uint32_t>(read.pos.size() / 3);
+		const size_t corners = a.pos.size() / 3;
+		/* Lit by its normals turned; a building without them lit wholly (its light is in its texture), and the other way. */
+		const bool lit = a.nrm.size() == a.pos.size();
+		if ((lit || !read.light.empty()) && read.light.size() != base) read.light.resize(base, 256);
+		std::vector<float> turned_nrm;
+		for (size_t i = 0; i < corners; i++) {
+			const double x = a.pos[i * 3], y = a.pos[i * 3 + 1], z = a.pos[i * 3 + 2];
+			read.pos.push_back(static_cast<float>((x * c - y * s) * place.scale + place.at[0] * OBJECT_UNITS_PER_METRE));
+			read.pos.push_back(static_cast<float>((x * s + y * c) * place.scale + place.at[1] * OBJECT_UNITS_PER_METRE));
+			read.pos.push_back(static_cast<float>(z * place.scale + place.at[2] * OBJECT_HEIGHT_PER_METRE));
+			read.top = std::max(read.top, read.pos.back());
+			read.uv.push_back(i * 2 + 1 < a.uv.size() ? a.uv[i * 2] : 0.0f);
+			read.uv.push_back(i * 2 + 1 < a.uv.size() ? a.uv[i * 2 + 1] : 0.0f);
+			read.corner_tex.push_back(tex);
+			if (lit) {
+				const float nx = a.nrm[i * 3], ny = a.nrm[i * 3 + 1];
+				turned_nrm.insert(turned_nrm.end(), {static_cast<float>(nx * c - ny * s), static_cast<float>(nx * s + ny * c), a.nrm[i * 3 + 2]});
+			}
+		}
+		if (lit) {
+			const std::vector<uint16_t> light = CornerLight(turned_nrm);
+			read.light.insert(read.light.end(), light.begin(), light.end());
+		} else if (!read.light.empty()) {
+			read.light.resize(read.pos.size() / 3, 256);
+		}
+		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) */
+		for (size_t t = 0; t + 2 < a.tri.size(); t += 3) {
+			read.tri.insert(read.tri.end(), {base + a.tri[t], base + a.tri[t + 1], base + a.tri[t + 2]});
+			read.facing.push_back(t / 3 < a.facing.size() ? a.facing[t / 3] : 0);
+			read.tri_tex.push_back(tex);
+		}
+		laid++;
+	}
+	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
+}
+
 /**
  * Read the house's shape and texture from its .glb (glb_path) the first time they are wanted, on whichever thread asks
  * first (MakeOnce()); after that they are never written again, and may be looked at on any thread.
@@ -4839,11 +4950,13 @@ bool ThreeDObject::Read() const
 		read.name = this->name;
 		read.tiles_x = this->tiles_x;
 		read.tiles_y = this->tiles_y;
+		read.addon = this->addon;
 		bool ok = ReadGlb(this->glb_path, read);
 		if (ok && !this->snow_path.empty()) {
 			std::vector<uint8_t> snow = ReadWholeFile(this->snow_path);
 			if (!snow.empty()) read.png = std::move(snow);
 		}
+		if (ok) LayAddons(*this, read);
 		Debug(misc, 2, "3D object {}: {} triangles read in {} ms", this->name, read.tri.size() / 3, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		return std::make_pair(ok, std::move(read));
 	}, [this](std::pair<bool, ThreeDObject> made) {
@@ -4862,6 +4975,10 @@ bool ThreeDObject::Read() const
 			self.top = r.top;
 			self.png = std::move(r.png);
 			self.light = std::move(r.light);
+			self.tri_tex = std::move(r.tri_tex);
+			self.corner_tex = std::move(r.corner_tex);
+			self.addon_objects = std::move(r.addon_objects);
+			self.nrm = std::move(r.nrm);
 		}
 		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
 	});
@@ -4882,10 +4999,10 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 	if (!this->Read()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	/* Its own: wanted so, or too many corners to count the triangles below. */
-	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
 	MakeOnce(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { return MakeHouseShape(*this, level); }, [this, level](std::shared_ptr<const ThreeDObjectShape> made) { this->shapes[level] = std::move(made); });
 	const ThreeDObjectShape &s = *this->shapes[level];
-	return {s.pos, s.uv, s.light, s.tri, s.facing};
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex};
 }
 
 /** The building's shape simplified for a level if it is made already; else its own shape stands in, and the simpler one is made in the background. */
@@ -4894,10 +5011,10 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 	MarkThreeDUsed(this->used);
 	if (!this->TryRead()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
-	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing};
-	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing};
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
+	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
 	const ThreeDObjectShape &s = *this->shapes[level];
-	return {s.pos, s.uv, s.light, s.tri, s.facing};
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex};
 }
 
 /** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */
@@ -5127,6 +5244,23 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 	std::lock_guard lock(_lazy_mutex);
 	auto it = this->painted.find(key);
 	return it != this->painted.end() ? &it->second : plain;
+}
+
+/**
+ * A texture of the building's triangles (ThreeDObjectShapeView::TriangleTexture()): 0 its own, painted; n its add-on
+ * n's, as it is (the add-ons are not painted by the building's colours).
+ */
+const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture == 0 || texture > this->addon_objects.size()) return this->GetTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level);
+}
+
+/** A texture of the building's triangles if it is made already (as TryGetTexture()); else made in the background. */
+const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture == 0 || texture > this->addon_objects.size()) return this->TryGetTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].TryGetTexture(level);
 }
 
 /**
