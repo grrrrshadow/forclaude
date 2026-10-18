@@ -114,7 +114,8 @@ struct ThreeDGpuPicture {
 	std::vector<ThreeDGpuMesh> meshes;  ///< the vehicle first, then its crew; the glass of all after all else
 	std::vector<ThreeDGpuNightTriangle> night;
 	std::vector<uint32_t> pixels;       ///< what comes: the colours (Colour::data), their alpha multiplied in, top row first
-	std::vector<uint8_t> lit;           ///< and whether a pixel is of the lit glass of a light (not 0); empty without the night
+	std::vector<uint8_t> lit;           ///< and whether a pixel is lit (not 0): the glass of a light on, a material's own light; empty when not read_lit
+	bool read_lit = false;              ///< whether the lit pixels are read back: at night, or with a material's own light
 };
 
 /**

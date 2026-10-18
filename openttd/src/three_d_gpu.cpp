@@ -137,7 +137,8 @@ static constexpr size_t TRIANGLES_KEPT = 512;
 
 /**
  * The triangles of a shape the card draws, as RasterObject() of three_d_vehicle_object.cpp draws them: of a vehicle
- * those of the parts its state shows (the driver too), the glass after the rest; of its crew all of them, as they are.
+ * those of the parts its state shows (the driver too), of its crew all of them; the see-through (the glass, a material
+ * "BLEND") after the rest.
  * @param parts the parts shown (ThreeDVehicleObject::PartsOf())
  * @param vehicle of the vehicle, else of a figure of its crew
  * @param textures how many textures it has (a simpler shape's are its whole shape's)
@@ -163,12 +164,11 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 		std::vector<ThreeDGpuTriangles::Run> &runs = pass == 0 ? made->opaque : made->glass;
 		for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
 			const size_t tn = t / 3;
-			bool glass = false;
 			if (vehicle) {
 				const uint8_t part = tn < shape.tri_part.size() ? shape.tri_part[tn] : 0;
 				if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
-				glass = shape.IsGlass(tn);
 			}
+			const bool glass = shape.IsSeeThrough(tn);
 			if (glass != (pass == 1)) continue;
 			if (shape.tri[t] >= corners || shape.tri[t + 1] >= corners || shape.tri[t + 2] >= corners) continue;
 			uint32_t ti = tn < shape.tri_tex.size() ? shape.tri_tex[tn] : 0;
@@ -333,6 +333,7 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(GLint, glGetUniformLocation, (GLuint program, const GLchar *name)) \
 	X(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)) \
 	X(void, glUniform3f, (GLint location, GLfloat x, GLfloat y, GLfloat z)) \
+	X(void, glUniform4f, (GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)) \
 	X(void, glUniform1i, (GLint location, GLint v)) \
 	X(void, glUniform1f, (GLint location, GLfloat v))
 
@@ -396,7 +397,7 @@ constexpr size_t GPU_BYTES_KEPT = 128u * 1024 * 1024; ///< (a phone's card has n
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {
 	GLuint program = 0;
-	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1;
+	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1, glow = -1;
 	/* The paint (ThreeDGpuPaint). */
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
 	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
@@ -411,7 +412,8 @@ GLint _max_texture = 0, _max_target = 0;
 /* The shapes drawn: a corner of the shape to the picture (u_matrix), lit as RasterObject() lights it -- at the
  * corners, the light between them as the processor's, straight across the picture (noperspective) --; each pixel the
  * texture's texel under it, as the processor picks it, a hole where the texel is 0. The glass laid over what is behind
- * by its alpha, the colour with its alpha multiplied in (as the processor's "over"). */
+ * by its alpha, the colour with its alpha multiplied in (as the processor's "over"). A material's own light added
+ * unshaded, its pixels marked lit. */
 const char *const MESH_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec3 a_nrm;
@@ -437,6 +439,7 @@ const char *const MESH_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform int u_glass;
 uniform float u_glass_alpha;
+uniform vec4 u_glow;
 uniform int u_paint;
 uniform sampler2D u_detail, u_detail_colours, u_paint_mask, u_addon_mask, u_rust_mask;
 uniform vec3 u_colour, u_target, u_addon_colour, u_tint, u_rust_colour;
@@ -541,8 +544,10 @@ void main()
 	if (u_glass == 0 && t == vec4(0.0)) discard;
 	vec3 own = floor(t.rgb * 255.0 + 0.5);
 	if (u_paint != 0 && t != vec4(0.0)) own = Paint(own, (vec2(at) + 0.5) / vec2(size));
-	vec3 c = floor(min(vec3(255.0), own * v_light)) / 255.0;
-	o_lit = vec4(0.0);
+	/* Its own light (ThreeDVehicleShape::tex_glow): u_glow.a 0 none, 1 the texel times its colour, 2 its colour. */
+	vec3 e = u_glow.a == 0.0 ? vec3(0.0) : (u_glow.a < 1.5 ? floor(u_glow.rgb * own / 255.0) : u_glow.rgb);
+	vec3 c = floor(min(vec3(255.0), own * v_light + e)) / 255.0;
+	o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);
 	o_colour = u_glass == 0 ? vec4(c, 1.0) : vec4(c * u_glass_alpha, u_glass_alpha);
 }
 )";
@@ -872,6 +877,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
 	p.glass = gl.glGetUniformLocation(p.program, "u_glass");
 	p.glass_alpha = gl.glGetUniformLocation(p.program, "u_glass_alpha");
+	p.glow = gl.glGetUniformLocation(p.program, "u_glow");
 	p.paint = gl.glGetUniformLocation(p.program, "u_paint");
 	p.detail = gl.glGetUniformLocation(p.program, "u_detail");
 	p.detail_colours = gl.glGetUniformLocation(p.program, "u_detail_colours");
@@ -1217,7 +1223,6 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	}
 	if (!TargetOfSize(w, h)) return false;
 	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	static const GLenum colour_only[2] = {GL_COLOR_ATTACHMENT0, GL_NONE};
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
 	gl.glViewport(0, 0, w, h);
 	gl.glDrawBuffers(2, both);
@@ -1297,14 +1302,22 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
 			set_paint(r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
+			/* Its material's own light, and see-through by its own alpha (a material "BLEND") or the glass's. */
+			const uint32_t glow = d.mesh->shape->Glow(r.texture);
+			const Colour e(glow);
+			gl.glUniform4f(_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
+			if (glass) {
+				const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
+				gl.glUniform1f(_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : pic.glass_alpha);
+			}
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
 	};
 	Step(fmt::format("kresleni obrazku {} (glDrawElements)", _gpu_pictures + 1));
 	for (const Draw &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
-	/* The glass after all else, over what is behind it, hiding nothing (no depth written), not lit. */
-	gl.glDrawBuffers(2, colour_only);
+	/* The glass after all else, over what is behind it, hiding nothing (no depth written); lit only where it has a light
+	 * of its own (its lit 1 with alpha 1 over what is there, else 0 with alpha 0 leaving it). */
 	gl.glDepthMask(GL_FALSE);
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -1313,7 +1326,6 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	}
 	gl.glDisable(GL_BLEND);
 	gl.glDepthMask(GL_TRUE);
-	gl.glDrawBuffers(2, both);
 	/* The glass of the lights on at night, over the body. */
 	if (!pic.night.empty()) {
 		std::vector<float> corners;
@@ -1335,7 +1347,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pic.pixels.data());
-	if (!pic.night.empty()) {
+	if (pic.read_lit) {
 		pic.lit.resize(static_cast<size_t>(w) * h);
 		gl.glPixelStorei(GL_PACK_ALIGNMENT, 1);
 		gl.glReadBuffer(GL_COLOR_ATTACHMENT1);

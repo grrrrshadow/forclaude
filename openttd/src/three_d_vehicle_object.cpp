@@ -1104,7 +1104,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	std::vector<uint8_t> used(n, 0);
 	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
 		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
-		const bool glass = shape->IsGlass(t / 3);
+		const bool glass = shape->IsSeeThrough(t / 3);
 		if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
 		(glass ? glass_triangles : drawn_triangles).push_back(t);
 		for (int c = 0; c < 3; c++) used[shape->tri[t + c]] = 1;
@@ -1206,6 +1206,28 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 
 	std::vector<float> zb(static_cast<size_t>(width) * height, std::numeric_limits<float>::infinity());
 	std::vector<Colour> buf(static_cast<size_t>(width) * height, Colour(0, 0, 0, 0));
+	/* Each subpixel whether it is lit -- not darkened at night: of a material with a light of its own (tex_glow), or
+	 * of the glass of a lamp on at night (below). */
+	const bool glows = whole->Glows() || std::ranges::any_of(crew, [](const CrewPiece &c) { return c.shape->Glows(); });
+	std::vector<uint8_t> litbuf(glows ? buf.size() : 0, 0);
+	/* A texel lit by the light at it (k), and a material's own light over it, unshaded: the texel times its colour, or
+	 * its colour alone. */
+	auto shine = [](uint32_t glow, float cr, float cg, float cb, float k) {
+		float r = cr * k, g = cg * k, b = cb * k;
+		if (glow != 0) {
+			const Colour e(glow);
+			if (e.a == ThreeDVehicleShape::GLOW_TEXTURED) {
+				r += e.r * cr / 255.0f;
+				g += e.g * cg / 255.0f;
+				b += e.b * cb / 255.0f;
+			} else {
+				r += e.r;
+				g += e.g;
+				b += e.b;
+			}
+		}
+		return Colour(static_cast<uint8_t>(std::min(255.0f, r)), static_cast<uint8_t>(std::min(255.0f, g)), static_cast<uint8_t>(std::min(255.0f, b)));
+	};
 	/* A triangle of a shape through the depth: of the vehicle's (its body painted, its add-ons coloured, an effect
 	 * tinted) or of its crew that walks (as it is). */
 	auto fill = [&](const ThreeDVehicleShape &s, const std::vector<float> &sx, const std::vector<float> &sy, const std::vector<float> &depth, const std::vector<float> &light, const std::vector<const ThreeDObjectTexture *> &texs, size_t t, bool body) {
@@ -1213,6 +1235,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const int ti = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
 		if (tex == nullptr) return;
+		const uint32_t glow = s.Glow(static_cast<size_t>(ti));
 		const float ax = sx[a] - left, ay = sy[a] - top, bx = sx[b] - left, by = sy[b] - top, cx = sx[c] - left, cy = sy[c] - top;
 		const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 		if (std::abs(area) < 1e-6f) return;
@@ -1242,7 +1265,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				float cr = col.r, cg = col.g, cb = col.b;
 				if (!body) {
 					zb[at] = dz;
-					buf[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr * k)), static_cast<uint8_t>(std::min(255.0f, cg * k)), static_cast<uint8_t>(std::min(255.0f, cb * k)));
+					buf[at] = shine(glow, cr, cg, cb, k);
+					if (!litbuf.empty()) litbuf[at] = glow != 0 ? 1 : 0;
 					continue;
 				}
 				/* A detail the set colours in the vehicle's colours; else the colours of the state. */
@@ -1267,7 +1291,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				}
 				if (ti == 0) painted.Rust(u, v, cr, cg, cb);
 				zb[at] = dz;
-				buf[at] = Colour(static_cast<uint8_t>(std::min(255.0f, cr * k)), static_cast<uint8_t>(std::min(255.0f, cg * k)), static_cast<uint8_t>(std::min(255.0f, cb * k)));
+				buf[at] = shine(glow, cr, cg, cb, k);
+				if (!litbuf.empty()) litbuf[at] = glow != 0 ? 1 : 0;
 			}
 		}
 	};
@@ -1281,13 +1306,15 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		for (size_t t = 0; t + 2 < c.shape->tri.size(); t += 3) fill(*c.shape, c.sx, c.sy, c.depth, c.light, crew_texs, t, false);
 	}
 
-	/* The glass of its windows ("sklo"), after all else: see-through, each layer of it laying its colour over what is
-	 * behind by its alpha, not hiding what is behind it (no depth written); over nothing, a pane of that alpha. */
-	const float glass_alpha = whole->glass_alpha;
+	/* The glass of its windows ("sklo") and what is of a material "BLEND" (the ghost), after all else: see-through,
+	 * each layer of it laying its colour over what is behind by its alpha, not hiding what is behind it (no depth
+	 * written); over nothing, a pane of that alpha. */
 	for (size_t t : glass_triangles) {
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
+		const float glass_alpha = shape->SeeThroughAlpha(t / 3);
+		const uint32_t glow = shape->Glow(static_cast<size_t>(ti));
 		const float ax = sx[a] - left, ay = sy[a] - top, bx = sx[b] - left, by = sy[b] - top, cx = sx[c] - left, cy = sy[c] - top;
 		const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
 		if (std::abs(area) < 1e-6f) continue;
@@ -1312,7 +1339,9 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				const int tx = std::min(tex->w - 1, static_cast<int>(u * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(v * tex->h));
 				const Colour g(tex->px[static_cast<size_t>(ty) * tex->w + tx]);
 				const float k = w0 * light[a] + w1 * light[b] + w2 * light[c];
-				const float gr = std::min(255.0f, g.r * k), gg = std::min(255.0f, g.g * k), gb = std::min(255.0f, g.b * k);
+				const Colour shone = shine(glow, g.r, g.g, g.b, k);
+				const float gr = shone.r, gg = shone.g, gb = shone.b;
+				if (glow != 0 && !litbuf.empty()) litbuf[at] = 1;
 				Colour &d = buf[at];
 				if (d.a == 0) {
 					d = Colour(static_cast<uint8_t>(gr), static_cast<uint8_t>(gg), static_cast<uint8_t>(gb), static_cast<uint8_t>(glass_alpha * 255.0f));
@@ -1328,9 +1357,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	/* At night the glass of its lights that are on (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): over the
 	 * body as it is turned and leant, in its material's colour unshaded, through the depth (it lies a few millimetres
 	 * before the body), each subpixel of it marked lit; and where its lights are, the pool of the headlights ahead. */
-	std::vector<uint8_t> litbuf;
 	if (lights != 0 && !whole->night_tri.empty()) {
-		litbuf.assign(static_cast<size_t>(width) * height, 0);
+		if (litbuf.empty()) litbuf.assign(static_cast<size_t>(width) * height, 0);
 		const size_t corners = whole->night_pos.size() / 3;
 		std::vector<float> nx(corners), ny(corners), nd(corners);
 		for (size_t i = 0; i < corners; i++) place(whole->night_pos[i * 3], whole->night_pos[i * 3 + 1], whole->night_pos[i * 3 + 2], nx[i], ny[i], nd[i]);
@@ -1681,13 +1709,16 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 			g.y[i] -= top;
 		}
 	}
+	/* Lit where a material has a light of its own (tex_glow), day and night: the card marks those pixels too. */
+	const bool glows = std::ranges::any_of(pic.meshes, [](const ThreeDGpuMesh &m) { return m.shape->Glows(); });
+	pic.read_lit = night || glows;
 	if (!ThreeDGpuRender(pic)) return std::nullopt;
 
 	/* Shrink as RasterObject() does: the mean of the covered subpixels by their alpha (the card's colours have it
 	 * multiplied in), the alpha from how much they cover; lit where any is. Then cut to the pixels drawn. */
 	const int ow = width / ss, oh = height / ss;
 	std::vector<Colour> px(static_cast<size_t>(ow) * oh, Colour(0, 0, 0, 0));
-	std::vector<uint8_t> lit_px(night ? px.size() : 0, 0);
+	std::vector<uint8_t> lit_px(pic.read_lit ? px.size() : 0, 0);
 	int x0 = ow, y0 = oh, x1 = -1, y1 = -1;
 	for (int y = 0; y < oh; y++) {
 		for (int x = 0; x < ow; x++) {
@@ -1715,10 +1746,10 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 	out.width = x1 - x0 + 1;
 	out.height = y1 - y0 + 1;
 	out.px.resize(static_cast<size_t>(out.width) * out.height);
-	out.lit.assign(night ? out.px.size() : 0, 0);
+	out.lit.assign(pic.read_lit ? out.px.size() : 0, 0);
 	for (int y = 0; y < out.height; y++) {
 		std::copy_n(px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.px.begin() + static_cast<size_t>(y) * out.width);
-		if (night) std::copy_n(lit_px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.lit.begin() + static_cast<size_t>(y) * out.width);
+		if (pic.read_lit) std::copy_n(lit_px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.lit.begin() + static_cast<size_t>(y) * out.width);
 	}
 	ObjectLightsOn(whole, parts, lights, cam, out.lights);
 	return true;

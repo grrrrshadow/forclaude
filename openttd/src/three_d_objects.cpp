@@ -646,7 +646,30 @@ struct GlbTexture {
 	ThreeDTextureBytes png;    ///< its picture, nullptr none
 	uint32_t flat = 0; ///< the material's base colour factor (Colour::data) when it has no picture
 	bool double_sided = false; ///< the material's "doubleSided": its triangles are seen from behind too
+	uint32_t glow = 0;         ///< its own light (ThreeDVehicleShape::tex_glow), 0 none
+	uint8_t alpha = 255;       ///< how much of what is behind it hides (ThreeDVehicleShape::tex_alpha)
 };
+
+/**
+ * A material's own light and see-through (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md: the fire Tatra's
+ * beacon lit, the ghost "BLEND, 0.7, it shines by itself at night"): its "emissiveFactor" -- times the texel with an
+ * "emissiveTexture" --, and with "alphaMode" "BLEND" the alpha of its base colour.
+ */
+static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
+{
+	if (mat.contains("emissiveFactor") && mat.at("emissiveFactor").is_array() && mat.at("emissiveFactor").size() == 3) {
+		const auto &f = mat.at("emissiveFactor");
+		auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+		const Colour e(c(0), c(1), c(2), mat.contains("emissiveTexture") ? ThreeDVehicleShape::GLOW_TEXTURED : ThreeDVehicleShape::GLOW_FLAT);
+		if (e.r != 0 || e.g != 0 || e.b != 0) t.glow = e.data;
+	}
+	if (mat.value("alphaMode", std::string()) == "BLEND" && mat.contains("pbrMetallicRoughness")) {
+		const auto &pbr = mat.at("pbrMetallicRoughness");
+		if (pbr.contains("baseColorFactor") && pbr.at("baseColorFactor").is_array() && pbr.at("baseColorFactor").size() == 4) {
+			t.alpha = static_cast<uint8_t>(std::clamp(pbr.at("baseColorFactor").at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+		}
+	}
+}
 
 /** The meshes of a .glb as read: metres, in the game's axes (x, y, z up), normals when the file has them. */
 struct GlbMesh {
@@ -861,6 +884,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				const auto &mat = j.at("materials").at(material);
 				t.name = mat.value("name", std::string());
 				t.double_sided = mat.value("doubleSided", false);
+				ReadMaterialLight(mat, t);
 				if (mat.contains("pbrMetallicRoughness")) {
 					const auto &pbr = mat.at("pbrMetallicRoughness");
 					if (pbr.contains("baseColorFactor")) {
@@ -1435,6 +1459,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 			if (material >= 0 && j.contains("materials")) {
 				const auto &mat = j.at("materials").at(material);
 				t.name = mat.value("name", std::string());
+				ReadMaterialLight(mat, t);
 				if (mat.contains("pbrMetallicRoughness")) {
 					const auto &pbr = mat.at("pbrMetallicRoughness");
 					if (pbr.contains("baseColorFactor")) {
@@ -3371,6 +3396,8 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.night_back.shrink_to_fit();
 	s.tri_part.shrink_to_fit();
 	s.tex_addon.shrink_to_fit();
+	s.tex_glow.shrink_to_fit();
+	s.tex_alpha.shrink_to_fit();
 	s.corner_wheel.shrink_to_fit();
 	s.tri_glass.shrink_to_fit();
 	s.night_part.shrink_to_fit();
@@ -3545,6 +3572,39 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 			if (a != b) island[b] = a;
 		}
 	}
+	/* Corners in one place of the model and of the texture, facing to the same side, are one there: a file of flat
+	 * faces (the colleague's ghost, each of its triangles with three corners of its own) has them apart, so each of
+	 * its triangles was an island of its own, and those smaller than a cell were left out -- the ghost full of holes
+	 * from the eyes. Joined (weld), they are of one island and face the way of all of them together. */
+	std::vector<uint32_t> weld(corners);
+	{
+		struct WeldHash {
+			size_t operator()(const std::array<int64_t, 6> &k) const
+			{
+				uint64_t h = 0;
+				for (int64_t v : k) h = (h ^ static_cast<uint64_t>(v)) * 0x9E3779B97F4A7C15ull;
+				return static_cast<size_t>(h ^ (h >> 29));
+			}
+		};
+		std::unordered_map<std::array<int64_t, 6>, uint32_t, WeldHash> seen;
+		seen.reserve(corners);
+		for (size_t i = 0; i < corners; i++) {
+			std::array<int64_t, 6> k{};
+			for (int a = 0; a < 3; a++) k[a] = std::llround(shape.pos[i * 3 + a] * 1e5);
+			if (has_uv) for (int a = 0; a < 2; a++) k[3 + a] = std::llround(shape.uv[i * 2 + a] * 1e6);
+			/* The side it faces (a sheet's two sides apart, each its own way). */
+			if (has_nrm) k[5] = shape.nrm[i * 3] + shape.nrm[i * 3 + 1] + shape.nrm[i * 3 + 2] >= 0 ? 1 : 0;
+			weld[i] = seen.emplace(k, static_cast<uint32_t>(i)).first->second;
+		}
+	}
+	std::vector<float> weld_nrm(has_nrm ? shape.nrm.size() : 0, 0.0f);
+	for (size_t i = 0; i < corners; i++) {
+		if (weld[i] != i) {
+			const uint32_t a = root(weld[i]), b = root(static_cast<uint32_t>(i));
+			if (a != b) island[b] = a;
+		}
+		if (has_nrm) for (int a = 0; a < 3; a++) weld_nrm[weld[i] * 3 + a] += shape.nrm[i * 3 + a];
+	}
 	/* What else keeps corners apart: their part (an add-on's node, the glass, the driver), their wheel, and their island
 	 * of the texture: corners of one place of the model in two places of the texture (two islands, a seam) joined took
 	 * one's place for both, and the triangles between them drew from anywhere between the islands -- a car black and
@@ -3560,7 +3620,7 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 		for (int a = 0; a < 3; a++) k = k * 4096 + static_cast<uint64_t>(static_cast<int64_t>(std::floor(shape.pos[i * 3 + a] / cell)) & 4095);
 		int face = 0;
 		if (has_nrm) {
-			const float nx = shape.nrm[i * 3], ny = shape.nrm[i * 3 + 1], nz = shape.nrm[i * 3 + 2];
+			const float nx = weld_nrm[weld[i] * 3], ny = weld_nrm[weld[i] * 3 + 1], nz = weld_nrm[weld[i] * 3 + 2];
 			const float ax = std::abs(nx), ay = std::abs(ny), az = std::abs(nz);
 			face = ax >= ay && ax >= az ? (nx < 0 ? 1 : 2) : (ay >= az ? (ny < 0 ? 3 : 4) : (nz < 0 ? 5 : 6));
 		}
@@ -3609,6 +3669,8 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 		if (!shape.tri_glass.empty()) out->tri_glass.push_back(t / 3 < shape.tri_glass.size() ? shape.tri_glass[t / 3] : 0);
 	}
 	out->tex_addon = shape.tex_addon;
+	out->tex_glow = shape.tex_glow;
+	out->tex_alpha = shape.tex_alpha;
 	out->glass_alpha = shape.glass_alpha;
 	out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
 	ShrinkShape(*out);
@@ -3701,6 +3763,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 		made->pngs.push_back(t.png);
 		made->flats.push_back(t.flat);
 		made->tex_names.push_back(t.name);
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
 	}
 	/* Its extent as posed (how big it is in the view from the eyes, CabFigure). */
 	if (!made->pos.empty()) {
@@ -3781,6 +3845,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->pngs.push_back(InternThreeDTextureBytes(png));
 			made->flats.push_back(m.flat);
 			made->tex_names.push_back(std::move(m.name));
+			made->tex_glow.push_back(0);
+			made->tex_alpha.push_back(255);
 		}
 		made->paint_whole = true;
 		made->night_pos = std::move(bm.night_pos);
@@ -3892,6 +3958,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->pngs.push_back(std::move(t.png));
 		made->flats.push_back(t.flat);
 		made->tex_names.push_back(std::move(t.name));
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
 	}
 	/* The glass and the wheels that turn (the colleague's hra/3d/PROSBA-V3S-3D.md). */
 	made->glass_alpha = this->glass_alpha;
@@ -3929,6 +3997,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->pngs.push_back(t.png);
 			made->flats.push_back(t.flat);
 			made->tex_names.push_back(t.name);
+			made->tex_glow.push_back(t.glow);
+			made->tex_alpha.push_back(t.alpha);
 		}
 		for (const auto &at : w.at) {
 			for (int side = 0; side < (w.both_sides && std::abs(at[1]) > 0.001f ? 2 : 1); side++) {
@@ -3976,6 +4046,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->pngs.push_back(fs->pngs[t]);
 			made->flats.push_back(fs->flats[t]);
 			made->tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
+			made->tex_glow.push_back(fs->Glow(t));
+			made->tex_alpha.push_back(fs->Alpha(t));
 		}
 		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
@@ -4111,6 +4183,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->pngs.push_back(std::move(tx.png));
 			made->flats.push_back(tx.flat);
 			made->tex_names.push_back(std::move(tx.name));
+			made->tex_glow.push_back(tx.glow);
+			made->tex_alpha.push_back(tx.alpha);
 			made->tex_addon.push_back(static_cast<int8_t>(std::min<size_t>(ai, 127)));
 		}
 		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
@@ -5923,6 +5997,7 @@ size_t ThreeDVehicleShape::Bytes() const
 	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_back);
 	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
 	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
+	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);
 	for (const auto &simpler : this->simpler.shapes) {
 		if (simpler != nullptr) b += simpler->Bytes();
 	}

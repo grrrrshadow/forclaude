@@ -6939,15 +6939,22 @@ static void CabClipNear(std::vector<CabPoint> &poly)
 	CabClipNear(poly, _cab_near);
 }
 
+/** How a triangle of the view from an eye takes its texels (CabRasterRows()'s fill_holes): bits. */
+static constexpr uint8_t CAB_FILL_HOLES = 1; ///< the nearest drawn texel where the texture has none (the diamonds of the ground)
+static constexpr uint8_t CAB_REPEAT = 2;     ///< the texture repeated beyond its edges, as glTF's samplers do (a model's texture moved and stretched by "KHR_texture_transform": the ghost's sixteen times)
+
 /**
  * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
  * the picture, CabFlushBatch()): 1/depth and the texture pixel over depth change linearly across the picture, so
  * each pixel's texture pixel is their quotient. A pixel is drawn where the triangle is nearer than what is there.
- * @param fill_holes take the nearest drawn pixel of the texture where it has none (the diamonds of the ground)
+ * @param fill_holes CAB_FILL_HOLES, CAB_REPEAT (true: CAB_FILL_HOLES); beyond the texture's edges nothing without CAB_REPEAT
  * @param alpha below 256 see-through (a vehicle's glass): laid over what is there by so many 256ths, its depth not kept
+ *              where something is behind it
  */
-static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light, int row_lo, int row_hi, uint alpha = 256)
+static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light, int row_lo, int row_hi, uint alpha = 256)
 {
+	const bool repeat = (fill_holes & CAB_REPEAT) != 0;
+	const bool fill = (fill_holes & CAB_FILL_HOLES) != 0;
 	/* Its rows first: of a stripe of the picture (ParallelRows()) most triangles have none. */
 	int y0 = std::max(row_lo, static_cast<int>(std::ceil(std::min({a.sy, b.sy, c.sy}) - 0.5)));
 	int y1 = std::min(std::min(h, row_hi) - 1, static_cast<int>(std::floor(std::max({a.sy, b.sy, c.sy}) - 0.5)));
@@ -6993,9 +7000,16 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			if (iw <= zrow[x]) continue;
 			double inv = 1.0 / iw;
 			int iu = static_cast<int>(std::floor(uw * inv)), iv = static_cast<int>(std::floor(vw * inv));
-			if (iu < 0 || iv < 0 || iu >= tw || iv >= th) continue;
+			if (repeat) {
+				iu %= tw;
+				iv %= th;
+				if (iu < 0) iu += tw;
+				if (iv < 0) iv += th;
+			} else if (iu < 0 || iv < 0 || iu >= tw || iv >= th) {
+				continue;
+			}
 			uint32_t p = tex[static_cast<size_t>(iv) * tw + iu];
-			if (p == 0 && fill_holes) {
+			if (p == 0 && fill) {
 				static const int near[24][2] = {
 					{1, 0}, {-1, 0}, {0, 1}, {0, -1}, {1, 1}, {-1, 1}, {1, -1}, {-1, -1},
 					{2, 0}, {-2, 0}, {0, 2}, {0, -2}, {2, 1}, {-2, 1}, {2, -1}, {-2, -1},
@@ -7013,6 +7027,8 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			if (alpha < 256) {
 				const Colour over(lit), under(row[x]);
 				row[x] = Colour(static_cast<uint8_t>((over.r * alpha + under.r * (256 - alpha)) >> 8), static_cast<uint8_t>((over.g * alpha + under.g * (256 - alpha)) >> 8), static_cast<uint8_t>((over.b * alpha + under.b * (256 - alpha)) >> 8)).data;
+				/* Over nothing (the sky): its depth, so the sky drawn after the dark (DrawEyeSky()) leaves it. */
+				if (zrow[x] == 0.0f) zrow[x] = static_cast<float>(iw);
 				continue;
 			}
 			row[x] = lit;
@@ -7035,7 +7051,7 @@ struct CabBatchTriangle {
 	const uint32_t *tex;
 	int tw, th;
 	CabVertex a, b, c;
-	bool fill_holes;
+	uint8_t fill_holes; ///< CAB_FILL_HOLES, CAB_REPEAT
 	uint light;
 	uint alpha = 256; ///< see-through (CabRasterRows())
 };
@@ -7044,6 +7060,9 @@ static bool _cab_batching = false;
 /** The glass of the vehicles (see-through): collected apart while this is set, drawn after all else of their pass (CabFlushGlass()). */
 static std::vector<CabBatchTriangle> _cab_glass_batch;
 static uint _cab_glass_alpha = 256;
+/** At night the triangles of a material with a light of its own drawn by CabDrawFigureModel(), put here to be drawn again
+ * over the dark (DrawEyeNight()) a hair nearer: not darkened. nullptr: not kept. */
+static std::vector<CabBatchTriangle> *_cab_glow_after_night = nullptr;
 
 /*
  * The picture from an eye in two steps (the player, 17. 10.: "how will one core compute the game and another load
@@ -7348,7 +7367,7 @@ struct CabBatchScope {
 };
 
 /** A triangle of the picture: drawn now, or collected to be drawn on every core (CabBatchScope). */
-static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, bool fill_holes, uint light = 256)
+static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light = 256)
 {
 	if (_eye_frame != nullptr) {
 		/* Into the frame being collected (the glass apart, laid over at CabFlushGlass()). */
@@ -7367,7 +7386,7 @@ static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint
 }
 
 /** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
-static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, bool fill_holes, uint light = 256)
+static void CabDrawPolygon(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, std::vector<CabPoint> poly, const CabEye &eye, uint8_t fill_holes, uint light = 256)
 {
 	CabClipNear(poly);
 	if (poly.size() < 3) return;
@@ -8374,7 +8393,6 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				lights[i] = 1.0;
 			}
 		};
-		const uint glass_alpha = static_cast<uint>(std::clamp(s.glass_alpha, 0.0f, 1.0f) * 256);
 		for (size_t t = 0; t + 2 < s.tri.size(); t += 3) {
 			const uint8_t part = t / 3 < s.tri_part.size() ? s.tri_part[t / 3] : 0;
 			if (fg.own_cab && ThreeDVehicleShape::AtDriverSeat(part)) continue;
@@ -8385,9 +8403,15 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			corner(ia);
 			corner(ib);
 			corner(ic);
-			const uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
-			/* The glass: see-through, laid over the rest after it (CabFlushGlass()). */
-			_cab_glass_alpha = s.IsGlass(t / 3) ? std::max(1u, glass_alpha) : 256;
+			/* A material's own light (tex_glow) over it, unshaded: brighter by its colour's strongest. */
+			const uint32_t glow = s.Glow(static_cast<size_t>(ti));
+			uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
+			if (glow != 0) {
+				const Colour e(glow);
+				light += std::max({e.r, e.g, e.b});
+			}
+			/* The glass and a material "BLEND": see-through, laid over the rest after it (CabFlushGlass()). */
+			_cab_glass_alpha = s.IsSeeThrough(t / 3) ? std::max(1u, static_cast<uint>(std::clamp(s.SeeThroughAlpha(t / 3), 0.0f, 1.0f) * 256)) : 256;
 			/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
 			auto in_tex = [&](CabPoint p) {
 				p.tu *= tex->w;
@@ -8403,10 +8427,20 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				};
 				const CabVertex va = v(ia), vb = v(ib), vc = v(ic);
 				if (std::max({va.sx, vb.sx, vc.sx}) < 0 || std::min({va.sx, vb.sx, vc.sx}) >= width || std::max({va.sy, vb.sy, vc.sy}) < 0 || std::min({va.sy, vb.sy, vc.sy}) >= height) continue;
-				CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, false, light);
+				CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, CAB_REPEAT, light);
+				if (glow != 0 && _cab_glow_after_night != nullptr) {
+					/* Again after the dark, a hair nearer (its place in the texture the same). */
+					auto nearer = [](CabVertex q) {
+						q.iw *= 1.0005;
+						q.uw *= 1.0005;
+						q.vw *= 1.0005;
+						return q;
+					};
+					_cab_glow_after_night->push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, nearer(va), nearer(vb), nearer(vc), CAB_REPEAT, light, _cab_glass_alpha});
+				}
 				continue;
 			}
-			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, {in_tex(pts[ia]), in_tex(pts[ib]), in_tex(pts[ic])}, eye, false, light);
+			CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, {in_tex(pts[ia]), in_tex(pts[ib]), in_tex(pts[ic])}, eye, CAB_REPEAT, light);
 		}
 	};
 	draw(*shape, place, texs);
@@ -10128,9 +10162,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	CabFlushBatch(); // the figures' billboards, collected above
 	CabFlushGlass();
 	/* The figures by their triangles: a job of the frame, their glass over them after (CabFlushGlass()); inside a
-	 * model's cab the near plane is the cab's. */
-	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures)](uint32_t *dst, float *zb) {
+	 * model's cab the near plane is the cab's. At night what has a light of its own is kept to be drawn again over
+	 * the dark (glow_after_night). */
+	auto glow_after_night = IsNightNow() ? std::make_shared<std::vector<CabBatchTriangle>>() : nullptr;
+	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures), glow_after_night](uint32_t *dst, float *zb) {
 		AutoRestoreBackup near_backup(_cab_near, near);
+		AutoRestoreBackup glow_backup(_cab_glow_after_night, glow_after_night.get());
 		{
 			CabBatchScope batch;
 			for (const auto &[fg, model] : solid_figures) CabDrawFigureModel(dst, zb, width, height, eye, fg, model, wheels_turn);
@@ -10258,6 +10295,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const NightLight moon = GetNightLight();
 		out.Job([eye, width, height, moon, glows = CollectEyeNightGlows(eye, own)](uint32_t *dst, float *zb) { DrawEyeNight(eye, width, height, dst, zb, moon, glows); });
 		DrawEyeVehicleGlass(eye, dst, zb, width, height);
+		/* What has a light of its own (the beacon of the fire Tatra, the ghost) again over the dark. */
+		if (glow_after_night != nullptr) out.Job([glow_after_night](uint32_t *, float *) {
+			const std::vector<CabBatchTriangle> *list = glow_after_night.get();
+			CabRasterLists({&list, 1});
+		});
 		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
 		std::vector<std::array<double, 3>> lamps;
 		for (const CabObject &co : objects) {

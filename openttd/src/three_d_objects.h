@@ -312,6 +312,12 @@ struct ThreeDVehicleShape {
 	std::vector<ThreeDTextureBytes> pngs; ///< the textures, as they are in the files (nullptr: none, the material's colour)
 	std::vector<uint32_t> flats; ///< for each texture, the colour where a material has no picture
 	std::vector<std::string> tex_names; ///< for each texture, the name of its material
+	/* The materials' own light and see-through (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md: the fire
+	 * Tatra's beacon, the ghost "BLEND 0.7, it shines by itself"; a material's "emissiveFactor" and "alphaMode"). */
+	static constexpr uint8_t GLOW_TEXTURED = 1; ///< tex_glow's alpha: its light the texel times the colour ("emissiveTexture")
+	static constexpr uint8_t GLOW_FLAT = 2;     ///< tex_glow's alpha: its light the colour alone
+	std::vector<uint32_t> tex_glow;     ///< for each texture, its own light (Colour::data, the alpha GLOW_*), 0 none: added to it unshaded, and at night it is not darkened
+	std::vector<uint8_t> tex_alpha;     ///< for each texture, how much of what is behind it hides (a material "BLEND"), 255 all
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
 	float all[6] = {};          ///< the extent of all its corners, what the states show among them: x0, x1, y0, y1, z0, z1, metres; all 0 not known
 	/* Its lights at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): the glass of the node "noc" of its
@@ -350,6 +356,23 @@ struct ThreeDVehicleShape {
 	bool IsGlass(size_t triangle) const
 	{
 		return (triangle < this->tri_part.size() && this->tri_part[triangle] == PART_GLASS) || (triangle < this->tri_glass.size() && this->tri_glass[triangle] != 0);
+	}
+	/** A texture's own light (tex_glow), 0 none. */
+	uint32_t Glow(size_t texture) const { return texture < this->tex_glow.size() ? this->tex_glow[texture] : 0; }
+	/** How much of what is behind a texture hides (tex_alpha), 255 all. */
+	uint8_t Alpha(size_t texture) const { return texture < this->tex_alpha.size() ? this->tex_alpha[texture] : 255; }
+	/** Whether any of its textures has a light of its own. */
+	bool Glows() const { return std::ranges::any_of(this->tex_glow, [](uint32_t g) { return g != 0; }); }
+	/** Whether a triangle is drawn see-through after the rest: of the glass, or of a material "BLEND". */
+	bool IsSeeThrough(size_t triangle) const
+	{
+		return this->IsGlass(triangle) || this->Alpha(triangle < this->tri_tex.size() ? this->tri_tex[triangle] : 0) < 255;
+	}
+	/** How much of what is behind a see-through triangle hides: its material's, else the glass's. */
+	float SeeThroughAlpha(size_t triangle) const
+	{
+		const uint8_t a = this->Alpha(triangle < this->tri_tex.size() ? this->tri_tex[triangle] : 0);
+		return a < 255 ? a / 255.0f : this->glass_alpha;
 	}
 	/** Whether a part of the object is shown with these parts (ThreeDVehicleObject::PartsOf()): 0 always. */
 	static constexpr uint8_t PART_SEAT = 128;   ///< tri_part PART_SEAT + n: of the part n, sitting at the driver's seat ("misto_ridicky"), not drawn from the own cab's eye

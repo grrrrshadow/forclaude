@@ -27,6 +27,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. večer – kolegovy tři balíky; psi a zvířata domluvena; svítící a průhledné materiály
+
+- Kolega poslal: Tatru v4 a stadion (sud s pípou, Mat posunutý k sudu, `mat_ridi` pro hasičskou posádku s `meritko`
+  0,74, červená kabina jako sady bez GRF), noční věci (strašidlo průhledné a svítící, zbraně kulomet / raketomet /
+  raketa, pochodeň a lucerna do ruky, lampy ve stylu Morrowindu, Tatra osobní v9 s Trabantem, Chimata) a prosbu
+  o formát psů, zvířat, hub a strašidel z hráčova `test1.zip`.
+- Hráč na psy a zvířata: prodavači psů se objevují náhodně, stojí nebo chodí; všichni prodávají všechno, ale každý má
+  v nabídce jen 3–5 zvířat náhodně. Strašidla útočí, ducha ale musí hráč vyprovokovat; slon a lev jsou mírumilovní,
+  dokud hráč nezačne souboj. Pořadí je jedno – udělat, co má kolega hotové.
+- Odpověď kolegovi (`hra/3d/ODPOVED-PSI-ZVIRATA-HOUBY.md`): `druh` pes / zvire / postava s `prodavac` / predmet
+  s `kategorie` houba / strasidlo; zvířata s kostrou ve formátu `pozy` (jako postavy), bez kostry jedna póza nebo snímky
+  jako uzly; Chimata taky v `pozy`; nový klíč `povaha` (utoci / vyprovokovat / mirumilovne) rozhoduje záznam, ne hra;
+  opice na střechách přes uzly `strecha_NN` od kolegy; `noc` a `svetlo_NN` i u stromů a předmětů; `kde` + `tema`.
+- Hotová data jsou v sadě hry (`92387b8`): stadion, `mat_ridi`, Chimata, zbraně, pochodeň, lucerna, sada `lampy`.
+  Tatra v4 je hráčův balíček (newgrf), hra ho jen čte; rig ho má místo v3.
+- **Svítící a průhledné materiály** (glTF `emissiveFactor`, `alphaMode` `BLEND`): hra je čte u všech modelů
+  (`tex_glow`, `tex_alpha` tvaru). Svítící část se kreslí s vlastním světlem navíc (bez stínu) a v noci se neztmaví
+  – na mapě i na kartě přes značku „rozsvícený pixel“, z očí se po ztmavení noci nakreslí znovu. Průhledné se kreslí
+  jako sklo se svou alfou. Maják hasičské Tatry v4 a strašidlo tak svítí samy.
+- Opraveno cestou: z očí se textura modelu neopakovala za okraj (strašidlo ji má 16× zvětšenou – kreslily se jen
+  tečky); zjednodušený tvar na dálku dělal díry do modelů, kde má každý trojúhelník vlastní rohy (rohy na stejném
+  místě a stejném místě textury se teď spojí); průhledné nad oblohou si drží hloubku.
+- Planý poplach: rig hlásil pád karty u stadionu („kresleni obrazku 7 (glDrawElements)“), ale byl to můj zkušební
+  deník z ověřování hlídače pádů. Deset běhů stadionu s Tatrou v4 na kartě (llvmpipe) proběhlo bez chyby.
+
 ## 18. 10. – build #285 shazuje celý Winlator; deník grafické karty
 
 - Hráč: *„#285 padá celej winlator. jednou v nákupním menu, podruhý load save velké zátěže“*, *„spadne to vždycky,
