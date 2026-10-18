@@ -2367,7 +2367,7 @@ STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat m
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Zdraví {NUM} · u města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
-STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · 1–5: kladivo, luk, kuše, meč, obouruční meč · F: tasit a schovat zbraň · levé tlačítko nebo mezerník: máchnout, vystřelit (luk: držet napne, puštění vystřelí; mezerník napne a vystřelí)
+STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · 1–5: kladivo, luk, kuše, meč, obouruční meč · F: tasit a schovat zbraň · levé tlačítko nebo mezerník: máchnout, vystřelit (luk: držet napne, puštění vystřelí; mezerník napne a vystřelí) · L: pochodeň, lucerna, zhasnout
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
@@ -2385,6 +2385,8 @@ STR_WALKER_ITEM_COUNT                                           :{STRING} × {NU
 STR_WALKER_USE                                                  :[použít, +{NUM} zdraví]
 STR_WALKER_TAKE                                                 :[{NUM}: vzít do ruky]
 STR_WALKER_IN_HAND                                              :[{NUM}: v ruce, schovat]
+STR_WALKER_TAKE_LIGHT                                           :[L: vzít do levé ruky]
+STR_WALKER_LIGHT_IN_HAND                                        :[L: v levé ruce, zhasnout]
 STR_WALKER_FOR_SALE                                             :Tady se prodává ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Tady se nic neprodává. Dojdi do hospody, k automatu, do hulírny nebo do obchodu ve městě.
 STR_WALKER_BUY                                                  :[koupit za {CURRENCY_LONG}]
@@ -2402,6 +2404,8 @@ STR_WALKER_ITEM_CROSSBOW                                        :Kuše
 STR_WALKER_ITEM_BOLTS                                           :Šipky do kuše
 STR_WALKER_ITEM_SWORD                                           :Meč
 STR_WALKER_ITEM_TWO_HANDED_SWORD                                :Obouruční meč
+STR_WALKER_ITEM_TORCH                                           :Pochodeň
+STR_WALKER_ITEM_LANTERN                                         :Lucerna
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

@@ -124,6 +124,23 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::TwoHandedSword, "mec_obourucni", WeaponUse::Swing, 2.8, 2, WalkerItem::End, {}, 0, 65},
 };
 
+/**
+ * A light of the walker for its left hand (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 3: "a thing
+ * of the category light in the walker's hand shines -- warm orange, about 8 m -- in the left hand, so that a weapon
+ * goes in the right, as in Morrowind"; the player: "take the torch too"): the thing of the inventory, its thing of
+ * the indices, its light.
+ */
+struct FirstPersonLight {
+	WalkerItem item;        ///< the thing of the inventory
+	std::string_view thing; ///< its thing of the indices ("kategorie": "svetlo")
+	uint32_t colour;        ///< its light's colour, 0xRRGGBB
+	double reach_m;         ///< how far it lights, metres
+};
+static const FirstPersonLight _first_person_lights[] = {
+	{WalkerItem::Torch, "pochoden", 0xFF9A40, 8.0},
+	{WalkerItem::Lantern, "lucerna", 0xFFC070, 8.0},
+};
+
 /** An arrow or a bolt the walker shot: flying, or stuck where it hit. Only the screen, never saved. */
 struct FirstPersonMissile {
 	std::string_view thing; ///< its thing of the indices, its +x its tip, its origin its nock
@@ -248,6 +265,9 @@ struct FirstPersonWindow : Window {
 	float kick = 0;                       ///< a shot's kick, 1 as it is shot to 0
 	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
+	int light = -1;                       ///< the light asked for in the left hand (_first_person_lights), -1 none: the one held put out first
+	int light_held = -1;                  ///< the light in the left hand or being put out, -1 none
+	double light_time = 0;                ///< seconds it burns, for its flame's frames
 	std::chrono::steady_clock::time_point look_clicked{}; ///< when the right button was last pressed without a look about after it
 	bool looked = false;                  ///< the view moved since the right button was pressed (OnScroll())
 	/*
@@ -587,6 +607,62 @@ struct FirstPersonWindow : Window {
 		this->reload_time = std::max(0.0, this->reload_time - dt);
 		this->kick = std::max(0.0f, this->kick - static_cast<float>(dt / FIRST_PERSON_KICK_S));
 		this->Dress();
+		this->HoldLight(dt);
+	}
+
+	/**
+	 * The light in the left hand (L, or a click on it in the inventory): raised as the weapon is, another put out first,
+	 * its flame going through its frames ("plamen") -- as long as the walker carries it, and not in a vehicle. The
+	 * torch says so as it is put out ("zhasnuti").
+	 */
+	void HoldLight(double dt)
+	{
+		if (this->light >= 0 && (Carried(_first_person_lights[this->light].item) == 0 || this->Riding() != nullptr)) this->light = -1;
+		ThreeDHeldThing &left = this->walker.left;
+		const bool changing = this->light != this->light_held;
+		const float target = this->light_held >= 0 && !changing ? 1.0f : 0.0f, step = static_cast<float>(dt / FIRST_PERSON_DRAW_S);
+		left.raise = target > left.raise ? std::min(target, left.raise + step) : std::max(target, left.raise - step);
+		if (changing && left.raise <= 0) {
+			if (this->light_held >= 0) {
+				if (auto sound = GetThreeDThingSound(_first_person_lights[this->light_held].thing, "zhasnuti"); sound.has_value()) SndPlayFx(*sound);
+			}
+			this->light_held = this->light;
+			this->light_time = 0;
+		}
+		this->light_time += dt;
+		if (this->light_held < 0 || left.raise <= 0) {
+			left.thing.clear();
+			this->walker.light_colour = 0;
+			return;
+		}
+		const FirstPersonLight &l = _first_person_lights[this->light_held];
+		left.thing = std::string(l.thing);
+		left.hold = ThreeDHold::Left;
+		/* Held so that its flame ("svetlo") is where the light is seen, low at the left: the torch's handle below it,
+		 * the lantern about it. */
+		auto grip = GetThreeDThingPlace(l.thing, "svetlo");
+		if (!grip.has_value()) grip = GetThreeDThingPlace(l.thing, "uchyt");
+		const std::array<float, 3> at = grip.value_or(std::array<float, 3>{0, 0, 0});
+		std::copy(at.begin(), at.end(), left.grip);
+		const ThreeDVehicleObject *fig = GetThreeDFigure(l.thing);
+		left.frame = fig != nullptr && fig->frames >= 2 ? static_cast<int>(this->light_time * 1000.0 / (MILLISECONDS_PER_TICK * fig->frame_ticks)) % fig->frames : 0;
+		this->walker.light_colour = l.colour;
+		this->walker.light_reach_m = l.reach_m * left.raise;
+	}
+
+	/** L: the next light the walker carries into the left hand, after the last one out (the torch, the lantern, none). */
+	void NextLight()
+	{
+		int next = this->light;
+		do {
+			next++;
+			if (next >= static_cast<int>(std::size(_first_person_lights))) {
+				next = -1;
+				break;
+			}
+		} while (Carried(_first_person_lights[next].item) == 0);
+		this->light = this->Riding() != nullptr ? -1 : next;
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
 	}
 
 	/**
@@ -823,6 +899,11 @@ struct FirstPersonWindow : Window {
 		}
 		if (key == 'f' || key == 'F') {
 			this->weapon_out = !this->weapon_out;
+			return EventState::Handled;
+		}
+		/* L: the torch, the lantern, the light put out (in the left hand, the weapon in the right). */
+		if (key == 'l' || key == 'L') {
+			this->NextLight();
 			return EventState::Handled;
 		}
 		if (key == ' ' || (keycode & ~WKC_SPECIAL_KEYS) == WKC_SPACE) {
@@ -1105,6 +1186,18 @@ bool RigFirstPersonHold(bool out, float swing)
  * go, the crossbow shot, a sword swung (0 ms: only in the hand) -- and the arrows let fly so many steps.
  * @return what is held and where the arrows are
  */
+/** The rig ('test3d chodec svetlo'): L pressed and the light held up at once; what is in the left hand. */
+std::string RigFirstPersonLight()
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	w->NextLight();
+	w->light_held = w->light;
+	w->walker.left.raise = w->light >= 0 ? 1.0f : 0.0f;
+	w->HoldLight(0);
+	return w->walker.left.thing.empty() ? std::string("nic") : fmt::format("{} snimek {} uchyt {:.2f},{:.2f},{:.2f}", w->walker.left.thing, w->walker.left.frame, w->walker.left.grip[0], w->walker.left.grip[1], w->walker.left.grip[2]);
+}
+
 std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
@@ -1171,6 +1264,26 @@ void FirstPersonTakeWeapon(WalkerItem item)
 		w->weapon_out = false;
 	} else {
 		w->Choose(key - 1);
+	}
+}
+
+/** The light in the left hand of the walker of the view from the first person (the torch, the lantern), End for none. */
+WalkerItem FirstPersonLightInHand()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr && w->light >= 0 ? _first_person_lights[w->light].item : WalkerItem::End;
+}
+
+/** A light clicked in the inventory (walker_inventory_gui.cpp): into the left hand, or put out when it is there. */
+void FirstPersonTakeLight(WalkerItem item)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || w->Riding() != nullptr) return;
+	for (int k = 0; k < static_cast<int>(std::size(_first_person_lights)); k++) {
+		if (_first_person_lights[k].item != item) continue;
+		w->light = w->light == k || w->Carried(item) == 0 ? -1 : k;
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+		return;
 	}
 }
 

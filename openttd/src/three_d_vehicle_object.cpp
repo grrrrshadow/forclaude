@@ -3435,7 +3435,7 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 	if (held.raise <= 0.0f || held.thing.empty() || width <= 0 || height <= 0) return false;
 	const ThreeDVehicleObject *obj = GetThreeDFigure(held.thing);
 	if (obj == nullptr) return false;
-	const ThreeDVehicleShape *shape = obj->GetShape(0);
+	const ThreeDVehicleShape *shape = obj->GetShape(held.frame);
 	if (shape == nullptr || shape->tri.empty()) return false;
 
 	/* The eye: x to the right, y up, z ahead, metres. A point of the thing's frame goes to the eye along its axes,
@@ -3481,6 +3481,17 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 			az = V{0.0f, 1.0f, 0.0f};
 			ay = V{-1.0f, 0.0f, 0.0f};
 			hand = V{0.12f, -0.22f - lowered * 0.7f + 0.02f * held.kick, 0.25f - 0.06f * held.kick};
+			break;
+		}
+		case ThreeDHold::Left: {
+			/* A light: upright, leaning a little in towards the middle, its flame (where it is held from, its "svetlo")
+			 * before the eye's lower left. */
+			az = unit({0.12f, 0.98f, 0.10f});
+			ax = V{0.0f, 0.0f, 1.0f};
+			const float d = ax.x * az.x + ax.y * az.y + ax.z * az.z;
+			ax = unit({ax.x - d * az.x, ax.y - d * az.y, ax.z - d * az.z});
+			ay = V{az.y * ax.z - az.z * ax.y, az.z * ax.x - az.x * ax.z, az.x * ax.y - az.y * ax.x};
+			hand = V{-0.40f, -0.20f - lowered * 0.9f, 0.80f};
 			break;
 		}
 	}
@@ -3557,7 +3568,9 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 					const int tx = std::min(tex->w - 1, static_cast<int>(uu * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(vv * tex->h));
 					const uint32_t texel = tex->px[static_cast<size_t>(ty) * tex->w + tx];
 					if (texel == 0) continue; // a hole in the texture
-					const float k = w0 * light[i0] + w1 * light[i1] + w2 * light[i2];
+					float k = w0 * light[i0] + w1 * light[i1] + w2 * light[i2];
+					/* A material's own light (a flame): unshaded, brighter by it. */
+					if (const uint32_t glow = sh->Glow(static_cast<size_t>(ti)); glow != 0) k = 1.0f + std::max({Colour(glow).r, Colour(glow).g, Colour(glow).b}) / 255.0f;
 					const Colour c(texel);
 					dst[at] = Colour(static_cast<uint8_t>(std::min(255.0f, c.r * k)), static_cast<uint8_t>(std::min(255.0f, c.g * k)), static_cast<uint8_t>(std::min(255.0f, c.b * k))).data;
 					zb[at] = near;

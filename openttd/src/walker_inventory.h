@@ -14,7 +14,8 @@
  * for with the company's money: beer at the pub, marijuana at the vending machine and the coffeeshop, cigarettes and
  * goods at a shop of a town (a house that takes goods). Beer heals, marijuana heals more; the rest is carried for now
  * (dressing and spells later). The hammer is there from the start, and the bow and the crossbow with fifty arrows and
- * fifty bolts (the player, 17. 10.: "put the bow, arrows, crossbow and bolts there"; WalkerStartItems()).
+ * fifty bolts (the player, 17. 10.: "put the bow, arrows, crossbow and bolts there"; WalkerStartItems()), and a torch and a
+ * lantern for the left hand (18. 10.: "take the torch too"), sold at the shops too.
  */
 
 #ifndef WALKER_INVENTORY_H
@@ -41,6 +42,8 @@ enum class WalkerItem : uint8_t {
 	Bolts,      ///< bolts for the crossbow; fifty from the start
 	Sword,      ///< the sword, swung as the hammer
 	TwoHandedSword, ///< the two-handed sword, swung as the hammer
+	Torch,      ///< a torch (the colleague's, objekty/predmety/pochoden.glb): in the left hand, it lights about the walker at night
+	Lantern,    ///< a lantern (Roblox Lantern, objekty/predmety/lucerna.glb): so too
 	End,        ///< the end of the known things
 };
 
@@ -49,6 +52,7 @@ enum class WalkerItemKind : uint8_t {
 	Thing,      ///< carried, bought, used
 	Weapon,     ///< a weapon: one is enough
 	Ammunition, ///< shot by a weapon, used up
+	Light,      ///< a light in the left hand (the torch, the lantern): one is enough
 };
 
 /** The places of the inventory kept and saved: room for the things to come. */
@@ -69,6 +73,8 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::Arrows)] = WALKER_AMMUNITION_FULL;
 	items[static_cast<size_t>(WalkerItem::Crossbow)] = 1;
 	items[static_cast<size_t>(WalkerItem::Bolts)] = WALKER_AMMUNITION_FULL;
+	items[static_cast<size_t>(WalkerItem::Torch)] = 1;
+	items[static_cast<size_t>(WalkerItem::Lantern)] = 1;
 	return items;
 }
 

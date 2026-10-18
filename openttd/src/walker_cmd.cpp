@@ -40,6 +40,8 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_BOLTS, 0, 0, WalkerItemKind::Ammunition},
 	{STR_WALKER_ITEM_SWORD, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_TWO_HANDED_SWORD, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_TORCH, 2, 0, WalkerItemKind::Light},
+	{STR_WALKER_ITEM_LANTERN, 12, 0, WalkerItemKind::Light},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -71,7 +73,7 @@ static bool IsShopHouse(TileIndex tile)
 
 /**
  * Whether a thing is sold at a tile: beer at the pub, marijuana at the vending machine and the coffeeshop, cigarettes
- * and goods at a shop of a town (the player).
+ * and goods at a shop of a town (the player), the torch and the lantern there too.
  */
 bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile)
 {
@@ -82,7 +84,9 @@ bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile)
 		case WalkerItem::Beer: return type == IT_PUB;
 		case WalkerItem::Marijuana: return type == IT_WEED_MACHINE || type == IT_COFFEESHOP;
 		case WalkerItem::Cigarettes:
-		case WalkerItem::Goods: return IsShopHouse(tile);
+		case WalkerItem::Goods:
+		case WalkerItem::Torch:
+		case WalkerItem::Lantern: return IsShopHouse(tile);
 		default: return false;
 	}
 }
@@ -213,7 +217,8 @@ CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health)
 uint16_t WalkerCheatCount(WalkerItem item, uint16_t carried, uint16_t quiver)
 {
 	switch (GetWalkerItemSpec(item).kind) {
-		case WalkerItemKind::Weapon: return std::max<uint16_t>(carried, 1);
+		case WalkerItemKind::Weapon:
+		case WalkerItemKind::Light: return std::max<uint16_t>(carried, 1);
 		case WalkerItemKind::Ammunition: return std::max(carried, quiver);
 		default: return carried;
 	}

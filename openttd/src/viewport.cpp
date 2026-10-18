@@ -10348,6 +10348,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* What the walker holds (the hammer), before the night: the dark is over it too. A job of the frame: it draws
 	 * by its own means (DrawThreeDHeldThing()), from the thing's model, which stays. */
 	if (walker != nullptr && !walker->held.thing.empty()) out.Job([held = walker->held, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(held, dst, zb, width, height, focal); });
+	/* The light in its left hand (the torch, the lantern): by day with the weapon, at night after the dark (it lights
+	 * itself, and about the walker, DrawEyeWitchLight()). */
+	if (walker != nullptr && !walker->left.thing.empty() && !night) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
 	if (night) {
 		/* The dark and the glows of the vehicles' lights: collected now, drawn with the frame. */
 		const NightLight moon = GetNightLight();
@@ -10367,10 +10370,21 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
 		}
 		if (_cab_lamp_light) out.Job([eye, width, height, lamps = std::move(lamps)](uint32_t *dst, float *zb) { DrawEyeLampLight(eye, dst, zb, width, height, lamps); });
-		/* The witches' lanterns and torches lighting what is about them and where the beam falls (DrawEyeWitchLight()). */
-		if (std::vector<ThreeDWitchLight> witch_lights = GetThreeDWitchLights(true); !witch_lights.empty()) {
+		/* The witches' lanterns and torches lighting what is about them and where the beam falls (DrawEyeWitchLight()),
+		 * and the light in the walker's left hand about it, warm, from just before it at the height of the hand. */
+		std::vector<ThreeDWitchLight> witch_lights = GetThreeDWitchLights(true);
+		if (walker != nullptr && walker->light_colour != 0 && walker->light_reach_m > 0) {
+			ThreeDWitchLight &l = witch_lights.emplace_back();
+			l.x = walker->x + std::cos(walker->heading) * 0.4 * OBJECT_UNITS_PER_METRE;
+			l.y = walker->y + std::sin(walker->heading) * 0.4 * OBJECT_UNITS_PER_METRE;
+			l.z = FirstPersonGroundZ(walker->x, walker->y) + walker->eye_z - 0.5 * OBJECT_HEIGHT_PER_METRE;
+			l.reach = walker->light_reach_m * OBJECT_UNITS_PER_METRE;
+			l.colour = Colour(static_cast<uint8_t>(walker->light_colour >> 16), static_cast<uint8_t>(walker->light_colour >> 8), static_cast<uint8_t>(walker->light_colour));
+		}
+		if (!witch_lights.empty()) {
 			out.Job([eye, width, height, witch_lights = std::move(witch_lights)](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); });
 		}
+		if (walker != nullptr && !walker->left.thing.empty()) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
 		{
 			const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
 			/* The lighter the night (gui.night_light), the fewer stars are seen: towards the dawn only the brightest. */

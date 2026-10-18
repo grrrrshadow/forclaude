@@ -9051,6 +9051,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			 * so many steps. */
 			extern std::string RigFirstPersonWeapon(int key, int draw_ms, int steps);
 			IConsolePrint(CC_DEFAULT, "test3d: zbran {}", RigFirstPersonWeapon(number(3).value_or(1), number(4).value_or(0), argv.size() > 5 && argv[5] == "drzet" ? -1 : number(5).value_or(0)));
+		} else if (argv.size() > 2 && argv[2] == "svetlo") {
+			/* 'chodec svetlo': L pressed (the torch, the lantern, the light put out), held up at once; the inventory
+			 * window closed, so that the picture shows the hand. */
+			extern std::string RigFirstPersonLight();
+			CloseWindowById(WindowClass::WalkerInventory, 0);
+			IConsolePrint(CC_DEFAULT, "test3d: svetlo {}", RigFirstPersonLight());
 		} else if (argv.size() > 2 && (argv[2] == "u" || argv[2] == "e")) {
 			/* 'chodec u <n>': the walker beside the n-th visible vehicle (as 'vozidlo' counts them); 'chodec e': E pressed
 			 * (into the vehicle near, or out of it). */

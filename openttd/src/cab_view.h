@@ -102,6 +102,7 @@ enum class ThreeDHold : uint8_t {
 	Swung,    ///< a hammer, a sword: in the right hand by its handle, swung
 	Bow,      ///< a bow: upright in the left hand, its string to the eye
 	Crossbow, ///< a crossbow: at the right shoulder, along the look
+	Left,     ///< a light (the torch, the lantern): upright in the left hand, low at the left
 };
 
 /** The thing in the walker's hands, as it is drawn over the picture from its eyes (DrawThreeDHeldThing()). */
@@ -116,6 +117,7 @@ struct ThreeDHeldThing {
 	float kick = 0;      ///< a shot's kick, 1 as it is shot to 0
 	float drawn = 0;     ///< a bow: how far it is drawn, 0 to 1 (brought before the eye, the arrow at the dot)
 	float twist = 0;     ///< swung: degrees it is turned about its handle (a sword's flat to the eye)
+	int frame = 0;       ///< its frame (a torch's flame, "plamen")
 };
 
 struct FirstPersonEye {
@@ -124,6 +126,9 @@ struct FirstPersonEye {
 	double pitch = 0;     ///< radians, looking up (positive) or down
 	double eye_z = 0;     ///< its eyes over the ground, units of height
 	ThreeDHeldThing held; ///< the thing in its hands
+	ThreeDHeldThing left; ///< the light in its left hand (the torch, the lantern), lighting about it at night
+	uint32_t light_colour = 0; ///< that light's colour (Colour::data), 0 none
+	double light_reach_m = 0;  ///< and how far it lights, metres
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);

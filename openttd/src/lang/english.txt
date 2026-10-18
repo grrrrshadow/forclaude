@@ -2262,7 +2262,7 @@ STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run inst
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Health {NUM} · near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
-STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · 1-5: hammer, bow, crossbow, sword, two-handed sword · F: the weapon out and away · left button or Space: swing it, shoot (the bow: hold to draw, let go to shoot; Space draws and shoots)
+STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · 1-5: hammer, bow, crossbow, sword, two-handed sword · F: the weapon out and away · left button or Space: swing it, shoot (the bow: hold to draw, let go to shoot; Space draws and shoots) · L: the torch, the lantern, the light put out
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
@@ -2280,6 +2280,8 @@ STR_WALKER_ITEM_COUNT                                           :{STRING} × {NU
 STR_WALKER_USE                                                  :[use, +{NUM} health]
 STR_WALKER_TAKE                                                 :[{NUM}: take in hand]
 STR_WALKER_IN_HAND                                              :[{NUM}: in hand, put away]
+STR_WALKER_TAKE_LIGHT                                           :[L: take in the left hand]
+STR_WALKER_LIGHT_IN_HAND                                        :[L: in the left hand, put out]
 STR_WALKER_FOR_SALE                                             :For sale here ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Nothing for sale here. Walk to a pub, a vending machine, a coffeeshop or a shop of a town.
 STR_WALKER_BUY                                                  :[buy for {CURRENCY_LONG}]
@@ -2297,6 +2299,8 @@ STR_WALKER_ITEM_CROSSBOW                                        :Crossbow
 STR_WALKER_ITEM_BOLTS                                           :Crossbow bolts
 STR_WALKER_ITEM_SWORD                                           :Sword
 STR_WALKER_ITEM_TWO_HANDED_SWORD                                :Two-handed sword
+STR_WALKER_ITEM_TORCH                                           :Torch
+STR_WALKER_ITEM_LANTERN                                         :Lantern
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

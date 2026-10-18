@@ -35,6 +35,9 @@ int FirstPersonWeaponKey(WalkerItem item);
 WalkerItem FirstPersonWeaponInHand();
 void FirstPersonTakeWeapon(WalkerItem item);
 bool FirstPersonOpen();
+/** The light in the left hand of the walker (first_person_gui.cpp): the one there, one taken or put out. */
+WalkerItem FirstPersonLightInHand();
+void FirstPersonTakeLight(WalkerItem item);
 
 static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
@@ -56,6 +59,7 @@ struct WalkerInventoryWindow : Window {
 		Use,  ///< use one (the beer, the marijuana)
 		Buy,  ///< buy one here
 		Hand, ///< a weapon into the hand, or put away
+		Light, ///< a light into the left hand, or put out
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
@@ -129,6 +133,10 @@ struct WalkerInventoryWindow : Window {
 			} else if (key != 0 && FirstPersonOpen()) {
 				DrawString(ir.left, ir.right, y, GetString(item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, key), item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Hand});
+			} else if (spec.kind == WalkerItemKind::Light && FirstPersonOpen()) {
+				const bool lit = FirstPersonLightInHand() == item;
+				DrawString(ir.left, ir.right, y, lit ? STR_WALKER_LIGHT_IN_HAND : STR_WALKER_TAKE_LIGHT, lit ? TextColour::Green : TextColour::Orange, AlignmentH::End);
+				this->lines.push_back({y, y + lh, item, LineDoes::Light});
 			}
 			y += lh;
 		}
@@ -169,6 +177,10 @@ struct WalkerInventoryWindow : Window {
 				case LineDoes::Hand:
 					FirstPersonTakeWeapon(l.item);
 					this->in_hand = FirstPersonWeaponInHand();
+					this->SetWidgetDirty(WID_WI_LIST);
+					break;
+				case LineDoes::Light:
+					FirstPersonTakeLight(l.item);
 					this->SetWidgetDirty(WID_WI_LIST);
 					break;
 			}

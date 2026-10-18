@@ -2632,6 +2632,14 @@ static void ReadThreeDVehicleObjects()
 						if (fig.frames < 2) fig.frame_prefix.clear();
 						if (a.contains("chuze") && a.at("chuze").is_object()) fig.walk_step = std::clamp(a.at("chuze").value("krok_m", 0.0f), 0.0f, 10.0f);
 					}
+					/* A light's flame (the colleague's torch and lantern, "plamen"): its frames, the rest of it in each. */
+					if (fig.thing && e.contains("plamen") && e.at("plamen").is_object()) {
+						const auto &a = e.at("plamen");
+						fig.frame_prefix = a.value("uzly", std::string("plamen_"));
+						fig.frames = std::clamp(a.value("snimku", 0), 0, 64);
+						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+						if (fig.frames < 2) fig.frame_prefix.clear();
+					}
 					/* A thing that turns (the colleague's hra/3d/PROSBA-HOSPODA.md, the spit: "we will turn it"): about an
 					 * axis through a point, a turn in so many ticks, smoothly; and its frames ("stridani", the pig, the
 					 * calf and the lamb) one after another, each for so many turns. */

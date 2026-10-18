@@ -54,6 +54,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   hra sama pouliční lampy (vanilla `Roadside::StreetLights` na městských ulicích, 4 místa dlaždice): sprite lampy hra
   vynechá a postaví 3D lampu s ramenem nad ulici (otočený pohled, sever s 3D domy, pohled z očí). Rozhoduje hra, ne
   já. Lampy u dveří dá kolega do domů sám (`doplnky`). Rig: `test3d lampy` vypíše dlaždice s pouličními lampami.
+- **Pochodeň a lucerna** (kolegovy `pochoden`, `lucerna`, `kategorie` svetlo): nové věci inventáře (od začátku, i na
+  prodej v obchodě, iddqd je dá), klávesa **L** střídá pochodeň → lucernu → zhasnout, klik v inventáři taky. Drží se
+  v levé ruce dole vlevo (zbraň zůstává v pravé), plamen se střídá po snímcích `plamen_NN`, v noci světlo kolem chodce
+  (teplé, 8 m) a samotné světlo se neztmaví; pochodeň při zhasnutí zasyčí (`zhasnuti`). Rig: `test3d chodec svetlo`.
 - Planý poplach: rig hlásil pád karty u stadionu („kresleni obrazku 7 (glDrawElements)“), ale byl to můj zkušební
   deník z ověřování hlídače pádů. Deset běhů stadionu s Tatrou v4 na kartě (llvmpipe) proběhlo bez chyby.
 
