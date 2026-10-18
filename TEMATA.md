@@ -62,6 +62,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   sednou** (stejné postavy jako v hospodě).
 - Jen **nový stadion `dum_20_stadion`** (holky na tribuně), starý ne. Akce trvá **jeden herní den**.
 - Kolegovi: `hra/3d/POSTAVY-MODULARNI-A-STADION.md` (prosba o místa akce v záznamu stadionu, klíč `akce`).
+- Hasičská Tatra (hráč): celkově méně trojúhelníků, ale mřížka chladiče pěkná, kola podrobná jak jsou (instance);
+  doplněno kolegovi do `PROSBA-POZARNI-TATRA.md`.
 
 ## 18. 10. – modulární postavy (hráč, domlouváme)
 
@@ -74,6 +76,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   jako pojmenovanými animacemi, stejná jména póz u všech postav, odkaz `{"postava", "poza", …}` všude, kopie holek
   z balíčku Tater pryč, později konfigurátor řidičů. Bez `poza` jako dřív.
 - **Hra dál:** (1) `poza` a doplňky domů, (2) akce na stadionu, (3) domy na grafické kartě.
+- **Hotovo (pózy):** záznam `"druh": "postava"` s `pozy` (každá póza animace kostry; `animace`, `snimku`, `tiku`,
+  `smycka`, `krok_m`), postavy `"<jmeno>/<poza>"`, jméno samo = `stoji` nebo první; odkaz `poza` u `postavy`
+  domů/průmyslu i `posadka`/`posadky` vozidel (`FigureNamed()`). Ověřeno v rigu na kostře draka (zkušební balíček
+  jen v buildu). Formát kolegovi doplněn do `POSTAVY-MODULARNI-A-STADION.md`.
 
 ## 18. 10. – 3D na grafické kartě, krok 1: obrázky vozidel, postav a efektů
 

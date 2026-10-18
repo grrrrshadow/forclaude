@@ -1722,14 +1722,25 @@ static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
 	}
 }
 
+/**
+ * The figure a place names: "postava", and of a figure of poses the pose it is in ("poza", the player, 18. 10.: "one
+ * figure object everywhere, with what it has to do"), "<postava>/<poza>". Without a pose the figure as it is named.
+ */
+static std::string FigureNamed(const nlohmann::json &f)
+{
+	std::string name = f.at("postava").get<std::string>();
+	if (f.contains("poza") && f.at("poza").is_string() && !f.at("poza").get<std::string>().empty()) name += "/" + f.at("poza").get<std::string>();
+	return name;
+}
+
 /** The figures standing on a building ("postavy") and its doors ("dvere"). */
-/** A figure of a list ("postava", "poloha", "otoceni", "meritko"); whether it is one. */
+/** A figure of a list ("postava", "poza", "poloha", "otoceni", "meritko"); whether it is one. */
 static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
 {
 	if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) return false;
 	const auto &at = f.at("poloha");
 	if (!at.is_array() || at.size() != 3) return false;
-	fig.figure = f.at("postava").get<std::string>();
+	fig.figure = FigureNamed(f);
 	for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
 	fig.facing = f.value("otoceni", 0.0f);
 	fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
@@ -2223,6 +2234,34 @@ static void ReadThreeDVehicleObjects()
 					fig.thing = figure_kind == "predmet";
 					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
 					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
+					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
+					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
+					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
+					 * "<jmeno>/<poza>": of one frame it stands so (the animation's first key), of more ("snimku", each held
+					 * "tiku" ticks) it goes round the animation ("smycka" false: once, staying on the last), walking "krok_m"
+					 * a round. The figure by its name alone is its pose "stoji", else its first. Placed with "poza" beside
+					 * "postava" (FigureNamed()). Its file is read when it is first drawn, not here. */
+					if (figure_kind == "postava" && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
+						const std::string bones = folder + e.value("kostra", e.at("soubor").get<std::string>());
+						const auto &poses = e.at("pozy");
+						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
+							ThreeDVehicleObject one = fig;
+							one.name = name;
+							one.skeleton_file = bones;
+							one.skeleton_anim = p.is_object() && p.contains("animace") && p.at("animace").is_string() ? p.at("animace").get<std::string>() : pose;
+							one.frames = p.is_object() ? std::clamp(p.value("snimku", 1), 1, 64) : 1;
+							one.frame_ticks = p.is_object() ? std::clamp(p.value("tiku", 1), 1, 1000) : 1;
+							one.loop = p.is_object() ? p.value("smycka", true) : true;
+							one.walk_step = p.is_object() ? std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f) : 0.0f;
+							/* (A figure of frames walks by them: the frames of the pose, though of bones, not of nodes.) */
+							if (one.frames >= 2) one.frame_prefix = pose + "_";
+							_figure_objects.push_back(std::move(one));
+						};
+						for (const auto &[pose, p] : poses.items()) posed(pose, p, fig.name + "/" + pose);
+						const std::string first = poses.contains("stoji") ? std::string("stoji") : poses.begin().key();
+						posed(first, poses.at(first), fig.name);
+						continue;
+					}
 					if (fig.thing) {
 						/* A thing's states, each a whole thing in a node of its own (the colleague's bow, "volno" and
 						 * "napnuto"; the crossbow, "natazeno" and "vystreleno"): a figure each, "<jmeno>/<stav>", that node
@@ -2422,7 +2461,7 @@ static void ReadThreeDVehicleObjects()
 					for (const auto &c : list) {
 						if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
 						ThreeDVehicleCrew crew;
-						crew.figure = c.at("postava").get<std::string>();
+						crew.figure = FigureNamed(c);
 						const auto &at = c.at("poloha");
 						if (!at.is_array() || at.size() != 3) continue;
 						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
