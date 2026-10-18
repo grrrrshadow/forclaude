@@ -1936,6 +1936,28 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 			size_t k = 0;
 			for (const auto &g : event.at("holky")) stand(g, girls[k++ % std::size(girls)]);
 		}
+		/* The Tatra standing on the pitch (the colleague's "tatra": its record "zaznam", its set "sada" or the sets of its
+		 * layers -- the cab, the grille, the body), empty -- the player, 18. 10.: "on the pitch stands an empty Tatra,
+		 * without a driver" --, drawn as a figure of its own name "vozidlo:<record>|<set>|<set>..."
+		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. */
+		if (event.contains("tatra") && event.at("tatra").is_object()) {
+			const auto &t = event.at("tatra");
+			const std::string record = t.value("zaznam", t.value("objekt", std::string()));
+			if (!record.empty()) {
+				nlohmann::json f = t;
+				std::string name = "vozidlo:" + record;
+				if (t.contains("sada") && t.at("sada").is_string()) name += "|" + t.at("sada").get<std::string>();
+				if (t.contains("sada") && t.at("sada").is_array()) {
+					for (const auto &set : t.at("sada")) {
+						if (set.is_string()) name += "|" + set.get<std::string>();
+					}
+				}
+				f["postava"] = name;
+				f.erase("poza");
+				ThreeDObjectFigure fig;
+				if (ReadFigure(f, fig)) obj.event_figures.push_back(std::move(fig));
+			}
+		}
 		/* The firemen are the Tatras' (their package's figures): only those named. */
 		if (event.contains("hasici") && event.at("hasici").is_array()) {
 			for (const auto &h : event.at("hasici")) stand(h, {});
@@ -2695,6 +2717,7 @@ static void ReadThreeDVehicleObjects()
 						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
 						crew.turn = c.value("otoceni", 0.0f);
 						crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
+						crew.driver_seat = c.value("misto_ridicky", false);
 						out.push_back(std::move(crew));
 					}
 				};
@@ -2737,14 +2760,23 @@ static void ReadThreeDVehicleObjects()
 						obj.crew_groups.emplace_back(group, std::move(crew));
 					}
 				}
-				if (obj.part_names.size() > 64) {
-					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only 63 can be", obj.name, obj.part_names.size() - 1);
-					obj.part_names.resize(64);
+				/* The record's own crew a part too: drawn in every state but one standing empty (EmptyStateOf()). */
+				if (!obj.crew.empty()) obj.part_names.push_back("posadka");
+				if (obj.part_names.size() > ThreeDParts::COUNT) {
+					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only {} can be", obj.name, obj.part_names.size() - 1, ThreeDParts::COUNT - 1);
+					obj.part_names.resize(ThreeDParts::COUNT);
 				}
 				auto part_of = [&](const std::string &name) {
 					auto it = std::ranges::find(obj.part_names, name);
 					return it == obj.part_names.end() || it == obj.part_names.begin() ? 0 : static_cast<int>(it - obj.part_names.begin());
 				};
+				/* The groups of the crew one of which sits at the driver's seat (the colleague's hra/3d/TATRY-V3-PRO-HRU.md:
+				 * Mat driving the fire Tatra): where a state shows one, the record's driver is not drawn (PartsOf()). */
+				for (const auto &[group, list] : obj.crew_groups) {
+					const int part = part_of("posadky/" + group);
+					if (part > 0 && std::ranges::any_of(list, [](const ThreeDVehicleCrew &c) { return c.driver_seat; })) obj.seat_groups.Set(part);
+				}
+				obj.crew_record_part = part_of("posadka");
 				/* The wheels of its own model that turn as it goes, the front ones steering. */
 				if (e.contains("kola_v_modelu") && e.at("kola_v_modelu").is_array()) {
 					for (const auto &k : e.at("kola_v_modelu")) {
@@ -2802,7 +2834,7 @@ static void ReadThreeDVehicleObjects()
 							state.addon_parts.assign(obj.addons.size(), -1);
 							for (const auto &[file, node] : st.at("doplnky").items()) {
 								const int part = node.is_string() ? part_of(file + "/" + node.get<std::string>()) : 0;
-								if (part > 0) state.parts |= uint64_t{1} << part;
+								if (part > 0) state.parts.Set(part);
 								for (size_t a = 0; a < obj.addons.size(); a++) {
 									if (obj.addons[a].key == file) state.addon_parts[a] = static_cast<int16_t>(part);
 								}
@@ -2820,9 +2852,10 @@ static void ReadThreeDVehicleObjects()
 								}
 							}
 						}
+						if (st.contains("sada") && st.at("sada").is_string()) state.set_name = st.at("sada").get<std::string>();
 						if (st.contains("posadka") && st.at("posadka").is_string()) {
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
-							if (part > 0) state.parts |= uint64_t{1} << part;
+							if (part > 0) state.parts.Set(part);
 							state.crew_part = part;
 						}
 						obj.states.push_back(state);
@@ -3047,7 +3080,23 @@ void ResetThreeDVehicleObjects()
 	_vehicle_objects_read = false;
 }
 
-/** An effect of the indices by its name ("druh": "efekt"), or nullptr. */
+/**
+ * A vehicle of the packages by its record's name ("jmeno": a building's event names the fire Tatra so), nullptr none:
+ * of two packages of the same set (v2 and v3 of the Tatras in the folder) the one beside its GRF loaded, as the
+ * engines take it.
+ */
+const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	const ThreeDVehicleObject *first = nullptr;
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.name != name) continue;
+		if (PackageBesideLoadedGrf(o.package, o.grfid)) return &o;
+		if (first == nullptr) first = &o;
+	}
+	return first;
+}
+
 /** The cars of the game's own that drive about by themselves (three_d_walkers.h). */
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars()
 {
@@ -3055,6 +3104,7 @@ const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars()
 	return _driving_objects;
 }
 
+/** An effect of the indices by its name ("druh": "efekt"), or nullptr. */
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
@@ -3351,22 +3401,22 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
  * state shows one. A part not in it yet is added: the shape is made again with it, the one before kept till nothing
  * draws from it. A figure that moves: its frame (GetShape(int)).
  */
-const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame, uint64_t parts) const
+const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame, const ThreeDParts &asked) const
 {
 	if (this->frames >= 2 && (frame > 0 || this->blend_from != nullptr)) return this->GetShape(frame);
 	MarkThreeDUsed(this->used);
-	parts |= 1;
-	MakeOnce(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || (this->shape_parts & parts) == parts); }, [this, parts] {
-		uint64_t want = parts;
+	const ThreeDParts parts = asked | 1;
+	MakeOnce(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || this->shape_parts.Contains(parts)); }, [this, parts] {
+		ThreeDParts want = parts;
 		{
 			std::lock_guard lock(_lazy_mutex);
 			want |= this->shape_parts;
 		}
 		return std::make_pair(this->MakeShape(0, want), want);
-	}, [this](std::pair<std::shared_ptr<const ThreeDVehicleShape>, uint64_t> made) {
+	}, [this](std::pair<std::shared_ptr<const ThreeDVehicleShape>, ThreeDParts> made) {
 		if (this->shape != nullptr) _shapes_replaced.push_back(std::move(this->shape));
 		this->shape = std::move(made.first);
-		this->shape_parts = this->shape != nullptr ? made.second : 0;
+		this->shape_parts = this->shape != nullptr ? made.second : ThreeDParts{};
 		this->shape_tried = true;
 		if (this->shape != nullptr && this->shape->all[1] > this->shape->all[0]) {
 			std::copy(std::begin(this->shape->all), std::end(this->shape->all), this->extent);
@@ -3410,12 +3460,12 @@ const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
  * parts it has not yet are added in the background (MadeOrAsked()), the shape as it is till then; nullptr when there
  * is none yet. A figure's frame that cannot be read: its shape, as GetShape(int) gives it.
  */
-const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame, uint64_t parts) const
+const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame, const ThreeDParts &asked) const
 {
 	MarkThreeDUsed(this->used);
 	if (this->frames < 2 || (frame <= 0 && this->blend_from == nullptr)) {
-		parts |= 1;
-		MadeOrAsked(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || (this->shape_parts & parts) == parts); }, [this, parts] { this->GetShape(0, parts); });
+		const ThreeDParts parts = asked | 1;
+		MadeOrAsked(this, LAZY_SHAPE, [this, parts] { return this->shape_tried && (this->shape == nullptr || this->shape_parts.Contains(parts)); }, [this, parts] { this->GetShape(0, parts); });
 		std::lock_guard lock(_lazy_mutex);
 		return this->shape.get();
 	}
@@ -3639,7 +3689,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
  * are asked for (a texture is asked for by its index: ThreeDVehicleObject::GetTexture()).
  * @param parts the parts of its states (PartsOf()), bit n the part n
  */
-std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame, uint64_t parts) const
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int frame, const ThreeDParts &parts) const
 {
 	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
@@ -3663,7 +3713,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
 	if (!this->only_node.empty()) key += "|u" + this->only_node;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
-	if (!this->addons.empty()) key += fmt::format("|p{:x}", parts);
+	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	GlbMesh mesh;
 	if (this->file.starts_with("beamng:")) {
@@ -3845,7 +3895,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
 			return;
 		}
-		if (part == 0 && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
+		if ((part == 0 || part == this->crew_record_part) && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
 		const size_t first_triangle = made->tri.size() / 3;
 		const bool lit = !made->nrm.empty() && !fs->nrm.empty();
 		if (!lit) made->nrm.clear();
@@ -3876,17 +3926,18 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		}
 		mark_part(part, first_triangle);
 	};
-	for (const ThreeDVehicleCrew &c : this->crew) add_crew(c, 0);
+	for (const ThreeDVehicleCrew &c : this->crew) add_crew(c, static_cast<uint8_t>(this->crew_record_part));
 	/* What a state shows -- a group of the crew, the load -- is not of the vehicle's size (its length on the map). */
 	const size_t extent_floats = made->pos.size();
 	auto part_of = [&](const std::string &name) {
 		auto p = std::ranges::find(this->part_names, name);
-		return p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64 ? uint8_t{0} : static_cast<uint8_t>(p - this->part_names.begin());
+		return p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= ThreeDParts::COUNT ? uint8_t{0} : static_cast<uint8_t>(p - this->part_names.begin());
 	};
 	for (const auto &[group, list] : this->crew_groups) {
 		const uint8_t part = part_of("posadky/" + group);
 		if (part == 0) continue;
-		for (const ThreeDVehicleCrew &c : list) add_crew(c, part);
+		/* One at the driver's seat (Mat driving) not drawn from the own cab's eye, as the record's driver is not. */
+		for (const ThreeDVehicleCrew &c : list) add_crew(c, c.driver_seat ? static_cast<uint8_t>(ThreeDVehicleShape::PART_SEAT + part) : part);
 	}
 	/* The add-ons: of each, only the nodes a state may show, each its part, its textures after the others (marked as
 	 * the add-on's, for the colour a state gives it). */
@@ -3908,7 +3959,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		std::vector<uint8_t> node_part;
 		for (const std::string &node : addon.nodes) {
 			const uint8_t part = part_of(addon.key + "/" + node);
-			if (part == 0 || ((parts >> part) & 1) == 0) continue;
+			if (part == 0 || !parts.Has(part)) continue;
 			nodes.push_back(node);
 			node_part.push_back(part);
 		}
@@ -4318,10 +4369,56 @@ float ThreeDVehicleObject::Length() const
  * The parts drawn in a state (its step, StateStep() of three_d_vehicle_object.cpp: 0 none): what is always drawn (bit
  * 0) and what the state shows -- an add-on's node, a group of the crew. Without a state no add-on and no group.
  */
-uint64_t ThreeDVehicleObject::PartsOf(int state) const
+ThreeDParts ThreeDVehicleObject::PartsOf(int state) const
 {
 	const ThreeDVehicleState *s = this->State(state);
-	return 1 | (s != nullptr ? s->parts : 0);
+	ThreeDParts parts = s != nullptr ? s->parts : ThreeDParts{};
+	if (s != nullptr && s->empty) {
+		/* Standing empty: none of its crew, the record's driver neither (bit 0). */
+		if (s->crew_part > 0) parts.Clear(s->crew_part);
+		return parts;
+	}
+	/* Bit 0: the record's driver drawn -- not where the state's group of the crew takes the driver's seat. */
+	if (s == nullptr || s->crew_part <= 0 || !this->seat_groups.Has(s->crew_part)) parts.Set(0);
+	if (this->crew_record_part > 0) parts.Set(this->crew_record_part);
+	return parts;
+}
+
+/** The first of its states drawn for the GRF's set so named ("sada"), 0 none (as it is). */
+int ThreeDVehicleObject::StateNamed(std::string_view set) const
+{
+	for (size_t i = 0; i < this->states.size(); i++) {
+		if (this->states[i].set_name == set) return static_cast<int>(i + 1);
+	}
+	return 0;
+}
+
+/**
+ * A state as another (0 as it is) but standing empty: none of its crew drawn (the player, 18. 10.: "on the pitch stands
+ * an empty Tatra, without a driver"). Made the first time, a step after its states as ComposeState() makes them.
+ */
+int ThreeDVehicleObject::EmptyStateOf(int step) const
+{
+	ThreeDVehicleState made;
+	if (const ThreeDVehicleState *s = this->State(step); s != nullptr) {
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->empty_steps.find(step);
+		if (it != this->empty_steps.end()) return it->second;
+		made = *s;
+	} else {
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->empty_steps.find(0);
+		if (it != this->empty_steps.end()) return it->second;
+		made.addon_parts.assign(this->addons.size(), -1);
+		made.addon_colours.assign(this->addons.size(), 0);
+	}
+	made.empty = true;
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->empty_steps.emplace(step, 0);
+	if (!added) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
 }
 
 /**
@@ -4383,9 +4480,9 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
 	}
 	for (int16_t part : made.addon_parts) {
-		if (part > 0 && part < 64) made.parts |= uint64_t{1} << part;
+		if (part > 0) made.parts.Set(part);
 	}
-	if (made.crew_part > 0 && made.crew_part < 64) made.parts |= uint64_t{1} << made.crew_part;
+	if (made.crew_part > 0) made.parts.Set(made.crew_part);
 	this->composed.push_back(std::move(made));
 	const int step = static_cast<int>(this->states.size() + this->composed.size());
 	this->composed_steps.emplace(std::make_pair(layers, true_colours), step);
@@ -4411,10 +4508,10 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 			w.part = part;
 			found.push_back(w);
 		};
-		for (const ThreeDVehicleCrew &c : this->crew) add(c, 0);
+		for (const ThreeDVehicleCrew &c : this->crew) add(c, static_cast<uint8_t>(this->crew_record_part));
 		for (const auto &[group, list] : this->crew_groups) {
 			auto p = std::ranges::find(this->part_names, "posadky/" + group);
-			if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= 64) continue;
+			if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= ThreeDParts::COUNT) continue;
 			for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
 		}
 		return found;
@@ -5669,7 +5766,7 @@ void ThreeDVehicleObject::Forget() const
 	this->frame_shapes.shrink_to_fit();
 	this->shape.reset();
 	this->shape_tried = false;
-	this->shape_parts = 0;
+	this->shape_parts = {};
 }
 
 /** How long a thing not drawn keeps what was made of it, seconds. */

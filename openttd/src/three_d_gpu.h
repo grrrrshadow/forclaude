@@ -31,6 +31,7 @@
 struct ThreeDVehicleShape;
 struct ThreeDObjectTexture;
 struct ThreeDDetailMask;
+struct ThreeDParts;
 
 /** A 4x4 matrix, rows first: a point (x, y, z, 1) of a shape to the picture's (x, y pixels, z depth, 1). */
 using ThreeDGpuMatrix = std::array<float, 16>;
@@ -53,7 +54,7 @@ struct ThreeDGpuTriangles {
 	std::vector<bool> used;          ///< by texture index, whether any triangle drawn has it
 };
 
-std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, uint64_t parts, bool vehicle, size_t textures);
+std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures);
 
 /**
  * How the card paints a texture's texels as it draws them -- as RasterObject() paints them on the processor, each step

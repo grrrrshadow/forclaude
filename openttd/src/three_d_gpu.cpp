@@ -36,7 +36,7 @@ std::atomic<bool> _three_d_gpu_off = false;
 
 /* The triangles of the shapes by the parts shown (ThreeDGpuTrianglesOf()), kept for the pictures to come. */
 static std::mutex _triangles_mutex;
-static std::map<std::tuple<uint64_t, uint64_t, bool>, std::pair<std::shared_ptr<const ThreeDGpuTriangles>, uint64_t>> _triangles_kept;
+static std::map<std::tuple<uint64_t, ThreeDParts, bool>, std::pair<std::shared_ptr<const ThreeDGpuTriangles>, uint64_t>> _triangles_kept;
 static uint64_t _triangles_clock = 0;
 static constexpr size_t TRIANGLES_KEPT = 512;
 
@@ -47,9 +47,9 @@ static constexpr size_t TRIANGLES_KEPT = 512;
  * @param vehicle of the vehicle, else of a figure of its crew
  * @param textures how many textures it has (a simpler shape's are its whole shape's)
  */
-std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, uint64_t parts, bool vehicle, size_t textures)
+std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures)
 {
-	const auto key = std::make_tuple(shape.uid.value, vehicle ? parts : 0, vehicle);
+	const auto key = std::make_tuple(shape.uid.value, vehicle ? parts : ThreeDParts{}, vehicle);
 	{
 		std::lock_guard lock(_triangles_mutex);
 		auto it = _triangles_kept.find(key);
@@ -71,7 +71,7 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 			bool glass = false;
 			if (vehicle) {
 				const uint8_t part = tn < shape.tri_part.size() ? shape.tri_part[tn] : 0;
-				if (part != ThreeDVehicleShape::PART_GLASS && part != ThreeDVehicleShape::PART_DRIVER && !ThreeDVehicleShape::Shown(part, parts)) continue;
+				if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
 				glass = shape.IsGlass(tn);
 			}
 			if (glass != (pass == 1)) continue;

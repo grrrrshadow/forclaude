@@ -359,12 +359,12 @@ static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walke
 {
 	const std::vector<ThreeDWalkingCrew> &walking = obj->WalkingCrew();
 	if (walking.empty() || walked == 0) return 0;
-	const uint64_t parts = obj->PartsOf(state);
+	const ThreeDParts parts = obj->PartsOf(state);
 	const float turn = StateTurn(obj, state);
 	uint64_t code = 0;
 	for (size_t k = 0; k < walking.size() && k < 8; k++) {
 		const ThreeDWalkingCrew &w = walking[k];
-		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
+		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const ThreeDVehicleObject &f = *w.figure;
 		const double step = f.walk_step * scale * w.scale * UNITS_PER_METRE;
 		if (step <= 0 || f.frames < 2) continue;
@@ -1011,7 +1011,7 @@ struct ObjectCamera {
 };
 
 /** The lights on at night of an object (RasterObject()): the places they shine from on the picture, pixels from its origin. */
-static void ObjectLightsOn(const ThreeDVehicleShape &whole, uint64_t parts, int lights, const ObjectCamera &cam, std::vector<ThreeDPictureLight> &out)
+static void ObjectLightsOn(const ThreeDVehicleShape &whole, const ThreeDParts &parts, int lights, const ObjectCamera &cam, std::vector<ThreeDPictureLight> &out)
 {
 	out.clear();
 	if (lights == 0) return;
@@ -1082,7 +1082,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	 * Its textures, lamps and glass stay the whole shape's. */
 	const ThreeDVehicleShape *shape = whole->Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
 	/* The parts the state shows; the whole object turned about z at its origin as the state has it (a cart pushed). */
-	const uint64_t parts = obj.PartsOf(state);
+	const ThreeDParts parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
 	const int ss = SUPERSAMPLE;
 	const float p = pxm * ss;
@@ -1101,7 +1101,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
 		const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
 		const bool glass = shape->IsGlass(t / 3);
-		if (part != ThreeDVehicleShape::PART_GLASS && part != ThreeDVehicleShape::PART_DRIVER && !ThreeDVehicleShape::Shown(part, parts)) continue;
+		if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
 		(glass ? glass_triangles : drawn_triangles).push_back(t);
 		for (int c = 0; c < 3; c++) used[shape->tri[t + c]] = 1;
 	}
@@ -1128,7 +1128,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
-		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
+		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
 		if (fs == nullptr) continue;
 		CrewPiece &c = crew.emplace_back(CrewPiece{w.figure, fs, w.scale, {}, {}, {}, {}});
@@ -1524,7 +1524,7 @@ static void ShapeExtent(const ThreeDVehicleShape &s, float e[6])
  */
 static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk)
 {
-	const uint64_t parts = obj.PartsOf(state);
+	const ThreeDParts parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
 	const int ss = SUPERSAMPLE;
 	const float p = pxm * ss;
@@ -1607,7 +1607,7 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
-		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
+		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
 		if (fs == nullptr) continue;
 		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
@@ -2673,7 +2673,7 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind});
 	};
 	/* The lamps of the parts its state shows only (the cab's on the cab shown). */
-	const uint64_t parts = ev.obj->PartsOf(ev.state);
+	const ThreeDParts parts = ev.obj->PartsOf(ev.state);
 	auto shown = [&](const std::vector<uint8_t> &of, size_t i) { return ThreeDVehicleShape::Shown(i < of.size() ? of[i] : 0, parts); };
 	if ((ev.lights & LIGHTS_FRONT) != 0 && !shape->front_lights.empty()) {
 		float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
@@ -3001,11 +3001,11 @@ static void MakePreviewFrame(const PreviewFrameKey &key, float fade, float rust_
 		}
 	}
 	if (!known) {
-		const uint64_t parts = obj->PartsOf(state);
+		const ThreeDParts parts = obj->PartsOf(state);
 		e = {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
 		for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
 			const uint8_t part = t / 3 < shape->tri_part.size() ? shape->tri_part[t / 3] : 0;
-			if (part != 0 && part < ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
+			if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
 			for (int k = 0; k < 3; k++) {
 				const float *v = &shape->pos[static_cast<size_t>(shape->tri[t + k]) * 3];
 				for (int a = 0; a < 3; a++) {
@@ -3234,9 +3234,55 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * @param x,y where it stands, world units, when z is known
  * @return the picture, or nullptr when the figure is not there
  */
+/**
+ * A vehicle standing as a figure of a building ("vozidlo:<record>|<set>", the new stadium's event: the fire Tatra on
+ * the pitch): the vehicle of its package by its record's name, in the state of the set so named, standing empty -- none
+ * of its crew (the player, 18. 10.: "on the pitch stands an empty Tatra, without a driver").
+ * @param[out] ev its object and state; its place, size and facing are the caller's
+ * @return false: not such a name, or its package is not there
+ */
+bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
+{
+	if (!name.starts_with("vozidlo:")) return false;
+	name.remove_prefix(std::string_view("vozidlo:").size());
+	size_t bar = name.find('|');
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObjectNamed(name.substr(0, bar));
+	if (obj == nullptr) return false;
+	/* Its sets, one of each layer it shows (the cab, the grille, the body), made one state as the GRF's layers are. */
+	std::vector<int> steps;
+	while (bar != std::string_view::npos) {
+		const size_t next = name.find('|', bar + 1);
+		const int step = obj->StateNamed(name.substr(bar + 1, next == std::string_view::npos ? std::string_view::npos : next - bar - 1));
+		if (step > 0) steps.push_back(step);
+		bar = next;
+	}
+	ev.obj = obj;
+	ev.state = obj->EmptyStateOf(obj->ComposeState(steps));
+	if (_debug_misc_level >= 2) {
+		const ThreeDParts parts = obj->PartsOf(ev.state);
+		Debug(misc, 2, "3D standing vehicle {}: {} sets found, state {}, parts {:x}.{:x}", obj->name, steps.size(), ev.state, parts.bits[1], parts.bits[0]);
+	}
+	return true;
+}
+
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y)
 {
 	if (std::isnan(yaw)) yaw = GetViewYaw();
+	if (name.starts_with("vozidlo:")) {
+		/* A vehicle standing as a figure: at its true size against the building, empty, still. */
+		ThreeDEyeVehicle ev;
+		if (!GetThreeDStandingVehicle(name, ev)) return nullptr;
+		const bool for_eye = ViewportDrawingEye();
+		const ThreeDParts parts = ev.obj->PartsOf(ev.state);
+		const ThreeDVehicleShape *shape = for_eye ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
+		if (shape == nullptr) return nullptr;
+		const float world_az = facing - 135.0f;
+		_object_picture_may_wait = for_eye;
+		const ThreeDModelPicture *pic = ObjectPicture(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state);
+		_object_picture_may_wait = false;
+		if (pic != nullptr && height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+		return pic;
+	}
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
 	if (fig == nullptr) return nullptr;
 	const bool by_tick = frame < 0;

@@ -8137,7 +8137,7 @@ struct CabFigureModel {
 	const ThreeDVehicleShape *whole = nullptr; ///< its shape
 	const ThreeDVehicleShape *shape = nullptr; ///< as simple as its distance allows
 	std::vector<const ThreeDObjectTexture *> texs; ///< its textures at that detail, painted as its state has them
-	uint64_t parts = 1;   ///< the parts its state shows
+	ThreeDParts parts = 1; ///< the parts its state shows
 	double turn = 0;      ///< how far its state turns the whole model, degrees
 	/** Its crew that walks, each at its frame. */
 	struct Crew {
@@ -8189,7 +8189,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureMode
 	const std::vector<ThreeDWalkingCrew> &walking = fig->WalkingCrew();
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
-		if (w.part != 0 && (w.part >= 64 || ((model.parts >> w.part) & 1) == 0)) continue;
+		if (!ThreeDVehicleShape::Shown(w.part, model.parts)) continue;
 		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(k < 8 ? static_cast<int>((fg.walk >> (8 * k)) & 0xFF) : 0);
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
@@ -8222,7 +8222,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	const bool lit = shape->nrm.size() == shape->pos.size();
 	/* The light from above, a little from the south-east of the map, as the houses have it. */
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
-	const uint64_t parts = model.parts;
+	const ThreeDParts parts = model.parts;
 	const double ta = model.turn * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
 	auto turned = [&](double &x, double &y) {
 		const double tx = x * tc - y * ts, ty = x * ts + y * tc;
@@ -8319,8 +8319,8 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 		const uint glass_alpha = static_cast<uint>(std::clamp(s.glass_alpha, 0.0f, 1.0f) * 256);
 		for (size_t t = 0; t + 2 < s.tri.size(); t += 3) {
 			const uint8_t part = t / 3 < s.tri_part.size() ? s.tri_part[t / 3] : 0;
-			if (part == ThreeDVehicleShape::PART_DRIVER && fg.own_cab) continue;
-			if (part != 0 && part < ThreeDVehicleShape::PART_DRIVER && (part >= 64 || ((parts >> part) & 1) == 0)) continue;
+			if (fg.own_cab && ThreeDVehicleShape::AtDriverSeat(part)) continue;
+			if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
 			const int ti = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
 			const ThreeDObjectTexture *tex = tx[static_cast<size_t>(ti) < tx.size() ? ti : 0];
 			const uint32_t ia = s.tri[t], ib = s.tri[t + 1], ic = s.tri[t + 2];
@@ -8669,7 +8669,7 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 		const double across = fg.size * OBJECT_UNITS_PER_METRE, length = across * fg.along, up = fg.size * OBJECT_HEIGHT_PER_METRE;
 		const size_t corners = shape->night_pos.size() / 3;
 		/* The lamps of the parts its state shows only (the colleague's lorries: the cab's on the cab shown). */
-		const uint64_t parts = fg.obj->PartsOf(fg.state);
+		const ThreeDParts parts = fg.obj->PartsOf(fg.state);
 		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
 			if ((fg.lights & (tn < shape->night_back.size() && shape->night_back[tn] ? 2 : 1)) == 0) continue;
@@ -9545,6 +9545,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	for (const CabObject &co : objects) {
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
 		auto add = [&](const ThreeDObjectFigure &f) {
+			/* A vehicle standing among them (the fire Tatra on the pitch, GetThreeDStandingVehicle()): as the vehicles. */
+			if (ThreeDEyeVehicle ev; GetThreeDStandingVehicle(f.figure, ev)) {
+				ev.scale = f.scale;
+				ev.x = ox + f.at[0] * OBJECT_UNITS_PER_METRE;
+				ev.y = oy + f.at[1] * OBJECT_UNITS_PER_METRE;
+				ev.z = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+				ev.facing = f.facing;
+				AddCabVehicle(ev, false);
+				return;
+			}
 			const ThreeDVehicleObject *fig = GetThreeDFigure(f.figure);
 			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, static_cast<int>(std::lround(ox + f.at[0] * OBJECT_UNITS_PER_METRE)), static_cast<int>(std::lround(oy + f.at[1] * OBJECT_UNITS_PER_METRE)),
 					static_cast<int>(std::lround(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE)), f.facing, -1);

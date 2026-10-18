@@ -265,6 +265,39 @@ struct ThreeDObject {
 };
 
 /**
+ * The parts of a vehicle's object a state shows (ThreeDVehicleObject::part_names, PartsOf()): bit n the part n, part 0
+ * always drawn, bit 0 the record's driver. 128 bits: the colleague's Tatra of all its bodies has 65 parts.
+ */
+struct ThreeDParts {
+	static constexpr int COUNT = 126; ///< the parts an object may have, part 0 among them (a part at the driver's seat, PART_SEAT + n, fits a byte)
+	std::array<uint64_t, 2> bits{};
+
+	constexpr ThreeDParts() = default;
+	/** The parts of the bits of the first 64 (1: part 0 alone). */
+	constexpr ThreeDParts(uint64_t low) : bits{low, 0} {}
+	static constexpr ThreeDParts All()
+	{
+		ThreeDParts p;
+		p.bits = {UINT64_MAX, UINT64_MAX};
+		return p;
+	}
+	constexpr bool Has(int n) const { return n >= 0 && n < 128 && ((this->bits[n >> 6] >> (n & 63)) & 1) != 0; }
+	constexpr void Set(int n) { if (n >= 0 && n < 128) this->bits[n >> 6] |= uint64_t{1} << (n & 63); }
+	constexpr void Clear(int n) { if (n >= 0 && n < 128) this->bits[n >> 6] &= ~(uint64_t{1} << (n & 63)); }
+	/** Whether it has all the parts of another. */
+	constexpr bool Contains(const ThreeDParts &o) const { return (this->bits[0] & o.bits[0]) == o.bits[0] && (this->bits[1] & o.bits[1]) == o.bits[1]; }
+	constexpr ThreeDParts &operator|=(const ThreeDParts &o)
+	{
+		this->bits[0] |= o.bits[0];
+		this->bits[1] |= o.bits[1];
+		return *this;
+	}
+	constexpr ThreeDParts operator|(const ThreeDParts &o) const { ThreeDParts p = *this; return p |= o; }
+	constexpr bool operator==(const ThreeDParts &) const = default;
+	constexpr auto operator<=>(const ThreeDParts &) const = default;
+};
+
+/**
  * The shape of a vehicle as a 3D object, shared by its paints (the colleague's hra/3d/PROSBA-VOZIDLA-3D.md): metres in
  * the vehicle's frame -- x forward, y to its left, z up, the origin in the middle of the vehicle on the top of the
  * rail -- with the normals, so the game lights it itself.
@@ -313,7 +346,19 @@ struct ThreeDVehicleShape {
 		return (triangle < this->tri_part.size() && this->tri_part[triangle] == PART_GLASS) || (triangle < this->tri_glass.size() && this->tri_glass[triangle] != 0);
 	}
 	/** Whether a part of the object is shown with these parts (ThreeDVehicleObject::PartsOf()): 0 always. */
-	static bool Shown(uint8_t part, uint64_t parts) { return part == 0 || (part < 64 && ((parts >> part) & 1) != 0); }
+	static constexpr uint8_t PART_SEAT = 128;   ///< tri_part PART_SEAT + n: of the part n, sitting at the driver's seat ("misto_ridicky"), not drawn from the own cab's eye
+	/**
+	 * Whether a triangle of a part is drawn where the parts are shown (ThreeDVehicleObject::PartsOf()): part 0 always,
+	 * the record's driver while bit 0 is set (not where a group of the state takes the driver's seat), else its bit.
+	 */
+	static bool Shown(uint8_t part, const ThreeDParts &parts)
+	{
+		if (part == PART_DRIVER) return parts.Has(0);
+		if (part >= PART_SEAT && part < PART_SEAT + ThreeDParts::COUNT) part -= PART_SEAT;
+		return part == 0 || (part < ThreeDParts::COUNT && parts.Has(part));
+	}
+	/** Whether a triangle of a part sits at the driver's seat: not drawn from the own cab's eye. */
+	static bool AtDriverSeat(uint8_t part) { return part == PART_DRIVER || (part >= PART_SEAT && part < PART_SEAT + ThreeDParts::COUNT); }
 
 	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
 	static constexpr int SIMPLER_LEVELS = 6;
@@ -386,7 +431,7 @@ struct ThreeDVehicleState {
 	uint32_t colour = 0;        ///< "barva": the paint's colour (Colour::data), over its mask; 0 the texture's own
 	float fade = 0;             ///< "lak": how far the paint has faded to its target, 0 to 1
 	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1
-	uint64_t parts = 0;         ///< the parts it shows ("doplnky" its nodes, "posadka" a group of the crew): bit n the part n (ThreeDVehicleObject::part_names)
+	ThreeDParts parts;          ///< the parts it shows ("doplnky" its nodes, "posadka" a group of the crew): bit n the part n (ThreeDVehicleObject::part_names)
 	std::vector<uint32_t> addon_colours; ///< "barvy_doplnku": each add-on's colour (Colour::data), 0 its texture's own
 	/* A state of layers (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): the GRF picks a set for each layer of its
 	 * sprites, as for its pictures, and the states of the layers make one (ThreeDVehicleObject::ComposeState()). */
@@ -396,6 +441,8 @@ struct ThreeDVehicleState {
 	uint8_t given = 0;          ///< the keys it gives (GIVEN_*): those of a later layer replace an earlier one's
 	std::vector<int16_t> addon_parts; ///< "doplnky": the part of each add-on it shows (its node), -1 where it names none of the add-on
 	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
+	std::string set_name;       ///< "sada": the GRF's set it is drawn for, by its name ("nastavba hasici"): a vehicle standing as a building's event (StateNamed())
+	bool empty = false;         ///< standing empty: none of its crew drawn, the record's nor its groups' (EmptyStateOf(): the fire Tatra on the pitch)
 	/**
 	 * The colours of the vehicle's set, detail by detail (true_colour.h, callback 1C1: the configurator, the colour by
 	 * the load, by chance, faded with age), its masks of details ("maska_podrobnosti") painted in them; 0 none. Not of
@@ -411,6 +458,7 @@ struct ThreeDVehicleCrew {
 	float at[3] = {};           ///< "poloha": where its feet stand, metres in the vehicle's frame
 	float turn = 0;             ///< "otoceni": degrees about z, 0 facing forward as the vehicle
 	float scale = 1.0f;         ///< "meritko": its size against its true one (the girls on a lorry's back twice, as at a stop)
+	bool driver_seat = false;   ///< "misto_ridicky": of a group, sitting at the driver's seat -- the record's driver not drawn where its state shows it
 };
 
 /**
@@ -508,6 +556,9 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::vector<std::pair<std::string, std::vector<ThreeDVehicleCrew>>> crew_groups; ///< "posadky": named groups of the crew, each shown by the states naming it ("posadka")
+	ThreeDParts seat_groups;  ///< by part, the groups of the crew one of which sits at the driver's seat ("misto_ridicky"): the record's driver not drawn where they are shown
+	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
+	mutable std::map<int, int> empty_steps; ///< the step of each state standing empty (EmptyStateOf()), made the first time
 	std::vector<ThreeDVehicleAddon> addons;  ///< "doplnky"
 	std::vector<std::string> part_names;     ///< the parts the states show: each add-on's nodes ("<soubor>/<uzel>"), then the crew's groups ("posadky/<jmeno>"); part n is bit n of a state's parts
 	std::vector<ThreeDModelWheel> model_wheels; ///< "kola_v_modelu"
@@ -545,9 +596,9 @@ struct ThreeDVehicleObject {
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
-	const ThreeDVehicleShape *GetShape(int frame, uint64_t parts) const;
+	const ThreeDVehicleShape *GetShape(int frame, const ThreeDParts &parts) const;
 	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
-	const ThreeDVehicleShape *TryGetShape(int frame, uint64_t parts) const;
+	const ThreeDVehicleShape *TryGetShape(int frame, const ThreeDParts &parts) const;
 	bool ShapeKnown() const;
 	bool KnownExtent(float extent[6], uint32_t *version = nullptr) const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
@@ -560,9 +611,11 @@ struct ThreeDVehicleObject {
 	const ThreeDDetailMask *GetDetailMask(int addon) const;
 	bool HasDetails() const;
 	float Length() const;
-	uint64_t PartsOf(int state) const;
+	ThreeDParts PartsOf(int state) const;
 	const ThreeDVehicleState *State(int step) const;
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0) const;
+	int StateNamed(std::string_view set) const;
+	int EmptyStateOf(int step) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void Forget() const;
 	size_t TrimTextures(std::set<const void *> &seen) const;
@@ -571,7 +624,7 @@ struct ThreeDVehicleObject {
 
 	mutable std::shared_ptr<const ThreeDVehicleShape> shape; ///< read the first time it is drawn
 	mutable bool shape_tried = false;
-	mutable uint64_t shape_parts = 0; ///< the parts of its states the shape has (PartsOf()): only those of the states drawn, the others added as they are drawn
+	mutable ThreeDParts shape_parts; ///< the parts of its states the shape has (PartsOf()): only those of the states drawn, the others added as they are drawn
 	mutable float extent[6] = {};   ///< its shape's extent of all its corners (ThreeDVehicleShape::all), kept when the shape is forgotten
 	mutable bool extent_known = false;
 	mutable uint32_t extent_version = 0; ///< each time the extent grew (a part added to the shape)
@@ -582,7 +635,7 @@ struct ThreeDVehicleObject {
 	mutable bool walking_found = false;
 
 private:
-	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame, uint64_t parts = UINT64_MAX) const;
+	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame, const ThreeDParts &parts = ThreeDParts::All()) const;
 	std::shared_ptr<const ThreeDVehicleShape> MakePosedShape(int frame) const;
 	mutable std::vector<ThreeDTextureLevels> levels; ///< the textures, each halved for each level of detail
 	mutable ThreeDTextureLevels mask_levels;         ///< the paint mask likewise (its grey in the red)
@@ -598,6 +651,7 @@ private:
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name);
 std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node);
 std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound);
 

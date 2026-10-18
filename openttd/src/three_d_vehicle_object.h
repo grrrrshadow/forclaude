@@ -69,6 +69,7 @@ struct ThreeDEyeVehicle {
 	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
+bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);
 struct ThreeDObjectTexture;
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
