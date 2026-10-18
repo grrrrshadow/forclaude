@@ -57,8 +57,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kolegovi napsáno (`hra/3d/PROSBA-POZARNI-TATRA.md`): hasičská Tatra jako objekt v balíčku 3D Tater, hasiči jako
   posádka, trojúhelníky „jako normální Tatra“ (zatím rozpočet osobního auta, Tatra 603 má 7 634), přesný limit až po
   hráčově porovnání V3S a Tatry.
-- **Nejasné:** jak často – hráč napsal „jednou za sedm dní, dvakrát za měsíc“, pak „obráceně“. A který stadion
-  (`dum_20_stadion` nebo `dum_14_stadion_stary`). Doptat se, pak dělat.
+- Jak často: „zhruba od do pozpátku“ – tedy zhruba od dvakrát za měsíc do jednou za týden (náhodně 7–15 dní).
+- Jen na našem 3D stadionu (ne s vanilla grafikou). Bude tam i **Mat, který točí pivo**, a **holky z hospody si tam
+  sednou** (stejné postavy jako v hospodě).
+- **Nejasné:** oba 3D stadiony (`dum_20_stadion`, `dum_14_stadion_stary`), nebo jen jeden? Jak dlouho akce trvá?
+
+## 18. 10. – modulární postavy (hráč, domlouváme)
+
+- „Postavy budou zvlášť modulární a jedna postava objekt bude všude s tím, co má dělat – kráčet, kouřit.“ Jedna
+  postava (kostra) s pózami/animacemi, volaná všude jménem a pózou: domy, hospoda, stadion, chodci, kabiny.
+- „Postavy budeme dávat skrz 3D GRF modulárně“: zabudované (ingame) postavy jsou výchozí a nezbytné pro Tatry;
+  **GRF Tater si jen zavolá postavy do kabiny** (žádné vlastní kopie holek v balíčku).
+- Později v konfigurátoru **jiní řidiči**, které nabídnou tvůrci GRF – postavy zasunovací do hry.
+- Kolegovi zatím jen návrh „jedna holka, víc póz, `poza`“ (`DOPLNKY-DOMU-A-POSTAVY.md`); zbytek mu napsat, až hráč
+  potvrdí.
 
 ## 18. 10. – 3D na grafické kartě, krok 1: obrázky vozidel, postav a efektů
 
