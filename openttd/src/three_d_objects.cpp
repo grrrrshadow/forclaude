@@ -4467,17 +4467,27 @@ static std::vector<uint8_t> TextureTexelsDrawn(int w, int h, const std::vector<f
 		mark((x[0] + x[1] + x[2]) / 3, (y[0] + y[1] + y[2]) / 3);
 		const double area = (x[1] - x[0]) * (y[2] - y[0]) - (y[1] - y[0]) * (x[2] - x[0]);
 		if (std::abs(area) < 1e-9) continue;
-		const int x0 = std::max(0, static_cast<int>(std::floor(std::min({x[0], x[1], x[2]})))), x1 = std::min(w - 1, static_cast<int>(std::ceil(std::max({x[0], x[1], x[2]}))));
+		/* Row by row: where the row's middle crosses the triangle's edges, the texels whose middles are between them
+		 * at once (each texel tried was the most of the time of an atlas of the colleague's). */
 		const int y0 = std::max(0, static_cast<int>(std::floor(std::min({y[0], y[1], y[2]})))), y1 = std::min(h - 1, static_cast<int>(std::ceil(std::max({y[0], y[1], y[2]}))));
 		for (int py = y0; py <= y1; py++) {
 			const double cy = py + 0.5;
-			for (int px = x0; px <= x1; px++) {
-				const double cx = px + 0.5;
-				const double w0 = ((x[2] - x[1]) * (cy - y[1]) - (y[2] - y[1]) * (cx - x[1])) / area;
-				const double w1 = ((x[0] - x[2]) * (cy - y[2]) - (y[0] - y[2]) * (cx - x[2])) / area;
-				const double w2 = 1.0 - w0 - w1;
-				if (w0 >= -1e-6 && w1 >= -1e-6 && w2 >= -1e-6) drawn[static_cast<size_t>(py) * w + px] = 1;
+			double lo = std::numeric_limits<double>::infinity(), hi = -std::numeric_limits<double>::infinity();
+			for (int k = 0; k < 3; k++) {
+				const double ax = x[k], ay = y[k], bx = x[(k + 1) % 3], by = y[(k + 1) % 3];
+				if (cy < std::min(ay, by) - 1e-9 || cy > std::max(ay, by) + 1e-9) continue;
+				if (std::abs(by - ay) < 1e-12) {
+					lo = std::min({lo, ax, bx});
+					hi = std::max({hi, ax, bx});
+					continue;
+				}
+				const double cx = ax + (bx - ax) * (cy - ay) / (by - ay);
+				lo = std::min(lo, cx);
+				hi = std::max(hi, cx);
 			}
+			if (!(lo <= hi)) continue;
+			const int px0 = std::max(0, static_cast<int>(std::ceil(lo - 0.5 - 1e-6))), px1 = std::min(w - 1, static_cast<int>(std::floor(hi - 0.5 + 1e-6)));
+			if (px0 <= px1) std::fill_n(drawn.begin() + static_cast<size_t>(py) * w + px0, px1 - px0 + 1, 1);
 		}
 	}
 	return drawn;

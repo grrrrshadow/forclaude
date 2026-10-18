@@ -40,8 +40,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   místo 345, 4096×1712 72 místo 140–190, 4096×1200 41 místo 115. Obraz Tatry 148: rozdíl 9 pixelů z 100 tisíc
   (jen odstín, žádná černá ani díry; s pruhem 4 by bylo 43 px). Pokrytí jednoho rozměru a pokrytí se pamatuje pro
   texturu a masky stejného rozvržení (3 poslední); trojúhelník přes celou opakovanou texturu = všechno kreslené.
-  Zbývá: (b) rasterizace pokrytí sama (4096×3824: ~150 ms; 512×1024 s opakovanou texturou pořád ~280 ms – trojúhelníky
-  přes opakování jen v jednom směru), (c) proč se tři textury 4096×3824 dělají souběžně (pamatování pak nepomůže).
+  **Hotovo (b)**: pokrytí se rasterizuje po řádcích (rozsah řádku najednou, ne test každého texelu): 512×1024
+  280 → 27 ms, 4096×1712 ~50 → 21–30, 4096×3824 150 → 113 ms (tam už rozhoduje počet trojúhelníků, 936 tisíc).
+  Obraz: pár desítek pixelů jiný odstín, nic černého. Zbývá (c): tři textury 4096×3824 se stejným pokrytím se
+  dělají souběžně, pamatování pokrytí pak nepomůže; celkem velký atlas ~300–380 ms na vlákně na pozadí.
 - **(3) hotovo**: sprite auta při 0° se dělá na vlákně jako ikonky nákupu (`ThreeDVehicleObjectSpriteStandIn`);
   mezitím se kreslí nejbližší hotový směr téhož auta (při otočení chvilku starý směr), první auto typu nic. Až
   přijde, překreslí se auta z objektů a okna vozidel (depo, seznamy, detail). Rig (Tatra 148 ze zatáčky při 0°):
