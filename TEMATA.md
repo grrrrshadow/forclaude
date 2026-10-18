@@ -27,6 +27,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – build #285 shazuje celý Winlator; deník grafické karty
+
+- Hráč: *„#285 padá celej winlator. jednou v nákupním menu, podruhý load save velké zátěže“*, *„spadne to vždycky,
+  když kliknu v menu nákupu na naše 3D auto, teď jednoduchá tatra vb“*, *„to není řešení takhle něco vypnout“*.
+- #285 = `87a22c8`. Proti #284 přibylo kreslení 3D obrázků grafickou kartou (vlastní vlákno, OpenGL 3.3). Pod
+  Winlatorem běží OpenGL (VirGL/Zink) přímo v aplikaci: když spadne ovladač, zmizí celý Winlator a crash log hry
+  nezůstane. V rigu (software OpenGL) to nepadá. Paměť v rigu: domy ~450 MB jako v #284 (stará sada ještě víc).
+- Hotovo (`8f33958`): **deník karty** `Dokumenty/OpenTTD/3d_karta.log` – každý krok s kartou se zapíše na disk
+  dřív, než se udělá (kontext, funkce, překlad programů, rámec, každý tvar/trojúhelníky/textura na kartu, kreslení,
+  čtení zpět). Po pádu při dalším startu hra kartu vynechá, nastavení vypne, řekne v okně, u čeho umřela, a deník
+  nechá jako `3d_karta_minule.log` → **ten pošli**, podle posledního řádku opravím přesné místo. Karta je výchozí
+  zapnutá (nastavení Grafika „3D obrázky kreslí grafická karta“), drží nejvýš 128 MB. Obrázek, jehož trojúhelníky
+  ukazují mimo rohy tvaru, kreslí procesor (telefonní karta čtení mimo neodpustí).
+- Opravená chyba: **textury postav** (holky, Mat, posádka, čarodějnice) se brala v plné velikosti 1024×1024 i na
+  obrázek pár pixelů – velikost textury se hledala v tvaru, který postava se snímky nemá. Textury vozidel v rigu
+  26,8 → 10,9 MB.
+
+## 18. 10. – pohled z první osoby
+
+- Hráč: *„může chodit rychleji ještě“*, *„když dvakrát kliknu na pravej čudl myši tak se mi zas pohled vycentruje,
+  jako otáčení mapy“*. Hotovo (`d240195`): chůze 3,0 m/s (dřív 1,6), běh 8,5 m/s; dva kliky pravým bez tažení
+  srovnají pohled rovně dopředu. *„pustil jsem 3D domy, je to dobrý, nečuká se to“*.
+
 ## 18. 10. – noční létající čarodějnice (prosba kolegovi, hra domluvit)
 
 - Hráč: *„potřebujem v grrrrf noční létající čarodějnice“*, *„udělej čarodějnice velký jak holky na zastávce“*.
