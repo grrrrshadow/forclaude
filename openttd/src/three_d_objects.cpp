@@ -224,6 +224,83 @@ static uint32_t ReadU32(std::span<const uint8_t> d, size_t at)
 	return d[at] | (d[at + 1] << 8) | (d[at + 2] << 16) | (static_cast<uint32_t>(d[at + 3]) << 24);
 }
 
+/** The bytes of one number of an accessor's component type (glTF's 5120 to 5126). */
+static size_t GlbComponentSize(int type)
+{
+	return type == 5126 || type == 5125 ? 4 : type == 5123 || type == 5122 ? 2 : 1;
+}
+
+/**
+ * One number of an accessor: a float, or a whole number of any size, signed or not. A normalised one is the fraction of
+ * its largest (a signed one -1 at the least): KHR_mesh_quantization (gltfpack, the colleague's hra/3d/PROSBA-TATRY-DOMY-
+ * POSTAVY.md) stores the normals and the texture coordinates so, the positions as whole numbers, a node's transform
+ * making them metres again.
+ * @throw std::invalid_argument for a type glTF does not have
+ */
+static double ReadGlbNumber(std::span<const uint8_t> d, size_t at, int type, bool normalized)
+{
+	switch (type) {
+		case 5126: return std::bit_cast<float>(ReadU32(d, at));
+		case 5125: return ReadU32(d, at);
+		case 5123: {
+			const double v = d[at] | (d[at + 1] << 8);
+			return normalized ? v / 65535.0 : v;
+		}
+		case 5122: {
+			const double v = static_cast<int16_t>(d[at] | (d[at + 1] << 8));
+			return normalized ? std::max(v / 32767.0, -1.0) : v;
+		}
+		case 5121: return normalized ? d[at] / 255.0 : d[at];
+		case 5120: {
+			const double v = static_cast<int8_t>(d[at]);
+			return normalized ? std::max(v / 127.0, -1.0) : v;
+		}
+		default: throw std::invalid_argument("component type");
+	}
+}
+
+/**
+ * Why a .glb is not read as it is: an extension it requires that the game cannot read -- its meshes compressed
+ * (gltfpack's -c, -cc: EXT_meshopt_compression; Draco), its pictures not PNG (gltfpack's -tc: KTX2, Basis; WebP).
+ * Quantised meshes (KHR_mesh_quantization) and moved textures (KHR_texture_transform) are read.
+ * @return empty when it can be read
+ */
+static std::string GlbExtensionNotRead(const nlohmann::json &j)
+{
+	if (!j.contains("extensionsRequired") || !j.at("extensionsRequired").is_array()) return {};
+	for (const auto &e : j.at("extensionsRequired")) {
+		if (!e.is_string()) continue;
+		const std::string name = e.get<std::string>();
+		if (name == "EXT_meshopt_compression" || name == "KHR_meshopt_compression" || name == "KHR_draco_mesh_compression" || name == "KHR_texture_basisu" || name == "EXT_texture_webp") {
+			return "requires " + name + ", which the game does not read (gltfpack: without -c, -cc and -tc)";
+		}
+	}
+	return {};
+}
+
+/**
+ * How a material moves its base colour texture over the coordinates (KHR_texture_transform: gltfpack stores the texture
+ * coordinates as fractions of where they lie, the move making them what they were): u' = a[0] + a[2] u + a[3] v,
+ * v' = a[1] + a[4] u + a[5] v; {0, 0, 1, 0, 0, 1} when it does not.
+ */
+static std::array<double, 6> GlbUvTransform(const nlohmann::json &j, int material)
+{
+	std::array<double, 6> a{0, 0, 1, 0, 0, 1};
+	if (material < 0 || !j.contains("materials") || static_cast<size_t>(material) >= j.at("materials").size()) return a;
+	const auto &mat = j.at("materials").at(material);
+	if (!mat.contains("pbrMetallicRoughness") || !mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return a;
+	const auto &info = mat.at("pbrMetallicRoughness").at("baseColorTexture");
+	if (!info.contains("extensions") || !info.at("extensions").contains("KHR_texture_transform")) return a;
+	const auto &t = info.at("extensions").at("KHR_texture_transform");
+	double offset[2] = {0, 0}, scale[2] = {1, 1};
+	if (t.contains("offset")) for (int k = 0; k < 2; k++) offset[k] = t.at("offset").at(k).get<double>();
+	if (t.contains("scale")) for (int k = 0; k < 2; k++) scale[k] = t.at("scale").at(k).get<double>();
+	const double r = t.value("rotation", 0.0), c = std::cos(r), s = std::sin(r);
+	/* translation * rotation * scale, the rotation as the extension has it */
+	a = {offset[0], offset[1], c * scale[0], s * scale[1], -s * scale[0], c * scale[1]};
+	return a;
+}
+
 /**
  * A .glb as its meshes are read from it (ReadGlbMesh()): its JSON parsed once, and of its binary buffer only the
  * pieces the meshes and pictures read need (Piece()), read from the file as they are wanted. A file of the colleague's
@@ -265,6 +342,8 @@ struct GlbFile {
 			this->error = e.what();
 			return;
 		}
+		this->error = GlbExtensionNotRead(this->json);
+		if (!this->error.empty()) return;
 		const size_t bin_head = 20 + ((json_len + 3) & ~size_t{3});
 		uint8_t chunk[8];
 		if (bin_head + 8 <= this->length && fseek(*this->file, static_cast<long>(this->base + bin_head), SEEK_SET) == 0 && fread(chunk, sizeof(chunk), 1, *this->file) == 1 && ReadU32(chunk, 4) == 0x004E4942) {
@@ -641,6 +720,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		struct AccessorBytes {
 			std::span<const uint8_t> bytes;
 			int type = 0;
+			bool normalized = false;
 			size_t count = 0, stride = 0, size = 0;
 		};
 		auto accessor_bytes = [&](int index, int comps) {
@@ -648,15 +728,17 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			const auto &v = views.at(a.at("bufferView").get<int>());
 			AccessorBytes r;
 			r.type = a.at("componentType").get<int>();
+			r.normalized = a.value("normalized", false);
 			r.count = a.at("count").get<size_t>();
-			r.size = r.type == 5126 || r.type == 5125 ? 4 : r.type == 5123 || r.type == 5122 ? 2 : 1;
+			r.size = GlbComponentSize(r.type);
 			r.stride = v.value("byteStride", 0);
 			if (r.stride == 0) r.stride = r.size * comps;
 			const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
 			r.bytes = glb->Piece(offset, r.count == 0 ? 0 : (r.count - 1) * r.stride + r.size * comps);
 			return r;
 		};
-		/* An accessor's elements as floats: copied as they are when they are floats one after the other. */
+		/* An accessor's elements as floats: copied as they are when they are floats one after the other; whole
+		 * numbers (a quantised mesh) as their values, normalised ones as fractions (ReadGlbNumber()). */
 		auto read = [&](int index, int comps, std::vector<float> &out) {
 			const AccessorBytes a = accessor_bytes(index, comps);
 			out.resize(a.count * comps);
@@ -668,16 +750,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			}
 			for (size_t i = 0; i < a.count; i++) {
 				for (int c = 0; c < comps; c++) {
-					const size_t at = i * a.stride + c * a.size;
-					float value;
-					switch (a.type) {
-						case 5126: value = std::bit_cast<float>(ReadU32(a.bytes, at)); break;
-						case 5125: value = static_cast<float>(ReadU32(a.bytes, at)); break;
-						case 5123: value = static_cast<float>(a.bytes[at] | (a.bytes[at + 1] << 8)); break;
-						case 5121: value = a.bytes[at]; break;
-						default: throw std::invalid_argument("component type");
-					}
-					out[i * comps + c] = value;
+					out[i * comps + c] = static_cast<float>(ReadGlbNumber(a.bytes, i * a.stride + c * a.size, a.type, a.normalized));
 				}
 			}
 		};
@@ -785,6 +858,16 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		/* One mesh's primitives, transformed. */
 		auto add_mesh = [&](int mesh_index, const Matrix &m, uint16_t group, uint16_t mark = 0, bool glass = false) {
 			const auto &prims = j.at("meshes").at(mesh_index).at("primitives");
+			/* The normals turned by the inverse transpose of the transform's turning -- the cross products of its columns,
+			 * mirrored the other way round -- so a node stretched more one way than another (a quantised mesh's node,
+			 * Blender's unapplied scale) keeps them square to its faces. */
+			const double ca[3] = {m[0], m[1], m[2]}, cb[3] = {m[4], m[5], m[6]}, cc[3] = {m[8], m[9], m[10]};
+			double nm[9] = {
+				cb[1] * cc[2] - cb[2] * cc[1], cb[2] * cc[0] - cb[0] * cc[2], cb[0] * cc[1] - cb[1] * cc[0],
+				cc[1] * ca[2] - cc[2] * ca[1], cc[2] * ca[0] - cc[0] * ca[2], cc[0] * ca[1] - cc[1] * ca[0],
+				ca[1] * cb[2] - ca[2] * cb[1], ca[2] * cb[0] - ca[0] * cb[2], ca[0] * cb[1] - ca[1] * cb[0],
+			};
+			if (ca[0] * nm[0] + ca[1] * nm[1] + ca[2] * nm[2] < 0) for (double &e : nm) e = -e;
 			for (const auto &p : prims) {
 				if (p.value("mode", 4) != 4) continue; // triangles only
 				std::vector<float> pos, nrm, uv;
@@ -799,6 +882,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				int material = p.value("material", -1);
 				if (first_material < 0 && material >= 0) first_material = material;
 				uint8_t tex = texture_of(material);
+				const std::array<double, 6> ut = GlbUvTransform(j, material);
 				uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
 				for (size_t i = 0; i < corners; i++) {
 					double X = pos[i * 3], Y = pos[i * 3 + 1], Z = pos[i * 3 + 2];
@@ -809,11 +893,12 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					mesh.pos.push_back(static_cast<float>(gx));
 					mesh.pos.push_back(static_cast<float>(-gz));
 					mesh.pos.push_back(static_cast<float>(gy));
-					mesh.uv.push_back(static_cast<float>(uv[i * 2]));
-					mesh.uv.push_back(static_cast<float>(uv[i * 2 + 1]));
+					const double u = uv[i * 2], v = uv[i * 2 + 1];
+					mesh.uv.push_back(static_cast<float>(ut[0] + ut[2] * u + ut[3] * v));
+					mesh.uv.push_back(static_cast<float>(ut[1] + ut[4] * u + ut[5] * v));
 					if (normals) {
 						double nx = nrm[i * 3], ny = nrm[i * 3 + 1], nz = nrm[i * 3 + 2];
-						double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+						double hx = nm[0] * nx + nm[3] * ny + nm[6] * nz, hy = nm[1] * nx + nm[4] * ny + nm[7] * nz, hz = nm[2] * nx + nm[5] * ny + nm[8] * nz;
 						double l = std::sqrt(hx * hx + hy * hy + hz * hz);
 						if (l > 0) { hx /= l; hy /= l; hz /= l; }
 						mesh.nrm.push_back(static_cast<float>(hx));
@@ -927,14 +1012,37 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				if (node.contains("children")) for (const auto &c : node.at("children")) todo.push_back({c.get<int>(), m, inside, group, mark, glass});
 			}
 		} else {
-			/* The first node with a mesh, its own transform. */
+			/* The first node with a mesh not of the night (the lit windows, "noc", are read on their own), with its
+			 * parents' transforms: gltfpack puts each mesh in a node of its own under the named one, its transform
+			 * making the quantised positions metres again, the named node's transform above it. */
 			Matrix m = identity;
 			int mesh_index = 0;
 			if (j.contains("nodes")) {
-				for (const auto &node : j.at("nodes")) {
-					if (!node.contains("mesh")) continue;
-					mesh_index = node.at("mesh").get<int>();
-					m = local(node);
+				const auto &nodes = j.at("nodes");
+				std::vector<int> parent(nodes.size(), -1);
+				for (size_t i = 0; i < nodes.size(); i++) {
+					if (!nodes.at(i).contains("children")) continue;
+					for (const auto &c : nodes.at(i).at("children")) {
+						const size_t child = c.get<size_t>();
+						if (child < parent.size() && parent[child] < 0 && child != i) parent[child] = static_cast<int>(i);
+					}
+				}
+				auto name_of = [&](int n) {
+					const auto &node = nodes.at(n);
+					return node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
+				};
+				for (size_t i = 0; i < nodes.size(); i++) {
+					if (!nodes.at(i).contains("mesh")) continue;
+					bool night = false;
+					Matrix w = local(nodes.at(i));
+					size_t up = 0;
+					for (int n = parent[i]; n >= 0 && up++ < nodes.size(); n = parent[n]) {
+						if (IsNightNode(name_of(n))) night = true;
+						w = multiply(local(nodes.at(n)), w);
+					}
+					if (night || IsNightNode(name_of(static_cast<int>(i)))) continue;
+					mesh_index = nodes.at(i).at("mesh").get<int>();
+					m = w;
 					break;
 				}
 			}
@@ -960,12 +1068,14 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					read(p.at("attributes").at("TEXCOORD_0").get<int>(), 2, uv);
 					const size_t corners = uv.size() / 2;
 					read_indices(p, corners, idx);
+					const std::array<double, 6> ut = GlbUvTransform(j, p.value("material", -1));
 					for (size_t i = 0; i + 2 < idx.size(); i += 3) {
 						for (int k = 0; k < 3; k++) {
 							const size_t c = static_cast<size_t>(idx[i + k]);
 							if (c >= corners) break;
-							cover->push_back(static_cast<float>(uv[c * 2]));
-							cover->push_back(static_cast<float>(uv[c * 2 + 1]));
+							const double u = uv[c * 2], v = uv[c * 2 + 1];
+							cover->push_back(static_cast<float>(ut[0] + ut[2] * u + ut[3] * v));
+							cover->push_back(static_cast<float>(ut[1] + ut[4] * u + ut[5] * v));
 						}
 						cover->resize(cover->size() / 6 * 6);
 					}
@@ -1182,15 +1292,19 @@ struct GlbSkeleton {
 	}
 };
 
-/** An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers (normalised ones as they are stored). */
+/**
+ * An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers, normalised ones as fractions
+ * (ReadGlbNumber(): gltfpack's turnings of the bones as normalised shorts, the weights as normalised bytes).
+ */
 static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bin, int index, int comps, std::vector<double> &out)
 {
 	const auto &a = j.at("accessors").at(index);
 	const auto &v = j.at("bufferViews").at(a.at("bufferView").get<int>());
 	const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
 	const int type = a.at("componentType").get<int>();
+	const bool normalized = a.value("normalized", false);
 	const size_t count = a.at("count").get<size_t>();
-	const size_t size = type == 5126 || type == 5125 ? 4 : type == 5123 || type == 5122 ? 2 : 1;
+	const size_t size = GlbComponentSize(type);
 	size_t stride = v.value("byteStride", 0);
 	if (stride == 0) stride = size * comps;
 	out.resize(count * comps);
@@ -1198,15 +1312,7 @@ static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bi
 		for (int c = 0; c < comps; c++) {
 			const size_t at = offset + i * stride + c * size;
 			if (at + size > bin.size()) throw std::out_of_range("accessor past the buffer");
-			double value;
-			switch (type) {
-				case 5126: value = std::bit_cast<float>(ReadU32(bin, at)); break;
-				case 5125: value = ReadU32(bin, at); break;
-				case 5123: value = bin[at] | (bin[at + 1] << 8); break;
-				case 5121: value = bin[at]; break;
-				default: throw std::invalid_argument("component type");
-			}
-			out[i * comps + c] = value;
+			out[i * comps + c] = ReadGlbNumber(bin, at, type, normalized);
 		}
 	}
 }
@@ -1244,6 +1350,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 	auto sk = std::make_unique<GlbSkeleton>();
 	try {
 		nlohmann::json j = nlohmann::json::parse(json_text);
+		if (const std::string why = GlbExtensionNotRead(j); !why.empty()) throw std::invalid_argument(why);
 		const auto &nodes = j.at("nodes");
 		sk->nodes.resize(nodes.size());
 		for (size_t i = 0; i < nodes.size(); i++) {
@@ -1335,15 +1442,22 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				const size_t corners = pos.size() / 3;
 				if (uv.size() != corners * 2) uv.assign(corners * 2, 0.0);
 				if (jn.size() != corners * 4 || wt.size() != corners * 4) continue;
-				/* Weights stored as whole numbers are fractions of their largest. */
-				const int wtype = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>()).at("componentType").get<int>();
-				const double wscale = wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
+				/* Weights stored as whole numbers are fractions of their largest (read so when they say they are normalised). */
+				const auto &wa = j.at("accessors").at(attr.at("WEIGHTS_0").get<int>());
+				const int wtype = wa.at("componentType").get<int>();
+				const double wscale = wa.value("normalized", false) ? 1.0 : wtype == 5121 ? 1.0 / 255 : wtype == 5123 ? 1.0 / 65535 : 1.0;
 				if (p.contains("indices")) {
 					ReadGlbAccessor(j, bin, p.at("indices").get<int>(), 1, idx);
 				} else {
 					for (size_t i = 0; i < corners; i++) idx.push_back(static_cast<double>(i));
 				}
 				const uint8_t tex = texture_of(p.value("material", -1));
+				const std::array<double, 6> ut = GlbUvTransform(j, p.value("material", -1));
+				for (size_t i = 0; i < corners; i++) {
+					const double u = uv[i * 2], v = uv[i * 2 + 1];
+					uv[i * 2] = ut[0] + ut[2] * u + ut[3] * v;
+					uv[i * 2 + 1] = ut[1] + ut[4] * u + ut[5] * v;
+				}
 				const uint32_t base = static_cast<uint32_t>(sk->pos.size() / 3);
 				const bool normals = nrm.size() == corners * 3 && (sk->pos.empty() || !sk->nrm.empty());
 				if (!normals) sk->nrm.clear();
@@ -1364,6 +1478,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 					sk->weight_of.push_back(ws);
 				}
 				for (size_t t = 0; t + 2 < idx.size(); t += 3) {
+					if (idx[t] >= corners || idx[t + 1] >= corners || idx[t + 2] >= corners) continue;
 					for (int k = 0; k < 3; k++) sk->tri.push_back(base + static_cast<uint32_t>(idx[t + k]));
 					sk->tri_tex.push_back(tex);
 				}
