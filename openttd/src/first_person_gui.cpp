@@ -45,6 +45,7 @@
 #include "command_func.h"
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
+#include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
 #include "sound_func.h"
@@ -90,6 +91,16 @@ static constexpr double FIRST_PERSON_GRAVITY = 9.81;
 static constexpr double FIRST_PERSON_FLY_S = 8.0;
 static constexpr double FIRST_PERSON_STUCK_S = 20.0;
 static constexpr size_t FIRST_PERSON_MISSILES = 40;
+/** The machine gun: seconds between its shots (the colleague: "ten a second"), shots of a burst from Space. */
+static constexpr double FIRST_PERSON_BURST_S = 0.1;
+static constexpr int FIRST_PERSON_BURST_SHOTS = 5;
+/** The rocket launcher: seconds to load it again (the colleague: "then it loads 2 s"); a rocket's blast, metres, and how
+ * long it is seen; its smoke: a puff every so many seconds, each seen so long. */
+static constexpr double FIRST_PERSON_ROCKET_RELOAD_S = 2.0;
+static constexpr double FIRST_PERSON_BLAST_M = 4.0;
+static constexpr double FIRST_PERSON_BLAST_S = 0.8;
+static constexpr double FIRST_PERSON_PUFF_EVERY_S = 0.04;
+static constexpr double FIRST_PERSON_PUFF_S = 1.6;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 
@@ -98,6 +109,8 @@ enum class WeaponUse : uint8_t {
 	Swing,    ///< swung: the hammer, the swords
 	Bow,      ///< drawn while held, shot let go
 	Crossbow, ///< shot, then drawn again
+	Burst,    ///< fires shot after shot while the button is held (the machine gun)
+	Rocket,   ///< a rocket, flying straight, exploding where it hits; then loaded again (the rocket launcher)
 };
 
 /**
@@ -122,6 +135,8 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::Crossbow, "kuse", WeaponUse::Crossbow, 0, 2, WalkerItem::Bolts, "sipka", 70},
 	{WalkerItem::Sword, "mec", WeaponUse::Swing, 2.2, 1, WalkerItem::End, {}, 0, 65},
 	{WalkerItem::TwoHandedSword, "mec_obourucni", WeaponUse::Swing, 2.8, 2, WalkerItem::End, {}, 0, 65},
+	{WalkerItem::MachineGun, "kulomet", WeaponUse::Burst, 0, 1, WalkerItem::Bullets, "naboj", 300},
+	{WalkerItem::RocketLauncher, "raketomet", WeaponUse::Rocket, 0, 6, WalkerItem::Rockets, "raketa", 40},
 };
 
 /**
@@ -153,6 +168,19 @@ struct FirstPersonMissile {
 	bool gone = false;      ///< in a dragon, in the water or off the map: gone
 	float facing = 0;       ///< degrees in the world its tip points to
 	float pitch = 0;        ///< degrees its tip is raised
+	bool rocket = false;    ///< a rocket: straight on, smoke behind it, a blast where it hits (Explode())
+	double smoke_time = 0;  ///< a rocket: seconds till its next puff of smoke
+};
+
+/** A puff of a rocket's smoke, or its blast: only the screen, never saved. */
+struct FirstPersonBlast {
+	double x = 0, y = 0, z = 0; ///< where, world units and units of height
+	double age = 0;             ///< seconds
+	bool smoke = true;          ///< a puff of smoke; else the blast
+	double size = 1;            ///< a puff: how many metres it grows; the cloud a blast leaves, more and darker, a while longer
+
+	/** Seconds it is seen. */
+	double Life() const { return this->smoke ? FIRST_PERSON_PUFF_S * std::sqrt(this->size) : FIRST_PERSON_BLAST_S; }
 };
 
 /**
@@ -229,6 +257,25 @@ static bool FirstPersonWalkable(double x, double y)
 }
 
 /**
+ * How high what the walker cannot stand on at a world point reaches, units of height over the ground: a house or an
+ * industry that is a 3D object, its top (ThreeDObject::top); anything else, as a house of four floors.
+ */
+static double FirstPersonWallTop(double x, double y)
+{
+	const double floors = 12 * OBJECT_HEIGHT_PER_METRE;
+	if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::SizeX() - 1) * TILE_SIZE || y >= (Map::SizeY() - 1) * TILE_SIZE) return floors;
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	const ThreeDObject *obj = nullptr;
+	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
+		HouseID north = GetHouseType(tile);
+		obj = GetThreeDHouseObjectAt(north, tile + GetHouseNorthPart(north));
+	} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
+		obj = GetThreeDIndustryObjectOf(Industry::GetByTile(tile));
+	}
+	return obj != nullptr && obj->top > 0 ? obj->top : floors;
+}
+
+/**
  * Whether the walker, a circle, can stand on a world point: its middle and eight points round it, so that the thin
  * walls of a house's shape (ThreeDObject::Blocks()) slip between none of them.
  */
@@ -263,7 +310,12 @@ struct FirstPersonWindow : Window {
 	bool mouse_draw = false;              ///< the bow drawn with the left button held: let go, it shoots
 	double reload_time = 0;               ///< seconds till the next arrow is on the string, the crossbow drawn again
 	float kick = 0;                       ///< a shot's kick, 1 as it is shot to 0
+	bool firing = false;                  ///< the machine gun firing (Attack(), Hold())
+	bool mouse_fire = false;              ///< fired with the left button held: firing till it is let go
+	int burst_left = 0;                   ///< shots it fires yet (a burst of Space), or many with the button
+	double burst_time = 0;                ///< seconds till its next shot
 	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
+	std::vector<FirstPersonBlast> blasts;  ///< the rockets' smoke and blasts
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
 	int light = -1;                       ///< the light asked for in the left hand (_first_person_lights), -1 none: the one held put out first
 	int light_held = -1;                  ///< the light in the left hand or being put out, -1 none
@@ -398,6 +450,7 @@ struct FirstPersonWindow : Window {
 			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Fly(FIRST_PERSON_TICK_MS / 1000.0);
 		}
+		this->SeeBlasts();
 		if (rv != nullptr) {
 			this->walker.x = rv->x_pos;
 			this->walker.y = rv->y_pos;
@@ -604,6 +657,19 @@ struct FirstPersonWindow : Window {
 				if (this->mouse_draw && !_left_button_down) this->Release();
 			}
 		}
+		if (this->firing) {
+			/* The machine gun: a shot every tenth of a second while the button is held (or the burst of Space lasts). */
+			if (held.raise < 1.0f || Carried(w.ammo) == 0 || (this->mouse_fire && !_left_button_down) || this->burst_left <= 0 || w.use != WeaponUse::Burst) {
+				this->firing = false;
+			} else {
+				this->burst_time -= dt;
+				while (this->burst_time <= 0 && this->burst_left > 0) {
+					this->Shoot(w, 1.0);
+					this->burst_left--;
+					this->burst_time += FIRST_PERSON_BURST_S;
+				}
+			}
+		}
 		this->reload_time = std::max(0.0, this->reload_time - dt);
 		this->kick = std::max(0.0f, this->kick - static_cast<float>(dt / FIRST_PERSON_KICK_S));
 		this->Dress();
@@ -684,6 +750,9 @@ struct FirstPersonWindow : Window {
 			case WeaponUse::Swing: held.hold = ThreeDHold::Swung; break;
 			case WeaponUse::Bow: held.hold = ThreeDHold::Bow; state = this->draw_time >= FIRST_PERSON_BOW_DRAW_S * 0.4 ? "napnuto" : "volno"; break;
 			case WeaponUse::Crossbow: held.hold = ThreeDHold::Crossbow; state = this->reload_time > 0 ? "vystreleno" : "natazeno"; break;
+			case WeaponUse::Burst: held.hold = ThreeDHold::Crossbow; break;
+			/* Shot, its loaded rocket gone from it till it is loaded again. */
+			case WeaponUse::Rocket: held.hold = ThreeDHold::Shoulder; state = this->reload_time > 0 || Carried(w.ammo) == 0 ? "prazdny" : ""; break;
 		}
 		held.thing = state.empty() ? std::string(w.thing) : fmt::format("{}/{}", w.thing, state);
 		const auto grip = GetThreeDThingPlace(w.thing, "uchyt");
@@ -731,6 +800,18 @@ struct FirstPersonWindow : Window {
 				this->Shoot(w, 1.0);
 				this->reload_time = FIRST_PERSON_RELOAD_S;
 				break;
+			case WeaponUse::Burst:
+				if (Carried(w.ammo) == 0) break;
+				this->firing = true;
+				this->mouse_fire = mouse;
+				this->burst_left = mouse ? WALKER_ITEM_MAX : FIRST_PERSON_BURST_SHOTS;
+				this->burst_time = 0;
+				break;
+			case WeaponUse::Rocket:
+				if (this->reload_time > 0 || Carried(w.ammo) == 0) break;
+				this->Shoot(w, 1.0);
+				this->reload_time = FIRST_PERSON_ROCKET_RELOAD_S;
+				break;
 		}
 		this->Dress();
 	}
@@ -771,6 +852,7 @@ struct FirstPersonWindow : Window {
 		m.vz = fz * speed;
 		m.facing = static_cast<float>(h * 180.0 / M_PI);
 		m.pitch = static_cast<float>(p * 180.0 / M_PI);
+		m.rocket = w.use == WeaponUse::Rocket;
 		this->missiles.push_back(m);
 		if (this->missiles.size() > FIRST_PERSON_MISSILES) this->missiles.erase(this->missiles.begin());
 		this->kick = 1.0f;
@@ -784,16 +866,28 @@ struct FirstPersonWindow : Window {
 	 */
 	void Fly(double dt)
 	{
+		/* The rockets' smoke and blasts, as they fade. */
+		for (FirstPersonBlast &b : this->blasts) b.age += dt;
+		std::erase_if(this->blasts, [](const FirstPersonBlast &b) { return b.age > b.Life(); });
 		for (FirstPersonMissile &m : this->missiles) {
 			m.age += dt;
 			if (m.stuck || m.gone) continue;
+			if (m.rocket) {
+				/* Its smoke behind it, from its tail (its origin). */
+				m.smoke_time -= dt;
+				while (m.smoke_time <= 0) {
+					this->blasts.push_back({m.x, m.y, m.z, 0, true});
+					m.smoke_time += FIRST_PERSON_PUFF_EVERY_S;
+				}
+			}
 			const int n = std::max(1, static_cast<int>(std::ceil(std::sqrt(m.vx * m.vx + m.vy * m.vy + m.vz * m.vz) * dt / 0.5)));
 			const double sub = dt / n;
 			/* How high its tip was over the ground before the step (where it went in, when it goes in). */
 			double above = -1;
 			for (int k = 0; k < n && !m.stuck && !m.gone; k++) {
 				const double px = m.x, py = m.y, pz = m.z;
-				m.vz -= FIRST_PERSON_GRAVITY * sub;
+				/* A rocket flies straight (the colleague: "it flies straight on, 40 m/s"). */
+				if (!m.rocket) m.vz -= FIRST_PERSON_GRAVITY * sub;
 				m.x += m.vx * sub * OBJECT_UNITS_PER_METRE;
 				m.y += m.vy * sub * OBJECT_UNITS_PER_METRE;
 				m.z += m.vz * sub * OBJECT_HEIGHT_PER_METRE;
@@ -807,8 +901,9 @@ struct FirstPersonWindow : Window {
 					m.gone = true;
 					continue;
 				}
-				if (HitThreeDDragonAt(tx, ty, tz, m.damage)) {
+				if (HitThreeDDragonAt(tx, ty, tz, m.damage) || HitThreeDWitchAt(tx, ty, tz)) {
 					m.gone = true;
+					if (m.rocket) this->Explode(tx, ty, tz, m.damage);
 					continue;
 				}
 				const double ground = FirstPersonGroundZ(tx, ty);
@@ -824,8 +919,8 @@ struct FirstPersonWindow : Window {
 					m.y = py + (m.y - py) * t + uy * 0.06 * OBJECT_UNITS_PER_METRE;
 					m.z = pz + (m.z - pz) * t + uz * 0.06 * OBJECT_HEIGHT_PER_METRE;
 					m.stuck = true;
-				} else if (tz - ground < 12 * OBJECT_HEIGHT_PER_METRE && !FirstPersonWalkable(tx, ty) && !IsTileType(tile, TileType::Water)) {
-					/* A house or a building as high as it is: stuck in its wall, where it was before the step. */
+				} else if (!FirstPersonWalkable(tx, ty) && !IsTileType(tile, TileType::Water) && tz - ground < FirstPersonWallTop(tx, ty)) {
+					/* A house or a building, under its top: stuck in its wall, where it was before the step. */
 					m.x = px;
 					m.y = py;
 					m.z = pz;
@@ -834,10 +929,73 @@ struct FirstPersonWindow : Window {
 				above = tz - ground;
 			}
 			if (m.stuck) m.age = 0;
+			/* A rocket where it hit the ground or a wall: its blast, nothing of it left. */
+			if (m.rocket && m.stuck) {
+				m.gone = true;
+				this->Explode(m.x, m.y, m.z, m.damage);
+			}
 		}
 		std::erase_if(this->missiles, [](const FirstPersonMissile &m) {
 			return m.gone || m.age > (m.stuck ? FIRST_PERSON_STUCK_S : FIRST_PERSON_FLY_S);
 		});
+	}
+
+	/**
+	 * A rocket's blast (the colleague: "at its end an explosion, of a radius of about 4 m, which should bring down a
+	 * dragon, a witch and the ghost"): every dragon within it struck, every witch and ghost falls; seen as a ball of fire
+	 * (ThreeDBlast), lighting about it at night.
+	 */
+	void Explode(double x, double y, double z, int damage)
+	{
+		BlastThreeDDragons(x, y, z, FIRST_PERSON_BLAST_M, damage);
+		BlastThreeDWitches(x, y, z, FIRST_PERSON_BLAST_M);
+		this->blasts.push_back({x, y, z, 0, false});
+		/* The cloud it leaves: a puff in its middle and round it, a little higher. */
+		const double m = OBJECT_UNITS_PER_METRE, up = OBJECT_HEIGHT_PER_METRE;
+		this->blasts.push_back({x, y, z + 0.5 * up, 0, true, 3.0});
+		for (int k = 0; k < 4; k++) {
+			const double a = k * M_PI / 2 + 0.4;
+			this->blasts.push_back({x + 1.4 * m * std::cos(a), y + 1.4 * m * std::sin(a), z + (0.2 + 0.3 * k) * up, 0, true, 2.5});
+		}
+	}
+
+	/**
+	 * The rockets' smoke and blasts as the eyes see them (ThreeDBlast): a puff grows and fades, a blast swells and fades
+	 * fast; and the flame behind each rocket flying, flickering.
+	 */
+	void SeeBlasts()
+	{
+		std::vector<ThreeDBlast> &out = this->walker.blasts;
+		out.clear();
+		for (const FirstPersonMissile &m : this->missiles) {
+			if (!m.rocket || m.stuck || m.gone) continue;
+			ThreeDBlast &s = out.emplace_back();
+			s.x = m.x;
+			s.y = m.y;
+			s.z = m.z;
+			s.radius_m = 0.3 + 0.08 * std::sin(m.age * 90.0);
+			s.alpha = 0.95f;
+			s.colour = 0xFFE080;
+			s.light = true;
+		}
+		for (const FirstPersonBlast &b : this->blasts) {
+			ThreeDBlast &s = out.emplace_back();
+			s.x = b.x;
+			s.y = b.y;
+			s.z = b.z;
+			if (b.smoke) {
+				const double t = b.age / b.Life();
+				s.radius_m = 0.25 + b.size * t;
+				s.alpha = static_cast<float>((b.size > 1 ? 0.7 : 0.55) * (1.0 - t));
+				s.colour = b.size > 1 ? 0x5C5852 : 0xB8B4AC;
+			} else {
+				const double t = b.age / FIRST_PERSON_BLAST_S;
+				s.radius_m = FIRST_PERSON_BLAST_M * std::min(1.0, 0.35 + 1.3 * t);
+				s.alpha = static_cast<float>(0.95 * (1.0 - t));
+				s.colour = t < 0.3 ? 0xFFF0A0 : 0xFF8A30;
+				s.light = true;
+			}
+		}
 	}
 
 	/** A weapon by its key, out in the hand (another put away first), when the walker carries it. */
@@ -893,7 +1051,7 @@ struct FirstPersonWindow : Window {
 		}
 		/* 1 to 5: a weapon (the hammer, the bow, the crossbow, the sword, the two-handed sword); F: it out or away (as
 		 * the weapon in Morrowind); Space: a swing of it, a shot. */
-		if (key >= '1' && key <= '5') {
+		if (key >= '1' && key < static_cast<char32_t>('1' + std::size(_first_person_weapons))) {
 			this->Choose(static_cast<int>(key - '1'));
 			return EventState::Handled;
 		}
@@ -1222,6 +1380,10 @@ std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
 	for (const FirstPersonMissile &m : w->missiles) {
 		held += fmt::format("; {} na {:.1f},{:.1f} vyska {:.1f} m nad zemi, smer {:.0f} sklon {:.0f}{}", m.thing, m.x, m.y, (m.z - FirstPersonGroundZ(m.x, m.y)) / OBJECT_HEIGHT_PER_METRE, m.facing, m.pitch, m.stuck ? " zabodnuty" : "");
 	}
+	int puffs = 0, fires = 0;
+	for (const FirstPersonBlast &b : w->blasts) (b.smoke ? puffs : fires)++;
+	if (puffs + fires > 0) held += fmt::format("; kour {}x, vybuch {}x", puffs, fires);
+	w->SeeBlasts();
 	w->MakePicture();
 	w->SetDirty();
 	return held;

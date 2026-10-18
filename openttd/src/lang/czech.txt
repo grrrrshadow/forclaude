@@ -2367,7 +2367,7 @@ STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat m
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WHERE_HEALTH                                   :Zdraví {NUM} · u města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
-STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · 1–5: kladivo, luk, kuše, meč, obouruční meč · F: tasit a schovat zbraň · levé tlačítko nebo mezerník: máchnout, vystřelit (luk: držet napne, puštění vystřelí; mezerník napne a vystřelí) · L: pochodeň, lucerna, zhasnout
+STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · 1–7: kladivo, luk, kuše, meč, obouruční meč, kulomet, raketomet · F: tasit a schovat zbraň · levé tlačítko nebo mezerník: máchnout, vystřelit (luk: držet napne, puštění vystřelí; mezerník napne a vystřelí; kulomet střílí, dokud se drží tlačítko) · L: pochodeň, lucerna, zhasnout
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
@@ -2406,6 +2406,10 @@ STR_WALKER_ITEM_SWORD                                           :Meč
 STR_WALKER_ITEM_TWO_HANDED_SWORD                                :Obouruční meč
 STR_WALKER_ITEM_TORCH                                           :Pochodeň
 STR_WALKER_ITEM_LANTERN                                         :Lucerna
+STR_WALKER_ITEM_MACHINE_GUN                                     :Kulomet
+STR_WALKER_ITEM_BULLETS                                         :Náboje
+STR_WALKER_ITEM_ROCKET_LAUNCHER                                 :Raketomet
+STR_WALKER_ITEM_ROCKETS                                         :Rakety
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

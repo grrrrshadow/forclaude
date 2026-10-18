@@ -102,6 +102,7 @@ enum class ThreeDHold : uint8_t {
 	Swung,    ///< a hammer, a sword: in the right hand by its handle, swung
 	Bow,      ///< a bow: upright in the left hand, its string to the eye
 	Crossbow, ///< a crossbow: at the right shoulder, along the look
+	Shoulder, ///< a rocket launcher: its tube along the look, low at the right, so that all of it is seen
 	Left,     ///< a light (the torch, the lantern): upright in the left hand, low at the left
 };
 
@@ -120,6 +121,15 @@ struct ThreeDHeldThing {
 	int frame = 0;       ///< its frame (a torch's flame, "plamen")
 };
 
+/** A puff of the smoke of a rocket, or its blast, seen from the eyes (first_person_gui.cpp): a soft ball of colour. */
+struct ThreeDBlast {
+	double x = 0, y = 0, z = 0; ///< its middle, world units and units of height
+	double radius_m = 0;        ///< how big, metres
+	float alpha = 0;            ///< how much of what is behind it hides, at its middle
+	uint32_t colour = 0;        ///< 0xRRGGBB
+	bool light = false;         ///< a blast: it lights what is about it at night
+};
+
 struct FirstPersonEye {
 	double x = 0, y = 0;  ///< where it stands, world units
 	double heading = 0;   ///< radians, the world direction it looks along (atan2 of y, x)
@@ -129,6 +139,7 @@ struct FirstPersonEye {
 	ThreeDHeldThing left; ///< the light in its left hand (the torch, the lantern), lighting about it at night
 	uint32_t light_colour = 0; ///< that light's colour (Colour::data), 0 none
 	double light_reach_m = 0;  ///< and how far it lights, metres
+	std::vector<ThreeDBlast> blasts; ///< the smoke of its rockets and their blasts
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);

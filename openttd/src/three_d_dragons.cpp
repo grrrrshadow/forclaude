@@ -503,6 +503,25 @@ bool HitThreeDDragonAt(double x, double y, double z, int damage)
 	return false;
 }
 
+/**
+ * A blast (a rocket's, of a radius of 4 m, the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md): every dragon whose
+ * body is within its reach struck so hard.
+ * @return how many it struck
+ */
+int BlastThreeDDragons(double x, double y, double z, double radius_m, int damage)
+{
+	int struck = 0;
+	for (Dragon &d : _dragons) {
+		if (!Hittable(d)) continue;
+		const double r = (std::max(1.0, d.length_m * 0.3) + radius_m) * OBJECT_UNITS_PER_METRE;
+		if (std::hypot(d.x - x, d.y - y) > r) continue;
+		if (z < d.z - radius_m * OBJECT_HEIGHT_PER_METRE || z > d.z + (d.height_m + radius_m) * OBJECT_HEIGHT_PER_METRE) continue;
+		Strike(d, damage);
+		struck++;
+	}
+	return struck;
+}
+
 /** The health the dragons took from the walker since the last asking; asked by the view from the first person, which takes it through a command. */
 uint TakeThreeDDragonDamage()
 {

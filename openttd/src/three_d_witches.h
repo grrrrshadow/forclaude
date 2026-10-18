@@ -40,6 +40,8 @@ void AddThreeDWitchesToViewport(ZoomLevel zoom);
 void AddThreeDWitchesToEye();
 std::vector<ThreeDWitchLight> GetThreeDWitchLights(bool eye);
 bool SendThreeDWitch(std::string_view kind, double x, double y, double heading);
+bool HitThreeDWitchAt(double x, double y, double z);
+int BlastThreeDWitches(double x, double y, double z, double radius_m);
 std::string DescribeThreeDWitches();
 
 #endif /* THREE_D_WITCHES_H */

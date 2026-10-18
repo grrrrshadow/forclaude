@@ -2632,6 +2632,15 @@ static void ReadThreeDVehicleObjects()
 						if (fig.frames < 2) fig.frame_prefix.clear();
 						if (a.contains("chuze") && a.at("chuze").is_object()) fig.walk_step = std::clamp(a.at("chuze").value("krok_m", 0.0f), 0.0f, 10.0f);
 					}
+					/* A light (the colleague's torch and lantern): its glass ("noc") drawn with it, lit by its flame; and
+					 * a weapon that shoots rockets, a figure of it shot (its loaded rocket, "raketa_v_hlavni", left out). */
+					if (fig.thing && e.value("kategorie", std::string()) == "svetlo") fig.night_glass = true;
+					if (fig.thing && e.value("strelba", std::string()) == "raketa") {
+						ThreeDVehicleObject shot = fig;
+						shot.name = fig.name + "/prazdny";
+						shot.skip_node = "raketa_v_hlavni";
+						_figure_objects.push_back(std::move(shot));
+					}
 					/* A light's flame (the colleague's torch and lantern, "plamen"): its frames, the rest of it in each. */
 					if (fig.thing && e.contains("plamen") && e.at("plamen").is_object()) {
 						const auto &a = e.at("plamen");
@@ -3945,6 +3954,17 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			o.frame = frame;
 			o.only_node = this->only_node;
 			o.skip_night = true;
+			o.groups = &marked;
+			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
+		} else if (!this->skip_node.empty() || this->night_glass) {
+			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept. */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.only_node = this->only_node;
+			o.skip_node = this->skip_node;
+			o.skip_night = !this->night_glass;
 			o.groups = &marked;
 			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
 		} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) {

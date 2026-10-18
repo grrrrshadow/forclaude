@@ -44,6 +44,10 @@ enum class WalkerItem : uint8_t {
 	TwoHandedSword, ///< the two-handed sword, swung as the hammer
 	Torch,      ///< a torch (the colleague's, objekty/predmety/pochoden.glb): in the left hand, it lights about the walker at night
 	Lantern,    ///< a lantern (Roblox Lantern, objekty/predmety/lucerna.glb): so too
+	MachineGun, ///< the machine gun (objekty/predmety/kulomet.glb): fires bursts while the button is held
+	Bullets,    ///< its bullets, used up as they are shot
+	RocketLauncher, ///< the rocket launcher (objekty/predmety/raketomet.glb): a rocket, then loaded again
+	Rockets,    ///< its rockets, exploding where they hit
 	End,        ///< the end of the known things
 };
 
@@ -61,6 +65,10 @@ static constexpr size_t WALKER_ITEM_SLOTS = 32;
 static constexpr uint16_t WALKER_ITEM_MAX = 999;
 /** The arrows and the bolts the cheat fills up to. */
 static constexpr uint16_t WALKER_AMMUNITION_FULL = 50;
+/** The bullets of the machine gun the cheat fills up to: ten bursts of a second's. */
+static constexpr uint16_t WALKER_BULLETS_FULL = 300;
+/** The rockets the cheat fills up to. */
+static constexpr uint16_t WALKER_ROCKETS_FULL = 10;
 /** The walker's full health. */
 static constexpr uint8_t WALKER_HEALTH_MAX = 100;
 
@@ -75,6 +83,10 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::Bolts)] = WALKER_AMMUNITION_FULL;
 	items[static_cast<size_t>(WalkerItem::Torch)] = 1;
 	items[static_cast<size_t>(WalkerItem::Lantern)] = 1;
+	items[static_cast<size_t>(WalkerItem::MachineGun)] = 1;
+	items[static_cast<size_t>(WalkerItem::Bullets)] = WALKER_BULLETS_FULL;
+	items[static_cast<size_t>(WalkerItem::RocketLauncher)] = 1;
+	items[static_cast<size_t>(WalkerItem::Rockets)] = WALKER_ROCKETS_FULL;
 	return items;
 }
 

@@ -3483,6 +3483,15 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 			hand = V{0.12f, -0.22f - lowered * 0.7f + 0.02f * held.kick, 0.25f - 0.06f * held.kick};
 			break;
 		}
+		case ThreeDHold::Shoulder: {
+			/* As the crossbow, only further down, right and ahead: the tube is wide and long, and at the shoulder it
+			 * would fill the picture. */
+			ax = V{0.0f, 0.0f, 1.0f};
+			az = V{0.0f, 1.0f, 0.0f};
+			ay = V{-1.0f, 0.0f, 0.0f};
+			hand = V{0.24f, -0.36f - lowered * 0.7f + 0.03f * held.kick, 0.45f - 0.08f * held.kick};
+			break;
+		}
 		case ThreeDHold::Left: {
 			/* A light: upright, leaning a little in towards the middle, its flame (where it is held from, its "svetlo")
 			 * before the eye's lower left. */

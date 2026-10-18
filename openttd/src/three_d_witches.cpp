@@ -57,6 +57,8 @@ struct Witch {
 	uint32_t phase = 0;    ///< her frames and her bobbing, each her own
 	int frame = 0;
 	int z = 0;             ///< height units, drawn at
+	bool falling = false;  ///< shot down (HitThreeDWitchAt(), BlastThreeDWitches()): falls, and is gone at the ground
+	double fall_ms = 0;    ///< how fast she falls, metres a second
 };
 
 std::vector<Witch> _witches;
@@ -271,6 +273,21 @@ void MarkDirty(const Witch &w, const ThreeDWitch &c)
 /** A tick of her flight: turning towards where she flies, on as fast as her animation, over the roofs. */
 void Update(Witch &w, const ThreeDWitch &c, uint64_t now)
 {
+	if (w.falling) {
+		/* Shot down (the colleague: "she then falls, no animation of death, a fall is enough"): on a little way as she
+		 * flew, ever faster down, her frame as it was. */
+		const double dt = MILLISECONDS_PER_TICK / 1000.0;
+		w.fall_ms += 9.81 * dt;
+		w.lift -= w.fall_ms * dt;
+		const double step = 0.5 * StepM(w, c) * OBJECT_UNITS_PER_METRE;
+		const double nx = w.x + std::cos(w.heading) * step, ny = w.y + std::sin(w.heading) * step;
+		if (OnMap(nx, ny)) {
+			w.x = nx;
+			w.y = ny;
+		}
+		w.z = static_cast<int>(std::lround(FirstPersonGroundZ(w.x, w.y) + std::max(0.0, w.lift) * OBJECT_HEIGHT_PER_METRE));
+		return;
+	}
 	double dx = w.tx - w.x, dy = w.ty - w.y, dist = std::hypot(dx, dy);
 	/* There, or past it (turning she may not come nearer): on. */
 	if (dist < 1.5 * TILE_SIZE || (dist < 6.0 * TILE_SIZE && dist > w.last_dist)) {
@@ -340,11 +357,61 @@ const IntervalTimer<TimerGameTick> _witches_timer({TimerGameTick::Priority::None
 		MarkDirty(*it, *c);
 		Update(*it, *c, now);
 		MarkDirty(*it, *c);
+		/* Shot down, at the ground: gone. */
+		if (it->falling && it->lift <= 0) {
+			it = _witches.erase(it);
+			continue;
+		}
 		++it;
 	}
 });
 
+/**
+ * Whether a point is in a witch's body as the eyes see it (her size there, EYE_OF_MAP): about her middle, where her
+ * origin is, as wide as she is long and as high as she is.
+ */
+bool InBody(const Witch &w, const ThreeDWitch &c, double x, double y, double z, double margin_m)
+{
+	const double s = w.scale * EYE_OF_MAP;
+	const double r = (std::max(0.6, static_cast<double>(std::max(c.size[0], c.size[1]))) * 0.5 * s + margin_m) * OBJECT_UNITS_PER_METRE;
+	const double h = (std::max(0.6, static_cast<double>(c.size[2])) * 0.5 * s + margin_m) * OBJECT_HEIGHT_PER_METRE;
+	return std::hypot(w.x - x, w.y - y) <= r && std::abs(w.z - z) <= h;
+}
+
 } // namespace
+
+/**
+ * A shot that hits a witch or the ghost flying (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md: "an arrow,
+ * a bullet and a rocket hit them as the dragons"): the one it is in falls.
+ * @param x,y,z the point of the shot, world units and units of height
+ * @return whether it hit one
+ */
+bool HitThreeDWitchAt(double x, double y, double z)
+{
+	for (Witch &w : _witches) {
+		const ThreeDWitch *c = Kind(w.kind);
+		if (w.falling || c == nullptr || !InBody(w, *c, x, y, z, 0)) continue;
+		w.falling = true;
+		return true;
+	}
+	return false;
+}
+
+/**
+ * A blast (a rocket's, of a radius of 4 m): every witch and ghost within its reach falls.
+ * @return how many fell
+ */
+int BlastThreeDWitches(double x, double y, double z, double radius_m)
+{
+	int fell = 0;
+	for (Witch &w : _witches) {
+		const ThreeDWitch *c = Kind(w.kind);
+		if (w.falling || c == nullptr || !InBody(w, *c, x, y, z, radius_m)) continue;
+		w.falling = true;
+		fell++;
+	}
+	return fell;
+}
 
 /**
  * Send a witch flying from a place (the rig's 'test3d carodejnice'; at night they come by themselves): towards the
@@ -435,7 +502,7 @@ std::string DescribeThreeDWitches()
 {
 	std::string s = fmt::format("{} witches of the indices, {} flying{}", GetThreeDWitches().size(), _witches.size(), IsNightNow() ? "" : " (day: none fly)");
 	for (const Witch &w : _witches) {
-		s += fmt::format("; {} at {:.1f},{:.1f} {:.0f} m up facing {:.0f} frame {} to {:.0f},{:.0f}", w.kind, w.x / TILE_SIZE, w.y / TILE_SIZE, w.lift, Facing(w), w.frame, w.tx / TILE_SIZE, w.ty / TILE_SIZE);
+		s += fmt::format("; {} at {:.1f},{:.1f} {:.0f} m up facing {:.0f} frame {} to {:.0f},{:.0f}{}", w.kind, w.x / TILE_SIZE, w.y / TILE_SIZE, w.lift, Facing(w), w.frame, w.tx / TILE_SIZE, w.ty / TILE_SIZE, w.falling ? fmt::format(" falling {:.1f} m/s", w.fall_ms) : std::string());
 	}
 	for (const ThreeDWitchLight &l : GetThreeDWitchLights(false)) {
 		s += fmt::format("; {} at {:.2f},{:.2f},{} reach {:.1f} tiles{}", l.torch ? "torch" : "lantern", l.x / TILE_SIZE, l.y / TILE_SIZE, static_cast<int>(l.z), l.reach / TILE_SIZE,

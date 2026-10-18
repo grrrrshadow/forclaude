@@ -42,6 +42,10 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_TWO_HANDED_SWORD, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_TORCH, 2, 0, WalkerItemKind::Light},
 	{STR_WALKER_ITEM_LANTERN, 12, 0, WalkerItemKind::Light},
+	{STR_WALKER_ITEM_MACHINE_GUN, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_BULLETS, 0, 0, WalkerItemKind::Ammunition},
+	{STR_WALKER_ITEM_ROCKET_LAUNCHER, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_ROCKETS, 0, 0, WalkerItemKind::Ammunition},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -219,7 +223,11 @@ uint16_t WalkerCheatCount(WalkerItem item, uint16_t carried, uint16_t quiver)
 	switch (GetWalkerItemSpec(item).kind) {
 		case WalkerItemKind::Weapon:
 		case WalkerItemKind::Light: return std::max<uint16_t>(carried, 1);
-		case WalkerItemKind::Ammunition: return std::max(carried, quiver);
+		case WalkerItemKind::Ammunition:
+			/* The machine gun's bullets and the rockets each by their own full count, as the quiver is to the arrows. */
+			if (item == WalkerItem::Bullets) return std::max<uint16_t>(carried, static_cast<uint16_t>(std::min<uint>(WALKER_ITEM_MAX, quiver * WALKER_BULLETS_FULL / WALKER_AMMUNITION_FULL)));
+			if (item == WalkerItem::Rockets) return std::max<uint16_t>(carried, static_cast<uint16_t>(quiver * WALKER_ROCKETS_FULL / WALKER_AMMUNITION_FULL));
+			return std::max(carried, quiver);
 		default: return carried;
 	}
 }

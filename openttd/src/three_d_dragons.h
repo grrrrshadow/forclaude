@@ -30,6 +30,7 @@ void AddThreeDDragonsToViewport(ZoomLevel zoom);
 void AddThreeDDragonsToEye();
 bool HitThreeDDragon(double x, double y, double heading, double reach_m, int damage = 1);
 bool HitThreeDDragonAt(double x, double y, double z, int damage);
+int BlastThreeDDragons(double x, double y, double z, double radius_m, int damage);
 uint TakeThreeDDragonDamage();
 bool SendThreeDDragon(std::string_view kind, double x, double y);
 std::string DescribeThreeDDragons();

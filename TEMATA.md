@@ -58,6 +58,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   prodej v obchodě, iddqd je dá), klávesa **L** střídá pochodeň → lucernu → zhasnout, klik v inventáři taky. Drží se
   v levé ruce dole vlevo (zbraň zůstává v pravé), plamen se střídá po snímcích `plamen_NN`, v noci světlo kolem chodce
   (teplé, 8 m) a samotné světlo se neztmaví; pochodeň při zhasnutí zasyčí (`zhasnuti`). Rig: `test3d chodec svetlo`.
+- **Kulomet a raketomet** (kolegovy `kulomet`, `raketomet`, `raketa`, `naboj`): klávesy 6 a 7, náboje (300) a rakety
+  (10) v inventáři od začátku, iddqd doplní. Kulomet střílí dávky (klávesou útoku 5 ran, levým tlačítkem myši, dokud ho hráč drží), kulky
+  letí rovně z hlavně. Raketa letí rovně 40 m/s (bez gravitace, jak navrhl kolega), za sebou plamen (svítí i v noci
+  a svítí kolem sebe) a kouř; kde narazí (zem, zeď, drak, čarodějnice), vybuchne: koule ohně 4 m, světlo kolem asi
+  10 m, po ní tmavý mrak. Výbuch zasáhne draky v dosahu a srazí čarodějnice i strašidlo – padají k zemi a u země
+  zmizí. Nabíjení 2 s, mezitím se kreslí stav `prazdny` (raketomet bez uzlu `raketa_v_hlavni`). Raketomet se drží níž
+  a víc vpravo než kuše, aby nezakryl půl obrazu.
+- Opraveno cestou: střely (šípy, šipky, kulky, rakety) se zapichovaly do vzduchu nad nízkými domy – zeď měla pevně
+  12 m. Teď platí skutečná výška 3D domu nebo průmyslu (`top`), jinde dál 12 m.
 - Planý poplach: rig hlásil pád karty u stadionu („kresleni obrazku 7 (glDrawElements)“), ale byl to můj zkušební
   deník z ověřování hlídače pádů. Deset běhů stadionu s Tatrou v4 na kartě (llvmpipe) proběhlo bez chyby.
 

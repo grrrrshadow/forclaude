@@ -619,6 +619,8 @@ struct ThreeDVehicleObject {
 	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
 	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
 	std::string only_node;          ///< a figure of one node of a file of several ("uzel", the colleague's girls of the lorries: a pose a node, the textures once): only that node of it is drawn
+	std::string skip_node;          ///< a node of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni")
+	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
 	/* An articulated vehicle of several objects, one an article (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
 	 * point 3): where an article is coupled to the one before it and the one after, the next one drawn with its front
 	 * coupling on the back one of the one before, turned as its own article. */

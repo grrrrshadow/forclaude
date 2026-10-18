@@ -9090,6 +9090,37 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
  * each within a torch's cone and reach its light, the more the nearer to the torch and to the middle of the beam --
  * its own colour coming back out of the dark, as under the houses' lamps (DrawEyeLampLight()).
  */
+/**
+ * The smoke of the walker's rockets, or their blasts, seen from the eyes (ThreeDBlast): each a soft ball of its colour
+ * over what is behind it, thinner to its edge, hidden behind what is nearer than its middle.
+ * @param fire the blasts (else the smoke)
+ */
+static void DrawEyeBlasts(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDBlast> &blasts, bool fire)
+{
+	for (const ThreeDBlast &b : blasts) {
+		if (b.light != fire || b.alpha <= 0) continue;
+		const CabPoint c = CabToEye(eye, b.x, b.y, b.z, 0, 0);
+		if (c.f < CAB_NEAR) continue;
+		const CabVertex v = CabProject(eye, c);
+		const double r = b.radius_m * OBJECT_UNITS_PER_METRE * eye.focal / c.f;
+		if (r < 0.5) continue;
+		const int x0 = std::max(0, static_cast<int>(v.sx - r)), x1 = std::min(width - 1, static_cast<int>(v.sx + r));
+		const int y0 = std::max(0, static_cast<int>(v.sy - r)), y1 = std::min(height - 1, static_cast<int>(v.sy + r));
+		const Colour col(static_cast<uint8_t>(b.colour >> 16), static_cast<uint8_t>(b.colour >> 8), static_cast<uint8_t>(b.colour));
+		for (int py = y0; py <= y1; py++) {
+			for (int px = x0; px <= x1; px++) {
+				const double dx = (px + 0.5 - v.sx) / r, dy = (py + 0.5 - v.sy) / r, d2 = dx * dx + dy * dy;
+				if (d2 >= 1.0) continue;
+				const size_t i = static_cast<size_t>(py) * width + px;
+				if (zb[i] > v.iw * 1.02f) continue; // something nearer
+				const double a = b.alpha * (1.0 - d2);
+				const Colour o(dst[i]);
+				dst[i] = Colour(static_cast<uint8_t>(o.r + (col.r - o.r) * a), static_cast<uint8_t>(o.g + (col.g - o.g) * a), static_cast<uint8_t>(o.b + (col.b - o.b) * a)).data;
+			}
+		}
+	}
+}
+
 static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights)
 {
 	const NightLight moon = GetNightLight();
@@ -10347,10 +10378,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. A job of the frame: it draws
 	 * by its own means (DrawThreeDHeldThing()), from the thing's model, which stays. */
+	/* The smoke of the walker's rockets, before the night: the dark is over it too (DrawEyeBlasts()). */
+	if (walker != nullptr && !walker->blasts.empty()) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, false); });
 	if (walker != nullptr && !walker->held.thing.empty()) out.Job([held = walker->held, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(held, dst, zb, width, height, focal); });
 	/* The light in its left hand (the torch, the lantern): by day with the weapon, at night after the dark (it lights
 	 * itself, and about the walker, DrawEyeWitchLight()). */
 	if (walker != nullptr && !walker->left.thing.empty() && !night) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
+	/* The rockets' blasts, by day here, at night after the dark (they light themselves). */
+	if (walker != nullptr && !walker->blasts.empty() && !night) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, true); });
 	if (night) {
 		/* The dark and the glows of the vehicles' lights: collected now, drawn with the frame. */
 		const NightLight moon = GetNightLight();
@@ -10381,9 +10416,22 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			l.reach = walker->light_reach_m * OBJECT_UNITS_PER_METRE;
 			l.colour = Colour(static_cast<uint8_t>(walker->light_colour >> 16), static_cast<uint8_t>(walker->light_colour >> 8), static_cast<uint8_t>(walker->light_colour));
 		}
+		/* A rocket's blast lighting what is about it, as it swells and fades. */
+		if (walker != nullptr) {
+			for (const ThreeDBlast &b : walker->blasts) {
+				if (!b.light || b.alpha <= 0) continue;
+				ThreeDWitchLight &l = witch_lights.emplace_back();
+				l.x = b.x;
+				l.y = b.y;
+				l.z = b.z;
+				l.reach = (3.0 + 2.0 * b.radius_m) * b.alpha * OBJECT_UNITS_PER_METRE; // a blast's some 10 m, a rocket's flame 3
+				l.colour = Colour(255, 160, 70);
+			}
+		}
 		if (!witch_lights.empty()) {
 			out.Job([eye, width, height, witch_lights = std::move(witch_lights)](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); });
 		}
+		if (walker != nullptr && !walker->blasts.empty()) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, true); });
 		if (walker != nullptr && !walker->left.thing.empty()) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
 		{
 			const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
