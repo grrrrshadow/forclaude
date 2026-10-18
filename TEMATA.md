@@ -27,6 +27,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – noční létající čarodějnice (prosba kolegovi, hra domluvit)
+
+- Hráč: *„potřebujem v grrrrf noční létající čarodějnice“*, *„udělej čarodějnice velký jak holky na zastávce“*.
+  Kolegovi `hra/3d/PROSBA-CARODEJNICE.md`: 2–3 čarodějnice na koštěti, model ve skutečných metrech jako holky,
+  v indexu `meritko` 2 (holky na zastávce kreslí hra dvakrát), let jako animace `let_NN` jako létající draci,
+  co svítí pod uzlem `noc`.
+- Hra: kolik jich a kudy létají – domluvit s hráčem, pak kódovat.
+
 ## 18. 10. – stadion: prázdná hasičská Tatra, Mat u grilu; barvy doplňků číslem
 
 - Hráč: *„mat nemůže sedět v hasičské tatře, bude točit pivo u grilu“*, *„na hřišti stojí prázdná tatra, bez
