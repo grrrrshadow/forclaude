@@ -2228,6 +2228,7 @@ static void ReadThreeDObjects()
 					addon.name = e.value("jmeno", addon.file);
 					addon.glb_path = folder + addon.file;
 					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
+					ReadColourParts(e, folder, addon);
 					addon.addon = true;
 					addon.variants = 0;
 					if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) {
@@ -4991,6 +4992,32 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 	return paint;
 }
 
+/**
+ * The colours of an add-on's texture of the house whose north tile is a tile (GetTextureOf()): of an add-on painted a
+ * colour by number ("barvy" of its record) a colour of its palette for each part by a hash of the tile and of its place
+ * in the house -- the parasols of a café each another, those of the next house others --; 0 for one not painted so.
+ * @param texture the add-on's texture, 1, 2, ... (ThreeDObjectShapeView::TriangleTexture())
+ */
+uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
+{
+	if (texture == 0 || texture > this->addon_objects.size()) return 0;
+	const ThreeDObject &a = _three_d_objects[this->addon_objects[texture - 1]];
+	if (a.colours.empty()) return 0;
+	const uint32_t place = texture <= this->addon_places_of.size() ? this->addon_places_of[texture - 1] : 0;
+	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u ^ (place + 1) * 0x165667B1u;
+	uint32_t paint = 1u << 31;
+	for (size_t k = 0; k < a.colours.size(); k++) {
+		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
+		x ^= x >> 15;
+		x *= 0x2C1B3C6Du;
+		x ^= x >> 12;
+		x *= 0x297A2D39u;
+		x ^= x >> 15;
+		paint |= (x % std::min<size_t>(a.colours[k].palette.size(), 16)) << (4 * k);
+	}
+	return paint;
+}
+
 /** The size of a cell of a level of the shapes (ThreeDObject::GetShape()): metres. */
 static double ShapeCellMetres(int level)
 {
@@ -5104,10 +5131,19 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		}
 		const ThreeDObject &a = _three_d_objects[found->second];
 		if (!a.Read() || a.tri.empty()) continue;
-		auto slot = std::ranges::find(read.addon_objects, found->second);
+		/* Its texture: one for all its places; one of its own at each place when it is painted a colour by number,
+		 * each place its colour (AddonPaintAt()). */
+		const uint16_t place_number = a.colours.empty() ? UINT16_MAX : static_cast<uint16_t>(std::min<size_t>(&place - house.addon_places.data(), UINT16_MAX - 1));
+		auto slot = read.addon_objects.end();
+		if (place_number == UINT16_MAX) {
+			for (size_t k = 0; k < read.addon_objects.size(); k++) {
+				if (read.addon_objects[k] == found->second && read.addon_places_of[k] == UINT16_MAX) slot = read.addon_objects.begin() + k;
+			}
+		}
 		if (slot == read.addon_objects.end()) {
 			if (read.addon_objects.size() >= UINT8_MAX - 1) continue;
 			read.addon_objects.push_back(found->second);
+			read.addon_places_of.push_back(place_number);
 			slot = read.addon_objects.end() - 1;
 		}
 		const uint8_t tex = static_cast<uint8_t>(1 + (slot - read.addon_objects.begin()));
@@ -5192,6 +5228,7 @@ bool ThreeDObject::Read() const
 			self.tri_tex = std::move(r.tri_tex);
 			self.corner_tex = std::move(r.corner_tex);
 			self.addon_objects = std::move(r.addon_objects);
+			self.addon_places_of = std::move(r.addon_places_of);
 			self.nrm = std::move(r.nrm);
 		}
 		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
@@ -5467,14 +5504,14 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
 	if (texture == 0 || texture > this->addon_objects.size()) return this->GetTexture(level, paint);
-	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level);
+	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level, paint);
 }
 
 /** A texture of the building's triangles if it is made already (as TryGetTexture()); else made in the background. */
 const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
 	if (texture == 0 || texture > this->addon_objects.size()) return this->TryGetTexture(level, paint);
-	return _three_d_objects[this->addon_objects[texture - 1]].TryGetTexture(level);
+	return _three_d_objects[this->addon_objects[texture - 1]].TryGetTexture(level, paint);
 }
 
 /**

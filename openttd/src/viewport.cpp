@@ -3283,7 +3283,9 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	if (o != nullptr && !shape.tri.empty()) {
 		tex = o->GetTexture(to_underlying(lay.zoom), paint);
 		texs.push_back(tex);
-		for (uint8_t k = 1; k < o->Textures(); k++) texs.push_back(o->GetTextureOf(k, to_underlying(lay.zoom)));
+		/* Its add-ons' each in its colour at this house's place (ThreeDObject::AddonPaintAt()). */
+		const TileIndex at = TileXY(std::clamp<int>(static_cast<int>(ox) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(oy) / TILE_SIZE, 0, Map::MaxY()));
+		for (uint8_t k = 1; k < o->Textures(); k++) texs.push_back(o->GetTextureOf(k, to_underlying(lay.zoom), o->AddonPaintAt(at, k)));
 		const bool lit = shape.light.size() == shape.pos.size() / 3;
 		const size_t corners = shape.pos.size() / 3;
 		verts.resize(corners);
@@ -9708,6 +9710,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* Which of them, at which level of detail; their textures made on every core first. */
 	struct ObjectJob {
 		const ThreeDObject *o;
+		TileIndex origin;
 		double ox, oy, oz;
 		int level;
 		uint32_t paint;
@@ -9732,7 +9735,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double reach = TILE_SIZE * std::hypot(o.tiles_x, o.tiles_y) / 2 + o.top * CAB_Z_SCALE;
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
 		const int shape_level = ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5);
-		jobs.push_back({&o, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}, {}});
+		jobs.push_back({&o, co.origin, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}, {}});
 	}
 	/* Its texture painted and its shape simplified if they are made; else unpainted and whole meanwhile, made in the background. */
 	for (ObjectJob &j : jobs) {
@@ -9740,7 +9743,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		j.shape = j.o->TryGetShape(j.shape_level);
 		/* Its add-ons' textures too; one not made yet, its triangles not this frame. */
 		j.texs.assign(1, j.tex);
-		for (uint8_t k = 1; k < j.o->Textures(); k++) j.texs.push_back(j.o->TryGetTextureOf(k, j.level));
+		for (uint8_t k = 1; k < j.o->Textures(); k++) j.texs.push_back(j.o->TryGetTextureOf(k, j.level, j.o->AddonPaintAt(j.origin, k)));
 	}
 	/* As a job of the frame, off the lock: each object on a core of its own: every corner to the eye once, the
 	 * triangles turned away left out (as the engines do), those wholly before the eye straight to its list, the others

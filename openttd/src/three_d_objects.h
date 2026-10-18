@@ -215,6 +215,10 @@ struct ThreeDObject {
 	 * laid into its shape when it is read (Read()), their triangles with their own textures. */
 	std::vector<ThreeDObjectFigure> addon_places; ///< "doplnky": each add-on's name ("jmeno", as figure), place, turn and size
 	std::vector<size_t> addon_objects; ///< the add-ons of its textures 1, 2, ... (objects of the add-ons' index, "druh": "doplnek")
+	/** By its textures 1, 2, ... as addon_objects: the place of an add-on painted a colour by number ("barvy" of its record,
+	 * the player, 18. 10.: "the parasols, the bicycles a colour by number") -- a texture of its own at each place, each
+	 * its own colour (AddonPaintAt()); UINT16_MAX a texture shared by all its places. */
+	std::vector<uint16_t> addon_places_of;
 	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s; empty all its own
 	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
@@ -243,6 +247,7 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
+	uint32_t AddonPaintAt(TileIndex origin, uint8_t texture) const;
 	/** How many textures its triangles have: its own and its add-ons'. */
 	size_t Textures() const { return 1 + this->addon_objects.size(); }
 	ThreeDObjectShapeView GetShape(int level) const;
