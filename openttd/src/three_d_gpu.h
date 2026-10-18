@@ -25,6 +25,7 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -48,6 +49,7 @@ struct ThreeDGpuTriangles {
 		uint32_t first = 0;          ///< the first index
 		uint32_t count = 0;          ///< and how many
 		uint32_t texture = 0;        ///< the texture of these triangles (its index)
+		int8_t facing = 0;           ///< a building's: the side seen, 1 where the corners go round clockwise on the picture, -1 the other, 0 both
 	};
 	std::vector<Run> opaque;         ///< the triangles drawn through the depth
 	std::vector<Run> glass;          ///< the vehicle's glass, drawn see-through after all else
@@ -115,8 +117,37 @@ struct ThreeDGpuPicture {
 	std::vector<uint8_t> lit;           ///< and whether a pixel is of the lit glass of a light (not 0); empty without the night
 };
 
+/**
+ * A building's triangles drawn into a picture on the card, as DrawObjectInto() of viewport.cpp draws them for the
+ * turned view (the player, 18. 10.: the houses on the card): each pixel its texture's texel -- a hole filled from the
+ * nearest within three texels, as the processor fills it --, shaded by the light of the corners about it; the side
+ * facing away left out; the nearer kept. What comes is its pixels and how near each is, for the figures standing on it.
+ */
+struct ThreeDGpuBuilding {
+	uint64_t uid = 0;                     ///< its shape's number (ThreeDObjectShapeView::uid)
+	std::span<const float> pos;           ///< its corners, world units from its north corner
+	std::span<const float> uv;            ///< their u, v
+	std::span<const uint16_t> light;      ///< their light, 256 as it is; empty: all 256
+	std::span<const uint32_t> tri;
+	std::span<const int8_t> facing;       ///< each triangle's side facing out (1 its corners' order, -1 the other, 0 both); empty: both
+	std::span<const uint8_t> tri_tex;     ///< each triangle's texture; empty: all the first
+	std::vector<const ThreeDObjectTexture *> textures;
+	bool cull = true;                     ///< the sides facing away left out (the rig: test3d zadni 0 draws them)
+};
+
+/** A picture of a building to draw on the card, and what comes of it. */
+struct ThreeDGpuBuildingPicture {
+	int width = 0, height = 0;            ///< pixels
+	ThreeDGpuMatrix matrix{};             ///< a corner to the picture: x, y pixels, z how near (the turned view's depth, the larger nearer)
+	float depth_near = 0, depth_far = 1;  ///< the depths of all its corners lie between these
+	ThreeDGpuBuilding building;
+	std::vector<uint32_t> pixels;         ///< what comes: its colours (Colour::data), 0 where it is not; top row first
+	std::vector<float> depth;             ///< and how near each pixel is, -infinity where it is not
+};
+
 bool ThreeDGpuAvailable();
 bool ThreeDGpuRender(ThreeDGpuPicture &pic);
+bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
 void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();
