@@ -90,7 +90,8 @@ struct ObjectSpriteRequest {
 	int bounds_of = 0;                        ///< what its bounds before it is made were worked out of (ThreeDVehicleObjectSpriteBounds()): 0 not yet, 1 a guess, 2 its object's extent
 	uint32_t extent_version = 0;              ///< with 2, of which extent of the object (ThreeDVehicleObject::KnownExtent()): it grows as parts are added
 	Rect bounds{};
-	bool gui = false;                         ///< for the windows (the purchase list, the news): made at the zoom of the interface, on the thread in the background (ThreeDVehicleObjectSpriteStandIn())
+	bool gui = false;                         ///< for the windows (the purchase list, the news): made at the zoom of the interface (ThreeDVehicleObjectSpriteStandIn())
+	uint32_t where = 0;                       ///< the piece and the place along of its key in _object_sprites (ObjectSprite())
 };
 static std::vector<ObjectSpriteRequest> _object_sprite_requests;
 /** The sprites made: by the object, the piece it is hung from (and whether for the windows), the direction, its scale (thousandths), its state (StateStep()) and the frames of its crew that walks. */
@@ -652,6 +653,7 @@ static SpriteID ObjectSprite(const ThreeDVehicleObject *obj, int piece, int dir,
 	req.fade = fade;
 	req.walk = walk;
 	req.gui = gui;
+	req.where = where;
 	Point anchor = ThreeDSpriteAnchor(obj->type, length, static_cast<Direction>(dir));
 	req.off_x = static_cast<float>(along * DIR_DX[dir] - anchor.x);
 	req.off_y = static_cast<float>(along * DIR_DY[dir] - anchor.y);
@@ -1324,97 +1326,136 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	return true;
 }
 
-/** The pixels of a sprite for the windows (ObjectSpriteRequest::gui): the object at a zoom of the interface, not at 16x and shrunk. On either thread. */
-static bool RasterGuiSprite(const ObjectSpriteRequest &req, ZoomLevel zoom, float fade, float rust_time, uint32_t paint_colour, ObjectRaster &r)
+/**
+ * The pixels of a sprite of an object (MakeThreeDVehicleObjectSprite()): at 16x for the map, the levels coarser made
+ * from it as from a set's zin16; for the windows (ObjectSpriteRequest::gui) at the zoom of the interface, not at 16x
+ * and shrunk. On either thread.
+ */
+static bool RasterObjectSprite(const ObjectSpriteRequest &req, ZoomLevel zoom, float fade, float rust_time, uint32_t paint_colour, ObjectRaster &r)
 {
 	const float along = (SqueezedType(req.obj->type) && (req.dir & 1)) ? SQUEEZE : 1.0f;
 	const float az = ViewAzimuth(req.dir);
 	return RasterObject(*req.obj, req.scale, az, az, along, PXM_16X / (1 << to_underlying(zoom)), fade, r, 0, rust_time, 0, paint_colour, 1.0f, 0.0f, 0.0f, 0.0f, 0, req.fade, req.walk) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
 }
 
-/** A sprite for the windows made on the thread (ThreeDVehicleObjectSpriteStandIn()), for MakeThreeDVehicleObjectSprite() to take. */
-struct GuiSpriteMade {
+/** The zoom a sprite of an object is made at: 16x for the map, the interface's for the windows. */
+static ZoomLevel ObjectSpriteZoom(const ObjectSpriteRequest &req)
+{
+	return req.gui ? _gui_zoom : ZoomLevel::Min;
+}
+
+/** A sprite of an object made on the thread (ThreeDVehicleObjectSpriteStandIn()), for MakeThreeDVehicleObjectSprite() to take. */
+struct SpriteMadeInBackground {
 	ObjectRaster raster;
-	ZoomLevel zoom = ZoomLevel::Normal; ///< the zoom of the interface it was made at
-	bool drawn = false;                 ///< false: not a pixel of the object seen
+	ZoomLevel zoom = ZoomLevel::Min; ///< the zoom it was made at (ObjectSpriteZoom())
+	bool drawn = false;              ///< false: not a pixel of the object seen
 };
-/** The sprites for the windows made on the thread, by their request; those asked of it. Under _gui_sprites_mutex. */
-static std::map<uint32_t, GuiSpriteMade> _gui_sprites_made;
-static std::set<uint32_t> _gui_sprites_asked;
-static std::mutex _gui_sprites_mutex;
-/** Some came: the windows that draw them are drawn again (_owed_pictures_timer). */
+/** The sprites made on the thread, by their request; those asked of it. Under _bg_sprites_mutex. */
+static std::map<uint32_t, SpriteMadeInBackground> _bg_sprites_made;
+static std::set<uint32_t> _bg_sprites_asked;
+static std::mutex _bg_sprites_mutex;
+/** Some came: the windows, and the vehicles of the map, that draw them are drawn again (_owed_pictures_timer). */
 static std::atomic<bool> _gui_sprites_came = false;
+static std::atomic<bool> _map_sprites_came = false;
 
 /**
- * What the sprite cache draws for a sprite of an object for the windows not made yet (ObjectSpriteRequest::gui; the
- * main thread, GetRawSprite()): it is made on the thread in the background -- the object read, tenths of a second, the
- * first of a set seconds; the purchase list stood still as it scrolled, for a picture of a few pixels (the player,
- * 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there") --, the empty picture till
- * then, and the windows drawn again when it comes. The rig makes it now.
- * @return the sprite to draw instead; 0: make it now (it is made, or it is not one of those)
+ * What stands in on the map for a sprite of an object not made yet: the vehicle's sprite of the nearest direction made
+ * (a vehicle turning shows the way it faced a moment longer), else nothing (the first of its object).
+ */
+static SpriteID NearestObjectSpriteMade(const ObjectSpriteRequest &req)
+{
+	for (int off = 1; off <= 4; off++) {
+		for (int side : {1, -1}) {
+			const int dir = (req.dir + side * off) & 7;
+			auto it = _object_sprites.find(std::make_tuple(req.obj, static_cast<int>(req.where), dir, static_cast<int>(std::lround(req.scale * 1000)), req.fade, req.walk));
+			if (it != _object_sprites.end() && ThreeDObjectSpriteMade(it->second)) return it->second;
+		}
+	}
+	return EmptyObjectSprite();
+}
+
+/**
+ * What the sprite cache draws for a sprite of an object not made yet (the main thread, GetRawSprite()): it is made on
+ * the thread in the background, and drawn again when it comes. For the windows (ObjectSpriteRequest::gui) the object
+ * read is tenths of a second, the first of a set seconds; the purchase list stood still as it scrolled, for a picture
+ * of a few pixels (the player, 17. 10.: "the picture in the purchase menu is tiny, what are you photographing there"):
+ * nothing drawn till then. On the map, the first vehicle of an object stood the game two or three seconds, each
+ * direction after it ten or twenty milliseconds, "the last place where 0 degrees may bite" (the player, 17. 10.): the
+ * vehicle's nearest direction made stands in. The rig makes it now.
+ * @return the sprite to draw instead; 0: make it now (it is made)
  */
 SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request)
 {
 	if (request < 1 || request > _object_sprite_requests.size()) return 0;
 	const ObjectSpriteRequest &req = _object_sprite_requests[request - 1];
-	if (!req.gui || req.obj == nullptr || _three_d_load_at_once) return 0;
-	const ZoomLevel zoom = _gui_zoom;
+	if (req.obj == nullptr || _three_d_load_at_once) return 0;
+	const ZoomLevel zoom = ObjectSpriteZoom(req);
 	{
-		std::lock_guard lock(_gui_sprites_mutex);
-		auto it = _gui_sprites_made.find(request);
-		if (it != _gui_sprites_made.end() && it->second.zoom == zoom) return 0;
-		if (!_gui_sprites_asked.insert(request).second) return EmptyObjectSprite(); // asked already
+		std::lock_guard lock(_bg_sprites_mutex);
+		auto it = _bg_sprites_made.find(request);
+		if (it != _bg_sprites_made.end() && it->second.zoom == zoom) return 0;
+		if (!_bg_sprites_asked.insert(request).second) return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req); // asked already
 	}
 	/* What the game's state gives it now (its paint faded by the date), for the thread. */
 	const float fade = FadeAmount(req.obj, req.fade), rust_time = RustTime(req.obj, req.fade);
 	const uint32_t paint_colour = PaletteColour(req.obj, req.fade);
 	ThreeDLoadInBackground([req, request, zoom, fade, rust_time, paint_colour] {
 		{
-			std::lock_guard lock(_gui_sprites_mutex);
-			if (!_gui_sprites_asked.contains(request)) return; // forgotten meanwhile (the objects read anew)
+			std::lock_guard lock(_bg_sprites_mutex);
+			if (!_bg_sprites_asked.contains(request)) return; // forgotten meanwhile (the objects read anew)
 		}
-		GuiSpriteMade made;
+		SpriteMadeInBackground made;
 		made.zoom = zoom;
-		made.drawn = RasterGuiSprite(req, zoom, fade, rust_time, paint_colour, made.raster);
-		std::lock_guard lock(_gui_sprites_mutex);
-		if (_gui_sprites_asked.erase(request) == 0) return;
-		_gui_sprites_made[request] = std::move(made);
-		_gui_sprites_came = true;
+		made.drawn = RasterObjectSprite(req, zoom, fade, rust_time, paint_colour, made.raster);
+		std::lock_guard lock(_bg_sprites_mutex);
+		if (_bg_sprites_asked.erase(request) == 0) return;
+		_bg_sprites_made[request] = std::move(made);
+		(req.gui ? _gui_sprites_came : _map_sprites_came) = true;
 	});
 	/* Without the thread it was made now. */
-	std::lock_guard lock(_gui_sprites_mutex);
-	return _gui_sprites_made.contains(request) ? 0 : EmptyObjectSprite();
+	{
+		std::lock_guard lock(_bg_sprites_mutex);
+		if (_bg_sprites_made.contains(request)) return 0;
+	}
+	return req.gui ? EmptyObjectSprite() : NearestObjectSpriteMade(req);
 }
 
 /**
- * Make a sprite of an object for the windows (ObjectSpriteRequest::gui): at the zoom of the interface, the levels
- * finer made from it as the sprite cache makes them (ResizeSprites()); from the thread's pixels when it made them.
+ * Make a sprite of an object (ReadSprite()): the object drawn with the camera of the sprites, facing the direction
+ * asked, about the point the game draws the sprite about -- at 16x for the map, the coarser levels made from it as from
+ * a set's zin16, at the zoom of the interface for the windows, the finer made from it (ResizeSprites()); from the
+ * thread's pixels when it made them (ThreeDVehicleObjectSpriteStandIn()).
+ * @param request the sprite's request, counted from 1
+ * @return the level made
  */
-static ZoomLevels MakeGuiSprite(uint32_t request, const ObjectSpriteRequest &req, SpriteLoader::SpriteCollection &sprite)
+ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite)
 {
-	const ZoomLevel zoom = _gui_zoom;
+	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
+	ZoomLevels avail;
+	const ZoomLevel zoom = req != nullptr ? ObjectSpriteZoom(*req) : ZoomLevel::Min;
 	auto start = std::chrono::steady_clock::now();
-	GuiSpriteMade made;
+	SpriteMadeInBackground made;
 	bool found = false;
-	{
-		std::lock_guard lock(_gui_sprites_mutex);
-		auto it = _gui_sprites_made.find(request);
-		if (it != _gui_sprites_made.end()) {
-			if (it->second.zoom == zoom) {
-				made = std::move(it->second);
-				found = true;
+	if (req != nullptr && req->obj != nullptr) {
+		{
+			std::lock_guard lock(_bg_sprites_mutex);
+			auto it = _bg_sprites_made.find(request);
+			if (it != _bg_sprites_made.end()) {
+				if (it->second.zoom == zoom) {
+					made = std::move(it->second);
+					found = true;
+				}
+				_bg_sprites_made.erase(it);
 			}
-			_gui_sprites_made.erase(it);
+		}
+		if (!found) {
+			made.zoom = zoom;
+			made.drawn = RasterObjectSprite(*req, zoom, FadeAmount(req->obj, req->fade), RustTime(req->obj, req->fade), PaletteColour(req->obj, req->fade), made.raster);
 		}
 	}
-	if (!found) {
-		made.zoom = zoom;
-		made.drawn = RasterGuiSprite(req, zoom, FadeAmount(req.obj, req.fade), RustTime(req.obj, req.fade), PaletteColour(req.obj, req.fade), made.raster);
-	}
-	ZoomLevels avail;
 	const ObjectRaster &r = made.raster;
 	if (!made.drawn) {
-		/* Not a pixel of it seen: a transparent pixel. */
+		/* The empty picture, or an object that cannot be drawn: a transparent pixel. */
 		SpriteLoader::Sprite &s = sprite[ZoomLevel::Min];
 		s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
 		s.width = 1;
@@ -1428,7 +1469,7 @@ static ZoomLevels MakeGuiSprite(uint32_t request, const ObjectSpriteRequest &req
 	SpriteLoader::Sprite &s = sprite[zoom];
 	s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
 	/* The object's origin from the point the sprite is drawn about, in pixels of the zoom (RemapCoords()). */
-	const double ox = (req.off_y - req.off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req.off_x + req.off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
+	const double ox = (req->off_y - req->off_x) * 2.0 * ZOOM_BASE / (1 << to_underlying(zoom)), oy = (req->off_x + req->off_y) * static_cast<double>(ZOOM_BASE) / (1 << to_underlying(zoom));
 	s.width = static_cast<uint16_t>(r.width);
 	s.height = static_cast<uint16_t>(r.height);
 	s.x_offs = static_cast<int16_t>(r.left + std::lround(ox));
@@ -1443,69 +1484,15 @@ static ZoomLevels MakeGuiSprite(uint32_t request, const ObjectSpriteRequest &req
 		d.m = 0;
 	}
 	avail.Set(zoom);
-	Debug(sprite, 3, "3D vehicle {}: sprite for the windows of direction {}, state {}, {}x{} at zoom {}, {}, {} ms", req.obj->name, req.dir, req.fade, r.width, r.height, to_underlying(zoom),
-			found ? "made in the background" : "made now", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
-	return avail;
-}
-
-/**
- * Make a sprite of an object (ReadSprite()): the object drawn at 16x with the camera of the sprites, facing the
- * direction asked, about the point the game draws the sprite about; the coarser levels are made from it as from a
- * set's zin16 (ResizeSprites()). One for the windows at the zoom of the interface (MakeGuiSprite()).
- * @param request the sprite's request, counted from 1
- * @return the levels made: 16x
- */
-ZoomLevels MakeThreeDVehicleObjectSprite(uint32_t request, SpriteLoader::SpriteCollection &sprite)
-{
-	const ObjectSpriteRequest *req = (request >= 1 && request <= _object_sprite_requests.size()) ? &_object_sprite_requests[request - 1] : nullptr;
-	if (req != nullptr && req->obj != nullptr && req->gui) return MakeGuiSprite(request, *req, sprite);
-
-	ZoomLevels avail;
-	avail.Set(ZoomLevel::Min);
-	SpriteLoader::Sprite &s = sprite[ZoomLevel::Min];
-	s.colours = SpriteComponents{SpriteComponent::RGB, SpriteComponent::Alpha};
-
-	ObjectRaster r;
-	auto start = std::chrono::steady_clock::now();
-	bool drawn = false;
-	if (req != nullptr && req->obj != nullptr) {
-		float along = (SqueezedType(req->obj->type) && (req->dir & 1)) ? SQUEEZE : 1.0f;
-		float az = ViewAzimuth(req->dir);
-		drawn = RasterObject(*req->obj, req->scale, az, az, along, PXM_16X, FadeAmount(req->obj, req->fade), r, 0, RustTime(req->obj, req->fade), 0, PaletteColour(req->obj, req->fade), 1.0f, 0.0f, 0.0f, 0.0f, 0, req->fade, req->walk) && r.width <= UINT16_MAX && r.height <= UINT16_MAX;
-	}
-	if (!drawn) {
-		/* The empty picture, or an object that cannot be drawn: a transparent pixel. */
-		s.width = 1;
-		s.height = 1;
-		s.x_offs = 0;
-		s.y_offs = 0;
-		s.AllocateData(ZoomLevel::Min, 1);
-		return avail;
-	}
-
-	/* The object's origin from the point the sprite is drawn about, in pixels of 16x (RemapCoords()). */
-	double ox = (req->off_y - req->off_x) * 2.0 * ZOOM_BASE, oy = (req->off_x + req->off_y) * static_cast<double>(ZOOM_BASE);
-	s.width = static_cast<uint16_t>(r.width);
-	s.height = static_cast<uint16_t>(r.height);
-	s.x_offs = static_cast<int16_t>(r.left + std::lround(ox));
-	s.y_offs = static_cast<int16_t>(r.top + std::lround(oy));
-	s.AllocateData(ZoomLevel::Min, static_cast<size_t>(r.width) * r.height);
-	for (size_t i = 0; i < r.px.size(); i++) {
-		SpriteLoader::CommonPixel &d = s.data[i];
-		d.r = r.px[i].r;
-		d.g = r.px[i].g;
-		d.b = r.px[i].b;
-		d.a = r.px[i].a;
-		d.m = 0;
-	}
 	if (_debug_sprite_level >= 3) {
 		/* And where the game thought it would be before it was made (ThreeDVehicleObjectSpriteBounds()): around it. */
 		Rect before{};
 		ThreeDVehicleObjectSpriteBounds(request, before);
-		const bool around = before.left <= s.x_offs && before.top <= s.y_offs && before.right >= s.x_offs + s.width - 1 && before.bottom >= s.y_offs + s.height - 1;
-		Debug(sprite, 3, "3D vehicle {}: sprite of direction {}, faded {}, made, {}x{} at 16x, {} ms; at {},{}..{},{}, thought {},{}..{},{}{}", req->obj->name, req->dir, req->fade, r.width, r.height,
-				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), s.x_offs, s.y_offs, s.x_offs + s.width - 1, s.y_offs + s.height - 1,
-				before.left, before.top, before.right, before.bottom, around ? "" : " NOT AROUND IT");
+		const int sc = 1 << to_underlying(zoom);
+		const bool around = req->gui || (before.left <= s.x_offs && before.top <= s.y_offs && before.right >= s.x_offs + s.width - 1 && before.bottom >= s.y_offs + s.height - 1);
+		Debug(sprite, 3, "3D vehicle {}: sprite{} of direction {}, state {}, {}x{} at zoom {}, {}, {} ms; at {},{}..{},{}, thought {},{}..{},{}{}", req->obj->name, req->gui ? " for the windows" : "", req->dir, req->fade, r.width, r.height, to_underlying(zoom),
+				found ? "made in the background" : "made now", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(),
+				s.x_offs * sc, s.y_offs * sc, (s.x_offs + s.width - 1) * sc, (s.y_offs + s.height - 1) * sc, before.left, before.top, before.right, before.bottom, around ? "" : " NOT AROUND IT");
 	}
 	return avail;
 }
@@ -1837,6 +1824,13 @@ static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::millis
 	/* The sprites for the windows made in the background (ThreeDVehicleObjectSpriteStandIn()): the windows that draw them. */
 	if (_gui_sprites_came.exchange(false)) {
 		for (WindowClass wc : {WindowClass::BuildVehicle, WindowClass::ReplaceVehicle, WindowClass::EnginePreview}) SetWindowClassesDirty(wc);
+	}
+	/* Those of the map: the vehicles drawn as objects, and the windows of the vehicles. */
+	if (_map_sprites_came.exchange(false)) {
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (ThreeDVehicleObjectOf(v) != nullptr) v->MarkAllViewportsDirty();
+		}
+		for (WindowClass wc : {WindowClass::VehicleDepot, WindowClass::VehicleView, WindowClass::VehicleDetails, WindowClass::TrainList, WindowClass::RoadVehicleList, WindowClass::ShipList, WindowClass::AircraftList}) SetWindowClassesDirty(wc);
 	}
 	if (!TakePicturesMade() || _vehicles_owed_pictures.empty()) return;
 	std::set<VehicleID> owed;
@@ -2538,9 +2532,9 @@ static std::mutex _preview_mutex;
 static void ForgetGuiSpritesAndPreviews()
 {
 	{
-		std::lock_guard lock(_gui_sprites_mutex);
-		_gui_sprites_made.clear();
-		_gui_sprites_asked.clear();
+		std::lock_guard lock(_bg_sprites_mutex);
+		_bg_sprites_made.clear();
+		_bg_sprites_asked.clear();
 	}
 	ForgetThreeDVehicleObjectPreviews();
 	std::lock_guard lock(_preview_mutex);

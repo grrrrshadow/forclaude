@@ -42,8 +42,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   texturu a masky stejného rozvržení (3 poslední); trojúhelník přes celou opakovanou texturu = všechno kreslené.
   Zbývá: (b) rasterizace pokrytí sama (4096×3824: ~150 ms; 512×1024 s opakovanou texturou pořád ~280 ms – trojúhelníky
   přes opakování jen v jednom směru), (c) proč se tři textury 4096×3824 dělají souběžně (pamatování pak nepomůže).
-- **(3) neudělané**: sprite auta při 0° (`MakeThreeDVehicleObjectSprite`, ne-gui) dělat na vlákně jako ikonky
-  nákupu (`ThreeDVehicleObjectSpriteStandIn`), mezitím nejbližší hotový směr / odhad velikosti.
+- **(3) hotovo**: sprite auta při 0° se dělá na vlákně jako ikonky nákupu (`ThreeDVehicleObjectSpriteStandIn`);
+  mezitím se kreslí nejbližší hotový směr téhož auta (při otočení chvilku starý směr), první auto typu nic. Až
+  přijde, překreslí se auta z objektů a okna vozidel (depo, seznamy, detail). Rig (Tatra 148 ze zatáčky při 0°):
+  nejdelší snímek 12,6 s → 1,4 s (zbytek je první kreslení mapy), pak 103 ms → 1,7 ms, výsledný obraz stejný.
 
 ## 17. 10. – kostičky v pohledu z očí, nákupní menu připravené
 

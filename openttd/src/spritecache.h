@@ -75,6 +75,7 @@ std::pair<uint, uint> GreenLoadPixels(SpriteID sprite);
 size_t GetSpriteCacheBytesUsed();
 bool GetThreeDObjectSpriteBounds(SpriteID sprite, Rect &bounds);
 void PrepareThreeDObjectSprite(SpriteID sprite);
+bool ThreeDObjectSpriteMade(SpriteID sprite);
 std::string DescribeSpriteLevels(SpriteID sprite);
 
 #endif /* SPRITECACHE_H */

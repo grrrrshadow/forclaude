@@ -1404,8 +1404,16 @@ bool GetThreeDObjectSpriteBounds(SpriteID sprite, Rect &bounds)
 	return ThreeDVehicleObjectSpriteBounds(sc->object_sprite, bounds);
 }
 
+/** Whether a sprite of a vehicle drawn from its 3D object is made (in the cache): one that may stand in for another (ThreeDVehicleObjectSpriteStandIn()). */
+bool ThreeDObjectSpriteMade(SpriteID sprite)
+{
+	if (sprite >= _spritecache.size()) return false;
+	const SpriteCache *sc = GetSpriteCache(sprite);
+	return sc->object_sprite != 0 && sc->ptr != nullptr;
+}
+
 /**
- * Have a sprite of a vehicle drawn from its 3D object for the windows made in the background before it is drawn
+ * Have a sprite of a vehicle drawn from its 3D object made in the background before it is drawn
  * (ThreeDVehicleObjectSpriteStandIn()); nothing for the other sprites, or one made already.
  */
 void PrepareThreeDObjectSprite(SpriteID sprite)
@@ -1846,8 +1854,8 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 
 		/* Load the sprite, if it is not loaded, yet */
 		if (sc->ptr == nullptr) {
-			/* A vehicle's 3D object for the windows not made yet: made in the background, drawn as nothing till then
-			 * and not kept so (three_d_vehicle_object.cpp). */
+			/* A vehicle's 3D object not made yet: made in the background, another drawn till then and not kept so
+			 * (three_d_vehicle_object.cpp). */
 			if (sc->object_sprite != 0) {
 				const SpriteID stand_in = ThreeDVehicleObjectSpriteStandIn(sc->object_sprite);
 				if (stand_in != 0) return GetRawSprite(stand_in, type, allocator, encoder);
