@@ -27,6 +27,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – auta po nákupu připravená, ne až při výjezdu z depa
+
+- Hráč: „auta načítat po nákupu, ne až když vyjede z depa… jezdí chvíli neviditelný… náhled zachovat a používat“.
+- Příčina: tvar s díly stavu na mapě, textury v barvě firmy a obrázek se dělaly až při prvním kreslení auta na
+  mapě (vlákno na pozadí), do té doby se nekreslilo nic.
+- `14dfe5b`: po koupi (zpětné volání nákupu, i vagonu) se hned objedná na vlákně tvar a obrázek auta čelem z depa
+  ve zvětšení každého otevřeného pohledu (i okna auta) – při 0° sprite, v otočeném pohledu obrázek. Co načetl
+  náhled nákupu, zůstává a kreslí se z toho (tvar drží 2 minuty od posledního kreslení). Rig `auta` dělá totéž.
+- Ověřit v buildu: koupit auto, hned pustit z depa – má být vidět hned.
+
+## 18. 10. – kvantované glb (gltfpack) hra čte
+
+- `6c899b0`: čísla všech typů (bajty, shorty, se znaménkem i bez, `normalized`), posun textur
+  `KHR_texture_transform`, normály inverzní transpozicí, dům čte první síť mimo `noc` se všemi rodiči (gltfpack
+  dává síť do vlastního uzlu pod pojmenovaný). Soubor, který chce `-c`/`-cc` (meshopt) nebo `-tc` (KTX2), hra
+  odmítne s hláškou v logu.
+- Zkoušeno v rigu s gltfpack 1.3.0 `-kn -km -ke`: Tatra 603 (1,44 → 1,08 MB), 613 (3,33 → 2,02 MB), drak s kostrou,
+  všechny mírné domy (65 → 48 MB) – kreslí se stejně (pár pixelů světla jinak). Většinu souboru tvoří obrázky.
+
 ## 18. 10. – odpověď kolegovi na `PROSBA-TATRY-DOMY-POSTAVY.md` (hráč odsouhlasil)
 
 - Kolegovi `hra/3d/ODPOVED-TATRY-DOMY-POSTAVY.md`. Hasičská nástavba 138/148 jako podtyp vody (dá se koupit), na
@@ -37,7 +56,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   `interier_<díl>`, instance, LOD a) `<díl>_lod1/_lod2`. Jména póz beru; **zachovat pózu College Girl za volantem
   Tatry** (`ridi`); řidiči později v konfigurátoru. Doplňky už hra umí. Open world: ulička 3 m (1,5 m u okraje),
   stadion `interier: false` + mezery + `pruchody`.
-- **Hra dodělá (hráč 18. 10.: „běž dělat kvantování a co je potřeba“):** čtení `KHR_mesh_quantization` (gltfpack),
+- **Hra dodělá (hráč 18. 10.: „běž dělat kvantování a co je potřeba“):** ~~čtení `KHR_mesh_quantization`~~ hotovo,
   značka `okraje_textur` (přeskočit vyplňování), masky podle materiálu, `interier_<díl>` jen z kabiny, LOD uzly,
   stojící Tatra v `akce` (záznam + sada).
 
