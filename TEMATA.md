@@ -36,7 +36,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: *„kolem lucerny chci světlo okolo a z ruční svítilny paprsek“*. Kolegovi doplněno: skla pod `noc`, místa
   `lucerna_NN` (záře a světlo na okolí) a `svitilna_NN` + `svitilna_NN_kam` (kužel a skvrna, kam dopadne), barva
   a dosah v indexu `svetla` – jako světla vozidel.
-- Hra: kolik jich a kudy létají – navrženo 1–3 přes města jen ve tmě, na mapě i z očí; čeká na hráče.
+- Hráč: *„jo ať litaj čarodějnice“*. Hotovo ve hře (`68b20d6`): v noci 1–3 najednou (dvě od 4 měst, tři od 10),
+  přilétají postupně, od města k městu, měkce zatáčí, 22 m nad zemí a 8 m nad střechou, rychlost z `krok_m`
+  animace `let`. Na mapě `meritko`× (2 jako holky na zastávce), z očí skutečná velikost. Ve dne žádné.
+  Lucerna: plamen a světlo kolem (na ni a na okolí), svítilna: paprsek jako rozšiřující se klín a skvrna, kde
+  dopadne na zem; z očí totéž jako záře a světlo po pixelech. Překresluje se jen krabice jí a jejích světel.
+  Zkoušeno na zkušební krabičce v rigu (jen scratch, do repa nejde), modely od kolegy přijdou místo ní.
+  Rig: `test3d carodejnice [x y stupně [jméno]]`, `test3d carodejnice tady <stupně>`.
 
 ## 18. 10. – stadion: prázdná hasičská Tatra, Mat u grilu; barvy doplňků číslem
 
