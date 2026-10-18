@@ -49,6 +49,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Opraveno cestou: z očí se textura modelu neopakovala za okraj (strašidlo ji má 16× zvětšenou – kreslily se jen
   tečky); zjednodušený tvar na dálku dělal díry do modelů, kde má každý trojúhelník vlastní rohy (rohy na stejném
   místě a stejném místě textury se teď spojí); průhledné nad oblohou si drží hloubku.
+- **Lampy**: doplňky domů mají noční sklo (`noc`) a záři (`svetlo_NN`) – v noci svítí v textuře doplňku a v jeho
+  barvě na tom místě (papír modrý ve dne, modrý i rozsvícený). U silnic stojí kolegova `lampa_na_sloupu` tam, kde má
+  hra sama pouliční lampy (vanilla `Roadside::StreetLights` na městských ulicích, 4 místa dlaždice): sprite lampy hra
+  vynechá a postaví 3D lampu s ramenem nad ulici (otočený pohled, sever s 3D domy, pohled z očí). Rozhoduje hra, ne
+  já. Lampy u dveří dá kolega do domů sám (`doplnky`). Rig: `test3d lampy` vypíše dlaždice s pouličními lampami.
 - Planý poplach: rig hlásil pád karty u stadionu („kresleni obrazku 7 (glDrawElements)“), ale byl to můj zkušební
   deník z ověřování hlídače pádů. Deset běhů stadionu s Tatrou v4 na kartě (llvmpipe) proběhlo bez chyby.
 

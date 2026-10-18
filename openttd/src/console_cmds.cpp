@@ -9488,6 +9488,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		std::string list;
 		for (int s : _three_d_rig_states) list += fmt::format(" {}", s);
 		IConsolePrint(CC_DEFAULT, "test3d: stav{}", list.empty() ? " 0" : list);
+	} else if (what == "lampy") {
+		/* 'lampy': the road tiles with the game's street lights (Roadside::StreetLights), where the 3D views stand
+		 * the colleague's lamps (GetThreeDStreetLamp()); how many and the first few. */
+		int count = 0;
+		std::string first;
+		for (const auto tile : Map::Iterate()) {
+			if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::StreetLights) continue;
+			if (count++ < 5) first += fmt::format(" {},{}", TileX(tile), TileY(tile));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: lampy {} dlazdic{}, lampa {}", count, first, GetThreeDStreetLamp(1, 8) != nullptr ? "je" : "NENI");
 	} else if (what == "detail") {
 		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
 		 * whole shape); with 'textura' its textures at their full size. */

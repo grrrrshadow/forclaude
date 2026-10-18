@@ -1298,6 +1298,7 @@ static int GetViewportY(Point tile)
 static bool _north_house_objects = false;
 static void AddNorthHouseObject(size_t first_parent);
 static void AddIndustryObjects(size_t first_parent, bool north);
+static void AddStreetLamps(size_t first_parent);
 static void AddFieldWheat();
 static const ThreeDIndustryTileParts *OriginalIndustryTileParts(TileIndex tile);
 static TileIndex OriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts);
@@ -1412,6 +1413,7 @@ static void ViewportAddLandscape()
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
 				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent, true);
+				if (_north_house_objects && tile_type == TileType::Road) AddStreetLamps(first_parent);
 				if (_north_house_objects && tile_type == TileType::Clear) AddFieldWheat();
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
@@ -3452,21 +3454,30 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	}
 	_turned_times.models_raster += TurnedNow() - t_projected;
 	if (triangles_only) return;
-	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. */
-	if (_night_windows_now && o != nullptr && tex != nullptr && !o->night_tri.empty()) {
+	/* At night its lit windows over it, kept bright (DrawNight()), and the places of its glows. The glass of an
+	 * add-on's lamp in the add-on's texture, in its colour at this place (the paper of a lamp blue by day, blue lit). */
+	if (_night_windows_now && o != nullptr && !o->night_tri.empty()) {
 		static std::vector<TurnedVertex> night;
+		const TileIndex at = TileXY(std::clamp<int>(static_cast<int>(ox) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(oy) / TILE_SIZE, 0, Map::MaxY()));
 		const size_t corners = o->night_pos.size() / 3;
 		night.resize(corners);
 		for (size_t i = 0; i < corners; i++) {
 			double sx, sy, xr, yr;
 			lay.Project(ox + o->night_pos[i * 3], oy + o->night_pos[i * 3 + 1], oz + o->night_pos[i * 3 + 2], sx, sy);
 			lay.Turn(ox + o->night_pos[i * 3], oy + o->night_pos[i * 3 + 1], xr, yr);
-			night[i] = {sx, sy, o->night_uv[i * 2] * tex->w, o->night_uv[i * 2 + 1] * tex->h, 256.0, xr + yr + 2 * o->night_pos[i * 3 + 2]};
+			night[i] = {sx, sy, o->night_uv[i * 2], o->night_uv[i * 2 + 1], 256.0, xr + yr + 2 * o->night_pos[i * 3 + 2]};
 		}
 		for (size_t t = 0; t + 2 < o->night_tri.size(); t += 3) {
-			const TurnedVertex &a = night[o->night_tri[t]], &b = night[o->night_tri[t + 1]], &c = night[o->night_tri[t + 2]];
+			const uint8_t k = o->NightTexture(t);
+			const ThreeDObjectTexture *nt = k == 0 ? tex : o->GetTextureOf(k, to_underlying(lay.zoom), o->AddonPaintAt(at, k));
+			if (nt == nullptr) continue;
+			TurnedVertex a = night[o->night_tri[t]], b = night[o->night_tri[t + 1]], c = night[o->night_tri[t + 2]];
 			if (std::max({a.x, b.x, c.x}) < 0 || std::min({a.x, b.x, c.x}) >= fw || std::max({a.y, b.y, c.y}) < 0 || std::min({a.y, b.y, c.y}) >= fh) continue;
-			DrawTexturedTriangle(dst, pitch, fw, fh, tex->px.data(), tex->w, tex->h, a, b, c, false, zb.data(), &_night_lit);
+			for (TurnedVertex *v : {&a, &b, &c}) {
+				v->u *= nt->w;
+				v->v *= nt->h;
+			}
+			DrawTexturedTriangle(dst, pitch, fw, fh, nt->px.data(), nt->w, nt->h, a, b, c, false, zb.data(), &_night_lit);
 		}
 	}
 	if (_night_windows_now && o != nullptr) {
@@ -3675,6 +3686,13 @@ static void AddTurnedObjectsToDraw()
 		ps.xmax = ox + tiles_x * TILE_SIZE - 1;
 		ps.ymin = oy;
 		ps.ymax = oy + tiles_y * TILE_SIZE - 1;
+		if (to.obj != nullptr && to.obj->street && to.obj->extent[1] >= to.obj->extent[0]) {
+			/* A street lamp by the street, the cars on it: its own box, not its tile's. */
+			ps.xmin = ox + static_cast<int>(std::floor(to.obj->extent[0]));
+			ps.xmax = ox + static_cast<int>(std::ceil(to.obj->extent[1]));
+			ps.ymin = oy + static_cast<int>(std::floor(to.obj->extent[2]));
+			ps.ymax = oy + static_cast<int>(std::ceil(to.obj->extent[3]));
+		}
 		ps.zmin = to.z + to.sort_z;
 		ps.zmax = to.z + to.sort_z + std::max(1, top);
 		ps.x = ps.y = ps.left = ps.top = 0;
@@ -3831,6 +3849,33 @@ static void AddFieldWheat()
 	if (type == 0 || type >= 8) return;
 	const ThreeDObject *wheat = GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala");
 	if (wheat != nullptr) _turned_objects.push_back({GetThreeDSlopedPlants(wheat, _cur_ti.tileh), _cur_ti.tile, _cur_ti.z});
+}
+
+/** Whether a sprite is one of the game's own street lights (Roadside::StreetLights: the table _roadside_lamps of road_cmd.cpp). */
+static bool IsStreetLightSprite(SpriteID image)
+{
+	const SpriteID s = image & SPRITE_MASK;
+	return s == 0x57E || s == 0x57F;
+}
+
+/**
+ * The game's own street lights a road tile just added (the paved streets of the towns, Roadside::StreetLights) as the
+ * lamps of the objects (the colleague's set "lampy", GetThreeDStreetLamp()): each light's sprite left out (box_kind
+ * 4), its lamp drawn among the standing things as a building is (box_kind 7) -- lit at night, its glow about it.
+ * See-through houses leave the game's sprites as they are.
+ * @param first_parent the first of the sprites the tile added
+ */
+static void AddStreetLamps(size_t first_parent)
+{
+	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Houses)) return;
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		if (!IsStreetLightSprite(ps.image)) continue;
+		const ThreeDObject *lamp = GetThreeDStreetLamp(ps.xmin & 0xF, ps.ymin & 0xF);
+		if (lamp == nullptr) continue;
+		ps.box_kind = 4;
+		_turned_objects.push_back({lamp, _cur_ti.tile, ps.zmin});
+	}
 }
 
 /**
@@ -4095,6 +4140,8 @@ static void ViewportDoDrawTurned()
 		}
 		/* One of the game's own industries as a real 3D object (AddIndustryObjects()). */
 		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent, false);
+		/* The street lights of the towns' streets as lamps (AddStreetLamps()). */
+		if (tile_type == TileType::Road) AddStreetLamps(first_parent);
 		/* Wheat on the farm's fields (AddFieldWheat()). */
 		if (tile_type == TileType::Clear) AddFieldWheat();
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
@@ -9703,6 +9750,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 		}
 		ps_kind.resize(_vd.parent_sprites_to_draw.size(), kind);
+		/* The street lights of the towns' streets as lamps, as the buildings (AddStreetLamps()). */
+		if (tile_type == TileType::Road && !IsTransparencySet(TransparencyOption::Houses)) {
+			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+				if (!IsStreetLightSprite(ps.image)) continue;
+				const ThreeDObject *lamp = GetThreeDStreetLamp(ps.xmin & 0xF, ps.ymin & 0xF);
+				if (lamp == nullptr) continue;
+				ps_kind[i] = 5;
+				objects.push_back({lamp, _cur_ti.tile, ps.zmin});
+			}
+		}
 		/* A bridge over the tile is built from its own sprites. */
 		for (auto it = _cab_bridge_sprites.rbegin(); it != _cab_bridge_sprites.rend() && it->from >= first_parent; ++it) {
 			if (it->to == SIZE_MAX) it->to = _vd.parent_sprites_to_draw.size();
@@ -10341,12 +10399,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
 			const ThreeDObjectTexture *tex = o.TryGetTexture(level, o.PaintAt(co.origin));
 			for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
+				/* An add-on's lamp in the add-on's texture, in its colour at this place. */
+				const uint8_t n = o.NightTexture(t);
+				const ThreeDObjectTexture *nt = n == 0 ? tex : o.TryGetTextureOf(n, level, o.AddonPaintAt(co.origin, n));
+				if (nt == nullptr) continue;
 				std::vector<CabPoint> poly;
 				for (int k = 0; k < 3; k++) {
 					const uint32_t i = o.night_tri[t + k];
-					poly.push_back(CabToEye(eye, ox + o.night_pos[i * 3], oy + o.night_pos[i * 3 + 1], oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * tex->w, o.night_uv[i * 2 + 1] * tex->h));
+					poly.push_back(CabToEye(eye, ox + o.night_pos[i * 3], oy + o.night_pos[i * 3 + 1], oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * nt->w, o.night_uv[i * 2 + 1] * nt->h));
 				}
-				CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(poly), eye, false);
+				CabDrawPolygon(dst, zb, width, height, nt->px.data(), nt->w, nt->h, std::move(poly), eye, false);
 			}
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) {
 				const CabPoint p = CabToEye(eye, ox + o.lights[i], oy + o.lights[i + 1], oz + o.lights[i + 2], 0, 0);

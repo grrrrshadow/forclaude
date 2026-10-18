@@ -198,6 +198,7 @@ struct ThreeDObject {
 	std::vector<float> night_pos;
 	std::vector<float> night_uv;
 	std::vector<uint32_t> night_tri;
+	std::vector<uint8_t> night_tex; ///< each triangle's texture, as tri_tex (an add-on's lamp: its own, in its colour at the place); empty all its own
 	std::vector<float> lights; ///< x, y, z of each light, as pos
 	std::vector<float> uv;    ///< u, v of each corner in the texture, 0..1
 	std::vector<uint32_t> tri; ///< three corners a triangle
@@ -222,6 +223,10 @@ struct ThreeDObject {
 	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s; empty all its own
 	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
+	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's
+	float extent[4] = {};             ///< x0, x1, y0, y1 of its corners as read, world units
+	/** Night triangle t's texture (night_tex): 0 its own, n its add-on n's. */
+	uint8_t NightTexture(size_t t) const { return t / 3 < this->night_tex.size() ? this->night_tex[t / 3] : 0; }
 	std::vector<float> nrm;           ///< an add-on's normals, metres, to light it as it is turned at a place
 	std::vector<ThreeDObjectFigure> event_figures; ///< "akce": the figures standing about it on its days (GetThreeDHouseEvent(): the new stadium's)
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
@@ -243,7 +248,8 @@ struct ThreeDObject {
 	bool Read() const;
 	bool TryRead() const;
 	/** Whether its shape and texture are read (Read()): what is read of it may be looked at then, on any thread. */
-	bool IsRead() const { return this->glb_path.empty() || this->glb_state.value.load(std::memory_order_acquire) == 1; }
+	/** Whether it is read (Read()): one made in memory (an industry's part) is from the first; a street lamp, its add-on alone, when laid. */
+	bool IsRead() const { return (this->glb_path.empty() && !this->street) || this->glb_state.value.load(std::memory_order_acquire) == 1; }
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
@@ -735,6 +741,7 @@ struct Industry;
 const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind);
 std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
+const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
 

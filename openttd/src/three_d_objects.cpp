@@ -89,6 +89,8 @@ static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objec
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 /** The add-ons of the buildings ("druh": "doplnek"), by their name: their objects in _three_d_objects (ThreeDObject::addon_places). */
 static std::map<std::string, size_t, std::less<>> _three_d_addons;
+/** The street lamps (MakeStreetLamps()) by the place of the game's street light on its tile, dx * 16 + dy: objects in _three_d_objects. */
+static std::map<int, size_t> _three_d_street_lamps;
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
@@ -2246,6 +2248,36 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 }
 
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
+/** The lamp of the colleague's set "lampy" standing where the game has its street lights. */
+static constexpr std::string_view STREET_LAMP = "lampa_na_sloupu";
+
+/**
+ * The street lamps (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 4: "lamps along the roads and
+ * streets, where exactly the game decides"): where the game has its own street lights -- the roadside of the towns'
+ * paved streets (Roadside::StreetLights), at the four places of a tile its sprites stand at, by the middle of an edge --
+ * the lamp on its post, its arm over the street towards the tile's middle. An object of that add-on alone at each of
+ * the places (no file of its own: Read() lays the add-on into it), drawn as the buildings are (GetThreeDStreetLamp()).
+ */
+static void MakeStreetLamps()
+{
+	_three_d_street_lamps.clear();
+	if (!_three_d_addons.contains(STREET_LAMP)) return;
+	static constexpr int PLACES[][2] = {{1, 8}, {14, 8}, {8, 1}, {8, 14}};
+	for (const auto &[dx, dy] : PLACES) {
+		ThreeDObject lamp;
+		lamp.name = fmt::format("{} {},{}", STREET_LAMP, dx, dy);
+		lamp.variants = 0;
+		lamp.street = true;
+		ThreeDObjectFigure &place = lamp.addon_places.emplace_back();
+		place.figure = std::string(STREET_LAMP);
+		place.at[0] = static_cast<float>(dx / OBJECT_UNITS_PER_METRE);
+		place.at[1] = static_cast<float>(dy / OBJECT_UNITS_PER_METRE);
+		place.facing = static_cast<float>(std::atan2(8.0 - dy, 8.0 - dx) * 180.0 / M_PI);
+		_three_d_street_lamps.emplace(dx * 16 + dy, _three_d_objects.size());
+		_three_d_objects.push_back(std::move(lamp));
+	}
+}
+
 static void ReadThreeDObjects()
 {
 	_three_d_objects_read = true;
@@ -2354,6 +2386,7 @@ static void ReadThreeDObjects()
 			Debug(misc, 0, "3D objects {}: {}", index, ex.what());
 		}
 	}
+	MakeStreetLamps();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
@@ -4778,6 +4811,14 @@ const ThreeDObject *GetThreeDObjectByName(std::string_view name)
 }
 
 /** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
+/** The street lamp standing where the game has a street light on a tile (MakeStreetLamps()): its place there, world units; nullptr none. */
+const ThreeDObject *GetThreeDStreetLamp(int dx, int dy)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_street_lamps.find(dx * 16 + dy);
+	return it == _three_d_street_lamps.end() ? nullptr : &_three_d_objects[it->second];
+}
+
 const ThreeDObject *GetThreeDFieldPart(std::string_view part)
 {
 	if (!_three_d_objects_read) ReadThreeDObjects();
@@ -5433,6 +5474,28 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 			read.facing.push_back(t / 3 < a.facing.size() ? a.facing[t / 3] : 0);
 			read.tri_tex.push_back(tex);
 		}
+		/* Its night (the colleague's lamps: their paper, glass and flame in "noc", their glows "svetlo_NN"): laid as it
+		 * is, the glass in its own texture -- the paper in its colour at the place, as by day. */
+		auto lay = [&](const float *p, std::vector<float> &out) {
+			const double x = p[0], y = p[1];
+			out.push_back(static_cast<float>((x * c - y * s) * place.scale + place.at[0] * OBJECT_UNITS_PER_METRE));
+			out.push_back(static_cast<float>((x * s + y * c) * place.scale + place.at[1] * OBJECT_UNITS_PER_METRE));
+			out.push_back(static_cast<float>(p[2] * place.scale + place.at[2] * OBJECT_HEIGHT_PER_METRE));
+		};
+		if (!a.night_tri.empty()) {
+			read.night_tex.resize(read.night_tri.size() / 3, 0);
+			const uint32_t night_base = static_cast<uint32_t>(read.night_pos.size() / 3);
+			for (size_t i = 0; i + 2 < a.night_pos.size(); i += 3) {
+				lay(&a.night_pos[i], read.night_pos);
+				read.night_uv.push_back(i / 3 * 2 + 1 < a.night_uv.size() ? a.night_uv[i / 3 * 2] : 0.0f);
+				read.night_uv.push_back(i / 3 * 2 + 1 < a.night_uv.size() ? a.night_uv[i / 3 * 2 + 1] : 0.0f);
+			}
+			for (size_t t = 0; t + 2 < a.night_tri.size(); t += 3) {
+				read.night_tri.insert(read.night_tri.end(), {night_base + a.night_tri[t], night_base + a.night_tri[t + 1], night_base + a.night_tri[t + 2]});
+				read.night_tex.push_back(tex);
+			}
+		}
+		for (size_t i = 0; i + 2 < a.lights.size(); i += 3) lay(&a.lights[i], read.lights);
 		laid++;
 	}
 	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
@@ -5454,7 +5517,8 @@ bool ThreeDObject::Read() const
 		read.tiles_x = this->tiles_x;
 		read.tiles_y = this->tiles_y;
 		read.addon = this->addon;
-		bool ok = ReadGlb(this->glb_path, read);
+		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()). */
+		bool ok = this->glb_path.empty() ? !this->addon_places.empty() : ReadGlb(this->glb_path, read);
 		if (ok && !this->snow_path.empty()) {
 			std::vector<uint8_t> snow = ReadWholeFile(this->snow_path);
 			if (!snow.empty()) read.png = std::move(snow);
@@ -5471,11 +5535,22 @@ bool ThreeDObject::Read() const
 			self.night_pos = std::move(r.night_pos);
 			self.night_uv = std::move(r.night_uv);
 			self.night_tri = std::move(r.night_tri);
+			self.night_tex = std::move(r.night_tex);
 			self.lights = std::move(r.lights);
 			self.uv = std::move(r.uv);
 			self.tri = std::move(r.tri);
 			self.facing = std::move(r.facing);
 			self.top = r.top;
+			if (!r.pos.empty()) {
+				self.extent[0] = self.extent[2] = std::numeric_limits<float>::infinity();
+				self.extent[1] = self.extent[3] = -std::numeric_limits<float>::infinity();
+				for (size_t i = 0; i + 2 < r.pos.size(); i += 3) {
+					self.extent[0] = std::min(self.extent[0], r.pos[i]);
+					self.extent[1] = std::max(self.extent[1], r.pos[i]);
+					self.extent[2] = std::min(self.extent[2], r.pos[i + 1]);
+					self.extent[3] = std::max(self.extent[3], r.pos[i + 1]);
+				}
+			}
 			self.png = std::move(r.png);
 			self.light = std::move(r.light);
 			self.tri_tex = std::move(r.tri_tex);
