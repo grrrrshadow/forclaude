@@ -8949,6 +8949,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * the frames of the preview), at most a minute; the next frames draw them. */
 		const auto start = std::chrono::steady_clock::now();
 		while (ThreeDPicturesWaiting() > 0 && std::chrono::steady_clock::now() - start < std::chrono::seconds(60)) std::this_thread::sleep_for(std::chrono::milliseconds(5));
+		extern void RigTakeThreeDPicturesMade();
+		RigTakeThreeDPicturesMade();
+		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: dokresleno za {} ms, ve fronte {}", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count(), ThreeDPicturesWaiting());
 	} else if (what == "nahledy") {
 		ThreeDPreviewsTick();
@@ -9111,13 +9114,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDDragons());
 	} else if (what == "carodejnice") {
 		/* 'carodejnice [<x> <y> <stupnu> [jmeno]]': the witches flying (three_d_witches.h, only at night); with a tile one
-		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu>': one sent from under
-		 * the middle of the main view, drawn about its middle as high as she flies. */
+		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu> [jmeno]': one sent from
+		 * under the middle of the main view, drawn about its middle as high as she flies. */
 		auto x = number(2), y = number(3), deg = number(4);
 		if (argv.size() > 2 && argv[2] == "tady") {
-			const int up = UnScaleByZoom(static_cast<int>(22.0 * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE), vp->zoom);
+			const int up = UnScaleByZoom(static_cast<int>(16.0 * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE), vp->zoom);
 			const Point pt = TranslateXYToTileCoord(*vp, vp->left + vp->width / 2, vp->top + std::min(vp->height - 1, vp->height / 2 + up));
-			const bool sent = pt.x >= 0 && SendThreeDWitch({}, pt.x, pt.y, number(3).value_or(0) * M_PI / 180.0);
+			const std::string_view kind = argv.size() > 4 ? argv[4] : std::string_view{};
+			const bool sent = pt.x >= 0 && SendThreeDWitch(kind, pt.x, pt.y, number(3).value_or(0) * M_PI / 180.0);
 			IConsolePrint(CC_DEFAULT, "test3d: carodejnice {}", sent ? "poslana" : "NEPOSLANA");
 		} else if (x.has_value() && y.has_value()) {
 			const std::string_view kind = argv.size() > 5 ? argv[5] : std::string_view{};

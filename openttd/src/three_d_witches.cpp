@@ -33,14 +33,14 @@ namespace {
 
 constexpr uint MAX_WITCHES = 3;           ///< at most so many in the air at once
 constexpr uint64_t NEXT_TICKS = 450;      ///< one more comes after so long (about a quarter of a minute)
-constexpr double FLY_M = 22.0;            ///< how high over the ground they fly, metres (her torch reaching the ground)
+constexpr double FLY_M = 16.0;            ///< how high over the ground they fly, metres (her torch reaching the ground: the colleague's shine 23 degrees down)
 constexpr double OVER_ROOF_M = 8.0;       ///< and at least so high over a roof
 constexpr double ROOF_GUESS_M = 30.0;     ///< a house's roof whose height is not known yet (its .glb not read)
 constexpr double TURN = 0.8 * M_PI / 180; ///< how far a witch turns in a tick, radians
 constexpr double CLIMB_M = 0.4;           ///< how far she rises or sinks in a tick, metres
 constexpr double FALLBACK_STEP_M = 0.12;  ///< metres a tick of her true size, when her animation does not say ("krok_m")
 constexpr double APPROACH_TILES = 14.0;   ///< how far from a town she comes from
-constexpr float FACING_STEP = 5.0f;       ///< her pictures every so many degrees she turns
+constexpr float FACING_STEP = 10.0f;      ///< her pictures every so many degrees she turns (each made on the thread)
 /** The girls at a stop are drawn twice their size on the map, as they are from the eyes: a witch "as big as them" so. */
 constexpr float EYE_OF_MAP = 0.5f;
 

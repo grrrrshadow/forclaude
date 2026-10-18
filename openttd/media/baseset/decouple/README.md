@@ -104,6 +104,13 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   Soubory `_kostra.glb` (síť s kostrou a animacemi pod stejnými jmény, klíč `kostra`): hra z nich pózuje draka
   každý tik místo snímků a mezi animacemi pózy 8 tiků prolíná (barvy materiálů, víc sítí s kostrou: tělo a oči);
   bez kostry (čínský drak) zůstávají snímky.
+- `carodejnice/` – **čarodějnice a strašidlo** létající v noci (od kolegy, grrrrf `hra/3d/objekty/carodejnice/`,
+  `PROSBA-CARODEJNICE.md`, `CARODEJNICE-PRO-HRU.md`): Marisa (skydash, Sketchfab, CC BY 4.0), čarodějnice na koštěti
+  ve fialovém a v zeleném (Witch Roll, xinus22, Sketchfab, CC BY 4.0), strašidlo (ghost, remi136, Sketchfab,
+  CC BY 4.0); lucerna Roblox Lantern (Luigi2013, Sketchfab, CC BY 4.0), ruční svítilna kolegova. Modely otočené,
+  zmenšené, s texturami nejvýš 1024 px, let ze snímků. `druh: "carodejnice"`, snímky letu `let_NN` s místy lucerny
+  (`lucerna_NN`), svítilny (`svitilna_NN`, `paprsek_NN`) a sklem pod `noc_NN`, světla v `svetla`. V noci jich létá
+  1–3 nad městy, lucerna svítí kolem sebe a svítilna dělá paprsek se skvrnou na zemi (`three_d_witches.cpp`).
 - `predmety/` – předměty chodce v pohledu z první osoby (od kolegy, grrrrf `hra/3d/objekty/predmety/`,
   `PROSBA-PREDMETY-KLADIVO-TRUHLA.md`): válečné kladivo a truhla z OpenMW Example Suite
   (gitlab.com/OpenMW/example-suite, modely **CC0**, volné dílo), `druh: "predmet"`. Kladivo chodec nese v inventáři

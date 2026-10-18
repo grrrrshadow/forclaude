@@ -2172,6 +2172,12 @@ static bool TakePicturesMade()
 	return !done.empty();
 }
 
+/** The rig ('test3d dokresli'): the pictures the thread made kept now, not at the next round of the window's timer. */
+void RigTakeThreeDPicturesMade()
+{
+	TakePicturesMade();
+}
+
 /** Whether the thread is making a picture of a vehicle or has some to make: what the objects made is held then (ForgetUnusedThreeDObjects()). */
 bool ThreeDPicturesBeingMade()
 {
@@ -3287,15 +3293,18 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	if (fig == nullptr) return nullptr;
 	const bool by_tick = frame < 0;
 	if (by_tick) frame = fig->FrameAt(TimerGameTick::counter, phase);
-	/* For the view from the eyes nothing is read now: its frame draws without the figure till it is read (TryGetShape()). */
+	/* For the view from the eyes nothing is read now: its frame draws without the figure till it is read (TryGetShape()).
+	 * Nor for a witch flying (three_d_witches.h): drawn again every tick, she comes as her frame is read and her picture
+	 * made on the thread (the colleague's Marisa has 41 000 triangles a frame). */
 	const bool for_eye = ViewportDrawingEye();
-	const ThreeDVehicleShape *shape = for_eye ? fig->TryGetShape(frame) : fig->GetShape(frame);
+	const bool later = for_eye || fig->frame_lights;
+	const ThreeDVehicleShape *shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
 	if (shape == nullptr) return nullptr;
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
 	const int spin_step = fig->spin_ticks > 0 ? static_cast<int>((TimerGameTick::counter % fig->spin_ticks) * SPIN_STEPS / fig->spin_ticks) : 0;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
-	_object_picture_may_wait = for_eye;
+	_object_picture_may_wait = later;
 	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step);
 	_object_picture_may_wait = false;
 	if (pic == nullptr) return nullptr;
