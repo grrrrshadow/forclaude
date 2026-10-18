@@ -27,6 +27,35 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – stadion: prase na rožni a hasičská Tatra (domluvit, pak kódovat)
+
+- Hráč: na hřišti/stadionu (`dum_20_stadion`, `dum_14_stadion_stary`) občas prase na rožni a hasičská Tatra
+  s hasiči. Bez balíčku 3D Tater hasiči nejsou (hra je bere jen z kolegova balíčku, sama je nemá).
+- Kolegovi napsáno (`hra/3d/PROSBA-POZARNI-TATRA.md`): hasičská Tatra jako objekt v balíčku 3D Tater, hasiči jako
+  posádka, trojúhelníky „jako normální Tatra“ (zatím rozpočet osobního auta, Tatra 603 má 7 634), přesný limit až po
+  hráčově porovnání V3S a Tatry.
+- **Nejasné:** jak často – hráč napsal „jednou za sedm dní, dvakrát za měsíc“. Zeptat se, pak dělat.
+
+## 18. 10. – 3D na grafické kartě, krok 1: obrázky vozidel, postav a efektů
+
+- Hráč: „proč kreslíme procesorem a ne normálně grafikou… začni tím, že všechny práce s 3D objekty převedeme na GPU“.
+  OpenGL hry (video driver) jen ukazuje hotový obraz z procesoru; všechno naše 3D kreslil procesor trojúhelník po
+  trojúhelníku.
+- **Hotovo:** `three_d_gpu.cpp/.h`. Karta má vlastní vlákno `ottd:3d-gpu` a vlastní kontext OpenGL 3.3 (Windows:
+  skryté okno a WGL, Linux: EGL bez okna), nezávisle na video driveru. `RasterObject()` (obrázky aut na mapě,
+  v otočeném pohledu, nákup, náhled, postavy, efekty) kreslí na kartě: stejná kamera, světlo, lak, sklo, posádka,
+  noční světla, stejné převzorkování 2× a zmenšení. Tvar, trojúhelníky a textury jdou na kartu jednou (podle čísla
+  `ThreeDUniqueId`), karta drží max. 384 MB a pouští nejdéle nekreslené. Lak/rez/barvy doplňků a podrobností se
+  malují do textury na procesoru jednou za stav a úroveň (ne pro každý pixel každého obrázku), pouští se po 15 s.
+- Obrázek z karty je ořezaný na své pixely (procesor měl prázdný okraj od neviditelných trojúhelníků délky).
+- Kde karta není nebo něco neudrží (textura větší, než karta zvládne), kreslí procesor jako dřív.
+- Ověřeno v rigu (Mesa llvmpipe, tj. „karta“ na procesoru): PPM Tatry 148, 603, 613 i v noci se od procesoru liší
+  jen o 1 odstín (zaokrouhlení) a pár krajních pixelů. Rychlost se v kontejneru měřit nedá (llvmpipe není karta).
+- Rig: `test3d gpu 0|1` (procesor / karta a co kreslí), `casy` ukazuje čas karty. `kresli <motor> …` (PPM) zase
+  funguje (dřív ho přebila větev `kresli [počet]`), `auta` píše číslo motoru.
+- **Dál:** domy (`DrawObjectInto`, obrázky domů) a pohled z očí na kartu; lak a rez rovnou v shaderu (bez malování
+  textur). Pak limity trojúhelníků (hráč chce můj názor „kolik“).
+
 ## 18. 10. – rychlejší 3D GRF: vzkaz kolegovi (grrrrf `hra/3d/ZRYCHLENI-3D-GRF.md`)
 
 - Hráč odsouhlasil: (1) okraje 16 px kolem ostrůvků v atlasu + značka `"okraje_textur"` v indexu (hra pak přeskočí

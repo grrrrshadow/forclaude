@@ -2901,6 +2901,13 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
  */
 static std::mutex _lazy_mutex;
 static std::condition_variable _lazy_made;
+
+/** The next number of a shape or a texture (ThreeDUniqueId): never 0, never one given before. */
+uint64_t ThreeDUniqueId::Next()
+{
+	static std::atomic<uint64_t> next{1};
+	return next++;
+}
 /** The things being made now: the object (or the shape) and which thing of it (LazyThing). */
 static std::set<std::pair<const void *, int>> _lazy_making;
 /** The things asked of the thread in the background and not made yet (MadeOrAsked()). */

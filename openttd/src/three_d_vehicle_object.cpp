@@ -10,6 +10,7 @@
 #include "stdafx.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_objects.h"
+#include "three_d_gpu.h"
 #include "three_d.h"
 #include "engine_base.h"
 #include "vehicle_base.h"
@@ -46,6 +47,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <set>
 #include <thread>
 
@@ -892,6 +894,157 @@ struct ObjectDetailPaint {
 };
 
 /**
+ * The camera of the pictures of an object (RasterObject()): a point of the object's frame on the picture -- turned as
+ * its state has it, leant, foreshortened, seen --, a normal of it lit by the world's light, a thing that turns turned
+ * about its axis. The pictures of the processor and of the graphics card (GpuRasterObject()) by the same.
+ */
+struct ObjectCamera {
+	float scale, along, stretch, p;
+	float tp, tc, ts;   ///< the state's turn about z ("otoceni")
+	float ca, sa;       ///< the camera's angle
+	float fx, fy, lx, ly; ///< the object's front and left in the world, for the light
+	float pitch, pc, ps, roll, rc, rs;
+	float spin, sc, sn;
+	const float *k, *kc; ///< the axis a thing that turns turns about, and a point of it
+	float ll;           ///< the length of L
+	static constexpr float L[3] = {-0.55f / 1.0f, 0.35f, 0.75f};
+
+	ObjectCamera(const ThreeDVehicleObject &obj, const ThreeDVehicleState *st, float scale, float cam_az, float world_az, float along, float p, float stretch, float spin, float pitch, float roll) :
+			scale(scale), along(along), stretch(stretch), p(p), pitch(pitch), roll(roll), spin(spin), k(obj.spin_axis), kc(obj.spin_centre)
+	{
+		this->tp = (st != nullptr ? st->turn : 0.0f) * static_cast<float>(M_PI) / 180.0f;
+		this->tc = std::cos(this->tp);
+		this->ts = std::sin(this->tp);
+		this->ca = std::cos(cam_az * static_cast<float>(M_PI) / 180.0f);
+		this->sa = std::sin(cam_az * static_cast<float>(M_PI) / 180.0f);
+		/* The light: the object's front and left in the world, the normals turned into it. */
+		const float wa = (world_az + 135.0f) * static_cast<float>(M_PI) / 180.0f;
+		this->fx = std::cos(wa);
+		this->fy = std::sin(wa);
+		this->lx = -this->fy;
+		this->ly = this->fx;
+		this->ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+		const float sp = spin * static_cast<float>(M_PI) / 180.0f;
+		this->sc = std::cos(sp);
+		this->sn = std::sin(sp);
+		const float pp = pitch * static_cast<float>(M_PI) / 180.0f;
+		this->pc = std::cos(pp);
+		this->ps = std::sin(pp);
+		const float rp = roll * static_cast<float>(M_PI) / 180.0f;
+		this->rc = std::cos(rp);
+		this->rs = std::sin(rp);
+	}
+
+	/** Turned about z at its origin as the state has it (a cart pushed). */
+	inline void Turned(float &vx, float &vy) const
+	{
+		if (this->tp == 0.0f) return;
+		const float x = vx * this->tc - vy * this->ts, y = vx * this->ts + vy * this->tc;
+		vx = x;
+		vy = y;
+	}
+
+	/** Turned about its axis (Rodrigues): v' = v cos + (k x v) sin + k (k . v)(1 - cos). */
+	inline void Spin(float &vx, float &vy, float &vz) const
+	{
+		const float d = k[0] * vx + k[1] * vy + k[2] * vz;
+		const float cx = k[1] * vz - k[2] * vy, cy = k[2] * vx - k[0] * vz, cz = k[0] * vy - k[1] * vx;
+		vx = vx * sc + cx * sn + k[0] * d * (1 - sc);
+		vy = vy * sc + cy * sn + k[1] * d * (1 - sc);
+		vz = vz * sc + cz * sn + k[2] * d * (1 - sc);
+	}
+
+	/** Up a hill its front higher (pitch), in a curve leaning in (roll, its left side down): about its middle on the rail. */
+	inline void Lean(float &vx, float &vy, float &vz) const
+	{
+		if (this->pitch != 0.0f) {
+			const float x = vx * this->pc - vz * this->ps, z = vx * this->ps + vz * this->pc;
+			vx = x;
+			vz = z;
+		}
+		if (this->roll != 0.0f) {
+			const float y = vy * this->rc + vz * this->rs, z = vz * this->rc - vy * this->rs;
+			vy = y;
+			vz = z;
+		}
+	}
+
+	/** A point of the vehicle's frame on the picture: turned as the state has it, leant, foreshortened, seen. */
+	inline void Place(float px, float py, float pz, float &osx, float &osy, float &od) const
+	{
+		this->Turned(px, py);
+		this->Lean(px, py, pz);
+		const float x = px * this->scale * this->along, y = py * this->scale, z = pz * this->scale * this->stretch;
+		const float xr = x * this->ca - y * this->sa, yr = x * this->sa + y * this->ca;
+		osx = xr * this->p;
+		osy = (-yr * CAM_SIN - z * CAM_COS) * this->p;
+		od = yr * CAM_COS - z * CAM_SIN;
+	}
+
+	/** A point of a thing that turns: turned about its axis's point, then placed. */
+	inline void PlaceSpun(float px, float py, float pz, float &osx, float &osy, float &od) const
+	{
+		if (this->spin != 0.0f) {
+			px -= kc[0]; py -= kc[1]; pz -= kc[2];
+			this->Spin(px, py, pz);
+			px += kc[0]; py += kc[1]; pz += kc[2];
+		}
+		this->Place(px, py, pz, osx, osy, od);
+	}
+
+	/** The light's angle at a normal of it: n . L, both in the world. */
+	inline float LightAt(float nx, float ny, float nz) const
+	{
+		this->Turned(nx, ny);
+		this->Lean(nx, ny, nz);
+		const float wx = nx * this->fx + ny * this->lx, wy = nx * this->fy + ny * this->ly;
+		return (wx * L[0] + wy * L[1] + nz * L[2]) / this->ll;
+	}
+
+	/** And how light it is there. */
+	inline float Shade(float nx, float ny, float nz) const
+	{
+		return 0.55f + 0.45f * std::max(0.0f, this->LightAt(nx, ny, nz));
+	}
+};
+
+/** The lights on at night of an object (RasterObject()): the places they shine from on the picture, pixels from its origin. */
+static void ObjectLightsOn(const ThreeDVehicleShape &whole, uint64_t parts, int lights, const ObjectCamera &cam, std::vector<ThreeDPictureLight> &out)
+{
+	out.clear();
+	if (lights == 0) return;
+	auto add_light = [&](float px, float py, float pz, ThreeDPictureLight::Kind kind) {
+		float lx, ly, ld;
+		cam.Place(px, py, pz, lx, ly, ld);
+		out.push_back({lx / SUPERSAMPLE, ly / SUPERSAMPLE, kind});
+	};
+	if ((lights & LIGHTS_FRONT) != 0 && !whole.front_lights.empty()) {
+		float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
+		size_t n_front = 0;
+		for (size_t i = 0; i < whole.front_lights.size() / 3; i++) n_front += ThreeDVehicleShape::Shown(i < whole.front_part.size() ? whole.front_part[i] : 0, parts) ? 1 : 0;
+		for (size_t i = 0; i < whole.front_lights.size() / 3; i++) {
+			if (!ThreeDVehicleShape::Shown(i < whole.front_part.size() ? whole.front_part[i] : 0, parts)) continue;
+			add_light(whole.front_lights[i * 3], whole.front_lights[i * 3 + 1], whole.front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
+			ahead = std::max(ahead, whole.front_lights[i * 3]);
+			mid += whole.front_lights[i * 3 + 1] / n_front;
+		}
+		/* The pool on the way, on the ground before the lamps (not over the bonnet): near, and further on. */
+		if (n_front > 0) {
+			add_light(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+			add_light(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+		}
+	}
+	if ((lights & LIGHTS_BACK) != 0) {
+		for (size_t i = 0; i * 3 + 2 < whole.back_lights.size(); i++) {
+			if (!ThreeDVehicleShape::Shown(i < whole.back_part.size() ? whole.back_part[i] : 0, parts)) continue;
+			add_light(whole.back_lights[i * 3], whole.back_lights[i * 3 + 1], whole.back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
+		}
+	}
+}
+
+static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk);
+
+/**
  * Draw an object with the camera of the sprites, turned: the triangles through a depth buffer, each pixel the
  * texture's, lit from the corners' normals by one light fixed to the world (the colleague's: from the left above
  * as the sprites of the original game and the sets, the brightness 0.55 + 0.45 max(0, n . L), L = (-0.55, 0.35,
@@ -917,6 +1070,11 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 {
 	const ThreeDVehicleShape *whole = obj.GetShape(frame, obj.PartsOf(state));
 	if (whole == nullptr) return false;
+	/* On the graphics card where there is one (three_d_gpu.h); what it cannot draw the processor draws. */
+	if (ThreeDGpuAvailable()) {
+		const std::optional<bool> drawn = GpuRasterObject(obj, *whole, scale, cam_az, world_az, along, pxm, fade, out, rust_time, tint, paint_colour, stretch, spin, pitch, roll, lights, state, walk);
+		if (drawn.has_value()) return *drawn;
+	}
 	/* As detailed as the picture is fine (the colleague's lorries and wagons are in full detail, PROSBA point 12: "the
 	 * game makes fewer triangles when it is far"): its corners joined about one and a half pixels apart (Simpler()).
 	 * Its textures, lamps and glass stay the whole shape's. */
@@ -924,69 +1082,16 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	/* The parts the state shows; the whole object turned about z at its origin as the state has it (a cart pushed). */
 	const uint64_t parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
-	const float tp = (st != nullptr ? st->turn : 0.0f) * static_cast<float>(M_PI) / 180.0f, tc = std::cos(tp), ts = std::sin(tp);
-	auto turned = [&](float &vx, float &vy) {
-		if (tp == 0.0f) return;
-		const float x = vx * tc - vy * ts, y = vx * ts + vy * tc;
-		vx = x;
-		vy = y;
-	};
 	const int ss = SUPERSAMPLE;
 	const float p = pxm * ss;
-	const float ca = std::cos(cam_az * static_cast<float>(M_PI) / 180.0f), sa = std::sin(cam_az * static_cast<float>(M_PI) / 180.0f);
-	/* The light: the object's front and left in the world, the normals turned into it. */
-	const float wa = (world_az + 135.0f) * static_cast<float>(M_PI) / 180.0f;
-	const float fx = std::cos(wa), fy = std::sin(wa), lx = -fy, ly = fx;
-	static const float L[3] = {-0.55f / 1.0f, 0.35f, 0.75f};
-	const float ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+	const ObjectCamera cam(obj, st, scale, cam_az, world_az, along, p, stretch, spin, pitch, roll);
 	const bool lit = !shape->nrm.empty();
 
 	const size_t n = shape->pos.size() / 3;
 	std::vector<float> sx(n), sy(n), depth(n), light(n, 1.0f);
 	float minx = std::numeric_limits<float>::infinity(), miny = minx, maxx = -minx, maxy = -minx;
-	/* Turned about its axis (Rodrigues): v' = v cos + (k x v) sin + k (k . v)(1 - cos), about the axis's point. */
-	const float sp = spin * static_cast<float>(M_PI) / 180.0f, sc = std::cos(sp), sn = std::sin(sp);
-	const float *k = obj.spin_axis, *kc = obj.spin_centre;
-	auto turn = [&](float &vx, float &vy, float &vz) {
-		const float d = k[0] * vx + k[1] * vy + k[2] * vz;
-		const float cx = k[1] * vz - k[2] * vy, cy = k[2] * vx - k[0] * vz, cz = k[0] * vy - k[1] * vx;
-		vx = vx * sc + cx * sn + k[0] * d * (1 - sc);
-		vy = vy * sc + cy * sn + k[1] * d * (1 - sc);
-		vz = vz * sc + cz * sn + k[2] * d * (1 - sc);
-	};
-	/* Up a hill its front higher (pitch), in a curve leaning in (roll, its left side down): about its middle on the rail. */
-	const float pp = pitch * static_cast<float>(M_PI) / 180.0f, pc = std::cos(pp), ps = std::sin(pp);
-	const float rp = roll * static_cast<float>(M_PI) / 180.0f, rc = std::cos(rp), rs = std::sin(rp);
-	auto lean = [&](float &vx, float &vy, float &vz) {
-		if (pitch != 0.0f) {
-			const float x = vx * pc - vz * ps, z = vx * ps + vz * pc;
-			vx = x;
-			vz = z;
-		}
-		if (roll != 0.0f) {
-			const float y = vy * rc + vz * rs, z = vz * rc - vy * rs;
-			vy = y;
-			vz = z;
-		}
-	};
-	/* A point of the vehicle's frame on the picture: turned as the state has it, leant, foreshortened, seen. */
-	auto place = [&](float px, float py, float pz, float &osx, float &osy, float &od) {
-		turned(px, py);
-		lean(px, py, pz);
-		const float x = px * scale * along, y = py * scale, z = pz * scale * stretch;
-		const float xr = x * ca - y * sa, yr = x * sa + y * ca;
-		osx = xr * p;
-		osy = (-yr * CAM_SIN - z * CAM_COS) * p;
-		od = yr * CAM_COS - z * CAM_SIN;
-	};
-	/* And a normal of it, lit by the world's light. */
-	auto shade = [&](float nx, float ny, float nz) {
-		turned(nx, ny);
-		lean(nx, ny, nz);
-		const float wx = nx * fx + ny * lx, wy = nx * fy + ny * ly;
-		const float d = (wx * L[0] + wy * L[1] + nz * L[2]) / ll;
-		return 0.55f + 0.45f * std::max(0.0f, d);
-	};
+	auto place = [&](float px, float py, float pz, float &osx, float &osy, float &od) { cam.Place(px, py, pz, osx, osy, od); };
+	auto shade = [&](float nx, float ny, float nz) { return cam.Shade(nx, ny, nz); };
 	/* The triangles drawn: of the parts the state shows (an object of seventy five loads draws one), the glass after
 	 * the rest; only their corners are placed, and the picture is as big as they are. */
 	std::vector<size_t> drawn_triangles, glass_triangles;
@@ -1000,18 +1105,12 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	}
 	for (size_t i = 0; i < n; i++) {
 		if (used[i] == 0) continue;
-		float px = shape->pos[i * 3], py = shape->pos[i * 3 + 1], pz = shape->pos[i * 3 + 2];
-		if (spin != 0.0f) {
-			px -= kc[0]; py -= kc[1]; pz -= kc[2];
-			turn(px, py, pz);
-			px += kc[0]; py += kc[1]; pz += kc[2];
-		}
-		place(px, py, pz, sx[i], sy[i], depth[i]);
+		cam.PlaceSpun(shape->pos[i * 3], shape->pos[i * 3 + 1], shape->pos[i * 3 + 2], sx[i], sy[i], depth[i]);
 		minx = std::min(minx, sx[i]); maxx = std::max(maxx, sx[i]);
 		miny = std::min(miny, sy[i]); maxy = std::max(maxy, sy[i]);
 		if (lit) {
 			float nx = shape->nrm[i * 3], ny = shape->nrm[i * 3 + 1], nz = shape->nrm[i * 3 + 2];
-			if (spin != 0.0f) turn(nx, ny, nz);
+			if (spin != 0.0f) cam.Spin(nx, ny, nz);
 			light[i] = shade(nx, ny, nz);
 		}
 	}
@@ -1262,36 +1361,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 			}
 		}
 	}
-	out.lights.clear();
-	if (lights != 0) {
-		auto add_light = [&](float px, float py, float pz, ThreeDPictureLight::Kind kind) {
-			float lx, ly, ld;
-			place(px, py, pz, lx, ly, ld);
-			out.lights.push_back({lx / ss, ly / ss, kind});
-		};
-		if ((lights & LIGHTS_FRONT) != 0 && !whole->front_lights.empty()) {
-			float ahead = -std::numeric_limits<float>::infinity(), mid = 0;
-			size_t n_front = 0;
-			for (size_t i = 0; i < whole->front_lights.size() / 3; i++) n_front += ThreeDVehicleShape::Shown(i < whole->front_part.size() ? whole->front_part[i] : 0, parts) ? 1 : 0;
-			for (size_t i = 0; i < whole->front_lights.size() / 3; i++) {
-				if (!ThreeDVehicleShape::Shown(i < whole->front_part.size() ? whole->front_part[i] : 0, parts)) continue;
-				add_light(whole->front_lights[i * 3], whole->front_lights[i * 3 + 1], whole->front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
-				ahead = std::max(ahead, whole->front_lights[i * 3]);
-				mid += whole->front_lights[i * 3 + 1] / n_front;
-			}
-			/* The pool on the way, on the ground before the lamps (not over the bonnet): near, and further on. */
-			if (n_front > 0) {
-				add_light(ahead + 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
-				add_light(ahead + 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
-			}
-		}
-		if ((lights & LIGHTS_BACK) != 0) {
-			for (size_t i = 0; i * 3 + 2 < whole->back_lights.size(); i++) {
-				if (!ThreeDVehicleShape::Shown(i < whole->back_part.size() ? whole->back_part[i] : 0, parts)) continue;
-				add_light(whole->back_lights[i * 3], whole->back_lights[i * 3 + 1], whole->back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
-			}
-		}
-	}
+	ObjectLightsOn(*whole, parts, lights, cam, out.lights);
 
 	/* Shrink: the mean of the covered subpixels by their alpha, the alpha from how much they cover (a pane of glass over
 	 * nothing a part); lit where any of them is (a lamp far off smaller than a pixel still shines). */
@@ -1323,6 +1393,362 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	/* Not a pixel of it seen (the colleague's lorry without its trailer: the trailer's main file is two transparent
 	 * triangles of a millimetre, its state shows nothing): no picture, and no lights of it. */
 	if (!any) return false;
+	return true;
+}
+
+/* The textures of the objects as the graphics card draws them (GpuTextureOf()): by the object, its state, the level,
+ * the texture, its fade, rust, colour and tint; nullptr: nothing paints it, the object's own. */
+using GpuPaintKey = std::tuple<const ThreeDVehicleObject *, int, int, int, uint32_t, uint32_t, uint32_t, uint32_t>;
+static std::map<GpuPaintKey, std::shared_ptr<const ThreeDObjectTexture>> _gpu_painted;
+static std::set<GpuPaintKey> _gpu_painted_seen; ///< drawn since the last trimming (TrimThreeDEyePainted())
+static size_t _gpu_painted_bytes = 0;
+static std::mutex _gpu_painted_mutex;
+/** More painted than this, those not drawn since the last trimming are let go of at once. */
+static constexpr size_t GPU_PAINTED_KEPT = 256u * 1024 * 1024;
+
+/**
+ * A texture of an object as the graphics card draws it (GpuRasterObject()): each texel painted as RasterObject()
+ * paints a pixel over it -- the details in the vehicle's colours of its set, the body's paint faded, the add-ons'
+ * colours, an effect's tint, the rust --, once for a state and a level, not at each pixel of each picture. A texture
+ * nothing paints is the object's own. On either thread.
+ * @param held keeps the painted texture while the picture is drawn
+ */
+static const ThreeDObjectTexture *GpuTextureOf(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, const ThreeDVehicleState *st, int state, int level, int index, float fade, float rust_time, uint32_t paint_colour, uint32_t tint, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
+{
+	const ThreeDObjectTexture *raw = obj.GetTexture(level, index);
+	if (raw == nullptr) return nullptr;
+	const GpuPaintKey key(&obj, state, level, index, std::bit_cast<uint32_t>(fade), std::bit_cast<uint32_t>(rust_time), paint_colour, tint);
+	{
+		std::lock_guard lock(_gpu_painted_mutex);
+		auto it = _gpu_painted.find(key);
+		if (it != _gpu_painted.end()) {
+			_gpu_painted_seen.insert(key);
+			if (it->second == nullptr) return raw;
+			held.push_back(it->second);
+			return it->second.get();
+		}
+	}
+	/* What paints it, as RasterObject() has it. */
+	const size_t textures = std::max<size_t>(1, whole.pngs.size());
+	std::vector<const ThreeDObjectTexture *> drawn(textures, nullptr);
+	drawn[static_cast<size_t>(index) < textures ? index : 0] = raw;
+	const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour);
+	const ObjectDetailPaint details(obj, whole, st, textures, drawn);
+	const ThreeDDetailMask *dm = details.MaskOf(index);
+	const bool body = index == 0;
+	const bool paints_body = body && (painted.mask != nullptr || painted.whole);
+	const bool rusts = body && painted.rust_mask != nullptr;
+	const ThreeDObjectTexture *addon_mask = nullptr;
+	Colour addon_colour;
+	float addon_start = 255.0f;
+	const int a = static_cast<size_t>(index) < whole.tex_addon.size() ? whole.tex_addon[index] : -1;
+	if (a >= 0 && st != nullptr && static_cast<size_t>(a) < st->addon_colours.size() && st->addon_colours[a] != 0) {
+		addon_mask = obj.GetAddonMask(a, level);
+		addon_colour = Colour(st->addon_colours[a]);
+		addon_start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
+	}
+	const bool tinted = tint != 0 && static_cast<size_t>(index) < whole.tex_names.size() && whole.tex_names[index] == obj.tint_material;
+	const Colour tint_colour(tint);
+	std::shared_ptr<ThreeDObjectTexture> t;
+	if (dm != nullptr || paints_body || rusts || addon_mask != nullptr || tinted) {
+		t = std::make_shared<ThreeDObjectTexture>();
+		t->w = raw->w;
+		t->h = raw->h;
+		t->px.assign(raw->px.size(), 0);
+		for (int y = 0; y < raw->h; y++) {
+			const float v = (y + 0.5f) / raw->h;
+			for (int x = 0; x < raw->w; x++) {
+				const size_t at = static_cast<size_t>(y) * raw->w + x;
+				const uint32_t texel = raw->px[at];
+				if (texel == 0) continue; // a hole in the texture
+				const float u = (x + 0.5f) / raw->w;
+				const Colour col(texel);
+				float cr = col.r, cg = col.g, cb = col.b;
+				const bool by_detail = dm != nullptr && details.Paint(dm, u, v, cr, cg, cb);
+				if (body && !by_detail) painted.Paint(u, v, cr, cg, cb);
+				if (!by_detail && addon_mask != nullptr) {
+					const int mx = std::min(addon_mask->w - 1, static_cast<int>(u * addon_mask->w)), my = std::min(addon_mask->h - 1, static_cast<int>(v * addon_mask->h));
+					const float m = Colour(addon_mask->px[static_cast<size_t>(my) * addon_mask->w + mx]).r / 255.0f;
+					if (m > 0) {
+						const float l = std::max({cr, cg, cb}) / addon_start;
+						cr += (std::min(255.0f, addon_colour.r * l) - cr) * m;
+						cg += (std::min(255.0f, addon_colour.g * l) - cg) * m;
+						cb += (std::min(255.0f, addon_colour.b * l) - cb) * m;
+					}
+				}
+				if (tinted) {
+					cr = cr * tint_colour.r / 255.0f;
+					cg = cg * tint_colour.g / 255.0f;
+					cb = cb * tint_colour.b / 255.0f;
+				}
+				if (body) painted.Rust(u, v, cr, cg, cb);
+				Colour c(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)), col.a);
+				if (c.data == 0) c.a = 1; // painted black, not a hole
+				t->px[at] = c.data;
+			}
+		}
+	}
+	std::lock_guard lock(_gpu_painted_mutex);
+	auto [it, added] = _gpu_painted.emplace(key, std::move(t));
+	_gpu_painted_seen.insert(key);
+	if (added && it->second != nullptr) {
+		_gpu_painted_bytes += it->second->px.size() * sizeof(uint32_t);
+		if (_gpu_painted_bytes > GPU_PAINTED_KEPT) {
+			/* Too much at once (a town of vehicles of many states made in one go): those not drawn since the last trimming go now. */
+			for (auto e = _gpu_painted.begin(); e != _gpu_painted.end();) {
+				if (_gpu_painted_seen.contains(e->first) || e->second == nullptr) {
+					++e;
+					continue;
+				}
+				_gpu_painted_bytes -= e->second->px.size() * sizeof(uint32_t);
+				e = _gpu_painted.erase(e);
+			}
+		}
+	}
+	if (it->second == nullptr) return raw;
+	held.push_back(it->second);
+	return it->second.get();
+}
+
+/** Between the frames: the textures painted for the card not drawn since the last time let go of (TrimThreeDEyePainted()). */
+static void TrimGpuPainted()
+{
+	std::lock_guard lock(_gpu_painted_mutex);
+	for (auto it = _gpu_painted.begin(); it != _gpu_painted.end();) {
+		if (_gpu_painted_seen.contains(it->first)) {
+			++it;
+			continue;
+		}
+		if (it->second != nullptr) _gpu_painted_bytes -= it->second->px.size() * sizeof(uint32_t);
+		it = _gpu_painted.erase(it);
+	}
+	_gpu_painted_seen.clear();
+}
+
+/** The objects are read anew: their textures painted for the card go with them. */
+static void ForgetGpuPainted()
+{
+	std::lock_guard lock(_gpu_painted_mutex);
+	_gpu_painted.clear();
+	_gpu_painted_seen.clear();
+	_gpu_painted_bytes = 0;
+}
+
+/** The extent of all the corners of a shape: x0, x1, y0, y1, z0, z1 (ThreeDVehicleShape::all, else counted). */
+static void ShapeExtent(const ThreeDVehicleShape &s, float e[6])
+{
+	if (s.all[1] > s.all[0] || s.all[3] > s.all[2] || s.all[5] > s.all[4]) {
+		std::copy(std::begin(s.all), std::end(s.all), e);
+		return;
+	}
+	for (int k = 0; k < 3; k++) {
+		e[k * 2] = std::numeric_limits<float>::infinity();
+		e[k * 2 + 1] = -std::numeric_limits<float>::infinity();
+	}
+	for (size_t i = 0; i + 2 < s.pos.size(); i += 3) {
+		for (int k = 0; k < 3; k++) {
+			e[k * 2] = std::min(e[k * 2], s.pos[i + k]);
+			e[k * 2 + 1] = std::max(e[k * 2 + 1], s.pos[i + k]);
+		}
+	}
+}
+
+/**
+ * RasterObject() on the graphics card (three_d_gpu.h): the same picture -- the camera, the light, the paint, the
+ * glass, the crew that walks, the lights at night, at SUPERSAMPLE times the size and shrunk the same way, of the shape
+ * as simple as the picture is small -- its triangles drawn by the card instead of one by one here. The picture is as
+ * big as the boxes of what is drawn are seen, then cut to its pixels.
+ * @return whether there is a picture; nullopt: the card could not draw it (a texture bigger than it holds), the
+ *         processor draws it
+ */
+static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk)
+{
+	const uint64_t parts = obj.PartsOf(state);
+	const ThreeDVehicleState *st = obj.State(state);
+	const int ss = SUPERSAMPLE;
+	const float p = pxm * ss;
+	const ObjectCamera cam(obj, st, scale, cam_az, world_az, along, p, stretch, spin, pitch, roll);
+	/* Its corners joined about one and a half pixels apart, as RasterObject() draws it (Simpler()). */
+	const ThreeDVehicleShape &shape = *whole.Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
+	const bool lit = !shape.nrm.empty();
+
+	ThreeDGpuPicture pic;
+	pic.glass_alpha = whole.glass_alpha;
+	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held;
+	float minx = std::numeric_limits<float>::infinity(), miny = minx, mind = minx, maxx = -minx, maxy = -minx, maxd = -minx;
+	auto grow = [&](float x, float y, float d) {
+		minx = std::min(minx, x); maxx = std::max(maxx, x);
+		miny = std::min(miny, y); maxy = std::max(maxy, y);
+		mind = std::min(mind, d); maxd = std::max(maxd, d);
+	};
+	/* A shape's frame on the picture is affine: its matrix from where the origin and the unit vectors are seen; what of
+	 * the shape is seen lies within its box's corners seen. */
+	auto matrix_of = [](auto &&to, ThreeDGpuMatrix &m) {
+		float ox, oy, od;
+		to(0.0f, 0.0f, 0.0f, ox, oy, od);
+		m = {};
+		for (int a = 0; a < 3; a++) {
+			float x, y, d;
+			to(a == 0 ? 1.0f : 0.0f, a == 1 ? 1.0f : 0.0f, a == 2 ? 1.0f : 0.0f, x, y, d);
+			m[a] = x - ox;
+			m[4 + a] = y - oy;
+			m[8 + a] = d - od;
+		}
+		m[3] = ox;
+		m[7] = oy;
+		m[11] = od;
+		m[15] = 1.0f;
+	};
+	auto box = [&](const ThreeDVehicleShape &s, auto &&to) {
+		float e[6];
+		ShapeExtent(s, e);
+		if (!(e[1] >= e[0])) return;
+		for (int i = 0; i < 8; i++) {
+			float x, y, d;
+			to(e[(i & 1) ? 1 : 0], e[(i & 2) ? 3 : 2], e[(i & 4) ? 5 : 4], x, y, d);
+			grow(x, y, d);
+		}
+	};
+	/* The light at a corner from its normal: n . light, the linear part of ObjectCamera::LightAt(). */
+	auto light_of = [](auto &&at, std::array<float, 3> &l) {
+		for (int a = 0; a < 3; a++) l[a] = at(a == 0 ? 1.0f : 0.0f, a == 1 ? 1.0f : 0.0f, a == 2 ? 1.0f : 0.0f);
+	};
+
+	/* The vehicle, turned about its axis if it turns; its textures at about a texel to a pixel, painted as its state has it. */
+	auto vehicle_to = [&cam](float x, float y, float z, float &ox, float &oy, float &od) { cam.PlaceSpun(x, y, z, ox, oy, od); };
+	{
+		ThreeDGpuMesh &m = pic.meshes.emplace_back();
+		m.shape = &shape;
+		m.triangles = ThreeDGpuTrianglesOf(shape, parts, true, whole.pngs.size());
+		matrix_of(vehicle_to, m.matrix);
+		m.lit = lit;
+		light_of([&cam, spin](float nx, float ny, float nz) {
+			if (spin != 0.0f) cam.Spin(nx, ny, nz);
+			return cam.LightAt(nx, ny, nz);
+		}, m.light);
+		box(whole, vehicle_to);
+		int level = 0;
+		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
+		m.textures.assign(m.triangles->used.size(), nullptr);
+		for (size_t i = 0; i < m.textures.size(); i++) {
+			if (m.triangles->used[i]) m.textures[i] = GpuTextureOf(obj, whole, st, state, level, static_cast<int>(i), fade, rust_time, paint_colour, tint, held);
+		}
+	}
+	/* The crew that walks: each figure the state shows at its frame of the way gone, turned, sized and stood at its
+	 * place in the vehicle's frame, then as the vehicle; its textures as they are. */
+	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
+	for (size_t k = 0; k < walking.size(); k++) {
+		const ThreeDWalkingCrew &w = walking[k];
+		if (w.part != 0 && (w.part >= 64 || ((parts >> w.part) & 1) == 0)) continue;
+		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
+		if (fs == nullptr) continue;
+		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
+		auto crew_to = [&cam, &w, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
+			cam.Place(w.at[0] + (fx0 * wc - fy0 * ws) * w.scale, w.at[1] + (fx0 * ws + fy0 * wc) * w.scale, w.at[2] + fz0 * w.scale, ox, oy, od);
+		};
+		ThreeDGpuMesh &m = pic.meshes.emplace_back();
+		m.shape = fs;
+		m.triangles = ThreeDGpuTrianglesOf(*fs, 0, false, fs->pngs.size());
+		matrix_of(crew_to, m.matrix);
+		m.lit = lit && fs->nrm.size() == fs->pos.size();
+		light_of([&cam, wc, ws](float nx, float ny, float nz) { return cam.LightAt(nx * wc - ny * ws, nx * ws + ny * wc, nz); }, m.light);
+		box(*fs, crew_to);
+		int crew_level = 0;
+		for (float d = TexelsPerMetre(*w.figure, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
+		m.textures.assign(m.triangles->used.size(), nullptr);
+		for (size_t i = 0; i < m.textures.size(); i++) {
+			if (m.triangles->used[i]) m.textures[i] = w.figure->GetTexture(crew_level, static_cast<int>(i));
+		}
+	}
+	/* At night the glass of its lights that are on, over the body as it is turned and leant, a few centimetres before
+	 * it (it lies on the lamp). */
+	const bool night = lights != 0 && !whole.night_tri.empty();
+	if (night) {
+		const size_t corners = whole.night_pos.size() / 3;
+		std::vector<float> nx(corners), ny(corners), nd(corners);
+		for (size_t i = 0; i < corners; i++) cam.Place(whole.night_pos[i * 3], whole.night_pos[i * 3 + 1], whole.night_pos[i * 3 + 2], nx[i], ny[i], nd[i]);
+		const float bias = 0.03f * scale;
+		for (size_t t = 0; t + 2 < whole.night_tri.size(); t += 3) {
+			const size_t tn = t / 3;
+			if ((lights & (tn < whole.night_back.size() && whole.night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
+			if (!ThreeDVehicleShape::Shown(tn < whole.night_part.size() ? whole.night_part[tn] : 0, parts)) continue;
+			const uint32_t a = whole.night_tri[t], b = whole.night_tri[t + 1], c = whole.night_tri[t + 2];
+			if (a >= corners || b >= corners || c >= corners) continue;
+			ThreeDGpuNightTriangle &g = pic.night.emplace_back();
+			const uint32_t abc[3] = {a, b, c};
+			for (int i = 0; i < 3; i++) {
+				g.x[i] = nx[abc[i]];
+				g.y[i] = ny[abc[i]];
+				g.depth[i] = nd[abc[i]] - bias;
+				grow(g.x[i], g.y[i], g.depth[i]);
+			}
+			g.colour = tn < whole.night_colour.size() ? whole.night_colour[tn] : Colour(255, 244, 216).data;
+		}
+	}
+	if (minx > maxx) return false;
+	/* As RasterObject() aligns its picture: its subpixels in whole pixels of the picture shrunk. */
+	int left = static_cast<int>(std::floor(minx)), top = static_cast<int>(std::floor(miny));
+	left -= ((left % ss) + ss) % ss;
+	top -= ((top % ss) + ss) % ss;
+	int width = static_cast<int>(std::ceil(maxx)) - left + 1, height = static_cast<int>(std::ceil(maxy)) - top + 1;
+	width += (ss - width % ss) % ss;
+	height += (ss - height % ss) % ss;
+	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > 64u * 1024 * 1024) return false;
+	pic.width = width;
+	pic.height = height;
+	const float margin = 0.01f * (maxd - mind) + 0.01f;
+	pic.depth_near = mind - margin;
+	pic.depth_far = maxd + margin;
+	for (ThreeDGpuMesh &m : pic.meshes) {
+		m.matrix[3] -= left;
+		m.matrix[7] -= top;
+	}
+	for (ThreeDGpuNightTriangle &g : pic.night) {
+		for (int i = 0; i < 3; i++) {
+			g.x[i] -= left;
+			g.y[i] -= top;
+		}
+	}
+	if (!ThreeDGpuRender(pic)) return std::nullopt;
+
+	/* Shrink as RasterObject() does: the mean of the covered subpixels by their alpha (the card's colours have it
+	 * multiplied in), the alpha from how much they cover; lit where any is. Then cut to the pixels drawn. */
+	const int ow = width / ss, oh = height / ss;
+	std::vector<Colour> px(static_cast<size_t>(ow) * oh, Colour(0, 0, 0, 0));
+	std::vector<uint8_t> lit_px(night ? px.size() : 0, 0);
+	int x0 = ow, y0 = oh, x1 = -1, y1 = -1;
+	for (int y = 0; y < oh; y++) {
+		for (int x = 0; x < ow; x++) {
+			uint r = 0, g = 0, bl = 0, cover = 0, glass = 0;
+			for (int dy = 0; dy < ss; dy++) {
+				for (int dx = 0; dx < ss; dx++) {
+					const size_t at = static_cast<size_t>(y * ss + dy) * width + (x * ss + dx);
+					const Colour cc(pic.pixels[at]);
+					if (cc.a == 0) continue;
+					r += cc.r * 255u; g += cc.g * 255u; bl += cc.b * 255u; cover += cc.a;
+					if (!pic.lit.empty() && pic.lit[at] != 0) glass++;
+				}
+			}
+			if (cover == 0) continue;
+			px[static_cast<size_t>(y) * ow + x] = Colour(std::min(255u, r / cover), std::min(255u, g / cover), std::min(255u, bl / cover), static_cast<uint8_t>(cover / (ss * ss)));
+			if (glass > 0 && !lit_px.empty()) lit_px[static_cast<size_t>(y) * ow + x] = 1;
+			x0 = std::min(x0, x); x1 = std::max(x1, x);
+			y0 = std::min(y0, y); y1 = std::max(y1, y);
+		}
+	}
+	/* Not a pixel of it seen: no picture, and no lights of it. */
+	if (x1 < x0) return false;
+	out.left = left / ss + x0;
+	out.top = top / ss + y0;
+	out.width = x1 - x0 + 1;
+	out.height = y1 - y0 + 1;
+	out.px.resize(static_cast<size_t>(out.width) * out.height);
+	out.lit.assign(night ? out.px.size() : 0, 0);
+	for (int y = 0; y < out.height; y++) {
+		std::copy_n(px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.px.begin() + static_cast<size_t>(y) * out.width);
+		if (night) std::copy_n(lit_px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.lit.begin() + static_cast<size_t>(y) * out.width);
+	}
+	ObjectLightsOn(whole, parts, lights, cam, out.lights);
 	return true;
 }
 
@@ -2310,6 +2736,7 @@ static void ForgetEyePainted()
 	_eye_painted_seen.clear();
 	_eye_painted_plain.clear();
 	_eye_trails.clear();
+	ForgetGpuPainted();
 }
 
 /**
@@ -2330,6 +2757,7 @@ void TrimThreeDEyePainted()
 	}
 	_eye_painted_seen.clear();
 	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB painted for the view from the eyes and not drawn let go of", freed / (1024.0 * 1024.0));
+	TrimGpuPainted();
 }
 
 /** The level of detail of an object's textures for the view from the eyes: about a texel to a pixel. */

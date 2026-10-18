@@ -133,6 +133,7 @@
 #include "newgrf_config.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_gpu.h"
 #include "three_d_navigation.h"
 #include "round_track.h"
 #include "simtrains.h"
@@ -9298,7 +9299,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			bought++;
 		}
 		ScrollMainWindowToTile(TileXY(x0 + 8, y0), true);
-		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
+		IConsolePrint(CC_DEFAULT, "test3d: auta {} '{}' (motor {}) na silnici {},{}..{},{}{}", bought, GetString(STR_ENGINE_NAME, engine->index), engine->index.base(), x0, y0, TileX(depot_b), TileY(depot_b), bend ? " se zatackou" : "");
 	} else if (what == "sipky" && argv.size() > 2) {
 		/* 'sipky <lurd|0>': the arrows held from now on as the keyboard would hold them (l left, u up, r right, d down;
 		 * 0 none), for the rig's frames ('smycka'): the walker and the view from the cab read them. */
@@ -9624,7 +9625,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string DescribeThreeDPictureMemory();
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDObjectMemory());
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDPictureMemory());
-	} else if (what == "kresli") {
+	} else if (what == "gpu") {
+		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
+		 * and what draws them (three_d_gpu.h). */
+		if (auto on = number(2); on.has_value()) _three_d_gpu_off = *on == 0;
+		ThreeDGpuAvailable();
+		IConsolePrint(CC_DEFAULT, "test3d: gpu {}", ThreeDGpuDescribe());
+	} else if (what == "kresli" && argv.size() <= 3) {
 		/* 'kresli [times]': how long drawing the first vehicle drawn from a 3D object takes, at each zoom, with its
 		 * shape and textures made: what drawing it anew every frame instead of keeping its picture would cost. */
 		auto times = number(2);
@@ -10352,8 +10359,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* The rig: where the turned view's time went since the last 'casy' (the round curves, the pictures of vehicles). */
 		extern double _round_curve_ms, _round_strip_ms, _object_picture_ms, _object_picture_thread_ms, _likeness_picture_ms;
 		extern uint64_t _round_curves_built, _object_pictures_made, _object_pictures_made_thread, _likeness_pictures_made, _three_d_loads_asked;
-		IConsolePrint(CC_DEFAULT, "test3d: casy oblouky {:.0f} ms ({} spocitano), pasy koleji {:.0f} ms, obrazky objektu {:.0f} ms ({}), na vlakne {:.0f} ms ({}, ve fronte {}, uloh zadano {}), podoby {:.0f} ms ({})",
-				_round_curve_ms, _round_curves_built, _round_strip_ms, _object_picture_ms, _object_pictures_made, _object_picture_thread_ms, _object_pictures_made_thread, ThreeDPicturesWaiting(), _three_d_loads_asked, _likeness_picture_ms, _likeness_pictures_made);
+		IConsolePrint(CC_DEFAULT, "test3d: casy oblouky {:.0f} ms ({} spocitano), pasy koleji {:.0f} ms, obrazky objektu {:.0f} ms ({}), na vlakne {:.0f} ms ({}, ve fronte {}, uloh zadano {}), podoby {:.0f} ms ({}), {}",
+				_round_curve_ms, _round_curves_built, _round_strip_ms, _object_picture_ms, _object_pictures_made, _object_picture_thread_ms, _object_pictures_made_thread, ThreeDPicturesWaiting(), _three_d_loads_asked, _likeness_picture_ms, _likeness_pictures_made, ThreeDGpuTimes());
 		_round_curve_ms = _round_strip_ms = _object_picture_ms = _object_picture_thread_ms = _likeness_picture_ms = 0;
 		_round_curves_built = _object_pictures_made = _object_pictures_made_thread = _likeness_pictures_made = _three_d_loads_asked = 0;
 		return true;

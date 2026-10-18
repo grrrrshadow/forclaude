@@ -57,11 +57,36 @@ static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
  */
 static constexpr double THREE_D_WALKER_RADIUS_M = 0.4;
 
+/**
+ * A number of its own for each shape and texture made: what the graphics card keeps of it is found by it
+ * (three_d_gpu.cpp) -- an address may be another thing's once the first is gone. A copy is another thing, with a number
+ * of its own; a thing moved keeps its number, and the one it was moved from takes a new one.
+ */
+struct ThreeDUniqueId {
+	uint64_t value = Next();
+	ThreeDUniqueId() = default;
+	ThreeDUniqueId(const ThreeDUniqueId &) : value(Next()) {}
+	ThreeDUniqueId(ThreeDUniqueId &&other) noexcept : value(other.value) { other.value = Next(); }
+	ThreeDUniqueId &operator=(const ThreeDUniqueId &)
+	{
+		this->value = Next();
+		return *this;
+	}
+	ThreeDUniqueId &operator=(ThreeDUniqueId &&other) noexcept
+	{
+		this->value = other.value;
+		other.value = Next();
+		return *this;
+	}
+	static uint64_t Next();
+};
+
 /** A texture of an object at one level of detail: 32bpp pixels in the blitter's colours, 0 where it is transparent. */
 struct ThreeDObjectTexture {
 	int w = 0;
 	int h = 0;
 	std::vector<uint32_t> px;
+	ThreeDUniqueId uid; ///< for the graphics card (three_d_gpu.cpp)
 };
 
 /**
@@ -219,6 +244,7 @@ struct ThreeDObject {
  * rail -- with the normals, so the game lights it itself.
  */
 struct ThreeDVehicleShape {
+	ThreeDUniqueId uid;        ///< for the graphics card (three_d_gpu.cpp)
 	std::vector<float> pos;    ///< x, y, z of each corner, metres
 	std::vector<float> nrm;    ///< its normal; empty when the file has none (drawn unlit)
 	std::vector<float> uv;     ///< u, v of each corner in its texture

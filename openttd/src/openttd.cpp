@@ -97,6 +97,7 @@
 
 #include "anomaly_log.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_gpu.h"
 #include "cab_view.h"
 
 #if defined(_WIN32)
@@ -317,6 +318,8 @@ static void ShutdownGame()
 	/* The threads making the pictures of the 3D vehicles and drawing the view from the eyes, before what they draw from is gone. */
 	StopThreeDPictureThread();
 	StopEyeFrameThread();
+	/* And then the graphics card's, which draws for them (three_d_gpu.h). */
+	ThreeDGpuStop();
 
 	if (_network_available) NetworkShutDown(); // Shut down the network and close any open connections
 
