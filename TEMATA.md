@@ -27,6 +27,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – stadion: prázdná hasičská Tatra, Mat u grilu; barvy doplňků číslem
+
+- Hráč: *„mat nemůže sedět v hasičské tatře, bude točit pivo u grilu“*, *„na hřišti stojí prázdná tatra, bez
+  řidiče“*, *„jinak může řídit mat“*. Hra čte `misto_ridicky` (řidička záznamu se nekreslí, Mat na místě řidiče
+  se schová z oka kabiny) a stojící vozidlo u akce domu (`akce.tatra`, sady jako seznam: kabina, mřížka,
+  nástavba), vždy prázdné (`16cbe1c`). Díly vozidla až 125 (Tatra 148 v3 jich má 65).
+- Od kolegy (grrrrf `4527bc2`): slunečníky a kola jeden doplněk na tvar, barva číslem pro každé místo
+  (hráč: *„slunečničky bycykly barvu čislem“*); Mat točí u grilu. Holky dál velikost 1.
+- Hráč: *„co ta barva kabiny, to dal blbě v grrrrf“* – stojící Tatra nemá GRF, kabina a mřížka mají v indexu
+  oranžovou `CA5E16`; na silnici je přebarví GRF (1C1) na hasičskou červenou. Kolegovi: sada s hasičskou
+  kabinou do balíčku Tater a do seznamu sad stadionu.
+- Hráč: *„mat točí pivo, má sud?“* – nemá, u grilu není pípa ani sud (póza má pípu 0,3 m před sebou ve
+  výšce 0,95 m). Kolegovi: sud s pípou k Matovi. Chybí i póza Mata `ridi` (Tatra na silnici zatím bez řidiče).
+- Zpráva kolegovi: grrrrf `hra/3d/STADION-SUD-A-KABINA-PRO-KOLEGU.md`.
+
 ## 18. 10. – kolegovy open world domy ve hře; GPU 1–6 odsouhlaseno
 
 - Kolega (grrrrf `44fa5ac`, `hra/3d/DOMY-OPEN-WORLD-PRO-HRU.md`): všech 39 domů přepečených s uličkou 1,5 m u každého
