@@ -9657,7 +9657,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "gpu") {
 		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
 		 * and what draws them (three_d_gpu.h). */
-		if (auto on = number(2); on.has_value()) _three_d_gpu_off = *on == 0;
+		if (auto on = number(2); on.has_value()) {
+			_settings_client.gui.three_d_gpu = *on != 0;
+			_three_d_gpu_off = *on == 0;
+		}
 		ThreeDGpuAvailable();
 		IConsolePrint(CC_DEFAULT, "test3d: gpu {}", ThreeDGpuDescribe());
 	} else if (what == "kresli" && argv.size() <= 3) {

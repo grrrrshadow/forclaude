@@ -257,6 +257,7 @@ struct GUISettings {
 	uint8_t three_d_north_houses; ///< The houses that are 3D objects facing north (angle 0): 0 drawn as the objects, the same as in the turned view; 1 the original pictures.
 	uint8_t three_d_houses; ///< The houses of the towns: 0 the 3D objects (three_d_objects.h); 1 the original houses of OpenTTD, the boxes of their hand tables in 3D and their pictures facing north.
 	bool three_d_wheels;          ///< The wheels of the 3D vehicles turn as they go and the front ones steer; off, they stand still in the model.
+	bool three_d_gpu;             ///< The 3D pictures drawn by the graphics card (three_d_gpu.h); off, by the processor.
 	bool night;                   ///< The night (the player's dark mode, in the help menu by the console): the map darkened, the vehicles' lights on.
 	uint8_t night_light;          ///< How light the night is: 0 a dark night, then the moon, the full moon, a bright full moon, 4 nearly the dawn.
 	bool round_track_curves; ///< In the turned view a curve of rails drawn as a round arc, the trains on it turned along it (round_track.h). Off, the curves are as they always were.

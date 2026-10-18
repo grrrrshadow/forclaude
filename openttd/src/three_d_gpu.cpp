@@ -32,7 +32,7 @@
 
 #include "safeguards.h"
 
-std::atomic<bool> _three_d_gpu_off = false;
+std::atomic<bool> _three_d_gpu_off = true;
 
 /* The triangles of the shapes by the parts shown (ThreeDGpuTrianglesOf()), kept for the pictures to come. */
 static std::mutex _triangles_mutex;
@@ -294,7 +294,7 @@ std::unordered_map<uint64_t, GpuIndices> _card_indices;
 std::unordered_map<uint64_t, GpuTexture> _card_textures;
 size_t _card_bytes = 0;
 uint64_t _card_clock = 0;
-constexpr size_t GPU_BYTES_KEPT = 384u * 1024 * 1024;
+constexpr size_t GPU_BYTES_KEPT = 128u * 1024 * 1024; ///< (a phone's card has no memory of its own: it is the game's)
 
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {

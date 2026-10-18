@@ -2343,6 +2343,8 @@ STR_CONFIG_SETTING_THREE_D_HOUSES_OBJECTS                       :3D domy
 STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :originální domy OpenTTD (jednoduché krabice)
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
+STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING2}
+STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :Obrázky 3D vozidel, postav a efektů kreslí grafická karta (OpenGL 3.3, ve vlastním vlákně) místo procesoru. Výchozí vypnuto: se zapnutou kartou padal celý Winlator; zapni, když to chceš zkusit
 STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
 STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Světlo v noci: {STRING}

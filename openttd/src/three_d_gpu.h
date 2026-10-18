@@ -152,6 +152,6 @@ void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();
 
-extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before (the rig: test3d gpu 0)
+extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0
 
 #endif /* THREE_D_GPU_H */

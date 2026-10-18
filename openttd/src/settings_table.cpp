@@ -54,6 +54,7 @@
 #include "aircraft.h"
 #include "aircraft_cmd.h"
 #include "three_d.h"
+#include "three_d_gpu.h"
 
 #include "table/strings.h"
 #include "table/settings.h"
@@ -460,6 +461,13 @@ static void ThreeDHousesChanged(int32_t)
 /** The houses facing north as 3D objects or their sprites (gui.three_d_north_houses): every view drawn anew. */
 static void ThreeDNorthHousesChanged(int32_t)
 {
+	MarkWholeScreenDirty();
+}
+
+/** The graphics card drawing the 3D pictures switched on or off (gui.three_d_gpu): the pictures made from now on so. */
+static void ThreeDGpuChanged(int32_t)
+{
+	_three_d_gpu_off = !_settings_client.gui.three_d_gpu;
 	MarkWholeScreenDirty();
 }
 

@@ -803,6 +803,7 @@ SettingsContainer &GetSettingsTree()
 			graphics->Add(new SettingEntry("gui.three_d_houses"));
 			graphics->Add(new SettingEntry("gui.three_d_north_houses"));
 			graphics->Add(new SettingEntry("gui.three_d_wheels"));
+			graphics->Add(new SettingEntry("gui.three_d_gpu"));
 			graphics->Add(new SettingEntry("gui.night"));
 			graphics->Add(new SettingEntry("gui.night_light"));
 			graphics->Add(new SettingEntry("gui.round_track_curves"));
