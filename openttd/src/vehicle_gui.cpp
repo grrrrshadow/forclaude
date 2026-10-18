@@ -50,6 +50,7 @@
 #include "train_cmd.h"
 #include "hotkeys.h"
 #include "group_cmd.h"
+#include "three_d_vehicle_object.h"
 
 #include "table/strings.h"
 
@@ -4350,6 +4351,8 @@ void CcBuildPrimaryVehicle(Commands, const CommandCost &result, VehicleID new_ve
 
 	const Vehicle *v = Vehicle::Get(new_veh_id);
 	ShowVehicleViewWindow(v);
+	/* Its 3D object made ready for the map while it stands in the depot, at the zoom of its window too. */
+	PrepareThreeDVehicleObjectOnMap(v);
 }
 
 /**

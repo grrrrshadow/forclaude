@@ -36,6 +36,7 @@
 #include "cab_view.h"
 #include "thread.h"
 #include "window_func.h"
+#include "window_gui.h"
 
 #include <array>
 #include <atomic>
@@ -2488,6 +2489,40 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	if (PlaceVehicleObject(v, zoom, pose, place) == nullptr) return false;
 	if (place.pic != nullptr) AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
 	return true;
+}
+
+/**
+ * Have what a vehicle just bought is drawn with on the map made in the background while it stands in its depot: the
+ * shape of its object with the parts of its state on the map, its textures painted in its colour, its picture facing
+ * out of the depot at the zoom of each view (the main one, its own window's) -- a sprite at 0 degrees, a picture
+ * turned. It went out of its depot drawn as nothing a while, all of it made only as it was first drawn (the player,
+ * 18. 10.: "load the cars after they are bought, not when they leave the depot"); what the preview of the purchase
+ * window read of the object is kept and drawn from, not read again.
+ * @param front the first piece of the vehicle
+ */
+void PrepareThreeDVehicleObjectOnMap(const Vehicle *front)
+{
+	if (!ThreeDEnabled() || front == nullptr) return;
+	std::set<ZoomLevel> zooms;
+	for (const Window *w : Window::Iterate()) {
+		if (w->viewport != nullptr) zooms.insert(w->viewport->zoom);
+	}
+	for (const Vehicle *u = front; u != nullptr; u = u->Next()) {
+		int piece = 0;
+		const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(u, &piece);
+		if (obj == nullptr || piece != obj->anchor) continue;
+		obj->TryGetShape(0, obj->PartsOf(StateStep(obj, u->engine_type, u, EngineImageType::OnMap)));
+		for (ZoomLevel zoom : zooms) {
+			if (IsViewTurned()) {
+				VehicleObjectPlace place;
+				PlaceVehicleObject(u, zoom, nullptr, place);
+				continue;
+			}
+			VehicleSpriteSeq seq;
+			if (u->direction == Direction::Invalid || !GetThreeDVehicleObjectSprite(u->engine_type, u, u->direction, EngineImageType::OnMap, &seq)) continue;
+			for (uint k = 0; k < seq.count; k++) PrepareThreeDObjectSprite(seq.seq[k].sprite);
+		}
+	}
 }
 
 /**

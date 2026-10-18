@@ -48,6 +48,7 @@ SpriteID ThreeDVehicleObjectSpriteStandIn(uint32_t request);
 void TrimThreeDEyePainted();
 void ResetThreeDVehicleObjectSprites();
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose);
+void PrepareThreeDVehicleObjectOnMap(const Vehicle *front);
 bool ThreeDVehicleObjectLitAtNight(const Vehicle *v);
 struct ThreeDPictureLight;
 bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az);

@@ -9295,6 +9295,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			Order back{};
 			back.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_a : depot_b)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, back);
+			/* As the purchase window's callback does (CcBuildPrimaryVehicle()): its object made ready in the depot. */
+			PrepareThreeDVehicleObjectOnMap(bought_v);
 			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
 			bought++;
 		}

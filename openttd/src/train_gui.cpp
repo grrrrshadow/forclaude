@@ -15,6 +15,7 @@
 #include "vehicle_func.h"
 #include "zoom_func.h"
 #include "train_cmd.h"
+#include "three_d_vehicle_object.h"
 
 #include "table/strings.h"
 
@@ -51,6 +52,9 @@ void CcBuildWagon(Commands, const CommandCost &result, VehicleID new_veh_id, uin
 		Command<Commands::MoveRailVehicle>::Post(found->tile, new_veh_id, found->index, false);
 		InvalidateWindowClassesData(WindowClass::TrainList, 0);
 	}
+	/* The train's 3D objects made ready for the map while it stands in the depot (the wagon added, when it was). */
+	const Vehicle *wagon = Vehicle::GetIfValid(new_veh_id);
+	if (wagon != nullptr) PrepareThreeDVehicleObjectOnMap(wagon->First());
 }
 
 /**
