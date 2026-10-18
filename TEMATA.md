@@ -27,14 +27,38 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – myš podruhé: ukazatel se zase vrací, ale pod ClipCursor (build #284: naráží na kraj okna)
+
+- Hráč (#284): pod kurzorem hry se pohybuje kurzor Windows, naráží na kraj okna a mapa stojí. Winlator má starší
+  (bez opravy z `cota`) a ta oprava z Winlatoru půjde pryč: **spravit to ve hře, aby myš fungovala všem**. Myš se
+  „kouše deset let, i na PC“.
+- Volný ukazatel (`f29a87c`) byl špatně: ve Winlatoru kurzor Windows vidět a u kraje okna tah končí.
+- **Nově (zdroje Wine 10.10, `winex11/mouse.c`, `event.c`, `win32u/input.c`):** `SetCursorPos` bez clipu dělá
+  krátký grab na kořenové okno (pod `explorer /desktop` okno plochy, proces hry k němu nemá data → puštění zahozeno).
+  **Když hra drží `ClipCursor`, Wine drží grab svého clip okna a `SetCursorPos` jen posune ukazatel bez grabu;**
+  události clip okna (i puštění) Wine pošle hře (`send_mouse_input()`, hwnd 0 + `clip_window`). Takže: náš režim
+  a otáčení prostředním vrací ukazatel jako dřív (kurzor Windows se nikdy neukáže zvlášť, kraj okna nevadí), ale po
+  dobu držení tlačítka je ukazatel uzavřený do okna (o 1 px menší než okno – clip velikosti obrazovky Wine bere jako
+  žádný). Pustí se při puštění tlačítka, konci připíchnutí a ztrátě fokusu. Vanilla režimy beze změny.
+- Zbytkové riziko: první vrácení ukazatele po stisku může přijít o zprávu dřív, než Wine clip zapne (Wine ho zapne
+  až při čtení dalších zpráv). Přeloženo MinGW, neověřeno na Windows ani ve Winlatoru – zkouší hráč.
+
+## 18. 10. – kolega a optimalizované domy (doplňky)
+
+- Hráč: „kolega se může pustit do budov optimalizovaných, že jo, co chybí?“ Chybí: kolegovo potvrzení formátu
+  doplňků (`hra/3d/DOPLNKY-DOMU-A-POSTAVY.md`, zatím neodpověděl) a **podpora ve hře** (doplňky u domů, `poza`
+  u postav) – moje práce. Slité domy nechat, dokud hra doplňky neumí.
+
 ## 18. 10. – stadion: prase na rožni a hasičská Tatra (domluvit, pak kódovat)
 
-- Hráč: na hřišti/stadionu (`dum_20_stadion`, `dum_14_stadion_stary`) občas prase na rožni a hasičská Tatra
-  s hasiči. Bez balíčku 3D Tater hasiči nejsou (hra je bere jen z kolegova balíčku, sama je nemá).
+- Hráč: na našem stadionu (ten, co sdílí rožeň budovy – `postavy/rozen`, točí se jako v hospodě) občas **obojí
+  současně**: prase na rožni i hasičská Tatra s hasiči. Tatru hra bere z GRF 3D Tater; bez něj akce není vůbec (ani
+  rožeň) – ale GRF Tater je ve hře zabudovaný („to je ingame truck“), takže tam bude vždycky.
 - Kolegovi napsáno (`hra/3d/PROSBA-POZARNI-TATRA.md`): hasičská Tatra jako objekt v balíčku 3D Tater, hasiči jako
   posádka, trojúhelníky „jako normální Tatra“ (zatím rozpočet osobního auta, Tatra 603 má 7 634), přesný limit až po
   hráčově porovnání V3S a Tatry.
-- **Nejasné:** jak často – hráč napsal „jednou za sedm dní, dvakrát za měsíc“. Zeptat se, pak dělat.
+- **Nejasné:** jak často – hráč napsal „jednou za sedm dní, dvakrát za měsíc“, pak „obráceně“. A který stadion
+  (`dum_20_stadion` nebo `dum_14_stadion_stary`). Doptat se, pak dělat.
 
 ## 18. 10. – 3D na grafické kartě, krok 1: obrázky vozidel, postav a efektů
 

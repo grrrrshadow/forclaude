@@ -543,19 +543,23 @@ static bool AnyMouseButtonHeld()
 /*
  * The pointer while a button is held, in this feature's own scroll mode (map_drag.cpp) and the turn of the view with
  * the middle button (three_d.h); the game's own modes are left as they are. The drawn cursor stays where the button
- * went down, as before, but the system's pointer is no longer put back there (SetCursorPos) on every move while the
- * button is held: it goes its own way, hidden, and the map follows how far it went. Under Wine every SetCursorPos
- * grabs the pointer for a moment, and a release made in that moment went to Wine's desktop window and was lost --
- * the right button stuck down, the system itself calling it held (the player's logs of 17. 10.; the report of the
- * Winlator side, grrrrshadow/cota MYS-REPORT.md). The game put the pointer back fifty times a second, so in a long drag
- * the release fell into one of those moments sooner or later. Now the pointer is put back once, when the buttons are
- * let go (nothing held, nothing to lose); under Windows itself also when it comes to the edge of the window, which
- * under Wine it never does while a button is held (the drag stops at the edge there).
+ * went down and the pointer is put back there on every move (SetCursorPos), as always -- but under a clip of the
+ * pointer to the window (ClipCursor) for as long as the button is held.
+ *
+ * Under Wine (winex11, wine-10.10 mouse.c X11DRV_SetCursorPos()) putting the pointer back without a clip grabs it
+ * for a moment to the root window -- under "explorer /desktop" the desktop's window, of which the game's process has
+ * no data -- and a release made in that moment went there and was dropped: the right button stuck down, the system
+ * itself calling it held (the player's logs of 17. 10.; grrrrshadow/cota MYS-REPORT.md). The game put the pointer
+ * back fifty times a second, so in a long drag the release fell into one of those moments sooner or later. With a
+ * clip Wine holds a grab of its own clip window for the whole of it and putting the pointer back only warps it; what
+ * comes to the clip window is the game's (send_mouse_input()), the release among it, whatever the X server does with
+ * the button's own grab -- under every Wine and X server, not only one put right. Under Windows itself the clip only
+ * keeps the pointer in the window. The pointer comes and goes as before: no edge of the window stops the drag, and
+ * the system's pointer never shows apart from the drawn cursor.
+ *
+ * The clip is a little smaller than the window: one as big as the screen Wine takes for none (process_wine_clipcursor()).
  */
-static bool _pointer_free = false;  ///< the system's pointer goes its own way while the drawn cursor stays pinned
-static POINT _pointer_free_last{};  ///< where it was at the last move, client coordinates
-/** How near the edge of the window the free pointer is put back under Windows itself, pixels. */
-static constexpr int POINTER_FREE_EDGE = 16;
+static bool _pin_clipped = false; ///< the pointer is clipped to the window for this feature's own pin
 
 /** Whether the pin is this feature's own: its drag of the map, the turn of the view with the middle button. */
 static bool PinnedOurOwn()
@@ -563,22 +567,23 @@ static bool PinnedOurOwn()
 	return _cursor.fix_at && (MapDragOn() || _middle_button_down);
 }
 
-/** Whether this runs under Wine (GetWineVersion()), asked once. */
-static bool UnderWine()
+/** The pointer clipped to the window while this feature's own pin holds a button, and free otherwise. */
+static void KeepPinClip(HWND hwnd, std::string_view why)
 {
-	static const bool wine = GetWineVersion().has_value();
-	return wine;
-}
-
-/** Put the free pointer back where the drawn cursor is, once nothing is pinned and no button is held any more. */
-static void PutFreePointerBack(HWND hwnd)
-{
-	if (!_pointer_free || _cursor.fix_at || AnyMouseButtonHeld()) return;
-	_pointer_free = false;
-	POINT pt{_cursor.pos.x, _cursor.pos.y};
-	ClientToScreen(hwnd, &pt);
-	SetCursorPos(pt.x, pt.y);
-	MouseDebugLog(fmt::format("ukazatel po pusteni vracen na misto kurzoru ({},{}) (SetCursorPos, nic neni drzeno)", _cursor.pos.x, _cursor.pos.y));
+	const bool want = PinnedOurOwn() && AnyMouseButtonHeld() && GetForegroundWindow() == hwnd;
+	if (want == _pin_clipped) return;
+	if (want) {
+		RECT r;
+		GetClientRect(hwnd, &r);
+		MapWindowPoints(hwnd, nullptr, reinterpret_cast<POINT *>(&r), 2);
+		InflateRect(&r, -1, -1);
+		_pin_clipped = r.right > r.left && r.bottom > r.top && ClipCursor(&r) != FALSE;
+		MouseDebugLog(fmt::format("ukazatel uzavren do okna ({},{})-({},{}) po dobu drzeni ({}){}", r.left, r.top, r.right, r.bottom, why, _pin_clipped ? "" : ": NEPOVEDLO SE"));
+	} else {
+		ClipCursor(nullptr);
+		_pin_clipped = false;
+		MouseDebugLog(fmt::format("ukazatel zase volny ({})", why));
+	}
 }
 
 LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -658,7 +663,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * very message that would have put it right. */
 			if (!AnyMouseButtonHeld()) ReleaseCapture();
 			HandleMouseEvents();
-			PutFreePointerBack(hwnd);
+			KeepPinClip(hwnd, "WM_LBUTTONUP");
 			return 0;
 
 		case WM_MBUTTONDOWN:
@@ -667,6 +672,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			_middle_button_down = true;
 			MouseDebugLog("zprava WM_MBUTTONDOWN");
 			HandleMouseEvents();
+			KeepPinClip(hwnd, "WM_MBUTTONDOWN");
 			return 0;
 
 		case WM_MBUTTONUP:
@@ -674,7 +680,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MouseDebugLog("zprava WM_MBUTTONUP");
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
-			PutFreePointerBack(hwnd);
+			KeepPinClip(hwnd, "WM_MBUTTONUP");
 			return 0;
 
 		case WM_RBUTTONDOWN:
@@ -692,6 +698,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MapDragSystemButton(true, "WM_RBUTTONDOWN");
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONDOWN (ctrl={})", _ctrl_pressed ? 1 : 0));
 			HandleMouseEvents();
+			KeepPinClip(hwnd, "WM_RBUTTONDOWN");
 			return 0;
 
 		case WM_RBUTTONUP:
@@ -700,7 +707,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
-			PutFreePointerBack(hwnd);
+			KeepPinClip(hwnd, "WM_RBUTTONUP");
 			return 0;
 
 		case WM_CAPTURECHANGED:
@@ -753,46 +760,8 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * holds what the game remembers. */
 			MapDragSystemButton((wParam & MK_RBUTTON) != 0, "WM_MOUSEMOVE");
 
-			const bool held = (wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON)) != 0;
-			if (PinnedOurOwn() && held) {
-				/* This feature's own pin with a button held: the pointer is not put back (see _pointer_free); the
-				 * drawn cursor stays, the move is how far the pointer went since the last message. */
-				if (!_pointer_free) {
-					/* It was at the cursor when the pin began: the press was made there. */
-					_pointer_free = true;
-					_pointer_free_last = {_cursor.pos.x, _cursor.pos.y};
-				}
-				_cursor.delta.x = x - _pointer_free_last.x;
-				_cursor.delta.y = y - _pointer_free_last.y;
-				_pointer_free_last = {x, y};
-				bool back = false;
-				if (!UnderWine() && (x < POINTER_FREE_EDGE || y < POINTER_FREE_EDGE || x >= _screen.width - POINTER_FREE_EDGE || y >= _screen.height - POINTER_FREE_EDGE)) {
-					/* Under Windows itself, at the edge of the window: back to the cursor, so the drag goes on. */
-					POINT pt{_cursor.pos.x, _cursor.pos.y};
-					_pointer_free_last = pt;
-					ClientToScreen(hwnd, &pt);
-					SetCursorPos(pt.x, pt.y);
-					back = true;
-				}
-				MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}) volny ukazatel, posun ({},{}){}", x, y, _cursor.delta.x, _cursor.delta.y, back ? " -> u okraje okna vracen (SetCursorPos, Windows)" : ""));
-				MyShowCursor(false);
-				HandleMouseEvents();
-				return 0;
-			}
-			if (_pointer_free && (!_cursor.fix_at || !held)) {
-				/* The pin is over, or no button is held under it any more: the pointer back where the drawn cursor is
-				 * when nothing is held (a pin still on then goes on the old way, from there); else the pin is over
-				 * and the cursor goes to the pointer, where it is. */
-				_pointer_free = false;
-				if (!held) {
-					POINT pt{_cursor.pos.x, _cursor.pos.y};
-					ClientToScreen(hwnd, &pt);
-					SetCursorPos(pt.x, pt.y);
-					MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}): konec pripichnuti, ukazatel vracen na misto kurzoru ({},{}) (SetCursorPos, nic neni drzeno)", x, y, _cursor.pos.x, _cursor.pos.y));
-					x = _cursor.pos.x;
-					y = _cursor.pos.y;
-				}
-			}
+			/* The clip on before the pointer is put back, off once the pin is over (see _pin_clipped). */
+			KeepPinClip(hwnd, "WM_MOUSEMOVE");
 
 			bool warp = _cursor.UpdateCursorPosition(x, y);
 			MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}){}", x, y, warp ? " -> ukazatel vracen (SetCursorPos)" : ""));
@@ -1041,6 +1010,12 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 		case WM_KILLFOCUS:
 			video_driver->has_focus = false;
+			/* Another window has the keyboard: the pointer is not left clipped to this one (see _pin_clipped). */
+			if (_pin_clipped) {
+				ClipCursor(nullptr);
+				_pin_clipped = false;
+				MouseDebugLog("ukazatel zase volny (WM_KILLFOCUS)");
+			}
 			break;
 
 		case WM_ACTIVATE: {
