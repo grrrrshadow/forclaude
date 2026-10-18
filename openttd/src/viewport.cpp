@@ -108,6 +108,7 @@
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_dragons.h"
+#include "three_d_witches.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
 #include "cab_drive.h"
@@ -4247,6 +4248,7 @@ static void ViewportDoDrawTurned()
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
 	AddThreeDDragonsToViewport(zoom);
+	AddThreeDWitchesToViewport(zoom);
 	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
 
@@ -4420,6 +4422,38 @@ static void AddNightLight(uint32_t *dst, int pitch, int w, int h, double cx, dou
 }
 
 /**
+ * Add a beam of light to the pixels of the block being drawn (a witch's hand torch, three_d_witches.h): from a point
+ * widening to another, brightest along its middle and at its start, gone at its end (where its pool is), its colour
+ * times its strength added to what is there.
+ * @param ax,ay where it starts, pixels of the block
+ * @param bx,by where it ends
+ * @param ra,rb its half width there, pixels
+ */
+static void AddNightBeam(uint32_t *dst, int pitch, int w, int h, double ax, double ay, double bx, double by, double ra, double rb, Colour colour, double strength)
+{
+	const double vx = bx - ax, vy = by - ay, vv = vx * vx + vy * vy;
+	if (vv < 1.0) return;
+	ra = std::max(ra, 0.75);
+	rb = std::max(rb, ra);
+	const int x0 = std::max(0, static_cast<int>(std::floor(std::min(ax - ra, bx - rb)))), x1 = std::min(w - 1, static_cast<int>(std::ceil(std::max(ax + ra, bx + rb))));
+	const int y0 = std::max(0, static_cast<int>(std::floor(std::min(ay - ra, by - rb)))), y1 = std::min(h - 1, static_cast<int>(std::ceil(std::max(ay + ra, by + rb))));
+	for (int y = y0; y <= y1; y++) {
+		uint32_t *row = dst + static_cast<size_t>(y) * pitch;
+		for (int x = x0; x <= x1; x++) {
+			const double px = x + 0.5 - ax, py = y + 0.5 - ay;
+			const double along = (px * vx + py * vy) / vv;
+			if (along < 0.0 || along > 1.0) continue;
+			const double r = ra + (rb - ra) * along;
+			const double ox = px - vx * along, oy = py - vy * along, d2 = (ox * ox + oy * oy) / (r * r);
+			if (d2 >= 1.0) continue;
+			const double f = strength * (1.0 - d2) * (1.0 - along * along);
+			Colour c(row[x]);
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+		}
+	}
+}
+
+/**
  * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
  * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
  * the front of a road vehicle, a train or a ship, with the pool of their light on the way ahead; the red lights at
@@ -4579,6 +4613,29 @@ static void DrawNight(bool turned)
 			}
 		}
 	}
+	/* The witches flying (three_d_witches.h; the player: "light all round the lantern, and from the hand torch a
+	 * beam"), where they are drawn: the flame and the light all round it -- over her and what is near --, the beam of
+	 * the torch and its pool where it falls on the ground. */
+	if (turned || _north_house_objects) {
+		for (const ThreeDWitchLight &l : GetThreeDWitchLights(false)) {
+			double px, py;
+			project(l.x, l.y, l.z, px, py);
+			const double r = l.reach * unit;
+			if (!l.torch) {
+				AddNightLight(dst, dpi.pitch, w, h, px, py, r, r, l.colour, 0.45);
+				AddNightLight(dst, dpi.pitch, w, h, px, py, std::max(1.5, r * 0.12), std::max(1.5, r * 0.12), l.colour, 1.0);
+				continue;
+			}
+			const double len = l.ground > 0 ? l.ground : l.reach;
+			const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+			double qx, qy;
+			project(l.x + l.dx * len, l.y + l.dy * len, l.z + l.dz * len * up, qx, qy);
+			const double spread = len * std::tan(l.half_angle) * unit;
+			AddNightBeam(dst, dpi.pitch, w, h, px, py, qx, qy, 0.1 * unit, spread, l.colour, 0.35);
+			AddNightLight(dst, dpi.pitch, w, h, px, py, std::max(1.2, 0.6 * unit), std::max(1.2, 0.6 * unit), l.colour, 1.0);
+			if (l.ground > 0) AddNightLight(dst, dpi.pitch, w, h, qx, qy, spread * 1.2, spread * 0.6, l.colour, 0.55);
+		}
+	}
 }
 
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
@@ -4618,6 +4675,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		ViewportAddLandscape();
 		if (_north_house_objects) AddTurnedObjectsToDraw();
 		if (_north_house_objects) AddThreeDDragonsToViewport(_vd.dpi.zoom);
+		if (_north_house_objects) AddThreeDWitchesToViewport(_vd.dpi.zoom);
 		ViewportAddVehicles(&_vd.dpi);
 
 		ViewportAddKdtreeSigns(&_vd.dpi);
@@ -8624,6 +8682,23 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 			for (int side = -1; side <= 1; side += 2) glow(u->x_pos - fx * half + sx * side * 1.5, u->y_pos - fy * half + sy * side * 1.5, z + 2, 0.5, tail, 0.9, 1.0);
 		}
 	}
+	/* The witches' lanterns and torches (three_d_witches.h): the flame and its light all round, the torch's glass, its
+	 * beam as a row of glows widening along it, and its pool where it falls on the ground. */
+	const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+	for (const ThreeDWitchLight &l : GetThreeDWitchLights(true)) {
+		if (!l.torch) {
+			glow(l.x, l.y, l.z, l.reach, l.colour, 0.35, 1.0);
+			glow(l.x, l.y, l.z, std::max(0.15, l.reach * 0.1), l.colour, 1.0, 1.0);
+			continue;
+		}
+		glow(l.x, l.y, l.z, 0.25, l.colour, 1.0, 1.0);
+		const double len = l.ground > 0 ? l.ground : l.reach, spread = std::tan(l.half_angle);
+		for (int k = 1; k <= 16; k++) {
+			const double s = len * k / 16;
+			glow(l.x + l.dx * s, l.y + l.dy * s, l.z + l.dz * s * up, std::max(0.2, s * spread), l.colour, 0.1 * (1.0 - k / 18.0), 1.0);
+		}
+		if (l.ground > 0) glow(l.x + l.dx * len, l.y + l.dy * len, l.z + l.dz * len * up, len * spread * 1.2, l.colour, 0.45, 0.4);
+	}
 	return glows;
 }
 
@@ -8922,6 +8997,70 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
 						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
 					};
 					dst[i] = Colour(add(o.r, moon.r, warm.r), add(o.g, moon.g, warm.g), add(o.b, moon.b, warm.b)).data;
+				}
+			}
+		}, (y1 - y0) * (x1 - x0) > 20000);
+	}
+}
+
+/**
+ * The witches' lights lighting what is about them (three_d_witches.h; the player: "light all round the lantern, and
+ * from the hand torch a beam"): each pixel within a lantern's reach takes its light all round, the more the nearer;
+ * each within a torch's cone and reach its light, the more the nearer to the torch and to the middle of the beam --
+ * its own colour coming back out of the dark, as under the houses' lamps (DrawEyeLampLight()).
+ */
+static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights)
+{
+	const NightLight moon = GetNightLight();
+	for (const ThreeDWitchLight &l : lights) {
+		const double reach = l.reach * (l.torch ? 1.3 : 1.0);
+		if (reach <= 0) continue;
+		/* The sphere it may reach: about the lantern, about the middle of the beam. */
+		const double half = l.torch ? reach / 2 : 0;
+		const double cx = l.x + l.dx * half, cy = l.y + l.dy * half, cz = l.z + l.dz * half * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+		const double radius = l.torch ? half + reach * std::tan(l.half_angle) : reach;
+		const CabPoint c = CabToEye(eye, cx, cy, cz, 0, 0);
+		if (c.f < -radius || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + radius) continue;
+		int x0 = 0, x1 = width - 1, y0 = 0, y1 = height - 1;
+		if (c.f > radius + CAB_NEAR) {
+			const CabVertex v = CabProject(eye, c);
+			const double r = radius * eye.focal / (c.f - radius);
+			x0 = std::max(0, static_cast<int>(v.sx - r));
+			x1 = std::min(width - 1, static_cast<int>(v.sx + r));
+			y0 = std::max(0, static_cast<int>(v.sy - r));
+			y1 = std::min(height - 1, static_cast<int>(v.sy + r));
+		}
+		if (x0 > x1 || y0 > y1) continue;
+		const double lzu = l.z * CAB_Z_SCALE, cos_edge = std::cos(l.half_angle);
+		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground. */
+		const double zu_per_unit = CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
+			for (int py = y0 + lo; py < y0 + hi; py++) {
+				for (int px = x0; px <= x1; px++) {
+					const size_t i = static_cast<size_t>(py) * width + px;
+					if (zb[i] <= 0.0f) continue;
+					double x, y, zu;
+					CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
+					const double ox = x - l.x, oy = y - l.y, oz = (zu - lzu) / zu_per_unit;
+					const double d = std::sqrt(ox * ox + oy * oy + oz * oz);
+					double k;
+					if (!l.torch) {
+						if (d >= reach) continue;
+						k = (1.0 - d / reach) * (1.0 - d / reach) * 0.8;
+					} else {
+						const double along = ox * l.dx + oy * l.dy + oz * l.dz;
+						if (along <= 0 || along >= reach || d < 1e-6) continue;
+						const double cosa = along / d;
+						if (cosa <= cos_edge) continue;
+						const double middle = (cosa - cos_edge) / (1.0 - cos_edge);
+						k = (1.0 - along / reach) * std::min(1.0, middle * 2.5) * 0.9;
+					}
+					const Colour o(dst[i]);
+					auto add = [&](uint8_t now, uint night, uint8_t light) {
+						const double own = std::min(255.0, now * 256.0 / night);
+						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
+					};
+					dst[i] = Colour(add(o.r, moon.r, l.colour.r), add(o.g, moon.g, l.colour.g), add(o.b, moon.b, l.colour.b)).data;
 				}
 			}
 		}, (y1 - y0) * (x1 - x0) > 20000);
@@ -9565,6 +9704,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
 	AddThreeDDragonsToEye();
+	AddThreeDWitchesToEye();
 	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
 	AddThreeDDriversToEye();
@@ -10127,6 +10267,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
 		}
 		if (_cab_lamp_light) out.Job([eye, width, height, lamps = std::move(lamps)](uint32_t *dst, float *zb) { DrawEyeLampLight(eye, dst, zb, width, height, lamps); });
+		/* The witches' lanterns and torches lighting what is about them and where the beam falls (DrawEyeWitchLight()). */
+		if (std::vector<ThreeDWitchLight> witch_lights = GetThreeDWitchLights(true); !witch_lights.empty()) {
+			out.Job([eye, width, height, witch_lights = std::move(witch_lights)](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); });
+		}
 		{
 			const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
 			/* The lighter the night (gui.night_light), the fewer stars are seen: towards the dawn only the brightest. */

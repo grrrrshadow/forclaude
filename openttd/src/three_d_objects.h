@@ -322,7 +322,13 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> night_back;    ///< whether a triangle is of a light at the back (its material "svetlo_zadni")
 	std::vector<float> front_lights;    ///< x, y, z of each headlight, metres
 	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
-	bool paint_whole = false;           ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
+	/* A witch's lights in her frame (the player, 18. 10.: "light all round the lantern, and from the hand torch a beam";
+	 * the colleague's hra/3d/PROSBA-CARODEJNICE.md): the places "lucerna_NN", "svitilna_NN" and "paprsek_NN" of the
+	 * frame NN, as her hand and broom have them there. */
+	std::vector<float> lanterns;        ///< x, y, z of each lantern's flame, metres
+	std::vector<float> torches;         ///< x, y, z of each hand torch's glass, metres
+	std::vector<float> torch_aims;      ///< x, y, z of the point a metre along each one's beam, metres
+	bool paint_whole = false;          ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
 	/* Its parts (the colleague's hra/3d/PROSBA-V3S-3D.md): what is drawn only as the state shows it, the glass, the
 	 * driver, the wheels that turn, the crew drawn bigger than they are. */
 	static constexpr uint8_t PART_DRIVER = 254; ///< tri_part: the driver, not drawn from the own cab's eye
@@ -571,6 +577,7 @@ struct ThreeDVehicleObject {
 	bool Walks() const { return this->walk_step > 0 && this->frames > 1 && !this->frame_prefix.empty(); }
 	bool loop = true;               ///< "smycka": the frames go round; false, they run once and stay on the last (a creature's attack, its death)
 	bool thing = false;             ///< a thing among the figures ("druh": "predmet", the spit): as big as the building it is on, also in the view from the eyes
+	bool frame_lights = false;      ///< a witch's ("druh": "carodejnice"): the glass of her lights under "noc_NN" and their places read from each frame (ThreeDVehicleShape::lanterns)
 	int spin_ticks = 0;             ///< a thing that turns ("predmet" with "otaceni", the spit of the pub): game ticks a turn ("tiku_na_otacku"), 0 for none
 	float spin_axis[3] = {1, 0, 0}; ///< "osa": the axis it turns about, in its frame
 	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
@@ -668,6 +675,28 @@ struct ThreeDCreature {
 	std::string Figure(std::string_view animation) const { return this->name + "/" + std::string(animation); }
 };
 const std::vector<ThreeDCreature> &GetThreeDCreatures();
+
+/**
+ * A witch of the indices ("druh": "carodejnice", the player, 18. 10.: "witches flying at night, as big as the girls at
+ * a stop"; the colleague's hra/3d/PROSBA-CARODEJNICE.md): her animations as a creature's, "<jmeno>/<animace>" (she
+ * flies "let"), how big she is drawn, and the light of her lantern and of her hand torch ("svetla"), what they are like
+ * the index's: none where it gives none.
+ */
+struct ThreeDWitch {
+	std::string name;                    ///< "jmeno"
+	std::vector<std::string> animations; ///< the names of her animations ("let")
+	float size[3] = {};                  ///< "rozmer_m": length, width and height, metres
+	float scale = 2.0f;                  ///< "meritko": so many times her true size on the map (2 as the girls at a stop)
+	uint32_t lantern_colour = 0;         ///< "svetla" "lucerna" "barva" (Colour::data); 0 no light of a lantern
+	float lantern_reach_m = 0;           ///< its "dosah_m", true metres
+	uint32_t torch_colour = 0;           ///< "svetla" "svitilna" "barva"; 0 no beam of a torch
+	float torch_reach_m = 0;             ///< its "dosah_m", true metres
+	float torch_angle = 0;               ///< its "uhel": the cone's whole angle, degrees
+
+	bool Has(std::string_view animation) const { return std::ranges::find(this->animations, animation) != this->animations.end(); }
+	std::string Figure(std::string_view animation) const { return this->name + "/" + std::string(animation); }
+};
+const std::vector<ThreeDWitch> &GetThreeDWitches();
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();

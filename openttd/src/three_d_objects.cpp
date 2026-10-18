@@ -70,6 +70,8 @@ static bool _three_d_objects_read = false;
 static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objects;
 /** The creatures of the indices ("druh": "tvor", the colleague's dragons). */
 static std::vector<ThreeDCreature> _creatures;
+/** The witches of the indices ("druh": "carodejnice"). */
+static std::vector<ThreeDWitch> _witches;
 /** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 
@@ -2432,8 +2434,10 @@ static void ReadThreeDVehicleObjects()
 					continue;
 				}
 				const std::string figure_kind = e.value("druh", std::string("dum"));
-				if (figure_kind == "tvor" && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
-					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". */
+				if ((figure_kind == "tvor" || figure_kind == "carodejnice") && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
+					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". A witch so too, the
+					 * glass of her lights and their places read from each frame. */
+					const bool witch = figure_kind == "carodejnice";
 					ThreeDCreature creature;
 					creature.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
@@ -2452,6 +2456,7 @@ static void ReadThreeDVehicleObjects()
 						fig.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
 						fig.loop = a.value("smycka", true);
 						fig.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+						fig.frame_lights = witch;
 						if (fig.frames < 2) fig.frame_prefix.clear();
 						/* With its bones ("kostra") and an animation of the same name there: a frame a tick, the round
 						 * as long as the frames' was. */
@@ -2468,7 +2473,34 @@ static void ReadThreeDVehicleObjects()
 						_figure_objects.push_back(std::move(fig));
 						creature.animations.push_back(anim);
 					}
-					if (!creature.animations.empty()) _creatures.push_back(std::move(creature));
+					if (creature.animations.empty()) continue;
+					if (!witch) {
+						_creatures.push_back(std::move(creature));
+						continue;
+					}
+					/* Her size, and her lights as the index has them (the colleague's hra/3d/PROSBA-CARODEJNICE.md). */
+					ThreeDWitch w;
+					w.name = creature.name;
+					w.animations = std::move(creature.animations);
+					std::copy(std::begin(creature.size), std::end(creature.size), std::begin(w.size));
+					w.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
+					auto colour_of = [](const nlohmann::json &l) -> uint32_t {
+						auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+						return n.has_value() ? Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data : 0;
+					};
+					if (e.contains("svetla") && e.at("svetla").is_object()) {
+						const auto &lights = e.at("svetla");
+						if (lights.contains("lucerna") && lights.at("lucerna").is_object()) {
+							w.lantern_colour = colour_of(lights.at("lucerna"));
+							w.lantern_reach_m = std::clamp(lights.at("lucerna").value("dosah_m", 0.0f), 0.0f, 50.0f);
+						}
+						if (lights.contains("svitilna") && lights.at("svitilna").is_object()) {
+							w.torch_colour = colour_of(lights.at("svitilna"));
+							w.torch_reach_m = std::clamp(lights.at("svitilna").value("dosah_m", 0.0f), 0.0f, 100.0f);
+							w.torch_angle = std::clamp(lights.at("svitilna").value("uhel", 0.0f), 1.0f, 120.0f);
+						}
+					}
+					_witches.push_back(std::move(w));
 					continue;
 				}
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom") && e.contains("soubor")) {
@@ -3075,6 +3107,7 @@ void ResetThreeDVehicleObjects()
 	_vehicle_object_shared_pieces.clear();
 	_three_d_theme_trees.clear();
 	_creatures.clear();
+	_witches.clear();
 	_thing_sounds.clear();
 	_thing_places.clear();
 	_vehicle_objects_read = false;
@@ -3341,6 +3374,9 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.corner_wheel.shrink_to_fit();
 	s.tri_glass.shrink_to_fit();
 	s.night_part.shrink_to_fit();
+	s.lanterns.shrink_to_fit();
+	s.torches.shrink_to_fit();
+	s.torch_aims.shrink_to_fit();
 	s.front_part.shrink_to_fit();
 	s.back_part.shrink_to_fit();
 }
@@ -3794,14 +3830,50 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		std::vector<std::string> marked{this->glass_node.empty() ? std::string("\x01") : this->glass_node};
 		/* (A wheel of an add-on is marked in the add-on: a name never found here keeps the numbering of the wheels.) */
 		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.addon.empty() ? w.node : std::string("\x01"));
-		if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) return nullptr;
+		if (this->frame_lights) {
+			/* A witch's frame: the glass of her lights ("noc_NN" of the frame) read below. */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.only_node = this->only_node;
+			o.skip_night = true;
+			o.groups = &marked;
+			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
+		} else if (!ReadGlbMesh(this->file, mesh, true, this->frame_prefix, frame, this->only_node, {}, nullptr, "noc", &marked)) {
+			return nullptr;
+		}
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	if (!this->file.ends_with(".s") && !this->file.ends_with(".S")) {
-		/* Its lights: the glass of "noc" in the colours of its materials, and the places they shine from. */
+		/* Its lights: the glass of "noc" in the colours of its materials, and the places they shine from. A
+		 * witch's of her frame: the glass of its "noc_NN", the places of her lantern and her torch in it. */
 		GlbMesh night, none;
-		ReadGlbMesh(this->file, night, true, {}, 0, "noc", "svetlo_predni_", &made->front_lights);
-		ReadGlbMesh(this->file, none, true, {}, 0, "\x01", "svetlo_zadni_", &made->back_lights);
+		if (this->frame_lights) {
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.frame_prefix = this->frame_prefix;
+			o.frame = frame;
+			o.only_night = true;
+			ReadGlbMesh(this->file, night, o);
+			o.only_night = false;
+			o.only_node = "\x01";
+			o.points_only = true;
+			for (auto [prefix, list] : {std::pair{"lucerna_", &made->lanterns}, std::pair{"svitilna_", &made->torches}, std::pair{"paprsek_", &made->torch_aims}}) {
+				o.point_prefix = prefix;
+				o.points = list;
+				ReadGlbMesh(this->file, none, o);
+			}
+			/* A torch without the aim of its beam, or an aim without its torch, shines nowhere. */
+			if (made->torches.size() != made->torch_aims.size()) {
+				Debug(misc, 0, "3D figure {}: frame {} has {} torches and {} aims of their beams", this->name, frame, made->torches.size() / 3, made->torch_aims.size() / 3);
+				made->torches.clear();
+				made->torch_aims.clear();
+			}
+		} else {
+			ReadGlbMesh(this->file, night, true, {}, 0, "noc", "svetlo_predni_", &made->front_lights);
+			ReadGlbMesh(this->file, none, true, {}, 0, "\x01", "svetlo_zadni_", &made->back_lights);
+		}
 		made->night_pos = std::move(night.pos);
 		made->night_tri = std::move(night.tri);
 		for (uint8_t t : night.tri_tex) {
@@ -4804,6 +4876,13 @@ const std::vector<ThreeDCreature> &GetThreeDCreatures()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _creatures;
+}
+
+/** The witches of the indices ("druh": "carodejnice"), read the first time they are asked for. */
+const std::vector<ThreeDWitch> &GetThreeDWitches()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _witches;
 }
 
 /**
@@ -5840,6 +5919,7 @@ size_t ThreeDVehicleShape::Bytes() const
 	size_t b = VectorBytes(this->pos) + VectorBytes(this->nrm) + VectorBytes(this->uv) + VectorBytes(this->tri) + VectorBytes(this->tri_tex);
 	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_back);
 	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
+	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
 	for (const auto &simpler : this->simpler.shapes) {
 		if (simpler != nullptr) b += simpler->Bytes();
 	}

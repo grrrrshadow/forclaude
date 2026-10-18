@@ -168,6 +168,7 @@
 
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
+#include "three_d_witches.h"
 
 #include "safeguards.h"
 
@@ -9108,6 +9109,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDDragon(wx, wy, FirstPersonWalkerHeading(), 2.5) ? "zasahl" : "minul");
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDDragons());
+	} else if (what == "carodejnice") {
+		/* 'carodejnice [<x> <y> <stupnu> [jmeno]]': the witches flying (three_d_witches.h, only at night); with a tile one
+		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu>': one sent from under
+		 * the middle of the main view, drawn about its middle as high as she flies. */
+		auto x = number(2), y = number(3), deg = number(4);
+		if (argv.size() > 2 && argv[2] == "tady") {
+			const int up = UnScaleByZoom(static_cast<int>(22.0 * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE), vp->zoom);
+			const Point pt = TranslateXYToTileCoord(*vp, vp->left + vp->width / 2, vp->top + std::min(vp->height - 1, vp->height / 2 + up));
+			const bool sent = pt.x >= 0 && SendThreeDWitch({}, pt.x, pt.y, number(3).value_or(0) * M_PI / 180.0);
+			IConsolePrint(CC_DEFAULT, "test3d: carodejnice {}", sent ? "poslana" : "NEPOSLANA");
+		} else if (x.has_value() && y.has_value()) {
+			const std::string_view kind = argv.size() > 5 ? argv[5] : std::string_view{};
+			const bool sent = SendThreeDWitch(kind, (*x + 0.5) * TILE_SIZE, (*y + 0.5) * TILE_SIZE, deg.value_or(0) * M_PI / 180.0);
+			IConsolePrint(CC_DEFAULT, "test3d: carodejnice {}", sent ? "poslana" : "NEPOSLANA");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDWitches());
 	} else if (what == "inventar") {
 		/* The walker's inventory (walker_inventory_gui.cpp): 'inventar' opens it and tells what it holds and what is sold
 		 * near the walker; 'inventar koupit <n>' buys thing n there, 'inventar pouzit <n>' uses it, 'inventar zdravi <n>'
