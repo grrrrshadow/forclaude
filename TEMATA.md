@@ -27,6 +27,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – rychlejší 3D GRF: vzkaz kolegovi (grrrrf `hra/3d/ZRYCHLENI-3D-GRF.md`)
+
+- Hráč odsouhlasil: (1) okraje 16 px kolem ostrůvků v atlasu + značka `"okraje_textur"` v indexu (hra pak přeskočí
+  pokrytí a vyplňování – **hra ji musí dodělat**), (2) masky menší a šedé, (3) atlas podle nástavby, (4) sloučit
+  materiály se stejným obrázkem, (5) skryté díly pryč a vnitřek kabiny jako uzel `interier` (**čtení jen pro kabinu
+  dodělat**), (6) opakované díly jako instance.
+- Zamítl (7) ikonky nákupu jako sprity v GRF: obrázek do nákupu dělá hra z modelu, jako u simtrains a BeamNG.
+- K probrání s kolegou: (8) LOD z Blenderu (uzly `_lod1/_lod2` nebo zvláštní soubory), (9) kvantování glb
+  (`KHR_mesh_quantization`, gltfpack). Hra by je musela umět číst.
+- Limity trojúhelníků zatím ne: hráč porovná V3S a Tatru (V3S v rigu nemám, rig má jen GRF Tater).
+
 ## 18. 10. – pravé tlačítko zaseklé pod Wine: hra už nevrací ukazatel, dokud je tlačítko dole
 
 - Hráč: pravé tlačítko zůstává zmáčklé, dokud ho znovu nezmáčkne (logy myši 17. 10. 01:45 a 13:29). Rozbor na
