@@ -39,8 +39,6 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   jeho pohybu (`win32_v.cpp`, `_pointer_free`). Po puštění se ukazatel jednou vrátí na místo kurzoru (nic není
   drženo, nic se neztratí). Na samotných Windows se vrátí i u okraje okna; pod Wine nikdy, dokud je tlačítko dole
   (tah tam u okraje okna skončí). Vanilla režimy beze změny. Neověřeno (Windows kód se tu nepřeloží) – zkouší hráč.
-- „bez návěsu bez tahačů“: hráčovo opakované pozorování – bez návěsů a tahačů (těžké objekty kolegových Tater) se hra
-  necuká. Neptat se znovu.
 
 ## 17. 10. – domy až při kreslení; pokrytí atlasu a 0° rozpracované
 
@@ -90,7 +88,6 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   animace překreslila. Teď je náhled z animace vyjmutý.
 - Hráč dál: glb domů číst až při prvním kreslení (start čte 170 souborů, 178 MB), pokrytí atlasu (50–80 ms na atlas),
   obrázky aut při 0° na vlákně (první auto typu 2–3,5 s na hlavním vlákně).
-- „bez návěsu bez tahačů“ = bez návěsů a tahačů se hra necuká (hráčovo pozorování).
 
 ## 17. 10. – zpracování 3D objektů zrychlené (hráč: „až potom, co optimalizuješ celý ten proces“)
 
