@@ -12,7 +12,8 @@
  * don't forget anything, the lights". The world is drawn as from the cab of a vehicle (cab_view.h, DrawEyeView() in
  * viewport.cpp), the eye at the walker's eyes; the walker goes with W and S or the arrows up and down, steps aside
  * with A and D, turns with the arrows left and right, looks about with the right mouse button held (as the map is
- * dragged), runs with Shift. It walks the ground as it lies and does not go through houses, industries' buildings
+ * dragged; two clicks of it without a drag look straight ahead again, as two of the middle one put the map back to
+ * north), runs with Shift. It walks the ground as it lies and does not go through houses, industries' buildings
  * or water. At night (gui.night) the picture is dark and the vehicles shine. Only the picture: nothing of the game
  * changes, and nothing of it is saved.
  */
@@ -51,6 +52,7 @@
 #include "table/strings.h"
 #include "table/sprites.h"
 
+#include <chrono>
 #include <cmath>
 
 #include "safeguards.h"
@@ -58,8 +60,8 @@
 /** The walker's eyes over the ground, metres (a girl of the indices is 1.62 m tall). */
 static constexpr double FIRST_PERSON_EYES_M = 1.55;
 /** How fast it walks and runs, metres a second. */
-static constexpr double FIRST_PERSON_WALK_MS = 1.6;
-static constexpr double FIRST_PERSON_RUN_MS = 6.5;
+static constexpr double FIRST_PERSON_WALK_MS = 3.0;
+static constexpr double FIRST_PERSON_RUN_MS = 8.5;
 /** How fast it turns on the arrows, radians a second. */
 static constexpr double FIRST_PERSON_TURN = 2.0;
 /** How far it looks up or down at most, radians. */
@@ -246,6 +248,8 @@ struct FirstPersonWindow : Window {
 	float kick = 0;                       ///< a shot's kick, 1 as it is shot to 0
 	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
+	std::chrono::steady_clock::time_point look_clicked{}; ///< when the right button was last pressed without a look about after it
+	bool looked = false;                  ///< the view moved since the right button was pressed (OnScroll())
 	/*
 	 * In a vehicle (the player, 17. 10.: "in the first person game, E gets into the car, into the cab view; no other
 	 * window of the cab view should open, it stays in the window of the first person -- a special window, the game
@@ -830,14 +834,26 @@ struct FirstPersonWindow : Window {
 
 	bool OnRightClick([[maybe_unused]] Point pt, WidgetID widget) override
 	{
-		/* Looking about with the right mouse button held, as the map is dragged (OnScroll()). */
+		/* Looking about with the right mouse button held, as the map is dragged (OnScroll()). Pressed twice without
+		 * looking about between (the player, 18. 10.: "two clicks of the right button and the view is centred again,
+		 * as the map's turn is"): looking straight ahead, level. */
 		if (widget != WID_FP_CANVAS || _scrolling_viewport) return false;
+		const auto now = std::chrono::steady_clock::now();
+		if (!this->looked && now - this->look_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+			this->walker.pitch = 0;
+			this->look_clicked = {};
+			this->SetWidgetDirty(WID_FP_CANVAS);
+		} else {
+			this->look_clicked = now;
+		}
+		this->looked = false;
 		_scrolling_viewport = true;
 		return true;
 	}
 
 	void OnScroll(Point delta) override
 	{
+		if (delta.x != 0 || delta.y != 0) this->looked = true;
 		this->walker.heading = std::remainder(this->walker.heading + delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
 		this->walker.pitch = std::clamp(this->walker.pitch + delta.y * FIRST_PERSON_MOUSE, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
 		this->SetWidgetDirty(WID_FP_CANVAS);
