@@ -300,6 +300,10 @@ constexpr size_t GPU_BYTES_KEPT = 384u * 1024 * 1024;
 struct GpuProgram {
 	GLuint program = 0;
 	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1;
+	/* The paint (ThreeDGpuPaint). */
+	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
+	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
+	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1;
 };
 GpuProgram _mesh_program, _night_program;
 GLuint _fbo = 0, _colour_rb = 0, _lit_rb = 0, _depth_rb = 0;
@@ -328,14 +332,109 @@ void main()
 }
 )";
 
+/* The texel painted as ThreeDGpuPaint has it, as GpuTextureOf() of three_d_vehicle_object.cpp paints it on the
+ * processor (the colours 0-255, each mask read at the texel's middle): the detail in its colour at the texel's lightness
+ * or turned, else the body's paint coloured and faded and the add-on's colour; then the tint and the rust; cut to whole
+ * numbers before it is lit. */
 const char *const MESH_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform int u_glass;
 uniform float u_glass_alpha;
+uniform int u_paint;
+uniform sampler2D u_detail, u_detail_colours, u_paint_mask, u_addon_mask, u_rust_mask;
+uniform vec3 u_colour, u_target, u_addon_colour, u_tint, u_rust_colour;
+uniform float u_start, u_fade, u_addon_start, u_rust_time, u_rust_ramp;
 noperspective in vec2 v_uv;
 noperspective in float v_light;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
+
+const int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
+
+/* A mask's red, 0-255, at the texel's middle (u, v of the texture). */
+float MaskAt(sampler2D m, vec2 uv)
+{
+	ivec2 size = textureSize(m, 0);
+	return floor(texelFetch(m, min(ivec2(uv * vec2(size)), size - 1), 0).r * 255.0 + 0.5);
+}
+
+/* A detail turned (ShiftTrueColourHue()): its hue round by turn 256ths, its saturation and value by 128ths. */
+vec3 TurnHue(vec3 c, vec3 by)
+{
+	vec3 f = c / 255.0;
+	float mx = max(f.r, max(f.g, f.b)), mn = min(f.r, min(f.g, f.b)), d = mx - mn;
+	float h = 0.0;
+	if (d > 1e-9) {
+		if (mx == f.r) {
+			h = mod((f.g - f.b) / d, 6.0);
+		} else if (mx == f.g) {
+			h = (f.b - f.r) / d + 2.0;
+		} else {
+			h = (f.r - f.g) / d + 4.0;
+		}
+	}
+	float s = mx > 0.0 ? d / mx : 0.0, v = mx;
+	h = mod(h + (by.x - 128.0) * 6.0 / 256.0 + 6.0, 6.0);
+	s = min(1.0, s * by.y / 128.0);
+	v = min(1.0, v * by.z / 128.0);
+	float cc = v * s, x = cc * (1.0 - abs(mod(h, 2.0) - 1.0)), m = v - cc;
+	vec3 rgb;
+	int k = int(h);
+	if (k == 0) rgb = vec3(cc, x, 0.0);
+	else if (k == 1) rgb = vec3(x, cc, 0.0);
+	else if (k == 2) rgb = vec3(0.0, cc, x);
+	else if (k == 3) rgb = vec3(0.0, x, cc);
+	else if (k == 4) rgb = vec3(x, 0.0, cc);
+	else rgb = vec3(cc, 0.0, x);
+	return clamp(floor((rgb + m) * 255.0 + 0.5), 0.0, 255.0);
+}
+
+vec3 Paint(vec3 c, vec2 uv)
+{
+	bool by_detail = false;
+	if ((u_paint & PAINT_DETAIL) != 0) {
+		int m = int(MaskAt(u_detail, uv));
+		if (m != 0) {
+			vec4 first = texelFetch(u_detail_colours, ivec2(0, m), 0);
+			float kind = floor(first.a * 255.0 + 0.5);
+			if (kind == 255.0) {
+				int l = int(max(c.r, max(c.g, c.b)));
+				c = floor(texelFetch(u_detail_colours, ivec2(l, m), 0).rgb * 255.0 + 0.5);
+				by_detail = true;
+			} else if (kind == 128.0) {
+				c = TurnHue(c, floor(first.rgb * 255.0 + 0.5));
+				by_detail = true;
+			}
+		}
+	}
+	if ((u_paint & PAINT_BODY) != 0 && !by_detail) {
+		float m = (u_paint & PAINT_MASK) != 0 ? MaskAt(u_paint_mask, uv) / 255.0 : 1.0;
+		if (m > 0.0) {
+			if ((u_paint & PAINT_COLOURED) != 0) {
+				float l = max(c.r, max(c.g, c.b)) / u_start;
+				c += (min(vec3(255.0), u_colour * l) - c) * m;
+			}
+			if (u_fade > 0.0) c += (u_target - c) * (u_fade * m);
+		}
+	}
+	if ((u_paint & PAINT_ADDON) != 0 && !by_detail) {
+		float m = MaskAt(u_addon_mask, uv) / 255.0;
+		if (m > 0.0) {
+			float l = max(c.r, max(c.g, c.b)) / u_addon_start;
+			c += (min(vec3(255.0), u_addon_colour * l) - c) * m;
+		}
+	}
+	if ((u_paint & PAINT_TINT) != 0) c = c * u_tint / 255.0;
+	if ((u_paint & PAINT_RUST) != 0) {
+		float m = MaskAt(u_rust_mask, uv);
+		if (m > 0.0) {
+			float f = (u_paint & PAINT_GRADUAL) != 0 ? clamp((u_rust_time - (m - 1.0) / 254.0) / u_rust_ramp, 0.0, 1.0) : m / 255.0 * u_rust_time;
+			c += (u_rust_colour - c) * f;
+		}
+	}
+	return floor(min(vec3(255.0), c));
+}
+
 void main()
 {
 	ivec2 size = textureSize(u_tex, 0);
@@ -343,7 +442,9 @@ void main()
 	ivec2 at = min(ivec2(f * vec2(size)), size - 1);
 	vec4 t = texelFetch(u_tex, at, 0);
 	if (u_glass == 0 && t == vec4(0.0)) discard;
-	vec3 c = floor(min(vec3(255.0), floor(t.rgb * 255.0 + 0.5) * v_light)) / 255.0;
+	vec3 own = floor(t.rgb * 255.0 + 0.5);
+	if (u_paint != 0 && t != vec4(0.0)) own = Paint(own, (vec2(at) + 0.5) / vec2(size));
+	vec3 c = floor(min(vec3(255.0), own * v_light)) / 255.0;
 	o_lit = vec4(0.0);
 	o_colour = u_glass == 0 ? vec4(c, 1.0) : vec4(c * u_glass_alpha, u_glass_alpha);
 }
@@ -670,6 +771,22 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
 	p.glass = gl.glGetUniformLocation(p.program, "u_glass");
 	p.glass_alpha = gl.glGetUniformLocation(p.program, "u_glass_alpha");
+	p.paint = gl.glGetUniformLocation(p.program, "u_paint");
+	p.detail = gl.glGetUniformLocation(p.program, "u_detail");
+	p.detail_colours = gl.glGetUniformLocation(p.program, "u_detail_colours");
+	p.paint_mask = gl.glGetUniformLocation(p.program, "u_paint_mask");
+	p.addon_mask = gl.glGetUniformLocation(p.program, "u_addon_mask");
+	p.rust_mask = gl.glGetUniformLocation(p.program, "u_rust_mask");
+	p.colour = gl.glGetUniformLocation(p.program, "u_colour");
+	p.target = gl.glGetUniformLocation(p.program, "u_target");
+	p.start = gl.glGetUniformLocation(p.program, "u_start");
+	p.fade = gl.glGetUniformLocation(p.program, "u_fade");
+	p.addon_colour = gl.glGetUniformLocation(p.program, "u_addon_colour");
+	p.addon_start = gl.glGetUniformLocation(p.program, "u_addon_start");
+	p.tint = gl.glGetUniformLocation(p.program, "u_tint");
+	p.rust_colour = gl.glGetUniformLocation(p.program, "u_rust_colour");
+	p.rust_time = gl.glGetUniformLocation(p.program, "u_rust_time");
+	p.rust_ramp = gl.glGetUniformLocation(p.program, "u_rust_ramp");
 	return true;
 }
 
@@ -858,6 +975,32 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
+/** A mask of details on the card, its index in the red of each texel (8 bits as it is). */
+const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
+{
+	auto it = _card_textures.find(m.uid.value);
+	if (it != _card_textures.end()) {
+		it->second.used = _card_clock;
+		return &it->second;
+	}
+	if (m.w <= 0 || m.h <= 0 || m.w > _max_texture || m.h > _max_texture || m.index.size() < static_cast<size_t>(m.w) * m.h) return nullptr;
+	GpuTexture g;
+	gl.glGenTextures(1, &g.name);
+	gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, m.w, m.h, 0, GL_RED, GL_UNSIGNED_BYTE, m.index.data());
+	g.bytes = static_cast<size_t>(m.w) * m.h;
+	g.used = _card_clock;
+	_card_bytes += g.bytes;
+	return &_card_textures.emplace(m.uid.value, g).first->second;
+}
+
 /** The picture drawn into, at least as big as asked (grown in steps, shrunk again after a very big one). */
 bool TargetOfSize(int w, int h)
 {
@@ -904,23 +1047,46 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target) return false;
 	_card_clock++;
 	/* All on the card first: what it cannot hold the processor draws. */
+	/* A texture's paint on the card: its masks' names (ThreeDGpuPaint). */
+	struct PaintOnCard {
+		GLuint detail = 0, detail_colours = 0, paint_mask = 0, addon_mask = 0, rust_mask = 0;
+	};
 	struct Draw {
 		const ThreeDGpuMesh *mesh;
 		const GpuShape *shape;
 		const GpuIndices *indices;
 		std::vector<GLuint> textures;
+		std::vector<PaintOnCard> paints;
 	};
 	std::vector<Draw> draws;
 	for (const ThreeDGpuMesh &m : pic.meshes) {
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
-		Draw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}};
+		Draw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}, {}};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
 		d.textures.assign(m.textures.size(), 0);
+		d.paints.assign(m.textures.size(), {});
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			if (m.textures[i] == nullptr || i >= m.triangles->used.size() || !m.triangles->used[i]) continue;
 			const GpuTexture *t = TextureOnCard(*m.textures[i]);
 			if (t == nullptr) return false;
 			d.textures[i] = t->name;
+			if (i >= m.paints.size() || !m.paints[i].Any()) continue;
+			/* Its masks on the card too; one it cannot hold, the processor draws the picture. */
+			const ThreeDGpuPaint &paint = m.paints[i];
+			PaintOnCard &pc = d.paints[i];
+			auto mask = [](const ThreeDObjectTexture *tex, GLuint &name) {
+				if (tex == nullptr) return true;
+				const GpuTexture *on = TextureOnCard(*tex);
+				if (on == nullptr) return false;
+				name = on->name;
+				return true;
+			};
+			if (paint.detail != nullptr) {
+				const GpuTexture *on = DetailMaskOnCard(*paint.detail);
+				if (on == nullptr || paint.detail_colours == nullptr) return false;
+				pc.detail = on->name;
+			}
+			if (!mask(paint.detail_colours, pc.detail_colours) || !mask(paint.paint_mask, pc.paint_mask) || !mask(paint.addon_mask, pc.addon_mask) || !mask(paint.rust_mask, pc.rust_mask)) return false;
 		}
 		draws.push_back(std::move(d));
 	}
@@ -952,8 +1118,48 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	};
 	gl.glUseProgram(_mesh_program.program);
 	gl.glUniform1i(_mesh_program.tex, 0);
+	gl.glUniform1i(_mesh_program.detail, 1);
+	gl.glUniform1i(_mesh_program.detail_colours, 2);
+	gl.glUniform1i(_mesh_program.paint_mask, 3);
+	gl.glUniform1i(_mesh_program.addon_mask, 4);
+	gl.glUniform1i(_mesh_program.rust_mask, 5);
 	gl.glUniform1f(_mesh_program.glass_alpha, pic.glass_alpha);
 	gl.glActiveTexture(GL_TEXTURE0);
+	/* A texture's paint: what of it to do (the bits of MESH_FRAGMENT), its colours and its masks on their units. */
+	constexpr int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
+	auto set_paint = [](const ThreeDGpuPaint *paint, const PaintOnCard *pc) {
+		if (paint == nullptr || pc == nullptr || !paint->Any()) {
+			gl.glUniform1i(_mesh_program.paint, 0);
+			return;
+		}
+		int bits = 0;
+		if (pc->detail != 0) bits |= PAINT_DETAIL;
+		if (paint->body) bits |= PAINT_BODY;
+		if (pc->paint_mask != 0) bits |= PAINT_MASK;
+		if (paint->coloured) bits |= PAINT_COLOURED;
+		if (pc->addon_mask != 0) bits |= PAINT_ADDON;
+		if (paint->tinted) bits |= PAINT_TINT;
+		if (pc->rust_mask != 0) bits |= PAINT_RUST;
+		if (paint->rust_gradual) bits |= PAINT_GRADUAL;
+		gl.glUniform1i(_mesh_program.paint, bits);
+		gl.glUniform3f(_mesh_program.colour, paint->colour[0], paint->colour[1], paint->colour[2]);
+		gl.glUniform3f(_mesh_program.target, paint->target[0], paint->target[1], paint->target[2]);
+		gl.glUniform1f(_mesh_program.start, paint->start);
+		gl.glUniform1f(_mesh_program.fade, paint->fade);
+		gl.glUniform3f(_mesh_program.addon_colour, paint->addon_colour[0], paint->addon_colour[1], paint->addon_colour[2]);
+		gl.glUniform1f(_mesh_program.addon_start, paint->addon_start);
+		gl.glUniform3f(_mesh_program.tint, paint->tint[0], paint->tint[1], paint->tint[2]);
+		gl.glUniform3f(_mesh_program.rust_colour, paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2]);
+		gl.glUniform1f(_mesh_program.rust_time, paint->rust_time);
+		gl.glUniform1f(_mesh_program.rust_ramp, paint->rust_ramp);
+		const GLuint units[5] = {pc->detail, pc->detail_colours, pc->paint_mask, pc->addon_mask, pc->rust_mask};
+		for (int k = 0; k < 5; k++) {
+			if (units[k] == 0) continue;
+			gl.glActiveTexture(GL_TEXTURE0 + 1 + k);
+			gl.glBindTexture(GL_TEXTURE_2D, units[k]);
+		}
+		gl.glActiveTexture(GL_TEXTURE0);
+	};
 	auto draw_runs = [&](const Draw &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
 		const ThreeDGpuMatrix m = Multiply(to_card, d.mesh->matrix);
 		gl.glUniformMatrix4fv(_mesh_program.matrix, 1, GL_TRUE, m.data());
@@ -965,6 +1171,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
+			set_paint(r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}

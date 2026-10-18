@@ -784,8 +784,9 @@ struct ObjectPaintOfState {
 	bool coloured = false, whole = false;
 	Colour colour, target, rust_colour;
 	float start = 255.0f, fade = 0, rust_time = 0;
+	int level = 0;                                  ///< the level of detail of the textures and masks
 
-	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour) : obj(&obj), fade(fade), rust_time(rust_time)
+	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour) : obj(&obj), fade(fade), rust_time(rust_time), level(level)
 	{
 		const ThreeDVehiclePaint &paint = obj.paint;
 		this->coloured = paint.coloured || paint_colour != 0;
@@ -1397,142 +1398,101 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	return true;
 }
 
-/* The textures of the objects as the graphics card draws them (GpuTextureOf()): by the object, its state, the level,
- * the texture, its fade, rust, colour and tint; nullptr: nothing paints it, the object's own. */
-using GpuPaintKey = std::tuple<const ThreeDVehicleObject *, int, int, int, uint32_t, uint32_t, uint32_t, uint32_t>;
-static std::map<GpuPaintKey, std::shared_ptr<const ThreeDObjectTexture>> _gpu_painted;
-static std::set<GpuPaintKey> _gpu_painted_seen; ///< drawn since the last trimming (TrimThreeDEyePainted())
-static size_t _gpu_painted_bytes = 0;
-static std::mutex _gpu_painted_mutex;
-/** More painted than this, those not drawn since the last trimming are let go of at once. */
-static constexpr size_t GPU_PAINTED_KEPT = 256u * 1024 * 1024;
+/*
+ * The colours of the details of a vehicle's set as the graphics card paints them (ThreeDGpuPaint::detail_colours): by
+ * the set's colours, a picture of each mask index (a row) at each lightness (a column) -- the colour ShadeTrueColour()
+ * gives, or for a detail turned its turn, saturation and value --, as ObjectDetailPaint::Paint() picks the first detail
+ * of the index. Kept by the colours themselves; let go of when the objects are read anew.
+ */
+static std::vector<std::pair<TrueColourSet, std::shared_ptr<const ThreeDObjectTexture>>> _gpu_detail_colours;
+static std::mutex _gpu_detail_colours_mutex;
+
+/** The picture of the colours of the details of a set (_gpu_detail_colours), made the first time. */
+static std::shared_ptr<const ThreeDObjectTexture> GpuDetailColoursOf(const TrueColourSet &colours)
+{
+	std::lock_guard lock(_gpu_detail_colours_mutex);
+	for (const auto &[known, made] : _gpu_detail_colours) {
+		if (known == colours) return made;
+	}
+	auto t = std::make_shared<ThreeDObjectTexture>();
+	t->w = 256;
+	t->h = 256;
+	t->px.assign(256 * 256, 0);
+	std::vector<bool> taken(256, false);
+	for (const TrueColourRange &range : colours) {
+		for (uint m = range.first; m < range.first + TRUE_COLOUR_RANGE_SIZE && m < 256; m++) {
+			if (m == 0 || taken[m]) continue; // the first detail of an index paints it; 0 none
+			taken[m] = true;
+			uint32_t *row = &t->px[static_cast<size_t>(m) * 256];
+			if (range.hue) {
+				row[0] = Colour(static_cast<uint8_t>(range.hue_turn + 128), range.hue_sat, range.hue_val, 128).data;
+				for (int l = 1; l < 256; l++) row[l] = Colour(0, 0, 0, 128).data;
+				continue;
+			}
+			for (int l = 0; l < 256; l++) {
+				Colour c = ShadeTrueColour(range, static_cast<uint8_t>(l));
+				c.a = 255;
+				row[l] = c.data;
+			}
+		}
+	}
+	if (_gpu_detail_colours.size() > 64) _gpu_detail_colours.clear();
+	_gpu_detail_colours.emplace_back(colours, t);
+	return t;
+}
+
+/** The objects are read anew: the colours of their sets' details go with them. */
+static void ForgetGpuDetailColours()
+{
+	std::lock_guard lock(_gpu_detail_colours_mutex);
+	_gpu_detail_colours.clear();
+}
 
 /**
- * A texture of an object as the graphics card draws it (GpuRasterObject()): each texel painted as RasterObject()
- * paints a pixel over it -- the details in the vehicle's colours of its set, the body's paint faded, the add-ons'
- * colours, an effect's tint, the rust --, once for a state and a level, not at each pixel of each picture. A texture
- * nothing paints is the object's own. On either thread.
- * @param held keeps the painted texture while the picture is drawn
+ * How the graphics card paints a texture of an object as it draws it (GpuRasterObject()): as RasterObject() paints a
+ * pixel over it -- the details in the vehicle's colours of its set, the body's paint faded, the add-ons' colours, an
+ * effect's tint, the rust --, each texel on the card as it is drawn. It was painted on the processor once for each
+ * state, level and colour, a texture of a lorry tens of megabytes (the player, 18. 10.: "the paint on the card").
+ * @param held keeps the colours of the details while the picture is drawn
  */
-static const ThreeDObjectTexture *GpuTextureOf(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, const ThreeDVehicleState *st, int state, int level, int index, float fade, float rust_time, uint32_t paint_colour, uint32_t tint, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
+static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, const ThreeDVehicleState *st, int index, const ObjectPaintOfState &painted, const ObjectDetailPaint &details, uint32_t tint, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
 {
-	const ThreeDObjectTexture *raw = obj.GetTexture(level, index);
-	if (raw == nullptr) return nullptr;
-	const GpuPaintKey key(&obj, state, level, index, std::bit_cast<uint32_t>(fade), std::bit_cast<uint32_t>(rust_time), paint_colour, tint);
-	{
-		std::lock_guard lock(_gpu_painted_mutex);
-		auto it = _gpu_painted.find(key);
-		if (it != _gpu_painted.end()) {
-			_gpu_painted_seen.insert(key);
-			if (it->second == nullptr) return raw;
-			held.push_back(it->second);
-			return it->second.get();
-		}
+	ThreeDGpuPaint g;
+	auto rgb = [](Colour c) { return std::array<float, 3>{static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b)}; };
+	if (const ThreeDDetailMask *dm = details.MaskOf(index); dm != nullptr && details.colours != nullptr) {
+		std::shared_ptr<const ThreeDObjectTexture> lut = GpuDetailColoursOf(*details.colours);
+		g.detail = dm;
+		g.detail_colours = lut.get();
+		held.push_back(std::move(lut));
 	}
-	/* What paints it, as RasterObject() has it. */
-	const size_t textures = std::max<size_t>(1, whole.pngs.size());
-	std::vector<const ThreeDObjectTexture *> drawn(textures, nullptr);
-	drawn[static_cast<size_t>(index) < textures ? index : 0] = raw;
-	const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour);
-	const ObjectDetailPaint details(obj, whole, st, textures, drawn);
-	const ThreeDDetailMask *dm = details.MaskOf(index);
 	const bool body = index == 0;
-	const bool paints_body = body && (painted.mask != nullptr || painted.whole);
-	const bool rusts = body && painted.rust_mask != nullptr;
-	const ThreeDObjectTexture *addon_mask = nullptr;
-	Colour addon_colour;
-	float addon_start = 255.0f;
+	if (body && (painted.mask != nullptr || painted.whole)) {
+		g.body = true;
+		g.paint_mask = painted.mask;
+		g.coloured = painted.coloured;
+		g.colour = rgb(painted.colour);
+		g.target = rgb(painted.target);
+		g.start = painted.start;
+		g.fade = painted.fade;
+	}
 	const int a = static_cast<size_t>(index) < whole.tex_addon.size() ? whole.tex_addon[index] : -1;
 	if (a >= 0 && st != nullptr && static_cast<size_t>(a) < st->addon_colours.size() && st->addon_colours[a] != 0) {
-		addon_mask = obj.GetAddonMask(a, level);
-		addon_colour = Colour(st->addon_colours[a]);
-		addon_start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
+		g.addon_mask = obj.GetAddonMask(a, painted.level);
+		g.addon_colour = rgb(Colour(st->addon_colours[a]));
+		g.addon_start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
 	}
-	const bool tinted = tint != 0 && static_cast<size_t>(index) < whole.tex_names.size() && whole.tex_names[index] == obj.tint_material;
-	const Colour tint_colour(tint);
-	std::shared_ptr<ThreeDObjectTexture> t;
-	if (dm != nullptr || paints_body || rusts || addon_mask != nullptr || tinted) {
-		t = std::make_shared<ThreeDObjectTexture>();
-		t->w = raw->w;
-		t->h = raw->h;
-		t->px.assign(raw->px.size(), 0);
-		for (int y = 0; y < raw->h; y++) {
-			const float v = (y + 0.5f) / raw->h;
-			for (int x = 0; x < raw->w; x++) {
-				const size_t at = static_cast<size_t>(y) * raw->w + x;
-				const uint32_t texel = raw->px[at];
-				if (texel == 0) continue; // a hole in the texture
-				const float u = (x + 0.5f) / raw->w;
-				const Colour col(texel);
-				float cr = col.r, cg = col.g, cb = col.b;
-				const bool by_detail = dm != nullptr && details.Paint(dm, u, v, cr, cg, cb);
-				if (body && !by_detail) painted.Paint(u, v, cr, cg, cb);
-				if (!by_detail && addon_mask != nullptr) {
-					const int mx = std::min(addon_mask->w - 1, static_cast<int>(u * addon_mask->w)), my = std::min(addon_mask->h - 1, static_cast<int>(v * addon_mask->h));
-					const float m = Colour(addon_mask->px[static_cast<size_t>(my) * addon_mask->w + mx]).r / 255.0f;
-					if (m > 0) {
-						const float l = std::max({cr, cg, cb}) / addon_start;
-						cr += (std::min(255.0f, addon_colour.r * l) - cr) * m;
-						cg += (std::min(255.0f, addon_colour.g * l) - cg) * m;
-						cb += (std::min(255.0f, addon_colour.b * l) - cb) * m;
-					}
-				}
-				if (tinted) {
-					cr = cr * tint_colour.r / 255.0f;
-					cg = cg * tint_colour.g / 255.0f;
-					cb = cb * tint_colour.b / 255.0f;
-				}
-				if (body) painted.Rust(u, v, cr, cg, cb);
-				Colour c(static_cast<uint8_t>(std::min(255.0f, cr)), static_cast<uint8_t>(std::min(255.0f, cg)), static_cast<uint8_t>(std::min(255.0f, cb)), col.a);
-				if (c.data == 0) c.a = 1; // painted black, not a hole
-				t->px[at] = c.data;
-			}
-		}
+	if (tint != 0 && static_cast<size_t>(index) < whole.tex_names.size() && whole.tex_names[index] == obj.tint_material) {
+		g.tinted = true;
+		g.tint = rgb(Colour(tint));
 	}
-	std::lock_guard lock(_gpu_painted_mutex);
-	auto [it, added] = _gpu_painted.emplace(key, std::move(t));
-	_gpu_painted_seen.insert(key);
-	if (added && it->second != nullptr) {
-		_gpu_painted_bytes += it->second->px.size() * sizeof(uint32_t);
-		if (_gpu_painted_bytes > GPU_PAINTED_KEPT) {
-			/* Too much at once (a town of vehicles of many states made in one go): those not drawn since the last trimming go now. */
-			for (auto e = _gpu_painted.begin(); e != _gpu_painted.end();) {
-				if (_gpu_painted_seen.contains(e->first) || e->second == nullptr) {
-					++e;
-					continue;
-				}
-				_gpu_painted_bytes -= e->second->px.size() * sizeof(uint32_t);
-				e = _gpu_painted.erase(e);
-			}
-		}
+	if (body && painted.rust_mask != nullptr) {
+		g.rust_mask = painted.rust_mask;
+		g.rust_colour = rgb(painted.rust_colour);
+		g.rust_time = painted.rust_time;
+		g.rust_ramp = obj.rust.ramp;
+		g.rust_gradual = obj.rust.gradual;
 	}
-	if (it->second == nullptr) return raw;
-	held.push_back(it->second);
-	return it->second.get();
-}
-
-/** Between the frames: the textures painted for the card not drawn since the last time let go of (TrimThreeDEyePainted()). */
-static void TrimGpuPainted()
-{
-	std::lock_guard lock(_gpu_painted_mutex);
-	for (auto it = _gpu_painted.begin(); it != _gpu_painted.end();) {
-		if (_gpu_painted_seen.contains(it->first)) {
-			++it;
-			continue;
-		}
-		if (it->second != nullptr) _gpu_painted_bytes -= it->second->px.size() * sizeof(uint32_t);
-		it = _gpu_painted.erase(it);
-	}
-	_gpu_painted_seen.clear();
-}
-
-/** The objects are read anew: their textures painted for the card go with them. */
-static void ForgetGpuPainted()
-{
-	std::lock_guard lock(_gpu_painted_mutex);
-	_gpu_painted.clear();
-	_gpu_painted_seen.clear();
-	_gpu_painted_bytes = 0;
+	return g;
 }
 
 /** The extent of all the corners of a shape: x0, x1, y0, y1, z0, z1 (ThreeDVehicleShape::all, else counted). */
@@ -1630,9 +1590,16 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 		box(whole, vehicle_to);
 		int level = 0;
 		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
+		/* Its textures as they are, painted by the card as they are drawn (GpuPaintOf()). */
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
-			if (m.triangles->used[i]) m.textures[i] = GpuTextureOf(obj, whole, st, state, level, static_cast<int>(i), fade, rust_time, paint_colour, tint, held);
+			if (m.triangles->used[i]) m.textures[i] = obj.GetTexture(level, static_cast<int>(i));
+		}
+		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour);
+		const ObjectDetailPaint details(obj, whole, st, std::max<size_t>(1, whole.pngs.size()), m.textures);
+		m.paints.resize(m.textures.size());
+		for (size_t i = 0; i < m.textures.size(); i++) {
+			if (m.textures[i] != nullptr) m.paints[i] = GpuPaintOf(obj, whole, st, static_cast<int>(i), painted, details, tint, held);
 		}
 	}
 	/* The crew that walks: each figure the state shows at its frame of the way gone, turned, sized and stood at its
@@ -2771,7 +2738,7 @@ static void ForgetEyePainted()
 	_eye_painted_seen.clear();
 	_eye_painted_plain.clear();
 	_eye_trails.clear();
-	ForgetGpuPainted();
+	ForgetGpuDetailColours();
 }
 
 /**
@@ -2792,7 +2759,6 @@ void TrimThreeDEyePainted()
 	}
 	_eye_painted_seen.clear();
 	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB painted for the view from the eyes and not drawn let go of", freed / (1024.0 * 1024.0));
-	TrimGpuPainted();
 }
 
 /** The level of detail of an object's textures for the view from the eyes: about a texel to a pixel. */

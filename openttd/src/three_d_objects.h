@@ -446,6 +446,7 @@ struct ThreeDDetailMask {
 	int w = 0;
 	int h = 0;
 	std::vector<uint8_t> index; ///< each pixel's mask index
+	ThreeDUniqueId uid; ///< for the graphics card (three_d_gpu.cpp)
 
 	/** The mask index at u, v of the texture, the nearest pixel's. */
 	uint8_t At(float u, float v) const

@@ -30,6 +30,7 @@
 
 struct ThreeDVehicleShape;
 struct ThreeDObjectTexture;
+struct ThreeDDetailMask;
 
 /** A 4x4 matrix, rows first: a point (x, y, z, 1) of a shape to the picture's (x, y pixels, z depth, 1). */
 using ThreeDGpuMatrix = std::array<float, 16>;
@@ -54,6 +55,37 @@ struct ThreeDGpuTriangles {
 
 std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, uint64_t parts, bool vehicle, size_t textures);
 
+/**
+ * How the card paints a texture's texels as it draws them -- as RasterObject() paints them on the processor, each step
+ * only where it has what it needs: the details in the vehicle's colours of its set (a detail's mask index, and the
+ * colours of its indices: detail_colours), the body's paint coloured and faded, an add-on's colour, an effect's tint,
+ * the rust. Colours 0-255. The masks are a level of detail as the texture, their grey in the red; the textures drawn
+ * as they are when nothing paints them.
+ */
+struct ThreeDGpuPaint {
+	const ThreeDDetailMask *detail = nullptr;      ///< the mask index of each texel, nullptr: no details painted
+	/** By mask index (the rows) the detail's colour at each lightness (the columns), its alpha 255; a detail turned
+	 * (ShiftTrueColourHue()) alpha 128 and in its first texel its turn + 128, its saturation and value; else alpha 0. */
+	const ThreeDObjectTexture *detail_colours = nullptr;
+	bool body = false;                                    ///< the body's paint: where paint_mask is grey, or all of it
+	const ThreeDObjectTexture *paint_mask = nullptr;
+	bool coloured = false;                                ///< the paint's colour at the texture's lightness (start)
+	std::array<float, 3> colour{}, target{};              ///< the paint's colour; what it fades to
+	float start = 255, fade = 0;
+	const ThreeDObjectTexture *addon_mask = nullptr;      ///< an add-on's colour where it is grey, nullptr none
+	std::array<float, 3> addon_colour{};
+	float addon_start = 255;
+	bool tinted = false;                                  ///< multiplied by tint (an effect's colour)
+	std::array<float, 3> tint{};
+	const ThreeDObjectTexture *rust_mask = nullptr;       ///< the rust where it is grey, nullptr none
+	std::array<float, 3> rust_colour{};
+	float rust_time = 0, rust_ramp = 1;
+	bool rust_gradual = false;                            ///< the grey is when it starts (else how much)
+
+	/** Whether it paints anything. */
+	bool Any() const { return this->detail != nullptr || this->body || this->addon_mask != nullptr || this->tinted || this->rust_mask != nullptr; }
+};
+
 /** A shape drawn into a picture on the card. */
 struct ThreeDGpuMesh {
 	const ThreeDVehicleShape *shape = nullptr;
@@ -61,7 +93,8 @@ struct ThreeDGpuMesh {
 	ThreeDGpuMatrix matrix{};           ///< its corners to the picture
 	std::array<float, 3> light{};       ///< n . light is the light's angle at a corner of normal n (0.55 + 0.45 max(0, n . light))
 	bool lit = false;                   ///< lit by its normals; else as its texture is
-	std::vector<const ThreeDObjectTexture *> textures; ///< by texture index, painted as drawn; nullptr: those triangles not drawn
+	std::vector<const ThreeDObjectTexture *> textures; ///< by texture index, as they are; nullptr: those triangles not drawn
+	std::vector<ThreeDGpuPaint> paints; ///< by texture index, how it is painted as drawn; empty or shorter: as it is
 };
 
 /** A triangle of the glass of a light on at night, placed on the picture already: drawn in its colour, marked lit. */
