@@ -1,0 +1,4185 @@
+[
+ {
+  "druh": "doplnek",
+  "jmeno": "bouda_99914b93",
+  "soubor": "bouda_99914b93.glb",
+  "nazev": {
+   "cs": "psí bouda"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.52,
+    0.52
+   ],
+   "y": [
+    -0.42,
+    0.42
+   ],
+   "z": [
+    0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 64,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (psí bouda): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_12825a67",
+  "soubor": "drivi_12825a67.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.4,
+    1.4
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 2.4,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_bea240e1",
+  "soubor": "drivi_bea240e1.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.5,
+    1.5
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 2.6,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "drivi_f294556a",
+  "soubor": "drivi_f294556a.glb",
+  "nazev": {
+   "cs": "dříví"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.7,
+    1.7
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "delka": 3.0,
+   "vyska": 1.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (dříví): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "gril_090fce5f",
+  "soubor": "gril_090fce5f.glb",
+  "nazev": {
+   "cs": "gril"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.02,
+    1.02
+   ],
+   "y": [
+    -0.45,
+    0.45
+   ],
+   "z": [
+    -0.0,
+    1.07
+   ]
+  },
+  "trojuhelniku": 304,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "drevo": false,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (gril): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "houpacka_43f0baaf",
+  "soubor": "houpacka_43f0baaf.glb",
+  "nazev": {
+   "cs": "houpačka"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.73,
+    0.73
+   ],
+   "y": [
+    -1.34,
+    1.34
+   ],
+   "z": [
+    -0.01,
+    2.23
+   ]
+  },
+  "trojuhelniku": 156,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (houpačka): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "klepac_5c888211",
+  "soubor": "klepac_5c888211.glb",
+  "nazev": {
+   "cs": "klepač s kobercem"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.06,
+    0.06
+   ],
+   "y": [
+    -1.23,
+    1.23
+   ],
+   "z": [
+    0.0,
+    1.75
+   ]
+  },
+  "trojuhelniku": 84,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "koberec": true,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (klepač s kobercem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "klepac_7ee4f811",
+  "soubor": "klepac_7ee4f811.glb",
+  "nazev": {
+   "cs": "klepač s kobercem"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.23,
+    1.23
+   ],
+   "y": [
+    -0.06,
+    0.06
+   ],
+   "z": [
+    0.0,
+    1.75
+   ]
+  },
+  "trojuhelniku": 84,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "koberec": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (klepač s kobercem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kocarek_99914b93",
+  "soubor": "kocarek_99914b93.glb",
+  "nazev": {
+   "cs": "kočárek"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.49,
+    0.74
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.02,
+    1.02
+   ]
+  },
+  "trojuhelniku": 192,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kočárek): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_038040d2",
+  "soubor": "kolo_038040d2.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.23,
+    0.37
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": 4.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_048fbdb5",
+  "soubor": "kolo_048fbdb5.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.09,
+    0.5
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_37c6e2ff",
+  "soubor": "kolo_37c6e2ff.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.98,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barva": "kolo_cerne",
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_3a59c233",
+  "soubor": "kolo_3a59c233.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_4018d096",
+  "soubor": "kolo_4018d096.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.98,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": true,
+   "kosik": true,
+   "naklon": -12.0,
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_49085622",
+  "soubor": "kolo_49085622.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "barva": "kolo_cerne",
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_4be4d17e",
+  "soubor": "kolo_4be4d17e.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": true,
+   "kosik": true,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_4cf7c94b",
+  "soubor": "kolo_4cf7c94b.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.23,
+    0.37
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_cerne",
+   "damske": false,
+   "kosik": false,
+   "naklon": 4.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_55df485a",
+  "soubor": "kolo_55df485a.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.98
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barva": "kolo_cerne",
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_57d03b18",
+  "soubor": "kolo_57d03b18.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": true,
+   "kosik": true,
+   "naklon": 12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_5ba1ec71",
+  "soubor": "kolo_5ba1ec71.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": true,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_5f806ab9",
+  "soubor": "kolo_5f806ab9.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_63c7cbcb",
+  "soubor": "kolo_63c7cbcb.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.98
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": true,
+   "kosik": true,
+   "naklon": 12.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_706ec1ed",
+  "soubor": "kolo_706ec1ed.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.09,
+    0.5
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_925c17af",
+  "soubor": "kolo_925c17af.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.23,
+    0.37
+   ],
+   "y": [
+    -0.97,
+    0.98
+   ],
+   "z": [
+    -0.02,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_cervene",
+   "damske": false,
+   "kosik": false,
+   "naklon": 4.0,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_ebe31bd3",
+  "soubor": "kolo_ebe31bd3.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.5,
+    0.09
+   ],
+   "y": [
+    -0.98,
+    0.97
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_cerne",
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0,
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_fdb39a81",
+  "soubor": "kolo_fdb39a81.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.98,
+    0.97
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": -12.0,
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kolo_ff741add",
+  "soubor": "kolo_ff741add.glb",
+  "nazev": {
+   "cs": "kolo"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.98
+   ],
+   "y": [
+    -0.5,
+    0.09
+   ],
+   "z": [
+    -0.02,
+    1.07
+   ]
+  },
+  "trojuhelniku": 1084,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "barva": "kolo_zelene",
+   "damske": false,
+   "kosik": false,
+   "naklon": 12.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (kolo): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "konev_99914b93",
+  "soubor": "konev_99914b93.glb",
+  "nazev": {
+   "cs": "konev"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.13,
+    0.37
+   ],
+   "y": [
+    -0.12,
+    0.12
+   ],
+   "z": [
+    0.0,
+    0.37
+   ]
+  },
+  "trojuhelniku": 60,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (konev): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kos_99914b93",
+  "soubor": "kos_99914b93.glb",
+  "nazev": {
+   "cs": "koš"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.27,
+    0.27
+   ],
+   "y": [
+    -0.27,
+    0.27
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (koš): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kralikarna_99914b93",
+  "soubor": "kralikarna_99914b93.glb",
+  "nazev": {
+   "cs": "králíkárna"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.0,
+    1.0
+   ],
+   "y": [
+    -0.45,
+    0.5
+   ],
+   "z": [
+    0.0,
+    1.48
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (králíkárna): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lavicka_99914b93",
+  "soubor": "lavicka_99914b93.glb",
+  "nazev": {
+   "cs": "lavička"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.24,
+    0.2
+   ],
+   "y": [
+    -0.8,
+    0.8
+   ],
+   "z": [
+    0.0,
+    0.86
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 25,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lavička): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_01361913",
+  "soubor": "lehatko_01361913.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_022d26bc",
+  "soubor": "lehatko_022d26bc.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_763dd1a8",
+  "soubor": "lehatko_763dd1a8.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.32,
+    0.32
+   ],
+   "y": [
+    -0.81,
+    0.68
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "uhel": -1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_ba85bfb9",
+  "soubor": "lehatko_ba85bfb9.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_d2e98c0f",
+  "soubor": "lehatko_d2e98c0f.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lehatko_fcc5460f",
+  "soubor": "lehatko_fcc5460f.glb",
+  "nazev": {
+   "cs": "lehátko"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.81,
+    0.68
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    -0.02,
+    0.95
+   ]
+  },
+  "trojuhelniku": 200,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (lehátko): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_4f7517d6",
+  "soubor": "paleta_4f7517d6.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.14
+   ]
+  },
+  "trojuhelniku": 48,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "naklad": null,
+   "seed": 1
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_a5134b92",
+  "soubor": "paleta_a5134b92.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.96
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "kartony",
+   "seed": 2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_a8c4122a",
+  "soubor": "paleta_a8c4122a.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.95
+   ]
+  },
+  "trojuhelniku": 108,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "bedny",
+   "seed": 1
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "paleta_b77a6775",
+  "soubor": "paleta_b77a6775.glb",
+  "nazev": {
+   "cs": "paleta"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.6
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    0.0,
+    0.72
+   ]
+  },
+  "trojuhelniku": 120,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "naklad": "pytle",
+   "seed": 3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (paleta): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popelnice_53d21dfb",
+  "soubor": "popelnice_53d21dfb.glb",
+  "nazev": {
+   "cs": "popelnice"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.3,
+    0.92
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.0,
+    1.05
+   ]
+  },
+  "trojuhelniku": 680,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "n": 2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (popelnice): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popelnice_6994da60",
+  "soubor": "popelnice_6994da60.glb",
+  "nazev": {
+   "cs": "popelnice"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.3,
+    1.54
+   ],
+   "y": [
+    -0.29,
+    0.29
+   ],
+   "z": [
+    0.0,
+    1.05
+   ]
+  },
+  "trojuhelniku": 1020,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "n": 3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (popelnice): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "rudl_43f0baaf",
+  "soubor": "rudl_43f0baaf.glb",
+  "nazev": {
+   "cs": "rudl"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.29,
+    0.29
+   ],
+   "y": [
+    -0.44,
+    0.25
+   ],
+   "z": [
+    -0.03,
+    1.18
+   ]
+  },
+  "trojuhelniku": 132,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (rudl): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_022cb583",
+  "soubor": "slunecnik_022cb583.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.8,
+    0.02
+   ],
+   "y": [
+    -1.09,
+    1.01
+   ],
+   "z": [
+    -0.01,
+    2.16
+   ]
+  },
+  "trojuhelniku": 180,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_zluta"
+   ],
+   "lem": 0.0,
+   "n": 10,
+   "naklon": 0.5,
+   "noha": null,
+   "r": 1.05,
+   "smer": 3.185398163397448,
+   "tyc": "drevo_svetle",
+   "v": 2.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_161457d6",
+  "soubor": "slunecnik_161457d6.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.93,
+    0.93
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.0,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_1a095515",
+  "soubor": "slunecnik_1a095515.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_1f170538",
+  "soubor": "slunecnik_1f170538.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zelena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_245fddce",
+  "soubor": "slunecnik_245fddce.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_2b65e73a",
+  "soubor": "slunecnik_2b65e73a.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.17,
+    0.23
+   ],
+   "y": [
+    -0.07,
+    0.07
+   ],
+   "z": [
+    -0.39,
+    0.51
+   ]
+  },
+  "trojuhelniku": 116,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 9,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_zluta"
+   ],
+   "lem": 0.0,
+   "n": 6,
+   "naklon": 0.4,
+   "noha": null,
+   "r": 0.07,
+   "tyc": "drevo_svetle",
+   "v": 0.13
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_36118142",
+  "soubor": "slunecnik_36118142.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_3b6f58f4",
+  "soubor": "slunecnik_3b6f58f4.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.93,
+    0.93
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.0,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_3ba4e905",
+  "soubor": "slunecnik_3ba4e905.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_46ba321c",
+  "soubor": "slunecnik_46ba321c.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.64,
+    0.79
+   ],
+   "y": [
+    -0.79,
+    1.64
+   ],
+   "z": [
+    -0.01,
+    2.5
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.3,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 2.356194490192345,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_5a26973b",
+  "soubor": "slunecnik_5a26973b.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.41
+   ]
+  },
+  "trojuhelniku": 244,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": null,
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.0
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_62a7fa44",
+  "soubor": "slunecnik_62a7fa44.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.93,
+    0.93
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.0,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_67941f14",
+  "soubor": "slunecnik_67941f14.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_6a5c96df",
+  "soubor": "slunecnik_6a5c96df.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_90464377",
+  "soubor": "slunecnik_90464377.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -0.47,
+    1.86
+   ],
+   "z": [
+    -0.01,
+    2.46
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.35,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 1.5707963267948966,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_9629fc51",
+  "soubor": "slunecnik_9629fc51.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_9ac36a5a",
+  "soubor": "slunecnik_9ac36a5a.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_a13ff92f",
+  "soubor": "slunecnik_a13ff92f.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_ruzova",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_a5e7a2a1",
+  "soubor": "slunecnik_a5e7a2a1.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_a62d19ef",
+  "soubor": "slunecnik_a62d19ef.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_oranz",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_a795cc10",
+  "soubor": "slunecnik_a795cc10.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.8,
+    0.8
+   ],
+   "y": [
+    -0.8,
+    0.8
+   ],
+   "z": [
+    0.0,
+    2.31
+   ]
+  },
+  "trojuhelniku": 268,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "kriz",
+   "r": 0.85,
+   "tyc": "drevo_tm",
+   "v": 1.9
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ac8e0e0f",
+  "soubor": "slunecnik_ac8e0e0f.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zelena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ad6a1ccb",
+  "soubor": "slunecnik_ad6a1ccb.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_b31cffe8",
+  "soubor": "slunecnik_b31cffe8.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.93,
+    0.93
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_zelena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.0,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ba6e9b27",
+  "soubor": "slunecnik_ba6e9b27.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_bdbb7d71",
+  "soubor": "slunecnik_bdbb7d71.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_112a6746",
+  "soubor": "slunecnik_ctverec_112a6746.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.91,
+    0.91
+   ],
+   "y": [
+    -0.91,
+    0.91
+   ],
+   "z": [
+    0.0,
+    2.74
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 0.9,
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_72c120fd",
+  "soubor": "slunecnik_ctverec_72c120fd.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.26,
+    1.26
+   ],
+   "y": [
+    -1.26,
+    1.26
+   ],
+   "z": [
+    0.0,
+    2.74
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.25,
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_83e1802e",
+  "soubor": "slunecnik_ctverec_83e1802e.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    2.84
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.2,
+   "v": 2.4
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_90a028fb",
+  "soubor": "slunecnik_ctverec_90a028fb.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    2.84
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zelena",
+    "sl_bila"
+   ],
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.2,
+   "v": 2.4
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ctverec_aaf64960",
+  "soubor": "slunecnik_ctverec_aaf64960.glb",
+  "nazev": {
+   "cs": "čtvercový slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.26,
+    1.26
+   ],
+   "y": [
+    -1.26,
+    1.26
+   ],
+   "z": [
+    0.0,
+    2.74
+   ]
+  },
+  "trojuhelniku": 284,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_zelena",
+    "sl_bila"
+   ],
+   "lem": 0.22,
+   "noha": "kriz",
+   "s": 1.25,
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (čtvercový slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_d1498d43",
+  "soubor": "slunecnik_d1498d43.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 0.95,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_d706c753",
+  "soubor": "slunecnik_d706c753.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_d7a34560",
+  "soubor": "slunecnik_d7a34560.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.3,
+    1.3
+   ],
+   "y": [
+    -1.3,
+    1.3
+   ],
+   "z": [
+    0.0,
+    2.81
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.4
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_dd4f1171",
+  "soubor": "slunecnik_dd4f1171.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.64,
+    0.79
+   ],
+   "y": [
+    -1.64,
+    0.79
+   ],
+   "z": [
+    -0.01,
+    2.5
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.3,
+   "noha": "beton",
+   "r": 1.3,
+   "smer": 3.9269908169872414,
+   "tyc": "drevo_tm",
+   "v": 2.2
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ddb389fc",
+  "soubor": "slunecnik_ddb389fc.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.16,
+    1.16
+   ],
+   "y": [
+    -1.16,
+    1.16
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.25,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_e0c43325",
+  "soubor": "slunecnik_e0c43325.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_tyrkys",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_e50a5a74",
+  "soubor": "slunecnik_e50a5a74.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.03,
+    1.03
+   ],
+   "y": [
+    -1.03,
+    1.03
+   ],
+   "z": [
+    0.0,
+    2.71
+   ]
+  },
+  "trojuhelniku": 288,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_cervena",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 8,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.1,
+   "tyc": "drevo_tm",
+   "v": 2.3
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_ef49e3ef",
+  "soubor": "slunecnik_ef49e3ef.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_zluta",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "slunecnik_fbb46815",
+  "soubor": "slunecnik_fbb46815.glb",
+  "nazev": {
+   "cs": "slunečník"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.34,
+    1.34
+   ],
+   "y": [
+    -1.41,
+    1.41
+   ],
+   "z": [
+    0.0,
+    2.91
+   ]
+  },
+  "trojuhelniku": 344,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    "sl_modra",
+    "sl_bila"
+   ],
+   "lem": 0.18,
+   "n": 10,
+   "naklon": 0.0,
+   "noha": "beton",
+   "r": 1.4,
+   "tyc": "drevo_tm",
+   "v": 2.5
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (slunečník): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stojan_destniku_a0180099",
+  "soubor": "stojan_destniku_a0180099.glb",
+  "nazev": {
+   "cs": "stojan s deštníky"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.18
+   ],
+   "y": [
+    -0.19,
+    0.18
+   ],
+   "z": [
+    0.0,
+    1.17
+   ]
+  },
+  "trojuhelniku": 492,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 6,
+  "tvar": {
+   "barvy": [
+    [
+     "destnik_cerny"
+    ],
+    [
+     "sl_cervena"
+    ],
+    [
+     "sl_modra"
+    ],
+    [
+     "destnik_cerny"
+    ]
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stojan s deštníky): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stojan_destniku_b5ec556a",
+  "soubor": "stojan_destniku_b5ec556a.glb",
+  "nazev": {
+   "cs": "stojan s deštníky"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.18
+   ],
+   "y": [
+    -0.19,
+    0.18
+   ],
+   "z": [
+    0.0,
+    1.17
+   ]
+  },
+  "trojuhelniku": 492,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "barvy": [
+    [
+     "sl_cervena",
+     "sl_bila"
+    ],
+    [
+     "sl_modra"
+    ],
+    [
+     "sl_zluta"
+    ],
+    [
+     "destnik_cerny"
+    ]
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stojan s deštníky): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_04e5f008",
+  "soubor": "stolek_kavarna_04e5f008.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.6
+   ],
+   "y": [
+    -0.85,
+    0.85
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    60,
+    180,
+    300
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_175b81c4",
+  "soubor": "stolek_kavarna_175b81c4.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.36,
+    0.36
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_17c02871",
+  "soubor": "stolek_kavarna_17c02871.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_398776c2",
+  "soubor": "stolek_kavarna_398776c2.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    270,
+    90
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_3c93aa8c",
+  "soubor": "stolek_kavarna_3c93aa8c.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.85,
+    0.85
+   ],
+   "y": [
+    -0.6,
+    0.6
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    150,
+    -30
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_3d216658",
+  "soubor": "stolek_kavarna_3d216658.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.54,
+    0.54
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    295,
+    115
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_7434ee83",
+  "soubor": "stolek_kavarna_7434ee83.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.6,
+    0.88
+   ],
+   "y": [
+    -0.85,
+    0.85
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    120,
+    240
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_8347ab5e",
+  "soubor": "stolek_kavarna_8347ab5e.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.4,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_a0ef44a9",
+  "soubor": "stolek_kavarna_a0ef44a9.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_b20d1261",
+  "soubor": "stolek_kavarna_b20d1261.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.38
+   ],
+   "y": [
+    -0.88,
+    0.38
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "drevo_svetle",
+   "hrnky": true,
+   "r": 0.38,
+   "uhly": [
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_bbbc6626",
+  "soubor": "stolek_kavarna_bbbc6626.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.36
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_cfed3188",
+  "soubor": "stolek_kavarna_cfed3188.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.88,
+    0.4
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d34c0817",
+  "soubor": "stolek_kavarna_d34c0817.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.9,
+    0.9
+   ],
+   "y": [
+    -0.41,
+    0.41
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    195,
+    15
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d3becd19",
+  "soubor": "stolek_kavarna_d3becd19.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.9,
+    0.9
+   ],
+   "y": [
+    -0.41,
+    0.41
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    345,
+    165
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d3c6f580",
+  "soubor": "stolek_kavarna_d3c6f580.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.33,
+    0.33
+   ],
+   "y": [
+    -0.89,
+    0.89
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.33,
+   "uhly": [
+    95,
+    -85
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_d4a5015b",
+  "soubor": "stolek_kavarna_d4a5015b.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.75,
+    0.75
+   ],
+   "y": [
+    -0.75,
+    0.75
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.36,
+   "uhly": [
+    45,
+    225
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_dc02192d",
+  "soubor": "stolek_kavarna_dc02192d.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.4,
+    0.88
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 4,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    0,
+    90,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_dc122b33",
+  "soubor": "stolek_kavarna_dc122b33.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.4
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 628,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.4,
+   "uhly": [
+    90,
+    180,
+    270
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_efa2faa2",
+  "soubor": "stolek_kavarna_efa2faa2.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 8,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.35,
+   "uhly": [
+    0,
+    180
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stolek_kavarna_f7126baf",
+  "soubor": "stolek_kavarna_f7126baf.glb",
+  "nazev": {
+   "cs": "stolek se židlemi"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.88,
+    0.88
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 468,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "deska": "bila",
+   "hrnky": true,
+   "r": 0.35,
+   "uhly": [
+    180,
+    0
+   ]
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "sud_99914b93",
+  "soubor": "sud_99914b93.glb",
+  "nazev": {
+   "cs": "sud"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.32,
+    0.32
+   ],
+   "y": [
+    -0.32,
+    0.32
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 280,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 5,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (sud): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "susak_2303bdbe",
+  "soubor": "susak_2303bdbe.glb",
+  "nazev": {
+   "cs": "sušák s prádlem"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.31,
+    0.31
+   ],
+   "y": [
+    -0.51,
+    0.51
+   ],
+   "z": [
+    -0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 100,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "seed": 2,
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (sušák s prádlem): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "vozik_zmrzlina_43f0baaf",
+  "soubor": "vozik_zmrzlina_43f0baaf.glb",
+  "nazev": {
+   "cs": "vozík se zmrzlinou"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.89,
+    1.25
+   ],
+   "z": [
+    0.0,
+    2.61
+   ]
+  },
+  "trojuhelniku": 504,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 1.5707963267948966
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (vozík se zmrzlinou): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "vzv_8f502b22",
+  "soubor": "vzv_8f502b22.glb",
+  "nazev": {
+   "cs": "vysokozdvižný vozík"
+  },
+  "rozmer_m": {
+   "x": [
+    -1.7,
+    1.05
+   ],
+   "y": [
+    -0.56,
+    0.56
+   ],
+   "z": [
+    0.01,
+    2.49
+   ]
+  },
+  "trojuhelniku": 420,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {
+   "uhel": 3.141592653589793
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (vysokozdvižný vozík): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "zidle_f3b274b6",
+  "soubor": "zidle_f3b274b6.glb",
+  "nazev": {
+   "cs": "židle"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.26,
+    0.2
+   ],
+   "y": [
+    -0.2,
+    0.2
+   ],
+   "z": [
+    -0.0,
+    0.88
+   ]
+  },
+  "trojuhelniku": 96,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 2,
+  "tvar": {
+   "m": "kov",
+   "sedak": "drevo_tm"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (židle): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci a bez barev číslem"
+ }
+]
