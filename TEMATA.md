@@ -43,6 +43,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Opravená chyba: **textury postav** (holky, Mat, posádka, čarodějnice) se brala v plné velikosti 1024×1024 i na
   obrázek pár pixelů – velikost textury se hledala v tvaru, který postava se snímky nemá. Textury vozidel v rigu
   26,8 → 10,9 MB.
+- Hráč: *„funguje to dobře, dal jsem nový winlator. ten starý neměl opengl hotové. nech implicitně zapnuto gpu“* –
+  příčina pádů byl starý Winlator bez hotového OpenGL; karta zůstává výchozí zapnutá, deník a hlídač zůstávají.
 
 ## 18. 10. – pohled z první osoby
 
