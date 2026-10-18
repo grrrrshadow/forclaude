@@ -27,6 +27,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 18. 10. – kolegovy open world domy ve hře; GPU 1–6 odsouhlaseno
+
+- Kolega (grrrrf `44fa5ac`, `hra/3d/DOMY-OPEN-WORLD-PRO-HRU.md`): všech 39 domů přepečených s uličkou 1,5 m u každého
+  okraje, dveře dosažitelné z ulice, branky otevřené; slunečníky, stolky, lavičky, kola… vyňaté do nové sady
+  `objekty/doplnky` (111 kousků); `okraje_textur` 16; gltfpack; stadiony `interier: false` + průchody; akce
+  nového stadionu rozmístěná (rožeň nad grilem, Tatra na hřišti, Mat u stánku PIVO, holky u stolků).
+- `e48bfb9`: převzato do sady hry. **Holky meritko 1** (kolega měl všude 2 – velikost holek je hráčova). Kolegovi
+  `hra/3d/DOMY-OPEN-WORLD-PREVZATO.md`. Rig: město a stadion s doplňky v pořádku.
+- `8addc3d`: `okraje_textur` – soubory se značkou se nepřepočítávají ani nevyplňují (obraz stejný na pixel).
+- Hráč odsouhlasil GPU body 1–6 (lak na kartě, domy, pohled z očí a kabina, kosti, terén otočeného pohledu, obraz
+  bez stahování zpět). Pořadí 3 → 1 → 2 → 4 → 5 → 6. Hráč pošle výstup `test3d gpu` z telefonu.
+
 ## 18. 10. – auta po nákupu připravená, ne až při výjezdu z depa
 
 - Hráč: „auta načítat po nákupu, ne až když vyjede z depa… jezdí chvíli neviditelný… náhled zachovat a používat“.
@@ -57,7 +69,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Tatry** (`ridi`); řidiči později v konfigurátoru. Doplňky už hra umí. Open world: ulička 3 m (1,5 m u okraje),
   stadion `interier: false` + mezery + `pruchody`.
 - **Hra dodělá (hráč 18. 10.: „běž dělat kvantování a co je potřeba“):** ~~čtení `KHR_mesh_quantization`~~ hotovo,
-  značka `okraje_textur` (přeskočit vyplňování), masky podle materiálu, `interier_<díl>` jen z kabiny, LOD uzly,
+  ~~značka `okraje_textur`~~ hotovo, masky podle materiálu, `interier_<díl>` jen z kabiny, LOD uzly,
   stojící Tatra v `akce` (záznam + sada).
 
 ## 18. 10. – myš podruhé: ukazatel se zase vrací, ale pod ClipCursor (build #284: naráží na kraj okna)
