@@ -33,7 +33,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Kolegovi `hra/3d/PROSBA-CARODEJNICE.md`: 2–3 čarodějnice na koštěti, model ve skutečných metrech jako holky,
   v indexu `meritko` 2 (holky na zastávce kreslí hra dvakrát), let jako animace `let_NN` jako létající draci,
   co svítí pod uzlem `noc`.
-- Hra: kolik jich a kudy létají – domluvit s hráčem, pak kódovat.
+- Hráč: *„kolem lucerny chci světlo okolo a z ruční svítilny paprsek“*. Kolegovi doplněno: skla pod `noc`, místa
+  `lucerna_NN` (záře a světlo na okolí) a `svitilna_NN` + `svitilna_NN_kam` (kužel a skvrna, kam dopadne), barva
+  a dosah v indexu `svetla` – jako světla vozidel.
+- Hra: kolik jich a kudy létají – navrženo 1–3 přes města jen ve tmě, na mapě i z očí; čeká na hráče.
 
 ## 18. 10. – stadion: prázdná hasičská Tatra, Mat u grilu; barvy doplňků číslem
 
