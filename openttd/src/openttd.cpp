@@ -432,8 +432,10 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		uint last_newgrf_count = _settings_client.gui.last_newgrf_count;
 		LoadFromConfig();
 		_settings_client.gui.last_newgrf_count = last_newgrf_count;
-		/* The graphics card draws the 3D pictures only as the player set it (three_d_gpu.h). */
+		/* The graphics card draws the 3D pictures as the player set it (three_d_gpu.h); not when it brought the game
+		 * down the last time (its diary). */
 		_three_d_gpu_off = !_settings_client.gui.three_d_gpu;
+		ThreeDGpuCheckLastRun();
 		/* Since the default for the palette might have changed due to
 		 * reading the configuration file, recalculate that now. */
 		UpdateNewGRFConfigPalette();

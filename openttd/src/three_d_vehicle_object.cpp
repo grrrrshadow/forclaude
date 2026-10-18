@@ -752,9 +752,12 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 		auto it = known.find(key);
 		if (it != known.end()) return it->second;
 	}
-	/* The texture's size at its finest, not the texture: its finest level is made only when drawn (the textures by need). */
+	/* The texture's size at its finest, not the texture: its finest level is made only when drawn (the textures by need).
+	 * Not known yet: as the most of them are, and not kept -- taken as 1 x 1, every picture of a figure, a few pixels
+	 * big, asked for its textures at their full size (three of 1024 x 1024 for a girl at a stop). */
 	int tw = 1, th = 1;
-	obj.TextureSize(0, tw, th);
+	const bool size_known = obj.TextureSize(0, tw, th);
+	if (!size_known) tw = th = 1024;
 	double uv_area = 0, area = 0;
 	for (size_t i = 0; i + 2 < shape.tri.size(); i += 3) {
 		const uint32_t a = shape.tri[i], b = shape.tri[i + 1], c = shape.tri[i + 2];
@@ -767,6 +770,7 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 		area += std::sqrt(cx * cx + cy * cy + cz * cz) / 2;
 	}
 	float density = area > 0 ? static_cast<float>(std::sqrt(uv_area / area)) : 1.0f;
+	if (!size_known) return density;
 	std::lock_guard lock(known_mutex);
 	known.emplace(key, density);
 	return density;

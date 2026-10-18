@@ -2239,7 +2239,7 @@ STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :original OpenTT
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Wheels of 3D vehicles turn: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :The wheels of vehicles drawn from 3D objects turn as they go and the front ones steer in the curves (seen up close, from the cab and the first person). Off, the wheels stand still
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D pictures drawn by the graphics card: {STRING2}
-STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :The pictures of the 3D vehicles, figures and effects are drawn by the graphics card (OpenGL 3.3, on a thread of its own) instead of the processor. Off by default: with it on, the whole of Winlator came down; switch it on to try it
+STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :The pictures of the 3D vehicles, figures and effects are drawn by the graphics card (OpenGL 3.3, on a thread of its own) instead of the processor. Each step with the card is written to 3d_karta.log in the OpenTTD folder; when the card brings the game down, the next start switches it off and tells at what it died (the diary kept as 3d_karta_minule.log)
 STR_CONFIG_SETTING_NIGHT                                        :Night: {STRING2}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :The map as at night: darkened, the lights of the vehicles on. Only the picture changes, nothing of the game. Also in the help menu, by the console. Needs the 32bpp blitter
 STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Light at night: {STRING2}
@@ -6182,6 +6182,7 @@ STR_ERROR_TOO_MANY_SIGNS                                        :too many signs
 STR_ERROR_CAN_T_PLACE_SIGN_HERE                                 :Can't place sign here...
 STR_ERROR_CAN_T_CHANGE_SIGN_NAME                                :Can't change sign name...
 STR_ERROR_CAN_T_DELETE_SIGN                                     :Can't delete sign...
+STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}The graphics card brought the game down the last time, at: {RAW_STRING}. The 3D pictures are drawn by the processor; the diary is 3d_karta_minule.log in the OpenTTD folder. Settings, Graphics switch the card on again
 
 # Translatable comment for OpenTTD's desktop shortcut
 ###external 1

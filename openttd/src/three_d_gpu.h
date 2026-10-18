@@ -146,6 +146,7 @@ struct ThreeDGpuBuildingPicture {
 };
 
 bool ThreeDGpuAvailable();
+void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(ThreeDGpuPicture &pic);
 bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
 void ThreeDGpuStop();

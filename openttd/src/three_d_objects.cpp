@@ -4288,7 +4288,10 @@ bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
 			h = this->levels[index]->front().h;
 			return true;
 		}
-		if (this->shape != nullptr && index >= 0 && static_cast<size_t>(index) < this->shape->pngs.size()) png = this->shape->pngs[index];
+		/* The shape read: a figure that moves has its frames' only (they share their pictures). */
+		const ThreeDVehicleShape *s = this->shape.get();
+		for (size_t f = 0; s == nullptr && f < this->frame_shapes.size(); f++) s = this->frame_shapes[f].get();
+		if (s != nullptr && index >= 0 && static_cast<size_t>(index) < s->pngs.size()) png = s->pngs[index];
 	}
 	std::vector<uint8_t> head;
 	if (index == 0 && !this->paint_file.empty()) {

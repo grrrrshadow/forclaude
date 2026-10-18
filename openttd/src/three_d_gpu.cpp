@@ -13,6 +13,14 @@
 #include "gfx_type.h"
 #include "debug.h"
 #include "thread.h"
+#include "fileio_func.h"
+#include "settings_type.h"
+#include "error.h"
+#include "strings_func.h"
+#include "window_func.h"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
+#include "table/strings.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -33,6 +41,93 @@
 #include "safeguards.h"
 
 std::atomic<bool> _three_d_gpu_off = true;
+
+/*
+ * The card's diary, 3d_karta.log in the player's folder. The player's build #285, the first with the card, brought the
+ * whole of Winlator down twice -- its OpenGL runs in the app itself, and nothing of the game's own crash log is left
+ * then. So each step with the card is written before it is taken and flushed to the disc: the last line says at what
+ * it died. The start and the first pictures step by step one line after the other; then only the step of the moment,
+ * on the last line again and again. "ceka" while the card waits, "konec" at the end of the game: a last line of a step
+ * at the next start (ThreeDGpuCheckLastRun()) has the processor draw, with a word why, the diary kept as
+ * 3d_karta_minule.log to send.
+ */
+static std::optional<FileHandle> _diary;
+static long _diary_tail = 0;       ///< where the line of the moment is written
+static int _diary_pictures = 0;    ///< the pictures written step by step so far
+static constexpr int DIARY_PICTURES = 30;
+static constexpr size_t DIARY_WIDTH = 120;
+static std::string _gpu_died_at;   ///< the step the card died at the last time, empty when it did not
+static bool _gpu_died_note = false; ///< the player not told of it yet
+
+static std::string DiaryPath(bool last)
+{
+	return _personal_dir + (last ? "3d_karta_minule.log" : "3d_karta.log");
+}
+
+/** A line of the diary: kept, or the line of the moment, written over by the next. */
+[[maybe_unused]] static void Diary(std::string_view line, bool keep)
+{
+	if (!_diary.has_value()) return;
+	std::string text(line.substr(0, DIARY_WIDTH));
+	text.resize(DIARY_WIDTH, ' ');
+	text += '\n';
+	fseek(*_diary, _diary_tail, SEEK_SET);
+	fwrite(text.data(), 1, text.size(), *_diary);
+	fflush(*_diary);
+	if (keep) _diary_tail = ftell(*_diary);
+}
+
+/** A step with the card about to be taken: kept while the start and the first pictures are written step by step. */
+[[maybe_unused]] static void Step(std::string_view what)
+{
+	Diary(fmt::format("krok {}", what), _diary_pictures < DIARY_PICTURES);
+}
+
+/**
+ * Whether the card brought the game down the last time (the last line of the diary a step): then the processor draws
+ * the 3D pictures, the setting switched off -- the player switches it on again to try -- and the player is told at
+ * what it died; the diary kept to send. Called at the start, the settings read.
+ */
+void ThreeDGpuCheckLastRun()
+{
+	auto f = FileHandle::Open(DiaryPath(false), "rb");
+	if (!f.has_value()) return;
+	std::string text;
+	char buffer[4096];
+	size_t n;
+	while ((n = fread(buffer, 1, sizeof(buffer), *f)) > 0) text.append(buffer, n);
+	f->Close();
+	/* Its last line not of spaces. */
+	std::string last;
+	size_t end = text.size();
+	while (end > 0) {
+		size_t start = text.rfind('\n', end - 1);
+		start = start == std::string::npos ? 0 : start + 1;
+		std::string line = text.substr(start, end - start);
+		while (!line.empty() && (line.back() == ' ' || line.back() == '\r' || line.back() == '\n')) line.pop_back();
+		if (!line.empty()) {
+			last = line;
+			break;
+		}
+		if (start == 0) break;
+		end = start - 1;
+	}
+	if (!last.starts_with("krok ")) return;
+	_gpu_died_at = last.substr(5);
+	_gpu_died_note = true;
+	_settings_client.gui.three_d_gpu = false;
+	_three_d_gpu_off = true;
+	if (auto kept = FileHandle::Open(DiaryPath(true), "wb"); kept.has_value()) fwrite(text.data(), 1, text.size(), *kept);
+	Debug(misc, 0, "3D on the graphics card: it brought the game down the last time, at \"{}\"; the processor draws (3d_karta_minule.log)", _gpu_died_at);
+}
+
+/** The player told once, in a window, that the card brought the game down the last time and at what. */
+static const IntervalTimer<TimerWindow> _gpu_died_timer(std::chrono::seconds(2), [](auto) {
+	if (!_gpu_died_note || FindWindowById(WindowClass::MainWindow, 0) == nullptr) return;
+	_gpu_died_note = false;
+	Debug(misc, 1, "3D on the graphics card: the player told it brought the game down the last time");
+	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_GPU_DIED, _gpu_died_at), {}, WarningLevel::Warning);
+});
 
 /* The triangles of the shapes by the parts shown (ThreeDGpuTrianglesOf()), kept for the pictures to come. */
 static std::mutex _triangles_mutex;
@@ -276,11 +371,13 @@ uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the pro
 struct GpuShape {
 	GLuint vao = 0, pos = 0, nrm = 0, uv = 0;
 	bool has_nrm = false;
+	size_t corners = 0;   ///< how many corners it has: no triangle drawn may name one beyond
 	size_t bytes = 0;
 	uint64_t used = 0;
 };
 struct GpuIndices {
 	GLuint ibo = 0;
+	uint32_t largest = 0; ///< the largest corner its triangles name
 	size_t bytes = 0;
 	uint64_t used = 0;
 };
@@ -647,6 +744,7 @@ GpuProc GetGlProc(const char *name)
 /** A context of OpenGL 3.3 of its own, of a hidden window of the card's thread. */
 bool StartContext(std::string &why)
 {
+	Step("okno pro kartu");
 	_gpu_window = CreateWindowW(L"STATIC", L"OpenTTD 3D", WS_POPUP, 0, 0, 1, 1, nullptr, nullptr, GetModuleHandleW(nullptr), nullptr);
 	if (_gpu_window == nullptr) {
 		why = "no window for the context";
@@ -660,11 +758,13 @@ bool StartContext(std::string &why)
 	pfd.iPixelType = PFD_TYPE_RGBA;
 	pfd.cColorBits = 24;
 	pfd.iLayerType = PFD_MAIN_PLANE;
+	Step("format pixelu");
 	const int format = ChoosePixelFormat(_gpu_dc, &pfd);
 	if (format == 0 || !SetPixelFormat(_gpu_dc, format, &pfd)) {
 		why = "no pixel format for OpenGL";
 		return false;
 	}
+	Step("prvni kontext OpenGL (wglCreateContext, wglMakeCurrent)");
 	HGLRC first = wglCreateContext(_gpu_dc);
 	if (first == nullptr || !wglMakeCurrent(_gpu_dc, first)) {
 		why = "no context of OpenGL";
@@ -678,6 +778,7 @@ bool StartContext(std::string &why)
 	if (create != nullptr) {
 		const int attributes[] = {0x2091 /* WGL_CONTEXT_MAJOR_VERSION_ARB */, 3, 0x2092 /* WGL_CONTEXT_MINOR_VERSION_ARB */, 3,
 				0x9126 /* WGL_CONTEXT_PROFILE_MASK_ARB */, 0x0001 /* WGL_CONTEXT_CORE_PROFILE_BIT_ARB */, 0};
+		Step("kontext OpenGL 3.3 core (wglCreateContextAttribsARB)");
 		HGLRC core = create(_gpu_dc, nullptr, attributes);
 		if (core != nullptr && wglMakeCurrent(_gpu_dc, core)) {
 			wglDeleteContext(first);
@@ -793,9 +894,13 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 /** The context, the functions, the programs: whether the card draws, and what it is. */
 bool StartCard(std::string &why, std::string &describe)
 {
-	if (!StartContext(why) || !LoadGlFunctions(why)) return false;
+	if (!StartContext(why)) return false;
+	Step("funkce OpenGL");
+	if (!LoadGlFunctions(why)) return false;
+	Step("verze OpenGL (glGetString)");
 	const char *version = reinterpret_cast<const char *>(gl.glGetString(GL_VERSION));
 	const char *renderer = reinterpret_cast<const char *>(gl.glGetString(GL_RENDERER));
+	Diary(fmt::format("karta: {}, OpenGL {}", renderer != nullptr ? renderer : "?", version != nullptr ? version : "?"), true);
 	/* "4.5 (Core Profile) Mesa ...": the first two numbers. */
 	int major = 0, minor = 0;
 	const char *c = version != nullptr ? version : "";
@@ -807,7 +912,11 @@ bool StartCard(std::string &why, std::string &describe)
 		why = fmt::format("OpenGL {} (3.3 needed)", version != nullptr ? version : "?");
 		return false;
 	}
-	if (!MakeProgram(_mesh_program, MESH_VERTEX, MESH_FRAGMENT, why) || !MakeProgram(_night_program, NIGHT_VERTEX, NIGHT_FRAGMENT, why)) return false;
+	Step("preklad programu vozidel (shader)");
+	if (!MakeProgram(_mesh_program, MESH_VERTEX, MESH_FRAGMENT, why)) return false;
+	Step("preklad programu svetel (shader)");
+	if (!MakeProgram(_night_program, NIGHT_VERTEX, NIGHT_FRAGMENT, why)) return false;
+	Step("ramec a buffery (framebuffer, renderbuffer, vertex array)");
 	gl.glGetIntegerv(GL_MAX_TEXTURE_SIZE, &_max_texture);
 	gl.glGetIntegerv(GL_MAX_RENDERBUFFER_SIZE, &_max_target);
 	_max_target = std::min(_max_target, 16384);
@@ -834,6 +943,7 @@ bool StartCard(std::string &why, std::string &describe)
 
 void ForgetCard()
 {
+	Step("vse z karty pryc");
 	for (auto &[uid, s] : _card_shapes) {
 		gl.glDeleteVertexArrays(1, &s.vao);
 		const GLuint buffers[] = {s.pos, s.nrm, s.uv};
@@ -876,6 +986,7 @@ void TrimCard()
 	for (const auto &[uid, i] : _card_indices) if (i.used < _card_clock) held.push_back({i.used, 1, uid});
 	for (const auto &[uid, t] : _card_textures) if (t.used < _card_clock) held.push_back({t.used, 2, uid});
 	std::ranges::sort(held, [](const Held &a, const Held &b) { return a.used < b.used; });
+	Step(fmt::format("uvolneni karty ({} MB)", _card_bytes >> 20));
 	for (const Held &h : held) {
 		if (_card_bytes <= GPU_BYTES_KEPT / 4 * 3) break;
 		if (h.kind == 0) {
@@ -911,6 +1022,8 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	if (corners == 0 || s.uv.size() < corners * 2) return nullptr;
 	GpuShape g;
 	g.has_nrm = s.nrm.size() == s.pos.size();
+	g.corners = corners;
+	Step(fmt::format("tvar na kartu: {} rohu{}", corners, g.has_nrm ? ", normaly" : ""));
 	gl.glGenVertexArrays(1, &g.vao);
 	gl.glBindVertexArray(g.vao);
 	auto buffer = [](GLuint &name, const std::vector<float> &data, size_t floats, GLuint index, GLint size) {
@@ -940,6 +1053,8 @@ const GpuIndices *IndicesOnCard(const ThreeDGpuTriangles &t)
 	}
 	/* Filled as an array (an array of elements is a vertex array's, bound only when drawn). */
 	GpuIndices g;
+	for (uint32_t i : t.indices) g.largest = std::max(g.largest, i);
+	Step(fmt::format("trojuhelniky na kartu: {} (nejvyssi roh {})", t.indices.size() / 3, g.largest));
 	gl.glGenBuffers(1, &g.ibo);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, g.ibo);
 	gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(t.indices.size() * sizeof(uint32_t)), t.indices.data(), GL_STATIC_DRAW);
@@ -958,6 +1073,7 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 		return &it->second;
 	}
 	if (t.w <= 0 || t.h <= 0 || t.w > _max_texture || t.h > _max_texture || t.px.size() < static_cast<size_t>(t.w) * t.h) return nullptr;
+	Step(fmt::format("textura na kartu: {}x{}", t.w, t.h));
 	GpuTexture g;
 	gl.glGenTextures(1, &g.name);
 	gl.glBindTexture(GL_TEXTURE_2D, g.name);
@@ -984,6 +1100,7 @@ const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 		return &it->second;
 	}
 	if (m.w <= 0 || m.h <= 0 || m.w > _max_texture || m.h > _max_texture || m.index.size() < static_cast<size_t>(m.w) * m.h) return nullptr;
+	Step(fmt::format("maska podrobnosti na kartu: {}x{}", m.w, m.h));
 	GpuTexture g;
 	gl.glGenTextures(1, &g.name);
 	gl.glBindTexture(GL_TEXTURE_2D, g.name);
@@ -1009,6 +1126,7 @@ bool TargetOfSize(int w, int h)
 	const int nw = too_big ? w : std::max(_fbo_w, w), nh = too_big ? h : std::max(_fbo_h, h);
 	_fbo_w = std::min(_max_target, (nw + 255) / 256 * 256);
 	_fbo_h = std::min(_max_target, (nh + 255) / 256 * 256);
+	Step(fmt::format("ramec {}x{} (glRenderbufferStorage, glCheckFramebufferStatus)", _fbo_w, _fbo_h));
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, _colour_rb);
 	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _fbo_w, _fbo_h);
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, _lit_rb);
@@ -1046,6 +1164,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	const int w = pic.width, h = pic.height;
 	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target) return false;
 	_card_clock++;
+	Step(fmt::format("obrazek {}: {}x{}, {} siti{}", _gpu_pictures + 1, w, h, pic.meshes.size(), pic.night.empty() ? "" : ", svetla"));
 	/* All on the card first: what it cannot hold the processor draws. */
 	/* A texture's paint on the card: its masks' names (ThreeDGpuPaint). */
 	struct PaintOnCard {
@@ -1063,6 +1182,12 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
 		Draw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}, {}};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
+		/* A triangle naming a corner the shape has not would have the card read beyond its corners: a phone's card
+		 * does not forgive that. The processor draws such a picture. */
+		if (d.indices->largest >= d.shape->corners) {
+			Debug(misc, 0, "3D on the graphics card: triangles naming corner {} of a shape of {}; the processor draws the picture", d.indices->largest, d.shape->corners);
+			return false;
+		}
 		d.textures.assign(m.textures.size(), 0);
 		d.paints.assign(m.textures.size(), {});
 		for (size_t i = 0; i < m.textures.size(); i++) {
@@ -1176,6 +1301,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
 	};
+	Step(fmt::format("kresleni obrazku {} (glDrawElements)", _gpu_pictures + 1));
 	for (const Draw &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
 	/* The glass after all else, over what is behind it, hiding nothing (no depth written), not lit. */
 	gl.glDrawBuffers(2, colour_only);
@@ -1205,6 +1331,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 	}
 	gl.glBindVertexArray(0);
 	pic.pixels.resize(static_cast<size_t>(w) * h);
+	Step(fmt::format("cteni obrazku {} zpet (glReadPixels)", _gpu_pictures + 1));
 	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pic.pixels.data());
@@ -1232,6 +1359,10 @@ void GpuThreadMain()
 {
 	std::string why, describe;
 	bool ok = false;
+	_diary = FileHandle::Open(DiaryPath(false), "wb");
+	_diary_tail = 0;
+	_diary_pictures = 0;
+	Diary("OpenTTD Decouple: denik graficke karty (3D obrazky)", true);
 	try {
 		ok = StartCard(why, describe);
 	} catch (...) {
@@ -1244,6 +1375,8 @@ void GpuThreadMain()
 	}
 	_gpu_done.notify_all();
 	Debug(misc, 1, "3D on the graphics card: {}", ok ? describe : "none, the processor draws (" + why + ")");
+	Diary(ok ? "start v poradku: " + describe : "karta nekresli: " + why, true);
+	Diary("ceka", false);
 	std::unique_lock lock(_gpu_mutex);
 	while (ok && !_gpu_stop) {
 		if (_gpu_jobs.empty()) {
@@ -1266,6 +1399,11 @@ void GpuThreadMain()
 			drawn = false;
 		}
 		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		if (_diary_pictures < DIARY_PICTURES) {
+			_diary_pictures++;
+			Diary(fmt::format("obrazek {} {} ({:.1f} ms)", _gpu_pictures + 1, drawn ? "hotov" : "kresli procesor", ms), true);
+		}
+		Diary("ceka", false);
 		lock.lock();
 		job->ok = drawn;
 		job->done = true;
@@ -1279,7 +1417,10 @@ void GpuThreadMain()
 	_gpu_state = GpuState::Failed;
 	_gpu_done.notify_all();
 	lock.unlock();
+	Step("konec karty");
 	EndCard();
+	Diary("konec", false);
+	_diary.reset();
 }
 
 } // namespace
@@ -1336,6 +1477,7 @@ void ThreeDGpuStop()
 std::string ThreeDGpuDescribe()
 {
 	std::lock_guard lock(_gpu_mutex);
+	if (!_gpu_died_at.empty() && _three_d_gpu_off) return fmt::format("the processor (the card brought the game down the last time, at \"{}\")", _gpu_died_at);
 	if (_three_d_gpu_off) return "the processor (the card switched off)";
 	return _gpu_describe;
 }

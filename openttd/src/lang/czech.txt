@@ -2344,7 +2344,7 @@ STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :originální do
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING2}
-STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :Obrázky 3D vozidel, postav a efektů kreslí grafická karta (OpenGL 3.3, ve vlastním vlákně) místo procesoru. Výchozí vypnuto: se zapnutou kartou padal celý Winlator; zapni, když to chceš zkusit
+STR_CONFIG_SETTING_THREE_D_GPU_HELPTEXT                         :Obrázky 3D vozidel, postav a efektů kreslí grafická karta (OpenGL 3.3, ve vlastním vlákně) místo procesoru. Každý krok s kartou se zapíše do 3d_karta.log ve složce OpenTTD; když karta shodí hru, další start ji vypne a řekne, u čeho umřela (deník zůstane jako 3d_karta_minule.log)
 STR_CONFIG_SETTING_NIGHT                                        :Noc: {STRING}
 STR_CONFIG_SETTING_NIGHT_HELPTEXT                               :Herní plocha jako v noci: ztmavlá, vozidla svítí. Mění se jen obraz, nic ve hře. Taky v nabídce nápovědy u konzole. Potřebuje 32bpp blitter
 STR_CONFIG_SETTING_NIGHT_LIGHT                                  :Světlo v noci: {STRING}
@@ -6298,6 +6298,7 @@ STR_ERROR_TOO_MANY_SIGNS                                        :{WHITE}... př�
 STR_ERROR_CAN_T_PLACE_SIGN_HERE                                 :{WHITE}Zde nelze umístit nápis...
 STR_ERROR_CAN_T_CHANGE_SIGN_NAME                                :{WHITE}Nelze změnit nápis...
 STR_ERROR_CAN_T_DELETE_SIGN                                     :{WHITE}Nelze smazat nápis...
+STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}Grafická karta minule shodila hru, u kroku: {RAW_STRING}. 3D obrázky kreslí procesor; deník je 3d_karta_minule.log ve složce OpenTTD. V Nastavení, Grafika se karta zase zapne
 
 # Translatable comment for OpenTTD's desktop shortcut
 ###external 1
