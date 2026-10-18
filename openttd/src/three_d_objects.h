@@ -219,6 +219,7 @@ struct ThreeDObject {
 	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
 	std::vector<float> nrm;           ///< an add-on's normals, metres, to light it as it is turned at a place
+	std::vector<ThreeDObjectFigure> event_figures; ///< "akce": the figures standing about it on its days (GetThreeDHouseEvent(): the new stadium's)
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
 	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
@@ -614,6 +615,8 @@ const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();
 
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme = 0);
+std::span<const ThreeDObjectFigure> GetThreeDHouseEvent(const ThreeDObject *obj, TileIndex origin);
+extern bool _three_d_event_forced;
 const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant);
 std::string ThreeDPackagePlaces();
 struct Industry;

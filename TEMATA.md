@@ -71,6 +71,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Kolegovi: `hra/3d/POSTAVY-MODULARNI-A-STADION.md` (prosba o místa akce v záznamu stadionu, klíč `akce`).
 - Hasičská Tatra (hráč): celkově méně trojúhelníků, ale mřížka chladiče pěkná, kola podrobná jak jsou (instance);
   doplněno kolegovi do `PROSBA-POZARNI-TATRA.md`.
+- **Hotovo (mechanismus akce):** `"akce"` v záznamu domu (rozen/mat/holky/hasici jako `postavy`; bez `postava` hra
+  bere `rozen`, `mat_toci`, sedící holky; hasiči jen jménem) → `ThreeDObject::event_figures`;
+  `GetThreeDHouseEvent()` je vrací v den akce (dny v blocích po 11, akce na jednom z prvních 4 dnů bloku podle místa
+  domu: rozestup 8–14 dní, jeden den), přidané k domu v otočeném pohledu, na mapě na sever i z očí. Rig `test3d akce
+  1` = každý den. **Chybí:** místa od kolegy (`akce` v `dum_20_stadion`), hasiči a hasičská Tatra (model; Tatru
+  nakreslit jako stojící vozidlo, `tatra.objekt`).
 
 ## 18. 10. – modulární postavy (hráč, domlouváme)
 

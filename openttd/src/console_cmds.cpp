@@ -9625,6 +9625,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string DescribeThreeDPictureMemory();
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDObjectMemory());
 		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDPictureMemory());
+	} else if (what == "akce") {
+		/* 'akce [0|1]': the events of the buildings (the new stadium's firemen, spit, Mat and girls) on every day, or
+		 * on their own days as the game has them (GetThreeDHouseEvent()). */
+		if (auto on = number(2); on.has_value()) _three_d_event_forced = *on != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: akce {}", _three_d_event_forced ? "kazdy den" : "ve sve dny");
 	} else if (what == "gpu") {
 		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
 		 * and what draws them (three_d_gpu.h). */

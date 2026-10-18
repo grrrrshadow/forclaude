@@ -37,6 +37,7 @@
 #include "3rdparty/nlohmann/json.hpp"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
+#include "timer/timer_game_calendar.h"
 #include "settings_type.h"
 
 #include <algorithm>
@@ -1759,6 +1760,35 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 	if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
 		ThreeDObjectFigure fig;
 		if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
+	}
+	/* Its event ("akce", the player, 18. 10.: on the new stadium every week or two for one day the firemen with their
+	 * Tatra, the pig on the spit, Mat drawing beer and the girls of the pub sitting there): the figures standing about it
+	 * on its days (GetThreeDHouseEvent()), each as one of "postavy"; without "postava" the game's own -- the spit, Mat at
+	 * the tap, the girls sitting by turns (their files of a pose a file till the figures have poses). */
+	if (e.contains("akce") && e.at("akce").is_object()) {
+		const auto &event = e.at("akce");
+		auto stand = [&obj](const nlohmann::json &p, std::string_view figure) {
+			if (!p.is_object()) return;
+			nlohmann::json f = p;
+			if (!f.contains("postava")) {
+				if (figure.empty()) return;
+				f["postava"] = figure;
+				f.erase("poza");
+			}
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) obj.event_figures.push_back(std::move(fig));
+		};
+		if (event.contains("rozen")) stand(event.at("rozen"), "rozen");
+		if (event.contains("mat")) stand(event.at("mat"), "mat_toci");
+		static constexpr std::string_view girls[] = {"college_girl_sedi", "people_girl_sedi", "galaxia_sedi"};
+		if (event.contains("holky") && event.at("holky").is_array()) {
+			size_t k = 0;
+			for (const auto &g : event.at("holky")) stand(g, girls[k++ % std::size(girls)]);
+		}
+		/* The firemen are the Tatras' (their package's figures): only those named. */
+		if (event.contains("hasici") && event.at("hasici").is_array()) {
+			for (const auto &h : event.at("hasici")) stand(h, {});
+		}
 	}
 	/* Its add-ons ("doplnky"): an add-on of the index by its name ("jmeno"), where its foot stands (metres in the
 	 * building's frame, as "postavy"), turned about it ("otoceni", degrees, 0 as it is made, 90 its +x to +y), sized
@@ -4304,6 +4334,26 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, 
 		}
 	}
 	return {};
+}
+
+/** The rig: every building's event on today (test3d akce 1). */
+bool _three_d_event_forced = false;
+
+/**
+ * The figures of a building's event standing about it today ("akce", the new stadium's): every 8 to 14 days one day,
+ * each building on days of its own -- the days counted in blocks of 11, the event on one of the first 4 days of each
+ * block, picked by the building's place and the block. Nothing on the other days.
+ */
+std::span<const ThreeDObjectFigure> GetThreeDHouseEvent(const ThreeDObject *obj, TileIndex origin)
+{
+	if (obj == nullptr || obj->event_figures.empty()) return {};
+	if (_three_d_event_forced) return obj->event_figures;
+	const uint32_t seed = origin.base() * 2654435761u;
+	const int64_t day = static_cast<int64_t>(TimerGameCalendar::date.base()) + seed % 11;
+	const uint64_t block = static_cast<uint64_t>(day / 11);
+	const uint32_t pick = static_cast<uint32_t>(((block * 40503u) ^ seed) * 2246822519u) >> 28;
+	if (day % 11 != static_cast<int64_t>(pick % 4)) return {};
+	return obj->event_figures;
 }
 
 /** A building's object by its name in the index ("jmeno"), for the rig; nullptr when there is none. */

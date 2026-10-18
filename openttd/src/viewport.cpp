@@ -3848,7 +3848,8 @@ static void AddNorthHouseObject(size_t first_parent)
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == origin) return;
 	}
-	_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+	/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()). */
+	_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
 }
 
 /**
@@ -4084,7 +4085,8 @@ static void ViewportDoDrawTurned()
 					for (const TurnedObject &to : _turned_objects) {
 						if (to.origin == origin) known = true;
 					}
-					if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+					/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()). */
+					if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
 				}
 			}
 		}
@@ -9450,7 +9452,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					for (const CabObject &co : objects) {
 						if (co.origin == origin) known = true;
 					}
-					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDHouseEvent(obj, origin)});
 				}
 			}
 		}
@@ -9674,7 +9676,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			for (const CabObject &co : objects) {
 				if (co.origin == origin) return;
 			}
-			objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+			objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDHouseEvent(obj, origin)});
 		});
 	}
 
