@@ -302,6 +302,41 @@ static std::array<double, 6> GlbUvTransform(const nlohmann::json &j, int materia
 }
 
 /**
+ * The .glb files whose pictures have the background about their pieces filled already ("okraje_textur" of their
+ * record, the colleague's hra/3d/ZRYCHLENI-3D-GRF.md): where their triangles draw from is not worked out for them
+ * (TextureCover()), nor the rest of the picture filled from it -- for a big atlas hundreds of milliseconds of reading.
+ */
+static std::set<std::string> _glb_margins_filled[2]; ///< of the buildings' indices, of the vehicles' (each read anew on its own)
+static std::mutex _glb_margins_mutex;
+
+/** Which of _glb_margins_filled: the files of the buildings' indices, or of the vehicles' (with their figures and effects). */
+enum class MarginsOf : uint8_t { Buildings, Vehicles };
+
+/** Note a file of a record that says its pictures have their margins filled ("okraje_textur": the width, or true). */
+static void NoteMarginsFilled(const nlohmann::json &e, const std::string &path, MarginsOf of)
+{
+	if (!e.contains("okraje_textur")) return;
+	const auto &m = e.at("okraje_textur");
+	if (!(m.is_number() ? m.get<double>() > 0 : m.is_boolean() && m.get<bool>())) return;
+	std::lock_guard lock(_glb_margins_mutex);
+	_glb_margins_filled[to_underlying(of)].insert(path);
+}
+
+/** The indices of the buildings or of the vehicles are read anew: what they said before goes. */
+static void ForgetMarginsFilled(MarginsOf of)
+{
+	std::lock_guard lock(_glb_margins_mutex);
+	_glb_margins_filled[to_underlying(of)].clear();
+}
+
+/** Whether a file's pictures have their margins filled already (NoteMarginsFilled()). */
+static bool MarginsFilled(const std::string &path)
+{
+	std::lock_guard lock(_glb_margins_mutex);
+	return _glb_margins_filled[0].contains(path) || _glb_margins_filled[1].contains(path);
+}
+
+/**
  * A .glb as its meshes are read from it (ReadGlbMesh()): its JSON parsed once, and of its binary buffer only the
  * pieces the meshes and pictures read need (Piece()), read from the file as they are wanted. A file of the colleague's
  * add-ons is forty megabytes of ten trailers, a lorry shows one of them, and all of it was read (on a cold disk five
@@ -1057,8 +1092,9 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			const int tex = mat.at("pbrMetallicRoughness").at("baseColorTexture").at("index").get<int>();
 			return j.at("textures").at(tex).value("source", -1);
 		};
+		const bool margins_filled = MarginsFilled(path);
 		for (const auto &[image, bytes] : image_bytes) {
-			if (bytes == nullptr || TextureCover(bytes) != nullptr || !j.contains("meshes")) continue;
+			if (margins_filled || bytes == nullptr || TextureCover(bytes) != nullptr || !j.contains("meshes")) continue;
 			auto cover = std::make_shared<std::vector<float>>();
 			for (const auto &me : j.at("meshes")) {
 				for (const auto &p : me.at("primitives")) {
@@ -2164,6 +2200,7 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 static void ReadThreeDObjects()
 {
 	_three_d_objects_read = true;
+	ForgetMarginsFilled(MarginsOf::Buildings);
 	GlbFilesScope files;
 	const auto start = std::chrono::steady_clock::now();
 	std::vector<std::string> indices = FindObjectIndices();
@@ -2190,6 +2227,7 @@ static void ReadThreeDObjects()
 					addon.file = e.at("soubor").get<std::string>();
 					addon.name = e.value("jmeno", addon.file);
 					addon.glb_path = folder + addon.file;
+					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
 					addon.addon = true;
 					addon.variants = 0;
 					if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) {
@@ -2218,6 +2256,7 @@ static void ReadThreeDObjects()
 						for (const auto &v : e.at("varianty")) obj.variants |= 1 << (v.get<int>() & 3);
 					}
 					obj.glb_path = folder + obj.file;
+					NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 					ReadColourParts(e, folder, obj);
 					ReadBuildingFigures(e, obj);
 					ReadBuildingTitle(e, obj);
@@ -2246,6 +2285,7 @@ static void ReadThreeDObjects()
 				}
 				/* Its shape and texture read the first time it is drawn (ThreeDObject::Read()). */
 				obj.glb_path = folder + obj.file;
+				NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 				ReadColourParts(e, folder, obj);
 				ReadBuildingFigures(e, obj);
 				ReadBuildingTitle(e, obj);
@@ -2332,6 +2372,7 @@ static VehicleType ParseIndexVehicleType(const std::string &text)
 static void ReadThreeDVehicleObjects()
 {
 	_vehicle_objects_read = true;
+	ForgetMarginsFilled(MarginsOf::Vehicles);
 	GlbFilesScope files;
 	for (const std::string &index : FindObjectIndices()) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
@@ -2346,6 +2387,7 @@ static void ReadThreeDVehicleObjects()
 					ThreeDVehicleObject fx;
 					fx.package = package;
 					fx.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fx.file, MarginsOf::Vehicles);
 					fx.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					if (e.contains("animace") && e.at("animace").is_object()) {
 						const auto &a = e.at("animace");
@@ -2379,6 +2421,7 @@ static void ReadThreeDVehicleObjects()
 						ThreeDVehicleObject fig;
 						fig.package = package;
 						fig.file = folder + e.at("soubor").get<std::string>();
+						NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
 						if (e.contains("textura") && e.at("textura").is_string()) fig.paint_file = folder + e.at("textura").get<std::string>();
 						fig.name = creature.Figure(anim);
 						fig.frame_prefix = a.value("uzly", anim + "_");
@@ -2412,6 +2455,7 @@ static void ReadThreeDVehicleObjects()
 					ThreeDVehicleObject fig;
 					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = figure_kind == "predmet";
 					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
@@ -2521,6 +2565,7 @@ static void ReadThreeDVehicleObjects()
 				obj.package = package;
 				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
 				obj.file = folder + e.at("soubor").get<std::string>();
+				NoteMarginsFilled(e, obj.file, MarginsOf::Vehicles);
 				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : "vlak")));
 				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
 				if (obj.type == VehicleType::Invalid || (!grfid.has_value() && !driving)) {
@@ -2662,6 +2707,9 @@ static void ReadThreeDVehicleObjects()
 						ThreeDVehicleAddon addon;
 						addon.key = a.at("soubor").get<std::string>();
 						addon.file = folder + addon.key;
+						/* The add-ons' files are the vehicle's record's, its "okraje_textur" theirs too (or their own). */
+						NoteMarginsFilled(e, addon.file, MarginsOf::Vehicles);
+						NoteMarginsFilled(a, addon.file, MarginsOf::Vehicles);
 						if (a.contains("poloha") && a.at("poloha").is_array() && a.at("poloha").size() == 3) {
 							for (int k = 0; k < 3; k++) addon.at[k] = a.at("poloha").at(k).get<float>();
 						}
@@ -2814,6 +2862,7 @@ static void ReadThreeDVehicleObjects()
 						if (!k.is_object() || !k.contains("soubor") || !k.contains("polohy")) continue;
 						ThreeDVehicleWheels w;
 						w.file = folder + k.at("soubor").get<std::string>();
+						NoteMarginsFilled(e, w.file, MarginsOf::Vehicles);
 						w.both_sides = k.value("oba_boky", true);
 						for (const auto &p : k.at("polohy")) {
 							if (!p.is_array() || p.size() != 3) continue;
