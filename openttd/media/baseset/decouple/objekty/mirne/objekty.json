@@ -5066,7 +5066,7 @@
    {
     "cast": "omitka",
     "maska": "dum_20_stadion_maska_omitka.png",
-    "zacatek": 233,
+    "zacatek": 234,
     "paleta": [
      "E8E6DE",
      "F0DCB0",
@@ -5259,6 +5259,16 @@
     ],
     "otoceni": 0.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_s_pipou_99914b93",
+    "poloha": [
+     25.721,
+     27.366,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
    }
   ],
   "postavy": [
@@ -5327,19 +5337,23 @@
     "otoceni": 90,
     "zaznam": "nt_t148",
     "objekt": "nt_t148",
-    "sada": ["kabina 148", "mrizka 148 puvodni", "nastavba hasici"],
+    "sada": [
+     "kabina 148 hasici",
+     "mrizka 148 hasici",
+     "nastavba hasici"
+    ],
     "poznamka": "hasičská Tatra 148 stojí prázdná na hřišti čelem ke stánku PIVO (hráč: „na hřišti stojí prázdná Tatra, bez řidiče“)"
    },
    "mat": {
     "poloha": [
-     25.97,
-     27.31,
+     26.421,
+     27.306,
      0.0
     ],
     "otoceni": 180,
     "poza": "toci",
     "meritko": 1.0,
-    "poznamka": "Mat točí pivo u grilu s rožněm (hráč: „Mat nemůže sedět v hasičské Tatře, bude točit pivo u grilu“), čelem ke grilu"
+    "poznamka": "Mat točí pivo z pípy sudu u grilu s rožněm (hráč: „Mat nemůže sedět v hasičské Tatře, bude točit pivo u grilu“, „mat toci pivo, ma sud?“), čelem ke grilu; tělo pípy 0,30 m před ním, 0,06 m vpravo, 0,95 m"
    },
    "holky": [
     {

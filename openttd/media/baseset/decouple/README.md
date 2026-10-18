@@ -120,6 +120,14 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   Stavy předmětu (`stavy`: luk `volno`/`napnuto`, kuše `natazeno`/`vystreleno`) hra čte jako figury
   `<jmeno>/<stav>` (jen ten uzel), úchyt z uzlu `uchyt`, zářez z uzlu `zarez_<stav>`, zvuky z klíče `zvuky`.
   Klávesy 1–5 zbraň, cheat `iddqd` v konzoli dá zbraně, které chybí, a doplní šípy a šipky na 50.
+  Od 18. 10. (`PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md`) kulomet (Machine Gun, Alexeykzm425, Sketchfab, CC BY 4.0),
+  raketomet (Roblox Classic Rocket Launcher, OrangeSauceu, Sketchfab, CC BY 4.0), raketa (Rocket, photon (that one
+  larry), Sketchfab, CC BY 4.0), lucerna do ruky (Roblox Lantern, Luigi2013, Sketchfab, CC BY 4.0), kolegova
+  pochodeň a náboj (GPL-2.0) a zvuk zhasnutí pochodně `pochoden_zhasnuti.wav` (`torch_out.wav` z Example Suite,
+  CC0). Modely zmenšené nebo zvětšené a otočené.
+- `lampy/` – lampy ve stylu Morrowindu (od kolegy, grrrrf `hra/3d/objekty/lampy/`, kolegovy vlastní, GPL-2.0):
+  papírová lucerna, lampa na sloupu, nástěnná pochodeň, svícen, lampička a ohnivý koš, `druh: "doplnek"` s uzlem
+  `noc` (papír, sklo a plamen svítí v noci), místy `svetlo_NN` a papírem v barvě číslem (`barvy`, část `papir`).
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.
@@ -134,6 +142,8 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   Beneš / Patmat Film, fanouškovský model, nekomerčně) chodí v otočeném pohledu
   po chodnících měst ode dveří domů ke dveřím (`dvere` v `mirne/objekty.json`).
   Na střeše hotelu stojí kouřící College Girl u slunečníků (`postavy` u hotelu).
+  Mat točí pivo ze sudu u grilu na stadionu (`mat_toci`) a řídí hasičskou Tatru (`mat_ridi`). Chimata (Chimata for
+  Touhou Multi Scroll Shooting 2, skydash, Sketchfab, CC BY 4.0, otočená, textury nejvýš 1024 px) čeká na interiéry.
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
   mírného klimatu, které staví arktické nebo pouštní domy („Domy z“).
 - Přidat sadu = dát sem složku se soubory a `objekty.json`; CMake ji zkopíruje

@@ -3350,6 +3350,36 @@
  },
  {
   "druh": "doplnek",
+  "jmeno": "sud_s_pipou_99914b93",
+  "soubor": "sud_s_pipou_99914b93.glb",
+  "nazev": {
+   "cs": "sud s pípou na kozlících"
+  },
+  "rozmer_m": {
+   "x": [
+    -0.29,
+    0.42
+   ],
+   "y": [
+    -0.33,
+    0.33
+   ],
+   "z": [
+    -0.01,
+    1.2
+   ]
+  },
+  "trojuhelniku": 588,
+  "atlas_px": 256,
+  "okraje_textur": 16,
+  "pouziti": 1,
+  "tvar": {},
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (sud s pípou na kozlících): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
   "jmeno": "susak_2303bdbe",
   "soubor": "susak_2303bdbe.glb",
   "nazev": {

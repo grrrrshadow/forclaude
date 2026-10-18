@@ -213,5 +213,246 @@
   "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
   "licence": "CC0 1.0 (volné dílo)",
   "poznamka": "obouruční meč, čepel 1.222 m; jako kladivo: počátek na konci hlavice, čepel po +z, ostří do ±x; prázdný uzel uchyt uprostřed rukojeti 0.214 m nad koncem; model bez materiálu, barvy naše (ocelová čepel, tmavá záštita a hlavice, kožená rukojeť 0.301 m), bez textury; 288 trojúhelníků, normály z modelu"
+ },
+ {
+  "soubor": "kulomet.glb",
+  "jmeno": "kulomet",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "kulomet",
+   "en": "machine gun"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 14.0,
+  "rozmer_m": {
+   "x": [
+    -0.074,
+    1.22
+   ],
+   "y": [
+    -0.346,
+    0.123
+   ],
+   "z": [
+    -0.632,
+    0.161
+   ]
+  },
+  "trojuhelniku": 2794,
+  "autor": "Machine Gun, Alexeykzm425 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/machine-gun-9b5220a1ba104999832c11dfcf3fa01c), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Alexeykzm425; změny: zmenšený, otočený)",
+  "strelivo": "naboj",
+  "strelba": "davka",
+  "kadence": 10,
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hlaven": [
+    1.22,
+    -0.0,
+    -0.095
+   ]
+  },
+  "poznamka": "šestihlavňový rotační kulomet s nosným uchem a pásem nábojů; střílí po +x, počátek v zadní rukojeti (uchyt), prázdný uzel hlaven na ústí hlavní (záblesk, odkud letí kulky); barvy modelu bez textury"
+ },
+ {
+  "soubor": "raketa.glb",
+  "jmeno": "raketa",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "raketa",
+   "en": "rocket"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 15.0,
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.878
+   ],
+   "y": [
+    -0.062,
+    0.058
+   ],
+   "z": [
+    -0.06,
+    0.06
+   ]
+  },
+  "trojuhelniku": 1496,
+  "autor": "Rocket (AGM-114), photon (that one larry) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/rocket-30011aad307544f6bbcdf47d7c2caaaf), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést photon; změny: zmenšená na trubku raketometu)",
+  "strela": "raketa",
+  "poznamka": "raketa raketometu 0.88 m, leží po +x, hrot na +x, počátek na zádi; prázdný uzel plamen na trysce (tam kouř a oheň za letu); návrh: letí rovně 40 m/s, na konci výbuch o poloměru 4 m"
+ },
+ {
+  "soubor": "raketomet.glb",
+  "jmeno": "raketomet",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "raketomet",
+   "en": "rocket launcher"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 7.0,
+  "rozmer_m": {
+   "x": [
+    -0.365,
+    0.835
+   ],
+   "y": [
+    -0.114,
+    0.114
+   ],
+   "z": [
+    -0.046,
+    0.242
+   ]
+  },
+  "trojuhelniku": 2434,
+  "autor": "Roblox Classic Rocket Launcher, OrangeSauceu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/roblox-classic-rocket-launcher-b7507d2fdad04aa3b359765bd4898856), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést OrangeSauceu; změny: zmenšený na 1,2 m, otočený, raketa v trubce)",
+  "strelivo": "raketa",
+  "strelba": "raketa",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hlaven": [
+    0.835,
+    -0.0,
+    0.121
+   ]
+  },
+  "poznamka": "trubka na rameno 1,2 m, střílí po +x, počátek v rukojeti (uchyt), prázdný uzel hlaven na ústí trubky, uzel raketa_v_hlavni s nabitou raketou (po výstřelu ho schovej, po nabití ukaž; návrh nabíjení 2 s)"
+ },
+ {
+  "soubor": "naboj.glb",
+  "jmeno": "naboj",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "náboj",
+   "en": "cartridge"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.025,
+  "rozmer_m": {
+   "x": [
+    -0.0,
+    0.071
+   ],
+   "y": [
+    -0.006,
+    0.006
+   ],
+   "z": [
+    -0.006,
+    0.006
+   ]
+  },
+  "trojuhelniku": 240,
+  "autor": "grrrrf: vlastní model (predmety/noc_predmety.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "náboj 7,62 × 51 do kulometu: mosazná nábojnice, měděná střela, 71 mm po +x, počátek na dně nábojnice; ve hře do inventáře, let kulky kreslí hra"
+ },
+ {
+  "soubor": "pochoden.glb",
+  "jmeno": "pochoden",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "pochodeň",
+   "en": "torch"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 0.6,
+  "rozmer_m": {
+   "x": [
+    -0.053,
+    0.053
+   ],
+   "y": [
+    -0.058,
+    0.069
+   ],
+   "z": [
+    0.0,
+    0.83
+   ]
+  },
+  "trojuhelniku": 1576,
+  "autor": "grrrrf: vlastní model (predmety/noc_predmety.py); zvuk torch_out.wav z OpenMW Example Suite (CC0)",
+  "licence": "GPL-2.0 (vlastní geometrie), zvuk CC0",
+  "zvuky": {
+   "zhasnuti": "pochoden_zhasnuti.wav"
+  },
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 4,
+   "tiku": 3
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.18
+   ],
+   "svetlo": [
+    0.0,
+    0.0,
+    0.68
+   ]
+  },
+  "poznamka": "pochodeň 0,62 m: dřevěná násada, železný kroužek, omotaná hlava; plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v plameni (teplá oranžová, dosah kolem 8 m), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo)"
+ },
+ {
+  "soubor": "lucerna.glb",
+  "jmeno": "lucerna",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "lucerna",
+   "en": "lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 1.2,
+  "rozmer_m": {
+   "x": [
+    -0.055,
+    0.055
+   ],
+   "y": [
+    -0.055,
+    0.055
+   ],
+   "z": [
+    0.0,
+    0.35
+   ]
+  },
+  "trojuhelniku": 2541,
+  "autor": "Roblox Lantern, Luigi2013 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/roblox-lantern-09e8f799eb2646ccb3e1fdeee69c42d2), převod predmety/noc_predmety.py bez renderu; plamen vlastní",
+  "licence": "CC BY 4.0 (uvést Luigi2013; změny: zmenšená, svítící sklo, plamen)",
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 4,
+   "tiku": 4
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.33999999999999997
+   ],
+   "svetlo": [
+    0.0,
+    0.005,
+    0.071
+   ]
+  },
+  "poznamka": "petrolejová lucerna 0,35 m (nádržka dole, sklo, víčko, ucho); uzel noc = sklo, které v noci svítí; plamen ve čtyřech snímcích plamen_00 až plamen_03 ve skle; prázdné uzly svetlo (ve skle) a uchyt (v uchu nahoře); počátek pod středem nádržky"
  }
 ]

@@ -72,7 +72,7 @@
   "poza": "jde: 8 snímků chůze jako uzly snimek_00..07 (stehna kývají, koleno nohy ve švihu pokrčené, ruce proti nohám, nejnižší noha vždy na zemi); jeden cyklus = dva kroky, asi 1,1 m",
   "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); pózy postavy/postavy_animace.py (kostra modelu), bez renderu",
   "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
-  "poznamka": "Mat, opravář (muž, ne holka): hráč: 'mat bude chodit ze dveří do dveří po městě, mat je opravář'. Počátek uprostřed těla na zemi (chodidla se hýbou), čelem k +x, metry, 34 288 trojúhelníků na snímek, sedm materiálů jen barvou bez textur, s normálami; nikdy nebledne"
+  "poznamka": "Mat, opravář (muž, ne holka): hráč: 'mat bude chodit ze dveří do dveří po městě, mat je opravář'. Počátek uprostřed těla na zemi (chodidla se hýbou), čelem k +x, metry, 34 288 trojúhelníků na snímek, sedm materiálů jen barvou bez textur, s normálami; nikdy nebledne; od 16. 10. kůže světlejší (Material.001 sRGB 232, 190, 160 místo hnědé 164, 125, 101; hráč: „mat má tmavý obličej hnědý, muže být světlejší“)"
  },
  {
   "soubor": "mat_toci.glb",
@@ -82,7 +82,7 @@
   "poza": "Mat točí pivo: pravá ruka na páce pípy, levá drží půllitr pod výtokem, hlava otočená doprava k holce, která si pro pivo přišla (hráč: „ten moment jak tocí pivo, kouka na holku ktera natuhuje ruce pro to pivo“, „se nehejbe jen ten moment“); jedna póza",
   "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_toci (kostra modelu, IK obou rukou, hlava k holce), půllitr vlastní, bez renderu",
   "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
-  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry; pípa (tělo) 0,30 m před ním, 0,06 m vpravo, 0,95 m vysoko, půllitr v ruce dnem 0,25 m před ním ve výšce 0,76 m (pultík a pípu staví domy/hospoda.py podle toho); 34 tisíc trojúhelníků, barvy bez textur, s normálami; nikdy nebledne"
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry; pípa (tělo) 0,30 m před ním, 0,06 m vpravo, 0,95 m vysoko, půllitr v ruce dnem 0,25 m před ním ve výšce 0,76 m (pultík a pípu staví domy/hospoda.py podle toho); 34 tisíc trojúhelníků, barvy bez textur, s normálami; nikdy nebledne; od 16. 10. kůže světlejší jako u mat"
  },
  {
   "soubor": "college_girl_pro_pivo.glb",
@@ -270,5 +270,31 @@
   "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza jako na druhém obrázku průmyslu (prumysl/holky_prumyslu.py, postavy/postavy.py), převod bez renderu (glb_pro_hru.py, u velkých glb_zmensi.py)",
   "licence": "CC BY 4.0 (uvést Rotmill)",
   "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, do 20 000 trojúhelníků, textury 1024 px, s normálami; u průmyslu dvakrát větší (meritko 2); nikdy nebledne"
+ },
+ {
+  "soubor": "mat_ridi.glb",
+  "jmeno": "mat_ridi",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "Mat řídí: sedí, stehna dopředu, lýtka dolů, trup mírně předkloněný, hlava na cestu, obě dlaně na věnci volantu 55° od jeho bližšího kraje na každou stranu (hráč: „bude řídit Mat Tatru“); jedna póza",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_ridi (kostra modelu, IK obou rukou), bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; při své velikosti (1,62 m) má hlavu 1,27 m nad sedem a chodidla 0,20 m pod ním. Je udělaný pro kabinu Tatry s meritko 0,74 (posádka nt_hasici_posadka v balíčku Tater): sed v kabině 1,53 m, střecha uvnitř 2,51 m, volant (věnec 0,25 m, sklon 14°) střed 0,407 m před sedem a 0,372 m nad ním; při jiném meritko ruce volant mine. 34 tisíc trojúhelníků, barvy bez textur, s normálami; nikdy nebledne"
+ },
+ {
+  "soubor": "chimata.glb",
+  "jmeno": "chimata",
+  "druh": "postava",
+  "vyska_m": 1.79,
+  "poza": "postava s kostrou a animací modelu „klid“ (13 s ve smyčce); pro interiéry domů",
+  "animace": {
+   "klid": {
+    "delka_s": 13.0,
+    "smycka": true
+   }
+  },
+  "autor": "Chimata for Touhou Multi Scroll Shooting 2, skydash (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/chimata-for-touhou-multi-scroll-shooting-2-d0ac86d260254fcd9c8804918f88b8de), převod postavy/chimata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést skydash; změny: otočená, textury nejvýš 1024 px, materiály metallic-roughness)",
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, kostra (skins) a animace klid (glTF animations), 22347 trojúhelníků, 6 textury nejvýš 1024 px; do interiérů (hráč: soubor „do interieru“); mimo kabinu meritko 2 jako holky, v domech mírného klimatu meritko 1 (hráčova velikost)"
  }
 ]
