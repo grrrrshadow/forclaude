@@ -166,9 +166,10 @@ static bool MapDragBegin()
 	_drag.window = w;
 	_drag.began = std::chrono::steady_clock::now();
 
-	/* The pin: the drawn cursor stays here and the video driver puts the
-	 * system's pointer back here on every move, so each move message carries
-	 * only how far the hand went since the last one. */
+	/* The pin: the drawn cursor stays here, and each move carries only how far
+	 * the hand went since the last one. The Windows driver does not put the
+	 * system's pointer back while the button is held -- under Wine that lost
+	 * the release (win32_v.cpp, _pointer_free) -- but once it is let go. */
 	_cursor.fix_at = true;
 
 	MouseDebugLog(fmt::format("tazeni (nase): zacatek stiskem praveho v ({},{}) nad oknem tridy {}", x, y, to_underlying(w->window_class)));

@@ -540,6 +540,47 @@ static bool AnyMouseButtonHeld()
 	return (GetKeyState(VK_LBUTTON) & 0x8000) != 0 || (GetKeyState(VK_RBUTTON) & 0x8000) != 0 || (GetKeyState(VK_MBUTTON) & 0x8000) != 0;
 }
 
+/*
+ * The pointer while a button is held, in this feature's own scroll mode (map_drag.cpp) and the turn of the view with
+ * the middle button (three_d.h); the game's own modes are left as they are. The drawn cursor stays where the button
+ * went down, as before, but the system's pointer is no longer put back there (SetCursorPos) on every move while the
+ * button is held: it goes its own way, hidden, and the map follows how far it went. Under Wine every SetCursorPos
+ * grabs the pointer for a moment, and a release made in that moment went to Wine's desktop window and was lost --
+ * the right button stuck down, the system itself calling it held (the player's logs of 17. 10.; the report of the
+ * Winlator side, grrrrshadow/cota MYS-REPORT.md). The game put the pointer back fifty times a second, so in a long drag
+ * the release fell into one of those moments sooner or later. Now the pointer is put back once, when the buttons are
+ * let go (nothing held, nothing to lose); under Windows itself also when it comes to the edge of the window, which
+ * under Wine it never does while a button is held (the drag stops at the edge there).
+ */
+static bool _pointer_free = false;  ///< the system's pointer goes its own way while the drawn cursor stays pinned
+static POINT _pointer_free_last{};  ///< where it was at the last move, client coordinates
+/** How near the edge of the window the free pointer is put back under Windows itself, pixels. */
+static constexpr int POINTER_FREE_EDGE = 16;
+
+/** Whether the pin is this feature's own: its drag of the map, the turn of the view with the middle button. */
+static bool PinnedOurOwn()
+{
+	return _cursor.fix_at && (MapDragOn() || _middle_button_down);
+}
+
+/** Whether this runs under Wine (GetWineVersion()), asked once. */
+static bool UnderWine()
+{
+	static const bool wine = GetWineVersion().has_value();
+	return wine;
+}
+
+/** Put the free pointer back where the drawn cursor is, once nothing is pinned and no button is held any more. */
+static void PutFreePointerBack(HWND hwnd)
+{
+	if (!_pointer_free || _cursor.fix_at || AnyMouseButtonHeld()) return;
+	_pointer_free = false;
+	POINT pt{_cursor.pos.x, _cursor.pos.y};
+	ClientToScreen(hwnd, &pt);
+	SetCursorPos(pt.x, pt.y);
+	MouseDebugLog(fmt::format("ukazatel po pusteni vracen na misto kurzoru ({},{}) (SetCursorPos, nic neni drzeno)", _cursor.pos.x, _cursor.pos.y));
+}
+
 LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
 	static uint32_t keycode = 0;
@@ -617,6 +658,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * very message that would have put it right. */
 			if (!AnyMouseButtonHeld()) ReleaseCapture();
 			HandleMouseEvents();
+			PutFreePointerBack(hwnd);
 			return 0;
 
 		case WM_MBUTTONDOWN:
@@ -632,6 +674,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MouseDebugLog("zprava WM_MBUTTONUP");
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
+			PutFreePointerBack(hwnd);
 			return 0;
 
 		case WM_RBUTTONDOWN:
@@ -657,6 +700,7 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			MouseDebugLog(fmt::format("zprava WM_RBUTTONUP (system: L={} R={})", (GetKeyState(VK_LBUTTON) & 0x8000) != 0, (GetKeyState(VK_RBUTTON) & 0x8000) != 0));
 			if (!AnyMouseButtonHeld()) ReleaseCapture(); // see WM_LBUTTONUP
 			HandleMouseEvents();
+			PutFreePointerBack(hwnd);
 			return 0;
 
 		case WM_CAPTURECHANGED:
@@ -708,6 +752,47 @@ LRESULT CALLBACK WndProcGdi(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 			 * was made (MK_RBUTTON), unasked -- against which map_drag.cpp
 			 * holds what the game remembers. */
 			MapDragSystemButton((wParam & MK_RBUTTON) != 0, "WM_MOUSEMOVE");
+
+			const bool held = (wParam & (MK_LBUTTON | MK_RBUTTON | MK_MBUTTON)) != 0;
+			if (PinnedOurOwn() && held) {
+				/* This feature's own pin with a button held: the pointer is not put back (see _pointer_free); the
+				 * drawn cursor stays, the move is how far the pointer went since the last message. */
+				if (!_pointer_free) {
+					/* It was at the cursor when the pin began: the press was made there. */
+					_pointer_free = true;
+					_pointer_free_last = {_cursor.pos.x, _cursor.pos.y};
+				}
+				_cursor.delta.x = x - _pointer_free_last.x;
+				_cursor.delta.y = y - _pointer_free_last.y;
+				_pointer_free_last = {x, y};
+				bool back = false;
+				if (!UnderWine() && (x < POINTER_FREE_EDGE || y < POINTER_FREE_EDGE || x >= _screen.width - POINTER_FREE_EDGE || y >= _screen.height - POINTER_FREE_EDGE)) {
+					/* Under Windows itself, at the edge of the window: back to the cursor, so the drag goes on. */
+					POINT pt{_cursor.pos.x, _cursor.pos.y};
+					_pointer_free_last = pt;
+					ClientToScreen(hwnd, &pt);
+					SetCursorPos(pt.x, pt.y);
+					back = true;
+				}
+				MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}) volny ukazatel, posun ({},{}){}", x, y, _cursor.delta.x, _cursor.delta.y, back ? " -> u okraje okna vracen (SetCursorPos, Windows)" : ""));
+				MyShowCursor(false);
+				HandleMouseEvents();
+				return 0;
+			}
+			if (_pointer_free && (!_cursor.fix_at || !held)) {
+				/* The pin is over, or no button is held under it any more: the pointer back where the drawn cursor is
+				 * when nothing is held (a pin still on then goes on the old way, from there); else the pin is over
+				 * and the cursor goes to the pointer, where it is. */
+				_pointer_free = false;
+				if (!held) {
+					POINT pt{_cursor.pos.x, _cursor.pos.y};
+					ClientToScreen(hwnd, &pt);
+					SetCursorPos(pt.x, pt.y);
+					MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}): konec pripichnuti, ukazatel vracen na misto kurzoru ({},{}) (SetCursorPos, nic neni drzeno)", x, y, _cursor.pos.x, _cursor.pos.y));
+					x = _cursor.pos.x;
+					y = _cursor.pos.y;
+				}
+			}
 
 			bool warp = _cursor.UpdateCursorPosition(x, y);
 			MouseDebugLog(fmt::format("zprava WM_MOUSEMOVE ({},{}){}", x, y, warp ? " -> ukazatel vracen (SetCursorPos)" : ""));

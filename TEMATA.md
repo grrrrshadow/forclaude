@@ -18,10 +18,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Vanilla zůstává vanilla. Naše obrázky jen 32bpp, žádný grfcodec (jen yagl), kolegovy obrázky neupravovat.
 - Kód OpenMW (GPL 3) nebrat, hra je GPL 2. Brát jen nápady. Example Suite od OpenMW je CC0 (modely smí).
 - Kolegovi psát jen do `hra/...` v grrrrf.
+- Repo `grrrrshadow/cota` (Winlator DL, hráčův Winlator na telefonu) číst jako grrrrf: neklonovat celé, jen
+  `git clone --filter=blob:none --no-checkout --depth 1` do scratchpadu a `git show origin/main:<soubor>`.
+- **Myš: vanilla režimy neměnit, jen náš režim** (`map_drag.cpp`) a naše otáčení prostředním tlačítkem. Opravy
+  Windows/Wine/Winlatoru nedělat ani na ně nespoléhat – „musíme spravit hru, ne předělat deset let starou chybu“.
 - **Velikost holek určuje hráč** (17. 10.: „vyser se na kolegu a udělej ty holky velikost… jestli potom někdo změní
   velikost holky, tak ho smažu“). Holky u domů a za volantem: pravá velikost (`meritko` 1 v `objekty/mirne`).
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
+
+## 18. 10. – pravé tlačítko zaseklé pod Wine: hra už nevrací ukazatel, dokud je tlačítko dole
+
+- Hráč: pravé tlačítko zůstává zmáčklé, dokud ho znovu nezmáčkne (logy myši 17. 10. 01:45 a 13:29). Rozbor na
+  straně Winlatoru (`cota/MYS-REPORT.md`): Wine při každém `SetCursorPos` na chvilku chytí ukazatel (XGrabPointer),
+  X server Winlatoru tím zahodí držení tlačítka, a puštění v tu chvilku dostane okno plochy a Wine ho zahodí –
+  systém (`GetAsyncKeyState`, `MK_RBUTTON`) pak tlačítko hlásí dole. Hra vracela ukazatel ~50× za sekundu, takže při
+  dlouhém tažení se puštění do té chvilky dřív nebo později trefilo. Hráč opravu ve Winlatoru ruší: má se spravit hra.
+- **Oprava (jen náš režim a otáčení prostředním):** dokud je tlačítko dole, hra ukazatel nevrací (`SetCursorPos` se
+  nevolá). Nakreslený kurzor stojí na místě stisku jako dřív, skrytý systémový ukazatel jde volně a mapa jede podle
+  jeho pohybu (`win32_v.cpp`, `_pointer_free`). Po puštění se ukazatel jednou vrátí na místo kurzoru (nic není
+  drženo, nic se neztratí). Na samotných Windows se vrátí i u okraje okna; pod Wine nikdy, dokud je tlačítko dole
+  (tah tam u okraje okna skončí). Vanilla režimy beze změny. Neověřeno (Windows kód se tu nepřeloží) – zkouší hráč.
+- „bez návěsu bez tahačů“ – zatím nevím, k čemu to je; zeptat se.
 
 ## 17. 10. – domy až při kreslení; pokrytí atlasu a 0° rozpracované
 
