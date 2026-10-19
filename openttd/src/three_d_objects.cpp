@@ -39,6 +39,10 @@
 #include "timer/timer_window.h"
 #include "timer/timer_game_calendar.h"
 #include "settings_type.h"
+#include "error.h"
+#include "strings_func.h"
+#include "window_func.h"
+#include "table/strings.h"
 
 #include <algorithm>
 #include <array>
@@ -97,6 +101,74 @@ static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 static std::map<std::string, size_t, std::less<>> _three_d_addons;
 /** The street lamps (MakeStreetLamps()) by the place of the game's street light on its tile, dx * 16 + dy: objects in _three_d_objects. */
 static std::map<int, size_t> _three_d_street_lamps;
+
+/*
+ * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
+ * houses are the boxes, the clay towns' are 3D): where each index was read from, every file that could not be read
+ * and why, and every set (NewGRF) whose houses have no 3D objects (ITL Houses, which takes the place of all the
+ * game's houses) -- such a house is drawn as the boxes, so far without a word. The first such problem the player is
+ * told of in the game, once.
+ */
+static std::mutex _read_diary_mutex;
+static std::optional<FileHandle> _read_diary;
+static std::string _read_problem;      ///< the first problem, to tell the player
+static bool _read_problem_told = false;
+static std::set<uint32_t> _boxed_house_sets; ///< the sets whose houses were told of as drawn without objects
+
+/** A line of the diary; a problem (a file not read) told to the player if it is the first. */
+static void ReadDiary(std::string_view line, bool problem)
+{
+	std::lock_guard lock(_read_diary_mutex);
+	if (!_read_diary.has_value()) _read_diary = FileHandle::Open(_personal_dir + "3d_domy.log", "w");
+	if (_read_diary.has_value()) {
+		std::string text(line);
+		text += '\n';
+		fwrite(text.data(), 1, text.size(), *_read_diary);
+		fflush(*_read_diary);
+	}
+	if (problem && _read_problem.empty()) _read_problem = line;
+}
+
+/**
+ * A house of a set (NewGRF) drawn in the turned view without a 3D object (no package of the set has it): its set
+ * told of, once.
+ * @param house the house of its north tile, one of a set
+ */
+void NoteThreeDHouseBoxed(HouseID house)
+{
+	const HouseSpec *hs = HouseSpec::Get(house);
+	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return;
+	const uint32_t grfid = hs->grf_prop.grfid;
+	/* (Asked for every such tile drawn: the set of the last one at once, without the lock.) */
+	static std::atomic<uint32_t> last{0};
+	if (last.load(std::memory_order_relaxed) == grfid) return;
+	{
+		std::lock_guard lock(_read_diary_mutex);
+		last.store(grfid, std::memory_order_relaxed);
+		if (!_boxed_house_sets.insert(grfid).second) return;
+	}
+	/* (The game's own houses, which have the objects, a set may switch off: ITL Houses all of them.) */
+	uint originals = 0;
+	for (HouseID h = 0; h < NEW_HOUSE_OFFSET; h++) {
+		if (HouseSpec::Get(h)->enabled) originals++;
+	}
+	const GRFConfig *config = GetGRFConfig(grfid);
+	const std::string name = config != nullptr ? config->GetName() : fmt::format("{:08X}", std::byteswap(grfid));
+	ReadDiary(fmt::format("domy z GRF {} nemají 3D model, kreslí se krabice; zapnutých původních domů hry (ty jsou 3D): {}", name, originals), true);
+}
+
+/** The player told once, in a window, of the first file of a 3D object not read (and so drawn as the boxes). */
+static const IntervalTimer<TimerWindow> _read_problem_timer(std::chrono::seconds(2), [](auto) {
+	std::string problem;
+	{
+		std::lock_guard lock(_read_diary_mutex);
+		if (_read_problem.empty() || _read_problem_told) return;
+		if (FindWindowById(WindowClass::MainWindow, 0) == nullptr) return;
+		_read_problem_told = true;
+		problem = _read_problem;
+	}
+	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_BOXES, problem), {}, WarningLevel::Warning);
+});
 
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
@@ -777,6 +849,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 	} close_after{*glb};
 	if (!glb->error.empty()) {
 		Debug(misc, 0, "3D object {}: {}", path, glb->error);
+		ReadDiary(fmt::format("soubor {}: {}", path, glb->error), true);
 		return false;
 	}
 	using Matrix = std::array<double, 16>; // column-major
@@ -1163,6 +1236,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		}
 	} catch (const std::exception &e) {
 		Debug(misc, 0, "3D object {}: {}", path, e.what());
+		ReadDiary(fmt::format("soubor {}: {}", path, e.what()), true);
 		return false;
 	}
 	return !mesh.tri.empty();
@@ -2308,6 +2382,7 @@ static void ReadThreeDObjects()
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+			ReadDiary(fmt::format("index {}: {} záznamů", index, list.size()), false);
 			const std::map<std::string, IndustryPartMesh> parts = ReadIndustryParts(list, folder);
 			for (const auto &e : list) {
 				const std::string kind = e.value("druh", std::string("dum"));
@@ -2402,6 +2477,7 @@ static void ReadThreeDObjects()
 			}
 		} catch (const std::exception &ex) {
 			Debug(misc, 0, "3D objects {}: {}", index, ex.what());
+			ReadDiary(fmt::format("index {}: {} (zbytek indexu se nečetl)", index, ex.what()), true);
 		}
 	}
 	MakeStreetLamps();
@@ -2430,6 +2506,15 @@ static void ReadThreeDObjects()
 		}
 	}
 	Debug(misc, 1, "3D objects: {} read from {} index(es) in {} ms, the houses' shapes as they are drawn", _three_d_objects.size(), indices.size(), std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+	if (indices.empty()) {
+		ReadDiary("žádný index baseset/decouple/objekty/<sada>/objekty.json se nenašel, všechny domy jsou krabice", true);
+	} else {
+		std::set<HouseID> plain, themed;
+		for (const auto &[key, i] : _three_d_house_objects) (std::get<0>(key) == 0 ? plain : themed).insert(std::get<1>(key));
+		std::set<std::pair<uint32_t, uint16_t>> grf;
+		for (const auto &[key, i] : _three_d_grf_house_objects) grf.emplace(std::get<0>(key), std::get<1>(key));
+		ReadDiary(fmt::format("celkem {} objektů z {} indexů; 3D model má {} domů hry, {} domů tematických měst a {} domů z GRF", _three_d_objects.size(), indices.size(), plain.size(), themed.size(), grf.size()), false);
+	}
 }
 
 /**
@@ -5718,6 +5803,7 @@ bool ThreeDObject::Read() const
 		}
 		if (ok) LayAddons(*this, read);
 		Debug(misc, 2, "3D object {}: {} triangles read in {} ms", this->name, read.tri.size() / 3, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+		if (!ok) ReadDiary(fmt::format("budova {} ({}) se nenačetla, kreslí se krabice", this->name, this->glb_path.empty() ? std::string("jen doplňky") : this->glb_path), true);
 		return std::make_pair(ok, std::move(read));
 	}, [this](std::pair<bool, ThreeDObject> made) {
 		/* (The objects are in _three_d_objects, never const themselves: what is read is put into them once.) */

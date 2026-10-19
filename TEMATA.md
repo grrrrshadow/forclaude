@@ -27,6 +27,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 19. 10. – mírné domy jako krabice v nové hře (ITL Houses); deník 3d_domy.log
+
+- Hráč (build #286, telefon): v nové hře jsou mírné domy „původní naše krabice“, hliněná města a Tatry jsou 3D.
+  Nastavení 3D domů má v cfg správně (`three_d_houses = 0`).
+- **Příčina:** seznam GRF pro novou hru (`[newgrf]` v hráčově cfg) má ITL Houses 2.3. ITL vypne všech 95 původních
+  domů a staví svoje. Ty nemají 3D objekty (žádný balíček, jaký mají Tatry), tak se kreslí krabicemi svých spritů.
+  Hliněná města staví naše domy, proto jsou 3D. Ověřeno v rigu i na #285: nová hra s ITL má krabice. Hráčův save
+  ITL nemá a v rigu je s hráčovým cfg 3D (procesor i karta).
+- **Caribbean (TT20) a ITL:** Caribbean bez ITL ≥ 1.4.0 dává fatální chybu (Action 0B Fatal) a hra ho vypne. Hra
+  se spustí, ale karibské průmysly v ní nejsou. Chyba, se kterou Caribbean běží, je jiná: mimo subtropické klima
+  napíše „intended for the sub-tropical climate“, což je jen upozornění. ITL domy přijímají a vyrábějí náklad pro
+  karibské průmysly (překladová tabulka ITL: FOOD, BEER, WATR, FUEL, VEHI, BDMT, RCYC, WSTE …). Proto ho Caribbean
+  chce. Caribbean je GPL 3, kolega ho má rozbalený v grrrrf (`rozbalene/caribbean-2.7`, yagl).
+- Hráč chce „Caribbean bez něčeho jiného“. Jak, se domlouvá. Hra GRF nic nestrká, takže jde jen o mody: buď
+  Caribbean bez podmínky ITL, nebo ITL s balíčkem 3D objektů jako Tatry.
+- **Deník `3d_domy.log`** v hráčově složce OpenTTD (`three_d_objects.cpp`, `ReadDiary()`) zapisuje:
+  - každý index a počet jeho záznamů;
+  - každý soubor, který se nepřečetl, a proč (budova se pak kreslí krabicí);
+  - každou GRF sadu, jejíž domy nemají 3D model, s počtem zapnutých původních domů hry (`NoteThreeDHouseBoxed()`).
+  První takový problém hra jednou ukáže v okně (`STR_ERROR_THREE_D_BOXES`).
+
 ## 19. 10. – psi, zvířata, strašidla a houby od kolegy (par13)
 
 - Kolega dodal (`PSI-ZVIRATA-HOUBY-PRO-HRU.md`): sadu `psi` (31: 8 na prodej, 19 do ulic, vlk u dveří,

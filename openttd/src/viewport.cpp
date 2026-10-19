@@ -4136,6 +4136,9 @@ static void ViewportDoDrawTurned()
 					}
 					/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()). */
 					if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
+				} else if (north >= NEW_HOUSE_OFFSET && _settings_client.gui.three_d_houses == 0) {
+					/* A set's house without an object (ITL Houses): its boxes below, the set told of once. */
+					NoteThreeDHouseBoxed(north);
 				}
 			}
 		}

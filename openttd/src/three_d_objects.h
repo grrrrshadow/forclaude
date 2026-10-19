@@ -857,6 +857,7 @@ struct ThreeDModelPicture;
 bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, float yaw, ZoomLevel zoom, ThreeDModelPicture &out);
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme = 0);
 const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin);
+void NoteThreeDHouseBoxed(HouseID house);
 /** A texture of an object wanted for drawing: the object, the level of detail and the paint (PrepareThreeDObjectTextures()). */
 struct ThreeDTextureWanted {
 	const ThreeDObject *obj;
