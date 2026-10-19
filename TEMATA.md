@@ -27,6 +27,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 19. 10. – #286: houby nevidět, obří houby nesvítí, psi nejsou
+
+- Hráč (#286, telefon): „malý houby nejsou vůbec a velký zespod taky nesvítí“, „nejsou psi, opice, v tom buildu něco
+  chybí“. **Build je celý:** zip #286 jsem stáhl a porovnal se zdrojem. Má všech 589 souborů sad, psi, zvirata,
+  strasidla i houby. Indexy mají jen konce řádků CRLF a hra je čte stejně.
+- **Malé houby (chyba hry):** v pohledu z očí se figura dál od oka kreslí obrázkem z mapy. Ten má u 5–10 cm houby
+  1–2 pixely, takže houba už od 1,5 m zmizí. Nově se malá věc kreslí po trojúhelnících (zjednodušených podle velikosti
+  na obrazovce), když by obrázek byl víc než 3× hrubší než místo na obrazovce, nebo měl méně než 4 pixely. Ověřeno:
+  houba je vidět z 2,6 i 5,6 m, ve dne i v noci.
+- **Obří houby nesvítí (chyba hry):** sdílená paměť tvarů měla klíč jen podle souboru. Noční podoba stromu
+  `<jmeno>/noc` je ze stejného .glb, takže dostala denní tvar, přečtený jako první, bez svítícího spodku. Klíč teď
+  rozlišuje noc (`night_glass`), světla snímků i vynechaný uzel. Ověřeno: choroše svítí.
+- **Svit po setmění:** dřív se svítící díly kreslily se světlem dne i vlastním svitem, takže barva přepálila do bílé.
+  Teď se kreslí jen vlastním svitem v barvě materiálu (choroš #9FE8FF světle modrý, ne bílý).
+- **Dům háj:** jeho obří houby nesvítí, protože model nemá svítící materiál. Uzel `noc` jsou jen lucerny ve výšce
+  kolem 2 m. Kolegův `domy/houby_noc.py` udělal svit jen čtyřem houbám-stromům. Hráč chce: „ať dům háj svítí i nahoru
+  všude“.
+- **Zem pod houbami:** kolega dal pod klobouky místa `svetlo_NN` („záře tu osvětluje zem“). Hra je u stromů-hub
+  nečte. Na mapě shora tak svit vidět není, spodek klobouku je pod kloboukem.
+- **Psi:** v hráčově savu v rigu žijí (pes v ulici, vlci u dveří, prodavač). Pes poslaný 3 m a 12 m před chodce je
+  vidět. Na 40 m se pes neukáže, protože jeho obrázek z mapy se nenakreslí. Psi se rodí 4–7 dlaždic od chodce
+  (60–100 m), tam má pes na obrazovce pár pixelů.
+
 ## 19. 10. – mírné domy jako krabice v nové hře (ITL Houses); deník 3d_domy.log
 
 - Hráč (build #286, telefon): v nové hře jsou mírné domy „původní naše krabice“, hliněná města a Tatry jsou 3D.

@@ -4082,6 +4082,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.addon + "/" + w.node;
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
 	if (!this->only_node.empty()) key += "|u" + this->only_node;
+	/* Read otherwise, so a shape of its own (the player, #286: the clay town's giant mushroom at night was its day's
+	 * shape, read first, without the glowing underside of its cap): the night kept or left out, a node left out. */
+	if (this->night_glass) key += "|n";
+	if (this->frame_lights) key += "|f";
+	if (!this->skip_node.empty()) key += "|x" + this->skip_node;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;

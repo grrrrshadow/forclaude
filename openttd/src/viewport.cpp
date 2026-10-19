@@ -8482,14 +8482,18 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				if (std::max({va.sx, vb.sx, vc.sx}) < 0 || std::min({va.sx, vb.sx, vc.sx}) >= width || std::max({va.sy, vb.sy, vc.sy}) < 0 || std::min({va.sy, vb.sy, vc.sy}) >= height) continue;
 				CabRasterTriangle(dst, zb, width, height, tex->px.data(), tex->w, tex->h, va, vb, vc, CAB_REPEAT, light);
 				if (glow != 0 && _cab_glow_after_night != nullptr) {
-					/* Again after the dark, a hair nearer (its place in the texture the same). */
+					/* Again after the dark, a hair nearer (its place in the texture the same), by its own light alone: the
+					 * colour the material shines in, not that and the day's light over it (the clay town's giant
+					 * mushrooms glowing under their caps were white, the colleague's colours lost). */
 					auto nearer = [](CabVertex q) {
 						q.iw *= 1.0005;
 						q.uw *= 1.0005;
 						q.vw *= 1.0005;
 						return q;
 					};
-					_cab_glow_after_night->push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, nearer(va), nearer(vb), nearer(vc), CAB_REPEAT, light, _cab_glass_alpha});
+					const Colour e(glow);
+					const uint own = std::max<uint>({e.r, e.g, e.b, 1});
+					_cab_glow_after_night->push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, nearer(va), nearer(vb), nearer(vc), CAB_REPEAT, own, _cab_glass_alpha});
 				}
 				continue;
 			}
@@ -10221,7 +10225,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const ThreeDVehicleShape *model_shape = model != nullptr ? model->TryGetShape(fg.frame) : nullptr;
 		const double extent = model_shape == nullptr ? 0.0 : std::max({(model_shape->x1 - model_shape->x0) * fg.along, model_shape->y1 - model_shape->y0, model_shape->z1 - model_shape->z0}) * fg.size * OBJECT_UNITS_PER_METRE;
 		if (foot.f < -extent) continue; // all of it behind the eye
-		fg.solid = fg.own_cab || fg.missile || (fg.plant ? foot.f < CAB_PLANT_SOLID : extent * eye.focal >= _cab_solid_pixels * std::max(foot.f, CAB_NEAR));
+		/* Near, a finer picture: about a pixel of it to a pixel of the view; a big one far, a coarser one. */
+		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : (foot.f > CAB_COARSE ? ZoomLevel::Out2x : ZoomLevel::Normal));
+		const double per = std::pow(2.0, to_underlying(fine) - to_underlying(ZoomLevel::Normal));
+		/* A small thing (the player, #286: the mushrooms a hand high "are not there at all", nor the dogs): its picture
+		 * would be far coarser than the place it takes on the screen, or but a few pixels, and it is lost -- drawn by
+		 * its triangles instead, as simple as its size on the screen allows. */
+		const double on_screen = extent * eye.focal / std::max(foot.f, CAB_NEAR);
+		const double in_picture = extent / (CAB_PX_ACROSS * per);
+		const bool small = !fg.plant && extent > 0 && on_screen >= 1.0 && (on_screen > 3.0 * in_picture || in_picture < 4.0);
+		fg.solid = fg.own_cab || fg.missile || small || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels);
 		if (fg.solid) {
 			/* What it needs, if it is there (CabFigureReady()): drawn by its triangles as a job of the frame, after the
 			 * billboards, all of them at once on every core (the depth sorts them out). */
@@ -10235,9 +10248,6 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
-		/* Near, a finer picture: about a pixel of it to a pixel of the view; a big one far, a coarser one. */
-		const ZoomLevel fine = foot.f < 3.0 * TILE_SIZE ? ZoomLevel::In4x : (foot.f < 8.0 * TILE_SIZE ? ZoomLevel::In2x : (foot.f > CAB_COARSE ? ZoomLevel::Out2x : ZoomLevel::Normal));
-		const double per = std::pow(2.0, to_underlying(fine) - to_underlying(ZoomLevel::Normal));
 		/* A vehicle at the angle the eye sees it at, in steps of 5 degrees (GetThreeDEyeVehiclePicture()). */
 		const ThreeDModelPicture *pic = fg.obj != nullptr ? GetThreeDEyeVehiclePicture(CabFigureVehicle(fg), fine, static_cast<float>(yaw_deg)) :
 				fg.plant ? GetThreeDPlantPicture(fg.name, fg.size, fg.stretch, fg.facing, fine, nullptr, side) : GetThreeDFigurePicture(fg.name, fg.size, fg.facing, fine, INVALID_TILE, 0, nullptr, fg.frame, side);
