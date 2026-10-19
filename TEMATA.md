@@ -54,6 +54,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   inventáře (věc „Houby“), dole se ukáže „E: utrhnout houbu (…)“; utržená doroste asi za měsíc. K čemu houby
   jsou, zatím nevím – nosí se.
 - Obří houby hliněného města mají v noci svítící spodky (figura `/noc`).
+- Tatra osobní v9 s Trabantem (hráčův balíček `Tatra_osobni_3D-v9`, MAXt) ověřena v rigu bez úprav hry: Trabant
+  z dílů v `doplnky` (hlavní glb jen délka), kola v dílech, Tatra 603 a 613 – na mapě i z očí.
 - Rig: `test3d zvirata` (druhy, houby, kdo je kolem), `zvirata posli <jmeno> [metru]`, `zvirata uder`,
   `zvirata pes <jmeno>`, `zvirata koupit [jmeno]`, `zvirata houba`, `zvirata utrhni`.
 
