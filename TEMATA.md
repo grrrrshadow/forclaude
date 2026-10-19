@@ -40,8 +40,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   napíše „intended for the sub-tropical climate“, což je jen upozornění. ITL domy přijímají a vyrábějí náklad pro
   karibské průmysly (překladová tabulka ITL: FOOD, BEER, WATR, FUEL, VEHI, BDMT, RCYC, WSTE …). Proto ho Caribbean
   chce. Caribbean je GPL 3, kolega ho má rozbalený v grrrrf (`rozbalene/caribbean-2.7`, yagl).
-- Hráč chce „Caribbean bez něčeho jiného“. Jak, se domlouvá. Hra GRF nic nestrká, takže jde jen o mody: buď
-  Caribbean bez podmínky ITL, nebo ITL s balíčkem 3D objektů jako Tatry.
+- **Rozhodnuto (hráč: „caribien jako firs, domy budovy průmyslu krabicí a bez itl houses, podmínky pryč, bez
+  omezení“):** Caribbean jako FIRS, bez ITL. Domy jsou naše 3D, budovy průmyslu krabice (jako u každé GRF sady
+  průmyslu). Upravený Caribbean nemá žádnou podmínku. Všech 295 záznamů Action 0B (59 podmínek po 5 jazycích:
+  ITL, subtropické klima, inflace, verze hry, nesnášenlivost s ECS, FIRS, NewCargos…) je nahrazeno neškodným
+  Action 0D do nepoužitého parametru 0x60. Počet záznamů zůstal, takže všechny skoky vedou tam, kam vedly.
+  Jméno „Industries of the Caribbean 2.7 (Decouple, bez podminek)“ a v popisu poznámka o úpravě (GPL 3).
+  GRF ID TT20 zůstává, aby šly savy s Caribbean. Skript je ve scratchpadu `skripty/carib_bez_podminek.py`.
+  K překladu yaglem chybí původní GRF (obrázky). GitHub autora (2TallTyler) i BaNaNaS jsou ze sítě zavřené,
+  takže soubor má poslat hráč.
+- Města bez ITL nebudou brát ani dávat palivo, auta, stavební materiál a odpad, takže tyhle řetězce nepojedou.
+  Hráč to ví z nabídky (bod 1).
 - **Deník `3d_domy.log`** v hráčově složce OpenTTD (`three_d_objects.cpp`, `ReadDiary()`) zapisuje:
   - každý index a počet jeho záznamů;
   - každý soubor, který se nepřečetl, a proč (budova se pak kreslí krabicí);
