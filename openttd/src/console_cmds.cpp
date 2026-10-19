@@ -8767,6 +8767,38 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
 			}
 		}
+	} else if (what == "domy") {
+		/* 'domy': the houses of the town nearest the middle of the main view, each kind once: its number, its set's
+		 * (the GRF's id and its number there, the original it stands for), and whether it is drawn as a 3D object. */
+		Point p = TranslateXYToTileCoord(*w->viewport, w->viewport->left + w->viewport->width / 2, w->viewport->top + w->viewport->height / 2, true);
+		const Town *town = ClosestTownFromTile(TileVirtXY(p.x, p.y), UINT_MAX);
+		if (town == nullptr) return true;
+		std::map<HouseID, int> seen;
+		for (const TileIndex t : Map::Iterate()) {
+			if (!IsTileType(t, TileType::House) || GetTownIndex(t) != town->index) continue;
+			HouseID h = GetHouseType(t);
+			if (GetHouseNorthPart(h) != 0) continue;
+			seen[h]++;
+		}
+		/* The original houses the town could build: those a set replaced ("override") are switched off. */
+		int originals = 0, replaced = 0;
+		for (HouseID h = 0; h < NEW_HOUSE_OFFSET; h++) {
+			const HouseSpec *hs = HouseSpec::Get(h);
+			if (!hs->building_availability.Any()) continue;
+			(hs->enabled ? originals : replaced)++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: domy mesta {}: puvodnich domu zapnutych {}, vypnutych (nahrazenych sadou) {}", town->GetCachedName(), originals, replaced);
+		for (const auto &[h, n] : seen) {
+			const HouseSpec *hs = HouseSpec::Get(h);
+			HouseID north = h;
+			TileIndex any = INVALID_TILE;
+			for (const TileIndex t : Map::Iterate()) {
+				if (IsTileType(t, TileType::House) && GetTownIndex(t) == town->index && GetHouseType(t) == h) { any = t; break; }
+			}
+			const ThreeDObject *obj = any != INVALID_TILE ? GetThreeDHouseObjectAt(north, any) : nullptr;
+			IConsolePrint(CC_DEFAULT, "test3d: dum {:#x} x{} grf {:08X} cislo {:#x} misto {:#x} povolen {} -> {}", h, n, hs->grf_prop.grffile != nullptr ? std::byteswap(hs->grf_prop.grfid) : 0,
+					hs->grf_prop.local_id, hs->grf_prop.subst_id, hs->enabled ? "ano" : "ne", obj != nullptr ? obj->name : std::string("krabice"));
+		}
 	} else if (what == "mesta") {
 		/* Where the towns are, for the rig: the game's own industries must be built in one. */
 		for (const Town *t : Town::Iterate()) IConsolePrint(CC_DEFAULT, "test3d: town {} at {},{} population {}{}", t->GetCachedName(), TileX(t->xy), TileY(t->xy), t->cache.population, t->theme == TownTheme::Clay ? " hlinene" : "");
