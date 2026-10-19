@@ -1,0 +1,413 @@
+[
+ {
+  "soubor": "los.glb",
+  "jmeno": "los",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "los",
+   "en": "moose"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.96,
+   1.36,
+   2.4
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 6394,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "wapiti.glb",
+  "jmeno": "wapiti",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "wapiti",
+   "en": "elk"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.26,
+   1.4,
+   2.4
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 7886,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "jelen.glb",
+  "jmeno": "jelen",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "jelen",
+   "en": "deer"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.98,
+   0.88,
+   1.8
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 7948,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "lan.glb",
+  "jmeno": "lan",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "laň",
+   "en": "doe"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.83,
+   0.38,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5216,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "vidloroh.glb",
+  "jmeno": "vidloroh",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "vidloroh",
+   "en": "pronghorn"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.59,
+   0.38,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 4688,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "ovce_tlustoroha.glb",
+  "jmeno": "ovce_tlustoroha",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ovce tlustorohá",
+   "en": "bighorn sheep"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.46,
+   0.5,
+   1.2
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5518,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "medved.glb",
+  "jmeno": "medved",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "medvěd",
+   "en": "bear"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.94,
+   0.65,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "vyprovokovat",
+  "trojuhelniku": 7508,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "zirafa.glb",
+  "jmeno": "zirafa",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "žirafa",
+   "en": "giraffe"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   4.32,
+   1.48,
+   5.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "idle_02",
+    "snimku": 57,
+    "tiku": 5
+   },
+   "chuze": {
+    "animace": "walk",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 2.78
+   },
+   "beh": {
+    "animace": "run_fast",
+    "snimku": 25,
+    "tiku": 1,
+    "krok_m": 12.37
+   },
+   "dupe": {
+    "animace": "giraffestomp",
+    "snimku": 21,
+    "tiku": 1
+   },
+   "utok": {
+    "animace": "attack_02",
+    "snimku": 37,
+    "tiku": 2
+   }
+  },
+  "trojuhelniku": 1966,
+  "autor": "Giraffe, planeta-elefante (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/giraffe-2f389c12391f422e966c7f63b7813d31), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést planeta-elefante; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "slon.glb",
+  "jmeno": "slon",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "slon",
+   "en": "elephant"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   5.35,
+   2.62,
+   3.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "CINEMA_4D_Principal",
+    "snimku": 55,
+    "tiku": 6
+   }
+  },
+  "trojuhelniku": 5998,
+  "autor": "Elephant Animation Idle, GremorySaiyan (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/elephant-animation-idle-a8e7e10f005f4baab0a2f5079d759fcd), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést GremorySaiyan; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "lev.glb",
+  "jmeno": "lev",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "lev",
+   "en": "lion"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.59,
+   0.61,
+   1.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "GltfAnimation 0",
+    "snimku": 55,
+    "tiku": 2
+   }
+  },
+  "trojuhelniku": 5497,
+  "autor": "Lion, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/lion-fc6eeed56f6e44048be4e6051a77c072), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "mamut.glb",
+  "jmeno": "mamut",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "mamut",
+   "en": "mammoth"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   5.94,
+   2.01,
+   3.5
+  ],
+  "kde": "okoli",
+  "klima": "subarkticke",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "idleLookAround",
+    "snimku": 53,
+    "tiku": 3
+   },
+   "zere": {
+    "animace": "idle_eat",
+    "snimku": 55,
+    "tiku": 4
+   }
+  },
+  "trojuhelniku": 2466,
+  "autor": "Manny the Mammoth, planeta-elefante (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/manny-the-mammoth-b4962af31e994a47b8b46fd4d0d13901), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést planeta-elefante; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "opice_madagaskar.glb",
+  "jmeno": "opice_madagaskar",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opice",
+   "en": "monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.29,
+   0.89,
+   0.65
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "klid",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 11709,
+  "autor": "Monkey (Madagascar), Guilherme Navarro (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-madagascar-ac75d17f2b464e49975d7b79a1f9d084), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Guilherme Navarro; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); ruce spuštěné z pózy T modelu o 45° pod vodorovnou (póza klid o jednom snímku)"
+ },
+ {
+  "soubor": "opice_sergio.glb",
+  "jmeno": "opice_sergio",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opice Sergio",
+   "en": "monkey Sergio"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.31,
+   0.63,
+   0.6
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 28412,
+  "autor": "Monkey Sergio, FabianRetamal (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-sergio-42a1cfd5d17649f8ac4d6a835e21d6a7), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést FabianRetamal; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "opice_stylizovana.glb",
+  "jmeno": "opice_stylizovana",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opička",
+   "en": "little monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.38,
+   0.33,
+   0.5
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "klid",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 11178,
+  "autor": "Stylized Monkey 3D Model (Free Download), ToonMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-monkey-3d-model-free-download-fb8322a7cd0d43fd894f2f7fef2deca1), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ToonMesh 3D; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); ruce spuštěné z pózy T modelu o 70° pod vodorovnou (póza klid o jednom snímku)"
+ },
+ {
+  "soubor": "opice_hneda.glb",
+  "jmeno": "opice_hneda",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "hnědá opice",
+   "en": "brown monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.21,
+   0.44,
+   0.6
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5392,
+  "autor": "JUST MONKEY BODY, HumAi Club (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/just-monkey-body-353a648db4034239b131b77c5d55186f), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést HumAi Club; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ }
+]

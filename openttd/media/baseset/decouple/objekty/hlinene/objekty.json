@@ -2748,7 +2748,12 @@
   "polomer_m": 3.98,
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "obří houba se štíhlým bledým třeněm a širokým plochým okrovým kloboukem, prstenem na třeni; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 744 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+  "poznamka": "obří houba se štíhlým bledým třeněm a širokým plochým okrovým kloboukem, prstenem na třeni; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 744 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra; v noci svítí zespodu (domy/houby_noc.py): uzel noc se spodkem klobouku 1,5 cm pod lupeny barvou #FFC870, 2 míst svetlo_NN pod klobouky",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 2
+  },
+  "barva_svetla": "FFC870"
  },
  {
   "soubor": "houba_bedla.glb",
@@ -2759,7 +2764,12 @@
   "polomer_m": 2.92,
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "obří houba se silným třeněm a kulatým červeným kloboukem s bílými puntíky; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 1096 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+  "poznamka": "obří houba se silným třeněm a kulatým červeným kloboukem s bílými puntíky; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 1096 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra; v noci svítí zespodu (domy/houby_noc.py): uzel noc se spodkem klobouku 1,5 cm pod lupeny barvou #FF9AB8, 7 míst svetlo_NN pod klobouky",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 7
+  },
+  "barva_svetla": "FF9AB8"
  },
  {
   "soubor": "houba_trs.glb",
@@ -2770,7 +2780,12 @@
   "polomer_m": 2.01,
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "trs pěti menších hub (okrová, červená s puntíky, fialová, modrozelená); houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 4184 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+  "poznamka": "trs pěti menších hub (okrová, červená s puntíky, fialová, modrozelená); houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 4184 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra; v noci svítí zespodu (domy/houby_noc.py): uzel noc se spodkem klobouku 1,5 cm pod lupeny barvou #B8FF9A, 5 míst svetlo_NN pod klobouky",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 5
+  },
+  "barva_svetla": "B8FF9A"
  },
  {
   "soubor": "houba_chorose.glb",
@@ -2781,6 +2796,11 @@
   "polomer_m": 1.61,
   "autor": "grrrrf: vlastní model domy/domy_hlinene.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "vysoký kmen houby s choroši jako policemi a malým hnědým kloboukem; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 2456 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra"
+  "poznamka": "vysoký kmen houby s choroši jako policemi a malým hnědým kloboukem; houby místo stromů v hliněném městě; počátek uprostřed třeně na zemi, metry; 2456 trojúhelníků, atlas 1024×1024 jen barva bez světla; velikost podle růstu stromu zmenšuje hra; v noci svítí zespodu (domy/houby_noc.py): uzel noc se spodkem klobouku 1,5 cm pod lupeny barvou #9FE8FF, 9 míst svetlo_NN pod klobouky",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 9
+  },
+  "barva_svetla": "9FE8FF"
  }
 ]

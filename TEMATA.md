@@ -27,6 +27,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 19. 10. – psi, zvířata, strašidla a houby od kolegy (par13)
+
+- Kolega dodal (`PSI-ZVIRATA-HOUBY-PRO-HRU.md`): sadu `psi` (31: 8 na prodej, 19 do ulic, vlk u dveří,
+  3 prodavači), `zvirata` (15: mírné klima kolem měst, žirafa/slon/lev/opice pro pouštní města, mamut), `strasidla`
+  (houbový bojovník, loutka na tříkolce), `houby` (7 ke sbírání, každá i svítící na noc), přízrak k čarodějnicím,
+  noční svícení obřích hub hliněného města, místa `strechy` na pouštních domech, Chimata v `pozy`. Všechno v sadě hry;
+  autoři v README sady. Pět modelů je CC BY-NC (jen nekomerčně: kočka, vlk, lev, loutka, přízrak), sedm CC BY-SA.
+- **Hra čte** `druh` pes / zvire / strasidlo a postavu s `prodavac` (`ThreeDAnimal`): pózy z kostry (`pozy`) nebo
+  snímky (`animace` po pózách), `povaha`, `kde`, `klima`, `tema`, `kdy`, `prodej`, `cena`, `leta`, `nazev`. Houby
+  (`kategorie` houba) jako seznam s noční svítící dvojicí; strom s `noc` má v noci svítící figuru `<jmeno>/noc`.
+- **Zvířata kolem chodce** (`three_d_animals.cpp`, jako Mat a draci: jen obrazovka, kolem chodce, jinak kolem středu
+  otočené mapy): v ulicích pár psů a koček (v pouštních městech opice), u dveří leží vlk (vrčí, když přijdeš), na
+  střechách pouštních domů opice, kolem měst zvířata podle klimatu (mírné: los, jelen, laň…; poušť: žirafa, slon,
+  lev), v noci strašidla (loutka v ulicích, houbový bojovník kolem hliněných měst). Občas se objeví prodavač psů
+  s nabídkou 3–5 náhodných zvířat z těch na prodej, chvíli stojí a zase odejde.
+- **Povaha** z indexu: `utoci` jde po chodci a útočí, `vyprovokovat` je klidné, dokud ho chodec nezasáhne, pak útočí,
+  `mirumilovne` po zásahu utíká. Zasáhnout jde kladivem, meči, šípy, šipkami, kulkami i výbuchem rakety. Zdraví
+  a síla úderu podle velikosti (kočka 2 rány, slon 12). Kdo má pózu `smrt`, padne a chvíli leží.
+- Rig: `test3d zvirata` (druhy, houby, kdo je kolem), `zvirata posli <jmeno> [metru]`, `zvirata uder`,
+  `zvirata pes <jmeno>`.
+
 ## 18. 10. večer – kolegovy tři balíky; psi a zvířata domluvena; svítící a průhledné materiály
 
 - Kolega poslal: Tatru v4 a stadion (sud s pípou, Mat posunutý k sudu, `mat_ridi` pro hasičskou posádku s `meritko`

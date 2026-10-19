@@ -108,6 +108,7 @@
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_dragons.h"
+#include "three_d_animals.h"
 #include "three_d_witches.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
@@ -4295,6 +4296,7 @@ static void ViewportDoDrawTurned()
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
 	AddThreeDDragonsToViewport(zoom);
+	AddThreeDAnimalsToViewport(zoom);
 	AddThreeDWitchesToViewport(zoom);
 	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
@@ -4722,6 +4724,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		ViewportAddLandscape();
 		if (_north_house_objects) AddTurnedObjectsToDraw();
 		if (_north_house_objects) AddThreeDDragonsToViewport(_vd.dpi.zoom);
+		if (_north_house_objects) AddThreeDAnimalsToViewport(_vd.dpi.zoom);
 		if (_north_house_objects) AddThreeDWitchesToViewport(_vd.dpi.zoom);
 		ViewportAddVehicles(&_vd.dpi);
 
@@ -9827,6 +9830,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
 	AddThreeDDragonsToEye();
+	AddThreeDAnimalsToEye();
 	AddThreeDWitchesToEye();
 	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);

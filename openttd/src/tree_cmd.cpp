@@ -659,7 +659,8 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	const TownTheme theme = GetTownThemeAt(ti->tile);
 	if (theme == TownTheme::None) return false;
-	std::span<const std::string> kinds = GetThreeDThemeTrees(to_underlying(theme));
+	/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
+	std::span<const std::string> kinds = GetThreeDThemeTrees(to_underlying(theme), IsNightNow());
 	if (kinds.empty()) return false;
 
 	const uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);

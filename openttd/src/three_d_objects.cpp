@@ -74,6 +74,12 @@ static std::vector<ThreeDCreature> _creatures;
 static std::vector<ThreeDWitch> _witches;
 /** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
+/** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees_night;
+/** The dogs, the animals, the ghosts and the sellers of dogs of the indices (ThreeDAnimal). */
+static std::vector<ThreeDAnimal> _animals;
+/** The mushrooms to pick of the indices (ThreeDMushroom). */
+static std::vector<ThreeDMushroom> _mushrooms;
 
 /** The town theme an index names ("tema"): "hlinene" the clay town (TownTheme::Clay), 0 none or one the game does not know. */
 static uint8_t ParseIndexTheme(const nlohmann::json &e)
@@ -2021,6 +2027,18 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 			obj.doors.push_back(door);
 		}
 	}
+	/* The places on its flat roof (the colleague's desert houses, "strechy"): a monkey sits there. */
+	if (e.contains("strechy") && e.at("strechy").is_array()) {
+		for (const auto &r : e.at("strechy")) {
+			if (!r.is_object() || !r.contains("poloha") || !r.at("poloha").is_array() || r.at("poloha").size() < 3) continue;
+			ThreeDObjectRoof roof;
+			for (int k = 0; k < 3; k++) roof.at[k] = r.at("poloha").at(k).get<float>();
+			if (r.contains("smer") && r.at("smer").is_array() && r.at("smer").size() >= 2) {
+				for (int k = 0; k < 2; k++) roof.out[k] = r.at("smer").at(k).get<float>();
+			}
+			obj.roofs.push_back(roof);
+		}
+	}
 }
 
 /** The game's own industry an index names ("prumysl"): its constant's name; 0xFF for one the game has not (yet). */
@@ -2561,7 +2579,8 @@ static void ReadThreeDVehicleObjects()
 					_witches.push_back(std::move(w));
 					continue;
 				}
-				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom") && e.contains("soubor")) {
+				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac"));
+				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
 					 * its file in the lists of plants ("rostliny"). */
@@ -2580,7 +2599,77 @@ static void ReadThreeDVehicleObjects()
 					 * "tiku" ticks) it goes round the animation ("smycka" false: once, staying on the last), walking "krok_m"
 					 * a round. The figure by its name alone is its pose "stoji", else its first. Placed with "poza" beside
 					 * "postava" (FigureNamed()). Its file is read when it is first drawn, not here. */
-					if (figure_kind == "postava" && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
+					/* A dog, an animal, a ghost, a seller of dogs: what it is, where it is found, how it takes the walker (ThreeDAnimal). */
+					auto note_animal = [&](std::vector<std::string> poses) {
+						if (!animal) return;
+						ThreeDAnimal a;
+						a.name = fig.name;
+						a.kind = figure_kind == "pes" ? ThreeDAnimal::Kind::Dog : figure_kind == "zvire" ? ThreeDAnimal::Kind::Animal : figure_kind == "strasidlo" ? ThreeDAnimal::Kind::Ghost : ThreeDAnimal::Kind::Seller;
+						const std::string temper = e.value("povaha", std::string());
+						a.temper = temper == "utoci" ? ThreeDAnimal::Temper::Attacks : temper == "vyprovokovat" ? ThreeDAnimal::Temper::Provoked : ThreeDAnimal::Temper::Peaceful;
+						auto place = [&](std::string_view where) {
+							if (where == "ulice") a.places |= ThreeDAnimal::STREET;
+							if (where == "dvere") a.places |= ThreeDAnimal::DOOR;
+							if (where == "okoli") a.places |= ThreeDAnimal::ROUND;
+							if (where == "strecha") a.places |= ThreeDAnimal::ROOF;
+						};
+						if (e.contains("kde") && e.at("kde").is_string()) place(e.at("kde").get<std::string>());
+						if (e.contains("kde") && e.at("kde").is_array()) {
+							for (const auto &w : e.at("kde")) {
+								if (w.is_string()) place(w.get<std::string>());
+							}
+						}
+						const std::string climate = e.value("klima", std::string());
+						a.climate = climate == "mirne" ? ThreeDAnimal::TEMPERATE : climate == "poust" ? ThreeDAnimal::DESERT : climate == "subarkticke" ? ThreeDAnimal::ARCTIC : 0;
+						a.theme = ParseIndexTheme(e);
+						a.night = e.value("kdy", std::string()) == "noc";
+						a.sold = e.value("prodej", false);
+						a.flies = e.value("leta", false);
+						a.price = std::clamp(e.value("cena", 0), 0, 10000000);
+						if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+							for (int k = 0; k < 3; k++) a.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
+						}
+						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
+						if (e.contains("nazev") && e.at("nazev").is_object()) {
+							a.title_cs = e.at("nazev").value("cs", std::string());
+							a.title_en = e.at("nazev").value("en", a.title_cs);
+							if (a.title_cs.empty()) a.title_cs = a.title_en;
+						}
+						if (a.title_en.empty()) a.title_cs = a.title_en = a.name;
+						a.poses = std::move(poses);
+						_animals.push_back(std::move(a));
+					};
+					/* A ghost's poses of frames ("animace" by the pose, the colleague's mushroom warrior: "chuze" with
+					 * "uzly" "chuze_"), as a creature's: a figure each, "<jmeno>/<poza>", the figure by its name alone
+					 * its rest ("klid", else its first). */
+					if (animal && !e.contains("pozy") && e.contains("animace") && e.at("animace").is_object() && !e.at("animace").empty() && e.at("animace").begin()->is_object()) {
+						std::vector<std::string> names;
+						for (const auto &[pose, a] : e.at("animace").items()) {
+							if (!a.is_object()) continue;
+							ThreeDVehicleObject one = fig;
+							one.name = fig.name + "/" + pose;
+							one.frame_prefix = a.value("uzly", pose + "_");
+							one.frames = std::clamp(a.value("snimku", 0), 0, 64);
+							one.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+							one.loop = a.value("smycka", true);
+							one.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+							if (one.frames < 2) one.frame_prefix.clear();
+							_figure_objects.push_back(std::move(one));
+							names.push_back(pose);
+						}
+						if (names.empty()) continue;
+						const std::string rest = fig.name + "/" + (std::ranges::find(names, "klid") != names.end() ? std::string("klid") : names.front());
+						for (size_t k = _figure_objects.size(); k-- > 0;) {
+							if (_figure_objects[k].name != rest) continue;
+							ThreeDVehicleObject one = _figure_objects[k];
+							one.name = fig.name;
+							_figure_objects.push_back(std::move(one));
+							break;
+						}
+						note_animal(std::move(names));
+						continue;
+					}
+					if ((figure_kind == "postava" || animal) && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
 						const std::string bones = folder + e.value("kostra", e.at("soubor").get<std::string>());
 						const auto &poses = e.at("pozy");
 						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
@@ -2596,11 +2685,17 @@ static void ReadThreeDVehicleObjects()
 							if (one.frames >= 2) one.frame_prefix = pose + "_";
 							_figure_objects.push_back(std::move(one));
 						};
-						for (const auto &[pose, p] : poses.items()) posed(pose, p, fig.name + "/" + pose);
-						const std::string first = poses.contains("stoji") ? std::string("stoji") : poses.begin().key();
+						std::vector<std::string> names;
+						for (const auto &[pose, p] : poses.items()) {
+							posed(pose, p, fig.name + "/" + pose);
+							names.push_back(pose);
+						}
+						const std::string first = poses.contains("stoji") ? std::string("stoji") : poses.contains("klid") ? std::string("klid") : poses.begin().key();
 						posed(first, poses.at(first), fig.name);
+						note_animal(std::move(names));
 						continue;
 					}
+					note_animal({});
 					if (fig.thing) {
 						/* A thing's states, each a whole thing in a node of its own (the colleague's bow, "volno" and
 						 * "napnuto"; the crossbow, "natazeno" and "vystreleno"): a figure each, "<jmeno>/<stav>", that node
@@ -2635,6 +2730,31 @@ static void ReadThreeDVehicleObjects()
 					/* A light (the colleague's torch and lantern): its glass ("noc") drawn with it, lit by its flame; and
 					 * a weapon that shoots rockets, a figure of it shot (its loaded rocket, "raketa_v_hlavni", left out). */
 					if (fig.thing && e.value("kategorie", std::string()) == "svetlo") fig.night_glass = true;
+					/* A thing glowing at night (the colleague's glowing mushrooms, "kdy": "noc" with "noc"): its glass
+					 * part of it, lit; and a mushroom to pick among the mushrooms, its glowing one beside it. */
+					if (fig.thing && e.value("kdy", std::string()) == "noc" && e.contains("noc")) fig.night_glass = true;
+					if (fig.thing && e.value("kategorie", std::string()) == "houba") {
+						const bool glowing = e.value("kdy", std::string()) == "noc";
+						std::string base = fig.name;
+						if (glowing && base.ends_with("_svitici")) base.resize(base.size() - std::string_view("_svitici").size());
+						auto it = std::ranges::find(_mushrooms, base, &ThreeDMushroom::name);
+						if (it == _mushrooms.end()) {
+							ThreeDMushroom m;
+							m.name = base;
+							_mushrooms.push_back(std::move(m));
+							it = std::prev(_mushrooms.end());
+						}
+						if (glowing) {
+							it->night = fig.name;
+						} else {
+							it->theme = ParseIndexTheme(e);
+							it->height_m = std::clamp(e.value("vyska_m", 0.1f), 0.01f, 5.0f);
+							if (e.contains("nazev") && e.at("nazev").is_object()) {
+								it->title_cs = e.at("nazev").value("cs", std::string());
+								it->title_en = e.at("nazev").value("en", it->title_cs);
+							}
+						}
+					}
 					if (fig.thing && e.value("strelba", std::string()) == "raketa") {
 						ThreeDVehicleObject shot = fig;
 						shot.name = fig.name + "/prazdny";
@@ -2675,12 +2795,24 @@ static void ReadThreeDVehicleObjects()
 						fig.frame_ticks = std::clamp(std::max(1, fig.spin_ticks) * std::max(1, a.value("otocek", 1)), 1, 1000000);
 						if (fig.frames < 2) fig.frame_prefix.clear();
 					}
-					/* A tree of a town theme (the clay town's mushrooms): among the trees the theme's towns have on their land. */
+					/* A tree of a town theme (the clay town's mushrooms): among the trees the theme's towns have on their land;
+					 * with its night ("noc": the colleague's mushrooms glowing under their caps) a figure "<jmeno>/noc" with it
+					 * lit, drawn at night. */
+					if (figure_kind == "strom" && e.contains("noc") && e.at("noc").is_object()) {
+						ThreeDVehicleObject night = fig;
+						night.name = fig.name + "/noc";
+						night.night_glass = true;
+						_figure_objects.push_back(std::move(night));
+					}
 					if (figure_kind == "strom") {
 						const uint8_t theme = ParseIndexTheme(e);
 						if (theme != 0) {
 							auto &trees = _three_d_theme_trees[theme];
-							if (std::ranges::find(trees, fig.name) == trees.end()) trees.push_back(fig.name);
+							if (std::ranges::find(trees, fig.name) == trees.end()) {
+								trees.push_back(fig.name);
+								const bool glows = e.contains("noc") && e.at("noc").is_object();
+								_three_d_theme_trees_night[theme].push_back(glows ? fig.name + "/noc" : fig.name);
+							}
 						}
 					}
 					_figure_objects.push_back(std::move(fig));
@@ -3181,8 +3313,11 @@ void ResetThreeDVehicleObjects()
 	_vehicle_object_pieces.clear();
 	_vehicle_object_shared_pieces.clear();
 	_three_d_theme_trees.clear();
+	_three_d_theme_trees_night.clear();
 	_creatures.clear();
 	_witches.clear();
+	_animals.clear();
+	_mushrooms.clear();
 	_thing_sounds.clear();
 	_thing_places.clear();
 	_vehicle_objects_read = false;
@@ -5009,11 +5144,12 @@ const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin
 }
 
 /** The trees of a town theme (TownTheme, "druh": "strom" with its "tema"): the names of their figures, none for the plain towns. */
-std::span<const std::string> GetThreeDThemeTrees(uint8_t theme)
+std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
-	auto it = _three_d_theme_trees.find(theme);
-	if (it == _three_d_theme_trees.end()) return {};
+	const auto &trees = night ? _three_d_theme_trees_night : _three_d_theme_trees;
+	auto it = trees.find(theme);
+	if (it == trees.end()) return {};
 	return it->second;
 }
 
@@ -5029,6 +5165,35 @@ const std::vector<ThreeDWitch> &GetThreeDWitches()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _witches;
+}
+
+/** The dogs, the animals, the ghosts and the sellers of dogs of the indices, read the first time they are asked for. */
+const std::vector<ThreeDAnimal> &GetThreeDAnimals()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _animals;
+}
+
+/** One of them by its name, or nullptr. */
+const ThreeDAnimal *GetThreeDAnimal(std::string_view name)
+{
+	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
+		if (a.name == name) return &a;
+	}
+	return nullptr;
+}
+
+/** Its name in Czech or else in English. */
+const std::string &ThreeDAnimal::Title() const
+{
+	return std::string_view(_current_language->isocode).starts_with("cs") ? this->title_cs : this->title_en;
+}
+
+/** The mushrooms to pick of the indices, read the first time they are asked for. */
+const std::vector<ThreeDMushroom> &GetThreeDMushrooms()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _mushrooms;
 }
 
 /**

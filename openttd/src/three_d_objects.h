@@ -130,6 +130,12 @@ struct ThreeDObjectDoor {
 	float width = 1;      ///< "sirka": metres
 };
 
+/** A place on a building's flat roof ("strechy", the colleague's desert houses): a monkey sits there (three_d_animals.h). */
+struct ThreeDObjectRoof {
+	float at[3] = {};     ///< "poloha": metres in the building's frame, z up
+	float out[2] = {};    ///< "smer": the way it looks, out to the street
+};
+
 /**
  * The shape of a building simplified for a level of detail (ThreeDObject::GetShape()), as its own: its corners
  * closer than the level's cell merged into one, the triangles left without area gone.
@@ -230,6 +236,7 @@ struct ThreeDObject {
 	std::vector<float> nrm;           ///< an add-on's normals, metres, to light it as it is turned at a place
 	std::vector<ThreeDObjectFigure> event_figures; ///< "akce": the figures standing about it on its days (GetThreeDHouseEvent(): the new stadium's)
 	std::vector<ThreeDObjectDoor> doors;         ///< "dvere": its doors
+	std::vector<ThreeDObjectRoof> roofs;         ///< "strechy": places on its roof
 	std::string title_cs;     ///< "nazev": its name in the land area information, Czech ("cs") ...
 	std::string title_en;     ///< ... and in any other language ("en"); empty for the house's own name
 	bool has_stop = false;    ///< "stani": where a car of the game's own that drives to it stops (ThreeDVehicleObject::drive_house)
@@ -728,6 +735,66 @@ struct ThreeDWitch {
 	std::string Figure(std::string_view animation) const { return this->name + "/" + std::string(animation); }
 };
 const std::vector<ThreeDWitch> &GetThreeDWitches();
+
+/**
+ * A dog, an animal, a ghost or a seller of dogs of the indices (the colleague's hra/3d/PSI-ZVIRATA-HOUBY-PRO-HRU.md;
+ * "druh" "pes", "zvire", "strasidlo", or "postava" with "prodavac"): its poses figures of their own,
+ * "<jmeno>/<poza>" ("pozy" with bones, or "animace" of frames), the figure "<jmeno>" as it stands; where it is found,
+ * how it takes the walker, what it costs. What it does is the index's (the player: "the index decides, not the game").
+ */
+struct ThreeDAnimal {
+	enum class Kind : uint8_t {
+		Dog,    ///< "pes": a dog, a cat, a fox, a wolf
+		Animal, ///< "zvire": about the towns, in the desert towns' streets and on their roofs
+		Ghost,  ///< "strasidlo": out at night
+		Seller, ///< a seller of dogs ("prodavac": "psi")
+	};
+	enum class Temper : uint8_t {
+		Peaceful, ///< "mirumilovne": never fights, runs from a blow
+		Provoked, ///< "vyprovokovat": peaceful till struck, then fights
+		Attacks,  ///< "utoci": goes for the walker
+	};
+	/* Where it is found ("kde"), bits. */
+	static constexpr uint8_t STREET = 1; ///< "ulice": in the streets of the towns
+	static constexpr uint8_t DOOR = 2;   ///< "dvere": before the doors of the houses
+	static constexpr uint8_t ROUND = 4;  ///< "okoli": in the land about the towns
+	static constexpr uint8_t ROOF = 8;   ///< "strecha": on the flat roofs ("strechy")
+	/* The towns it is found at ("klima"): 0 any. */
+	static constexpr uint8_t TEMPERATE = 1; ///< "mirne"
+	static constexpr uint8_t DESERT = 2;    ///< "poust": the desert towns
+	static constexpr uint8_t ARCTIC = 3;    ///< "subarkticke"
+
+	std::string name;            ///< "jmeno"
+	std::string title_cs, title_en; ///< "nazev"
+	Kind kind = Kind::Dog;
+	Temper temper = Temper::Peaceful; ///< "povaha"
+	uint8_t places = 0;          ///< "kde", bits
+	uint8_t climate = 0;         ///< "klima"
+	uint8_t theme = 0;           ///< "tema": only about the towns of the theme (TownTheme), 0 any
+	bool night = false;          ///< "kdy": "noc": out only at night
+	bool sold = false;           ///< "prodej": a seller sells it, it walks with the walker
+	bool flies = false;          ///< "leta": flies beside the walker
+	int price = 0;               ///< "cena", pounds
+	float size[3] = {};          ///< "rozmer_m": length, width and height, metres
+	float scale = 2.0f;          ///< "meritko": so many times its true size on the map (2 as the girls)
+	std::vector<std::string> poses; ///< its poses ("klid", "chuze", "beh", "utok", "smrt", "lezi"...)
+
+	bool Has(std::string_view pose) const { return std::ranges::find(this->poses, pose) != this->poses.end(); }
+	std::string Figure(std::string_view pose) const { return pose.empty() || !this->Has(pose) ? this->name : this->name + "/" + std::string(pose); }
+	const std::string &Title() const;
+};
+const std::vector<ThreeDAnimal> &GetThreeDAnimals();
+const ThreeDAnimal *GetThreeDAnimal(std::string_view name);
+
+/** A mushroom to pick of the indices ("predmet" of "kategorie" "houba"): where, and its glowing one for the night ("kdy": "noc"). */
+struct ThreeDMushroom {
+	std::string name;            ///< "jmeno", a figure
+	std::string night;           ///< the one glowing at night, "<jmeno>_svitici"; empty none
+	std::string title_cs, title_en; ///< "nazev"
+	uint8_t theme = 0;           ///< "tema": about the towns of the theme
+	float height_m = 0.1f;       ///< "vyska_m"
+};
+const std::vector<ThreeDMushroom> &GetThreeDMushrooms();
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();
@@ -807,7 +874,7 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  */
 void ThreeDLoadInBackground(std::function<void()> job);
 extern bool _three_d_load_at_once; ///< the rig: a job is run the moment it is asked for, so a picture is of the moment
-std::span<const std::string> GetThreeDThemeTrees(uint8_t theme);
+std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
 

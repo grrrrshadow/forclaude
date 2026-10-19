@@ -565,6 +565,8 @@ add_files(
     three_d_vehicle_object.h
     three_d_walkers.cpp
     three_d_walkers.h
+    three_d_animals.cpp
+    three_d_animals.h
     three_d_dragons.cpp
     three_d_dragons.h
     three_d_witches.cpp

@@ -168,6 +168,7 @@
 
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
+#include "three_d_animals.h"
 #include "three_d_witches.h"
 
 #include "safeguards.h"
@@ -9118,6 +9119,31 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDDragon(wx, wy, FirstPersonWalkerHeading(), 2.5) ? "zasahl" : "minul");
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDDragons());
+	} else if (what == "zvirata") {
+		/* The dogs, the animals, the ghosts and the sellers (three_d_animals.h): 'zvirata' tells where they are and what
+		 * the indices have; 'zvirata posli <jmeno> [metru]' puts one so many metres ahead of the walker (3 without);
+		 * 'zvirata uder' a blow of the hammer; 'zvirata pes [jmeno]' the walker's dog (none without). */
+		extern bool FirstPersonWalkerAt(double &x, double &y);
+		extern double FirstPersonWalkerHeading();
+		double wx = 0, wy = 0;
+		const bool walker = FirstPersonWalkerAt(wx, wy);
+		if (argv.size() > 3 && argv[2] == "posli" && walker) {
+			const double ahead = number(4).value_or(3) * OBJECT_UNITS_PER_METRE, h = FirstPersonWalkerHeading();
+			const bool sent = SendThreeDAnimal(argv[3], wx + std::cos(h) * ahead, wy + std::sin(h) * ahead);
+			IConsolePrint(CC_DEFAULT, "test3d: zvire {}", sent ? "poslano" : "NEPOSLANO");
+		} else if (argv.size() > 2 && argv[2] == "uder" && walker) {
+			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDAnimal(wx, wy, FirstPersonWalkerHeading(), 2.5, 1) ? "zasahl" : "minul");
+		} else if (argv.size() > 2 && argv[2] == "pes") {
+			SetThreeDPet(argv.size() > 3 ? argv[3] : std::string_view{});
+		} else if (argv.size() <= 2) {
+			std::string kinds;
+			for (const ThreeDAnimal &a : GetThreeDAnimals()) kinds += fmt::format(" {}({}{})", a.name, a.poses.size(), a.sold ? fmt::format(", {} L", a.price) : std::string());
+			IConsolePrint(CC_DEFAULT, "test3d: druhy:{}", kinds);
+			std::string shrooms;
+			for (const ThreeDMushroom &m : GetThreeDMushrooms()) shrooms += fmt::format(" {}{}", m.name, m.night.empty() ? "" : "+noc");
+			IConsolePrint(CC_DEFAULT, "test3d: houby:{}", shrooms);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDAnimals());
 	} else if (what == "carodejnice") {
 		/* 'carodejnice [<x> <y> <stupnu> [jmeno]]': the witches flying (three_d_witches.h, only at night); with a tile one
 		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu> [jmeno]': one sent from

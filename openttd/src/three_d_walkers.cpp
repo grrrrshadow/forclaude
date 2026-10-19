@@ -734,6 +734,12 @@ std::string DescribeThreeDDrivers()
 	return out;
 }
 
+/** Where the life of the towns goes on (LifeMiddle()): about the walker of the view from the first person, else the middle of the turned main view; INVALID_TILE nowhere. */
+TileIndex ThreeDLifeMiddle()
+{
+	return LifeMiddle();
+}
+
 /** Put the walkers on the turned view being drawn (after its vehicles; ViewportDoDrawTurned()). */
 void AddThreeDWalkersToViewport(ZoomLevel zoom)
 {

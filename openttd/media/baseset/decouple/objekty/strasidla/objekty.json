@@ -1,0 +1,69 @@
+[
+ {
+  "soubor": "houbovy_bojovnik.glb",
+  "jmeno": "houbovy_bojovnik",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "houbový bojovník",
+   "en": "mushroom warrior"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   1.05,
+   0.65,
+   1.94
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 4,
+    "smycka": true,
+    "krok_m": 1.48
+   }
+  },
+  "trojuhelniku": 71229,
+  "autor": "Mushroom Warrior, POTVORA (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushroom-warrior-391de0aa11d44635a53fa927e47dd1cb), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY 4.0 (uvést POTVORA; změny: zjednodušený z 1 187 000 na 71229 trojúhelníků, otočený, chůze ze snímků)",
+  "poznamka": "v noci kolem hliněných měst, útočí sám; skutečné metry (1,9 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; chůze z 12 snímků chuze_00 až chuze_11: horní polovina (50295 trojúhelníků) jako instance jedné sítě, nohy (20934) v každém snímku vlastní, kývají se kolem kyčlí ±24°, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); bez kostry; glb z gltfpacku"
+ },
+ {
+  "soubor": "billy_tricykl.glb",
+  "jmeno": "billy_tricykl",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "loutka na tříkolce",
+   "en": "puppet on a tricycle"
+  },
+  "kdy": "noc",
+  "kde": "ulice",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   0.82,
+   0.61,
+   1.2
+  ],
+  "pozy": {
+   "chuze": {
+    "animace": "Armature|CINEMA_4D_Main|Layer0",
+    "snimku": 36,
+    "tiku": 2,
+    "krok_m": 1.26
+   },
+   "klid": {
+    "animace": "Armature|CINEMA_4D_Main|Layer0",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 5033,
+  "autor": "Billy On Bike, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/billy-on-bike-cfdf86390bdf4c2592732178ee4a6d57), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; nekomerčně; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "v noci jezdí ulicemi a útočí sám; skutečné metry (1,2 m i s tříkolkou), meritko 2, čelem k +x, počátek mezi koly na zemi; kostra a šlapání modelu (pozy chuze, klid = první snímek); krok_m = kolik ujede přední kolo (poloměr 0.207 m, otočí se o 348°) za jedno kolo šlapání"
+ }
+]

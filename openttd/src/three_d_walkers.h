@@ -26,6 +26,7 @@
 #include <functional>
 #include <string>
 
+TileIndex ThreeDLifeMiddle();
 void AddThreeDWalkersToViewport(ZoomLevel zoom);
 void AddThreeDWalkersToEye(float scale);
 std::string DescribeThreeDWalkers();

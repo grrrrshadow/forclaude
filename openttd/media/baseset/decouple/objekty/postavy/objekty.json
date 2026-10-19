@@ -287,14 +287,14 @@
   "druh": "postava",
   "vyska_m": 1.79,
   "poza": "postava s kostrou a animací modelu „klid“ (13 s ve smyčce); pro interiéry domů",
-  "animace": {
-   "klid": {
-    "delka_s": 13.0,
-    "smycka": true
-   }
-  },
   "autor": "Chimata for Touhou Multi Scroll Shooting 2, skydash (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/chimata-for-touhou-multi-scroll-shooting-2-d0ac86d260254fcd9c8804918f88b8de), převod postavy/chimata.py bez renderu",
   "licence": "CC BY 4.0 (uvést skydash; změny: otočená, textury nejvýš 1024 px, materiály metallic-roughness)",
-  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, kostra (skins) a animace klid (glTF animations), 22347 trojúhelníků, 6 textury nejvýš 1024 px; do interiérů (hráč: soubor „do interieru“); mimo kabinu meritko 2 jako holky, v domech mírného klimatu meritko 1 (hráčova velikost)"
+  "poznamka": "počátek mezi chodidly na zemi, čelem k +x, metry, kostra (skins) a animace klid (glTF animations), 22347 trojúhelníků, 6 textury nejvýš 1024 px; do interiérů (hráč: soubor „do interieru“); mimo kabinu meritko 2 jako holky, v domech mírného klimatu meritko 1 (hráčova velikost)",
+  "pozy": {
+   "klid": {
+    "snimku": 64,
+    "tiku": 7
+   }
+  }
  }
 ]

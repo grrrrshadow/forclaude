@@ -45,6 +45,7 @@
 #include "command_func.h"
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
+#include "three_d_animals.h"
 #include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
@@ -462,8 +463,9 @@ struct FirstPersonWindow : Window {
 			this->Close();
 			return;
 		}
-		/* The dragons' blows since the last step (three_d_dragons.h): the health through the command, the picture red a moment. */
-		const uint damage = TakeThreeDDragonDamage();
+		/* The blows of the dragons and the animals since the last step (three_d_dragons.h, three_d_animals.h): the health
+		 * through the command, the picture red a moment. */
+		const uint damage = TakeThreeDDragonDamage() + TakeThreeDAnimalDamage();
 		if (damage > 0 && c != nullptr) {
 			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)));
 			this->hurt_steps = 6;
@@ -640,7 +642,9 @@ struct FirstPersonWindow : Window {
 			/* The blow lands as the weapon comes down before the eyes: on a dragon there, if one is. */
 			const bool before = this->swing_time < FIRST_PERSON_BLOW_S;
 			this->swing_time += dt;
-			if (before && this->swing_time >= FIRST_PERSON_BLOW_S) HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage);
+			if (before && this->swing_time >= FIRST_PERSON_BLOW_S && !HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage)) {
+				HitThreeDAnimal(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage);
+			}
 			held.swing = SwingAngle(this->swing_time);
 			if (this->swing_time >= FIRST_PERSON_SWING_S) {
 				this->swing_time = -1;
@@ -901,7 +905,7 @@ struct FirstPersonWindow : Window {
 					m.gone = true;
 					continue;
 				}
-				if (HitThreeDDragonAt(tx, ty, tz, m.damage) || HitThreeDWitchAt(tx, ty, tz)) {
+				if (HitThreeDDragonAt(tx, ty, tz, m.damage) || HitThreeDWitchAt(tx, ty, tz) || HitThreeDAnimalAt(tx, ty, tz, m.damage)) {
 					m.gone = true;
 					if (m.rocket) this->Explode(tx, ty, tz, m.damage);
 					continue;
@@ -949,6 +953,7 @@ struct FirstPersonWindow : Window {
 	{
 		BlastThreeDDragons(x, y, z, FIRST_PERSON_BLAST_M, damage);
 		BlastThreeDWitches(x, y, z, FIRST_PERSON_BLAST_M);
+		BlastThreeDAnimals(x, y, z, FIRST_PERSON_BLAST_M, damage);
 		this->blasts.push_back({x, y, z, 0, false});
 		/* The cloud it leaves: a puff in its middle and round it, a little higher. */
 		const double m = OBJECT_UNITS_PER_METRE, up = OBJECT_HEIGHT_PER_METRE;

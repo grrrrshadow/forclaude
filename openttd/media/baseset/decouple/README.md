@@ -128,6 +128,21 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 - `lampy/` – lampy ve stylu Morrowindu (od kolegy, grrrrf `hra/3d/objekty/lampy/`, kolegovy vlastní, GPL-2.0):
   papírová lucerna, lampa na sloupu, nástěnná pochodeň, svícen, lampička a ohnivý koš, `druh: "doplnek"` s uzlem
   `noc` (papír, sklo a plamen svítí v noci), místy `svetlo_NN` a papírem v barvě číslem (`barvy`, část `papir`).
+- `psi/`, `zvirata/`, `strasidla/`, `houby/` – psi, kočky, lišky a vlci, prodavači psů, zvířata u měst, strašidla
+  a houby ke sbírání (od kolegy, grrrrf `hra/3d/objekty/…`, `PSI-ZVIRATA-HOUBY-PRO-HRU.md`; otočené, zmenšené na
+  skutečnou velikost, kostra a animace modelu ve formátu `pozy`). Všechno ze Sketchfabu. **CC BY 4.0**: gepard,
+  žirafa a mamut (planeta-elefante), somálská kočka (DreamNoms), kreslená kočka (Omabuarts Studio), liška
+  (dragonsnap), fenek (Dylan Martínez Sánchez), Falkor (sharksie), roztomilý pes (Tech developers), šedý vlk a veselý
+  pes (Stakler), malý pes (samuelsgr art), lovecký pes (Jurassic Radassic), pouliční pes (MAROUANE), nafocený pes
+  (3DigitalArtist), skákající liška (sheana), šedá kočka (savounited), rezavá kočka (ilhamtr), lesní vlk (AX-7YK),
+  dvoubarevná kočka (kenchoo), stylizovaný vlk (ESO), vlk u dveří (victory_mirosya), prodavačka psů farmářka (AKM),
+  prodavač Bodi (Jacob Quintana), prodavač dalmatin (iRahulRajput), los, wapiti, jelen, laň, vidloroh, ovce
+  tlustorohá a medvěd (Stylized Animals BIG PACK, WildMesh 3D), slon (GremorySaiyan), opice (Guilherme Navarro,
+  FabianRetamal, ToonMesh 3D, HumAi Club), houbový bojovník (POTVORA, zjednodušený), houby (Mushrooms, leha_pu,
+  rozdělené, svítící verze kolegova). **CC BY-SA 4.0** (úpravy pod stejnou licencí): hnědý pes (1-3D.com), bulteriér,
+  baset, malamut, jack russell a bulmastif (low poly dog pack, compost the second). **CC BY-NC 4.0** (jen
+  nekomerčně): kočka, která chodí (pamoan10), vlk (OLEKSO), lev, loutka na tříkolce a přízrak v `carodejnice/`
+  (LostBoyz2078). Odkazy na modely jsou v `objekty.json` u každého záznamu (`autor`, `licence`).
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.
