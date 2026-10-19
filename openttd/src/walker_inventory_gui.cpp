@@ -20,6 +20,8 @@
 #include "command_func.h"
 #include "company_base.h"
 #include "company_func.h"
+#include "three_d_animals.h"
+#include "three_d_objects.h"
 #include "widgets/walker_inventory_widget.h"
 
 #include "table/strings.h"
@@ -38,6 +40,11 @@ bool FirstPersonOpen();
 /** The light in the left hand of the walker (first_person_gui.cpp): the one there, one taken or put out. */
 WalkerItem FirstPersonLightInHand();
 void FirstPersonTakeLight(WalkerItem item);
+/** Where the walker of the view from the first person stands, world units; false when the view is not open. */
+bool FirstPersonWalkerAt(double &x, double &y);
+
+/** How near a seller of dogs the walker buys of it, metres. */
+static constexpr double SELLER_REACH_M = 6.0;
 
 static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
@@ -60,22 +67,41 @@ struct WalkerInventoryWindow : Window {
 		Buy,  ///< buy one here
 		Hand, ///< a weapon into the hand, or put away
 		Light, ///< a light into the left hand, or put out
+		BuyDog, ///< buy a dog of the seller near
+		LetDogGo, ///< let the walker's dog go
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
 		int top, bottom;
 		WalkerItem item;
 		LineDoes does;
+		std::string dog = {}; ///< the dog a line buys
 	};
 	mutable std::vector<Line> lines; ///< where the clickable lines were drawn
 	TileIndex shop = INVALID_TILE;   ///< where things are sold near the walker, as last seen
 	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
+	mutable std::string seller;      ///< the seller of dogs near the walker, as last seen; empty none
+	mutable std::vector<std::string> dogs; ///< and the dogs it sells
+
+	/** The seller of dogs near the walker now, and what it sells; whether that changed. */
+	bool SeeSeller() const
+	{
+		double x = 0, y = 0;
+		const ThreeDDogSeller *s = FirstPersonWalkerAt(x, y) ? ThreeDDogSellerNear(x, y, SELLER_REACH_M) : nullptr;
+		std::string name = s != nullptr ? s->name : std::string();
+		std::vector<std::string> dogs = s != nullptr ? s->offer : std::vector<std::string>();
+		if (name == this->seller && dogs == this->dogs) return false;
+		this->seller = std::move(name);
+		this->dogs = std::move(dogs);
+		return true;
+	}
 
 	WalkerInventoryWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
 		this->CreateNestedTree();
 		this->FinishInitNested(number);
 		this->shop = FirstPersonShopNearby();
+		this->SeeSeller();
 	}
 
 	/** The walker walks on: what is sold where it stands now; and the weapon in its hand. */
@@ -83,7 +109,7 @@ struct WalkerInventoryWindow : Window {
 	{
 		TileIndex now = FirstPersonShopNearby();
 		const WalkerItem hand = FirstPersonWeaponInHand();
-		if (now != this->shop || hand != this->in_hand) {
+		if (this->SeeSeller() || now != this->shop || hand != this->in_hand) {
 			this->shop = now;
 			this->in_hand = hand;
 			this->SetWidgetDirty(WID_WI_LIST);
@@ -140,12 +166,36 @@ struct WalkerInventoryWindow : Window {
 			}
 			y += lh;
 		}
+		/* The walker's dog, let go with a click. */
+		if (const ThreeDAnimal *dog = c->walker_pet.empty() ? nullptr : GetThreeDAnimal(c->walker_pet); dog != nullptr) {
+			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_YOUR_DOG, dog->Title()), TextColour::White);
+			DrawString(ir.left, ir.right, y, STR_WALKER_LET_DOG_GO, TextColour::Orange, AlignmentH::End);
+			this->lines.push_back({y, y + lh, WalkerItem::End, LineDoes::LetDogGo});
+			y += lh;
+		}
 		y += 4;
+
+		/* The dogs of a seller near; bought with a click (the walker's dog then, instead of the one it had). */
+		this->SeeSeller();
+		const ThreeDAnimal *seller = this->seller.empty() ? nullptr : GetThreeDAnimal(this->seller);
+		if (seller != nullptr) {
+			DrawString(ir.left, ir.right, y, GetString(STR_WALKER_DOGS_FOR_SALE, seller->Title()), TextColour::Yellow);
+			y += lh;
+			for (const std::string &name : this->dogs) {
+				const ThreeDAnimal *dog = GetThreeDAnimal(name);
+				if (dog == nullptr) continue;
+				DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_DOG, dog->Title()), name == c->walker_pet ? TextColour::Yellow : TextColour::White);
+				DrawString(ir.left, ir.right, y, GetString(STR_WALKER_BUY, WalkerPetPrice(name)), TextColour::Green, AlignmentH::End);
+				this->lines.push_back({y, y + lh, WalkerItem::End, LineDoes::BuyDog, name});
+				y += lh;
+			}
+			y += 4;
+		}
 
 		/* What is sold here; bought with a click. */
 		const StringID place = WalkerShopName(this->shop);
 		if (place == INVALID_STRING_ID) {
-			DrawStringMultiLine(ir.left, ir.right, y, ir.bottom, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
+			if (seller == nullptr) DrawStringMultiLine(ir.left, ir.right, y, ir.bottom, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
 			return;
 		}
 		DrawString(ir.left, ir.right, y, GetString(STR_WALKER_FOR_SALE, place), TextColour::Yellow);
@@ -182,6 +232,12 @@ struct WalkerInventoryWindow : Window {
 				case LineDoes::Light:
 					FirstPersonTakeLight(l.item);
 					this->SetWidgetDirty(WID_WI_LIST);
+					break;
+				case LineDoes::BuyDog:
+					Command<Commands::BuyWalkerPet>::Post(STR_ERROR_WALKER_CAN_T_BUY, l.dog);
+					break;
+				case LineDoes::LetDogGo:
+					Command<Commands::BuyWalkerPet>::Post(std::string());
 					break;
 			}
 			return;

@@ -574,6 +574,7 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CargoTypes128, SaveLoadVersion::MaxVersion),
 	SLE_CONDARR(CompanyProperties, walker_items, VarTypes::U16, WALKER_ITEM_SLOTS, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, walker_health, VarTypes::U8, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
+	SLE_CONDSSTR(CompanyProperties, walker_pet, VarTypes::STR, SaveLoadVersion::WalkerPet, SaveLoadVersion::MaxVersion),
 	SLEG_STRUCT("settings", SlCompanySettings),
 	SLEG_CONDSTRUCT("old_ai", SlCompanyOldAI, SaveLoadVersion::MinVersion, SaveLoadVersion::NoAI),
 	SLEG_STRUCT("cur_economy", SlCompanyEconomy),

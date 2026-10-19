@@ -9122,7 +9122,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "zvirata") {
 		/* The dogs, the animals, the ghosts and the sellers (three_d_animals.h): 'zvirata' tells where they are and what
 		 * the indices have; 'zvirata posli <jmeno> [metru]' puts one so many metres ahead of the walker (3 without);
-		 * 'zvirata uder' a blow of the hammer; 'zvirata pes [jmeno]' the walker's dog (none without). */
+		 * 'zvirata uder' a blow of the hammer; 'zvirata pes [jmeno]' the walker's dog (none without), as the company's,
+		 * 'zvirata koupit [jmeno]' through the command (bought, or let go without a name). */
 		extern bool FirstPersonWalkerAt(double &x, double &y);
 		extern double FirstPersonWalkerHeading();
 		double wx = 0, wy = 0;
@@ -9134,7 +9135,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else if (argv.size() > 2 && argv[2] == "uder" && walker) {
 			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDAnimal(wx, wy, FirstPersonWalkerHeading(), 2.5, 1) ? "zasahl" : "minul");
 		} else if (argv.size() > 2 && argv[2] == "pes") {
-			SetThreeDPet(argv.size() > 3 ? argv[3] : std::string_view{});
+			Company *c = Company::GetIfValid(_local_company);
+			if (c != nullptr) c->walker_pet = argv.size() > 3 ? std::string(argv[3]) : std::string();
+		} else if (argv.size() > 2 && (argv[2] == "houba" || argv[2] == "utrhni")) {
+			/* 'zvirata houba': the walker to the mushroom nearest it; 'zvirata utrhni': and E there. */
+			extern std::string RigFirstPersonToMushroom(bool pick);
+			IConsolePrint(CC_DEFAULT, "test3d: houba {}", RigFirstPersonToMushroom(argv[2] == "utrhni"));
+		} else if (argv.size() > 2 && argv[2] == "koupit") {
+			const Company *c = Company::GetIfValid(_local_company);
+			const Money before = c != nullptr ? c->money : Money(0);
+			const bool ok = Command<Commands::BuyWalkerPet>::Post(argv.size() > 3 ? std::string(argv[3]) : std::string());
+			IConsolePrint(CC_DEFAULT, "test3d: koupit {} (penize {} -> {})", ok ? "ano" : "NE", before, c != nullptr ? c->money : Money(0));
 		} else if (argv.size() <= 2) {
 			std::string kinds;
 			for (const ThreeDAnimal &a : GetThreeDAnimals()) kinds += fmt::format(" {}({}{})", a.name, a.poses.size(), a.sold ? fmt::format(", {} L", a.price) : std::string());

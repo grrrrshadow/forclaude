@@ -253,6 +253,8 @@ enum class Commands : uint8_t {
 	HurtWalker, ///< a dragon hurts the walker of the view from the first person
 	ReviveWalker, ///< the walker of the view from the first person comes back with full health
 	WalkerCheat, ///< the cheat iddqd: every weapon to the walker, the arrows filled up (walker_inventory.h)
+	BuyWalkerPet, ///< buy a dog of a seller of dogs for the walker, or let its dog go (three_d_animals.h)
+	PickWalkerItem, ///< the walker picks up a thing where it is: a mushroom (walker_inventory.h)
 	ConfigureVehicle, ///< choose one of the details a vehicle's set offers -- who pulls the hand cart, pushed or pulled, a stripe, a colour (vehicle_config.h)
 	SendVehicleToDepot, ///< send a vehicle to a depot
 	SetVehicleVisibility, ///< hide or unhide a vehicle in the build vehicle and autoreplace GUIs

@@ -2268,6 +2268,7 @@ STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
 STR_FIRST_PERSON_SHOP_HERE                                      :Here: {STRING} · I: the inventory, buy and use
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
+STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
 STR_FIRST_PERSON_RIDING_KEYS                                    :E: get out · the arrows: left and right steer, up faster (a standing vehicle starts), down brake; an aircraft up and down higher and lower · T: go its route or take the wheel · I: horn · F: lights
@@ -2286,6 +2287,10 @@ STR_WALKER_FOR_SALE                                             :For sale here (
 STR_WALKER_NOTHING_FOR_SALE                                     :Nothing for sale here. Walk to a pub, a vending machine, a coffeeshop or a shop of a town.
 STR_WALKER_BUY                                                  :[buy for {CURRENCY_LONG}]
 STR_WALKER_SHOP                                                 :Shop
+STR_WALKER_DOGS_FOR_SALE                                        :Dogs for sale ({RAW_STRING}):
+STR_WALKER_DOG                                                  :{RAW_STRING}
+STR_WALKER_YOUR_DOG                                             :Your dog: {RAW_STRING}
+STR_WALKER_LET_DOG_GO                                           :[let go]
 STR_WALKER_ITEM_HAMMER                                          :Big hammer
 STR_WALKER_ITEM_ARMOUR                                          :Armour
 STR_WALKER_ITEM_BOOTS                                           :Boots
@@ -2305,9 +2310,11 @@ STR_WALKER_ITEM_MACHINE_GUN                                     :Machine gun
 STR_WALKER_ITEM_BULLETS                                         :Bullets
 STR_WALKER_ITEM_ROCKET_LAUNCHER                                 :Rocket launcher
 STR_WALKER_ITEM_ROCKETS                                         :Rockets
+STR_WALKER_ITEM_MUSHROOMS                                       :Mushrooms
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
+STR_ERROR_WALKER_HAS_THIS_DOG                                   :{WHITE}This one already walks with you
 STR_ERROR_WALKER_CARRIES_TOO_MANY                               :{WHITE}No more can be carried
 STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}It can't be used (yet)
 STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}You have none

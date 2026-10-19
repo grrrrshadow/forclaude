@@ -20,6 +20,7 @@
 #include "industry.h"
 #include "industry_map.h"
 #include "cargotype.h"
+#include "three_d_objects.h"
 
 #include "table/strings.h"
 
@@ -46,6 +47,7 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_BULLETS, 0, 0, WalkerItemKind::Ammunition},
 	{STR_WALKER_ITEM_ROCKET_LAUNCHER, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_ROCKETS, 0, 0, WalkerItemKind::Ammunition},
+	{STR_WALKER_ITEM_MUSHROOMS, 0, 0, WalkerItemKind::Thing},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -246,6 +248,62 @@ CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver)
 		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
 			c->walker_items[i] = WalkerCheatCount(static_cast<WalkerItem>(i), c->walker_items[i], quiver);
 		}
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/** What a dog of the sellers costs ("cena", pounds), inflated as the things of the inventory; 0 one not sold. */
+Money WalkerPetPrice(std::string_view name)
+{
+	const ThreeDAnimal *a = GetThreeDAnimal(name);
+	if (a == nullptr || !a->sold) return 0;
+	return Money(static_cast<int64_t>(a->price) * static_cast<int64_t>(_economy.inflation_prices) >> 16);
+}
+
+/**
+ * A dog bought of a seller of dogs (the player, 18. 10.: "the dogs will be sold by three sellers and will walk with
+ * the player"), paid with the company's money: it walks with the walker from now on, instead of the one it had. An
+ * empty name lets the walker's dog go.
+ * @param flags operation to perform
+ * @param name the dog, a ThreeDAnimal sold ("prodej")
+ * @return the cost or an error
+ */
+CommandCost CmdBuyWalkerPet(DoCommandFlags flags, const std::string &name)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	CommandCost cost(ExpensesType::Other);
+	if (!name.empty()) {
+		const Money price = WalkerPetPrice(name);
+		if (price <= 0) return CommandCost(STR_ERROR_WALKER_NOT_SOLD_HERE);
+		if (name == c->walker_pet) return CommandCost(STR_ERROR_WALKER_HAS_THIS_DOG);
+		cost.AddCost(price);
+	}
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_pet = name;
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return cost;
+}
+
+/**
+ * A thing the walker picks up where it is (the player, 18. 10.: "the mushrooms will be picked about the clay towns"):
+ * one more of it in the inventory. Only the mushrooms are picked so.
+ * @param flags operation to perform
+ * @param item the thing
+ * @return nothing, or an error
+ */
+CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item)
+{
+	if (item != WalkerItem::Mushrooms) return CMD_ERROR;
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	if (c->walker_items[to_underlying(item)] >= WALKER_ITEM_MAX) return CommandCost(STR_ERROR_WALKER_CARRIES_TOO_MANY);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(item)]++;
 		InvalidateWindowData(WindowClass::FirstPerson, 0);
 		InvalidateWindowData(WindowClass::WalkerInventory, 0);
 	}

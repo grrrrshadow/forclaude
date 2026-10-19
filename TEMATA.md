@@ -45,8 +45,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Povaha** z indexu: `utoci` jde po chodci a útočí, `vyprovokovat` je klidné, dokud ho chodec nezasáhne, pak útočí,
   `mirumilovne` po zásahu utíká. Zasáhnout jde kladivem, meči, šípy, šipkami, kulkami i výbuchem rakety. Zdraví
   a síla úderu podle velikosti (kočka 2 rány, slon 12). Kdo má pózu `smrt`, padne a chvíli leží.
+- **Pes chodce**: u prodavače ukáže inventář „Prodává psy (…)“ s jeho 3–5 zvířaty a cenami z indexu (`cena`,
+  s inflací); klik koupí (příkaz `BuyWalkerPet`, peníze firmy). Pes je firmy a ukládá se se hrou
+  (`CompanyProperties::walker_pet`, verze savu `WalkerPet`); s otevřeným pohledem z první osoby jde za chodcem
+  (chůze, při velké vzdálenosti běh, u chodce stojí), Falkor létá. V inventáři „Tvůj pes: … [pustit]“.
+- **Houby**: rostou kolem hliněných měst (na nezastavěné zemi, každá třetí dlaždice, druh a místo podle dlaždice,
+  nic se neukládá), vidět jsou z očí do tří dlaždic, v noci svítící verze. **E** u houby (do 1,5 m) ji utrhne do
+  inventáře (věc „Houby“), dole se ukáže „E: utrhnout houbu (…)“; utržená doroste asi za měsíc. K čemu houby
+  jsou, zatím nevím – nosí se.
+- Obří houby hliněného města mají v noci svítící spodky (figura `/noc`).
 - Rig: `test3d zvirata` (druhy, houby, kdo je kolem), `zvirata posli <jmeno> [metru]`, `zvirata uder`,
-  `zvirata pes <jmeno>`.
+  `zvirata pes <jmeno>`, `zvirata koupit [jmeno]`, `zvirata houba`, `zvirata utrhni`.
 
 ## 18. 10. večer – kolegovy tři balíky; psi a zvířata domluvena; svítící a průhledné materiály
 

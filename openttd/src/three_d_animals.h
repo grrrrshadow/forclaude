@@ -31,6 +31,11 @@ struct ThreeDDogSeller {
 	double x = 0, y = 0;             ///< world units
 };
 const ThreeDDogSeller *ThreeDDogSellerNear(double x, double y, double reach_m);
-void SetThreeDPet(std::string_view name);
+
+struct ThreeDMushroom;
+void AddThreeDMushroomsToEye();
+const ThreeDMushroom *ThreeDMushroomNear(double x, double y, double reach_m);
+bool PickThreeDMushroom(double x, double y, double reach_m);
+bool ThreeDMushroomPlace(double x, double y, int tiles, double &mx, double &my, std::string &name);
 
 #endif /* THREE_D_ANIMALS_H */

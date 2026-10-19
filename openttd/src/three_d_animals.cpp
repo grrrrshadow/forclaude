@@ -36,12 +36,15 @@
 #include "town.h"
 #include "house.h"
 #include "settings_type.h"
+#include "company_base.h"
+#include "company_func.h"
 #include "core/random_func.hpp"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
 #include "debug.h"
 
 #include <cmath>
+#include <map>
 
 #include "safeguards.h"
 
@@ -124,8 +127,61 @@ struct Beast {
 std::vector<Beast> _beasts;
 uint _damage = 0;                 ///< the health they took from the walker since the view last asked
 uint64_t _next_seller = 0;        ///< when a seller may come again
-std::string _pet;                 ///< the walker's dog, a ThreeDAnimal (SetThreeDPet()); empty none
 std::vector<ThreeDDogSeller> _sellers_seen; ///< ThreeDDogSellerNear(): the sellers as they are now
+
+/*
+ * The mushrooms to pick (the player, 18. 10.: "the mushrooms will be picked about the clay towns, the glowing ones only
+ * at night"): on the land of the towns of their theme, where nothing is built, one on a tile in so many, where and
+ * which by the tile -- the same each time it is looked at, nothing kept; only those picked are kept, till they grow
+ * again. At night the glowing one of each.
+ */
+constexpr uint MUSHROOM_ONE_IN = 3;          ///< a tile of the land in so many has one
+constexpr int MUSHROOM_SEEN_TILES = 3;       ///< seen this many tiles about the eye (they are a hand high)
+constexpr uint64_t MUSHROOM_REGROW_TICKS = 74 * 30; ///< a picked one grows again after about a month
+std::map<uint32_t, uint64_t> _mushrooms_picked; ///< the tiles picked, and when
+
+/** A mushroom where it grows. */
+struct MushroomAt {
+	const ThreeDMushroom *kind = nullptr;
+	double x = 0, y = 0; ///< world units
+	float facing = 0;
+};
+
+/** The mushroom of a tile, if it has one now. */
+bool MushroomOnTile(TileIndex t, MushroomAt &at)
+{
+	if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) return false;
+	const uint32_t h = (TileX(t) * 2654435761u) ^ (TileY(t) * 40503u) ^ 0x5bd1e995u;
+	if ((h >> 3) % MUSHROOM_ONE_IN != 0) return false;
+	const std::vector<ThreeDMushroom> &kinds = GetThreeDMushrooms();
+	if (kinds.empty()) return false;
+	const ThreeDMushroom &m = kinds[(h >> 9) % kinds.size()];
+	if (m.theme != 0 && to_underlying(GetTownThemeAt(t)) != m.theme) return false;
+	auto picked = _mushrooms_picked.find(t.base());
+	if (picked != _mushrooms_picked.end()) {
+		if (TimerGameTick::counter - picked->second < MUSHROOM_REGROW_TICKS) return false;
+		_mushrooms_picked.erase(picked);
+	}
+	at.kind = &m;
+	at.x = TileX(t) * TILE_SIZE + 2 + (h >> 13) % (TILE_SIZE - 4);
+	at.y = TileY(t) * TILE_SIZE + 2 + (h >> 18) % (TILE_SIZE - 4);
+	at.facing = static_cast<float>((h >> 23) % 24 * 15);
+	return true;
+}
+
+/** The mushrooms about a point, so many tiles each way: each with its tile. */
+template <typename F>
+void ForMushroomsNear(double x, double y, int tiles, F fn)
+{
+	const int cx = static_cast<int>(x / TILE_SIZE), cy = static_cast<int>(y / TILE_SIZE);
+	for (int ty = std::max(1, cy - tiles); ty <= std::min<int>(Map::MaxY() - 1, cy + tiles); ty++) {
+		for (int tx = std::max(1, cx - tiles); tx <= std::min<int>(Map::MaxX() - 1, cx + tiles); tx++) {
+			const TileIndex t = TileXY(tx, ty);
+			MushroomAt at;
+			if (MushroomOnTile(t, at)) fn(t, at);
+		}
+	}
+}
 
 const ThreeDAnimal *KindOf(const Beast &b)
 {
@@ -638,11 +694,19 @@ uint Count(Place place)
 	return static_cast<uint>(std::ranges::count_if(_beasts, [&](const Beast &b) { return b.place == place && b.state != State::Dead; }));
 }
 
+/** The walker's dog, the company's (CompanyProperties::walker_pet); empty none. */
+std::string_view PetName()
+{
+	const Company *c = Company::GetIfValid(_local_company);
+	return c != nullptr ? std::string_view(c->walker_pet) : std::string_view();
+}
+
 /** The walker's dog as it should be: there with the walker out, beside it; gone without. */
 void KeepPet(bool walker, double wx, double wy, uint64_t now)
 {
 	auto it = std::ranges::find(_beasts, Place::Pet, &Beast::place);
-	const ThreeDAnimal *a = _pet.empty() ? nullptr : GetThreeDAnimal(_pet);
+	const std::string_view pet = PetName();
+	const ThreeDAnimal *a = pet.empty() ? nullptr : GetThreeDAnimal(pet);
 	if (!walker || a == nullptr) {
 		if (it != _beasts.end()) _beasts.erase(it);
 		return;
@@ -807,6 +871,65 @@ void AddThreeDAnimalsToEye()
 	}
 }
 
+/** The mushrooms about the walker in the view from its eyes, at their true size; at night the glowing ones. */
+void AddThreeDMushroomsToEye()
+{
+	double wx = 0, wy = 0;
+	if (!FirstPersonWalkerAt(wx, wy) || GetThreeDMushrooms().empty()) return;
+	const bool night = IsNightNow();
+	ForMushroomsNear(wx, wy, MUSHROOM_SEEN_TILES, [&](TileIndex, const MushroomAt &at) {
+		const std::string &figure = night && !at.kind->night.empty() ? at.kind->night : at.kind->name;
+		AddCabFigure(figure, 1.0f, static_cast<int>(std::lround(at.x)), static_cast<int>(std::lround(at.y)), static_cast<int>(std::lround(FirstPersonGroundZ(at.x, at.y))), at.facing, 0);
+	});
+}
+
+/** The mushroom nearest a point within reach (metres), its name in Czech or English; nullptr none. */
+const ThreeDMushroom *ThreeDMushroomNear(double x, double y, double reach_m)
+{
+	const ThreeDMushroom *best = nullptr;
+	double best_d = reach_m * OBJECT_UNITS_PER_METRE;
+	ForMushroomsNear(x, y, 1, [&](TileIndex, const MushroomAt &at) {
+		const double d = std::hypot(at.x - x, at.y - y);
+		if (d <= best_d) {
+			best_d = d;
+			best = at.kind;
+		}
+	});
+	return best;
+}
+
+/** The rig: the mushroom nearest a point, so many tiles about: where it is and what it is; false none. */
+bool ThreeDMushroomPlace(double x, double y, int tiles, double &mx, double &my, std::string &name)
+{
+	double best = 1e18;
+	ForMushroomsNear(x, y, tiles, [&](TileIndex, const MushroomAt &at) {
+		const double d = std::hypot(at.x - x, at.y - y);
+		if (d >= best) return;
+		best = d;
+		mx = at.x;
+		my = at.y;
+		name = at.kind->name;
+	});
+	return best < 1e18;
+}
+
+/** The mushroom nearest a point within reach picked: gone till it grows again. @return whether one was */
+bool PickThreeDMushroom(double x, double y, double reach_m)
+{
+	TileIndex best = INVALID_TILE;
+	double best_d = reach_m * OBJECT_UNITS_PER_METRE;
+	ForMushroomsNear(x, y, 1, [&](TileIndex t, const MushroomAt &at) {
+		const double d = std::hypot(at.x - x, at.y - y);
+		if (d <= best_d) {
+			best_d = d;
+			best = t;
+		}
+	});
+	if (best == INVALID_TILE) return false;
+	_mushrooms_picked[best.base()] = TimerGameTick::counter;
+	return true;
+}
+
 /**
  * A blow of the walker's hammer or sword: the one it reaches in front of it takes it (Strike()).
  * @return whether one was hit
@@ -861,16 +984,6 @@ uint TakeThreeDAnimalDamage()
 }
 
 /**
- * The walker's dog (the company's, bought of a seller): it walks with the walker while the view from the first person
- * is open. Empty for none.
- */
-void SetThreeDPet(std::string_view name)
-{
-	if (_pet == name) return;
-	_pet = name;
-}
-
-/**
  * A seller of dogs within reach of a point (the walker), as it is now: what it sells; nullptr none.
  * @param reach_m metres
  */
@@ -920,7 +1033,7 @@ std::string DescribeThreeDAnimals()
 {
 	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "prodavac", "pes chodce"};
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
-	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), _pet.empty() ? "-" : _pet);
+	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
 	for (const Beast &b : _beasts) {
 		out += fmt::format("\n  {} ({}) {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, poza {} snimek {}, zdravi {}{}", b.kind, PLACES[static_cast<int>(b.place)], STATES[static_cast<int>(b.state)],
 				b.x / TILE_SIZE, b.y / TILE_SIZE, b.up / OBJECT_HEIGHT_PER_METRE, b.heading * 180.0 / M_PI, b.pose.empty() ? "-" : b.pose, b.frame, b.health, b.angry ? ", vyprovokovany" : "");

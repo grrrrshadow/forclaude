@@ -48,6 +48,7 @@ enum class WalkerItem : uint8_t {
 	Bullets,    ///< its bullets, used up as they are shot
 	RocketLauncher, ///< the rocket launcher (objekty/predmety/raketomet.glb): a rocket, then loaded again
 	Rockets,    ///< its rockets, exploding where they hit
+	Mushrooms,  ///< mushrooms picked about the clay towns (the colleague's objekty/houby, E by one)
 	End,        ///< the end of the known things
 };
 

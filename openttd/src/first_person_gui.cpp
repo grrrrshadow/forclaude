@@ -35,6 +35,7 @@
 #include "water_map.h"
 #include "three_d.h"
 #include "three_d_objects.h"
+#include "language.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "blitter/factory.hpp"
@@ -104,6 +105,8 @@ static constexpr double FIRST_PERSON_PUFF_EVERY_S = 0.04;
 static constexpr double FIRST_PERSON_PUFF_S = 1.6;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
+/** How near a mushroom the walker picks it (E), metres. */
+static constexpr double FIRST_PERSON_PICK_M = 1.5;
 
 /** How a weapon of the walker is used. */
 enum class WeaponUse : uint8_t {
@@ -409,11 +412,15 @@ struct FirstPersonWindow : Window {
 		this->SetDirty();
 	}
 
-	/** E: into the vehicle near, or out of the one the walker is in. */
+	/** E: a mushroom at the walker's feet picked (into the inventory, three_d_animals.h); else into the vehicle near, or out of the one the walker is in. */
 	void BoardOrLeave()
 	{
 		if (this->Riding() != nullptr) {
 			this->GetOut();
+			return;
+		}
+		if (PickThreeDMushroom(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M)) {
+			Command<Commands::PickWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WalkerItem::Mushrooms);
 			return;
 		}
 		this->riding = VehicleID::Invalid();
@@ -1182,7 +1189,12 @@ struct FirstPersonWindow : Window {
 				/* Near a place that sells things: said instead of the keys. */
 				const StringID shop = WalkerShopName(FirstPersonShopNearby());
 				const Vehicle *near = this->VehicleToBoard();
-				if (shop != INVALID_STRING_ID) {
+				const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M);
+				if (mushroom != nullptr) {
+					/* At a mushroom: E picks it. */
+					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
+					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en), TextColour::Yellow);
+				} else if (shop != INVALID_STRING_ID) {
 					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
 				} else if (near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
@@ -1560,6 +1572,32 @@ std::string RigFirstPersonFreeMap(int tiles)
 }
 
 /** The rig: walk the walker as if the keys were held so many steps (ahead, aside, turn: -1, 0 or 1). */
+/**
+ * The rig: the walker to the mushroom nearest it (three tiles about), 1.4 m from it looking down at it; with pick, E
+ * pressed there.
+ * @return what was found and done
+ */
+std::string RigFirstPersonToMushroom(bool pick)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	double mx = 0, my = 0;
+	std::string name;
+	if (!ThreeDMushroomPlace(w->walker.x, w->walker.y, 3, mx, my, name)) return "zadna houba blizko";
+	w->walker.x = mx - 1.4 * OBJECT_UNITS_PER_METRE;
+	w->walker.y = my;
+	w->walker.heading = 0;
+	w->walker.pitch = -0.75;
+	std::string out = fmt::format("{} na {:.1f},{:.1f}", name, mx / TILE_SIZE, my / TILE_SIZE);
+	if (pick) {
+		w->BoardOrLeave();
+		out += ThreeDMushroomNear(w->walker.x, w->walker.y, FIRST_PERSON_PICK_M) == nullptr ? ", utrzena" : ", NEUTRZENA";
+	}
+	w->MakePicture();
+	w->SetDirty();
+	return out;
+}
+
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
