@@ -975,12 +975,13 @@ struct ObjectCamera {
 		}
 	}
 
-	/** A point of the vehicle's frame on the picture: turned as the state has it, leant, foreshortened, seen. */
+	/** A point of the vehicle's frame on the picture: turned as the state has it, foreshortened, leant, seen. */
 	inline void Place(float px, float py, float pz, float &osx, float &osy, float &od) const
 	{
 		this->Turned(px, py);
-		this->Lean(px, py, pz);
-		const float x = px * this->scale * this->along, y = py * this->scale, z = pz * this->scale * this->stretch;
+		float x = px * this->scale * this->along, y = py * this->scale, z = pz * this->scale * this->stretch;
+		/* Leant as it stands foreshortened: as steep as the ground under it, not steeper for its length shortened (#287). */
+		this->Lean(x, y, z);
 		const float xr = x * this->ca - y * this->sa, yr = x * this->sa + y * this->ca;
 		osx = xr * this->p;
 		osy = (-yr * CAM_SIN - z * CAM_COS) * this->p;
@@ -2398,6 +2399,43 @@ struct VehicleObjectPlace {
  */
 static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, double &x, double &y, double &facing, double &rolled, double &curvature, int depth = 0);
 
+/**
+ * How far a vehicle's front is raised over its back, degrees (the player, #287: "the cars do not lean up a hill"; the
+ * tilting of OpenLoco, the player 16. 10.): the ground under its front end and under its back end, its length apart,
+ * as its wheels stand on it -- so it tips as its front reaches a slope, not at once on the slope's tile. Level on a
+ * bridge and in a tunnel, and a ship or an aircraft.
+ * @param obj its object
+ * @param v its anchor piece
+ * @param x,y its middle, world units
+ * @param facing the way its front faces, radians
+ */
+static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v, double x, double y, double facing)
+{
+	if (v->type == VehicleType::Train) {
+		if (Train::From(v)->track == Track::Wormhole) return 0;
+	} else if (v->type == VehicleType::Road) {
+		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return 0;
+	} else {
+		return 0;
+	}
+	float length_m = obj->length_m;
+	if (length_m <= 0) {
+		const ThreeDVehicleShape *shape = obj->TryGetShape();
+		if (shape == nullptr) return 0;
+		length_m = shape->x1 - shape->x0;
+	}
+	const double half = length_m * ObjectScale(obj) * UNITS_PER_METRE / 2;
+	if (half <= 0) return 0;
+	auto ground = [](double px, double py) {
+		const int gx = std::clamp(static_cast<int>(px), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
+		const int gy = std::clamp(static_cast<int>(py), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
+		return GetSlopePixelZ(gx, gy, true);
+	};
+	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
+	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE;
+	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
+}
+
 static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place)
 {
 	int piece = 0;
@@ -2444,9 +2482,11 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 		world_az = std::round((static_cast<float>(facing * 180.0 / M_PI) - 135.0f) / 5.0f) * 5.0f;
 		if (SqueezedType(obj->type)) along = std::round(SqueezeAt(facing) * 20.0f) / 20.0f;
 	}
+	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
+	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
 	_object_picture_may_wait = true;
 	_object_picture_waited = false;
-	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, 0, 0, lights, along, WalkCode(obj, state, WalkedOf(v, obj), scale));
+	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, WalkCode(obj, state, WalkedOf(v, obj), scale));
 	_object_picture_may_wait = false;
 	if (_object_picture_waited) _vehicles_owed_pictures.insert(v->index);
 	place.ax = static_cast<int>(std::lround(ox));
@@ -2688,6 +2728,7 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	out.y = y;
 	out.z = v->z_pos;
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);
+	out.pitch = VehicleSlopePitch(obj, v, x, y, facing);
 	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale);
 	out.lights = VehicleObjectLightsOn(obj, front, last, reversed, ZoomLevel::Normal);
@@ -2958,10 +2999,12 @@ const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev,
 	const float world_az = std::round((ev.facing - 135.0f) / 5.0f) * 5.0f;
 	const float cam = std::round(yaw / 5.0f) * 5.0f;
 	const float along = std::round(ev.along * 20.0f) / 20.0f;
+	/* Up or down a hill leaning as near, in steps of 2 degrees as on the map. */
+	const int pitch = static_cast<int>(std::lround(ev.pitch / 2.0f)) * 2;
 	/* On the thread too (as the vehicles of the map): the view draws again every frame as it goes, and the nearest made
 	 * stands in meanwhile. */
 	_object_picture_may_wait = true;
-	const ThreeDModelPicture *pic = ObjectPicture(ev.obj, ev.scale, zoom, world_az + cam, world_az, false, ev.state, 0, -1, 1.0f, 0, 0, 0, ev.lights, along, ev.walk);
+	const ThreeDModelPicture *pic = ObjectPicture(ev.obj, ev.scale, zoom, world_az + cam, world_az, false, ev.state, 0, -1, 1.0f, 0, pitch, 0, ev.lights, along, ev.walk);
 	_object_picture_may_wait = false;
 	return pic;
 }

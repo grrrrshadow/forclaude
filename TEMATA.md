@@ -27,16 +27,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
-## 19. 10. – #287: rozhlížení myší, panel pryč, barvy psů, větší houby
+## 19. 10. – #287: rozhlížení myší, jeden řádek dole, barvy psů, větší houby, auta do kopce
 
 - **Rozhlížení pravým tlačítkem** v pohledu z první osoby jde stejně jako posun mapy (hráč: „ať to je v souladu
   s pohybem pravým čudlíkem mapou“). Hráč má náš režim (`scroll_mode = 0`, RMBPinned), kde tah doprava posune pohled
   mapy doprava. V první osobě se dřív tahem doprava otočil doleva a tahem dolů díval nahoru. Teď: doprava se dívá
   doprava, dolů dolů.
 - **Spodní panel pohledu z první osoby je pryč** (hráč: „ten návod dej taky pryč, zdraví, u města dej do okna
-  inventáře“). Obraz je o něj větší. Návod kláves zmizel, i ve vozidle. Žlutá nápověda na místě (utrhnout houbu,
-  obchod, nastoupit) a ve vozidle jméno a rychlost jsou dole v obraze. Zdraví už inventář měl, pod něj přibyl řádek
+  inventáře“). Obraz je o něj větší. Návod kláves zmizel, i ve vozidle. Zdraví už inventář měl, pod něj přibyl řádek
   „U města …, dlaždice …, směr …°“.
+- **Dole v obraze jeden řádek** (hráč: „udělej to na jeden řádek: zdraví, kde je, a že je u obchodu ať zmáčkne I;
+  dlouhý řeči jak se to ovládá tam nepatří“): „Zdraví 100/100 · u města X“ a žlutě, co jde na místě: „Obchod:
+  zmáčkni I“, „E: utrhnout houbu“, „E: nastoupit do …“. Ve vozidle místo toho jméno a rychlost. Žádný návod kláves.
+- **Auta se naklánějí do kopce** (hráč: „auta se nenaklání do kopce“): vozidlo z 3D objektu má předek tak vysoko
+  nad zadkem, jak stojí zem pod jeho předkem a zadkem (`VehicleSlopePitch()`). Naklání se tedy, až předek najede na
+  svah, ne skokem na dlaždici. Na mostě, v tunelu, loď a letadlo rovně. Mapa bere náklon po 2° (málo obrázků), pohled
+  z očí přesně, vlastní kabina oka zůstává rovně. Chyba po cestě: náklon se počítal před zkrácením auta na délku,
+  jakou mu hra dává, takže zkrácené auto stálo strměji než svah. Teď se naklání až zkrácené. Ověřeno v rigu
+  (`test3d silnice 603 3 kopec`, `test3d svah`): Tatra 603 do kopce +8°, z kopce −8°, na mapě i z očí.
 - **Prodavačka psů farmářka** je ze hry pryč (hráč: „tuhle prodavačku psů přestanem používat“): záznam z `psi/objekty.json`,
   model ze sady hry a autor z README sady. U kolegy v grrrrf zůstává.
 - **Psi bez barvy** (hráč: „fenek nemá barvu a nějakej vlk neměl barvu“): devět psů od kolegy má barvu zapsanou

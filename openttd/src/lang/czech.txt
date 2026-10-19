@@ -2365,11 +2365,16 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž m�
 STR_FIRST_PERSON_RUN                                            :Běh
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
+STR_FIRST_PERSON_LINE                                           :Zdraví {NUM}/{NUM} · u města {TOWN}
+STR_FIRST_PERSON_NEAR_TOWN                                      :U města {TOWN}
+STR_FIRST_PERSON_LINE_AND                                       :{RAW_STRING} · {RAW_STRING}
+STR_FIRST_PERSON_LINE_HINT                                      :{RAW_STRING} · {YELLOW}{RAW_STRING}
+STR_FIRST_PERSON_LINE_HINT_ONLY                                 :{YELLOW}{RAW_STRING}
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
-STR_FIRST_PERSON_SHOP_HERE                                      :Tady: {STRING} · I: inventář, nákup a použití
+STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: zmáčkni I
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš

@@ -8208,6 +8208,7 @@ static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 	CabFigure f{std::string(), ev.scale, ev.x, ev.y, ev.z, ev.facing, 0};
 	f.obj = ev.obj;
 	f.along = ev.along;
+	f.pitch = ev.pitch;
 	f.state = ev.state;
 	f.lights = ev.lights;
 	f.own_car = own_car;
@@ -8245,6 +8246,7 @@ static ThreeDEyeVehicle CabFigureVehicle(const CabFigure &fg)
 	ev.y = fg.y;
 	ev.z = fg.z;
 	ev.facing = fg.facing;
+	ev.pitch = static_cast<float>(fg.pitch);
 	ev.state = fg.state;
 	ev.lights = fg.lights;
 	ev.walk = fg.walk;
@@ -8426,18 +8428,21 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			ready[i] = 1;
 			double px, py, pz, nx = 0, ny = 0, nz = 1;
 			to_model(i, px, py, pz, nx, ny, nz);
-			if (fg.pitch != 0) {
-				/* Raised about its y: its +x up. */
-				const double qx = px * pc - pz * ps, qz = px * ps + pz * pc;
-				px = qx;
-				pz = qz;
-				const double mx = nx * pc - nz * ps, mz = nx * ps + nz * pc;
-				nx = mx;
-				nz = mz;
-			}
 			turned(px, py);
 			turned(nx, ny);
-			pts[i] = CabToEye(eye, fg.x + px * length * ca - py * across * sa, fg.y + px * length * sa + py * across * ca, fg.z + pz * up, s.uv[i * 2], s.uv[i * 2 + 1]);
+			/* In metres as it stands, foreshortened, and then raised about its y, its front (+x) up: as steep as the
+			 * ground under it, not steeper for its length shortened (#287). */
+			double mx = px * length / OBJECT_UNITS_PER_METRE, mz = pz * up / OBJECT_HEIGHT_PER_METRE;
+			if (fg.pitch != 0) {
+				const double qx = mx * pc - mz * ps, qz = mx * ps + mz * pc;
+				mx = qx;
+				mz = qz;
+				const double rx = nx * pc - nz * ps, rz = nx * ps + nz * pc;
+				nx = rx;
+				nz = rz;
+			}
+			const double fx = mx * OBJECT_UNITS_PER_METRE, fy = py * across;
+			pts[i] = CabToEye(eye, fg.x + fx * ca - fy * sa, fg.y + fx * sa + fy * ca, fg.z + mz * OBJECT_HEIGHT_PER_METRE, s.uv[i * 2], s.uv[i * 2 + 1]);
 			if (pts[i].f >= _cab_near) scr[i] = CabProject(eye, pts[i]);
 			if (shape_lit) {
 				const double wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
@@ -10160,6 +10165,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	if (in_model_cab) {
 		AddCabVehicle(own_model, false);
 		_cab_figures.back().own_cab = true;
+		/* (The eye sits in it level: its cab not tipped round the eye.) */
+		_cab_figures.back().pitch = 0;
 	}
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->First() == own) continue;

@@ -10016,6 +10016,24 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowTo(found->x_pos, found->y_pos, found->z_pos, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} smer {}", found->unitnumber, to_underlying(found->type), found->x_pos, found->y_pos, found->z_pos, to_underlying(found->direction));
+	} else if (what == "svah") {
+		/* 'svah [n]': the middle of the view on the n-th vehicle drawn from its object that goes up or down a slope now,
+		 * and how far its front is raised (the eye's figure of it, GetThreeDEyeVehicle()). */
+		auto n = number(2);
+		int want = n.value_or(0), seen = 0;
+		for (const Vehicle *v : Vehicle::Iterate()) {
+			if (v->vehstatus.Test(VehState::Hidden) || (v->type != VehicleType::Road && v->type != VehicleType::Train)) continue;
+			const auto flags = v->type == VehicleType::Road ? RoadVehicle::From(v)->gv_flags : Train::From(v)->gv_flags;
+			if (!flags.Any({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown})) continue;
+			ThreeDEyeVehicle ev;
+			if (!GetThreeDEyeVehicle(v, ev) || ev.obj == nullptr) continue;
+			if (seen++ != want) continue;
+			ScrollMainWindowTo(v->x_pos, v->y_pos, v->z_pos, true);
+			UpdateViewportPosition(w, 0);
+			IConsolePrint(CC_DEFAULT, "test3d: svah vozidlo {} typ {} na {},{},{} smer {:.0f} sklon {:.1f}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos, ev.facing, ev.pitch);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: svah {}: zadne 3D vozidlo na svahu.", want);
 	} else if (what == "jed") {
 		/* The rig: start a vehicle that stands (in its shed): 'test3d jed <type> <unit number>', type 0 train, 1 road, 2 ship, 3 aircraft. */
 		auto type = number(2), unit = number(3);
@@ -10391,6 +10409,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			vtype = VehicleType::Train;
 		} else {
+			/* 'test3d silnice <text> <count> kopec': a plateau a level high in the middle of the grid, the rows climbing
+			 * onto it and down again (the player, #287: "the cars do not lean up a hill"). */
+			if (argv.size() > 4 && argv[4] == "kopec") {
+				Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 11, y0 + 14), TileXY(x0 + 6, y0 + 2), false, LevelMode::Raise);
+			}
 			/* Roads along x at rows 4 and 12, along y at columns 4, 9 and 14; the depot at the end of the first column. */
 			for (uint row : {4u, 12u}) {
 				CommandCost r = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 2, y0 + row), TileXY(x0 + 1, y0 + row), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);

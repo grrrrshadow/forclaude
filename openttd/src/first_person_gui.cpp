@@ -1166,26 +1166,44 @@ struct FirstPersonWindow : Window {
 					const std::string text = wp.ammo != WalkerItem::End ? GetString(STR_FIRST_PERSON_WEAPON_AMMO, name, GetWalkerItemSpec(wp.ammo).name, Carried(wp.ammo)) : GetString(name);
 					DrawString(r.left, r.right - WidgetDimensions::scaled.framerect.right * 2, line, text, TextColour::White, AlignmentH::End);
 				}
-				/* What can be done where it stands, in the picture (the player, #287: the keys under the view away, where the
-				 * walker is and its health into the inventory): in a vehicle which and how fast; else E's use here. */
+				/* One line under the view (the player, #287: no long words there how it is played): the walker's health,
+				 * the town it is near, and what can be done where it stands -- in a vehicle which and how fast; else E's use
+				 * here or I at a shop, in yellow. */
 				const int left = r.left + WidgetDimensions::scaled.framerect.left * 2, right = r.right - WidgetDimensions::scaled.framerect.right * 2;
-				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
-					DrawString(left, right, line, GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
-					break;
+				const Company *c = Company::GetIfValid(_local_company);
+				const Town *town = ClosestTownFromTile(TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y)), UINT_MAX);
+				std::string text;
+				if (c != nullptr && town != nullptr) {
+					text = GetString(STR_FIRST_PERSON_LINE, c->walker_health, WALKER_HEALTH_MAX, town->index);
+				} else if (c != nullptr) {
+					text = GetString(STR_WALKER_HEALTH, c->walker_health, WALKER_HEALTH_MAX);
+				} else if (town != nullptr) {
+					text = GetString(STR_FIRST_PERSON_NEAR_TOWN, town->index);
 				}
-				const StringID shop = WalkerShopName(FirstPersonShopNearby());
-				const Vehicle *near = this->VehicleToBoard();
-				const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M);
-				if (mushroom != nullptr) {
+				std::string hint;
+				bool riding = false;
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+					hint = GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type));
+					riding = true;
+				} else if (const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M); mushroom != nullptr) {
 					/* At a mushroom: E picks it. */
 					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
-					DrawString(left, right, line, GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en), TextColour::Yellow);
-				} else if (shop != INVALID_STRING_ID) {
-					DrawString(left, right, line, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
-				} else if (near != nullptr) {
+					hint = GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en);
+				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
+					/* At a shop: I opens the inventory, where it is bought. */
+					hint = GetString(STR_FIRST_PERSON_SHOP_HERE, shop);
+				} else if (const Vehicle *near = this->VehicleToBoard(); near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
-					DrawString(left, right, line, GetString(STR_FIRST_PERSON_BOARD_HERE, near->index), TextColour::Yellow);
+					hint = GetString(STR_FIRST_PERSON_BOARD_HERE, near->index);
 				}
+				if (!hint.empty()) {
+					if (text.empty()) {
+						text = riding ? hint : GetString(STR_FIRST_PERSON_LINE_HINT_ONLY, hint);
+					} else {
+						text = GetString(riding ? STR_FIRST_PERSON_LINE_AND : STR_FIRST_PERSON_LINE_HINT, text, hint);
+					}
+				}
+				DrawString(left, right, line, text, TextColour::White);
 				break;
 			}
 			default:

@@ -62,6 +62,7 @@ struct ThreeDEyeVehicle {
 	float along = 1.0f;         ///< its length foreshortened as the game spaces its vehicles
 	double x = 0, y = 0, z = 0; ///< its origin, world units
 	float facing = 0;           ///< degrees in the world, 0 along +x, 90 along +y, finer than the eight directions
+	float pitch = 0;            ///< degrees its front is raised over its back: up a hill (VehicleSlopePitch())
 	int state = 0;              ///< its state its GRF picks (paint, fading, rust), 0 none
 	int lights = 0;             ///< its lights on at night (front 1, back 2)
 	double rolled = 0;          ///< how far it has gone, world units: its wheels turn by it ("kola_v_modelu")

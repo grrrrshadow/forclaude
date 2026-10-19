@@ -2260,11 +2260,16 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the
 STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
+STR_FIRST_PERSON_LINE                                           :Health {NUM}/{NUM} · near {TOWN}
+STR_FIRST_PERSON_NEAR_TOWN                                      :Near {TOWN}
+STR_FIRST_PERSON_LINE_AND                                       :{RAW_STRING} · {RAW_STRING}
+STR_FIRST_PERSON_LINE_HINT                                      :{RAW_STRING} · {YELLOW}{RAW_STRING}
+STR_FIRST_PERSON_LINE_HINT_ONLY                                 :{YELLOW}{RAW_STRING}
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
-STR_FIRST_PERSON_SHOP_HERE                                      :Here: {STRING} · I: the inventory, buy and use
+STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: press I
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
