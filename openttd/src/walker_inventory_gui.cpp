@@ -22,6 +22,8 @@
 #include "company_func.h"
 #include "three_d_animals.h"
 #include "three_d_objects.h"
+#include "town.h"
+#include "tile_map.h"
 #include "widgets/walker_inventory_widget.h"
 
 #include "table/strings.h"
@@ -42,6 +44,23 @@ WalkerItem FirstPersonLightInHand();
 void FirstPersonTakeLight(WalkerItem item);
 /** Where the walker of the view from the first person stands, world units; false when the view is not open. */
 bool FirstPersonWalkerAt(double &x, double &y);
+/** The direction the walker of the view from the first person faces, radians (first_person_gui.cpp). */
+double FirstPersonWalkerHeading();
+
+/**
+ * Where the walker stands, as told under its health (the player, #287: out of the view from the first person into the
+ * inventory): the town it is near, its tile and the direction it faces; empty without the view.
+ */
+static std::string WalkerWhere()
+{
+	double x, y;
+	if (!FirstPersonWalkerAt(x, y)) return {};
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	const Town *town = ClosestTownFromTile(tile, UINT_MAX);
+	if (town == nullptr) return {};
+	const int deg = static_cast<int>(std::lround(std::fmod(FirstPersonWalkerHeading() * 180.0 / M_PI + 360.0, 360.0)));
+	return GetString(STR_FIRST_PERSON_WHERE, town->index, TileX(tile), TileY(tile), deg);
+}
 
 /** How near a seller of dogs the walker buys of it, metres. */
 static constexpr double SELLER_REACH_M = 6.0;
@@ -80,6 +99,7 @@ struct WalkerInventoryWindow : Window {
 	mutable std::vector<Line> lines; ///< where the clickable lines were drawn
 	TileIndex shop = INVALID_TILE;   ///< where things are sold near the walker, as last seen
 	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
+	mutable std::string where;       ///< where the walker is (WalkerWhere()), as last drawn
 	mutable std::string seller;      ///< the seller of dogs near the walker, as last seen; empty none
 	mutable std::vector<std::string> dogs; ///< and the dogs it sells
 
@@ -104,14 +124,16 @@ struct WalkerInventoryWindow : Window {
 		this->SeeSeller();
 	}
 
-	/** The walker walks on: what is sold where it stands now; and the weapon in its hand. */
+	/** The walker walks on: what is sold where it stands now, where it is; and the weapon in its hand. */
 	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
 	{
 		TileIndex now = FirstPersonShopNearby();
 		const WalkerItem hand = FirstPersonWeaponInHand();
-		if (this->SeeSeller() || now != this->shop || hand != this->in_hand) {
+		std::string where = WalkerWhere();
+		if (this->SeeSeller() || now != this->shop || hand != this->in_hand || where != this->where) {
 			this->shop = now;
 			this->in_hand = hand;
+			this->where = std::move(where);
 			this->SetWidgetDirty(WID_WI_LIST);
 		}
 	}
@@ -139,7 +161,14 @@ struct WalkerInventoryWindow : Window {
 		const int bar_left = ir.left + ir.Width() / 2, bar_top = y + 3, bar_bottom = y + lh - 4;
 		GfxFillRect(bar_left, bar_top, ir.right, bar_bottom, GetColourGradient(Colours::Grey, Shade::Darkest));
 		GfxFillRect(bar_left, bar_top, bar_left + (ir.right - bar_left) * c->walker_health / WALKER_HEALTH_MAX, bar_bottom, GetColourGradient(Colours::Red, Shade::Light));
-		y += lh + 4;
+		y += lh;
+		/* Where the walker is. */
+		this->where = WalkerWhere();
+		if (!this->where.empty()) {
+			DrawString(ir.left, ir.right, y, this->where, TextColour::White);
+			y += lh;
+		}
+		y += 4;
 
 		/* What it carries; the beer and the marijuana used with a click, a weapon taken in the hand (as its key 1 to 5
 		 * does in the view from the first person, Morrowind's quick keys) or put away. */

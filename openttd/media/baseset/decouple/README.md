@@ -135,7 +135,7 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   (dragonsnap), fenek (Dylan Martínez Sánchez), Falkor (sharksie), roztomilý pes (Tech developers), šedý vlk a veselý
   pes (Stakler), malý pes (samuelsgr art), lovecký pes (Jurassic Radassic), pouliční pes (MAROUANE), nafocený pes
   (3DigitalArtist), skákající liška (sheana), šedá kočka (savounited), rezavá kočka (ilhamtr), lesní vlk (AX-7YK),
-  dvoubarevná kočka (kenchoo), stylizovaný vlk (ESO), vlk u dveří (victory_mirosya), prodavačka psů farmářka (AKM),
+  dvoubarevná kočka (kenchoo), stylizovaný vlk (ESO), vlk u dveří (victory_mirosya),
   prodavač Bodi (Jacob Quintana), prodavač dalmatin (iRahulRajput), los, wapiti, jelen, laň, vidloroh, ovce
   tlustorohá a medvěd (Stylized Animals BIG PACK, WildMesh 3D), slon (GremorySaiyan), opice (Guilherme Navarro,
   FabianRetamal, ToonMesh 3D, HumAi Club), houbový bojovník (POTVORA, zjednodušený), houby (Mushrooms, leha_pu,

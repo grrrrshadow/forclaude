@@ -2365,9 +2365,7 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž m�
 STR_FIRST_PERSON_RUN                                            :Běh
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
-STR_FIRST_PERSON_WHERE_HEALTH                                   :Zdraví {NUM} · u města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
-STR_FIRST_PERSON_KEYS                                           :W/S nebo šipky nahoru a dolů: chůze · A/D: úkrok · šipky vlevo a vpravo: otočit se · pravé tlačítko myši: rozhlížení · Shift: běh · E: nastoupit do vozidla vedle · 1–7: kladivo, luk, kuše, meč, obouruční meč, kulomet, raketomet · F: tasit a schovat zbraň · levé tlačítko nebo mezerník: máchnout, vystřelit (luk: držet napne, puštění vystřelí; mezerník napne a vystřelí; kulomet střílí, dokud se drží tlačítko) · L: pochodeň, lucerna, zhasnout
 STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebuje 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
@@ -2376,8 +2374,6 @@ STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš
 STR_FIRST_PERSON_RIDING_ROUTE                                   :Ve vozidle {VEHICLE} · {VELOCITY} · jede svou trasu
-STR_FIRST_PERSON_RIDING_KEYS                                    :E: vystoupit · šipky: vlevo a vpravo řízení, nahoru rychleji (stojící vozidlo se rozjede), dolů brzda; letadlo nahoru a dolů výš a níž · T: jeď svou trasu nebo řídit · I: houkačka · F: světla
-STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: vystoupit · jedeš jako cestující: vozidlo není tvé firmy
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventář
 STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
 STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}

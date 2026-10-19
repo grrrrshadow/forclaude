@@ -2260,9 +2260,7 @@ STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the
 STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
-STR_FIRST_PERSON_WHERE_HEALTH                                   :Health {NUM} · near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
 STR_FIRST_PERSON_WEAPON_AMMO                                    :{STRING} · {STRING} × {NUM}
-STR_FIRST_PERSON_KEYS                                           :W/S or the arrows up and down: walk · A/D: step aside · the arrows left and right: turn · right mouse button: look about · Shift: run · E: get into a vehicle beside you · 1-7: hammer, bow, crossbow, sword, two-handed sword, machine gun, rocket launcher · F: the weapon out and away · left button or Space: swing it, shoot (the bow: hold to draw, let go to shoot; Space draws and shoots; the machine gun fires while the button is held) · L: the torch, the lantern, the light put out
 STR_FIRST_PERSON_NEEDS_32BPP                                    :The view needs the 32bpp blitter
 STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
@@ -2271,8 +2269,6 @@ STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VE
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
-STR_FIRST_PERSON_RIDING_KEYS                                    :E: get out · the arrows: left and right steer, up faster (a standing vehicle starts), down brake; an aircraft up and down higher and lower · T: go its route or take the wheel · I: horn · F: lights
-STR_FIRST_PERSON_PASSENGER_KEYS                                 :E: get out · you ride along: it is not your company's vehicle
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory
 STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
 STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}

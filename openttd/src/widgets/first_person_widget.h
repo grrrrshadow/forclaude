@@ -14,7 +14,6 @@
 enum FirstPersonWidgets : WidgetID {
 	WID_FP_CAPTION, ///< Caption of the window.
 	WID_FP_CANVAS,  ///< The view from the walker's eyes.
-	WID_FP_PANEL,   ///< The panel under it: where the walker is, how to walk.
 	WID_FP_FULL,    ///< The window over the whole screen, and back.
 	WID_FP_HERE,    ///< Put the walker where the main view looks.
 	WID_FP_CENTRE,  ///< Put the main view on the walker.

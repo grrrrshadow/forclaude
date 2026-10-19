@@ -136,7 +136,10 @@ std::vector<ThreeDDogSeller> _sellers_seen; ///< ThreeDDogSellerNear(): the sell
  * again. At night the glowing one of each.
  */
 constexpr uint MUSHROOM_ONE_IN = 3;          ///< a tile of the land in so many has one
-constexpr int MUSHROOM_SEEN_TILES = 3;       ///< seen this many tiles about the eye (they are a hand high)
+constexpr int MUSHROOM_SEEN_TILES = 3;       ///< seen this many tiles about the eye
+/** How much bigger than the colleague's true size (5-10 cm) they grow (the player, #287: "the mushrooms are too small,
+ * make them much bigger"): a quarter to half a metre. */
+constexpr float MUSHROOM_SCALE = 5.0f;
 constexpr uint64_t MUSHROOM_REGROW_TICKS = 74 * 30; ///< a picked one grows again after about a month
 std::map<uint32_t, uint64_t> _mushrooms_picked; ///< the tiles picked, and when
 
@@ -879,7 +882,7 @@ void AddThreeDMushroomsToEye()
 	const bool night = IsNightNow();
 	ForMushroomsNear(wx, wy, MUSHROOM_SEEN_TILES, [&](TileIndex, const MushroomAt &at) {
 		const std::string &figure = night && !at.kind->night.empty() ? at.kind->night : at.kind->name;
-		AddCabFigure(figure, 1.0f, static_cast<int>(std::lround(at.x)), static_cast<int>(std::lround(at.y)), static_cast<int>(std::lround(FirstPersonGroundZ(at.x, at.y))), at.facing, 0);
+		AddCabFigure(figure, MUSHROOM_SCALE, static_cast<int>(std::lround(at.x)), static_cast<int>(std::lround(at.y)), static_cast<int>(std::lround(FirstPersonGroundZ(at.x, at.y))), at.facing, 0);
 	});
 }
 

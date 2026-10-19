@@ -211,7 +211,6 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 	NWidget(WWT_PANEL, Colours::Grey),
 		NWidget(WWT_EMPTY, Colours::Invalid, WID_FP_CANVAS), SetMinimalSize(480, 300), SetResize(1, 1), SetFill(1, 1),
 	EndContainer(),
-	NWidget(WWT_PANEL, Colours::Grey, WID_FP_PANEL), SetMinimalSize(480, 52), SetResize(1, 0), SetFill(1, 0), EndContainer(),
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_HERE), SetStringTip(STR_FIRST_PERSON_HERE, STR_FIRST_PERSON_HERE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CENTRE), SetStringTip(STR_FIRST_PERSON_CENTRE, STR_FIRST_PERSON_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
@@ -480,7 +479,6 @@ struct FirstPersonWindow : Window {
 		this->MakePicture();
 		this->hurt_steps = std::max(0, this->hurt_steps - static_cast<int>(steps));
 		this->SetWidgetDirty(WID_FP_CANVAS);
-		this->SetWidgetDirty(WID_FP_PANEL);
 	}
 
 	FirstPersonWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
@@ -1052,7 +1050,7 @@ struct FirstPersonWindow : Window {
 			}
 			if (key == 't' || key == 'T') {
 				CabToggleRoute(rv, this->arrows);
-				this->SetWidgetDirty(WID_FP_PANEL);
+				this->SetWidgetDirty(WID_FP_CANVAS);
 				return EventState::Handled;
 			}
 		}
@@ -1104,9 +1102,11 @@ struct FirstPersonWindow : Window {
 
 	void OnScroll(Point delta) override
 	{
+		/* As the right button moves the view of the map (the player, #287: "turn left, right, up and down in keeping with
+		 * the right button on the map"): the pointer to the right looks to the right, down looks down. */
 		if (delta.x != 0 || delta.y != 0) this->looked = true;
-		this->walker.heading = std::remainder(this->walker.heading + delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
-		this->walker.pitch = std::clamp(this->walker.pitch + delta.y * FIRST_PERSON_MOUSE, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
+		this->walker.heading = std::remainder(this->walker.heading - delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
+		this->walker.pitch = std::clamp(this->walker.pitch - delta.y * FIRST_PERSON_MOUSE, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
 		this->SetWidgetDirty(WID_FP_CANVAS);
 	}
 
@@ -1159,48 +1159,32 @@ struct FirstPersonWindow : Window {
 				const int cx = r.left + w / 2, cy = r.top + h / 2;
 				GfxFillRect(cx - 1, cy - 1, cx + 1, cy + 1, GetColourGradient(Colours::White, Shade::Lightest));
 				/* The weapon out, and how many arrows or bolts there are for it. */
+				const int line = r.bottom - GetCharacterHeight(FontSize::Normal) - WidgetDimensions::scaled.framerect.bottom * 2;
 				if (this->weapon_out && this->Riding() == nullptr) {
 					const FirstPersonWeapon &wp = _first_person_weapons[this->weapon];
 					const StringID name = GetWalkerItemSpec(wp.item).name;
 					const std::string text = wp.ammo != WalkerItem::End ? GetString(STR_FIRST_PERSON_WEAPON_AMMO, name, GetWalkerItemSpec(wp.ammo).name, Carried(wp.ammo)) : GetString(name);
-					DrawString(r.left, r.right - WidgetDimensions::scaled.framerect.right * 2, r.bottom - GetCharacterHeight(FontSize::Normal) - WidgetDimensions::scaled.framerect.bottom * 2, text, TextColour::White, AlignmentH::End);
+					DrawString(r.left, r.right - WidgetDimensions::scaled.framerect.right * 2, line, text, TextColour::White, AlignmentH::End);
 				}
-				break;
-			}
-			case WID_FP_PANEL: {
-				GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
-				const Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
-				const int second = ir.top + GetCharacterHeight(FontSize::Normal) + 2;
-				/* In a vehicle: which, how fast, and the keys of its cab. */
+				/* What can be done where it stands, in the picture (the player, #287: the keys under the view away, where the
+				 * walker is and its health into the inventory): in a vehicle which and how fast; else E's use here. */
+				const int left = r.left + WidgetDimensions::scaled.framerect.left * 2, right = r.right - WidgetDimensions::scaled.framerect.right * 2;
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
-					DrawString(ir.left, ir.right, ir.top, GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
-					DrawStringMultiLine(ir.left, ir.right, second, ir.bottom, rv->owner == _local_company ? STR_FIRST_PERSON_RIDING_KEYS : STR_FIRST_PERSON_PASSENGER_KEYS, TextColour::Silver);
+					DrawString(left, right, line, GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type)), TextColour::White);
 					break;
 				}
-				const TileIndex tile = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
-				const Town *town = ClosestTownFromTile(tile, UINT_MAX);
-				const int deg = static_cast<int>(std::lround(std::fmod(this->walker.heading * 180.0 / M_PI + 360.0, 360.0)));
-				const Company *c = Company::GetIfValid(_local_company);
-				if (town != nullptr && c != nullptr) {
-					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_WHERE_HEALTH, c->walker_health, town->index, TileX(tile), TileY(tile), deg), TextColour::White);
-				} else if (town != nullptr) {
-					DrawString(ir.left, ir.right, ir.top, GetString(STR_FIRST_PERSON_WHERE, town->index, TileX(tile), TileY(tile), deg), TextColour::White);
-				}
-				/* Near a place that sells things: said instead of the keys. */
 				const StringID shop = WalkerShopName(FirstPersonShopNearby());
 				const Vehicle *near = this->VehicleToBoard();
 				const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M);
 				if (mushroom != nullptr) {
 					/* At a mushroom: E picks it. */
 					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
-					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en), TextColour::Yellow);
+					DrawString(left, right, line, GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en), TextColour::Yellow);
 				} else if (shop != INVALID_STRING_ID) {
-					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
+					DrawString(left, right, line, GetString(STR_FIRST_PERSON_SHOP_HERE, shop), TextColour::Yellow);
 				} else if (near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
-					DrawString(ir.left, ir.right, second, GetString(STR_FIRST_PERSON_BOARD_HERE, near->index), TextColour::Yellow);
-				} else {
-					DrawStringMultiLine(ir.left, ir.right, second, ir.bottom, STR_FIRST_PERSON_KEYS, TextColour::Silver);
+					DrawString(left, right, line, GetString(STR_FIRST_PERSON_BOARD_HERE, near->index), TextColour::Yellow);
 				}
 				break;
 			}

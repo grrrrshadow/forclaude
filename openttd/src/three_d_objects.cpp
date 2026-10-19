@@ -361,6 +361,33 @@ static std::string GlbExtensionNotRead(const nlohmann::json &j)
 }
 
 /**
+ * A material's base colour texture: glTF's own, or the diffuse one of the older KHR_materials_pbrSpecularGlossiness,
+ * which goes before it where it is (the player, #287: the fennec and a wolf "have no colour"; nine of the colleague's
+ * dogs keep their colour so, their base colour only a stand-in). nullptr: none.
+ */
+static const nlohmann::json *GlbColourTexture(const nlohmann::json &mat)
+{
+	if (mat.contains("extensions") && mat.at("extensions").contains("KHR_materials_pbrSpecularGlossiness")) {
+		const auto &sg = mat.at("extensions").at("KHR_materials_pbrSpecularGlossiness");
+		if (sg.contains("diffuseTexture")) return &sg.at("diffuseTexture");
+	}
+	if (mat.contains("pbrMetallicRoughness") && mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return &mat.at("pbrMetallicRoughness").at("baseColorTexture");
+	return nullptr;
+}
+
+/** A material's base colour, red, green, blue and alpha (as GlbColourTexture(): the diffuse one first); nullptr: none. */
+static const nlohmann::json *GlbColourFactor(const nlohmann::json &mat)
+{
+	const nlohmann::json *f = nullptr;
+	if (mat.contains("extensions") && mat.at("extensions").contains("KHR_materials_pbrSpecularGlossiness")) {
+		const auto &sg = mat.at("extensions").at("KHR_materials_pbrSpecularGlossiness");
+		if (sg.contains("diffuseFactor")) f = &sg.at("diffuseFactor");
+	}
+	if (f == nullptr && mat.contains("pbrMetallicRoughness") && mat.at("pbrMetallicRoughness").contains("baseColorFactor")) f = &mat.at("pbrMetallicRoughness").at("baseColorFactor");
+	return f != nullptr && f->is_array() && f->size() == 4 ? f : nullptr;
+}
+
+/**
  * How a material moves its base colour texture over the coordinates (KHR_texture_transform: gltfpack stores the texture
  * coordinates as fractions of where they lie, the move making them what they were): u' = a[0] + a[2] u + a[3] v,
  * v' = a[1] + a[4] u + a[5] v; {0, 0, 1, 0, 0, 1} when it does not.
@@ -369,9 +396,9 @@ static std::array<double, 6> GlbUvTransform(const nlohmann::json &j, int materia
 {
 	std::array<double, 6> a{0, 0, 1, 0, 0, 1};
 	if (material < 0 || !j.contains("materials") || static_cast<size_t>(material) >= j.at("materials").size()) return a;
-	const auto &mat = j.at("materials").at(material);
-	if (!mat.contains("pbrMetallicRoughness") || !mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return a;
-	const auto &info = mat.at("pbrMetallicRoughness").at("baseColorTexture");
+	const nlohmann::json *colour = GlbColourTexture(j.at("materials").at(material));
+	if (colour == nullptr) return a;
+	const auto &info = *colour;
 	if (!info.contains("extensions") || !info.at("extensions").contains("KHR_texture_transform")) return a;
 	const auto &t = info.at("extensions").at("KHR_texture_transform");
 	double offset[2] = {0, 0}, scale[2] = {1, 1};
@@ -743,10 +770,9 @@ static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
 		const Colour e(c(0), c(1), c(2), mat.contains("emissiveTexture") ? ThreeDVehicleShape::GLOW_TEXTURED : ThreeDVehicleShape::GLOW_FLAT);
 		if (e.r != 0 || e.g != 0 || e.b != 0) t.glow = e.data;
 	}
-	if (mat.value("alphaMode", std::string()) == "BLEND" && mat.contains("pbrMetallicRoughness")) {
-		const auto &pbr = mat.at("pbrMetallicRoughness");
-		if (pbr.contains("baseColorFactor") && pbr.at("baseColorFactor").is_array() && pbr.at("baseColorFactor").size() == 4) {
-			t.alpha = static_cast<uint8_t>(std::clamp(pbr.at("baseColorFactor").at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+	if (mat.value("alphaMode", std::string()) == "BLEND") {
+		if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+			t.alpha = static_cast<uint8_t>(std::clamp(f->at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5);
 		}
 	}
 }
@@ -966,15 +992,13 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				t.name = mat.value("name", std::string());
 				t.double_sided = mat.value("doubleSided", false);
 				ReadMaterialLight(mat, t);
-				if (mat.contains("pbrMetallicRoughness")) {
-					const auto &pbr = mat.at("pbrMetallicRoughness");
-					if (pbr.contains("baseColorFactor")) {
-						const auto &f = pbr.at("baseColorFactor");
-						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+				{
+					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
 						t.flat = Colour(c(0), c(1), c(2)).data;
 					}
-					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
-						int tex = pbr.at("baseColorTexture").at("index").get<int>();
+					if (const nlohmann::json *colour = GlbColourTexture(mat); colour != nullptr && j.contains("textures") && j.contains("images")) {
+						int tex = colour->at("index").get<int>();
 						int image = j.at("textures").at(tex).at("source").get<int>();
 						const auto &img = j.at("images").at(image);
 						auto known = image_bytes.find(image);
@@ -1194,9 +1218,9 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		 * atlas is shared by the vehicles of a package, each showing other nodes of it (TextureCover()). */
 		auto image_of = [&](int material) {
 			if (material < 0 || !j.contains("materials") || !j.contains("textures")) return -1;
-			const auto &mat = j.at("materials").at(material);
-			if (!mat.contains("pbrMetallicRoughness") || !mat.at("pbrMetallicRoughness").contains("baseColorTexture")) return -1;
-			const int tex = mat.at("pbrMetallicRoughness").at("baseColorTexture").at("index").get<int>();
+			const nlohmann::json *colour = GlbColourTexture(j.at("materials").at(material));
+			if (colour == nullptr) return -1;
+			const int tex = colour->at("index").get<int>();
 			return j.at("textures").at(tex).value("source", -1);
 		};
 		const bool margins_filled = MarginsFilled(path);
@@ -1542,15 +1566,13 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				const auto &mat = j.at("materials").at(material);
 				t.name = mat.value("name", std::string());
 				ReadMaterialLight(mat, t);
-				if (mat.contains("pbrMetallicRoughness")) {
-					const auto &pbr = mat.at("pbrMetallicRoughness");
-					if (pbr.contains("baseColorFactor")) {
-						const auto &f = pbr.at("baseColorFactor");
-						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f.at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
+				{
+					if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
+						auto c = [&](int k) { return static_cast<uint8_t>(std::clamp(f->at(k).get<double>(), 0.0, 1.0) * 255.0 + 0.5); };
 						t.flat = Colour(c(0), c(1), c(2)).data;
 					}
-					if (pbr.contains("baseColorTexture") && j.contains("textures") && j.contains("images")) {
-						const int image = j.at("textures").at(pbr.at("baseColorTexture").at("index").get<int>()).at("source").get<int>();
+					if (const nlohmann::json *colour = GlbColourTexture(mat); colour != nullptr && j.contains("textures") && j.contains("images")) {
+						const int image = j.at("textures").at(colour->at("index").get<int>()).at("source").get<int>();
 						const auto &img = j.at("images").at(image);
 						auto known = image_bytes.find(image);
 						if (known != image_bytes.end()) {

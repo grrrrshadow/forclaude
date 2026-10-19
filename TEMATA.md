@@ -27,6 +27,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 19. 10. – #287: rozhlížení myší, panel pryč, barvy psů, větší houby
+
+- **Rozhlížení pravým tlačítkem** v pohledu z první osoby jde stejně jako posun mapy (hráč: „ať to je v souladu
+  s pohybem pravým čudlíkem mapou“). Hráč má náš režim (`scroll_mode = 0`, RMBPinned), kde tah doprava posune pohled
+  mapy doprava. V první osobě se dřív tahem doprava otočil doleva a tahem dolů díval nahoru. Teď: doprava se dívá
+  doprava, dolů dolů.
+- **Spodní panel pohledu z první osoby je pryč** (hráč: „ten návod dej taky pryč, zdraví, u města dej do okna
+  inventáře“). Obraz je o něj větší. Návod kláves zmizel, i ve vozidle. Žlutá nápověda na místě (utrhnout houbu,
+  obchod, nastoupit) a ve vozidle jméno a rychlost jsou dole v obraze. Zdraví už inventář měl, pod něj přibyl řádek
+  „U města …, dlaždice …, směr …°“.
+- **Prodavačka psů farmářka** je ze hry pryč (hráč: „tuhle prodavačku psů přestanem používat“): záznam z `psi/objekty.json`,
+  model ze sady hry a autor z README sady. U kolegy v grrrrf zůstává.
+- **Psi bez barvy** (hráč: „fenek nemá barvu a nějakej vlk neměl barvu“): devět psů od kolegy má barvu zapsanou
+  postaru (KHR_materials_pbrSpecularGlossiness, `diffuseTexture`/`diffuseFactor`), hra četla jen `baseColorTexture`.
+  Jde o fenka, vlka lesního, nafoceného psa, baseta, bulmastifa, bulteriéra, jack russella a malamuta. Hra teď bere
+  barvu z obou zápisů (`GlbColourTexture()`, `GlbColourFactor()`), i s posunem textury. Ověřeno: fenek, vlk lesní
+  i nafocený pes mají barvy.
+- **Houby 5× větší** (hráč: „houby jsou moc malý, udělej je mnohem větší“): `MUSHROOM_SCALE` 5, tedy 25–50 cm místo
+  kolegových 5–10 cm. Ve dne je teď vidět i z dálky.
+
 ## 19. 10. – #286: houby nevidět, obří houby nesvítí, psi nejsou
 
 - Hráč (#286, telefon): „malý houby nejsou vůbec a velký zespod taky nesvítí“, „nejsou psi, opice, v tom buildu něco
