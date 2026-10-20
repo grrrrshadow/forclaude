@@ -120,6 +120,7 @@ struct ThreeDGpuPicture {
 	std::vector<uint32_t> pixels;       ///< what comes: the colours (Colour::data), their alpha multiplied in, top row first
 	std::vector<uint8_t> lit;           ///< and whether a pixel is lit (not 0): the glass of a light on, a material's own light; empty when not read_lit
 	bool read_lit = false;              ///< whether the lit pixels are read back: at night, or with a material's own light
+	bool drawn = false;                 ///< what came: whether the card drew it (ThreeDGpuRender()); not, the processor draws it
 };
 
 /**
@@ -303,8 +304,9 @@ struct ThreeDGpuEyeFrame {
 };
 
 bool ThreeDGpuAvailable();
+bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
-bool ThreeDGpuRender(ThreeDGpuPicture &pic);
+bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);

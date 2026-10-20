@@ -29,6 +29,7 @@
 #include "spriteloader/spriteloader.hpp"
 
 #include <cmath>
+#include <functional>
 #include <vector>
 
 struct VehicleSpriteSeq;
@@ -92,6 +93,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 void PinThreeDPictures(bool pin);
 bool ThreeDPicturesBeingMade();
 size_t ThreeDPicturesWaiting();
+void MakeThreeDPicturesAtOnce(const std::function<void()> &ask);
 void StopThreeDPictureThread();
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
 struct ThreeDHeldThing;

@@ -1049,6 +1049,9 @@ static void ObjectLightsOn(const ThreeDVehicleShape &whole, const ThreeDParts &p
 	}
 }
 
+struct GpuObjectPicture;
+static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp);
+static bool FinishGpuObject(const GpuObjectPicture &gp, ObjectRaster &out);
 static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk);
 
 /**
@@ -1547,15 +1550,23 @@ static void ShapeExtent(const ThreeDVehicleShape &s, float e[6])
 	}
 }
 
+/** A picture of an object for the card (PrepareGpuObject()), drawn with others at once (ThreeDGpuRender()), shrunk to its pixels (FinishGpuObject()). */
+struct GpuObjectPicture {
+	ThreeDGpuPicture pic;
+	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held; ///< the colours of its details, kept till it is drawn
+	int left = 0, top = 0;                  ///< where its subpixels begin
+	std::vector<ThreeDPictureLight> lights; ///< its lights on at night (ObjectLightsOn())
+};
+
 /**
  * RasterObject() on the graphics card (three_d_gpu.h): the same picture -- the camera, the light, the paint, the
  * glass, the crew that walks, the lights at night, at SUPERSAMPLE times the size and shrunk the same way, of the shape
  * as simple as the picture is small -- its triangles drawn by the card instead of one by one here. The picture is as
- * big as the boxes of what is drawn are seen, then cut to its pixels.
- * @return whether there is a picture; nullopt: the card could not draw it (a texture bigger than it holds), the
- *         processor draws it
+ * big as the boxes of what is drawn are seen, then cut to its pixels (FinishGpuObject()). Made ready here, drawn by
+ * the card with the others asked for at once (ThreeDGpuRender()).
+ * @return whether there is a picture to draw
  */
-static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk)
+static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp)
 {
 	const ThreeDParts parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
@@ -1566,9 +1577,9 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 	const ThreeDVehicleShape &shape = *whole.Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
 	const bool lit = !shape.nrm.empty();
 
-	ThreeDGpuPicture pic;
+	ThreeDGpuPicture &pic = gp.pic;
 	pic.glass_alpha = whole.glass_alpha;
-	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held;
+	std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held = gp.held;
 	float minx = std::numeric_limits<float>::infinity(), miny = minx, mind = minx, maxx = -minx, maxy = -minx, maxd = -minx;
 	auto grow = [&](float x, float y, float d) {
 		minx = std::min(minx, x); maxx = std::max(maxx, x);
@@ -1713,8 +1724,18 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 	/* Lit where a material has a light of its own (tex_glow), day and night: the card marks those pixels too. */
 	const bool glows = std::ranges::any_of(pic.meshes, [](const ThreeDGpuMesh &m) { return m.shape->Glows(); });
 	pic.read_lit = night || glows;
-	if (!ThreeDGpuRender(pic)) return std::nullopt;
+	gp.left = left;
+	gp.top = top;
+	ObjectLightsOn(whole, parts, lights, cam, gp.lights);
+	return true;
+}
 
+/** A picture of an object the card drew (PrepareGpuObject()) shrunk as RasterObject() does, cut to its pixels: false when not a pixel of it is seen. */
+static bool FinishGpuObject(const GpuObjectPicture &gp, ObjectRaster &out)
+{
+	const ThreeDGpuPicture &pic = gp.pic;
+	const int ss = SUPERSAMPLE;
+	const int width = pic.width, height = pic.height, left = gp.left, top = gp.top;
 	/* Shrink as RasterObject() does: the mean of the covered subpixels by their alpha (the card's colours have it
 	 * multiplied in), the alpha from how much they cover; lit where any is. Then cut to the pixels drawn. */
 	const int ow = width / ss, oh = height / ss;
@@ -1752,8 +1773,22 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
 		std::copy_n(px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.px.begin() + static_cast<size_t>(y) * out.width);
 		if (pic.read_lit) std::copy_n(lit_px.begin() + static_cast<size_t>(y + y0) * ow + x0, out.width, out.lit.begin() + static_cast<size_t>(y) * out.width);
 	}
-	ObjectLightsOn(whole, parts, lights, cam, out.lights);
+	out.lights = gp.lights;
 	return true;
+}
+
+/**
+ * RasterObject() on the graphics card, a picture alone (PrepareGpuObject()).
+ * @return whether there is a picture; nullopt: the card could not draw it (a texture bigger than it holds), the
+ *         processor draws it
+ */
+static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk)
+{
+	GpuObjectPicture gp;
+	if (!PrepareGpuObject(obj, whole, scale, cam_az, world_az, along, pxm, fade, rust_time, tint, paint_colour, stretch, spin, pitch, roll, lights, state, walk, gp)) return false;
+	ThreeDGpuPicture *one = &gp.pic;
+	if (!ThreeDGpuRender({&one, 1}) || !gp.pic.drawn) return std::nullopt;
+	return FinishGpuObject(gp, out);
 }
 
 /**
@@ -2052,6 +2087,11 @@ static void PictureOfRaster(ThreeDModelPicture &picture, ObjectRaster &r)
 	picture.lights = std::move(r.lights);
 }
 
+/* (PictureToMake, PictureMade below.) */
+struct PictureToMake;
+struct PictureMade;
+static void MakePictures(std::span<const PictureToMake> ps, std::vector<PictureMade> &made);
+
 /*
  * The pictures of the vehicles on the map are made on a thread of their own (the player, 17. 10.: "put a thread in
  * the background"): each is a few or tens of milliseconds, the first of an object half a second (its textures read),
@@ -2080,6 +2120,53 @@ struct PictureMade {
 };
 /** Only so many wait to be made: the oldest asked for go when more come (a vehicle long gone round its curve). */
 static constexpr size_t PICTURES_WAITING = 128;
+/** So many the thread hands the graphics card at once (ThreeDGpuRender()): drawn side by side, read back once. */
+static constexpr size_t PICTURES_AT_ONCE = 64;
+
+/**
+ * The pictures of objects drawn by the graphics card all at once (ThreeDGpuRender(); the player, 20. 10.: "fix the
+ * card so it works"): one frame of the card read back once, not a picture at a time -- 5-19 ms each on the player's
+ * phone, a turn of the map a thousand of them.
+ * @param[out] result per picture: 1 drawn, 0 nothing of it seen, -1 not drawn by the card (the processor draws it)
+ */
+static void RasterObjectsOnCard(std::span<const PictureToMake> ps, std::span<ObjectRaster> out, std::span<int8_t> result)
+{
+	std::vector<GpuObjectPicture> gps(ps.size());
+	std::vector<ThreeDGpuPicture *> pics;
+	for (size_t i = 0; i < ps.size(); i++) {
+		const PictureToMake &p = ps[i];
+		result[i] = 0;
+		const ThreeDVehicleShape *whole = p.obj->GetShape(p.frame, p.obj->PartsOf(p.state));
+		if (whole == nullptr || !PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gps[i])) continue;
+		result[i] = -1;
+		pics.push_back(&gps[i].pic);
+	}
+	if (pics.empty()) return;
+	ThreeDGpuRender(pics);
+	for (size_t i = 0; i < ps.size(); i++) {
+		if (result[i] < 0 && gps[i].pic.drawn) result[i] = FinishGpuObject(gps[i], out[i]) ? 1 : 0;
+	}
+}
+
+/** Pictures of objects made (RasterObject()): by the card all at once where it draws them, else one by one; how long each took, a share of all. */
+static void MakePictures(std::span<const PictureToMake> ps, std::vector<PictureMade> &made)
+{
+	const auto start = std::chrono::steady_clock::now();
+	std::vector<ObjectRaster> rasters(ps.size());
+	std::vector<int8_t> result(ps.size(), -1);
+	if (ps.size() > 1 && ThreeDGpuAvailable()) RasterObjectsOnCard(ps, rasters, result);
+	made.resize(ps.size());
+	for (size_t i = 0; i < ps.size(); i++) {
+		const PictureToMake &p = ps[i];
+		if (result[i] < 0) {
+			result[i] = RasterObject(*p.obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, rasters[i], p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk) ? 1 : 0;
+		}
+		made[i].key = p.key;
+		if (result[i] > 0) PictureOfRaster(made[i].picture, rasters[i]);
+	}
+	const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+	for (PictureMade &m : made) m.ms = ms / made.size();
+}
 static std::mutex _pictures_mutex; ///< of _pictures_to_make, _loads_to_do, _pictures_done, _picture_in_hand and _pictures_stop
 static std::condition_variable _pictures_wake;
 static std::deque<PictureToMake> _pictures_to_make;
@@ -2115,23 +2202,24 @@ static void MakePicturesInBackground()
 			_picture_in_hand = false;
 			continue;
 		}
-		const PictureToMake p = std::move(_pictures_to_make.back());
-		_pictures_to_make.pop_back();
+		/* With the card as many as it draws at once (RasterObjectsOnCard()), else one. */
+		std::vector<PictureToMake> batch;
+		const size_t at_once = ThreeDGpuReady() ? PICTURES_AT_ONCE : 1;
+		while (!_pictures_to_make.empty() && batch.size() < at_once) {
+			batch.push_back(std::move(_pictures_to_make.back()));
+			_pictures_to_make.pop_back();
+		}
 		_picture_in_hand = true;
 		lock.unlock();
 
-		PictureMade made;
-		made.key = p.key;
-		const auto start = std::chrono::steady_clock::now();
-		ObjectRaster r;
-		if (RasterObject(*p.obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, r, p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk)) {
-			PictureOfRaster(made.picture, r);
+		std::vector<PictureMade> made;
+		MakePictures(batch, made);
+		for (size_t i = 0; i < made.size(); i++) {
+			Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {:.0f} ms, in the background", batch[i].obj->name, std::get<2>(made[i].key), std::get<1>(made[i].key), made[i].picture.width, made[i].picture.height, made[i].ms);
 		}
-		made.ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
-		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {:.0f} ms, in the background", p.obj->name, std::get<2>(p.key), std::get<1>(p.key), made.picture.width, made.picture.height, made.ms);
 
 		lock.lock();
-		_pictures_done.push_back(std::move(made));
+		for (PictureMade &m : made) _pictures_done.push_back(std::move(m));
 		_picture_in_hand = false;
 	}
 }
@@ -2168,6 +2256,9 @@ void ThreeDLoadInBackground(std::function<void()> job)
 	_pictures_wake.notify_one();
 }
 
+/** Pictures were asked of the thread since it was last woken for them (AskForPicture()). */
+static std::atomic<bool> _pictures_asked_since = false;
+
 /** Ask the thread for a picture (started the first time); false when there is none (it could not be started): made at once then. */
 static bool AskForPicture(PictureToMake &&p)
 {
@@ -2181,7 +2272,8 @@ static bool AskForPicture(PictureToMake &&p)
 		}
 		_pictures_to_make.push_back(std::move(p));
 	}
-	_pictures_wake.notify_one();
+	/* The thread woken when the frame is drawn (_owed_pictures_timer), so that it hands the card the frame's at once. */
+	_pictures_asked_since = true;
 	return true;
 }
 
@@ -2224,6 +2316,7 @@ bool ThreeDPicturesBeingMade()
 /** How many pictures of vehicles and loads wait for the thread, the one in hand among them (the rig, test3d casy). */
 size_t ThreeDPicturesWaiting()
 {
+	if (_pictures_asked_since.exchange(false)) _pictures_wake.notify_one();
 	std::lock_guard lock(_pictures_mutex);
 	return _pictures_to_make.size() + _loads_to_do.size() + (_picture_in_hand ? 1 : 0);
 }
@@ -2254,9 +2347,14 @@ void StopThreeDPictureThread()
 /** Whether the picture asked for now may wait for the thread (a vehicle on the map), and whether it waited: the nearest made was given. */
 static bool _object_picture_may_wait = false;
 static bool _object_picture_waited = false;
+/** The pictures not made yet asked for while collecting (MakeThreeDPicturesAtOnce()), and their keys; nullptr: not collecting. */
+static std::vector<PictureToMake> *_pictures_collected = nullptr;
+static std::set<ObjectPictureKey> _pictures_collected_keys;
 
 /** The pictures made come in, and the vehicles that waited for them are drawn again. */
 static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::milliseconds(30), [](auto) {
+	/* The pictures asked for while the frames were drawn: the thread makes them now, together. */
+	if (_pictures_asked_since.exchange(false)) _pictures_wake.notify_one();
 	/* The sprites for the windows made in the background (ThreeDVehicleObjectSpriteStandIn()): the windows that draw them. */
 	if (_gui_sprites_came.exchange(false)) {
 		for (WindowClass wc : {WindowClass::BuildVehicle, WindowClass::ReplaceVehicle, WindowClass::EnginePreview}) SetWindowClassesDirty(wc);
@@ -2298,7 +2396,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	float f = cam_step * static_cast<float>(M_PI) / 180.0f;
 	float along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
 	const float pxm = PXM_16X / (1 << to_underlying(zoom));
-	if (_object_picture_may_wait) {
+	if (_pictures_collected != nullptr || _object_picture_may_wait) {
 		PictureToMake p;
 		p.key = key;
 		p.obj = obj;
@@ -2319,6 +2417,11 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		p.lights = lights;
 		p.state = fade;
 		p.walk = walk;
+		if (_pictures_collected != nullptr) {
+			/* Collected, made with the others after (MakeThreeDPicturesAtOnce()). */
+			if (_pictures_collected_keys.insert(key).second) _pictures_collected->push_back(std::move(p));
+			return nullptr;
+		}
 		if (AskForPicture(std::move(p))) {
 			/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
 			const ThreeDModelPicture *nearest = nullptr;
@@ -2350,6 +2453,33 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	}
 	_object_picture_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	return e.picture.width > 0 ? &e.picture : nullptr;
+}
+
+/**
+ * The pictures of objects a drawing will ask for made before it, all at once (three_d_vehicle_object.h; the player,
+ * 20. 10.: "fix the card so it works"): what ask asks for and is not made yet is collected, then made together -- by the
+ * card in one frame read back once (RasterObjectsOnCard()), not a picture at a time as the drawing comes to each.
+ * @param ask asks for the pictures as the drawing will (GetThreeDFigurePicture(), GetThreeDPlantPicture(), ...)
+ */
+void MakeThreeDPicturesAtOnce(const std::function<void()> &ask)
+{
+	std::vector<PictureToMake> wanted;
+	_pictures_collected = &wanted;
+	_pictures_collected_keys.clear();
+	ask();
+	_pictures_collected = nullptr;
+	_pictures_collected_keys.clear();
+	if (wanted.empty()) return;
+	std::vector<PictureMade> made;
+	MakePictures(wanted, made);
+	for (PictureMade &m : made) {
+		MakeRoomForPicture();
+		ObjectPictureEntry &e = _object_pictures[m.key];
+		e.used = ++_object_pictures_clock;
+		e.picture = std::move(m.picture);
+		_object_pictures_made++;
+		_object_picture_ms += m.ms;
+	}
 }
 
 /**

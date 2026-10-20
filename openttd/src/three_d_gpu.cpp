@@ -332,6 +332,7 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(void, glDrawArrays, (GLenum mode, GLint first, GLsizei count)) \
 	X(void, glReadPixels, (GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GLenum type, void *data)) \
 	X(void, glFinish, ()) \
+	X(void, glScissor, (GLint x, GLint y, GLsizei w, GLsizei h)) \
 	X(void, glPixelStorei, (GLenum pname, GLint param)) \
 	X(void, glReadBuffer, (GLenum src)) \
 	X(void, glDrawBuffers, (GLsizei n, const GLenum *bufs)) \
@@ -398,8 +399,8 @@ using GpuProc = void (*)();
 /* The card's thread and what is asked of it. */
 enum class GpuState { NotStarted, Starting, Ready, Failed };
 struct GpuJob {
-	ThreeDGpuPicture *pic;
-	ThreeDGpuEyePicture *eye = nullptr; ///< else the view from the eyes (DrawEyeOnCard())
+	std::span<ThreeDGpuPicture *const> pics; ///< pictures drawn at once (DrawPicturesOnCard()); else
+	ThreeDGpuEyePicture *eye = nullptr; ///< the view from the eyes (DrawEyeOnCard())
 	ThreeDGpuEyeFrame *frame = nullptr; ///< else the view from the eyes whole (DrawEyeFrameOnCard())
 	struct ShownRead *read = nullptr;   ///< else a picture shown straight from the card read back (ReadShownOnCard())
 	bool done = false;
@@ -1866,29 +1867,29 @@ ThreeDGpuMatrix Multiply(const ThreeDGpuMatrix &a, const ThreeDGpuMatrix &b)
 	return m;
 }
 
-/** Draw a picture on the card and read it back (ThreeDGpuRender()). */
-bool DrawOnCard(ThreeDGpuPicture &pic)
+/* A texture's paint on the card: its masks' names (ThreeDGpuPaint). */
+struct PaintOnCard {
+	GLuint detail = 0, detail_colours = 0, paint_mask = 0, addon_mask = 0, rust_mask = 0;
+};
+
+/** A mesh of a picture as the card draws it (PictureOnCard()): its shape, its triangles, its textures and their paints there. */
+struct MeshOnCard {
+	const ThreeDGpuMesh *mesh;
+	const GpuShape *shape;
+	const GpuIndices *indices;
+	std::vector<GLuint> textures;
+	std::vector<PaintOnCard> paints;
+};
+
+/**
+ * Put on the card what a picture draws (DrawPicturesOnCard()): its shapes, triangles, textures and masks.
+ * @return false: something the card cannot hold, or triangles naming a corner their shape has not; the processor draws it
+ */
+bool PictureOnCard(const ThreeDGpuPicture &pic, std::vector<MeshOnCard> &draws)
 {
-	const int w = pic.width, h = pic.height;
-	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target) return false;
-	_card_clock++;
-	Step(fmt::format("obrazek {}: {}x{}, {} siti{}", _gpu_pictures + 1, w, h, pic.meshes.size(), pic.night.empty() ? "" : ", svetla"));
-	/* All on the card first: what it cannot hold the processor draws. */
-	/* A texture's paint on the card: its masks' names (ThreeDGpuPaint). */
-	struct PaintOnCard {
-		GLuint detail = 0, detail_colours = 0, paint_mask = 0, addon_mask = 0, rust_mask = 0;
-	};
-	struct Draw {
-		const ThreeDGpuMesh *mesh;
-		const GpuShape *shape;
-		const GpuIndices *indices;
-		std::vector<GLuint> textures;
-		std::vector<PaintOnCard> paints;
-	};
-	std::vector<Draw> draws;
 	for (const ThreeDGpuMesh &m : pic.meshes) {
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
-		Draw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}, {}};
+		MeshOnCard d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}, {}};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
 		/* A triangle naming a corner the shape has not would have the card read beyond its corners: a phone's card
 		 * does not forgive that. The processor draws such a picture. */
@@ -1923,23 +1924,23 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		}
 		draws.push_back(std::move(d));
 	}
-	if (!TargetOfSize(w, h)) return false;
-	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
-	gl.glViewport(0, 0, w, h);
-	gl.glDrawBuffers(2, both);
-	gl.glDisable(GL_SCISSOR_TEST);
-	gl.glDisable(GL_DITHER);
-	gl.glDisable(GL_CULL_FACE);
+	return true;
+}
+
+/**
+ * Draw a picture into the frame bound, its corner at x, y (DrawPicturesOnCard()): the frame cleared, its depths its own
+ * -- the pictures beside it are not where it is.
+ */
+void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &draws, int x, int y)
+{
+	const int w = pic.width, h = pic.height;
+	gl.glViewport(x, y, w, h);
 	gl.glDisable(GL_BLEND);
 	gl.glEnable(GL_DEPTH_TEST);
 	gl.glDepthFunc(GL_LESS);
 	gl.glDepthMask(GL_TRUE);
-	gl.glClearColor(0, 0, 0, 0);
-	gl.glClearDepth(1.0);
-	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	/* The picture's pixels and depths to the card's: a pixel x, y of the picture is the card's pixel x, y, its rows
-	 * from the bottom -- so the rows read back are the picture's from the top. */
+	/* The picture's pixels and depths to the card's: a pixel x, y of the picture is the card's pixel x, y of its place,
+	 * its rows from the bottom -- so the rows read back are the picture's from the top. */
 	const float dn = pic.depth_near, df = pic.depth_far;
 	const float dz = df > dn ? 2.0f / (df - dn) : 1.0f;
 	const ThreeDGpuMatrix to_card = {
@@ -1992,7 +1993,7 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		}
 		gl.glActiveTexture(GL_TEXTURE0);
 	};
-	auto draw_runs = [&](const Draw &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
+	auto draw_runs = [&](const MeshOnCard &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
 		const ThreeDGpuMatrix m = Multiply(to_card, d.mesh->matrix);
 		gl.glUniformMatrix4fv(_mesh_program.matrix, 1, GL_TRUE, m.data());
 		gl.glUniform3f(_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
@@ -2016,14 +2017,13 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
 	};
-	Step(fmt::format("kresleni obrazku {} (glDrawElements)", _gpu_pictures + 1));
-	for (const Draw &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
+	for (const MeshOnCard &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
 	/* The glass after all else, over what is behind it, hiding nothing (no depth written); lit only where it has a light
 	 * of its own (its lit 1 with alpha 1 over what is there, else 0 with alpha 0 leaving it). */
 	gl.glDepthMask(GL_FALSE);
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	for (const Draw &d : draws) {
+	for (const MeshOnCard &d : draws) {
 		if (!d.mesh->triangles->glass.empty()) draw_runs(d, d.mesh->triangles->glass, true);
 	}
 	gl.glDisable(GL_BLEND);
@@ -2044,28 +2044,109 @@ bool DrawOnCard(ThreeDGpuPicture &pic)
 		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(pic.night.size() * 3));
 	}
 	gl.glBindVertexArray(0);
-	pic.pixels.resize(static_cast<size_t>(w) * h);
-	Step(fmt::format("cteni obrazku {} zpet (glReadPixels)", _gpu_pictures + 1));
-	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
-	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
-	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pic.pixels.data());
-	if (pic.read_lit) {
-		pic.lit.resize(static_cast<size_t>(w) * h);
-		gl.glPixelStorei(GL_PACK_ALIGNMENT, 1);
-		gl.glReadBuffer(GL_COLOR_ATTACHMENT1);
-		gl.glReadPixels(0, 0, w, h, GL_RED, GL_UNSIGNED_BYTE, pic.lit.data());
-	} else {
-		pic.lit.clear();
+}
+
+/**
+ * Draw pictures on the card and read them back (ThreeDGpuRender()), all at once (the player, 20. 10.: "fix the card so
+ * it works, it has more power to draw than the processor"; a picture alone was sent, drawn, waited for and read back,
+ * 5-19 ms each on the player's phone, a turn of the map a thousand of them): side by side in rows in one frame of the
+ * card, its pixels read back once, as many frames as they fill. Each picture's ThreeDGpuPicture::drawn tells whether
+ * it was drawn; one not drawn the processor draws.
+ */
+void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
+{
+	_card_clock++;
+	struct Placed {
+		ThreeDGpuPicture *pic;
+		std::vector<MeshOnCard> draws;
+		int x = 0, y = 0;
+	};
+	std::vector<Placed> placed;
+	for (ThreeDGpuPicture *pic : pics) {
+		pic->drawn = false;
+		if (pic->width <= 0 || pic->height <= 0 || pic->width > _max_target || pic->height > _max_target) continue;
+		/* All on the card first: what it cannot hold the processor draws. */
+		Placed p{pic, {}};
+		if (PictureOnCard(*pic, p.draws)) placed.push_back(std::move(p));
 	}
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	const GLenum error = gl.glGetError();
-	if (error != 0) {
-		Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor draws the picture", error);
-		if (error == GL_OUT_OF_MEMORY) ForgetCard();
-		return false;
+	/* The tallest first, in rows: little left empty. */
+	std::ranges::stable_sort(placed, [](const Placed &a, const Placed &b) { return a.pic->height > b.pic->height; });
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+	std::vector<uint32_t> colours;
+	std::vector<uint8_t> lit;
+	for (size_t at = 0; at < placed.size();) {
+		/* A frame as wide as 2048 or the widest picture, as tall as its rows. */
+		int frame_w = 2048;
+		for (size_t k = at; k < placed.size(); k++) frame_w = std::max(frame_w, placed[k].pic->width);
+		frame_w = std::min(frame_w, _max_target);
+		int x = 0, y = 0, row = 0;
+		size_t end = at;
+		bool read_lit = false;
+		for (; end < placed.size(); end++) {
+			const ThreeDGpuPicture &pic = *placed[end].pic;
+			if (x + pic.width > frame_w) {
+				y += row;
+				x = 0;
+				row = 0;
+			}
+			if (y + pic.height > _max_target) break;
+			placed[end].x = x;
+			placed[end].y = y;
+			x += pic.width;
+			row = std::max(row, pic.height);
+			read_lit |= pic.read_lit;
+		}
+		const int frame_h = y + row;
+		Step(fmt::format("obrazky {}-{}: {} najednou, {}x{}", _gpu_pictures + 1 + at, _gpu_pictures + end, end - at, frame_w, frame_h));
+		if (!TargetOfSize(frame_w, frame_h)) return;
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
+		gl.glDrawBuffers(2, both);
+		gl.glDisable(GL_DITHER);
+		gl.glDisable(GL_CULL_FACE);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glScissor(0, 0, frame_w, frame_h);
+		gl.glDepthMask(GL_TRUE);
+		gl.glClearColor(0, 0, 0, 0);
+		gl.glClearDepth(1.0);
+		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		gl.glDisable(GL_SCISSOR_TEST);
+		Step(fmt::format("kresleni obrazku {}-{} (glDrawElements)", _gpu_pictures + 1 + at, _gpu_pictures + end));
+		for (size_t k = at; k < end; k++) DrawPictureAt(*placed[k].pic, placed[k].draws, placed[k].x, placed[k].y);
+		/* Read back once, each picture's rows out of it. */
+		Step(fmt::format("cteni obrazku {}-{} zpet (glReadPixels)", _gpu_pictures + 1 + at, _gpu_pictures + end));
+		colours.resize(static_cast<size_t>(frame_w) * frame_h);
+		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+		gl.glReadPixels(0, 0, frame_w, frame_h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, colours.data());
+		if (read_lit) {
+			lit.resize(static_cast<size_t>(frame_w) * frame_h);
+			gl.glPixelStorei(GL_PACK_ALIGNMENT, 1);
+			gl.glReadBuffer(GL_COLOR_ATTACHMENT1);
+			gl.glReadPixels(0, 0, frame_w, frame_h, GL_RED, GL_UNSIGNED_BYTE, lit.data());
+		}
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		const GLenum error = gl.glGetError();
+		if (error != 0) {
+			Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor draws the pictures", error);
+			if (error == GL_OUT_OF_MEMORY) ForgetCard();
+			return;
+		}
+		for (size_t k = at; k < end; k++) {
+			ThreeDGpuPicture &pic = *placed[k].pic;
+			const int w = pic.width, h = pic.height, px = placed[k].x, py = placed[k].y;
+			pic.pixels.resize(static_cast<size_t>(w) * h);
+			for (int r = 0; r < h; r++) std::copy_n(colours.begin() + static_cast<size_t>(py + r) * frame_w + px, w, pic.pixels.begin() + static_cast<size_t>(r) * w);
+			if (pic.read_lit) {
+				pic.lit.resize(static_cast<size_t>(w) * h);
+				for (int r = 0; r < h; r++) std::copy_n(lit.begin() + static_cast<size_t>(py + r) * frame_w + px, w, pic.lit.begin() + static_cast<size_t>(r) * w);
+			} else {
+				pic.lit.clear();
+			}
+			pic.drawn = true;
+		}
+		at = end;
 	}
 	TrimCard();
-	return true;
 }
 
 /** A building of the view from the eyes on the card: put there the first time (GpuBuilding). */
@@ -3056,7 +3137,14 @@ void GpuThreadMain()
 		const auto start = std::chrono::steady_clock::now();
 		bool drawn = false;
 		try {
-			drawn = job->frame != nullptr ? DrawEyeFrameOnCard(*job->frame) : job->eye != nullptr ? DrawEyeOnCard(*job->eye) : DrawOnCard(*job->pic);
+			if (job->frame != nullptr) {
+				drawn = DrawEyeFrameOnCard(*job->frame);
+			} else if (job->eye != nullptr) {
+				drawn = DrawEyeOnCard(*job->eye);
+			} else {
+				DrawPicturesOnCard(job->pics);
+				drawn = std::ranges::any_of(job->pics, [](const ThreeDGpuPicture *p) { return p->drawn; });
+			}
 		} catch (...) {
 			drawn = false;
 		}
@@ -3070,8 +3158,13 @@ void GpuThreadMain()
 		job->ok = drawn;
 		job->done = true;
 		_gpu_ms += ms;
-		_gpu_pictures++;
-		if (!drawn) _gpu_failed++;
+		if (job->pics.empty()) {
+			_gpu_pictures++;
+			if (!drawn) _gpu_failed++;
+		} else {
+			_gpu_pictures += job->pics.size();
+			_gpu_failed += std::ranges::count_if(job->pics, [](const ThreeDGpuPicture *p) { return !p->drawn; });
+		}
 		_gpu_done.notify_all();
 	}
 	for (GpuJob *job : _gpu_jobs) job->done = true;
@@ -3086,6 +3179,14 @@ void GpuThreadMain()
 }
 
 } // namespace
+
+/** Whether the card draws the 3D pictures now, not starting it nor waiting for it (the thread making the pictures of the map). */
+bool ThreeDGpuReady()
+{
+	if (_three_d_gpu_off) return false;
+	std::lock_guard lock(_gpu_mutex);
+	return _gpu_state == GpuState::Ready;
+}
 
 /**
  * Whether the card draws the 3D pictures: the first time asked its thread is started and waited for (its context made,
@@ -3111,10 +3212,11 @@ bool ThreeDGpuAvailable()
  * Draw a picture on the card, on whichever thread asks (it waits): its pixels and the lit ones read back.
  * @return false: not drawn (no card, or a picture it cannot hold): the processor draws it
  */
-bool ThreeDGpuRender(ThreeDGpuPicture &pic)
+bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics)
 {
-	if (!ThreeDGpuAvailable()) return false;
-	GpuJob job{&pic};
+	for (ThreeDGpuPicture *pic : pics) pic->drawn = false;
+	if (pics.empty() || !ThreeDGpuAvailable()) return false;
+	GpuJob job{pics};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
 	_gpu_jobs.push_back(&job);
@@ -3131,7 +3233,7 @@ bool ThreeDGpuRender(ThreeDGpuPicture &pic)
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic)
 {
 	if (!ThreeDGpuAvailable()) return false;
-	GpuJob job{nullptr, &pic};
+	GpuJob job{{}, &pic};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
 	_gpu_jobs.push_back(&job);
@@ -3147,7 +3249,7 @@ bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic)
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame)
 {
 	if (!ThreeDGpuAvailable()) return false;
-	GpuJob job{nullptr, nullptr, &frame};
+	GpuJob job{{}, nullptr, &frame};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
 	_gpu_jobs.push_back(&job);
@@ -3168,7 +3270,7 @@ bool ThreeDGpuReadShown(uint32_t texture, int width, int height, std::vector<uin
 {
 	if (texture == 0 || width <= 0 || height <= 0) return false;
 	ShownRead read{texture, width, height, &pixels};
-	GpuJob job{nullptr};
+	GpuJob job{};
 	job.read = &read;
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
@@ -3286,8 +3388,9 @@ void ThreeDGpuVideoContext(void *, void *, bool) {}
 void ThreeDGpuVideoContextGone() {}
 void *ThreeDGpuOwnContext() { return nullptr; }
 bool ThreeDGpuShows() { return false; }
+bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
-bool ThreeDGpuRender(ThreeDGpuPicture &) { return false; }
+bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }
 std::string ThreeDGpuTimes() { return "card: none"; }

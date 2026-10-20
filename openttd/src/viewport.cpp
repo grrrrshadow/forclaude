@@ -3280,6 +3280,31 @@ static ThreeDObjectShapeView TurnedObjectShape(const ThreeDObject *o, const Obje
 }
 
 /**
+ * Whether the figures of a building (the girls on its balconies and roof, the colleague's 12 to 25 thousand triangles
+ * each) are drawn at a zoom: only at the closest (the player, 20. 10.: "they are hardly seen; at zoom in 2x you can
+ * switch them off, they are not seen").
+ */
+static bool BuildingFiguresSeen(ZoomLevel zoom)
+{
+	return zoom <= ZoomLevel::In4x;
+}
+
+/**
+ * The picture of a figure or a plant standing on a 3D object (DrawObjectInto()), at its place on it.
+ * @param ox,oy,oz the object's north corner, world units
+ * @param origin the object's tile
+ * @param index how many of its figures stood on it before (they move each a little apart)
+ * @param[out] height how tall it is, units of height
+ */
+static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure &f, bool plant, const ObjectLay &lay, double ox, double oy, double oz, TileIndex origin, size_t index, int &height)
+{
+	if (plant) return GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
+	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
+	return GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, -1, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
+}
+
+/**
  * Draw a 3D object into pixels: its triangles turned with the view, far first, each filled with its texture at the
  * level of detail of the zoom -- the texture's 1024 pixels for a tile's width at the closest zoom, halved with every
  * zoom level out -- and the figures and plants standing on it among them by the middle of their height.
@@ -3361,13 +3386,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
 		double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 		int height = 0;
-		const ThreeDModelPicture *pic;
-		if (plant) {
-			pic = GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
-		} else {
-			TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
-			pic = GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(on_it.size()), &height, -1, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
-		}
+		const ThreeDModelPicture *pic = StandingFigurePicture(f, plant, lay, ox, oy, oz, origin, on_it.size(), height);
 		if (pic == nullptr) return;
 		double xr, yr;
 		lay.Turn(wx, wy, xr, yr);
@@ -3377,7 +3396,9 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	};
 	if (!triangles_only) {
 		if (o != nullptr) {
-			for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
+			if (BuildingFiguresSeen(lay.zoom)) {
+				for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
+			}
 			for (const ThreeDObjectFigure &f : o->plants) stand(f, true);
 		}
 		for (const ThreeDObjectFigure &f : more) stand(f, false);
@@ -3710,6 +3731,31 @@ static void AddTurnedObjectsToDraw()
 		if (to.ground != nullptr) wanted.push_back({to.ground, to_underlying(_vd.dpi.zoom), to.ground->PaintAt(to.origin)});
 	}
 	PrepareThreeDObjectTextures(wanted);
+	/* The pictures of the figures and plants standing on them made before they are drawn, all at once: by the card in
+	 * one go (MakeThreeDPicturesAtOnce()), not one at a time as each building is drawn -- a turn of the map a new one of
+	 * each at every degree. Asked as DrawObjectInto() will ask. */
+	MakeThreeDPicturesAtOnce([] {
+		ObjectLay lay;
+		lay.yaw = GetViewYaw();
+		lay.zoom = _vd.dpi.zoom;
+		for (const TurnedObject &to : _turned_objects) {
+			const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
+			auto ask = [&](const ThreeDObject *o, std::span<const ThreeDObjectFigure> more) {
+				size_t index = 0;
+				int height = 0;
+				if (o != nullptr) {
+					o->Read();
+					if (BuildingFiguresSeen(lay.zoom)) {
+						for (const ThreeDObjectFigure &f : o->figures) StandingFigurePicture(f, false, lay, ox, oy, to.z, to.origin, index++, height);
+					}
+					for (const ThreeDObjectFigure &f : o->plants) StandingFigurePicture(f, true, lay, ox, oy, to.z, to.origin, index++, height);
+				}
+				for (const ThreeDObjectFigure &f : more) StandingFigurePicture(f, false, lay, ox, oy, to.z, to.origin, index++, height);
+			};
+			if (to.ground != nullptr) ask(to.ground, {});
+			ask(to.obj, to.more);
+		}
+	});
 	for (size_t m = 0; m < _turned_objects.size(); m++) {
 		const TurnedObject &to = _turned_objects[m];
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();

@@ -90,9 +90,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Po pádech #285: karta zase výchozí zapnutá (`8f33958`), ale strop paměti karty zůstal 128 MB (dřív 384). Teď
   **1 GB**. V rigu při otáčení strop nehrál roli (karta drží pod 1 MB tvarů), cukání je z jednotlivých obrázků.
 - Rig: `test3d casy` píše i kolik karta drží, kolik se na ni poslalo a kolikrát uvolňovala.
-- **Domluvit:** obrázky plochy na kartě po jednom jsou pomalejší než procesor. Buď je zase kreslí procesor jako
-  v #279 (karta zůstane pro pohled z očí a z kabiny, kde kreslí celý snímek najednou), nebo karta všechny obrázky
-  jednoho snímku plochy najednou s jedním čtením zpět.
+- Hráč: *„sprav gpu ať maká, gpu má na kreslení víc výkonu než procesor“*. **Hotovo – obrázky plochy po dávkách:**
+  karta kreslí víc obrázků vedle sebe do jednoho rámce a čte ho zpět jednou (`ThreeDGpuRender()` bere seznam).
+  Postavy a rostliny na domech se posbírají před kreslením snímku plochy a udělají najednou
+  (`MakeThreeDPicturesAtOnce()`); vlákno obrázků vozidel se probudí jednou za snímek a vezme všechny čekající (až 64).
+  Rig: dávky po 5–11 obrázcích místo po jednom, obraz plochy stejný na pixel jako z procesoru.
+- Hráč: *„holky na balkonech se kreslí 60 000 trojúhelníčků“*, *„nejsou skoro vidět, při zoom in 2x je můžeš už
+  vypnout“*. Holky mají 12–25 tisíc trojúhelníků (kouřící 12 tisíc na každý z 8 snímků); hra je podle velikosti
+  zjednodušuje, ale holka 5 px vysoká měla pořád ~1 900. **Postavy domů (balkony, střechy) se kreslí jen při
+  přiblížení 4x a víc**, při 2x a dál ne (`BuildingFiguresSeen()`). Při otáčení na 1x se tak nedělá žádný obrázek
+  postavy (dřív 1374 na otočku).
+- Hráč: kolega ukazoval auto zmenšené na 10 000 trojúhelníků – děravé plochy, černé. Zjednodušovat modely se
+  nevyplácí; co není vidět, nekreslit.
 
 ## 20. 10. – pohled 0 s OpenGL: rozpadlé domy, marťanské domy jako stíny, noc jen na silnicích
 
