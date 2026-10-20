@@ -48,6 +48,7 @@
 #include "sound_func.h"
 #include "newgrf_sound.h"
 #include "widgets/cab_view_widget.h"
+#include "video/video_driver.hpp"
 
 #include "table/strings.h"
 
@@ -298,6 +299,50 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 	this->held = now;
 }
 
+/**
+ * A picture of the view from the eyes onto the screen, within the clipping of the moment (the cab view's, the first
+ * person's): its pixels; or, drawn by the graphics card and shown straight from it (CabViewPicture::shown), a hole of
+ * pixels of alpha 0 where it is, the video driver laying the card's picture into it (VideoDriver::ShowThreeDPicture()):
+ * what the window draws over it after stays.
+ * @param w whose picture it is
+ * @param px where in the window, left
+ * @param py top
+ * @param tint laid over it by its alpha (Colour::data), 0 none (hurt)
+ */
+void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, uint32_t tint)
+{
+	const DrawPixelInfo *dpi = _cur_dpi;
+	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
+	int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
+	int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+	if (x0 >= x1 || y0 >= y1) return;
+	/* Written straight into the screen: not the palette's colours of what was under it (Blitter::RealizeAnimation()). */
+	blitter->RealizeAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
+	const Rect on_screen{w.left + px, w.top + py, w.left + px + pic.width - 1, w.top + py + pic.height - 1};
+	if (pic.shown != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&w, on_screen, pic.shown, tint)) {
+		for (int y = y0; y < y1; y++) {
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			std::fill(dst, dst + (x1 - x0), 0u);
+		}
+		return;
+	}
+	VideoDriver::GetInstance()->HideThreeDPicture(&w);
+	if (pic.pixels.size() != static_cast<size_t>(pic.width) * pic.height) return;
+	const Colour tc(tint);
+	const uint a = tint == 0 ? 0 : tc.a;
+	for (int y = y0; y < y1; y++) {
+		const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
+		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+		for (int x = x0; x < x1; x++, dst++) {
+			Colour sc(src[x - px]);
+			if (a != 0) {
+				sc = Colour(static_cast<uint8_t>((sc.r * (255 - a) + tc.r * a) / 255), static_cast<uint8_t>((sc.g * (255 - a) + tc.g * a) / 255), static_cast<uint8_t>((sc.b * (255 - a) + tc.b * a) / 255));
+			}
+			*dst = Colour(sc.r, sc.g, sc.b).data;
+		}
+	}
+}
+
 /** The window of the view from a vehicle's cab; the window number is the vehicle. */
 struct CabViewWindow : Window {
 	mutable CabViewCamera camera{};   ///< the eye between frames
@@ -333,6 +378,7 @@ struct CabViewWindow : Window {
 		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
 		CabLetGo(Vehicle::GetIfValid(this->window_number));
 		DropEyeFrame(&this->camera);
+		VideoDriver::GetInstance()->HideThreeDPicture(this);
 		this->Window::Close(data);
 	}
 
@@ -368,23 +414,6 @@ struct CabViewWindow : Window {
 		this->DrawWidgets();
 	}
 
-	/** The picture onto the screen, within the clipping of the moment. */
-	static void BlitCabPicture(const CabViewPicture &pic, int px, int py)
-	{
-		const DrawPixelInfo *dpi = _cur_dpi;
-		Blitter *blitter = BlitterFactory::GetCurrentBlitter();
-		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
-		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
-		for (int y = y0; y < y1; y++) {
-			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
-			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
-			for (int x = x0; x < x1; x++, dst++) {
-				Colour sc(src[x - px]);
-				*dst = Colour(sc.r, sc.g, sc.b).data;
-			}
-		}
-	}
-
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
@@ -397,7 +426,7 @@ struct CabViewWindow : Window {
 					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
 					return;
 				}
-				BlitCabPicture(this->picture, r.left, r.top);
+				BlitEyePicture(*this, this->picture, r.left, r.top);
 				break;
 			}
 			case WID_CV_PANEL:

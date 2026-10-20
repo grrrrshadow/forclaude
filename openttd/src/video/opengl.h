@@ -15,6 +15,9 @@
 #include "../spriteloader/spriteloader.hpp"
 #include "../misc/lrucache.hpp"
 
+#include <map>
+#include <mutex>
+
 typedef void (*OGLProc)();
 typedef OGLProc (*GetOGLProcAddressProc)(const char *proc);
 
@@ -68,6 +71,20 @@ private:
 	bool cursor_in_window = false; ///< Cursor inside this window
 	std::vector<CursorSprite> cursor_sprites{}; ///< Sprites comprising cursor
 
+	/** A picture of the graphics card shown straight from it where a window's is (ShowThreeDPicture()). */
+	struct ThreeDPicture {
+		Rect r;           ///< where on the screen
+		GLuint texture;   ///< the card's, shared with this context
+		uint32_t tint;    ///< laid over it by its alpha (Colour::data), 0 none
+	};
+	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
+	std::mutex three_d_mutex; ///< of three_d_pictures: set by the game, drawn by Paint()
+	GLuint three_d_program = 0; ///< Shader program for a picture of the graphics card where the screen's pixels are of alpha 0.
+	GLint  three_d_sprite_loc = 0; ///< Uniform location for its place.
+	GLint  three_d_screen_loc = 0; ///< Uniform location for screen size.
+	GLint  three_d_size_loc = 0; ///< Uniform location for screen size in the fragment shader.
+	GLint  three_d_tint_loc = 0; ///< Uniform location for its tint.
+
 	OpenGLBackend();
 	~OpenGLBackend() override;
 
@@ -102,6 +119,11 @@ public:
 	void DrawMouseCursor();
 	void PopulateCursorCache();
 	void ClearCursorCache();
+
+	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint);
+	void HideThreeDPicture(const void *owner);
+	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
 
 	void *GetVideoBuffer();
 	uint8_t *GetAnimBuffer();

@@ -51,6 +51,7 @@
 #include "vehicle_base.h"
 #include "cab_drive.h"
 #include "sound_func.h"
+#include "video/video_driver.hpp"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -497,6 +498,7 @@ struct FirstPersonWindow : Window {
 		/* Out of the vehicle the walker was in: let go of it, as the cab view closing does. */
 		CabLetGo(this->Riding());
 		DropEyeFrame(&this->camera);
+		VideoDriver::GetInstance()->HideThreeDPicture(this);
 		this->Window::Close(data);
 	}
 
@@ -508,15 +510,6 @@ struct FirstPersonWindow : Window {
 		if (w <= 0 || h <= 0) return;
 		const Vehicle *rv = this->Riding();
 		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
-		/* (Over a picture drawn anew only: the one shown is the last drawn, a frame behind.) */
-		if (this->picture_ok && this->camera.fresh && this->hurt_steps > 0) {
-			/* Hurt: red over the picture, fading. */
-			const uint a = 30 + this->hurt_steps * 18;
-			for (uint32_t &p : this->picture.pixels) {
-				Colour o(p);
-				p = Colour(static_cast<uint8_t>((o.r * (255 - a) + 220 * a) / 255), static_cast<uint8_t>(o.g * (255 - a) / 255), static_cast<uint8_t>(o.b * (255 - a) / 255)).data;
-			}
-		}
 	}
 
 	/** Over the whole screen between the toolbar and the status bar, or back where the window was. */
@@ -1124,25 +1117,6 @@ struct FirstPersonWindow : Window {
 		this->DrawWidgets();
 	}
 
-	/** The picture onto the screen, within the clipping of the moment. */
-	static void BlitPicture(const CabViewPicture &pic, int px, int py)
-	{
-		const DrawPixelInfo *dpi = _cur_dpi;
-		Blitter *blitter = BlitterFactory::GetCurrentBlitter();
-		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
-		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
-		/* Written straight into the screen: not the palette's colours of what was under it (Blitter::RealizeAnimation()). */
-		if (x0 < x1 && y0 < y1) blitter->RealizeAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
-		for (int y = y0; y < y1; y++) {
-			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
-			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
-			for (int x = x0; x < x1; x++, dst++) {
-				Colour sc(src[x - px]);
-				*dst = Colour(sc.r, sc.g, sc.b).data;
-			}
-		}
-	}
-
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		switch (widget) {
@@ -1156,7 +1130,8 @@ struct FirstPersonWindow : Window {
 					DrawString(r.left, r.right, r.top + h / 2, STR_FIRST_PERSON_NEEDS_32BPP, TextColour::White, AlignmentH::Centre);
 					return;
 				}
-				BlitPicture(this->picture, r.left, r.top);
+				/* Hurt: red over the picture, fading. */
+				BlitEyePicture(*this, this->picture, r.left, r.top, this->hurt_steps > 0 ? Colour(220, 0, 0, static_cast<uint8_t>(30 + this->hurt_steps * 18)).data : 0);
 				/* A dot in the middle, where it looks. */
 				const int cx = r.left + w / 2, cy = r.top + h / 2;
 				GfxFillRect(cx - 1, cy - 1, cx + 1, cy + 1, GetColourGradient(Colours::White, Shade::Lightest));

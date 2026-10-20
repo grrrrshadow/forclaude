@@ -199,3 +199,34 @@ static const char *_frag_shader_sprite_blend_150[] = {
 	"  colour.rgb = idx > 0.0 ? adj_brightness(remap_col.rgb, max3(rgb_col.rgb)) : rgb_col.rgb;",
 	"}",
 };
+
+/** Fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha 0 (OpenGLBackend::ShowThreeDPicture()). */
+static const char *_frag_shader_three_d[] = {
+	"#version 110\n",
+	"uniform sampler2D colour_tex;",
+	"uniform sampler2D screen_tex;",
+	"uniform vec2 screen_size;",
+	"uniform vec4 tint;",
+	"varying vec2 colour_tex_uv;",
+	"void main() {",
+	"  vec4 s = texture2D(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
+	"  if (s.a > 0.5) discard;",
+	"  gl_FragData[0] = vec4(mix(texture2D(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"}",
+};
+
+/** GLSL 1.50 fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha 0. */
+static const char *_frag_shader_three_d_150[] = {
+	"#version 150\n",
+	"uniform sampler2D colour_tex;",
+	"uniform sampler2D screen_tex;",
+	"uniform vec2 screen_size;",
+	"uniform vec4 tint;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"void main() {",
+	"  vec4 s = texture(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
+	"  if (s.a > 0.5) discard;",
+	"  colour = vec4(mix(texture(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"}",
+};

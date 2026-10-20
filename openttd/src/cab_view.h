@@ -36,6 +36,7 @@ struct CabViewPicture {
 	int width = 0;
 	int height = 0;
 	std::vector<uint32_t> pixels;
+	uint32_t shown = 0; ///< drawn by the graphics card and shown straight from it: its texture there (pixels not of it; three_d_gpu.h)
 };
 
 /** The eye of the cab view, kept by the window between frames: the heading it has turned to so far. */
@@ -64,6 +65,7 @@ extern bool _eye_synchronous;          ///< the rig: drawn at once on the thread
 
 struct Vehicle;
 struct Window;
+void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, uint32_t tint = 0);
 bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 void ShowCabViewWindow(const Vehicle *v);
 Window *ArrowsWindow();

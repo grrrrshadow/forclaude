@@ -27,6 +27,7 @@
 #include "landscape.h"
 #include "video/video_driver.hpp"
 #include "smallmap_gui.h"
+#include "three_d_gpu.h"
 #include "screenshot_type.h"
 
 #include "table/strings.h"
@@ -77,11 +78,26 @@ std::string_view GetCurrentScreenshotExtension()
  * @param n Number of lines to render
  * @see ScreenshotCallback
  */
+/** The pictures shown straight from the graphics card (VideoDriver::ShowThreeDPicture()) read back for the screenshot: where, and their pixels. */
+static std::vector<std::pair<Rect, std::vector<uint32_t>>> _screenshot_three_d;
+
 static void CurrentScreenCallback(void *buf, uint y, uint pitch, uint n)
 {
 	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
 	void *src = blitter->MoveTo(_screen.dst_ptr, 0, y);
 	blitter->CopyImageToBuffer(src, buf, _screen.width, n, pitch);
+	/* Where the screen has holes for them (alpha 0), the pictures shown straight from the card. */
+	for (const auto &[r, px] : _screenshot_three_d) {
+		const int w = r.Width();
+		for (uint row = 0; row < n; row++) {
+			const int sy = static_cast<int>(y + row);
+			if (sy < r.top || sy > r.bottom) continue;
+			uint32_t *line = static_cast<uint32_t *>(buf) + static_cast<size_t>(row) * pitch;
+			for (int sx = std::max(r.left, 0); sx <= std::min(r.right, _screen.width - 1); sx++) {
+				if (Colour(line[sx]).a == 0) line[sx] = px[static_cast<size_t>(sy - r.top) * w + sx - r.left];
+			}
+		}
+	}
 }
 
 /**
@@ -186,8 +202,18 @@ static bool MakeSmallScreenshot(bool crashlog)
 	auto provider = GetScreenshotProvider();
 	if (provider == nullptr) return false;
 
-	return provider->MakeImage(MakeScreenshotName(SCREENSHOT_NAME, provider->GetName(), crashlog), CurrentScreenCallback, _screen.width, _screen.height,
+	/* The pictures shown straight from the graphics card read back into it (not for a crash: the card may be what stopped). */
+	_screenshot_three_d.clear();
+	if (!crashlog && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32) {
+		for (const auto &[r, texture] : VideoDriver::GetInstance()->GetThreeDPictures()) {
+			std::vector<uint32_t> px;
+			if (ThreeDGpuReadShown(texture, r.Width(), r.Height(), px)) _screenshot_three_d.emplace_back(r, std::move(px));
+		}
+	}
+	bool made = provider->MakeImage(MakeScreenshotName(SCREENSHOT_NAME, provider->GetName(), crashlog), CurrentScreenCallback, _screen.width, _screen.height,
 			BlitterFactory::GetCurrentBlitter()->GetScreenDepth(), _cur_palette.palette);
+	_screenshot_three_d.clear();
+	return made;
 }
 
 /**

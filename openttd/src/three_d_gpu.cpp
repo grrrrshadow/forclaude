@@ -41,6 +41,7 @@
 #include "safeguards.h"
 
 std::atomic<bool> _three_d_gpu_off = true;
+std::atomic<bool> _three_d_gpu_show = true;
 
 /*
  * The card's diary, 3d_karta.log in the player's folder. The player's build #285, the first with the card, brought the
@@ -58,6 +59,10 @@ static constexpr int DIARY_PICTURES = 30;
 static constexpr size_t DIARY_WIDTH = 120;
 static std::string _gpu_died_at;   ///< the step the card died at the last time, empty when it did not
 static bool _gpu_died_note = false; ///< the player not told of it yet
+/* The card's context not sharing the video driver's: making it so brought the game down once (ThreeDGpuCheckLastRun()),
+ * and so for good -- each diary says it again (SHARE_OFF) for the next start. The view from the eyes is read back. */
+static bool _gpu_no_share = false;
+static constexpr std::string_view SHARE_OFF = "sdileni s ovladacem videa vypnuto (pri nem hra jednou spadla)";
 
 static std::string DiaryPath(bool last)
 {
@@ -112,8 +117,16 @@ void ThreeDGpuCheckLastRun()
 		if (start == 0) break;
 		end = start - 1;
 	}
+	if (text.find(SHARE_OFF) != std::string::npos) _gpu_no_share = true;
 	if (!last.starts_with("krok ")) return;
 	if (auto kept = FileHandle::Open(DiaryPath(true), "wb"); kept.has_value()) fwrite(text.data(), 1, text.size(), *kept);
+	if (last.find("sdileny") != std::string::npos) {
+		/* At making its context share the video driver's (the view from the eyes shown straight from the card): the card
+		 * stays on, its context its own from now on. */
+		_gpu_no_share = true;
+		Debug(misc, 0, "3D on the graphics card: the game went down the last time at \"{}\"; the card's context is its own from now on (3d_karta_minule.log)", last.substr(5));
+		return;
+	}
 	/* The game left in the middle of a step after the card drew its first pictures: the player closing the whole of
 	 * Winlator leaves it so too (the player, 20. 10.: "I close it by closing the whole Winlator") -- the card stays on,
 	 * the diary kept to send. Only a card that died before its first pictures were drawn is switched off: else the game
@@ -318,6 +331,7 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(void, glDrawElements, (GLenum mode, GLsizei count, GLenum type, const void *indices)) \
 	X(void, glDrawArrays, (GLenum mode, GLint first, GLsizei count)) \
 	X(void, glReadPixels, (GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GLenum type, void *data)) \
+	X(void, glFinish, ()) \
 	X(void, glPixelStorei, (GLenum pname, GLint param)) \
 	X(void, glReadBuffer, (GLenum src)) \
 	X(void, glDrawBuffers, (GLsizei n, const GLenum *bufs)) \
@@ -387,6 +401,7 @@ struct GpuJob {
 	ThreeDGpuPicture *pic;
 	ThreeDGpuEyePicture *eye = nullptr; ///< else the view from the eyes (DrawEyeOnCard())
 	ThreeDGpuEyeFrame *frame = nullptr; ///< else the view from the eyes whole (DrawEyeFrameOnCard())
+	struct ShownRead *read = nullptr;   ///< else a picture shown straight from the card read back (ReadShownOnCard())
 	bool done = false;
 	bool ok = false;
 };
@@ -397,6 +412,13 @@ GpuState _gpu_state = GpuState::NotStarted;
 std::deque<GpuJob *> _gpu_jobs;
 bool _gpu_stop = false;
 std::thread _gpu_thread;
+/* The video driver's OpenGL (ThreeDGpuVideoContext()): an EGL display and context, or a WGL device and context. The
+ * card's context made sharing its things with it (_video_shared), the view from the eyes is shown straight from the
+ * card: the driver draws the card's texture where the picture is (ThreeDGpuEyeFrame::shown). */
+std::mutex _video_mutex;
+void *_video_display = nullptr;
+void *_video_context = nullptr;
+std::atomic<bool> _video_shared = false;
 std::string _gpu_describe = "not started";
 double _gpu_ms = 0;                 ///< the time the card took for the pictures since the last ThreeDGpuTimes()
 uint64_t _gpu_pictures = 0;         ///< and how many
@@ -474,10 +496,16 @@ std::vector<uint32_t> _frame_atlas_px;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
-bool _frame_programs = false; ///< compiled: the frame on the card is possible
+std::atomic<bool> _frame_programs = false; ///< compiled: the frame on the card is possible
 GpuProgram _frame_tri_program, _frame_background_program, _frame_haze_program, _frame_far_haze_program, _frame_shadow_program;
 GpuProgram _frame_night_program, _frame_lamps_program, _frame_blasts_program, _frame_glow_after_program, _frame_lay_program;
-GpuProgram _frame_glow_program, _frame_star_program, _frame_moon_program;
+GpuProgram _frame_glow_program, _frame_star_program, _frame_moon_program, _frame_copy_program;
+/* The pictures shown straight from the card (ThreeDGpuEyeFrame::shown): three in turn, the video driver drawing the
+ * last while the next is made. */
+GLuint _frame_shown[3] = {0, 0, 0};
+int _frame_shown_w[3] = {0, 0, 0}, _frame_shown_h[3] = {0, 0, 0};
+int _frame_shown_next = 0;
+GLuint _frame_shown_fbo = 0;
 
 void StartEyeFrame();
 void EndEyeFrame();
@@ -1096,6 +1124,14 @@ void main()
 }
 )";
 
+/* The picture as it is, into the picture shown (ThreeDGpuEyeFrame::shown). */
+const char *const EYE_COPY_FRAGMENT = R"(
+void main()
+{
+	Put(ColourAt(Pixel()));
+}
+)";
+
 /* The moon (DrawEyeSky()): its face (u_glow 0, laid over) or the glow about it (1, added), where nothing is drawn above the horizon. */
 const char *const EYE_MOON_FRAGMENT = R"(
 uniform vec3 u_moon; // x, y, radius
@@ -1172,6 +1208,7 @@ struct EglContext {
 	EGLDisplay display = nullptr;
 	EGLContext context = nullptr;
 	EGLSurface surface = nullptr;
+	bool video_display = false; ///< the display is the video driver's (shared with it): not ended with the card
 };
 EglContext _egl;
 
@@ -1195,6 +1232,8 @@ GpuProc GetGlProc(const char *name)
 }
 
 /** A context of OpenGL 3.3 of its own: without a window, of Mesa's render node where there is one. */
+bool MakeEglContext(EGLContext share);
+
 bool StartContext(std::string &why)
 {
 	_egl.lib = std::make_unique<LibraryLoader>("libEGL.so.1");
@@ -1221,9 +1260,30 @@ bool StartContext(std::string &why)
 		why = "libEGL.so.1 without " + l.GetLastError();
 		return false;
 	}
+	EGLint major = 0, minor = 0;
+	/* On the video driver's display, sharing its things with its context, when it has one of EGL (ThreeDGpuVideoContext()). */
+	EGLDisplay video_display = nullptr;
+	EGLContext video_context = nullptr;
+	if (_gpu_no_share) {
+		Diary(SHARE_OFF, true);
+	} else {
+		std::lock_guard lock(_video_mutex);
+		video_display = _video_display;
+		video_context = _video_context;
+	}
+	if (video_display != nullptr && video_context != nullptr && _egl.Initialize(video_display, &major, &minor)) {
+		_egl.display = video_display;
+		_egl.video_display = true;
+		Step("kontext sdileny s ovladacem videa (EGL)");
+		if (MakeEglContext(video_context)) {
+			_video_shared = true;
+			return true;
+		}
+		_egl.display = nullptr;
+		_egl.video_display = false;
+	}
 	using GetPlatformDisplay = EGLDisplay (*)(EGLenum, void *, const EGLint *);
 	auto platform_display = reinterpret_cast<GetPlatformDisplay>(_egl.GetProcAddress("eglGetPlatformDisplayEXT"));
-	EGLint major = 0, minor = 0;
 	if (platform_display != nullptr) {
 		_egl.display = platform_display(EGL_PLATFORM_SURFACELESS_MESA, nullptr, nullptr);
 		if (_egl.display != nullptr && !_egl.Initialize(_egl.display, &major, &minor)) _egl.display = nullptr;
@@ -1236,16 +1296,26 @@ bool StartContext(std::string &why)
 			return false;
 		}
 	}
-	if (!_egl.BindAPI(EGL_OPENGL_API)) {
-		why = "EGL without OpenGL";
+	if (!MakeEglContext(nullptr)) {
+		why = fmt::format("no context of OpenGL 3.3 (EGL error {:#x})", _egl.GetError());
 		return false;
 	}
+	return true;
+}
+
+/**
+ * The context of OpenGL 3.3 on the display (StartContext()), current: without a configuration and a surface where EGL
+ * can, else with a pixel's buffer of its own.
+ * @param share the context it shares its things with, nullptr none
+ */
+bool MakeEglContext(EGLContext share)
+{
+	if (!_egl.BindAPI(EGL_OPENGL_API)) return false;
 	const EGLint context_attributes[] = {EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3, EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE};
 	const char *extensions = _egl.QueryString(_egl.display, EGL_EXTENSIONS);
 	const std::string_view ext = extensions != nullptr ? extensions : "";
-	/* Without a configuration and a surface where EGL can; else a pixel's buffer of its own. */
 	if (ext.find("EGL_KHR_no_config_context") != std::string_view::npos && ext.find("EGL_KHR_surfaceless_context") != std::string_view::npos) {
-		_egl.context = _egl.CreateContext(_egl.display, nullptr, nullptr, context_attributes);
+		_egl.context = _egl.CreateContext(_egl.display, nullptr, share, context_attributes);
 		if (_egl.context != nullptr && !_egl.MakeCurrent(_egl.display, nullptr, nullptr, _egl.context)) {
 			_egl.DestroyContext(_egl.display, _egl.context);
 			_egl.context = nullptr;
@@ -1255,15 +1325,14 @@ bool StartContext(std::string &why)
 		const EGLint config_attributes[] = {EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_NONE};
 		EGLConfig config = nullptr;
 		EGLint configs = 0;
-		if (!_egl.ChooseConfig(_egl.display, config_attributes, &config, 1, &configs) || configs < 1) {
-			why = "no EGL configuration for OpenGL";
-			return false;
-		}
+		if (!_egl.ChooseConfig(_egl.display, config_attributes, &config, 1, &configs) || configs < 1) return false;
 		const EGLint surface_attributes[] = {EGL_WIDTH, 1, EGL_HEIGHT, 1, EGL_NONE};
 		_egl.surface = _egl.CreatePbufferSurface(_egl.display, config, surface_attributes);
-		_egl.context = _egl.CreateContext(_egl.display, config, nullptr, context_attributes);
+		_egl.context = _egl.CreateContext(_egl.display, config, share, context_attributes);
 		if (_egl.surface == nullptr || _egl.context == nullptr || !_egl.MakeCurrent(_egl.display, _egl.surface, _egl.surface, _egl.context)) {
-			why = fmt::format("no context of OpenGL 3.3 (EGL error {:#x})", _egl.GetError());
+			if (_egl.context != nullptr) _egl.DestroyContext(_egl.display, _egl.context);
+			if (_egl.surface != nullptr) _egl.DestroySurface(_egl.display, _egl.surface);
+			_egl.context = _egl.surface = nullptr;
 			return false;
 		}
 	}
@@ -1276,8 +1345,10 @@ void EndContext()
 		_egl.MakeCurrent(_egl.display, nullptr, nullptr, nullptr);
 		if (_egl.context != nullptr) _egl.DestroyContext(_egl.display, _egl.context);
 		if (_egl.surface != nullptr) _egl.DestroySurface(_egl.display, _egl.surface);
-		_egl.Terminate(_egl.display);
+		/* (The video driver's display stays: it is its.) */
+		if (!_egl.video_display) _egl.Terminate(_egl.display);
 	}
+	_video_shared = false;
 	if (_egl.ReleaseThread != nullptr) _egl.ReleaseThread();
 	_egl.context = _egl.surface = _egl.display = nullptr;
 }
@@ -1308,6 +1379,17 @@ bool StartContext(std::string &why)
 		return false;
 	}
 	_gpu_dc = GetDC(_gpu_window);
+	/* The video driver's context (ThreeDGpuVideoContext()): the card's shares its things with it, on the pixel format
+	 * of its device. */
+	HDC video_dc = nullptr;
+	HGLRC video_rc = nullptr;
+	if (_gpu_no_share) {
+		Diary(SHARE_OFF, true);
+	} else {
+		std::lock_guard lock(_video_mutex);
+		video_dc = static_cast<HDC>(_video_display);
+		video_rc = static_cast<HGLRC>(_video_context);
+	}
 	PIXELFORMATDESCRIPTOR pfd = {};
 	pfd.nSize = sizeof(pfd);
 	pfd.nVersion = 1;
@@ -1315,11 +1397,19 @@ bool StartContext(std::string &why)
 	pfd.iPixelType = PFD_TYPE_RGBA;
 	pfd.cColorBits = 24;
 	pfd.iLayerType = PFD_MAIN_PLANE;
-	Step("format pixelu");
-	const int format = ChoosePixelFormat(_gpu_dc, &pfd);
-	if (format == 0 || !SetPixelFormat(_gpu_dc, format, &pfd)) {
-		why = "no pixel format for OpenGL";
-		return false;
+	Step(video_dc != nullptr ? "format pixelu sdileny s ovladacem videa" : "format pixelu");
+	int format = 0;
+	if (video_dc != nullptr) {
+		const int video_format = GetPixelFormat(video_dc);
+		PIXELFORMATDESCRIPTOR video_pfd = {};
+		if (video_format > 0 && DescribePixelFormat(video_dc, video_format, sizeof(video_pfd), &video_pfd) != 0 && SetPixelFormat(_gpu_dc, video_format, &video_pfd)) format = video_format;
+	}
+	if (format == 0) {
+		format = ChoosePixelFormat(_gpu_dc, &pfd);
+		if (format == 0 || !SetPixelFormat(_gpu_dc, format, &pfd)) {
+			why = "no pixel format for OpenGL";
+			return false;
+		}
 	}
 	Step("prvni kontext OpenGL (wglCreateContext, wglMakeCurrent)");
 	HGLRC first = wglCreateContext(_gpu_dc);
@@ -1336,20 +1426,34 @@ bool StartContext(std::string &why)
 		const int attributes[] = {0x2091 /* WGL_CONTEXT_MAJOR_VERSION_ARB */, 3, 0x2092 /* WGL_CONTEXT_MINOR_VERSION_ARB */, 3,
 				0x9126 /* WGL_CONTEXT_PROFILE_MASK_ARB */, 0x0001 /* WGL_CONTEXT_CORE_PROFILE_BIT_ARB */, 0};
 		Step("kontext OpenGL 3.3 core (wglCreateContextAttribsARB)");
-		HGLRC core = create(_gpu_dc, nullptr, attributes);
+		HGLRC core = nullptr;
+		if (video_rc != nullptr) {
+			Step("kontext OpenGL 3.3 core sdileny s ovladacem videa");
+			core = create(_gpu_dc, video_rc, attributes);
+			if (core != nullptr) _video_shared = true;
+		}
+		if (core == nullptr) core = create(_gpu_dc, nullptr, attributes);
 		if (core != nullptr && wglMakeCurrent(_gpu_dc, core)) {
 			wglDeleteContext(first);
 			_gpu_rc = core;
-		} else if (core != nullptr) {
-			wglDeleteContext(core);
+		} else {
+			if (core != nullptr) wglDeleteContext(core);
+			_video_shared = false;
 			wglMakeCurrent(_gpu_dc, first);
 		}
+	}
+	if (_gpu_rc == first && video_rc != nullptr) {
+		/* The first context, its lists shared with the video driver's before anything is made in it. */
+		wglMakeCurrent(nullptr, nullptr);
+		_video_shared = wglShareLists(video_rc, first) != FALSE;
+		wglMakeCurrent(_gpu_dc, first);
 	}
 	return true;
 }
 
 void EndContext()
 {
+	_video_shared = false;
 	wglMakeCurrent(nullptr, nullptr);
 	if (_gpu_rc != nullptr) wglDeleteContext(_gpu_rc);
 	if (_gpu_dc != nullptr) ReleaseDC(_gpu_window, _gpu_dc);
@@ -2239,7 +2343,7 @@ void StartEyeFrame()
 			pixel(_frame_far_haze_program, EYE_FAR_HAZE_FRAGMENT) && pixel(_frame_shadow_program, EYE_SHADOW_FRAGMENT) &&
 			pixel(_frame_night_program, EYE_NIGHT_FRAGMENT) && pixel(_frame_lamps_program, EYE_LAMPS_FRAGMENT) &&
 			pixel(_frame_blasts_program, EYE_BLASTS_FRAGMENT) && pixel(_frame_glow_after_program, EYE_GLOW_AFTER_FRAGMENT) &&
-			pixel(_frame_moon_program, EYE_MOON_FRAGMENT) && MakeProgram(_frame_lay_program, EYE_PIXEL_VERTEX, EYE_LAY_FRAGMENT, why) &&
+			pixel(_frame_moon_program, EYE_MOON_FRAGMENT) && pixel(_frame_copy_program, EYE_COPY_FRAGMENT) && MakeProgram(_frame_lay_program, EYE_PIXEL_VERTEX, EYE_LAY_FRAGMENT, why) &&
 			MakeProgram(_frame_glow_program, EYE_GLOW_VERTEX, EYE_GLOW_FRAGMENT, why) && MakeProgram(_frame_star_program, EYE_STAR_VERTEX, EYE_STAR_FRAGMENT, why);
 	if (!_frame_programs) {
 		Debug(misc, 1, "3D on the graphics card: the view from the eyes whole not on it ({})", why);
@@ -2270,6 +2374,7 @@ void StartEyeFrame()
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	gl.glGenFramebuffers(2, _frame_geometry_fbo);
 	gl.glGenFramebuffers(2, _frame_pixel_fbo);
+	gl.glGenFramebuffers(1, &_frame_shown_fbo);
 	gl.glGenVertexArrays(1, &_frame_vao);
 	gl.glGenBuffers(1, &_frame_vbo);
 	gl.glBindVertexArray(_frame_vao);
@@ -2308,16 +2413,41 @@ void StartEyeFrame()
 	}
 }
 
+/** A picture shown straight from the card (ThreeDGpuReadShown()). */
+struct ShownRead {
+	uint32_t texture;
+	int width, height;
+	std::vector<uint32_t> *pixels;
+};
+
+/** A picture shown straight from the card read back, top row first: one of the three it is shown from, of its size. */
+bool ReadShownOnCard(const ShownRead &r)
+{
+	int k = 0;
+	while (k < 3 && (_frame_shown[k] == 0 || _frame_shown[k] != r.texture)) k++;
+	if (k == 3 || _frame_shown_w[k] != r.width || _frame_shown_h[k] != r.height) return false;
+	Step("cteni ukazaneho snimku zpet (snimek obrazovky)");
+	r.pixels->resize(static_cast<size_t>(r.width) * r.height);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_shown_fbo);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, r.texture, 0);
+	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+	gl.glReadPixels(0, 0, r.width, r.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, r.pixels->data());
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	return gl.glGetError() == 0;
+}
+
 /** Let go of what the frame on the card holds (EndCard()). */
 void EndEyeFrame()
 {
 	const GLuint textures[] = {_frame_colour[0], _frame_colour[1], _frame_glow, _frame_depth, _frame_atlas, _frame_list, _frame_lay, _frame_lay_z, _frame_shadow_map};
 	for (GLuint t : textures) if (t != 0) gl.glDeleteTextures(1, &t);
-	for (GLuint f : {_frame_geometry_fbo[0], _frame_geometry_fbo[1], _frame_pixel_fbo[0], _frame_pixel_fbo[1]}) if (f != 0) gl.glDeleteFramebuffers(1, &f);
+	for (GLuint t : _frame_shown) if (t != 0) gl.glDeleteTextures(1, &t);
+	for (GLuint f : {_frame_geometry_fbo[0], _frame_geometry_fbo[1], _frame_pixel_fbo[0], _frame_pixel_fbo[1], _frame_shown_fbo}) if (f != 0) gl.glDeleteFramebuffers(1, &f);
 	for (GLuint b : {_frame_vbo, _frame_glow_vbo, _frame_star_vbo}) if (b != 0) gl.glDeleteBuffers(1, &b);
 	for (GLuint a : {_frame_vao, _frame_empty_vao, _frame_glow_vao, _frame_star_vao}) if (a != 0) gl.glDeleteVertexArrays(1, &a);
 	for (GpuProgram *p : {&_frame_tri_program, &_frame_background_program, &_frame_haze_program, &_frame_far_haze_program, &_frame_shadow_program, &_frame_night_program,
-			&_frame_lamps_program, &_frame_blasts_program, &_frame_glow_after_program, &_frame_lay_program, &_frame_glow_program, &_frame_star_program, &_frame_moon_program}) {
+			&_frame_lamps_program, &_frame_blasts_program, &_frame_glow_after_program, &_frame_lay_program, &_frame_glow_program, &_frame_star_program, &_frame_moon_program, &_frame_copy_program}) {
 		if (p->program != 0) gl.glDeleteProgram(p->program);
 	}
 }
@@ -2809,13 +2939,55 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 	}
 	glass();
 	gl.glBindVertexArray(0);
-	f.pixels.resize(static_cast<size_t>(w) * h);
-	Step(fmt::format("cteni snimku z oci {} zpet (glReadPixels)", _gpu_pictures + 1));
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[now]);
-	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
-	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
-	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, f.pixels.data());
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	f.shown = 0;
+	if (f.show && _video_shared) {
+		/* Shown straight from the card: into the picture of the three not shown now, done before it is handed on. */
+		const int k = _frame_shown_next;
+		_frame_shown_next = (k + 1) % 3;
+		if (_frame_shown[k] == 0) {
+			gl.glGenTextures(1, &_frame_shown[k]);
+			gl.glBindTexture(GL_TEXTURE_2D, _frame_shown[k]);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+			gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		}
+		gl.glBindTexture(GL_TEXTURE_2D, _frame_shown[k]);
+		if (_frame_shown_w[k] != w || _frame_shown_h[k] != h) {
+			gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+			_frame_shown_w[k] = w;
+			_frame_shown_h[k] = h;
+		}
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_shown_fbo);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _frame_shown[k], 0);
+		gl.glDrawBuffers(1, colour_only);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glDisable(GL_BLEND);
+		gl.glUseProgram(_frame_copy_program.program);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, _frame_colour[now]);
+		gl.glUniform1i(gl.glGetUniformLocation(_frame_copy_program.program, "u_colour"), 0);
+		gl.glBindVertexArray(_frame_empty_vao);
+		gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+		gl.glBindVertexArray(0);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		Step(fmt::format("snimek z oci {} hotov na karte (glFinish)", _gpu_pictures + 1));
+		gl.glFinish();
+		f.shown = _frame_shown[k];
+		f.pixels.clear();
+	} else {
+		f.pixels.resize(static_cast<size_t>(w) * h);
+		Step(fmt::format("cteni snimku z oci {} zpet (glReadPixels)", _gpu_pictures + 1));
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[now]);
+		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+		gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, f.pixels.data());
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
 	const GLenum error = gl.glGetError();
 	if (error != 0) {
 		Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x} in the view from the eyes whole, the processor draws it", error);
@@ -2863,6 +3035,15 @@ void GpuThreadMain()
 		GpuJob *job = _gpu_jobs.front();
 		_gpu_jobs.pop_front();
 		lock.unlock();
+		if (job->read != nullptr) {
+			/* Not a picture: a texture read back (a screenshot). */
+			const bool read = ReadShownOnCard(*job->read);
+			lock.lock();
+			job->ok = read;
+			job->done = true;
+			_gpu_done.notify_all();
+			continue;
+		}
 		const auto start = std::chrono::steady_clock::now();
 		bool drawn = false;
 		try {
@@ -2966,6 +3147,92 @@ bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame)
 	return job.ok;
 }
 
+/**
+ * A picture shown straight from the card read back (ThreeDGpuEyeFrame::shown): for a screenshot of the screen.
+ * @param texture the picture's
+ * @param width its size
+ * @param height
+ * @param[out] pixels its colours (Colour::data), top row first
+ * @return whether it was read
+ */
+bool ThreeDGpuReadShown(uint32_t texture, int width, int height, std::vector<uint32_t> &pixels)
+{
+	if (texture == 0 || width <= 0 || height <= 0) return false;
+	ShownRead read{texture, width, height, &pixels};
+	GpuJob job{nullptr};
+	job.read = &read;
+	std::unique_lock lock(_gpu_mutex);
+	if (_gpu_state != GpuState::Ready) return false;
+	_gpu_jobs.push_back(&job);
+	_gpu_wake.notify_one();
+	_gpu_done.wait(lock, [&job] { return job.done; });
+	return job.ok;
+}
+
+/**
+ * The video driver's OpenGL context, made now (current on the thread calling): the card's shares its things with it,
+ * and the view from the eyes is shown straight from the card (ThreeDGpuShows()). Before the card's thread starts; or
+ * after, when the driver made its context sharing with the card's (ThreeDGpuOwnContext()).
+ * @param display a WGL context's device; with EGL nullptr: the current display
+ * @param context the WGL context; with EGL nullptr: the current context
+ * @param shared_with_card the driver's context shares the card's already
+ */
+void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card)
+{
+#ifdef THREE_D_GPU_EGL
+	if (context == nullptr) {
+		/* The video driver's context of EGL, when it has one (SDL may have GLX): its display and it. */
+		static LibraryLoader lib("libEGL.so.1");
+		if (lib.HasError()) return;
+		EGLDisplay (*current_display)() = lib.GetFunction("eglGetCurrentDisplay");
+		EGLContext (*current_context)() = lib.GetFunction("eglGetCurrentContext");
+		if (current_display == nullptr || current_context == nullptr) return;
+		display = current_display();
+		context = current_context();
+		if (display == nullptr || context == nullptr) return;
+	}
+#endif
+#ifdef THREE_D_GPU_WGL
+	if (context == nullptr) {
+		/* The current one (SDL's). */
+		display = wglGetCurrentDC();
+		context = wglGetCurrentContext();
+		if (display == nullptr || context == nullptr) return;
+	}
+#endif
+	std::lock_guard lock(_video_mutex);
+	_video_display = display;
+	_video_context = context;
+	if (shared_with_card) _video_shared = true;
+	Debug(misc, 1, "3D on the graphics card: the video driver's OpenGL {}", shared_with_card ? "shares the card's" : "is there to share");
+}
+
+/** The video driver's OpenGL context goes (DestroyContext()): what the card makes is read back again. */
+void ThreeDGpuVideoContextGone()
+{
+	std::lock_guard lock(_video_mutex);
+	_video_display = nullptr;
+	_video_context = nullptr;
+	_video_shared = false;
+}
+
+/** The card's context, for the video driver's made anew to share its things with it (WGL); nullptr: none yet. */
+void *ThreeDGpuOwnContext()
+{
+#ifdef THREE_D_GPU_WGL
+	std::lock_guard lock(_gpu_mutex);
+	return _gpu_state == GpuState::Ready && !_gpu_no_share ? static_cast<void *>(_gpu_rc) : nullptr;
+#else
+	return nullptr;
+#endif
+}
+
+/** Whether the view from the eyes is shown straight from the card: its context and the video driver's share their things. */
+bool ThreeDGpuShows()
+{
+	return _three_d_gpu_show && !_three_d_gpu_off && _video_shared && _frame_programs;
+}
+
 /** The card's thread ended, at the end of the game (after the threads asking it, ShutdownGame()). */
 void ThreeDGpuStop()
 {
@@ -3003,6 +3270,11 @@ std::string ThreeDGpuTimes()
 bool ThreeDGpuAvailable() { return false; }
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &) { return false; }
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &) { return false; }
+void ThreeDGpuVideoContext(void *, void *, bool) {}
+void ThreeDGpuVideoContextGone() {}
+void *ThreeDGpuOwnContext() { return nullptr; }
+bool ThreeDGpuShows() { return false; }
+bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(ThreeDGpuPicture &) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }

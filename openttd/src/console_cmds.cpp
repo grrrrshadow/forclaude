@@ -5379,6 +5379,11 @@ static const IntervalTimer<TimerGameTick> _testodtah_watch({TimerGameTick::Prior
  */
 static std::vector<std::pair<int, std::string>> _testza_queue;
 
+/* The rig's picture of the screen as the video driver shows it (test3d obrazovka, OpenGLBackend::Paint()). */
+std::string _rig_screen_picture; ///< into this .ppm, empty none
+int _rig_screen_paints = 0;      ///< after so many paints
+bool _rig_screen_quit = false;   ///< and the game ended after it
+
 static bool ConTestAfter(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
@@ -9739,6 +9744,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (auto on = number(2); on.has_value()) _three_d_event_forced = *on != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: akce {}", _three_d_event_forced ? "kazdy den" : "ve sve dny");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "ukaz") {
+		/* 'gpu ukaz 0|1': the view from the eyes shown straight from the graphics card where the video driver can (1),
+		 * or read back from it (0). */
+		_three_d_gpu_show = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: gpu ukaz {}, {}", _three_d_gpu_show ? "rovnou z karty" : "cteni zpet", ThreeDGpuShows() ? "ukazuje se z karty" : "cte se zpet");
+	} else if (what == "obrazovka" && argv.size() > 2) {
+		/* 'obrazovka <name> [paints] [konec]': the screen as the video driver shows it (with what it shows straight from
+		 * the card) into <name>.ppm in the working folder, after so many paints of it (10); the game ended after it with
+		 * "konec". */
+		_rig_screen_picture = std::string(argv[2]);
+		_rig_screen_paints = 10;
+		_rig_screen_quit = false;
+		for (size_t i = 3; i < argv.size(); i++) {
+			if (argv[i] == "konec") {
+				_rig_screen_quit = true;
+			} else if (auto n = ParseInteger(argv[i]); n.has_value()) {
+				_rig_screen_paints = static_cast<int>(*n);
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: obrazovka {} po {} kresleni{}", _rig_screen_picture, _rig_screen_paints, _rig_screen_quit ? ", pak konec" : "");
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "snimek") {
 		/* 'gpu snimek 0|1': the frames of the view from the eyes drawn whole by the graphics card (1), or by the
 		 * processor with only the objects on the card (0). */

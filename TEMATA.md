@@ -60,8 +60,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Opraveno: sklo kabiny uřezávalo, co je za ním proti nebi** (komíny elektrárny, stromy). Procesor zapisoval hloubku
   skla přes oblohu, takže plakáty kreslené až po postavách byly „za sklem“. Teď sklo postav až po všem pevném a jeho
   hloubka se nezapisuje (ani na procesoru, ani na kartě): za sklem je vidět i měsíc a hvězdy, světla za ním svítí.
-- **Dál:** krok 3 – ukázat snímek z karty bez čtení zpět (sdílený kontext s ovladačem videa). Tak se to dělá, aby to
-  necukalo, na každém počítači.
+- **Hotovo – krok 3: snímek z očí se ukazuje rovnou z karty, bez čtení zpět.** Kontext karty sdílí věci s kontextem
+  ovladače videa (OpenGL ovladač hry: Windows `win32-opengl` přes WGL, Linux `sdl-opengl` přes EGL; GLX nesdílí).
+  Karta snímek nakreslí do jedné ze tří textur a hotovo; okno (chodec i kabina, `BlitEyePicture()`) do obrazovky
+  napíše jen „díru“ (pixely s alfou 0) a ovladač videa při každém vykreslení obrazovky položí texturu karty do té
+  díry (`OpenGLBackend::Paint()`). Co okno nakreslí přes obraz (řádek dole, tečka, hlášky, jiná okna), zůstane nahoře.
+  Červené zranění se kreslí přes obraz jako barva s průhledností (i bez karty, při kopírování obrazu). Kde sdílení
+  nejde (jiný ovladač videa, GLX, prohlížeč), čte se zpět jako v kroku 2. Rig: obraz rovnou z karty a čtený zpět jsou
+  stejné na pixel (chodec u Sufingpoolu, kabina auta); liší se jen vyhlazené okraje písmen řádku nad obrazem (v díře
+  se míchají s černou místo s obrazem, okraj písmen je o trochu tmavší).
+  Snímek obrazovky (Ctrl+S) si obraz z karty dočte, díra v něm není. Pojistka: když hra spadne přímo při sdílení
+  kontextu, příště a pak už pořád má karta kontext vlastní (deník to opakuje řádkem „sdileni … vypnuto“) a čte se zpět.
+  Rig: `test3d gpu ukaz 0|1`, `test3d obrazovka <jmeno> [kresleni] [konec]` (PPM obrazovky, jak ji ukazuje ovladač).
+- **Dál:** okno pohledu z očí se teď překresluje celé každý snímek jen kvůli díře – stačilo by kreslit řádek a tečku
+  (méně posílání obrazovky na kartu).
 - **Deník karty:** `3d_karta.log` je ve složce hry vedle `openttd.cfg` (ne v `save`). Hráčův: zink (Vortek, Mali-G615),
   OpenGL 4.3, obrázky 5–19 ms. Hráč zavírá hru zavřením celého Winlatoru, takže hra nestihne zapsat „konec“ a příště
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra

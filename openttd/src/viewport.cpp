@@ -7265,6 +7265,7 @@ struct EyeFrame {
 	double collect_ms = 0;                    ///< how long collecting took, under the lock
 	double draw_ms = 0;                       ///< and drawing, on the thread
 	bool on_card = false;                     ///< drawn whole by the graphics card
+	uint32_t shown = 0;                       ///< and shown straight from it: its texture there, pixels not of it (CabViewPicture::shown)
 	std::chrono::steady_clock::time_point drawn_at{}; ///< when it was drawn: one its window does not take goes after a while
 
 	/** A triangle, into the pass being collected (a new one after a job). */
@@ -11181,6 +11182,8 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 	c.near_plane = static_cast<float>(f.near_plane);
 	c.eye = {static_cast<float>(f.eye.x), static_cast<float>(f.eye.y), static_cast<float>(f.eye.z), static_cast<float>(f.eye.fx), static_cast<float>(f.eye.fy),
 			static_cast<float>(f.eye.rx), static_cast<float>(f.eye.ry), static_cast<float>(f.eye.focal), static_cast<float>(f.eye.cx), static_cast<float>(f.eye.cy)};
+	/* Shown straight from the card where the video driver can: not read back (ThreeDGpuShows()). */
+	c.show = ThreeDGpuShows();
 	card.Step(ThreeDGpuEyeStep::Kind::Background).horizon = static_cast<float>(f.eye.cy);
 	for (const EyePass &p : f.passes) {
 		if (!p.work) {
@@ -11189,7 +11192,12 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 			return false;
 		}
 	}
-	if (!ThreeDGpuRenderEyeFrame(c) || c.pixels.size() != f.pixels.size()) return false;
+	if (!ThreeDGpuRenderEyeFrame(c)) return false;
+	if (c.shown != 0) {
+		f.shown = c.shown;
+		return true;
+	}
+	if (c.pixels.size() != f.pixels.size()) return false;
 	f.pixels.swap(c.pixels);
 	return true;
 }
@@ -11198,6 +11206,7 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 static void DrawEyeFrame(EyeFrame &f)
 {
 	const double start = TurnedNow();
+	f.shown = 0;
 	const bool on_card = DrawEyeFrameOnCard(f);
 	if (!on_card) {
 		for (EyePass &p : f.passes) {
@@ -11209,8 +11218,9 @@ static void DrawEyeFrame(EyeFrame &f)
 			}
 		}
 	}
-	if (_debug_misc_level >= 6) {
-		/* The rig: the picture as a PPM in the working directory, and its depth: black where nothing is drawn, the nearer the lighter. */
+	if (_debug_misc_level >= 6 && f.shown == 0) {
+		/* The rig: the picture as a PPM in the working directory, and its depth: black where nothing is drawn, the nearer the lighter
+		 * (one shown straight from the card: test3d obrazovka). */
 		auto fz = FileHandle::Open(std::string("cab_depth.pgm"), "wb");
 		if (fz.has_value()) {
 			std::string head = fmt::format("P5\n{} {}\n255\n", f.width, f.height);
@@ -11296,6 +11306,7 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 	f->depot = false;
 	f->pinned = false;
 	f->collect_ms = f->draw_ms = 0;
+	f->shown = 0;
 	return f;
 }
 
@@ -11305,6 +11316,7 @@ static void TakeEyeFrame(EyeFrame &f, CabViewCamera &camera, CabViewPicture &out
 	out.width = f.width;
 	out.height = f.height;
 	out.pixels.swap(f.pixels);
+	out.shown = f.shown;
 	camera.collect_ms = f.collect_ms;
 	camera.draw_ms = f.draw_ms;
 	camera.ms = f.collect_ms + f.draw_ms;

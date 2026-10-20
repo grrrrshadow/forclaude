@@ -29,6 +29,8 @@
 
 #include "opengl.h"
 #include "../core/geometry_func.hpp"
+#include "../fileio_func.h"
+#include "../openttd.h"
 #include "../core/math_func.hpp"
 #include "../gfx_func.h"
 #include "../debug.h"
@@ -60,6 +62,7 @@ GL(glClear);
 GL(glClearColor);
 GL(glBlendFunc);
 GL(glDrawArrays);
+GL(glReadPixels);
 
 GL(glTexImage1D);
 GL(glTexImage2D);
@@ -255,6 +258,7 @@ static bool BindBasicOpenGLProcs()
 	if (!BindGLProc(_glClearColor, "glClearColor")) return false;
 	if (!BindGLProc(_glBlendFunc, "glBlendFunc")) return false;
 	if (!BindGLProc(_glDrawArrays, "glDrawArrays")) return false;
+	BindGLProc(_glReadPixels, "glReadPixels"); // (the rig's picture of the screen only)
 
 	return true;
 }
@@ -714,6 +718,19 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 	_glUniform1i(palette_location, 1); // Texture unit 1.
 	_glUniform1i(remap_location, 2);   // Texture unit 2.
 	_glUniform1i(pal_location, 3);     // Texture unit 3.
+
+	/* Bind uniforms in the program of the graphics card's pictures. */
+	if (this->three_d_program != 0) {
+		tex_location = _glGetUniformLocation(this->three_d_program, "colour_tex");
+		GLint screen_tex_location = _glGetUniformLocation(this->three_d_program, "screen_tex");
+		this->three_d_sprite_loc = _glGetUniformLocation(this->three_d_program, "sprite");
+		this->three_d_screen_loc = _glGetUniformLocation(this->three_d_program, "screen");
+		this->three_d_size_loc = _glGetUniformLocation(this->three_d_program, "screen_size");
+		this->three_d_tint_loc = _glGetUniformLocation(this->three_d_program, "tint");
+		_glUseProgram(this->three_d_program);
+		_glUniform1i(tex_location, 0);        // Texture unit 0.
+		_glUniform1i(screen_tex_location, 1); // Texture unit 1.
+	}
 	(void)_glGetError(); // Clear errors.
 
 	/* Create pixel buffer object as video buffer storage. */
@@ -904,6 +921,23 @@ bool OpenGLBackend::InitShaders()
 	_glLinkProgram(this->sprite_program);
 	if (!VerifyProgram(this->sprite_program)) return false;
 
+	/* The pictures of the graphics card shown straight from it (three_d_gpu.h): without them, they are read back. */
+	GLuint three_d_shader = _glCreateShader(GL_FRAGMENT_SHADER);
+	_glShaderSource(three_d_shader, glsl_150 ? lengthof(_frag_shader_three_d_150) : lengthof(_frag_shader_three_d), glsl_150 ? _frag_shader_three_d_150 : _frag_shader_three_d, nullptr);
+	_glCompileShader(three_d_shader);
+	if (VerifyShader(three_d_shader)) {
+		this->three_d_program = _glCreateProgram();
+		_glAttachShader(this->three_d_program, vert_shader);
+		_glAttachShader(this->three_d_program, three_d_shader);
+		if (glsl_150) _glBindFragDataLocation(this->three_d_program, 0, "colour");
+		_glLinkProgram(this->three_d_program);
+		if (!VerifyProgram(this->three_d_program)) {
+			_glDeleteProgram(this->three_d_program);
+			this->three_d_program = 0;
+		}
+	}
+	_glDeleteShader(three_d_shader);
+
 	_glDeleteShader(vert_shader);
 	_glDeleteShader(frag_shader_rgb);
 	_glDeleteShader(frag_shader_pal);
@@ -1088,7 +1122,80 @@ void OpenGLBackend::Paint()
 	_glBindVertexArray(this->vao_quad);
 	_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
+	/* The pictures of the graphics card shown straight from it where their windows' are: in the holes the windows left
+	 * for them (the screen's pixels of alpha 0), under what the windows drew over them. */
+	{
+		std::lock_guard lock(this->three_d_mutex);
+		if (!this->three_d_pictures.empty() && this->three_d_program != 0) {
+			_glUseProgram(this->three_d_program);
+			_glUniform2f(this->three_d_screen_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+			_glUniform2f(this->three_d_size_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+			_glActiveTexture(GL_TEXTURE1);
+			_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
+			_glActiveTexture(GL_TEXTURE0);
+			for (const auto &[owner, pic] : this->three_d_pictures) {
+				const Colour tint(pic.tint);
+				_glUniform4f(this->three_d_sprite_loc, static_cast<float>(pic.r.left), static_cast<float>(pic.r.top), static_cast<float>(pic.r.right - pic.r.left + 1), static_cast<float>(pic.r.bottom - pic.r.top + 1));
+				_glUniform4f(this->three_d_tint_loc, tint.r / 255.0f, tint.g / 255.0f, tint.b / 255.0f, pic.tint == 0 ? 0.0f : tint.a / 255.0f);
+				_glBindTexture(GL_TEXTURE_2D, pic.texture);
+				_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+			}
+			_glActiveTexture(GL_TEXTURE1);
+			_glBindTexture(GL_TEXTURE_2D, 0);
+			_glActiveTexture(GL_TEXTURE0);
+			_glBindTexture(GL_TEXTURE_2D, 0);
+		}
+	}
+
+	/* The rig: what is on the screen as it is shown (test3d obrazovka), a PPM where the game runs; after so many paints,
+	 * and the game ended after it when asked. */
+	extern std::string _rig_screen_picture;
+	extern int _rig_screen_paints;
+	extern bool _rig_screen_quit;
+	if (!_rig_screen_picture.empty() && _glReadPixels != nullptr && --_rig_screen_paints <= 0) {
+		std::vector<uint8_t> rgb(static_cast<size_t>(_screen.width) * _screen.height * 3);
+		_glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		_glReadPixels(0, 0, _screen.width, _screen.height, GL_RGB, GL_UNSIGNED_BYTE, rgb.data());
+		if (auto f = FileHandle::Open(_rig_screen_picture + ".ppm", "wb"); f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", _screen.width, _screen.height);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (int y = _screen.height - 1; y >= 0; y--) fwrite(rgb.data() + static_cast<size_t>(y) * _screen.width * 3, 1, static_cast<size_t>(_screen.width) * 3, *f);
+		}
+		Debug(driver, 0, "OpenGL: the screen as shown into {}.ppm, {} pictures straight from the graphics card", _rig_screen_picture, this->three_d_pictures.size());
+		_rig_screen_picture.clear();
+		if (_rig_screen_quit) _exit_game = true;
+	}
+
 	_glEnable(GL_BLEND);
+}
+
+/**
+ * Show a picture of the graphics card straight from it where a window's is (VideoDriver::ShowThreeDPicture()).
+ * @param owner whose it is
+ * @param r where on the screen
+ * @param texture the card's, shared with this context
+ * @param tint laid over it by its alpha (Colour::data), 0 none
+ */
+void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint)
+{
+	std::lock_guard lock(this->three_d_mutex);
+	this->three_d_pictures[owner] = {r, texture, tint};
+}
+
+/** A window's picture of the graphics card shown no more. */
+void OpenGLBackend::HideThreeDPicture(const void *owner)
+{
+	std::lock_guard lock(this->three_d_mutex);
+	this->three_d_pictures.erase(owner);
+}
+
+/** The pictures of the graphics card shown now: where on the screen, and their textures. */
+std::vector<std::pair<Rect, uint32_t>> OpenGLBackend::GetThreeDPictures()
+{
+	std::lock_guard lock(this->three_d_mutex);
+	std::vector<std::pair<Rect, uint32_t>> shown;
+	for (const auto &[owner, pic] : this->three_d_pictures) shown.emplace_back(pic.r, pic.texture);
+	return shown;
 }
 
 /**

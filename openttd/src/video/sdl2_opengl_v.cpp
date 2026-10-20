@@ -22,6 +22,7 @@
 #include "../fileio_func.h"
 #include "../framerate_type.h"
 #include "../window_func.h"
+#include "../three_d_gpu.h"
 #include "sdl2_opengl_v.h"
 #include <SDL.h>
 #include <mutex>
@@ -95,6 +96,7 @@ void VideoDriver_SDL_OpenGL::Stop()
  */
 void VideoDriver_SDL_OpenGL::DestroyContext()
 {
+	ThreeDGpuVideoContextGone();
 	OpenGLBackend::Destroy();
 
 	if (this->gl_context != nullptr) {
@@ -130,7 +132,29 @@ std::optional<std::string_view> VideoDriver_SDL_OpenGL::AllocateContext()
 
 	ToggleVsync(_video_vsync);
 
-	return OpenGLBackend::Create(&GetOGLProcAddressCallback, this->GetScreenSize());
+	auto err = OpenGLBackend::Create(&GetOGLProcAddressCallback, this->GetScreenSize());
+	/* The graphics card's context of the 3D shares this one's things where it can (three_d_gpu.h; EGL, not GLX): the view
+	 * from the eyes shown straight from the card. */
+	if (!err.has_value() && OpenGLBackend::Get()->CanShowThreeDPictures()) ThreeDGpuVideoContext(nullptr, nullptr);
+	return err;
+}
+
+bool VideoDriver_SDL_OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint)
+{
+	OpenGLBackend *backend = OpenGLBackend::Get();
+	if (backend == nullptr || !backend->CanShowThreeDPictures()) return false;
+	backend->ShowThreeDPicture(owner, r, texture, tint);
+	return true;
+}
+
+void VideoDriver_SDL_OpenGL::HideThreeDPicture(const void *owner)
+{
+	if (OpenGLBackend::Get() != nullptr) OpenGLBackend::Get()->HideThreeDPicture(owner);
+}
+
+std::vector<std::pair<Rect, uint32_t>> VideoDriver_SDL_OpenGL::GetThreeDPictures()
+{
+	return OpenGLBackend::Get() != nullptr ? OpenGLBackend::Get()->GetThreeDPictures() : std::vector<std::pair<Rect, uint32_t>>{};
 }
 
 void VideoDriver_SDL_OpenGL::PopulateSystemSprites()

@@ -43,6 +43,7 @@
 #include "../mouse_debug.h"
 #include "../map_drag.h"
 #include "../three_d.h"
+#include "../three_d_gpu.h"
 
 #include "../safeguards.h"
 
@@ -1702,6 +1703,7 @@ void VideoDriver_Win32OpenGL::Stop()
 
 void VideoDriver_Win32OpenGL::DestroyContext()
 {
+	ThreeDGpuVideoContextGone();
 	OpenGLBackend::Destroy();
 
 	wglMakeCurrent(nullptr, nullptr);
@@ -1758,12 +1760,36 @@ std::optional<std::string_view> VideoDriver_Win32OpenGL::AllocateContext()
 		rc = wglCreateContext(this->dc);
 		if (rc == nullptr) return "Can't create OpenGL context";
 	}
+	/* The graphics card's context of the 3D made before this one (the full screen toggled, three_d_gpu.h): this one
+	 * shares its things, so that the view from the eyes is shown straight from the card. */
+	HGLRC card = static_cast<HGLRC>(ThreeDGpuOwnContext());
+	const bool shared = card != nullptr && wglShareLists(card, rc);
 	if (!wglMakeCurrent(this->dc, rc)) return "Can't activate GL context";
 
 	this->ToggleVsync(_video_vsync);
 
 	this->gl_rc = rc;
-	return OpenGLBackend::Create(&GetOGLProcAddressCallback, this->GetScreenSize());
+	auto backend_err = OpenGLBackend::Create(&GetOGLProcAddressCallback, this->GetScreenSize());
+	if (!backend_err.has_value() && OpenGLBackend::Get()->CanShowThreeDPictures()) ThreeDGpuVideoContext(this->dc, rc, shared);
+	return backend_err;
+}
+
+bool VideoDriver_Win32OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint)
+{
+	OpenGLBackend *backend = OpenGLBackend::Get();
+	if (backend == nullptr || !backend->CanShowThreeDPictures()) return false;
+	backend->ShowThreeDPicture(owner, r, texture, tint);
+	return true;
+}
+
+void VideoDriver_Win32OpenGL::HideThreeDPicture(const void *owner)
+{
+	if (OpenGLBackend::Get() != nullptr) OpenGLBackend::Get()->HideThreeDPicture(owner);
+}
+
+std::vector<std::pair<Rect, uint32_t>> VideoDriver_Win32OpenGL::GetThreeDPictures()
+{
+	return OpenGLBackend::Get() != nullptr ? OpenGLBackend::Get()->GetThreeDPictures() : std::vector<std::pair<Rect, uint32_t>>{};
 }
 
 bool VideoDriver_Win32OpenGL::ToggleFullscreen(bool full_screen)

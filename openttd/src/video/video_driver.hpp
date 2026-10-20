@@ -108,6 +108,30 @@ public:
 	virtual void ClearSystemSprites() {}
 
 	/**
+	 * Show a picture of the graphics card straight from it where a window's picture is on the screen (three_d_gpu.h:
+	 * the card's OpenGL shares the driver's): where the screen's pixels there are of alpha 0; what the window draws
+	 * over the picture stays.
+	 * @param owner whose picture it is (one each)
+	 * @param r where on the screen
+	 * @param texture the card's texture, its top row first
+	 * @param tint laid over it by its alpha (Colour::data), 0 none
+	 * @return whether it is shown
+	 */
+	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint) { return false; }
+
+	/**
+	 * A window's picture shown straight from the graphics card no more (the window gone).
+	 * @param owner whose picture it was
+	 */
+	virtual void HideThreeDPicture([[maybe_unused]] const void *owner) {}
+
+	/**
+	 * The pictures shown straight from the graphics card now (ShowThreeDPicture()), for a screenshot of the screen.
+	 * @return where each is on the screen, and its texture
+	 */
+	virtual std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures() { return {}; }
+
+	/**
 	 * Whether the driver has a graphical user interface with the end user.
 	 * Or in other words, whether we should spawn a thread for world generation
 	 * and NewGRF scanning so the graphical updates can keep coming. Otherwise

@@ -150,6 +150,12 @@ public:
 
 	void ClearSystemSprites() override;
 
+	bool ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint) override;
+
+	void HideThreeDPicture(const void *owner) override;
+
+	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures() override;
+
 	bool HasAnimBuffer() override { return true; }
 	uint8_t *GetAnimBuffer() override { return this->anim_buffer; }
 

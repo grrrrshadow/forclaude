@@ -297,7 +297,9 @@ struct ThreeDGpuEyeFrame {
 	std::vector<ThreeDGpuEyeCorner> corners;
 	std::vector<ThreeDGpuEyeRun> runs;
 	std::vector<ThreeDGpuEyeStep> steps;
-	std::vector<uint32_t> pixels;    ///< what comes: the colours (Colour::data), top row first
+	bool show = false;               ///< to be shown straight from the card (ThreeDGpuShows()): no pixels read back
+	std::vector<uint32_t> pixels;    ///< what comes: the colours (Colour::data), top row first; or
+	uint32_t shown = 0;              ///< the texture of the video driver's OpenGL it is in, top row first (shown)
 };
 
 bool ThreeDGpuAvailable();
@@ -306,10 +308,16 @@ bool ThreeDGpuRender(ThreeDGpuPicture &pic);
 bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
+void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);
+void ThreeDGpuVideoContextGone();
+void *ThreeDGpuOwnContext();
+bool ThreeDGpuShows();
+bool ThreeDGpuReadShown(uint32_t texture, int width, int height, std::vector<uint32_t> &pixels);
 void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();
 
+extern std::atomic<bool> _three_d_gpu_show; ///< the view from the eyes shown straight from the card where it can (ThreeDGpuShows()); the rig's test3d gpu ukaz 0: read back
 extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0
 
 #endif /* THREE_D_GPU_H */
