@@ -3465,21 +3465,20 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
  *  - a bow: upright in the left hand a little left of the middle, its string to the eye (-x), the arrow on the string
  *    flying along +x ahead, the top of it leaning a little to the right;
  *  - a crossbow: at the right shoulder below the eye, along the look, its bolt in the groove.
- * The arrow or the bolt on it (loaded) is drawn with it, its origin at the nock.
+ * The arrow or the bolt on it (loaded) is drawn with it, its origin at the nock. Its triangles on the picture, to be
+ * drawn (DrawThreeDHeldThing(), or by the graphics card) where the thing is nearer, its depth kept there so that the
+ * night's lights behind it stay behind it -- 1 over the distance ahead in world units.
  * @param held what is held and how
- * @param dst the picture, width by height
- * @param zb its depth, 1 over the distance ahead in world units (larger nearer): drawn where the thing is nearer,
- *           and kept there, so that the night's lights behind it stay behind it
  * @param focal pixels of the picture across, for a unit across at a unit ahead
- * @return whether it was drawn
+ * @param[out] out its triangles, added
  */
-bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, int width, int height, double focal)
+void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height, double focal, std::vector<ThreeDHeldTriangle> &out)
 {
-	if (held.raise <= 0.0f || held.thing.empty() || width <= 0 || height <= 0) return false;
+	if (held.raise <= 0.0f || held.thing.empty() || width <= 0 || height <= 0) return;
 	const ThreeDVehicleObject *obj = GetThreeDFigure(held.thing);
-	if (obj == nullptr) return false;
+	if (obj == nullptr) return;
 	const ThreeDVehicleShape *shape = obj->GetShape(held.frame);
-	if (shape == nullptr || shape->tri.empty()) return false;
+	if (shape == nullptr || shape->tri.empty()) return;
 
 	/* The eye: x to the right, y up, z ahead, metres. A point of the thing's frame goes to the eye along its axes,
 	 * ax, ay and az, from where its grip is held, at the hand. */
@@ -3573,9 +3572,7 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 	/* The light from above, a little left and behind the eye. */
 	const V sun = unit({-0.45f, 0.75f, -0.5f});
 	const float cx = width / 2.0f, cy = height / 2.0f, f = static_cast<float>(focal);
-	const float to_world = 1.0f / static_cast<float>(OBJECT_UNITS_PER_METRE);
-	bool drawn = false;
-	auto draw = [&](const ThreeDVehicleObject *o, const ThreeDVehicleShape *sh, const float *offset) {
+	auto add = [&](const ThreeDVehicleObject *o, const ThreeDVehicleShape *sh, const float *offset) {
 		const size_t n = sh->pos.size() / 3;
 		std::vector<float> sx(n), sy(n), iz(n), light(n, 1.0f);
 		const bool lit = sh->nrm.size() == sh->pos.size();
@@ -3590,53 +3587,80 @@ bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, 
 			}
 		}
 		for (size_t t = 0; t + 2 < sh->tri.size(); t += 3) {
-			const uint32_t i0 = sh->tri[t], i1 = sh->tri[t + 1], i2 = sh->tri[t + 2];
-			if (iz[i0] <= 0 || iz[i1] <= 0 || iz[i2] <= 0) continue; // behind the eye
+			const uint32_t c[3] = {sh->tri[t], sh->tri[t + 1], sh->tri[t + 2]};
+			if (iz[c[0]] <= 0 || iz[c[1]] <= 0 || iz[c[2]] <= 0) continue; // behind the eye
 			const int ti = t / 3 < sh->tri_tex.size() ? sh->tri_tex[t / 3] : 0;
 			const ThreeDObjectTexture *tex = o->GetTexture(0, ti);
 			if (tex == nullptr) continue;
-			const float ax0 = sx[i0], ay0 = sy[i0], bx = sx[i1], by = sy[i1], qx = sx[i2], qy = sy[i2];
-			const float area = (bx - ax0) * (qy - ay0) - (by - ay0) * (qx - ax0);
-			if (std::abs(area) < 1e-6f) continue;
-			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({ax0, bx, qx})))), x1 = std::min(width - 1, static_cast<int>(std::ceil(std::max({ax0, bx, qx}))));
-			const int y0 = std::max(0, static_cast<int>(std::floor(std::min({ay0, by, qy})))), y1 = std::min(height - 1, static_cast<int>(std::ceil(std::max({ay0, by, qy}))));
-			const float inv = 1.0f / area;
-			for (int py = y0; py <= y1; py++) {
-				const float ry = py + 0.5f;
-				for (int px = x0; px <= x1; px++) {
-					const float rx = px + 0.5f;
-					const float w0 = ((qx - bx) * (ry - by) - (qy - by) * (rx - bx)) * inv;
-					const float w1 = ((ax0 - qx) * (ry - qy) - (ay0 - qy) * (rx - qx)) * inv;
-					const float w2 = 1.0f - w0 - w1;
-					if (w0 < 0 || w1 < 0 || w2 < 0) continue;
-					/* Perspective: 1/z goes evenly across the picture, the texture's place over z with it. */
-					const float z_inv = w0 * iz[i0] + w1 * iz[i1] + w2 * iz[i2];
-					const float near = z_inv * to_world;
-					const size_t at = static_cast<size_t>(py) * width + px;
-					if (near <= zb[at]) continue;
-					const float u = (w0 * sh->uv[i0 * 2] * iz[i0] + w1 * sh->uv[i1 * 2] * iz[i1] + w2 * sh->uv[i2 * 2] * iz[i2]) / z_inv;
-					const float v = (w0 * sh->uv[i0 * 2 + 1] * iz[i0] + w1 * sh->uv[i1 * 2 + 1] * iz[i1] + w2 * sh->uv[i2 * 2 + 1] * iz[i2]) / z_inv;
-					const float uu = u - std::floor(u), vv = v - std::floor(v);
-					const int tx = std::min(tex->w - 1, static_cast<int>(uu * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(vv * tex->h));
-					const uint32_t texel = tex->px[static_cast<size_t>(ty) * tex->w + tx];
-					if (texel == 0) continue; // a hole in the texture
-					float k = w0 * light[i0] + w1 * light[i1] + w2 * light[i2];
-					/* A material's own light (a flame): unshaded, brighter by it. */
-					if (const uint32_t glow = sh->Glow(static_cast<size_t>(ti)); glow != 0) k = 1.0f + std::max({Colour(glow).r, Colour(glow).g, Colour(glow).b}) / 255.0f;
-					const Colour c(texel);
-					dst[at] = Colour(static_cast<uint8_t>(std::min(255.0f, c.r * k)), static_cast<uint8_t>(std::min(255.0f, c.g * k)), static_cast<uint8_t>(std::min(255.0f, c.b * k))).data;
-					zb[at] = near;
-					drawn = true;
-				}
+			ThreeDHeldTriangle &h = out.emplace_back();
+			h.tex = tex;
+			/* A material's own light (a flame): unshaded, brighter by it. */
+			const uint32_t glow = sh->Glow(static_cast<size_t>(ti));
+			for (int k = 0; k < 3; k++) {
+				h.sx[k] = sx[c[k]];
+				h.sy[k] = sy[c[k]];
+				h.iz[k] = iz[c[k]];
+				h.u[k] = sh->uv[c[k] * 2];
+				h.v[k] = sh->uv[c[k] * 2 + 1];
+				h.light[k] = glow != 0 ? 1.0f + std::max({Colour(glow).r, Colour(glow).g, Colour(glow).b}) / 255.0f : light[c[k]];
 			}
+			h.glow = glow != 0;
 		}
 	};
-	draw(obj, shape, nullptr);
+	add(obj, shape, nullptr);
 	/* The arrow on the string, the bolt in the groove. */
 	if (!held.loaded.empty()) {
 		const ThreeDVehicleObject *missile = GetThreeDFigure(held.loaded);
 		const ThreeDVehicleShape *ms = missile != nullptr ? missile->GetShape(0) : nullptr;
-		if (ms != nullptr && !ms->tri.empty()) draw(missile, ms, held.nock);
+		if (ms != nullptr && !ms->tri.empty()) add(missile, ms, held.nock);
+	}
+}
+
+/**
+ * Draw the thing in the walker's hand (ThreeDHeldThingTriangles()) into the view from the eyes, over what is farther:
+ * each pixel its texel in perspective, lit by its corners' light straight across the picture.
+ * @return whether anything of it was drawn
+ */
+bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, int width, int height, double focal)
+{
+	std::vector<ThreeDHeldTriangle> tris;
+	ThreeDHeldThingTriangles(held, width, height, focal, tris);
+	const float to_world = 1.0f / static_cast<float>(OBJECT_UNITS_PER_METRE);
+	bool drawn = false;
+	for (const ThreeDHeldTriangle &h : tris) {
+		const ThreeDObjectTexture *tex = h.tex;
+		const float ax0 = h.sx[0], ay0 = h.sy[0], bx = h.sx[1], by = h.sy[1], qx = h.sx[2], qy = h.sy[2];
+		const float area = (bx - ax0) * (qy - ay0) - (by - ay0) * (qx - ax0);
+		if (std::abs(area) < 1e-6f) continue;
+		const int x0 = std::max(0, static_cast<int>(std::floor(std::min({ax0, bx, qx})))), x1 = std::min(width - 1, static_cast<int>(std::ceil(std::max({ax0, bx, qx}))));
+		const int y0 = std::max(0, static_cast<int>(std::floor(std::min({ay0, by, qy})))), y1 = std::min(height - 1, static_cast<int>(std::ceil(std::max({ay0, by, qy}))));
+		const float inv = 1.0f / area;
+		for (int py = y0; py <= y1; py++) {
+			const float ry = py + 0.5f;
+			for (int px = x0; px <= x1; px++) {
+				const float rx = px + 0.5f;
+				const float w0 = ((qx - bx) * (ry - by) - (qy - by) * (rx - bx)) * inv;
+				const float w1 = ((ax0 - qx) * (ry - qy) - (ay0 - qy) * (rx - qx)) * inv;
+				const float w2 = 1.0f - w0 - w1;
+				if (w0 < 0 || w1 < 0 || w2 < 0) continue;
+				/* Perspective: 1/z goes evenly across the picture, the texture's place over z with it. */
+				const float z_inv = w0 * h.iz[0] + w1 * h.iz[1] + w2 * h.iz[2];
+				const float near = z_inv * to_world;
+				const size_t at = static_cast<size_t>(py) * width + px;
+				if (near <= zb[at]) continue;
+				const float u = (w0 * h.u[0] * h.iz[0] + w1 * h.u[1] * h.iz[1] + w2 * h.u[2] * h.iz[2]) / z_inv;
+				const float v = (w0 * h.v[0] * h.iz[0] + w1 * h.v[1] * h.iz[1] + w2 * h.v[2] * h.iz[2]) / z_inv;
+				const float uu = u - std::floor(u), vv = v - std::floor(v);
+				const int tx = std::min(tex->w - 1, static_cast<int>(uu * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(vv * tex->h));
+				const uint32_t texel = tex->px[static_cast<size_t>(ty) * tex->w + tx];
+				if (texel == 0) continue; // a hole in the texture
+				const float k = h.glow ? h.light[0] : w0 * h.light[0] + w1 * h.light[1] + w2 * h.light[2];
+				const Colour c(texel);
+				dst[at] = Colour(static_cast<uint8_t>(std::min(255.0f, c.r * k)), static_cast<uint8_t>(std::min(255.0f, c.g * k)), static_cast<uint8_t>(std::min(255.0f, c.b * k))).data;
+				zb[at] = near;
+				drawn = true;
+			}
+		}
 	}
 	return drawn;
 }

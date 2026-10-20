@@ -226,15 +226,19 @@ using GLsizeiptr = std::ptrdiff_t;
 constexpr GLboolean GL_FALSE = 0;
 constexpr GLboolean GL_TRUE = 1;
 constexpr GLenum GL_NONE = 0;
+constexpr GLenum GL_ZERO = 0;
 constexpr GLenum GL_ONE = 1;
+constexpr GLenum GL_POINTS = 0x0000;
 constexpr GLenum GL_TRIANGLES = 0x0004;
 constexpr GLbitfield GL_DEPTH_BUFFER_BIT = 0x0100;
 constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
 constexpr GLenum GL_LESS = 0x0201;
 constexpr GLenum GL_GREATER = 0x0204;
+constexpr GLenum GL_GEQUAL = 0x0206;
 constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_CW = 0x0900;
 constexpr GLenum GL_CCW = 0x0901;
+constexpr GLenum GL_SRC_ALPHA = 0x0302;
 constexpr GLenum GL_ONE_MINUS_SRC_ALPHA = 0x0303;
 constexpr GLenum GL_OUT_OF_MEMORY = 0x0505;
 constexpr GLenum GL_CULL_FACE = 0x0B44;
@@ -251,6 +255,7 @@ constexpr GLenum GL_UNSIGNED_INT = 0x1405;
 constexpr GLenum GL_FLOAT = 0x1406;
 constexpr GLenum GL_DEPTH_COMPONENT = 0x1902;
 constexpr GLenum GL_RED = 0x1903;
+constexpr GLenum GL_RGBA = 0x1908;
 constexpr GLenum GL_RENDERER = 0x1F01;
 constexpr GLenum GL_VERSION = 0x1F02;
 constexpr GLenum GL_NEAREST = 0x2600;
@@ -265,9 +270,14 @@ constexpr GLenum GL_TEXTURE_BASE_LEVEL = 0x813C;
 constexpr GLenum GL_TEXTURE_MAX_LEVEL = 0x813D;
 constexpr GLenum GL_DEPTH_COMPONENT24 = 0x81A6;
 constexpr GLenum GL_R8 = 0x8229;
+constexpr GLenum GL_R32F = 0x822E;
 constexpr GLenum GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 constexpr GLenum GL_TEXTURE0 = 0x84C0;
+constexpr GLenum GL_TEXTURE1 = 0x84C1;
+constexpr GLenum GL_TEXTURE2 = 0x84C2;
+constexpr GLenum GL_TEXTURE3 = 0x84C3;
 constexpr GLenum GL_MAX_RENDERBUFFER_SIZE = 0x84E8;
+constexpr GLenum GL_RGBA32F = 0x8814;
 constexpr GLenum GL_ARRAY_BUFFER = 0x8892;
 constexpr GLenum GL_ELEMENT_ARRAY_BUFFER = 0x8893;
 constexpr GLenum GL_STREAM_DRAW = 0x88E0;
@@ -316,11 +326,13 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(void, glBindTexture, (GLenum target, GLuint texture)) \
 	X(void, glActiveTexture, (GLenum unit)) \
 	X(void, glTexImage2D, (GLenum target, GLint level, GLint internal, GLsizei w, GLsizei h, GLint border, GLenum format, GLenum type, const void *data)) \
+	X(void, glTexSubImage2D, (GLenum target, GLint level, GLint x, GLint y, GLsizei w, GLsizei h, GLenum format, GLenum type, const void *data)) \
 	X(void, glTexParameteri, (GLenum target, GLenum pname, GLint param)) \
 	X(void, glGenFramebuffers, (GLsizei n, GLuint *fbos)) \
 	X(void, glDeleteFramebuffers, (GLsizei n, const GLuint *fbos)) \
 	X(void, glBindFramebuffer, (GLenum target, GLuint fbo)) \
 	X(void, glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum rbtarget, GLuint rb)) \
+	X(void, glFramebufferTexture2D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)) \
 	X(GLenum, glCheckFramebufferStatus, (GLenum target)) \
 	X(void, glGenRenderbuffers, (GLsizei n, GLuint *rbs)) \
 	X(void, glDeleteRenderbuffers, (GLsizei n, const GLuint *rbs)) \
@@ -352,6 +364,7 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(void, glUseProgram, (GLuint program)) \
 	X(GLint, glGetUniformLocation, (GLuint program, const GLchar *name)) \
 	X(void, glUniformMatrix4fv, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value)) \
+	X(void, glUniform2f, (GLint location, GLfloat x, GLfloat y)) \
 	X(void, glUniform3f, (GLint location, GLfloat x, GLfloat y, GLfloat z)) \
 	X(void, glUniform4f, (GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)) \
 	X(void, glUniform1i, (GLint location, GLint v)) \
@@ -373,6 +386,7 @@ enum class GpuState { NotStarted, Starting, Ready, Failed };
 struct GpuJob {
 	ThreeDGpuPicture *pic;
 	ThreeDGpuEyePicture *eye = nullptr; ///< else the view from the eyes (DrawEyeOnCard())
+	ThreeDGpuEyeFrame *frame = nullptr; ///< else the view from the eyes whole (DrawEyeFrameOnCard())
 	bool done = false;
 	bool ok = false;
 };
@@ -450,6 +464,23 @@ GLuint _eye_fbo = 0, _eye_colour_rb = 0, _eye_glow_rb = 0, _eye_depth_rb = 0;
 int _eye_w = 0, _eye_h = 0;
 GLuint _night_vao = 0, _night_vbo = 0;
 GLint _max_texture = 0, _max_target = 0;
+/* The whole view from the eyes on the card (DrawEyeFrameOnCard()). */
+GLuint _frame_colour[2] = {0, 0}, _frame_glow = 0, _frame_depth = 0;
+GLuint _frame_geometry_fbo[2] = {0, 0}, _frame_pixel_fbo[2] = {0, 0};
+int _frame_w = 0, _frame_h = 0;
+GLuint _frame_atlas = 0;
+int _frame_atlas_w = 0, _frame_atlas_h = 0;
+std::vector<uint32_t> _frame_atlas_px;
+GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
+GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
+uint64_t _frame_shadow_key = 0;
+bool _frame_programs = false; ///< compiled: the frame on the card is possible
+GpuProgram _frame_tri_program, _frame_background_program, _frame_haze_program, _frame_far_haze_program, _frame_shadow_program;
+GpuProgram _frame_night_program, _frame_lamps_program, _frame_blasts_program, _frame_glow_after_program, _frame_lay_program;
+GpuProgram _frame_glow_program, _frame_star_program, _frame_moon_program;
+
+void StartEyeFrame();
+void EndEyeFrame();
 
 /* The shapes drawn: a corner of the shape to the picture (u_matrix), lit as RasterObject() lights it -- at the
  * corners, the light between them as the processor's, straight across the picture (noperspective) --; each pixel the
@@ -684,6 +715,416 @@ void main()
 {
 	o_colour = vec4(v_colour, 1.0);
 	o_lit = vec4(1.0);
+}
+)";
+
+/*
+ * The whole view from the eyes on the card (DrawEyeFrameOnCard()): its triangles placed on the picture already, as
+ * CabRasterRows() of viewport.cpp draws them -- in perspective, each pixel the texel of its texture under it (its place
+ * in the texture holding it: v_rect), a hole filled from the nearest texel within three where asked, the texture
+ * repeated where asked, else none off its edges; shaded by its light (256 as it is) to whole numbers; see-through by
+ * its alpha. Its depth as the objects' (u_near / how far ahead), its own light none.
+ */
+const char *const EYE_TRI_VERTEX = R"(#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in vec4 a_rect;
+layout(location = 3) in vec3 a_how;
+uniform vec2 u_size;
+out vec2 v_uv;
+flat out vec4 v_rect;
+flat out float v_light;
+noperspective out float v_corner_light;
+flat out vec2 v_how;
+void main()
+{
+	float w = 1.0 / a_pos.z;
+	gl_Position = vec4((2.0 * a_pos.x / u_size.x - 1.0) * w, (2.0 * a_pos.y / u_size.y - 1.0) * w, 0.0, w);
+	v_uv = a_uv;
+	v_rect = a_rect;
+	v_light = a_how.x;
+	v_corner_light = a_how.x;
+	v_how = a_how.yz;
+}
+)";
+
+const char *const EYE_TRI_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_tex;
+uniform float u_near;
+in vec2 v_uv;
+flat in vec4 v_rect;
+flat in float v_light;
+noperspective in float v_corner_light;
+flat in vec2 v_how;
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_glow;
+const ivec2 NEAR[24] = ivec2[24](
+	ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
+	ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
+	ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
+void main()
+{
+	ivec2 size = ivec2(v_rect.zw), origin = ivec2(v_rect.xy);
+	int how = int(v_how.y + 0.5);
+	ivec2 at = ivec2(floor(v_uv));
+	if ((how & 2) != 0) {
+		at -= size * ivec2(floor(vec2(at) / vec2(size)));
+		at = clamp(at, ivec2(0), size - 1);
+	} else if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) {
+		discard;
+	}
+	vec4 t = texelFetch(u_tex, origin + at, 0);
+	if (t == vec4(0.0) && (how & 1) != 0) {
+		for (int k = 0; k < 24; k++) {
+			ivec2 n = at + NEAR[k];
+			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
+			t = texelFetch(u_tex, origin + n, 0);
+			if (t != vec4(0.0)) break;
+		}
+	}
+	if (t == vec4(0.0)) discard;
+	vec3 c = floor(t.rgb * 255.0 + 0.5);
+	float light = (how & 4) != 0 ? v_corner_light : v_light;
+	if (light != 256.0) c = min(vec3(255.0), floor(c * light / 256.0));
+	o_colour = vec4(c / 255.0, v_how.x >= 256.0 ? 1.0 : v_how.x / 256.0);
+	o_glow = vec4(0.0);
+	gl_FragDepth = u_near * gl_FragCoord.w;
+}
+)";
+
+/* The jobs over the whole picture: one triangle over it, each pixel computed from the picture so far (u_colour), its
+ * depth (u_depth: u_near / how far ahead, 0 nothing) and the job's own numbers, as the processor computes it. */
+const char *const EYE_PIXEL_VERTEX = R"(#version 330 core
+void main()
+{
+	gl_Position = vec4(float((gl_VertexID & 1) * 4 - 1), float((gl_VertexID & 2) * 2 - 1), 0.0, 1.0);
+}
+)";
+
+/* What the jobs share: the pixel, its colour 0-255, its 1 / how far ahead, where it is in the world from the eye. */
+const char *const EYE_PIXEL_COMMON = R"(#version 330 core
+uniform sampler2D u_colour;
+uniform sampler2D u_depth;
+uniform float u_near;
+uniform vec4 u_eye_dir;   // fx, fy, rx, ry
+uniform vec3 u_eye_lens;  // focal, cx, cy
+layout(location = 0) out vec4 o_colour;
+ivec2 Pixel() { return ivec2(gl_FragCoord.xy); }
+vec3 ColourAt(ivec2 p) { return floor(texelFetch(u_colour, p, 0).rgb * 255.0 + 0.5); }
+float IwAt(ivec2 p) { return texelFetch(u_depth, p, 0).r / u_near; }
+/* CabPixelInWorld(): x, y from the eye, the height as x and y from the eye's. */
+vec3 InWorld(vec2 s, float iw)
+{
+	float f = 1.0 / iw;
+	float r = (s.x - u_eye_lens.y) * f / u_eye_lens.x, u = (u_eye_lens.z - s.y) * f / u_eye_lens.x;
+	return vec3(f * u_eye_dir.x + r * u_eye_dir.z, f * u_eye_dir.y + r * u_eye_dir.w, u);
+}
+void Put(vec3 c) { o_colour = vec4(c / 255.0, 1.0); }
+)";
+
+/* The sky down to the horizon, the far ground under it (CollectEyeFrame()). */
+const char *const EYE_BACKGROUND_FRAGMENT = R"(
+uniform float u_horizon;
+void main()
+{
+	float y = floor(gl_FragCoord.y);
+	if (y < u_horizon) {
+		float t = y / u_horizon;
+		Put(floor(vec3(60.0, 110.0, 210.0) + vec3(105.0, 90.0, 30.0) * t));
+	} else {
+		Put(vec3(84.0, 120.0, 64.0));
+	}
+}
+)";
+
+/* The haze: the far fades into its colour, the more the farther. */
+const char *const EYE_HAZE_FRAGMENT = R"(
+uniform vec3 u_haze;
+uniform float u_from, u_reach;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float z = IwAt(p);
+	if (z > 0.0) {
+		float dist = 1.0 / z;
+		if (dist > u_from) c = floor(c + (u_haze - c) * ((1.0 - exp(-(dist - u_from) / u_reach)) * 0.8));
+	}
+	Put(c);
+}
+)";
+
+/* The haze far off: from u_from to u_to all of it; the ground beyond the land (nothing drawn under the horizon) all haze. */
+const char *const EYE_FAR_HAZE_FRAGMENT = R"(
+uniform vec3 u_haze;
+uniform float u_from, u_to, u_horizon;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float z = IwAt(p);
+	float f = 0.0;
+	if (z <= 0.0) {
+		if (float(p.y) >= u_horizon) f = 1.0;
+	} else {
+		f = clamp((1.0 / z - u_from) / (u_to - u_from), 0.0, 1.0);
+	}
+	if (f > 0.0) c = floor(c + (u_haze - c) * f);
+	Put(c);
+}
+)";
+
+/* The sun's shadows (DrawEyeShadows()): darker where something is nearer to the sun on the map of the shadows, unless
+ * the surface is turned away from the sun (dark of its own light). The map's u, v and the sun's depth from the eye. */
+const char *const EYE_SHADOW_FRAGMENT = R"(
+uniform sampler2D u_map;
+uniform vec3 u_sun, u_a, u_b;
+uniform vec4 u_map_place; // u0, v0, texel, bias (from the eye)
+uniform float u_sun0;     // the sun's depth of the eye
+uniform vec2 u_size;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float iw = IwAt(p);
+	if (iw > 0.0 && p.x < int(u_size.x) - 1 && p.y < int(u_size.y) - 1) {
+		vec3 w = InWorld(vec2(p) + 0.5, iw);
+		float u = (dot(u_a, w) - u_map_place.x) / u_map_place.z, v = (dot(u_b, w) - u_map_place.y) / u_map_place.z;
+		ivec2 size = textureSize(u_map, 0);
+		if (u >= 0.0 && v >= 0.0 && u < float(size.x) && v < float(size.y)) {
+			float nearest = texelFetch(u_map, ivec2(u, v), 0).r;
+			if (nearest - u_sun0 > dot(u_sun, w) + u_map_place.w) {
+				bool turned_away = false;
+				float iw_r = IwAt(p + ivec2(1, 0)), iw_d = IwAt(p + ivec2(0, 1));
+				if (iw_r > 0.0 && iw_d > 0.0 && abs(iw_r - iw) < iw * 0.05 && abs(iw_d - iw) < iw * 0.05) {
+					vec3 e = InWorld(vec2(p) + vec2(1.5, 0.5), iw_r) - w, g = InWorld(vec2(p) + vec2(0.5, 1.5), iw_d) - w;
+					vec3 n = cross(e, g);
+					if (dot(n, -w) < 0.0) n = -n;
+					float nl = length(n);
+					turned_away = nl > 0.0 && dot(n, u_sun) / nl < 0.05;
+				}
+				if (!turned_away) c = floor(c * vec3(160.0, 165.0, 180.0) / 256.0);
+			}
+		}
+	}
+	Put(c);
+}
+)";
+
+/* The night (DrawEyeNight()): the picture darkened, so many 256ths of red, green and blue left. */
+const char *const EYE_NIGHT_FRAGMENT = R"(
+uniform vec3 u_night;
+void main()
+{
+	Put(floor(ColourAt(Pixel()) * u_night / 256.0));
+}
+)";
+
+/* The lights lighting what is about them (DrawEyeLampLight(), DrawEyeWitchLight()), one after the other: each pixel
+ * within reach its own colour out of the dark (u_night) in the light's. The lights four texels each of u_lights. */
+const char *const EYE_LAMPS_FRAGMENT = R"(
+uniform sampler2D u_lights;
+uniform int u_count;
+uniform vec3 u_night;
+uniform float u_zu_per_unit;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float iw = IwAt(p);
+	if (iw > 0.0) {
+		vec3 w = InWorld(vec2(p) + 0.5, iw);
+		for (int i = 0; i < u_count; i++) {
+			vec4 l0 = texelFetch(u_lights, ivec2(i * 4, 0), 0), l1 = texelFetch(u_lights, ivec2(i * 4 + 1, 0), 0);
+			vec4 l2 = texelFetch(u_lights, ivec2(i * 4 + 2, 0), 0), l3 = texelFetch(u_lights, ivec2(i * 4 + 3, 0), 0);
+			if (p.x < int(l3.x) || p.y < int(l3.y) || p.x > int(l3.z) || p.y > int(l3.w)) continue;
+			int kind = int(l1.w + 0.5);
+			float reach = l0.w, k;
+			if (kind == 0) {
+				/* A house's lamp: down from it only. */
+				if (w.z > l0.z + 0.5) continue;
+				float d = length(w - l0.xyz);
+				if (d >= reach) continue;
+				k = (1.0 - d / reach) * (1.0 - d / reach) * 0.7;
+			} else {
+				vec3 o = vec3(w.xy - l0.xy, (w.z - l0.z) / u_zu_per_unit);
+				float d = length(o);
+				if (kind == 1) {
+					if (d >= reach) continue;
+					k = (1.0 - d / reach) * (1.0 - d / reach) * 0.8;
+				} else {
+					float along = dot(o, l2.xyz);
+					if (along <= 0.0 || along >= reach || d < 1e-6) continue;
+					float cosa = along / d;
+					if (cosa <= l2.w) continue;
+					float middle = (cosa - l2.w) / (1.0 - l2.w);
+					k = (1.0 - along / reach) * min(1.0, middle * 2.5) * 0.9;
+				}
+			}
+			vec3 own = min(vec3(255.0), c * 256.0 / u_night);
+			c = floor(min(vec3(255.0), c + own * l1.rgb / 255.0 * k));
+		}
+	}
+	Put(c);
+}
+)";
+
+/* The smoke and the blasts (DrawEyeBlasts()), one after the other, each a soft ball over what is behind it, hidden by
+ * the pixel behind what is nearer than its middle. Two texels each of u_blasts. */
+const char *const EYE_BLASTS_FRAGMENT = R"(
+uniform sampler2D u_blasts;
+uniform int u_count;
+uniform vec2 u_size;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	float iw = IwAt(p);
+	for (int i = 0; i < u_count; i++) {
+		vec4 b0 = texelFetch(u_blasts, ivec2(i * 2, 0), 0), b1 = texelFetch(u_blasts, ivec2(i * 2 + 1, 0), 0);
+		int x0 = max(0, int(b0.x - b0.z)), x1 = min(int(u_size.x) - 1, int(b0.x + b0.z));
+		int y0 = max(0, int(b0.y - b0.z)), y1 = min(int(u_size.y) - 1, int(b0.y + b0.z));
+		if (p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1) continue;
+		vec2 d = (vec2(p) + 0.5 - b0.xy) / b0.z;
+		float d2 = dot(d, d);
+		if (d2 >= 1.0 || iw > b0.w * 1.02) continue;
+		c = floor(c + (b1.rgb - c) * (b1.a * (1.0 - d2)));
+	}
+	Put(c);
+}
+)";
+
+/* What has a light of its own again over the dark (glow_after_night of viewport.cpp), where it is still what is seen:
+ * whole, or see-through over what is there. */
+const char *const EYE_GLOW_AFTER_FRAGMENT = R"(
+uniform sampler2D u_glow;
+void main()
+{
+	ivec2 p = Pixel();
+	vec3 c = ColourAt(p);
+	vec4 g = texelFetch(u_glow, p, 0);
+	float a = floor(g.a * 255.0 + 0.5);
+	vec3 gc = floor(g.rgb * 255.0 + 0.5);
+	if (a >= 255.0) {
+		c = gc;
+	} else if (a > 0.0) {
+		c = min(vec3(255.0), gc + floor((c * (255.0 - a) + 127.0) / 255.0));
+	}
+	Put(c);
+}
+)";
+
+/* A picture of its own laid in where it is and nearer (a tunnel seen through its portal, CabDrawTunnelSeenIn()). */
+const char *const EYE_LAY_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_lay;
+uniform sampler2D u_lay_z;
+uniform float u_near;
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_glow;
+void main()
+{
+	ivec2 p = ivec2(gl_FragCoord.xy);
+	vec4 c = texelFetch(u_lay, p, 0);
+	float z = texelFetch(u_lay_z, p, 0).r;
+	if (z <= 0.0 || c == vec4(0.0)) discard;
+	o_colour = vec4(c.rgb, 1.0);
+	o_glow = vec4(0.0);
+	gl_FragDepth = u_near * z;
+}
+)";
+
+/* A soft spot of light added (AddNightLight() of viewport.cpp): a quad about it, the whole of it gone where the picture
+ * is nearer than its middle (by hidden_by). Its corner, middle and sizes, colour and strength, depth and hidden_by. */
+const char *const EYE_GLOW_VERTEX = R"(#version 330 core
+layout(location = 0) in vec2 a_corner;
+layout(location = 1) in vec4 a_spot;   // sx, sy, rx, ry
+layout(location = 2) in vec4 a_colour; // r, g, b, strength
+layout(location = 3) in vec2 a_hidden; // iw, hidden_by
+uniform sampler2D u_depth;
+uniform float u_near;
+uniform vec2 u_size;
+flat out vec4 v_spot;
+flat out vec4 v_colour;
+void main()
+{
+	v_spot = a_spot;
+	v_colour = a_colour;
+	ivec2 m = ivec2(int(a_spot.x), int(a_spot.y));
+	bool hidden = a_hidden.x > 0.0 && m.x >= 0 && m.y >= 0 && m.x < int(u_size.x) && m.y < int(u_size.y) && texelFetch(u_depth, m, 0).r / u_near > a_hidden.x * a_hidden.y;
+	vec2 at = a_spot.xy + a_corner * (a_spot.zw + 1.0);
+	gl_Position = hidden ? vec4(2.0, 2.0, 0.0, 1.0) : vec4(2.0 * at / u_size - 1.0, 0.0, 1.0);
+}
+)";
+
+const char *const EYE_GLOW_FRAGMENT = R"(#version 330 core
+flat in vec4 v_spot;
+flat in vec4 v_colour;
+layout(location = 0) out vec4 o_colour;
+void main()
+{
+	vec2 d = (gl_FragCoord.xy - v_spot.xy) / v_spot.zw;
+	float d2 = dot(d, d);
+	if (d2 >= 1.0) discard;
+	float f = v_colour.a * (1.0 - d2) * (1.0 - d2);
+	o_colour = vec4(floor(v_colour.rgb * f) / 255.0, 1.0);
+}
+)";
+
+/* The stars (DrawEyeSky()): a pixel each of what is added, where nothing is drawn above the horizon. */
+const char *const EYE_STAR_VERTEX = R"(#version 330 core
+layout(location = 0) in vec2 a_at;
+layout(location = 1) in vec3 a_add;
+uniform vec2 u_size;
+flat out vec3 v_add;
+void main()
+{
+	v_add = a_add;
+	gl_Position = vec4(2.0 * (a_at + 0.5) / u_size - 1.0, 0.0, 1.0);
+}
+)";
+
+const char *const EYE_STAR_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_depth;
+uniform float u_horizon;
+flat in vec3 v_add;
+layout(location = 0) out vec4 o_colour;
+void main()
+{
+	ivec2 p = ivec2(gl_FragCoord.xy);
+	if (float(p.y) >= u_horizon || texelFetch(u_depth, p, 0).r > 0.0) discard;
+	o_colour = vec4(v_add / 255.0, 1.0);
+}
+)";
+
+/* The moon (DrawEyeSky()): its face (u_glow 0, laid over) or the glow about it (1, added), where nothing is drawn above the horizon. */
+const char *const EYE_MOON_FRAGMENT = R"(
+uniform vec3 u_moon; // x, y, radius
+uniform vec4 u_box;  // x0, y0, x1, y1
+uniform float u_horizon;
+uniform int u_glow;
+void main()
+{
+	ivec2 p = Pixel();
+	if (p.x < int(u_box.x) || p.y < int(u_box.y) || p.x > int(u_box.z) || p.y > int(u_box.w)) discard;
+	if (float(p.y) >= u_horizon || IwAt(p) > 0.0) discard;
+	vec2 d = (vec2(p) + 0.5 - u_moon.xy) / u_moon.z;
+	float d2 = dot(d, d);
+	if (u_glow == 0) {
+		if (d2 > 1.0) discard;
+		float k = 0.75 + 0.25 * sqrt(1.0 - d2);
+		const vec3 seas[4] = vec3[4](vec3(-0.30, -0.20, 0.32), vec3(0.25, -0.35, 0.22), vec3(0.10, 0.30, 0.28), vec3(-0.35, 0.35, 0.15));
+		for (int i = 0; i < 4; i++) {
+			vec2 e = d - seas[i].xy;
+			if (dot(e, e) < seas[i].z * seas[i].z) k *= 0.82;
+		}
+		Put(floor(vec3(240.0, 236.0, 218.0) * k));
+	} else {
+		if (d2 <= 1.0) discard;
+		float g = max(0.0, 1.0 - (sqrt(d2) - 1.0) / 3.0);
+		if (g <= 0.0) discard;
+		float a = floor(g * g * 90.0);
+		Put(floor(vec3(150.0, 165.0, 200.0) * a / 255.0));
+	}
 }
 )";
 
@@ -1066,7 +1507,9 @@ bool StartCard(std::string &why, std::string &describe)
 		why = "OpenGL failed at the start";
 		return false;
 	}
-	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target);
+	Step("preklad programu snimku z oci (shader)");
+	StartEyeFrame();
+	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}{}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target, _frame_programs ? "" : ", the view from the eyes in parts");
 	return true;
 }
 
@@ -1105,6 +1548,7 @@ void EndCard()
 		if (_night_program.program != 0) gl.glDeleteProgram(_night_program.program);
 		if (_eye_building_program.program != 0) gl.glDeleteProgram(_eye_building_program.program);
 		if (_eye_mesh_program.program != 0) gl.glDeleteProgram(_eye_mesh_program.program);
+		EndEyeFrame();
 	}
 	EndContext();
 }
@@ -1585,46 +2029,46 @@ bool EyeTargetOfSize(int w, int h)
 	return w <= _eye_w && h <= _eye_h;
 }
 
-/**
- * Draw the objects of the view from the eyes on the card and read them back (ThreeDGpuRenderEye()): the depth the
- * larger the nearer (near / how far ahead, cleared 0), each side of a building that faces away left out as the processor
- * leaves it out -- on the picture y down, a triangle of side 1 drawn when its corners go round clockwise.
- */
-bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
-{
-	const int w = pic.width, h = pic.height;
-	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target || pic.near_plane <= 0) return false;
-	_card_clock++;
-	Step(fmt::format("pohled z oci {}: {}x{}, {} budov, {} siti", _gpu_pictures + 1, w, h, pic.buildings.size(), pic.meshes.size()));
+/** The objects of the view from the eyes on the card, ready to be drawn (PrepareEyeObjects()). */
+struct EyeObjectDraws {
 	struct Draw {
 		const ThreeDGpuEyeBuilding *eye;
 		const GpuBuilding *on;
 		std::vector<GLuint> textures;
 	};
-	std::vector<Draw> draws;
-	for (const ThreeDGpuEyeBuilding &e : pic.buildings) {
-		const GpuBuilding *on = BuildingOnCard(e.building);
-		if (on == nullptr) continue;
-		Draw d{&e, on, std::vector<GLuint>(e.building.textures.size(), 0)};
-		for (const GpuBuilding::Run &r : on->runs) {
-			if (r.texture >= d.textures.size() || e.building.textures[r.texture] == nullptr || d.textures[r.texture] != 0) continue;
-			const GpuTexture *t = TextureOnCard(*e.building.textures[r.texture]);
-			if (t == nullptr) return false;
-			d.textures[r.texture] = t->name;
-		}
-		draws.push_back(std::move(d));
-	}
-	/* The figures' shapes, triangles and textures (painted for the eye already). */
 	struct MeshDraw {
 		const ThreeDGpuMesh *mesh;
 		const GpuShape *shape;
 		const GpuIndices *indices;
 		std::vector<GLuint> textures;
 	};
+	std::vector<Draw> draws;
 	std::vector<MeshDraw> mesh_draws;
+	float glass_alpha = 0.15f;
+};
+
+void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass);
+
+/** What the objects of the view from the eyes need on the card put there: false, something it cannot hold. */
+bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
+{
+	out.glass_alpha = pic.glass_alpha;
+	for (const ThreeDGpuEyeBuilding &e : pic.buildings) {
+		const GpuBuilding *on = BuildingOnCard(e.building);
+		if (on == nullptr) continue;
+		EyeObjectDraws::Draw d{&e, on, std::vector<GLuint>(e.building.textures.size(), 0)};
+		for (const GpuBuilding::Run &r : on->runs) {
+			if (r.texture >= d.textures.size() || e.building.textures[r.texture] == nullptr || d.textures[r.texture] != 0) continue;
+			const GpuTexture *t = TextureOnCard(*e.building.textures[r.texture]);
+			if (t == nullptr) return false;
+			d.textures[r.texture] = t->name;
+		}
+		out.draws.push_back(std::move(d));
+	}
+	/* The figures' shapes, triangles and textures (painted for the eye already). */
 	for (const ThreeDGpuMesh &m : pic.meshes) {
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
-		MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0)};
+		EyeObjectDraws::MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0)};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
 		/* As DrawOnCard(): a triangle naming a corner the shape has not, the processor draws. */
 		if (d.indices->largest >= d.shape->corners) return false;
@@ -1634,29 +2078,24 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 			if (t == nullptr) return false;
 			d.textures[i] = t->name;
 		}
-		mesh_draws.push_back(std::move(d));
+		out.mesh_draws.push_back(std::move(d));
 	}
-	if (!EyeTargetOfSize(w, h)) return false;
-	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _eye_fbo);
-	gl.glViewport(0, 0, w, h);
-	gl.glDrawBuffers(2, both);
-	gl.glDisable(GL_SCISSOR_TEST);
-	gl.glDisable(GL_DITHER);
-	gl.glDisable(GL_BLEND);
-	gl.glEnable(GL_DEPTH_TEST);
-	gl.glDepthFunc(GL_GREATER);
-	gl.glDepthMask(GL_TRUE);
-	gl.glClearColor(0, 0, 0, 0);
-	gl.glClearDepth(0.0);
-	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	return true;
+}
+
+/**
+ * Draw the objects of the view from the eyes (PrepareEyeObjects()) into the picture bound, through its depth (near /
+ * how far ahead, the larger the nearer): each side of a building that faces away left out as the processor leaves it
+ * out -- on the picture y down, a triangle of side 1 drawn when its corners go round clockwise --; the figures opaque.
+ */
+void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
+{
 	gl.glUseProgram(_eye_building_program.program);
 	gl.glUniform1i(_eye_building_program.tex, 0);
-	gl.glUniform1f(_eye_building_program.near_plane, pic.near_plane);
+	gl.glUniform1f(_eye_building_program.near_plane, near_plane);
 	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glCullFace(GL_BACK);
-	Step(fmt::format("kresleni pohledu z oci {} (glDrawArrays)", _gpu_pictures + 1));
-	for (const Draw &d : draws) {
+	for (const EyeObjectDraws::Draw &d : o.draws) {
 		gl.glUniformMatrix4fv(_eye_building_program.matrix, 1, GL_TRUE, d.eye->matrix.data());
 		gl.glBindVertexArray(d.on->vao);
 		for (const GpuBuilding::Run &r : d.on->runs) {
@@ -1672,13 +2111,27 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 		}
 	}
 	gl.glDisable(GL_CULL_FACE);
-	/* The figures, as DrawOnCard() draws their pictures; their glass after all else, over what is behind it,
-	 * its depth written (what is behind it of the eye's own picture is laid under it there). */
+	DrawEyeMeshes(o, near_plane, false);
+}
+
+/**
+ * The figures of the view from the eyes, as DrawOnCard() draws their pictures: opaque, or their glass over what is
+ * behind it (laid over by its alpha, its colour multiplied in), its depth written.
+ */
+void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
+{
 	gl.glUseProgram(_eye_mesh_program.program);
 	gl.glUniform1i(_eye_mesh_program.tex, 0);
 	gl.glUniform1i(_eye_mesh_program.paint, 0);
-	gl.glUniform1f(_eye_mesh_program.near_plane, pic.near_plane);
-	auto draw_mesh_runs = [&](const MeshDraw &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
+	gl.glUniform1f(_eye_mesh_program.near_plane, near_plane);
+	gl.glActiveTexture(GL_TEXTURE0);
+	if (glass) {
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	}
+	for (const EyeObjectDraws::MeshDraw &d : o.mesh_draws) {
+		const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? d.mesh->triangles->glass : d.mesh->triangles->opaque;
+		if (runs.empty()) continue;
 		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
 		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
 		gl.glUniform1f(_eye_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
@@ -1697,20 +2150,47 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 			gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
 			if (glass) {
 				const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
-				gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : pic.glass_alpha);
+				gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
 			}
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
-	};
-	for (const MeshDraw &d : mesh_draws) draw_mesh_runs(d, d.mesh->triangles->opaque, false);
-	gl.glEnable(GL_BLEND);
-	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-	for (const MeshDraw &d : mesh_draws) {
-		if (!d.mesh->triangles->glass.empty()) draw_mesh_runs(d, d.mesh->triangles->glass, true);
 	}
-	gl.glDisable(GL_BLEND);
+	if (glass) gl.glDisable(GL_BLEND);
 	gl.glBindVertexArray(0);
+}
+
+/**
+ * Draw the objects of the view from the eyes on the card and read them back (ThreeDGpuRenderEye()): the depth the
+ * larger the nearer (near / how far ahead, cleared 0).
+ */
+bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
+{
+	const int w = pic.width, h = pic.height;
+	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target || pic.near_plane <= 0) return false;
+	_card_clock++;
+	Step(fmt::format("pohled z oci {}: {}x{}, {} budov, {} siti", _gpu_pictures + 1, w, h, pic.buildings.size(), pic.meshes.size()));
+	EyeObjectDraws objects;
+	if (!PrepareEyeObjects(pic, objects)) return false;
+	if (!EyeTargetOfSize(w, h)) return false;
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _eye_fbo);
+	gl.glViewport(0, 0, w, h);
+	gl.glDrawBuffers(2, both);
+	gl.glDisable(GL_SCISSOR_TEST);
+	gl.glDisable(GL_DITHER);
+	gl.glDisable(GL_BLEND);
+	gl.glEnable(GL_DEPTH_TEST);
+	gl.glDepthFunc(GL_GREATER);
+	gl.glDepthMask(GL_TRUE);
+	gl.glClearColor(0, 0, 0, 0);
+	gl.glClearDepth(0.0);
+	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	Step(fmt::format("kresleni pohledu z oci {} (glDrawArrays)", _gpu_pictures + 1));
+	DrawEyeObjects(objects, pic.near_plane);
+	/* The glass after all else, over what is behind it, its depth written (what is behind it of the eye's own picture
+	 * is laid under it there). */
+	DrawEyeMeshes(objects, pic.near_plane, true);
 	const size_t n = static_cast<size_t>(w) * h;
 	pic.pixels.resize(n);
 	pic.depth.resize(n);
@@ -1736,6 +2216,612 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 	/* The depth as the eye's: 1 / how far ahead. */
 	const float to_eye = 1.0f / pic.near_plane;
 	for (float &d : pic.depth) d *= to_eye;
+	TrimCard();
+	return true;
+}
+
+/*
+ * The whole view from the eyes on the card (ThreeDGpuRenderEyeFrame()): drawn into two pictures of colours taken in
+ * turn -- a job over the whole picture reads the one and writes the other --, a picture of what has a light of its own
+ * (the figures', glow), and the depth as a texture the jobs read (near / how far ahead, 0 nothing). The textures of the
+ * frame alone laid into one (the atlas), each where its triangles find it; those the frames share kept by their number.
+ */
+/** Compile the programs of the frame on the card (StartCard()): without them, the frames are not drawn on it. */
+void StartEyeFrame()
+{
+	std::string why;
+	auto pixel = [&](GpuProgram &p, const char *body) {
+		const std::string source = std::string(EYE_PIXEL_COMMON) + body;
+		return MakeProgram(p, EYE_PIXEL_VERTEX, source.c_str(), why);
+	};
+	_frame_programs = MakeProgram(_frame_tri_program, EYE_TRI_VERTEX, EYE_TRI_FRAGMENT, why) &&
+			pixel(_frame_background_program, EYE_BACKGROUND_FRAGMENT) && pixel(_frame_haze_program, EYE_HAZE_FRAGMENT) &&
+			pixel(_frame_far_haze_program, EYE_FAR_HAZE_FRAGMENT) && pixel(_frame_shadow_program, EYE_SHADOW_FRAGMENT) &&
+			pixel(_frame_night_program, EYE_NIGHT_FRAGMENT) && pixel(_frame_lamps_program, EYE_LAMPS_FRAGMENT) &&
+			pixel(_frame_blasts_program, EYE_BLASTS_FRAGMENT) && pixel(_frame_glow_after_program, EYE_GLOW_AFTER_FRAGMENT) &&
+			pixel(_frame_moon_program, EYE_MOON_FRAGMENT) && MakeProgram(_frame_lay_program, EYE_PIXEL_VERTEX, EYE_LAY_FRAGMENT, why) &&
+			MakeProgram(_frame_glow_program, EYE_GLOW_VERTEX, EYE_GLOW_FRAGMENT, why) && MakeProgram(_frame_star_program, EYE_STAR_VERTEX, EYE_STAR_FRAGMENT, why);
+	if (!_frame_programs) {
+		Debug(misc, 1, "3D on the graphics card: the view from the eyes whole not on it ({})", why);
+		Diary("snimek z oci na karte ne: " + why, true);
+		return;
+	}
+	GLuint textures[11];
+	gl.glGenTextures(11, textures);
+	_frame_colour[0] = textures[0];
+	_frame_colour[1] = textures[1];
+	_frame_glow = textures[2];
+	_frame_depth = textures[3];
+	_frame_atlas = textures[4];
+	_frame_list = textures[5];
+	_frame_lay = textures[6];
+	_frame_lay_z = textures[7];
+	_frame_shadow_map = textures[8];
+	for (int i = 0; i < 9; i++) {
+		gl.glBindTexture(GL_TEXTURE_2D, textures[i]);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	}
+	gl.glDeleteTextures(2, textures + 9);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	gl.glGenFramebuffers(2, _frame_geometry_fbo);
+	gl.glGenFramebuffers(2, _frame_pixel_fbo);
+	gl.glGenVertexArrays(1, &_frame_vao);
+	gl.glGenBuffers(1, &_frame_vbo);
+	gl.glBindVertexArray(_frame_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_vbo);
+	/* A corner: sx, sy, iw; u, v; its texture's place x, y, w, h; light, alpha, how. */
+	const GLsizei stride = 12 * sizeof(float);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, nullptr);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, reinterpret_cast<const void *>(9 * sizeof(float)));
+	for (GLuint a = 0; a < 4; a++) gl.glEnableVertexAttribArray(a);
+	gl.glGenVertexArrays(1, &_frame_empty_vao);
+	gl.glGenVertexArrays(1, &_frame_glow_vao);
+	gl.glGenBuffers(1, &_frame_glow_vbo);
+	gl.glBindVertexArray(_frame_glow_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_glow_vbo);
+	/* A glow's corner: the corner (-1, 1), its middle and sizes, colour and strength, depth and hidden_by. */
+	const GLsizei glow_stride = 12 * sizeof(float);
+	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, glow_stride, nullptr);
+	gl.glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(2 * sizeof(float)));
+	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(6 * sizeof(float)));
+	gl.glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(10 * sizeof(float)));
+	for (GLuint a = 0; a < 4; a++) gl.glEnableVertexAttribArray(a);
+	gl.glGenVertexArrays(1, &_frame_star_vao);
+	gl.glGenBuffers(1, &_frame_star_vbo);
+	gl.glBindVertexArray(_frame_star_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_star_vbo);
+	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
+	gl.glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(2 * sizeof(float)));
+	gl.glEnableVertexAttribArray(0);
+	gl.glEnableVertexAttribArray(1);
+	gl.glBindVertexArray(0);
+	if (gl.glGetError() != 0) {
+		_frame_programs = false;
+		Diary("snimek z oci na karte ne: chyba OpenGL pri pripraveni", true);
+	}
+}
+
+/** Let go of what the frame on the card holds (EndCard()). */
+void EndEyeFrame()
+{
+	const GLuint textures[] = {_frame_colour[0], _frame_colour[1], _frame_glow, _frame_depth, _frame_atlas, _frame_list, _frame_lay, _frame_lay_z, _frame_shadow_map};
+	for (GLuint t : textures) if (t != 0) gl.glDeleteTextures(1, &t);
+	for (GLuint f : {_frame_geometry_fbo[0], _frame_geometry_fbo[1], _frame_pixel_fbo[0], _frame_pixel_fbo[1]}) if (f != 0) gl.glDeleteFramebuffers(1, &f);
+	for (GLuint b : {_frame_vbo, _frame_glow_vbo, _frame_star_vbo}) if (b != 0) gl.glDeleteBuffers(1, &b);
+	for (GLuint a : {_frame_vao, _frame_empty_vao, _frame_glow_vao, _frame_star_vao}) if (a != 0) gl.glDeleteVertexArrays(1, &a);
+	for (GpuProgram *p : {&_frame_tri_program, &_frame_background_program, &_frame_haze_program, &_frame_far_haze_program, &_frame_shadow_program, &_frame_night_program,
+			&_frame_lamps_program, &_frame_blasts_program, &_frame_glow_after_program, &_frame_lay_program, &_frame_glow_program, &_frame_star_program, &_frame_moon_program}) {
+		if (p->program != 0) gl.glDeleteProgram(p->program);
+	}
+}
+
+/** The frame's pictures at least as big as asked (grown in steps): the colours twice, the own light, the depth. */
+bool EyeFrameTargetOfSize(int w, int h)
+{
+	if (w <= _frame_w && h <= _frame_h) return true;
+	_frame_w = std::min(_max_target, (std::max(_frame_w, w) + 255) / 256 * 256);
+	_frame_h = std::min(_max_target, (std::max(_frame_h, h) + 255) / 256 * 256);
+	Step(fmt::format("ramec snimku z oci {}x{} (glTexImage2D, glCheckFramebufferStatus)", _frame_w, _frame_h));
+	for (GLuint t : {_frame_colour[0], _frame_colour[1], _frame_glow}) {
+		gl.glBindTexture(GL_TEXTURE_2D, t);
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, _frame_w, _frame_h, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	}
+	gl.glBindTexture(GL_TEXTURE_2D, _frame_depth);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, _frame_w, _frame_h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	for (int k = 0; k < 2; k++) {
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_geometry_fbo[k]);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _frame_colour[k], 0);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _frame_glow, 0);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _frame_depth, 0);
+		bool ok = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[k]);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _frame_colour[k], 0);
+		ok = ok && gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+		if (!ok) {
+			gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			_frame_w = _frame_h = 0;
+			return false;
+		}
+	}
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	return w <= _frame_w && h <= _frame_h;
+}
+
+/** A texture the frames share on the card by its number, its texels as they are (Colour::data). */
+const GpuTexture *KeptTextureOnCard(uint64_t uid, const uint32_t *px, int w, int h)
+{
+	auto it = _card_textures.find(uid);
+	if (it != _card_textures.end()) {
+		it->second.used = _card_clock;
+		return &it->second;
+	}
+	if (w <= 0 || h <= 0 || w > _max_texture || h > _max_texture || px == nullptr) return nullptr;
+	GpuTexture g;
+	gl.glGenTextures(1, &g.name);
+	gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, px);
+	g.bytes = static_cast<size_t>(w) * h * 4;
+	g.used = _card_clock;
+	_card_bytes += g.bytes;
+	return &_card_textures.emplace(uid, g).first->second;
+}
+
+/**
+ * The frame's own textures laid into the atlas, the tallest first, row by row, and put on the card: where each is.
+ * False when they do not fit in the largest texture the card has.
+ */
+bool EyeFrameAtlas(const ThreeDGpuEyeFrame &f, std::vector<std::array<int, 2>> &place)
+{
+	place.assign(f.textures.size(), {-1, -1});
+	std::vector<uint32_t> order;
+	int widest = 1;
+	size_t area = 0;
+	for (uint32_t i = 0; i < f.textures.size(); i++) {
+		const ThreeDGpuEyeTexture &t = f.textures[i];
+		if (t.uid != 0 || t.w <= 0 || t.h <= 0) continue;
+		order.push_back(i);
+		widest = std::max(widest, t.w);
+		area += static_cast<size_t>(t.w) * t.h;
+	}
+	if (order.empty()) return true;
+	if (widest > _max_texture) return false;
+	const int aw = std::min(_max_texture, std::max({widest, 1024, (static_cast<int>(std::sqrt(static_cast<double>(area) * 1.3)) + 255) / 256 * 256}));
+	std::ranges::sort(order, [&](uint32_t a, uint32_t b) { return f.textures[a].h > f.textures[b].h; });
+	int x = 0, y = 0, row_h = 0;
+	for (uint32_t i : order) {
+		const ThreeDGpuEyeTexture &t = f.textures[i];
+		if (x + t.w > aw) {
+			x = 0;
+			y += row_h;
+			row_h = 0;
+		}
+		place[i] = {x, y};
+		x += t.w;
+		row_h = std::max(row_h, t.h);
+	}
+	const int ah = y + row_h;
+	if (ah > _max_texture) return false;
+	_frame_atlas_px.resize(static_cast<size_t>(aw) * ah);
+	for (uint32_t i : order) {
+		const ThreeDGpuEyeTexture &t = f.textures[i];
+		for (int r = 0; r < t.h; r++) std::copy_n(t.px + static_cast<size_t>(r) * t.w, t.w, _frame_atlas_px.data() + static_cast<size_t>(place[i][1] + r) * aw + place[i][0]);
+	}
+	gl.glBindTexture(GL_TEXTURE_2D, _frame_atlas);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	if (aw > _frame_atlas_w || ah > _frame_atlas_h) {
+		_frame_atlas_w = std::max(_frame_atlas_w, aw);
+		_frame_atlas_h = std::min(_max_texture, std::max(_frame_atlas_h, (ah + 255) / 256 * 256));
+		Step(fmt::format("atlas snimku z oci {}x{}", _frame_atlas_w, _frame_atlas_h));
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, _frame_atlas_w, _frame_atlas_h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+	}
+	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, aw, ah, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, _frame_atlas_px.data());
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	return true;
+}
+
+/** A list of numbers of a step put on the card as a row of texels, four floats each (the lights, the blasts). */
+void EyeFrameList(const std::vector<float> &values)
+{
+	const GLsizei n = static_cast<GLsizei>(std::max<size_t>(1, values.size() / 4));
+	gl.glBindTexture(GL_TEXTURE_2D, _frame_list);
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, n, 1, 0, GL_RGBA, GL_FLOAT, values.empty() ? nullptr : values.data());
+}
+
+/**
+ * Draw the whole view from the eyes on the card and read its colours back (ThreeDGpuRenderEyeFrame()): its steps in
+ * their order -- what is drawn through the depth into the picture of the moment, the jobs over the whole picture from
+ * it into the other. The figures' glass after the triangles following them (all that is solid first), before a job.
+ */
+bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
+{
+	const int w = f.width, h = f.height;
+	if (!_frame_programs || w <= 0 || h <= 0 || w > _max_target || h > _max_target || f.near_plane <= 0) return false;
+	_card_clock++;
+	Step(fmt::format("snimek z oci {}: {}x{}, {} kroku, {} trojuhelniku, {} textur", _gpu_pictures + 1, w, h, f.steps.size(), f.corners.size() / 3, f.textures.size()));
+	/* The depth on the card: near / 64 / how far ahead, so that what is nearer than the near plane (a thing in the
+	 * hand) is not cut to 1 (a float keeps its digits however small it is). */
+	const float depth_scale = f.near_plane / 64.0f;
+	/* What the steps need, before anything is drawn: the textures, the objects. */
+	std::vector<std::array<int, 2>> place;
+	if (!EyeFrameAtlas(f, place)) return false;
+	std::vector<GLuint> names(f.textures.size(), 0);
+	for (size_t i = 0; i < f.textures.size(); i++) {
+		const ThreeDGpuEyeTexture &t = f.textures[i];
+		if (t.uid == 0) {
+			names[i] = _frame_atlas;
+			continue;
+		}
+		const GpuTexture *g = KeptTextureOnCard(t.uid, t.px, t.w, t.h);
+		if (g == nullptr) return false;
+		names[i] = g->name;
+		place[i] = {0, 0};
+	}
+	std::vector<EyeObjectDraws> objects(f.steps.size());
+	for (size_t i = 0; i < f.steps.size(); i++) {
+		if (f.steps[i].kind == ThreeDGpuEyeStep::Kind::Objects && f.steps[i].objects != nullptr && !PrepareEyeObjects(*f.steps[i].objects, objects[i])) return false;
+	}
+	if (!EyeFrameTargetOfSize(w, h)) return false;
+	/* The corners of all the triangles at once. */
+	{
+		std::vector<float> corners;
+		corners.reserve(f.corners.size() * 12);
+		std::vector<uint32_t> texture_of(f.corners.size(), 0);
+		for (const ThreeDGpuEyeRun &r : f.runs) {
+			for (uint32_t k = r.first; k < r.first + r.count && k < f.corners.size(); k++) texture_of[k] = r.texture;
+		}
+		for (size_t k = 0; k < f.corners.size(); k++) {
+			const ThreeDGpuEyeCorner &c = f.corners[k];
+			const uint32_t t = texture_of[k];
+			const ThreeDGpuEyeTexture &tex = f.textures[t];
+			corners.insert(corners.end(), {c.sx, c.sy, c.iw, c.u, c.v, static_cast<float>(place[t][0]), static_cast<float>(place[t][1]), static_cast<float>(tex.w), static_cast<float>(tex.h), c.light, c.alpha, c.how});
+		}
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_vbo);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.empty() ? nullptr : corners.data(), GL_STREAM_DRAW);
+	}
+	Step(fmt::format("kresleni snimku z oci {}", _gpu_pictures + 1));
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
+	int now = 0; // the picture of the moment
+	gl.glViewport(0, 0, w, h);
+	gl.glDisable(GL_SCISSOR_TEST);
+	gl.glDisable(GL_DITHER);
+	gl.glDisable(GL_BLEND);
+	gl.glDisable(GL_CULL_FACE);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_geometry_fbo[now]);
+	gl.glDrawBuffers(2, both);
+	gl.glClearColor(0, 0, 0, 0);
+	gl.glClearDepth(0.0);
+	gl.glDepthMask(GL_TRUE);
+	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	auto geometry = [&]() {
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_geometry_fbo[now]);
+		gl.glDrawBuffers(2, both);
+		gl.glEnable(GL_DEPTH_TEST);
+		gl.glDepthFunc(GL_GREATER);
+		gl.glDepthMask(GL_TRUE);
+	};
+	/* A job over the whole picture: its program, the picture of the moment read, the other written. */
+	auto job = [&](const GpuProgram &p) {
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[1 - now]);
+		gl.glDrawBuffers(1, colour_only);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glDisable(GL_BLEND);
+		gl.glUseProgram(p.program);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, _frame_colour[now]);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, _frame_depth);
+		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_colour"), 0);
+		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_depth"), 1);
+		gl.glUniform1f(gl.glGetUniformLocation(p.program, "u_near"), depth_scale);
+		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+	};
+	auto done = [&]() {
+		gl.glBindVertexArray(_frame_empty_vao);
+		gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		now = 1 - now;
+	};
+	/* Drawn over the picture of the moment (added, or laid over), the depth read. */
+	auto over = [&](const GpuProgram &p) {
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[now]);
+		gl.glDrawBuffers(1, colour_only);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glUseProgram(p.program);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, _frame_depth);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glUniform1i(gl.glGetUniformLocation(p.program, "u_depth"), 1);
+		gl.glUniform1f(gl.glGetUniformLocation(p.program, "u_near"), depth_scale);
+		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+	};
+	auto glows = [&](const std::vector<ThreeDGpuEyeGlow> &list) {
+		if (list.empty()) return;
+		std::vector<float> v;
+		v.reserve(list.size() * 6 * 12);
+		static const float quad[6][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1}};
+		for (const ThreeDGpuEyeGlow &g : list) {
+			if (g.rx < 0.5f || g.ry < 0.5f) continue;
+			for (const auto &q : quad) v.insert(v.end(), {q[0], q[1], g.sx, g.sy, g.rx, g.ry, g.r, g.g, g.b, g.strength, g.iw, g.hidden_by});
+		}
+		if (v.empty()) return;
+		over(_frame_glow_program);
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE);
+		gl.glBindVertexArray(_frame_glow_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_glow_vbo);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(v.size() * sizeof(float)), v.data(), GL_STREAM_DRAW);
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(v.size() / 12));
+		gl.glDisable(GL_BLEND);
+	};
+	/* The figures' glass, after what is solid; seen through, its depth not kept (what is behind it is lit, hazed and
+	 * seen to be hidden as it is). */
+	std::vector<size_t> glass_waiting;
+	auto glass = [&]() {
+		if (glass_waiting.empty()) return;
+		geometry();
+		gl.glDepthMask(GL_FALSE);
+		for (size_t i : glass_waiting) DrawEyeMeshes(objects[i], depth_scale, true);
+		gl.glDepthMask(GL_TRUE);
+		glass_waiting.clear();
+	};
+	for (size_t i = 0; i < f.steps.size(); i++) {
+		const ThreeDGpuEyeStep &s = f.steps[i];
+		using Kind = ThreeDGpuEyeStep::Kind;
+		if (s.kind != Kind::Triangles && s.kind != Kind::Objects && s.kind != Kind::Lay) glass();
+		switch (s.kind) {
+			case Kind::Background:
+				job(_frame_background_program);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_background_program.program, "u_horizon"), s.horizon);
+				done();
+				break;
+			case Kind::Triangles: {
+				geometry();
+				gl.glUseProgram(_frame_tri_program.program);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_tri_program.program, "u_tex"), 0);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_tri_program.program, "u_near"), depth_scale);
+				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+				gl.glActiveTexture(GL_TEXTURE0);
+				gl.glBindVertexArray(_frame_vao);
+				for (size_t r = s.first_run; r < s.first_run + s.runs && r < f.runs.size(); r++) {
+					/* Those after it of the same texture at once. */
+					const ThreeDGpuEyeRun &run = f.runs[r];
+					uint32_t count = run.count;
+					while (r + 1 < s.first_run + s.runs && r + 1 < f.runs.size() && names[f.runs[r + 1].texture] == names[run.texture] && f.runs[r + 1].glass == run.glass && f.runs[r + 1].first == run.first + count) {
+						count += f.runs[++r].count;
+					}
+					if (run.glass) {
+						gl.glEnable(GL_BLEND);
+						gl.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+						gl.glDepthMask(GL_FALSE);
+					}
+					gl.glBindTexture(GL_TEXTURE_2D, names[run.texture]);
+					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(run.first), static_cast<GLsizei>(count));
+					if (run.glass) {
+						gl.glDisable(GL_BLEND);
+						gl.glDepthMask(GL_TRUE);
+					}
+				}
+				gl.glBindVertexArray(0);
+				break;
+			}
+			case Kind::Objects:
+				if (s.objects == nullptr) break;
+				geometry();
+				DrawEyeObjects(objects[i], depth_scale);
+				glass_waiting.push_back(i);
+				break;
+			case Kind::Lay: {
+				if (s.lay_px.size() < static_cast<size_t>(w) * h || s.lay_z.size() < static_cast<size_t>(w) * h) break;
+				gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, _frame_lay);
+				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, s.lay_px.data());
+				gl.glActiveTexture(GL_TEXTURE3);
+				gl.glBindTexture(GL_TEXTURE_2D, _frame_lay_z);
+				gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, w, h, 0, GL_RED, GL_FLOAT, s.lay_z.data());
+				geometry();
+				gl.glDepthFunc(GL_GEQUAL);
+				gl.glUseProgram(_frame_lay_program.program);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_lay_program.program, "u_lay"), 2);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_lay_program.program, "u_lay_z"), 3);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_lay_program.program, "u_near"), depth_scale);
+				gl.glBindVertexArray(_frame_empty_vao);
+				gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			}
+			case Kind::Haze:
+				job(_frame_haze_program);
+				gl.glUniform3f(gl.glGetUniformLocation(_frame_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_from"), s.from);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_reach"), s.depth);
+				done();
+				break;
+			case Kind::FarHaze:
+				job(_frame_far_haze_program);
+				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_from"), s.from);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_to"), s.to);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_horizon"), s.horizon);
+				done();
+				break;
+			case Kind::Shadows: {
+				const ThreeDGpuEyeStep::ShadowMap &m = s.shadow_map;
+				if (m.nearest == nullptr || m.nu <= 0 || m.nv <= 0 || m.nu > _max_texture || m.nv > _max_texture) break;
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, _frame_shadow_map);
+				if (m.key != _frame_shadow_key) {
+					Step(fmt::format("mapa stinu {}x{}", m.nu, m.nv));
+					gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+					gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m.nu, m.nv, 0, GL_RED, GL_FLOAT, m.nearest);
+					_frame_shadow_key = m.key;
+				}
+				job(_frame_shadow_program);
+				const GLuint p = _frame_shadow_program.program;
+				gl.glUniform1i(gl.glGetUniformLocation(p, "u_map"), 2);
+				gl.glUniform3f(gl.glGetUniformLocation(p, "u_sun"), m.sun[0], m.sun[1], m.sun[2]);
+				gl.glUniform3f(gl.glGetUniformLocation(p, "u_a"), m.a[0], m.a[1], m.a[2]);
+				gl.glUniform3f(gl.glGetUniformLocation(p, "u_b"), m.b[0], m.b[1], m.b[2]);
+				gl.glUniform4f(gl.glGetUniformLocation(p, "u_map_place"), m.u0, m.v0, m.texel, m.bias);
+				gl.glUniform1f(gl.glGetUniformLocation(p, "u_sun0"), m.sun0);
+				done();
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			}
+			case Kind::Night:
+				job(_frame_night_program);
+				gl.glUniform3f(gl.glGetUniformLocation(_frame_night_program.program, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
+				done();
+				glows(s.glows);
+				break;
+			case Kind::Glows:
+				glows(s.glows);
+				break;
+			case Kind::GlowAfterNight:
+				job(_frame_glow_after_program);
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, _frame_glow);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_glow_after_program.program, "u_glow"), 2);
+				done();
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			case Kind::Lamps: {
+				if (s.lights.empty()) break;
+				std::vector<float> list;
+				for (const ThreeDGpuEyeLight &l : s.lights) {
+					list.insert(list.end(), {l.x, l.y, l.zu, l.reach, l.r, l.g, l.b, static_cast<float>(l.kind), l.dx, l.dy, l.dz, l.cos_edge,
+							static_cast<float>(l.x0), static_cast<float>(l.y0), static_cast<float>(l.x1), static_cast<float>(l.y1)});
+				}
+				gl.glActiveTexture(GL_TEXTURE2);
+				EyeFrameList(list);
+				job(_frame_lamps_program);
+				const GLuint p = _frame_lamps_program.program;
+				gl.glUniform1i(gl.glGetUniformLocation(p, "u_lights"), 2);
+				gl.glUniform1i(gl.glGetUniformLocation(p, "u_count"), static_cast<GLint>(s.lights.size()));
+				gl.glUniform3f(gl.glGetUniformLocation(p, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
+				gl.glUniform1f(gl.glGetUniformLocation(p, "u_zu_per_unit"), s.depth);
+				done();
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			}
+			case Kind::Blasts: {
+				if (s.blasts.empty()) break;
+				std::vector<float> list;
+				for (const ThreeDGpuEyeBlast &b : s.blasts) list.insert(list.end(), {b.sx, b.sy, b.radius, b.iw, b.r, b.g, b.b, b.alpha});
+				gl.glActiveTexture(GL_TEXTURE2);
+				EyeFrameList(list);
+				job(_frame_blasts_program);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_blasts"), 2);
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_count"), static_cast<GLint>(s.blasts.size()));
+				done();
+				gl.glActiveTexture(GL_TEXTURE2);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			}
+			case Kind::Sky: {
+				std::vector<float> stars;
+				for (const ThreeDGpuEyeStar &st : s.stars) {
+					auto add = [&](int x, int y, int a) {
+						if (x < 0 || y < 0 || x >= w || y >= h) return;
+						stars.insert(stars.end(), {static_cast<float>(x), static_cast<float>(y), std::floor(st.r * a / 255.0f), std::floor(st.g * a / 255.0f), std::floor(st.b * a / 255.0f)});
+					};
+					add(st.x, st.y, st.a);
+					if (st.cross) {
+						add(st.x - 1, st.y, st.a / 3);
+						add(st.x + 1, st.y, st.a / 3);
+						add(st.x, st.y - 1, st.a / 3);
+						add(st.x, st.y + 1, st.a / 3);
+					}
+				}
+				if (!stars.empty()) {
+					over(_frame_star_program);
+					gl.glUniform1f(gl.glGetUniformLocation(_frame_star_program.program, "u_horizon"), s.horizon);
+					gl.glEnable(GL_BLEND);
+					gl.glBlendFunc(GL_ONE, GL_ONE);
+					gl.glBindVertexArray(_frame_star_vao);
+					gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_star_vbo);
+					gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(stars.size() * sizeof(float)), stars.data(), GL_STREAM_DRAW);
+					gl.glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(stars.size() / 5));
+					gl.glDisable(GL_BLEND);
+				}
+				if (s.moon[2] > 0) {
+					const float rad = s.moon[2];
+					const float box[4] = {std::max(0.0f, static_cast<float>(static_cast<int>(s.moon[0] - rad * 4))), std::max(0.0f, static_cast<float>(static_cast<int>(s.moon[1] - rad * 4))),
+							std::min(w - 1.0f, static_cast<float>(static_cast<int>(s.moon[0] + rad * 4))), std::min(h - 1.0f, static_cast<float>(static_cast<int>(s.moon[1] + rad * 4)))};
+					for (int glow = 0; glow < 2; glow++) {
+						over(_frame_moon_program);
+						const GLuint p = _frame_moon_program.program;
+						gl.glUniform3f(gl.glGetUniformLocation(p, "u_moon"), s.moon[0], s.moon[1], s.moon[2]);
+						gl.glUniform4f(gl.glGetUniformLocation(p, "u_box"), box[0], box[1], box[2], box[3]);
+						gl.glUniform1f(gl.glGetUniformLocation(p, "u_horizon"), s.horizon);
+						gl.glUniform1i(gl.glGetUniformLocation(p, "u_glow"), glow);
+						if (glow == 1) {
+							gl.glEnable(GL_BLEND);
+							gl.glBlendFunc(GL_ONE, GL_ONE);
+						}
+						gl.glBindVertexArray(_frame_empty_vao);
+						gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+						gl.glDisable(GL_BLEND);
+					}
+				}
+				gl.glBindVertexArray(0);
+				gl.glActiveTexture(GL_TEXTURE1);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
+				break;
+			}
+		}
+	}
+	glass();
+	gl.glBindVertexArray(0);
+	f.pixels.resize(static_cast<size_t>(w) * h);
+	Step(fmt::format("cteni snimku z oci {} zpet (glReadPixels)", _gpu_pictures + 1));
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[now]);
+	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, f.pixels.data());
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	const GLenum error = gl.glGetError();
+	if (error != 0) {
+		Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x} in the view from the eyes whole, the processor draws it", error);
+		if (error == GL_OUT_OF_MEMORY) ForgetCard();
+		return false;
+	}
 	TrimCard();
 	return true;
 }
@@ -1780,7 +2866,7 @@ void GpuThreadMain()
 		const auto start = std::chrono::steady_clock::now();
 		bool drawn = false;
 		try {
-			drawn = job->eye != nullptr ? DrawEyeOnCard(*job->eye) : DrawOnCard(*job->pic);
+			drawn = job->frame != nullptr ? DrawEyeFrameOnCard(*job->frame) : job->eye != nullptr ? DrawEyeOnCard(*job->eye) : DrawOnCard(*job->pic);
 		} catch (...) {
 			drawn = false;
 		}
@@ -1864,6 +2950,22 @@ bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic)
 	return job.ok;
 }
 
+/**
+ * Draw the whole view from the eyes on the card, on whichever thread asks (it waits): its colours read back.
+ * @return false: not drawn (no card, or something it cannot hold): the processor draws it
+ */
+bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame)
+{
+	if (!ThreeDGpuAvailable()) return false;
+	GpuJob job{nullptr, nullptr, &frame};
+	std::unique_lock lock(_gpu_mutex);
+	if (_gpu_state != GpuState::Ready) return false;
+	_gpu_jobs.push_back(&job);
+	_gpu_wake.notify_one();
+	_gpu_done.wait(lock, [&job] { return job.done; });
+	return job.ok;
+}
+
 /** The card's thread ended, at the end of the game (after the threads asking it, ShutdownGame()). */
 void ThreeDGpuStop()
 {
@@ -1900,6 +3002,7 @@ std::string ThreeDGpuTimes()
 
 bool ThreeDGpuAvailable() { return false; }
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &) { return false; }
+bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &) { return false; }
 bool ThreeDGpuRender(ThreeDGpuPicture &) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }

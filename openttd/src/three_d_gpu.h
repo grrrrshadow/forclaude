@@ -179,11 +179,133 @@ struct ThreeDGpuEyePicture {
 	std::vector<uint32_t> glow;
 };
 
+/** A texture the triangles of the eye's frame draw from (ThreeDGpuEyeFrame): its texels as they are (Colour::data), 0 none. */
+struct ThreeDGpuEyeTexture {
+	const uint32_t *px = nullptr;
+	int w = 0, h = 0;
+	uint64_t uid = 0; ///< kept on the card by this number for the frames to come; 0: this frame's alone
+};
+
+/** A corner of a triangle of the eye's frame, placed on the picture already (CabVertex of viewport.cpp), with how its triangle is drawn (CabRasterRows()). */
+struct ThreeDGpuEyeCorner {
+	float sx, sy; ///< on the picture, pixels, y down
+	float iw;     ///< 1 / how far ahead
+	float u, v;   ///< the texel of its texture there
+	float light;  ///< its light, 256 as it is (ShadedPixel())
+	float alpha;  ///< 256 whole, below see-through
+	float how;    ///< THREE_D_GPU_EYE_FILL, THREE_D_GPU_EYE_REPEAT, THREE_D_GPU_EYE_CORNER_LIGHT
+};
+static constexpr int THREE_D_GPU_EYE_FILL = 1;         ///< a hole of its texture filled from the nearest texel within three (CAB_FILL_HOLES)
+static constexpr int THREE_D_GPU_EYE_REPEAT = 2;       ///< its texture repeated beyond its edges (CAB_REPEAT)
+static constexpr int THREE_D_GPU_EYE_CORNER_LIGHT = 4; ///< the light of each corner, straight across the picture between them (a thing in the hand)
+
+/** Triangles of the eye's frame of one texture, in the order they are drawn: corners first to first + count. */
+struct ThreeDGpuEyeRun {
+	uint32_t texture = 0; ///< ThreeDGpuEyeFrame::textures
+	uint32_t first = 0, count = 0;
+	bool glass = false;   ///< see-through: laid over what is behind by its alpha, its depth not kept
+};
+
+/** A light of the night lighting what is about it on the eye's frame: a lamp's (DrawEyeLampLight()) or a witch's (DrawEyeWitchLight()). */
+struct ThreeDGpuEyeLight {
+	enum Kind : int { LAMP, LANTERN, TORCH };
+	int kind = LAMP;           ///< a house's lamp shines down only; a lantern all round; a torch along its beam
+	float x, y, zu;            ///< where, world units from the eye, its height as x and y (CAB_Z_SCALE)
+	float reach;               ///< how far it lights, world units
+	float r, g, b;             ///< its colour, 0-255
+	float dx = 0, dy = 0, dz = 0; ///< a torch's beam's direction, a unit long (dz in metres as dx and dy)
+	float cos_edge = 0;        ///< and the cosine of its half angle
+	int x0 = 0, y0 = 0, x1 = -1, y1 = -1; ///< the pixels it may reach
+};
+
+/** A soft spot of light added to the eye's frame (AddNightLight() of viewport.cpp), hidden behind what is nearer than its middle. */
+struct ThreeDGpuEyeGlow {
+	float sx, sy, rx, ry;  ///< its middle and half sizes, pixels
+	float r, g, b;         ///< its colour, 0-255
+	float strength;
+	float iw;              ///< its middle's 1 / how far ahead: hidden where the picture is nearer there by more than hidden_by; 0 never hidden
+	float hidden_by = 1.05f;
+};
+
+/** A ball of smoke or a blast laid over the eye's frame (DrawEyeBlasts()), hidden by the pixel behind what is nearer than its middle. */
+struct ThreeDGpuEyeBlast {
+	float sx, sy, radius, iw;
+	float r, g, b, alpha;
+};
+
+/** A star of the night sky of the eye's frame (DrawEyeSky()): a pixel, and a little cross for a bright one. */
+struct ThreeDGpuEyeStar {
+	int x, y;
+	float r, g, b; ///< 0-255
+	int a;         ///< how much of its colour is added, 255ths
+	bool cross;
+};
+
+/**
+ * A step of the eye's frame drawn on the card (ThreeDGpuEyeFrame), as a pass or a job of the processor's frame
+ * (EyeFrame of viewport.cpp) draws it: what is drawn in its order, and the jobs over the whole picture as the
+ * processor computes them, pixel by pixel.
+ */
+struct ThreeDGpuEyeStep {
+	enum class Kind : uint8_t {
+		Background,     ///< the sky down to the horizon (horizon), the ground under it
+		Triangles,      ///< runs first_run to first_run + runs
+		Objects,        ///< the buildings and the figures by their triangles (objects); their glass after the triangles that follow
+		Lay,            ///< a picture of its own laid in where it is and nearer (a tunnel seen through its portal): lay_px, lay_z
+		Haze,           ///< the far fading into colour from from on, over depth (the haze job of CollectEyeFrame())
+		FarHaze,        ///< the haze far off: from from to to, the ground under the horizon all of it
+		Shadows,        ///< the sun's shadows of the buildings (DrawEyeShadows()): shadow_map
+		Night,          ///< the picture darkened by colour 256ths, then the glows
+		Glows,          ///< glows added
+		GlowAfterNight, ///< the figures' own light again over the dark, where they are still what is seen
+		Lamps,          ///< lights lighting what is about them (lights), each pixel's own colour out of the dark by colour (the night's 256ths)
+		Sky,            ///< the stars and the moon where nothing is drawn above the horizon
+		Blasts,         ///< blasts laid over
+	};
+	Kind kind = Kind::Triangles;
+	size_t first_run = 0, runs = 0;
+	std::shared_ptr<ThreeDGpuEyePicture> objects;
+	std::vector<uint32_t> lay_px;
+	std::vector<float> lay_z;
+	std::array<float, 3> colour{};
+	float from = 0, to = 0, depth = 0, horizon = 0;
+	std::vector<ThreeDGpuEyeGlow> glows;
+	std::vector<ThreeDGpuEyeLight> lights;
+	std::vector<ThreeDGpuEyeBlast> blasts;
+	std::vector<ThreeDGpuEyeStar> stars;
+	std::array<float, 3> moon{};     ///< the moon on the sky: x, y, radius, pixels; radius 0 not seen
+	/** The map of the shadows (CabShadowMap of viewport.cpp): kept on the card by key. */
+	struct ShadowMap {
+		uint64_t key = 0;
+		int nu = 0, nv = 0;
+		const float *nearest = nullptr;
+		float u0 = 0, v0 = 0, texel = 1, bias = 0; ///< u0, v0 from the eye
+		float sun0 = 0;                            ///< how near to the sun the eye is (the map's nearest from it)
+		std::array<float, 3> sun{}, a{}, b{};
+	} shadow_map;
+};
+
+/**
+ * The whole view from the eyes drawn on the card (the player, 20. 10.: "draw as it is to be drawn, so that it does not
+ * jerk"): its steps in their order, the triangles' corners and textures they point to, and what comes of it.
+ */
+struct ThreeDGpuEyeFrame {
+	int width = 0, height = 0;
+	float near_plane = 1;            ///< the nearest drawn, world units ahead
+	std::array<float, 10> eye{};     ///< x, y, z, fx, fy, rx, ry, focal, cx, cy (CabEye of viewport.cpp)
+	std::vector<ThreeDGpuEyeTexture> textures;
+	std::vector<ThreeDGpuEyeCorner> corners;
+	std::vector<ThreeDGpuEyeRun> runs;
+	std::vector<ThreeDGpuEyeStep> steps;
+	std::vector<uint32_t> pixels;    ///< what comes: the colours (Colour::data), top row first
+};
+
 bool ThreeDGpuAvailable();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(ThreeDGpuPicture &pic);
 bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
+bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();

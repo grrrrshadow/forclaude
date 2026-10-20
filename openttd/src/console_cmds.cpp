@@ -9739,6 +9739,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (auto on = number(2); on.has_value()) _three_d_event_forced = *on != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: akce {}", _three_d_event_forced ? "kazdy den" : "ve sve dny");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "snimek") {
+		/* 'gpu snimek 0|1': the frames of the view from the eyes drawn whole by the graphics card (1), or by the
+		 * processor with only the objects on the card (0). */
+		extern bool _eye_frame_on_card;
+		_eye_frame_on_card = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: gpu snimek {}", _eye_frame_on_card ? "cely na karte" : "procesor, objekty na karte");
 	} else if (what == "gpu") {
 		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
 		 * and what draws them (three_d_gpu.h). */

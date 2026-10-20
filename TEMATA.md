@@ -47,9 +47,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   vloží se přes tmu tam, kde je figura nejblíž. Rig, karta proti procesoru: noční houby u Drakova 13–19 px, Tatra 603
   s koly ve dne i v noci 11–38 px, kabina Tatry 148 ve dne i v noci 10–14 px (hra pauznutá, jinak auto mezi snímky
   popojede a liší se celá zem).
-- **Dál:** krok 2 – celý snímek z očí na kartě (terén, plakáty, mosty a tunely, vzdálená krajina, obloha, mlha, noc,
-  světla lamp, stíny, věci v ruce); krok 3 – ukázat ho bez čtení zpět. Tak se to dělá, aby to necukalo, na každém
-  počítači.
+- **Hotovo – krok 2: celý snímek z očí na kartě** (`ThreeDGpuRenderEyeFrame()`, v `viewport.cpp` `EyeCard`): snímek
+  se dál sbírá jako dřív (průchody trojúhelníků a práce nad celým obrazem), ale kreslí ho karta celý najednou a čte se
+  zpět jen jednou na konci. Každá práce snímku má svou podobu na kartě: obloha a zem pod obzorem, trojúhelníky (zem,
+  vzdálená krajina, základy, mosty, tunely, plakáty, okna v noci, sklo světel), domy a postavy (sítě na kartě), co
+  procesor u postavy nedokáže (víc než 32 kol), dá kartě své trojúhelníky, opar a mlha v dálce, stíny slunce (mapa
+  stínů na kartě, jen když se domy změní), noc a záře světel, svit materiálů po noci, světla lamp a čarodějnic,
+  výbuchy a kouř, hvězdy a měsíc, věci v ruce, tunel viděný portálem. Textury jen tohoto snímku jdou do jedné
+  (atlas), sprity a textury domů si karta drží podle čísla. Barvy počítá stejně jako procesor (celá čísla, ořez), rig:
+  karta proti procesoru 5–1023 px (okraje tenkých trojúhelníků a textura pod velmi ostrým úhlem).
+  Bez karty, nebo když karta něco neudrží, kreslí procesor jako dřív. Rig: `test3d gpu snimek 0|1`.
+- **Opraveno: sklo kabiny uřezávalo, co je za ním proti nebi** (komíny elektrárny, stromy). Procesor zapisoval hloubku
+  skla přes oblohu, takže plakáty kreslené až po postavách byly „za sklem“. Teď sklo postav až po všem pevném a jeho
+  hloubka se nezapisuje (ani na procesoru, ani na kartě): za sklem je vidět i měsíc a hvězdy, světla za ním svítí.
+- **Dál:** krok 3 – ukázat snímek z karty bez čtení zpět (sdílený kontext s ovladačem videa). Tak se to dělá, aby to
+  necukalo, na každém počítači.
 - **Deník karty:** `3d_karta.log` je ve složce hry vedle `openttd.cfg` (ne v `save`). Hráčův: zink (Vortek, Mali-G615),
   OpenGL 4.3, obrázky 5–19 ms. Hráč zavírá hru zavřením celého Winlatoru, takže hra nestihne zapsat „konec“ a příště
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra

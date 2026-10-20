@@ -134,6 +134,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include <mutex>
 #include <condition_variable>
 #include <map>
+#include <unordered_map>
 #include <tuple>
 #include <atomic>
 #include <functional>
@@ -6985,6 +6986,7 @@ struct CabTexture {
 	int ox = 0, oy = 0; ///< where the texture's top left is in the north-up virtual coordinates the sprite was drawn at (RemapCoords())
 	std::vector<uint32_t> px;
 	uint64_t used = 0;
+	uint64_t uid = 0;   ///< a kept one's number: the graphics card keeps it by it for the frames to come (ThreeDGpuEyeTexture)
 };
 static std::map<uint64_t, CabTexture> _cab_textures;
 static uint64_t _cab_texture_clock = 0;
@@ -7036,15 +7038,17 @@ static ThreeDGpuMatrix EyeClipMatrix(const std::array<double, 16> &clip, const s
 
 /**
  * Lay what the card drew of the view from the eyes (ThreeDGpuRenderEye()) into the eye's picture where it is nearer:
- * whole, or see-through (the glass over nothing of the card's) over what is drawn there.
+ * what is whole, or the see-through (the glass over nothing of the card's) over what is drawn there -- the glass after
+ * all that is solid (the billboards too), else what stands behind it against the sky was cut off by it.
+ * @param glass the see-through (else the whole)
  */
-static void LayEyeCardPicture(const ThreeDGpuEyePicture &pic, uint32_t *dst, float *zb)
+static void LayEyeCardPicture(const ThreeDGpuEyePicture &pic, uint32_t *dst, float *zb, bool glass = false)
 {
-	const size_t n = static_cast<size_t>(pic.width) * pic.height;
+	const size_t n = std::min(pic.pixels.size(), pic.depth.size());
 	for (size_t i = 0; i < n; i++) {
 		if (pic.depth[i] <= zb[i]) continue;
 		const Colour c(pic.pixels[i]);
-		if (c.a == 0) continue;
+		if (c.a == 0 || (c.a == 255) == glass) continue;
 		if (c.a == 255) {
 			dst[i] = pic.pixels[i];
 			zb[i] = pic.depth[i];
@@ -7053,8 +7057,7 @@ static void LayEyeCardPicture(const ThreeDGpuEyePicture &pic, uint32_t *dst, flo
 		const Colour d(dst[i]);
 		const uint na = 255 - c.a;
 		dst[i] = Colour(static_cast<uint8_t>(std::min<uint>(255, c.r + (d.r * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.g + (d.g * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.b + (d.b * na + 127) / 255))).data;
-		/* Over nothing (the sky): its depth, so the sky drawn after the dark (DrawEyeSky()) leaves it (as CabRasterRows()). */
-		if (zb[i] == 0.0f) zb[i] = pic.depth[i];
+		/* Its depth not kept: seen through (the stars and the moon behind the windscreen too, as CabRasterRows()). */
 	}
 }
 
@@ -7100,7 +7103,6 @@ static constexpr uint8_t CAB_REPEAT = 2;     ///< the texture repeated beyond it
  * each pixel's texture pixel is their quotient. A pixel is drawn where the triangle is nearer than what is there.
  * @param fill_holes CAB_FILL_HOLES, CAB_REPEAT (true: CAB_FILL_HOLES); beyond the texture's edges nothing without CAB_REPEAT
  * @param alpha below 256 see-through (a vehicle's glass): laid over what is there by so many 256ths, its depth not kept
- *              where something is behind it
  */
 static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light, int row_lo, int row_hi, uint alpha = 256)
 {
@@ -7178,8 +7180,7 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			if (alpha < 256) {
 				const Colour over(lit), under(row[x]);
 				row[x] = Colour(static_cast<uint8_t>((over.r * alpha + under.r * (256 - alpha)) >> 8), static_cast<uint8_t>((over.g * alpha + under.g * (256 - alpha)) >> 8), static_cast<uint8_t>((over.b * alpha + under.b * (256 - alpha)) >> 8)).data;
-				/* Over nothing (the sky): its depth, so the sky drawn after the dark (DrawEyeSky()) leaves it. */
-				if (zrow[x] == 0.0f) zrow[x] = static_cast<float>(iw);
+				/* Its depth not kept: what is behind it is lit, hazed and hidden as it is, the night sky seen through it. */
 				continue;
 			}
 			row[x] = lit;
@@ -7229,10 +7230,16 @@ static std::vector<CabBatchTriangle> *_cab_glow_after_night = nullptr;
  * and a frame is collected only when the one before was taken, so the caches the collecting writes (the sprites as
  * textures, the painted textures of the vehicles) are not written while they are read.
  */
-/** A pass of a frame: triangles drawn at once by bands of rows (CabRasterLists()), or a job over the whole picture. */
+struct EyeCard;
+/**
+ * A pass of a frame: triangles drawn at once by bands of rows (CabRasterLists()), or a job over the whole picture --
+ * with what it is on the graphics card (DrawEyeFrameOnCard()): its steps added to the card's frame; false, or none,
+ * the frame is drawn by the processor.
+ */
 struct EyePass {
 	std::vector<CabBatchTriangle> triangles;
 	std::function<void(uint32_t *, float *)> work; ///< the job, given the picture and its depth; none for the triangles
+	std::function<bool(EyeCard &)> card;           ///< the job on the graphics card
 };
 /** A picture drawn into of its own (a tunnel seen through its portal, CabDrawTunnelSeenIn()). */
 struct EyeCanvas {
@@ -7249,11 +7256,15 @@ struct EyeFrame {
 	std::deque<CabTexture> sprites;           ///< sprites painted for this frame alone (a bridge's, a foundation's)
 	std::deque<EyeCanvas> canvases;           ///< pictures of its own drawn while collecting (a tunnel seen in)
 	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead
+	std::unordered_map<const uint32_t *, uint64_t> kept; ///< the textures its triangles point to that the frames share (a sprite's), by their number
+	CabEye eye{};                             ///< the eye it is seen from
+	double near_plane = 0;                    ///< its near plane (_cab_near)
 	const void *client = nullptr;             ///< whose picture it is: the window's camera
 	bool depot = false;                       ///< nothing to draw: the picture was filled while collecting (hidden in a depot)
 	bool pinned = false;                      ///< the pictures of the vehicles pinned for it (PinThreeDPictures())
 	double collect_ms = 0;                    ///< how long collecting took, under the lock
 	double draw_ms = 0;                       ///< and drawing, on the thread
+	bool on_card = false;                     ///< drawn whole by the graphics card
 	std::chrono::steady_clock::time_point drawn_at{}; ///< when it was drawn: one its window does not take goes after a while
 
 	/** A triangle, into the pass being collected (a new one after a job). */
@@ -7262,14 +7273,84 @@ struct EyeFrame {
 		if (this->passes.empty() || this->passes.back().work) this->passes.emplace_back();
 		this->passes.back().triangles.push_back(t);
 	}
-	/** A job over the whole picture, after all collected so far. */
-	void Job(std::function<void(uint32_t *, float *)> work)
+	/** A job over the whole picture, after all collected so far; and what it is on the graphics card. */
+	void Job(std::function<void(uint32_t *, float *)> work, std::function<bool(EyeCard &)> card = {})
 	{
-		this->passes.push_back({{}, std::move(work)});
+		this->passes.push_back({{}, std::move(work), std::move(card)});
 	}
 };
 /** The frame being collected: what is drawn goes into it (CabRasterTriangle()); nullptr: drawn at once, as before. */
 static EyeFrame *_eye_frame = nullptr;
+
+/**
+ * A frame of the view from an eye as the graphics card draws it whole (the player, 20. 10.: "draw as it is to be
+ * drawn, so that it does not jerk"; ThreeDGpuEyeFrame): made of the frame's passes in their order when it is drawn --
+ * its triangles as they are, each job by what it is on the card (EyePass::card).
+ */
+struct EyeCard {
+	ThreeDGpuEyeFrame frame;
+	const EyeFrame &of;
+	std::map<std::tuple<const uint32_t *, int, int>, uint32_t> textures; ///< the frame's textures by their texels and size
+
+	explicit EyeCard(const EyeFrame &f) : of(f) {}
+
+	/** The frame's texture of these texels: kept by the card when the frames share it. */
+	uint32_t Texture(const uint32_t *px, int w, int h, uint64_t uid = 0)
+	{
+		auto [it, added] = this->textures.try_emplace(std::make_tuple(px, w, h), static_cast<uint32_t>(this->frame.textures.size()));
+		if (added) {
+			if (uid == 0) {
+				auto k = this->of.kept.find(px);
+				if (k != this->of.kept.end()) uid = k->second;
+			}
+			this->frame.textures.push_back({px, w, h, uid});
+		}
+		return it->second;
+	}
+
+	/** A step after all added so far. */
+	ThreeDGpuEyeStep &Step(ThreeDGpuEyeStep::Kind kind)
+	{
+		ThreeDGpuEyeStep &s = this->frame.steps.emplace_back();
+		s.kind = kind;
+		return s;
+	}
+
+	/** Corners of triangles of a texture, as a run of their own (after the triangles step of the moment, or a new one). */
+	void Corners(uint32_t texture, bool glass, std::span<const ThreeDGpuEyeCorner> corners)
+	{
+		if (corners.empty()) return;
+		if (this->frame.steps.empty() || this->frame.steps.back().kind != ThreeDGpuEyeStep::Kind::Triangles) {
+			this->Step(ThreeDGpuEyeStep::Kind::Triangles).first_run = this->frame.runs.size();
+		}
+		const uint32_t first = static_cast<uint32_t>(this->frame.corners.size());
+		this->frame.corners.insert(this->frame.corners.end(), corners.begin(), corners.end());
+		std::vector<ThreeDGpuEyeRun> &runs = this->frame.runs;
+		ThreeDGpuEyeStep &step = this->frame.steps.back();
+		if (step.runs > 0 && runs.back().texture == texture && runs.back().glass == glass && runs.back().first + runs.back().count == first) {
+			runs.back().count += static_cast<uint32_t>(corners.size());
+		} else {
+			runs.push_back({texture, first, static_cast<uint32_t>(corners.size()), glass});
+			step.runs++;
+		}
+	}
+
+	/** The processor's triangles (CabBatchTriangle), as they are. */
+	void Triangles(std::span<const CabBatchTriangle> tris)
+	{
+		for (const CabBatchTriangle &t : tris) {
+			auto corner = [&t](const CabVertex &v) {
+				return ThreeDGpuEyeCorner{static_cast<float>(v.sx), static_cast<float>(v.sy), static_cast<float>(v.iw), static_cast<float>(v.uw / v.iw), static_cast<float>(v.vw / v.iw),
+						static_cast<float>(t.light), static_cast<float>(t.alpha), static_cast<float>(t.fill_holes)};
+			};
+			const ThreeDGpuEyeCorner c[3] = {corner(t.a), corner(t.b), corner(t.c)};
+			this->Corners(this->Texture(t.tex, t.tw, t.th), t.alpha < 256, c);
+		}
+	}
+};
+
+/** Whether the frames of the view from the eyes are drawn whole by the graphics card when it draws (the rig: test3d gpu snimek 0, by the processor with its objects on the card). */
+bool _eye_frame_on_card = true;
 
 /** A texture of one colour a triangle may point to: the frame's while one is collected, else the colour given, drawn at once. */
 static const uint32_t *EyeColour(uint32_t &colour)
@@ -7565,6 +7646,7 @@ static const CabTexture *CabSpriteTexture(const ParentSpriteToDraw &ps)
 		auto it = _cab_textures.find(key);
 		if (it != _cab_textures.end()) {
 			it->second.used = ++_cab_texture_clock;
+			if (_eye_frame != nullptr) _eye_frame->kept[it->second.px.data()] = it->second.uid;
 			return &it->second;
 		}
 		if (_cab_textures.size() >= CAB_TEXTURES_KEPT) {
@@ -7619,6 +7701,11 @@ static const CabTexture *CabSpriteTexture(const ParentSpriteToDraw &ps)
 				fwrite(rgb, 1, 3, *f);
 			}
 		}
+	}
+	if (cacheable) {
+		/* A new one: a new number, whatever was at its place before. */
+		t.uid = ThreeDUniqueId::Next();
+		if (_eye_frame != nullptr) _eye_frame->kept[t.px.data()] = t.uid;
 	}
 	return &t;
 }
@@ -8224,7 +8311,12 @@ static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const Ca
 		}
 	};
 	if (frame != nullptr) {
-		frame->Job(lay);
+		frame->Job(lay, [&tube_canvas, &open_canvas](EyeCard &card) {
+			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Lay);
+			st.lay_px = tube_canvas.px;
+			st.lay_z = open_canvas.z;
+			return true;
+		});
 	} else {
 		lay(cv.dst, cv.zb);
 	}
@@ -8794,7 +8886,11 @@ static constexpr double CAB_WHEAT_TILES = 10.0;
  * in the sky so that they go round as the eye turns, a little twinkling, and the moon with its glow -- made by the
  * game, nothing to license. Only where the sky is, nothing drawn there.
  */
-static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, const float *zb, double t, double seen)
+/**
+ * The night sky seen from an eye (DrawEyeSky()): the stars where they are on the picture, twinkling (t), the fewer the
+ * lighter the night (seen); the moon's middle and size, its radius 0 when it is not ahead.
+ */
+static void EyeSkySeen(const CabEye &eye, double t, double seen, std::vector<ThreeDGpuEyeStar> &out, std::array<float, 3> &moon)
 {
 	struct Star {
 		float az, el;   ///< its direction: round from the world's x, up from the horizon, radians
@@ -8820,15 +8916,6 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
 			stars.push_back(st);
 		}
 	}
-	auto sky = [&](int x, int y) {
-		return x >= 0 && y >= 0 && x < width && y < height && y < eye.cy && zb[static_cast<size_t>(y) * width + x] <= 0.0f;
-	};
-	auto put = [&](int x, int y, Colour c, uint a) {
-		if (!sky(x, y)) return;
-		uint32_t &d = dst[static_cast<size_t>(y) * width + x];
-		Colour o(d);
-		d = Colour(static_cast<uint8_t>(std::min(255u, o.r + c.r * a / 255)), static_cast<uint8_t>(std::min(255u, o.g + c.g * a / 255)), static_cast<uint8_t>(std::min(255u, o.b + c.b * a / 255))).data;
-	};
 	/* Where a direction of the sky is on the picture: ahead of the eye only. */
 	auto place = [&](double az, double el, double &sx, double &sy) {
 		const double h = std::cos(el), dx = std::cos(az) * h, dy = std::sin(az) * h;
@@ -8838,25 +8925,49 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
 		sy = eye.cy - u * eye.focal / f;
 		return true;
 	};
+	out.clear();
 	for (const Star &st : stars) {
 		double sx, sy;
 		if (!place(st.az, st.el, sx, sy)) continue;
-		const int x = static_cast<int>(sx), y = static_cast<int>(sy);
 		const uint a = static_cast<uint>(st.bright * (0.8 + 0.2 * std::sin(t + st.phase)) * seen);
 		const Colour c = st.warm > 200 ? Colour(255, 235, 200) : (st.warm < 60 ? Colour(200, 215, 255) : Colour(240, 240, 255));
-		put(x, y, c, a);
-		if (st.bright > 200) {
-			/* A bright one: a little cross. */
-			put(x - 1, y, c, a / 3);
-			put(x + 1, y, c, a / 3);
-			put(x, y - 1, c, a / 3);
-			put(x, y + 1, c, a / 3);
+		/* A bright one: a little cross. */
+		out.push_back({static_cast<int>(sx), static_cast<int>(sy), static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b), static_cast<int>(a), st.bright > 200});
+	}
+	/* The moon, low in the south-east of the map. */
+	double mx, my;
+	moon = {0, 0, 0};
+	if (place(0.6, 0.42, mx, my)) moon = {static_cast<float>(mx), static_cast<float>(my), static_cast<float>(std::max(3.0, 0.035 * eye.focal))};
+}
+
+static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, const float *zb, double t, double seen)
+{
+	std::vector<ThreeDGpuEyeStar> stars;
+	std::array<float, 3> moon;
+	EyeSkySeen(eye, t, seen, stars, moon);
+	auto sky = [&](int x, int y) {
+		return x >= 0 && y >= 0 && x < width && y < height && y < eye.cy && zb[static_cast<size_t>(y) * width + x] <= 0.0f;
+	};
+	auto put = [&](int x, int y, Colour c, uint a) {
+		if (!sky(x, y)) return;
+		uint32_t &d = dst[static_cast<size_t>(y) * width + x];
+		Colour o(d);
+		d = Colour(static_cast<uint8_t>(std::min(255u, o.r + c.r * a / 255)), static_cast<uint8_t>(std::min(255u, o.g + c.g * a / 255)), static_cast<uint8_t>(std::min(255u, o.b + c.b * a / 255))).data;
+	};
+	for (const ThreeDGpuEyeStar &st : stars) {
+		const Colour c(static_cast<uint8_t>(st.r), static_cast<uint8_t>(st.g), static_cast<uint8_t>(st.b));
+		const uint a = static_cast<uint>(st.a);
+		put(st.x, st.y, c, a);
+		if (st.cross) {
+			put(st.x - 1, st.y, c, a / 3);
+			put(st.x + 1, st.y, c, a / 3);
+			put(st.x, st.y - 1, c, a / 3);
+			put(st.x, st.y + 1, c, a / 3);
 		}
 	}
-	/* The moon, low in the south-east of the map, its glow round it and a few darker seas on it. */
-	double mx, my;
-	if (place(0.6, 0.42, mx, my)) {
-		const double rad = std::max(3.0, 0.035 * eye.focal);
+	/* The moon, its glow round it and a few darker seas on it. */
+	if (moon[2] > 0) {
+		const double mx = moon[0], my = moon[1], rad = moon[2];
 		const int x0 = static_cast<int>(mx - rad * 4), x1 = static_cast<int>(mx + rad * 4);
 		const int y0 = static_cast<int>(my - rad * 4), y1 = static_cast<int>(my + rad * 4);
 		static const double seas[][3] = {{-0.30, -0.20, 0.32}, {0.25, -0.35, 0.22}, {0.10, 0.30, 0.28}, {-0.35, 0.35, 0.15}};
@@ -9111,13 +9222,21 @@ static const std::array<double, 3> &CabSun()
  * place in the world from its depth, seen from the sun on the map of the shadows (CabShadowMap); a surface turned
  * away from the sun is dark of its own light already, and is left as it is.
  */
-static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::span<const CabShadowCaster> casters)
+/** The plane the map of the shadows lies on (CabShadowMap): its u and v, across the sun's light. */
+static void CabShadowAxes(std::array<double, 3> &a, std::array<double, 3> &b)
 {
-	if (casters.empty()) return;
 	const std::array<double, 3> &s = CabSun();
 	const double al = std::hypot(s[0], s[1]);
-	const std::array<double, 3> a = {-s[1] / al, s[0] / al, 0.0};
-	const std::array<double, 3> b = {s[1] * a[2] - s[2] * a[1], s[2] * a[0] - s[0] * a[2], s[0] * a[1] - s[1] * a[0]};
+	a = {-s[1] / al, s[0] / al, 0.0};
+	b = {s[1] * a[2] - s[2] * a[1], s[2] * a[0] - s[0] * a[2], s[0] * a[1] - s[1] * a[0]};
+}
+
+/** The map of the shadows of these buildings (DrawEyeShadows()): made again only when they are others. */
+static const CabShadowMap &EyeShadowMap(std::span<const CabShadowCaster> casters)
+{
+	const std::array<double, 3> &s = CabSun();
+	std::array<double, 3> a, b;
+	CabShadowAxes(a, b);
 	auto dot = [](const std::array<double, 3> &v, double x, double y, double z) { return v[0] * x + v[1] * y + v[2] * z; };
 
 	/* The map again when the buildings are others. */
@@ -9190,6 +9309,17 @@ static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, in
 			}
 		}, tris.size() >= 1024);
 	}
+	return map;
+}
+
+static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::span<const CabShadowCaster> casters)
+{
+	if (casters.empty()) return;
+	const std::array<double, 3> &s = CabSun();
+	std::array<double, 3> a, b;
+	CabShadowAxes(a, b);
+	auto dot = [](const std::array<double, 3> &v, double x, double y, double z) { return v[0] * x + v[1] * y + v[2] * z; };
+	const CabShadowMap &map = EyeShadowMap(casters);
 
 	/* Each pixel: in the shadow when something is nearer to the sun there, by more than a texel or two. */
 	const float bias = static_cast<float>(2.0 * map.texel);
@@ -9236,12 +9366,18 @@ static void DrawEyeShadows(const CabEye &eye, uint32_t *dst, const float *zb, in
  * only (CAB_LAMPS_LIT).
  * @param lights the places of the lights, world units (z in units of height)
  */
-static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::vector<std::array<double, 3>> lights)
+/** How far a house's lamp lights (DrawEyeLampLight()), world units. */
+static constexpr double CAB_LAMP_REACH = 6.0 * OBJECT_UNITS_PER_METRE;
+
+/**
+ * The lamps of the houses that light the picture (DrawEyeLampLight()): those ahead within the view, the nearest
+ * CAB_LAMPS_LIT; each with the pixels it may reach -- its sphere on the picture, all of it when the eye is in the sphere
+ * or the light behind.
+ */
+static std::vector<ThreeDGpuEyeLight> EyeLampsLit(const CabEye &eye, int width, int height, std::vector<std::array<double, 3>> lights)
 {
-	static constexpr double REACH = 6.0 * OBJECT_UNITS_PER_METRE;
+	static constexpr double REACH = CAB_LAMP_REACH;
 	static constexpr size_t CAB_LAMPS_LIT = 48;
-	const Colour warm(255, 214, 150);
-	const NightLight moon = GetNightLight();
 	auto far = [&](const std::array<double, 3> &l) { return (l[0] - eye.x) * (l[0] - eye.x) + (l[1] - eye.y) * (l[1] - eye.y); };
 	/* Those whose light may be seen: ahead, within the view. */
 	std::erase_if(lights, [&](const std::array<double, 3> &l) {
@@ -9252,9 +9388,9 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
 		std::ranges::nth_element(lights, lights.begin() + CAB_LAMPS_LIT, {}, far);
 		lights.resize(CAB_LAMPS_LIT);
 	}
+	std::vector<ThreeDGpuEyeLight> lit;
 	for (const auto &l : lights) {
 		const CabPoint c = CabToEye(eye, l[0], l[1], l[2], 0, 0);
-		/* The pixels it may reach: its sphere on the picture (all of it when the eye is in the sphere or the light behind). */
 		int x0 = 0, x1 = width - 1, y0 = 0, y1 = height - 1;
 		if (c.f > REACH + CAB_NEAR) {
 			const CabVertex v = CabProject(eye, c);
@@ -9265,7 +9401,32 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
 			y1 = std::min(height - 1, static_cast<int>(v.sy + r));
 		}
 		if (x0 > x1 || y0 > y1) continue;
-		const double lzu = l[2] * CAB_Z_SCALE;
+		ThreeDGpuEyeLight &g = lit.emplace_back();
+		g.kind = ThreeDGpuEyeLight::LAMP;
+		g.x = static_cast<float>(l[0] - eye.x);
+		g.y = static_cast<float>(l[1] - eye.y);
+		g.zu = static_cast<float>((l[2] - eye.z) * CAB_Z_SCALE);
+		g.reach = static_cast<float>(REACH);
+		g.r = 255;
+		g.g = 214;
+		g.b = 150;
+		g.x0 = x0;
+		g.y0 = y0;
+		g.x1 = x1;
+		g.y1 = y1;
+	}
+	return lit;
+}
+
+static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::vector<std::array<double, 3>> lights)
+{
+	static constexpr double REACH = CAB_LAMP_REACH;
+	const Colour warm(255, 214, 150);
+	const NightLight moon = GetNightLight();
+	for (const ThreeDGpuEyeLight &g : EyeLampsLit(eye, width, height, std::move(lights))) {
+		const std::array<double, 3> l = {eye.x + g.x, eye.y + g.y, 0.0};
+		const int x0 = g.x0, x1 = g.x1, y0 = g.y0, y1 = g.y1;
+		const double lzu = g.zu + eye.z * CAB_Z_SCALE;
 		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
 			for (int py = y0 + lo; py < y0 + hi; py++) {
 				for (int px = x0; px <= x1; px++) {
@@ -9302,8 +9463,10 @@ static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, 
  * over what is behind it, thinner to its edge, hidden behind what is nearer than its middle.
  * @param fire the blasts (else the smoke)
  */
-static void DrawEyeBlasts(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDBlast> &blasts, bool fire)
+/** The smoke or the blasts as the eye sees them (DrawEyeBlasts()): their middles, sizes and depths on the picture. */
+static std::vector<ThreeDGpuEyeBlast> EyeBlastsSeen(const CabEye &eye, const std::vector<ThreeDBlast> &blasts, bool fire)
 {
+	std::vector<ThreeDGpuEyeBlast> seen;
 	for (const ThreeDBlast &b : blasts) {
 		if (b.light != fire || b.alpha <= 0) continue;
 		const CabPoint c = CabToEye(eye, b.x, b.y, b.z, 0, 0);
@@ -9311,15 +9474,25 @@ static void DrawEyeBlasts(const CabEye &eye, uint32_t *dst, const float *zb, int
 		const CabVertex v = CabProject(eye, c);
 		const double r = b.radius_m * OBJECT_UNITS_PER_METRE * eye.focal / c.f;
 		if (r < 0.5) continue;
-		const int x0 = std::max(0, static_cast<int>(v.sx - r)), x1 = std::min(width - 1, static_cast<int>(v.sx + r));
-		const int y0 = std::max(0, static_cast<int>(v.sy - r)), y1 = std::min(height - 1, static_cast<int>(v.sy + r));
-		const Colour col(static_cast<uint8_t>(b.colour >> 16), static_cast<uint8_t>(b.colour >> 8), static_cast<uint8_t>(b.colour));
+		seen.push_back({static_cast<float>(v.sx), static_cast<float>(v.sy), static_cast<float>(r), static_cast<float>(v.iw),
+				static_cast<float>((b.colour >> 16) & 0xFF), static_cast<float>((b.colour >> 8) & 0xFF), static_cast<float>(b.colour & 0xFF), static_cast<float>(b.alpha)});
+	}
+	return seen;
+}
+
+static void DrawEyeBlasts(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDBlast> &blasts, bool fire)
+{
+	for (const ThreeDGpuEyeBlast &b : EyeBlastsSeen(eye, blasts, fire)) {
+		const double r = b.radius;
+		const int x0 = std::max(0, static_cast<int>(b.sx - r)), x1 = std::min(width - 1, static_cast<int>(b.sx + r));
+		const int y0 = std::max(0, static_cast<int>(b.sy - r)), y1 = std::min(height - 1, static_cast<int>(b.sy + r));
+		const Colour col(static_cast<uint8_t>(b.r), static_cast<uint8_t>(b.g), static_cast<uint8_t>(b.b));
 		for (int py = y0; py <= y1; py++) {
 			for (int px = x0; px <= x1; px++) {
-				const double dx = (px + 0.5 - v.sx) / r, dy = (py + 0.5 - v.sy) / r, d2 = dx * dx + dy * dy;
+				const double dx = (px + 0.5 - b.sx) / r, dy = (py + 0.5 - b.sy) / r, d2 = dx * dx + dy * dy;
 				if (d2 >= 1.0) continue;
 				const size_t i = static_cast<size_t>(py) * width + px;
-				if (zb[i] > v.iw * 1.02f) continue; // something nearer
+				if (zb[i] > b.iw * 1.02f) continue; // something nearer
 				const double a = b.alpha * (1.0 - d2);
 				const Colour o(dst[i]);
 				dst[i] = Colour(static_cast<uint8_t>(o.r + (col.r - o.r) * a), static_cast<uint8_t>(o.g + (col.g - o.g) * a), static_cast<uint8_t>(o.b + (col.b - o.b) * a)).data;
@@ -9328,13 +9501,16 @@ static void DrawEyeBlasts(const CabEye &eye, uint32_t *dst, const float *zb, int
 	}
 }
 
-static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights)
+/**
+ * The witches' lights that light the picture (DrawEyeWitchLight()): those whose sphere -- about the lantern, about the
+ * middle of the beam -- may be seen, each with the pixels it may reach.
+ */
+static std::vector<ThreeDGpuEyeLight> EyeWitchLightsLit(const CabEye &eye, int width, int height, const std::vector<ThreeDWitchLight> &lights)
 {
-	const NightLight moon = GetNightLight();
+	std::vector<ThreeDGpuEyeLight> lit;
 	for (const ThreeDWitchLight &l : lights) {
 		const double reach = l.reach * (l.torch ? 1.3 : 1.0);
 		if (reach <= 0) continue;
-		/* The sphere it may reach: about the lantern, about the middle of the beam. */
 		const double half = l.torch ? reach / 2 : 0;
 		const double cx = l.x + l.dx * half, cy = l.y + l.dy * half, cz = l.z + l.dz * half * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
 		const double radius = l.torch ? half + reach * std::tan(l.half_angle) : reach;
@@ -9350,7 +9526,37 @@ static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb,
 			y1 = std::min(height - 1, static_cast<int>(v.sy + r));
 		}
 		if (x0 > x1 || y0 > y1) continue;
-		const double lzu = l.z * CAB_Z_SCALE, cos_edge = std::cos(l.half_angle);
+		ThreeDGpuEyeLight &g = lit.emplace_back();
+		g.kind = l.torch ? ThreeDGpuEyeLight::TORCH : ThreeDGpuEyeLight::LANTERN;
+		g.x = static_cast<float>(l.x - eye.x);
+		g.y = static_cast<float>(l.y - eye.y);
+		g.zu = static_cast<float>((l.z - eye.z) * CAB_Z_SCALE);
+		g.reach = static_cast<float>(reach);
+		g.r = l.colour.r;
+		g.g = l.colour.g;
+		g.b = l.colour.b;
+		g.dx = static_cast<float>(l.dx);
+		g.dy = static_cast<float>(l.dy);
+		g.dz = static_cast<float>(l.dz);
+		g.cos_edge = static_cast<float>(std::cos(l.half_angle));
+		g.x0 = x0;
+		g.y0 = y0;
+		g.x1 = x1;
+		g.y1 = y1;
+	}
+	return lit;
+}
+
+static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights)
+{
+	const NightLight moon = GetNightLight();
+	for (const ThreeDGpuEyeLight &g : EyeWitchLightsLit(eye, width, height, lights)) {
+		const double lx = eye.x + g.x, ly = eye.y + g.y;
+		const bool torch = g.kind == ThreeDGpuEyeLight::TORCH;
+		const Colour colour(static_cast<uint8_t>(g.r), static_cast<uint8_t>(g.g), static_cast<uint8_t>(g.b));
+		const double reach = g.reach;
+		const int x0 = g.x0, x1 = g.x1, y0 = g.y0, y1 = g.y1;
+		const double lzu = g.zu + eye.z * CAB_Z_SCALE, cos_edge = g.cos_edge;
 		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground. */
 		const double zu_per_unit = CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
 		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
@@ -9360,14 +9566,14 @@ static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb,
 					if (zb[i] <= 0.0f) continue;
 					double x, y, zu;
 					CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
-					const double ox = x - l.x, oy = y - l.y, oz = (zu - lzu) / zu_per_unit;
+					const double ox = x - lx, oy = y - ly, oz = (zu - lzu) / zu_per_unit;
 					const double d = std::sqrt(ox * ox + oy * oy + oz * oz);
 					double k;
-					if (!l.torch) {
+					if (!torch) {
 						if (d >= reach) continue;
 						k = (1.0 - d / reach) * (1.0 - d / reach) * 0.8;
 					} else {
-						const double along = ox * l.dx + oy * l.dy + oz * l.dz;
+						const double along = ox * g.dx + oy * g.dy + oz * g.dz;
 						if (along <= 0 || along >= reach || d < 1e-6) continue;
 						const double cosa = along / d;
 						if (cosa <= cos_edge) continue;
@@ -9379,7 +9585,7 @@ static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb,
 						const double own = std::min(255.0, now * 256.0 / night);
 						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
 					};
-					dst[i] = Colour(add(o.r, moon.r, l.colour.r), add(o.g, moon.g, l.colour.g), add(o.b, moon.b, l.colour.b)).data;
+					dst[i] = Colour(add(o.r, moon.r, colour.r), add(o.g, moon.g, colour.g), add(o.b, moon.b, colour.b)).data;
 				}
 			}
 		}, (y1 - y0) * (x1 - x0) > 20000);
@@ -9594,6 +9800,22 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 	}
 }
 
+/** The thing in the walker's hand on the graphics card (ThreeDHeldThingTriangles()): its triangles, each corner its own light. */
+static void EyeHeldOnCard(EyeCard &card, const ThreeDHeldThing &held, int width, int height, double focal)
+{
+	std::vector<ThreeDHeldTriangle> tris;
+	ThreeDHeldThingTriangles(held, width, height, focal, tris);
+	const float to_world = static_cast<float>(1.0 / OBJECT_UNITS_PER_METRE);
+	for (const ThreeDHeldTriangle &h : tris) {
+		const ThreeDObjectTexture &tex = *h.tex;
+		ThreeDGpuEyeCorner c[3];
+		for (int k = 0; k < 3; k++) {
+			c[k] = {h.sx[k], h.sy[k], h.iz[k] * to_world, h.u[k] * tex.w, h.v[k] * tex.h, h.light[k] * 256.0f, 256.0f, static_cast<float>(THREE_D_GPU_EYE_REPEAT | THREE_D_GPU_EYE_CORNER_LIGHT)};
+		}
+		card.Corners(card.Texture(tex.px.data(), tex.w, tex.h, tex.uid.value), false, c);
+	}
+}
+
 /**
  * The view from an eye in perspective: from the cab of a vehicle (cab_view.h), or from the eyes of the walker of the
  * view from the first person (first_person_gui.cpp, the player: "let's make Morrowind, first person view").
@@ -9721,6 +9943,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
 	if (walker != nullptr) eye.cy += std::tan(walker->pitch) * eye.focal;
+	out.eye = eye;
+	out.near_plane = _cab_near;
 
 	/* The sky down to the horizon, the far ground under it. */
 	const Colour haze(165, 200, 240);
@@ -10232,27 +10456,33 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * cut at the near plane; then the lists drawn by bands of rows (CabRasterLists()). Their shapes and textures stay
 	 * as they are till the frame is taken (EyeFrameDrawing()). */
 	camera.billboards += static_cast<int>(jobs.size());
-	if (!jobs.empty()) out.Job([jobs = std::move(jobs), eye, width, height, near = _cab_near](uint32_t *dst, float *zb) {
+	/* Their buildings as the graphics card draws them (ThreeDGpuEyeBuilding). */
+	auto card_buildings = [eye, width, height, near = _cab_near](const std::vector<ObjectJob> &jobs, ThreeDGpuEyePicture &pic) {
+		pic.width = width;
+		pic.height = height;
+		pic.near_plane = static_cast<float>(near);
+		for (const ObjectJob &job : jobs) {
+			if (job.shape.tri.empty() || job.shape.uid == 0) continue;
+			ThreeDGpuEyeBuilding &b = pic.buildings.emplace_back();
+			b.building.uid = job.shape.uid;
+			b.building.pos = job.shape.pos;
+			b.building.uv = job.shape.uv;
+			b.building.light = job.shape.light;
+			b.building.tri = job.shape.tri;
+			b.building.facing = job.shape.facing;
+			b.building.tri_tex = job.shape.tri_tex;
+			b.building.textures = job.texs;
+			b.matrix = EyeClipMatrix(EyeClip(eye, width, height, job.ox, job.oy, job.oz, near));
+		}
+	};
+	auto shared_jobs = std::make_shared<std::vector<ObjectJob>>(std::move(jobs));
+	if (!shared_jobs->empty()) out.Job([shared_jobs, card_buildings, eye, width, height, near = _cab_near](uint32_t *dst, float *zb) {
+		const std::vector<ObjectJob> &jobs = *shared_jobs;
 		/* On the graphics card all at once (the player, 20. 10.: "all the objects by the GPU"), laid in where nearer
 		 * than what is drawn; what it cannot draw the processor draws as below. */
 		if (ThreeDGpuAvailable()) {
 			ThreeDGpuEyePicture pic;
-			pic.width = width;
-			pic.height = height;
-			pic.near_plane = static_cast<float>(near);
-			for (const ObjectJob &job : jobs) {
-				if (job.shape.tri.empty() || job.shape.uid == 0) continue;
-				ThreeDGpuEyeBuilding &b = pic.buildings.emplace_back();
-				b.building.uid = job.shape.uid;
-				b.building.pos = job.shape.pos;
-				b.building.uv = job.shape.uv;
-				b.building.light = job.shape.light;
-				b.building.tri = job.shape.tri;
-				b.building.facing = job.shape.facing;
-				b.building.tri_tex = job.shape.tri_tex;
-				b.building.textures = job.texs;
-				b.matrix = EyeClipMatrix(EyeClip(eye, width, height, job.ox, job.oy, job.oz, near));
-			}
+			card_buildings(jobs, pic);
 			if (ThreeDGpuRenderEye(pic)) {
 				LayEyeCardPicture(pic, dst, zb);
 				return;
@@ -10311,6 +10541,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		std::vector<const std::vector<CabBatchTriangle> *> drawn;
 		for (const std::vector<CabBatchTriangle> &l : lists) drawn.push_back(&l);
 		CabRasterLists(drawn);
+	}, [shared_jobs, card_buildings](EyeCard &card) {
+		auto pic = std::make_shared<ThreeDGpuEyePicture>();
+		card_buildings(*shared_jobs, *pic);
+		card.Step(ThreeDGpuEyeStep::Kind::Objects).objects = std::move(pic);
+		return true;
 	});
 	}
 	for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
@@ -10492,30 +10727,35 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	}
 	CabFlushBatch(); // the figures' billboards, collected above
 	CabFlushGlass();
-	/* The figures by their triangles: a job of the frame, their glass over them after (CabFlushGlass()); inside a
-	 * model's cab the near plane is the cab's. At night what has a light of its own is kept to be drawn again over
-	 * the dark (glow_after_night). */
+	/* The figures by their triangles: a job of the frame, their glass kept to be laid over all that is solid, the
+	 * billboards too (figure_glass); inside a model's cab the near plane is the cab's. At night what has a light of its
+	 * own is kept to be drawn again over the dark (glow_after_night). */
 	auto glow_after_night = IsNightNow() ? std::make_shared<std::vector<CabBatchTriangle>>() : nullptr;
-	/* And what the graphics card drew of them by its own light (ThreeDGpuEyePicture::glow), laid over the dark so too. */
-	auto card_glow = IsNightNow() ? std::make_shared<ThreeDGpuEyePicture>() : nullptr;
-	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures), glow_after_night, card_glow](uint32_t *dst, float *zb) {
+	/* What the graphics card drew of them: its glass, and at night by its own light (ThreeDGpuEyePicture::glow). */
+	auto card_figures = std::make_shared<ThreeDGpuEyePicture>();
+	auto figure_glass = std::make_shared<std::vector<CabBatchTriangle>>();
+	auto shared_figures = std::make_shared<std::vector<std::pair<CabFigure, CabFigureModel>>>(std::move(solid_figures));
+	if (!shared_figures->empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, night = IsNightNow(), shared_figures, glow_after_night, card_figures, figure_glass](uint32_t *dst, float *zb) {
+		const std::vector<std::pair<CabFigure, CabFigureModel>> &solid_figures = *shared_figures;
 		AutoRestoreBackup near_backup(_cab_near, near);
+		if (glow_after_night != nullptr) glow_after_night->clear();
 		AutoRestoreBackup glow_backup(_cab_glow_after_night, glow_after_night.get());
 		/* Those the graphics card draws (EyeFigureOnCard()) laid in first, the rest by the processor. */
 		std::vector<bool> on_card(solid_figures.size(), false);
+		*card_figures = {};
 		if (ThreeDGpuAvailable()) {
 			ThreeDGpuEyePicture pic;
 			pic.width = width;
 			pic.height = height;
 			pic.near_plane = static_cast<float>(near);
-			pic.read_glow = card_glow != nullptr;
+			pic.read_glow = night;
 			for (size_t k = 0; k < solid_figures.size(); k++) {
 				on_card[k] = EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, wheels_turn, pic.meshes);
 			}
 			if (!pic.meshes.empty()) {
 				if (ThreeDGpuRenderEye(pic)) {
 					LayEyeCardPicture(pic, dst, zb);
-					if (card_glow != nullptr) *card_glow = std::move(pic);
+					*card_figures = std::move(pic);
 				} else {
 					on_card.assign(solid_figures.size(), false);
 				}
@@ -10527,7 +10767,34 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				if (!on_card[k]) CabDrawFigureModel(dst, zb, width, height, eye, solid_figures[k].first, solid_figures[k].second, wheels_turn);
 			}
 		}
-		CabFlushGlass();
+		figure_glass->swap(_cab_glass_batch);
+		_cab_glass_batch.clear();
+	}, [eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, shared_figures, glow_after_night, figure_glass](EyeCard &card) {
+		/* Those the card draws by their meshes; the rest by the processor's triangles, as they would draw (their glow
+		 * kept for after the night, glow_after_night). */
+		const std::vector<std::pair<CabFigure, CabFigureModel>> &solid_figures = *shared_figures;
+		if (glow_after_night != nullptr) glow_after_night->clear();
+		auto pic = std::make_shared<ThreeDGpuEyePicture>();
+		pic->width = width;
+		pic->height = height;
+		pic->near_plane = static_cast<float>(near);
+		std::vector<size_t> by_processor;
+		for (size_t k = 0; k < solid_figures.size(); k++) {
+			if (!EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, wheels_turn, pic->meshes)) by_processor.push_back(k);
+		}
+		if (!pic->meshes.empty()) card.Step(ThreeDGpuEyeStep::Kind::Objects).objects = std::move(pic);
+		if (by_processor.empty()) return true;
+		EyeFrame triangles;
+		{
+			AutoRestoreBackup frame_backup(_eye_frame, &triangles);
+			AutoRestoreBackup near_backup(_cab_near, near);
+			AutoRestoreBackup glow_backup(_cab_glow_after_night, glow_after_night.get());
+			for (size_t k : by_processor) CabDrawFigureModel(nullptr, nullptr, width, height, eye, solid_figures[k].first, solid_figures[k].second, wheels_turn);
+			figure_glass->swap(_cab_glass_batch);
+			_cab_glass_batch.clear();
+		}
+		for (const EyePass &p : triangles.passes) card.Triangles(p.triangles);
+		return true;
 	});
 	std::sort(bills.begin(), bills.end(), [](const CabBillboard &a, const CabBillboard &b) { return a.f > b.f; });
 	for (const CabBillboard &b : bills) {
@@ -10579,6 +10846,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		CabDrawPolygon(dst, zb, width, height, tex->px.data(), tex->w, tex->h, std::move(quad), eye, false);
 		camera.billboards++;
 	}
+	/* The figures' glass over all that is solid (the card's own after the triangles of a frame drawn on it whole). */
+	if (!shared_figures->empty()) out.Job([card_figures, figure_glass](uint32_t *dst, float *zb) {
+		LayEyeCardPicture(*card_figures, dst, zb, true);
+		const std::vector<CabBatchTriangle> *list = figure_glass.get();
+		CabRasterLists({&list, 1});
+	}, [figure_glass](EyeCard &card) {
+		card.Triangles(*figure_glass);
+		return true;
+	});
 
 	/* 5b. The sun's shadows of the buildings about the eye, by day (DrawEyeShadows()): their shapes made now, as simple
 	 * as a texel of the map of the shadows allows; the map and the shadows as a job of the frame. */
@@ -10593,7 +10869,31 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		if (!casters.empty()) {
 			const int level = ThreeDShapeLevel(OBJECT_UNITS_PER_METRE / CAB_SHADOW_TEXEL, 1.0);
 			for (CabShadowCaster &c : casters) c.shape = c.obj->TryGetShape(level);
-			out.Job([eye, width, height, casters = std::move(casters)](uint32_t *dst, float *zb) { DrawEyeShadows(eye, dst, zb, width, height, casters); });
+			auto shared_casters = std::make_shared<std::vector<CabShadowCaster>>(std::move(casters));
+			out.Job([eye, width, height, shared_casters](uint32_t *dst, float *zb) { DrawEyeShadows(eye, dst, zb, width, height, *shared_casters); }, [eye, shared_casters](EyeCard &card) {
+				const CabShadowMap &map = EyeShadowMap(*shared_casters);
+				const std::array<double, 3> &sun = CabSun();
+				std::array<double, 3> a, b;
+				CabShadowAxes(a, b);
+				/* From the eye: its own place on the map and towards the sun taken away. */
+				auto dot = [&eye](const std::array<double, 3> &v) { return v[0] * eye.x + v[1] * eye.y + v[2] * eye.z * CAB_Z_SCALE; };
+				ThreeDGpuEyeStep::ShadowMap &m = card.Step(ThreeDGpuEyeStep::Kind::Shadows).shadow_map;
+				m.key = map.key;
+				m.nu = map.nu;
+				m.nv = map.nv;
+				m.nearest = map.nearest.data();
+				m.u0 = static_cast<float>(map.u0 - dot(a));
+				m.v0 = static_cast<float>(map.v0 - dot(b));
+				m.texel = static_cast<float>(map.texel);
+				m.bias = static_cast<float>(2.0 * map.texel);
+				m.sun0 = static_cast<float>(dot(sun));
+				for (int k = 0; k < 3; k++) {
+					m.sun[k] = static_cast<float>(sun[k]);
+					m.a[k] = static_cast<float>(a[k]);
+					m.b[k] = static_cast<float>(b[k]);
+				}
+				return true;
+			});
 		}
 	}
 
@@ -10613,6 +10913,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				dst[i] = Colour(static_cast<uint8_t>(c.r + (haze.r - c.r) * t), static_cast<uint8_t>(c.g + (haze.g - c.g) * t), static_cast<uint8_t>(c.b + (haze.b - c.b) * t)).data;
 			}
 		});
+	}, [haze, haze_depth](EyeCard &card) {
+		ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Haze);
+		st.colour = {static_cast<float>(haze.r), static_cast<float>(haze.g), static_cast<float>(haze.b)};
+		st.from = static_cast<float>(CAB_HAZE_FROM);
+		st.depth = static_cast<float>(haze_depth);
+		return true;
 	});
 	_vd.tile_sprites_to_draw.clear();
 	_vd.parent_sprites_to_draw.clear();
@@ -10640,30 +10946,62 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 			});
+		}, [eye, fog_near, fog_far, far_haze](EyeCard &card) {
+			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::FarHaze);
+			st.colour = {static_cast<float>(far_haze.r), static_cast<float>(far_haze.g), static_cast<float>(far_haze.b)};
+			st.from = static_cast<float>(fog_near);
+			st.to = static_cast<float>(fog_far);
+			st.horizon = static_cast<float>(eye.cy);
+			return true;
 		});
 	}
 	/* What the walker holds (the hammer), before the night: the dark is over it too. A job of the frame: it draws
 	 * by its own means (DrawThreeDHeldThing()), from the thing's model, which stays. */
 	/* The smoke of the walker's rockets, before the night: the dark is over it too (DrawEyeBlasts()). */
-	if (walker != nullptr && !walker->blasts.empty()) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, false); });
-	if (walker != nullptr && !walker->held.thing.empty()) out.Job([held = walker->held, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(held, dst, zb, width, height, focal); });
+	auto blasts_job = [&](bool fire) {
+		out.Job([eye, width, height, blasts = walker->blasts, fire](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, fire); }, [eye, blasts = walker->blasts, fire](EyeCard &card) {
+			card.Step(ThreeDGpuEyeStep::Kind::Blasts).blasts = EyeBlastsSeen(eye, blasts, fire);
+			return true;
+		});
+	};
+	auto held_job = [&](const ThreeDHeldThing &held) {
+		out.Job([held, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(held, dst, zb, width, height, focal); }, [held, width, height, focal = eye.focal](EyeCard &card) {
+			EyeHeldOnCard(card, held, width, height, focal);
+			return true;
+		});
+	};
+	if (walker != nullptr && !walker->blasts.empty()) blasts_job(false);
+	if (walker != nullptr && !walker->held.thing.empty()) held_job(walker->held);
 	/* The light in its left hand (the torch, the lantern): by day with the weapon, at night after the dark (it lights
 	 * itself, and about the walker, DrawEyeWitchLight()). */
-	if (walker != nullptr && !walker->left.thing.empty() && !night) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
+	if (walker != nullptr && !walker->left.thing.empty() && !night) held_job(walker->left);
 	/* The rockets' blasts, by day here, at night after the dark (they light themselves). */
-	if (walker != nullptr && !walker->blasts.empty() && !night) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, true); });
+	if (walker != nullptr && !walker->blasts.empty() && !night) blasts_job(true);
 	if (night) {
 		/* The dark and the glows of the vehicles' lights: collected now, drawn with the frame. */
 		const NightLight moon = GetNightLight();
-		out.Job([eye, width, height, moon, glows = CollectEyeNightGlows(eye, own)](uint32_t *dst, float *zb) { DrawEyeNight(eye, width, height, dst, zb, moon, glows); });
+		auto glows = std::make_shared<std::vector<EyeGlow>>(CollectEyeNightGlows(eye, own));
+		out.Job([eye, width, height, moon, glows](uint32_t *dst, float *zb) { DrawEyeNight(eye, width, height, dst, zb, moon, *glows); }, [eye, moon, glows](EyeCard &card) {
+			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Night);
+			st.colour = {static_cast<float>(moon.r), static_cast<float>(moon.g), static_cast<float>(moon.b)};
+			for (const EyeGlow &g : *glows) {
+				const CabPoint p = CabToEye(eye, g.x, g.y, g.z, 0, 0);
+				if (p.f < CAB_NEAR) continue;
+				const CabVertex v = CabProject(eye, p);
+				const double r = std::max(1.0, g.radius * eye.focal / p.f);
+				st.glows.push_back({static_cast<float>(v.sx), static_cast<float>(v.sy), static_cast<float>(r), static_cast<float>(r * g.squash),
+						static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), static_cast<float>(g.strength), static_cast<float>(v.iw)});
+			}
+			return true;
+		});
 		DrawEyeVehicleGlass(eye, dst, zb, width, height);
 		/* What has a light of its own (the beacon of the fire Tatra, the ghost) again over the dark. */
-		if (glow_after_night != nullptr) out.Job([glow_after_night, card_glow](uint32_t *dst, float *zb) {
+		if (glow_after_night != nullptr) out.Job([glow_after_night, card_figures](uint32_t *dst, float *zb) {
 			const std::vector<CabBatchTriangle> *list = glow_after_night.get();
 			CabRasterLists({&list, 1});
 			/* The card's: where its figure is still what is seen (nothing nearer drawn over it since). */
-			if (card_glow == nullptr || card_glow->glow.empty()) return;
-			const ThreeDGpuEyePicture &g = *card_glow;
+			if (card_figures->glow.empty()) return;
+			const ThreeDGpuEyePicture &g = *card_figures;
 			const size_t n = static_cast<size_t>(g.width) * g.height;
 			for (size_t i = 0; i < n; i++) {
 				const Colour c(g.glow[i]);
@@ -10676,6 +11014,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const uint na = 255 - c.a;
 				dst[i] = Colour(static_cast<uint8_t>(std::min<uint>(255, c.r + (d.r * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.g + (d.g * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.b + (d.b * na + 127) / 255))).data;
 			}
+		}, [glow_after_night](EyeCard &card) {
+			/* The processor's figures' (their triangles), then the card's (its own light kept as it drew them). */
+			card.Triangles(*glow_after_night);
+			card.Step(ThreeDGpuEyeStep::Kind::GlowAfterNight);
+			return true;
 		});
 		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
 		std::vector<std::array<double, 3>> lamps;
@@ -10685,7 +11028,20 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
 		}
-		if (_cab_lamp_light) out.Job([eye, width, height, lamps = std::move(lamps)](uint32_t *dst, float *zb) { DrawEyeLampLight(eye, dst, zb, width, height, lamps); });
+		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground (DrawEyeWitchLight()). */
+		const float zu_per_unit = static_cast<float>(CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE);
+		auto lights_step = [zu_per_unit](EyeCard &card, std::vector<ThreeDGpuEyeLight> lights) {
+			if (lights.empty()) return;
+			const NightLight moon = GetNightLight();
+			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Lamps);
+			st.colour = {static_cast<float>(moon.r), static_cast<float>(moon.g), static_cast<float>(moon.b)};
+			st.depth = zu_per_unit;
+			st.lights = std::move(lights);
+		};
+		if (_cab_lamp_light) out.Job([eye, width, height, lamps](uint32_t *dst, float *zb) { DrawEyeLampLight(eye, dst, zb, width, height, lamps); }, [eye, width, height, lamps, lights_step](EyeCard &card) {
+			lights_step(card, EyeLampsLit(eye, width, height, lamps));
+			return true;
+		});
 		/* The witches' lanterns and torches lighting what is about them and where the beam falls (DrawEyeWitchLight()),
 		 * and the light in the walker's left hand about it, warm, from just before it at the height of the hand. */
 		std::vector<ThreeDWitchLight> witch_lights = GetThreeDWitchLights(true);
@@ -10710,15 +11066,23 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 		}
 		if (!witch_lights.empty()) {
-			out.Job([eye, width, height, witch_lights = std::move(witch_lights)](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); });
+			out.Job([eye, width, height, witch_lights](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); }, [eye, width, height, witch_lights, lights_step](EyeCard &card) {
+				lights_step(card, EyeWitchLightsLit(eye, width, height, witch_lights));
+				return true;
+			});
 		}
-		if (walker != nullptr && !walker->blasts.empty()) out.Job([eye, width, height, blasts = walker->blasts](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, true); });
-		if (walker != nullptr && !walker->left.thing.empty()) out.Job([left = walker->left, width, height, focal = eye.focal](uint32_t *dst, float *zb) { DrawThreeDHeldThing(left, dst, zb, width, height, focal); });
+		if (walker != nullptr && !walker->blasts.empty()) blasts_job(true);
+		if (walker != nullptr && !walker->left.thing.empty()) held_job(walker->left);
 		{
 			const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
 			/* The lighter the night (gui.night_light), the fewer stars are seen: towards the dawn only the brightest. */
 			const double seen = 1.0 - 0.2 * std::min<int>(_settings_client.gui.night_light, 4);
-			out.Job([eye, width, height, t, seen](uint32_t *dst, float *zb) { DrawEyeSky(eye, width, height, dst, zb, t, seen); });
+			out.Job([eye, width, height, t, seen](uint32_t *dst, float *zb) { DrawEyeSky(eye, width, height, dst, zb, t, seen); }, [eye, t, seen](EyeCard &card) {
+				ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Sky);
+				EyeSkySeen(eye, t, seen, st.stars, st.moon);
+				st.horizon = static_cast<float>(eye.cy);
+				return true;
+			});
 		}
 		/* The lit windows of the houses (their "noc") over the dark, as they were drawn, and the glows of their
 		 * lights ("svetlo_NN"): seen where nothing nearer is in front of them -- told by the depth when the frame is drawn. */
@@ -10751,6 +11115,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					const uint32_t i = o.night_tri[t + k];
 					poly.push_back(CabToEye(eye, ox + o.night_pos[i * 3], oy + o.night_pos[i * 3 + 1], oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * nt->w, o.night_uv[i * 2 + 1] * nt->h));
 				}
+				/* (The texture the house's: kept by the card.) */
+				out.kept[nt->px.data()] = nt->uid.value;
 				CabDrawPolygon(dst, zb, width, height, nt->px.data(), nt->w, nt->h, std::move(poly), eye, false);
 			}
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) {
@@ -10760,12 +11126,19 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				window_glows.push_back({v.sx, v.sy, std::max(1.0, 1.2 * eye.focal / p.f), static_cast<float>(v.iw)});
 			}
 		}
-		if (!window_glows.empty()) out.Job([width, height, window, window_glows = std::move(window_glows)](uint32_t *dst, float *zb) {
+		if (!window_glows.empty()) out.Job([width, height, window, window_glows](uint32_t *dst, float *zb) {
 			for (const WindowGlow &g : window_glows) {
 				const int px = static_cast<int>(g.sx), py = static_cast<int>(g.sy);
 				if (px >= 0 && py >= 0 && px < width && py < height && zb[static_cast<size_t>(py) * width + px] > g.iw * 1.05f) continue;
 				AddNightLight(dst, width, width, height, g.sx, g.sy, g.r, g.r, window, 0.35);
 			}
+		}, [window, window_glows](EyeCard &card) {
+			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Glows);
+			for (const WindowGlow &g : window_glows) {
+				st.glows.push_back({static_cast<float>(g.sx), static_cast<float>(g.sy), static_cast<float>(g.r), static_cast<float>(g.r),
+						static_cast<float>(window.r), static_cast<float>(window.g), static_cast<float>(window.b), 0.35f, g.iw});
+			}
+			return true;
 		});
 	}
 	eye_stage(6);
@@ -10793,16 +11166,47 @@ static const void *_eye_last_client = nullptr;  ///< whose frame was collected l
 static const void *_eye_asked_client = nullptr; ///< a window that asked while another's frame was on the way
 bool _eye_synchronous = false;
 
-/** Draw a frame: its passes in their order, the triangles of each at once on every core of the drawing (CabRasterLists()). */
+/**
+ * Draw a frame whole on the graphics card (EyeCard): the sky and the ground under the horizon first, then its passes in
+ * their order -- the triangles as they are, each job by what it is on the card. False: not on the card (no card, a job
+ * without its form there, or what the card cannot hold): the processor draws it.
+ */
+static bool DrawEyeFrameOnCard(EyeFrame &f)
+{
+	if (!_eye_frame_on_card || !ThreeDGpuAvailable()) return false;
+	EyeCard card(f);
+	ThreeDGpuEyeFrame &c = card.frame;
+	c.width = f.width;
+	c.height = f.height;
+	c.near_plane = static_cast<float>(f.near_plane);
+	c.eye = {static_cast<float>(f.eye.x), static_cast<float>(f.eye.y), static_cast<float>(f.eye.z), static_cast<float>(f.eye.fx), static_cast<float>(f.eye.fy),
+			static_cast<float>(f.eye.rx), static_cast<float>(f.eye.ry), static_cast<float>(f.eye.focal), static_cast<float>(f.eye.cx), static_cast<float>(f.eye.cy)};
+	card.Step(ThreeDGpuEyeStep::Kind::Background).horizon = static_cast<float>(f.eye.cy);
+	for (const EyePass &p : f.passes) {
+		if (!p.work) {
+			card.Triangles(p.triangles);
+		} else if (!p.card || !p.card(card)) {
+			return false;
+		}
+	}
+	if (!ThreeDGpuRenderEyeFrame(c) || c.pixels.size() != f.pixels.size()) return false;
+	f.pixels.swap(c.pixels);
+	return true;
+}
+
+/** Draw a frame: on the graphics card whole, or its passes in their order, the triangles of each at once on every core of the drawing (CabRasterLists()). */
 static void DrawEyeFrame(EyeFrame &f)
 {
 	const double start = TurnedNow();
-	for (EyePass &p : f.passes) {
-		if (p.work) {
-			p.work(f.pixels.data(), f.depth.data());
-		} else {
-			const std::vector<CabBatchTriangle> *list = &p.triangles;
-			CabRasterLists({&list, 1});
+	const bool on_card = DrawEyeFrameOnCard(f);
+	if (!on_card) {
+		for (EyePass &p : f.passes) {
+			if (p.work) {
+				p.work(f.pixels.data(), f.depth.data());
+			} else {
+				const std::vector<CabBatchTriangle> *list = &p.triangles;
+				CabRasterLists({&list, 1});
+			}
 		}
 	}
 	if (_debug_misc_level >= 6) {
@@ -10832,7 +11236,9 @@ static void DrawEyeFrame(EyeFrame &f)
 	f.colours.clear();
 	f.sprites.clear();
 	f.canvases.clear();
+	f.kept.clear();
 	f.draw_ms = TurnedNow() - start;
+	f.on_card = on_card;
 }
 
 /** The thread drawing the frames: each as it comes, into _eye_drawn. */
@@ -10885,6 +11291,7 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 	f->colours.clear();
 	f->sprites.clear();
 	f->canvases.clear();
+	f->kept.clear();
 	f->client = client;
 	f->depot = false;
 	f->pinned = false;

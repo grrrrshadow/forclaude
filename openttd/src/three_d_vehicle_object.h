@@ -95,6 +95,16 @@ size_t ThreeDPicturesWaiting();
 void StopThreeDPictureThread();
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
 struct ThreeDHeldThing;
+/** A triangle of a thing in the walker's hand on the picture of its eyes (ThreeDHeldThingTriangles()). */
+struct ThreeDHeldTriangle {
+	const ThreeDObjectTexture *tex = nullptr;
+	float sx[3], sy[3];  ///< its corners on the picture, pixels
+	float iz[3];         ///< 1 / metres ahead
+	float u[3], v[3];    ///< their place in the texture, repeated beyond it
+	float light[3];      ///< multiplied in, straight across the picture between them
+	bool glow = false;   ///< a material's own light: its light all over it, the first
+};
+void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height, double focal, std::vector<ThreeDHeldTriangle> &out);
 bool DrawThreeDHeldThing(const ThreeDHeldThing &held, uint32_t *dst, float *zb, int width, int height, double focal);
 
 /* three_d_vehicle.cpp */
