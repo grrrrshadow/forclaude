@@ -106,6 +106,7 @@
 #include "viewport_cmd.h"
 #include "three_d.h"
 #include "three_d_objects.h"
+#include "three_d_gpu.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
@@ -6994,6 +6995,27 @@ static inline CabPoint CabToEye(const CabEye &eye, double wx, double wy, double 
 	return {dx * eye.fx + dy * eye.fy, dx * eye.rx + dy * eye.ry, (wz - eye.z) * CAB_Z_SCALE, tu, tv};
 }
 
+/**
+ * The eye's view on the graphics card (ThreeDGpuEyePicture): a point of the world, from an origin, to the card's clip
+ * space as CabToEye() and CabProject() place it on the picture -- x, y the picture's pixels (y down), w how far ahead,
+ * z within the clip space from the near plane on.
+ * @param ox,oy,oz the origin, world units (z the game's units of height)
+ * @param near the near plane, world units ahead
+ */
+static ThreeDGpuMatrix EyeClipMatrix(const CabEye &eye, int width, int height, double ox, double oy, double oz, double near)
+{
+	const double dx = ox - eye.x, dy = oy - eye.y;
+	const double f0 = dx * eye.fx + dy * eye.fy, r0 = dx * eye.rx + dy * eye.ry, u0 = (oz - eye.z) * CAB_Z_SCALE;
+	const double ax = 2 * eye.cx / width - 1, bx = 2 * eye.focal / width;
+	const double ay = 2 * eye.cy / height - 1, by = 2 * eye.focal / height;
+	return {
+		static_cast<float>(ax * eye.fx + bx * eye.rx), static_cast<float>(ax * eye.fy + bx * eye.ry), 0.0f, static_cast<float>(ax * f0 + bx * r0),
+		static_cast<float>(ay * eye.fx), static_cast<float>(ay * eye.fy), static_cast<float>(-by * CAB_Z_SCALE), static_cast<float>(ay * f0 - by * u0),
+		static_cast<float>(-eye.fx), static_cast<float>(-eye.fy), 0.0f, static_cast<float>(2 * near - f0),
+		static_cast<float>(eye.fx), static_cast<float>(eye.fy), 0.0f, static_cast<float>(f0),
+	};
+}
+
 static inline CabVertex CabProject(const CabEye &eye, const CabPoint &p)
 {
 	double iw = 1.0 / p.f;
@@ -10075,6 +10097,36 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * as they are till the frame is taken (EyeFrameDrawing()). */
 	camera.billboards += static_cast<int>(jobs.size());
 	if (!jobs.empty()) out.Job([jobs = std::move(jobs), eye, width, height, near = _cab_near](uint32_t *dst, float *zb) {
+		/* On the graphics card all at once (the player, 20. 10.: "all the objects by the GPU"), laid in where nearer
+		 * than what is drawn; what it cannot draw the processor draws as below. */
+		if (ThreeDGpuAvailable()) {
+			ThreeDGpuEyePicture pic;
+			pic.width = width;
+			pic.height = height;
+			pic.near = static_cast<float>(near);
+			for (const ObjectJob &job : jobs) {
+				if (job.shape.tri.empty() || job.shape.uid == 0) continue;
+				ThreeDGpuEyeBuilding &b = pic.buildings.emplace_back();
+				b.building.uid = job.shape.uid;
+				b.building.pos = job.shape.pos;
+				b.building.uv = job.shape.uv;
+				b.building.light = job.shape.light;
+				b.building.tri = job.shape.tri;
+				b.building.facing = job.shape.facing;
+				b.building.tri_tex = job.shape.tri_tex;
+				b.building.textures = job.texs;
+				b.matrix = EyeClipMatrix(eye, width, height, job.ox, job.oy, job.oz, near);
+			}
+			if (ThreeDGpuRenderEye(pic)) {
+				const size_t n = static_cast<size_t>(width) * height;
+				for (size_t i = 0; i < n; i++) {
+					if (pic.depth[i] <= zb[i]) continue;
+					dst[i] = pic.pixels[i];
+					zb[i] = pic.depth[i];
+				}
+				return;
+			}
+		}
 		std::vector<std::vector<CabBatchTriangle>> lists(jobs.size());
 		std::atomic<size_t> next_job = 0;
 		auto set_up = [&](int, int) {

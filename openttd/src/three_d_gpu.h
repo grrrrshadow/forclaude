@@ -146,10 +146,34 @@ struct ThreeDGpuBuildingPicture {
 	std::vector<float> depth;             ///< and how near each pixel is, -infinity where it is not
 };
 
+/**
+ * A building of the view from the eyes on the card (ThreeDGpuEyePicture): its triangles as the processor draws them for
+ * the view (the houses' job of the eye's frame, viewport.cpp) -- each pixel its texture's texel, none where the texel is
+ * 0 or off the texture, shaded by its triangle's light (its corners' mean), the side facing away left out.
+ */
+struct ThreeDGpuEyeBuilding {
+	ThreeDGpuBuilding building;
+	ThreeDGpuMatrix matrix{}; ///< its corners (world units from its north corner) to the card's clip space: w how far ahead
+};
+
+/**
+ * The objects of the view from the eyes drawn on the card at once (the player, 20. 10.: "from the eyes it is to be
+ * drawn by the GPU, all the objects by the GPU"), the nearer kept; what comes is their pixels and how near each is,
+ * laid into the eye's picture where they are nearer than what is there.
+ */
+struct ThreeDGpuEyePicture {
+	int width = 0, height = 0;     ///< pixels
+	float near = 1;                ///< the nearest drawn, world units ahead
+	std::vector<ThreeDGpuEyeBuilding> buildings;
+	std::vector<uint32_t> pixels;  ///< what comes: the colours (Colour::data), top row first
+	std::vector<float> depth;      ///< and 1 / how far ahead each is, as the eye's depth has it; 0 where nothing
+};
+
 bool ThreeDGpuAvailable();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(ThreeDGpuPicture &pic);
 bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
+bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();

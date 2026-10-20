@@ -27,6 +27,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 20. 10. – pohled z očí na kartě (GPU krok „pohled z očí“), deník karty
+
+- Hráč: *„z pohledu očí se to má kreslit gpu, všechny objekty přes gpu“*, *„kresli jak se má kreslit, aby to
+  necukalo, nehraju to jen já, nepotřebuju hru extra na míru mýmu telefonu“*. Odsouhlaseno už 18. 10. (GPU body 1–6).
+- **Hotovo – domy a budovy z očí na kartě** (`ThreeDGpuRenderEye()`): všechny domy a průmysl snímku najednou, se
+  stejnou kamerou, texturami, světlem trojúhelníku a vynecháním odvrácených stěn jako procesor; hloubka na kartě
+  `blízko / vzdálenost` jako float (32 bitů), zpět obraz a hloubka a vloží se tam, kde je blíž než terén. Tvar domu
+  je na kartě jednou (číslo `ThreeDObjectShapeView::uid`). Co karta neudrží, kreslí procesor jako dřív. Rig: obraz
+  z karty a z procesoru se liší v 0,1–0,2 % pixelů (hrany).
+- **Dál:** auta, postavy a zvířata ve stejném průchodu; pak celý snímek z očí na kartě a ukázat ho bez čtení zpět
+  (krok 6) – tak se to dělá, aby to necukalo, na každém počítači.
+- **Deník karty:** `3d_karta.log` je ve složce hry vedle `openttd.cfg` (ne v `save`). Hráčův: zink (Vortek, Mali-G615),
+  OpenGL 4.3, obrázky 5–19 ms. Hráč zavírá hru zavřením celého Winlatoru, takže hra nestihne zapsat „konec“ a příště
+  si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra
+  nemusela vůbec spustit); pozdější konec si jen schová jako `3d_karta_minule.log`.
+
 ## 20. 10. – pohled 0 s OpenGL: rozpadlé domy, marťanské domy jako stíny, noc jen na silnicích
 
 - Hráč (#287, telefon, karta zapnutá): při pohledu 0 mají 3D domy černá místa a prosvítají přes ně původní domy,

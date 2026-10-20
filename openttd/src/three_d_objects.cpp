@@ -5884,10 +5884,10 @@ ThreeDObjectShapeView ThreeDObject::GetShape(int level) const
 	if (!this->Read()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
 	/* Its own: wanted so, or too many corners to count the triangles below. */
-	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
 	MakeOnce(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { return MakeHouseShape(*this, level); }, [this, level](std::shared_ptr<const ThreeDObjectShape> made) { this->shapes[level] = std::move(made); });
 	const ThreeDObjectShape &s = *this->shapes[level];
-	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex};
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
 }
 
 /** The building's shape simplified for a level if it is made already; else its own shape stands in, and the simpler one is made in the background. */
@@ -5896,10 +5896,10 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 	MarkThreeDUsed(this->used);
 	if (!this->TryRead()) return {};
 	level = std::clamp(level, 0, THREE_D_SHAPE_LEVELS - 1);
-	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
-	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex};
+	if (level == 0 || this->pos.size() / 3 >= (1u << 21)) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
+	if (!MadeOrAsked(this, LAZY_HOUSE_SHAPE + level, [this, level] { return this->shapes[level] != nullptr; }, [this, level] { this->GetShape(level); })) return {this->pos, this->uv, this->light, this->tri, this->facing, this->tri_tex, this->corner_tex, this->shape_uid.value};
 	const ThreeDObjectShape &s = *this->shapes[level];
-	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex};
+	return {s.pos, s.uv, s.light, s.tri, s.facing, s.tri_tex, s.corner_tex, s.uid.value};
 }
 
 /** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */

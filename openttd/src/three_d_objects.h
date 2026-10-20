@@ -148,6 +148,7 @@ struct ThreeDObjectShape {
 	std::vector<int8_t> facing;
 	std::vector<uint8_t> tri_tex;    ///< as ThreeDObject's
 	std::vector<uint8_t> corner_tex; ///< as ThreeDObject's
+	ThreeDUniqueId uid;              ///< for the graphics card (three_d_gpu.cpp)
 };
 
 /** A shape of a building to draw: its own (level 0) or simplified (ThreeDObject::GetShape()). */
@@ -159,6 +160,7 @@ struct ThreeDObjectShapeView {
 	std::span<const int8_t> facing;
 	std::span<const uint8_t> tri_tex;    ///< each triangle's texture (ThreeDObject::GetTextureOf()); empty all the building's own
 	std::span<const uint8_t> corner_tex; ///< each corner's texture, the texture its u, v are of; empty all the building's own
+	uint64_t uid = 0;                    ///< the shape's number, for the graphics card (ThreeDUniqueId); 0 none
 
 	/** The texture of a triangle (its first index) and of a corner: 0 the building's own, n its add-on n's (ThreeDObject::GetTextureOf()). */
 	uint8_t TriangleTexture(size_t t) const { return t / 3 < this->tri_tex.size() ? this->tri_tex[t / 3] : 0; }
@@ -244,6 +246,7 @@ struct ThreeDObject {
 	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
 	mutable std::array<std::shared_ptr<const ThreeDObjectShape>, THREE_D_SHAPE_LEVELS> shapes; ///< its shape simplified, by level, made the first time it is asked for (GetShape())
+	ThreeDUniqueId shape_uid; ///< its own shape's number, for the graphics card (ThreeDObjectShapeView::uid)
 	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
 	std::string industry_name; ///< "prumysl" as the index writes it ("IT_GYMNASIUM", "lihovar")
 	int8_t industry_variant = -1; ///< "varianta": the statue of stone 0 ("kamen") or bronze 1 ("bronz", the industry's random bit 0); -1 any
