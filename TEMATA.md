@@ -27,6 +27,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 20. 10. – Springfield nebude, limity trojúhelníků
+
+- **Springfield nebude** (hráč: „moe a lenny … nech je v grrrrf a auto pro ježdění ve springfieldu taky nech
+  v grrrrf, nepoužijem. já nevím proč dělat jiné domy springfieldu, když tady už domy jsou udělaný“). Moe, Lenny
+  a auto Simpsonových zůstávají jen v grrrrf, do sady hry je nebereme. Tematické město `springfield` se nedělá.
+  Kolegovi `hra/3d/ODPOVED-SPRINGFIELD.md` (grrrrf 7efe189).
+- **Trojúhelníky aut:** limit domluvený není. 17. 10. hráč hranice zrušil („nech si dělat 3D GRF tak, aby to
+  odsejpalo“, `hra/3d/HRANICE-PODROBNOSTI.md`): nejdřív se předělá hra, pak změříme, kolik unese, a teprve pak
+  se domluví, kde ubrat. Kolegova auta v11 (Tatra osobní) mají 32–83 tisíc (Tesla 82 684, Škoda 1000 MB 77 716,
+  GAZ-24 71 281, Velorex 65 423, pickup 64 585), sám je zjednodušil z 2,6 milionu / 934 / 684 tisíc. Pro srovnání
+  Tatra 603 má 7 659, Tatra 613 24 292, Trabant 7 782, holka 11 778.
+
 ## 19. 10. – #287: rozhlížení myší, jeden řádek dole, barvy psů, větší houby, auta do kopce
 
 - **Rozhlížení pravým tlačítkem** v pohledu z první osoby jde stejně jako posun mapy (hráč: „ať to je v souladu
