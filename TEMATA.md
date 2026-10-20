@@ -27,6 +27,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 20. 10. – pohled 0 s OpenGL: rozpadlé domy, marťanské domy jako stíny, noc jen na silnicích
+
+- Hráč (#287, telefon, karta zapnutá): při pohledu 0 mají 3D domy černá místa a prosvítají přes ně původní domy,
+  marťanské domy jsou jen stíny („když má za sebou silnici, ten kousek se vykreslí, když prázdnou dlaždici, jen
+  stín“). V noci ztmavnou jen ulice. Při otáčení je všechno v pořádku.
+- **Příčina (chyba hry):** OpenGL ovladač kreslí s blitterem 40bpp-anim. Ten si u každého pixelu z palety (tráva
+  a původní domy ze sady 8bpp) pamatuje číslo barvy a karta pak barvu dosadí z palety sama. Naše 3D domy, postavy
+  a pohled z očí se při pohledu 0 píšou rovnou do 32bpp obrazu a to číslo nemazaly, takže karta ukázala trávu nebo
+  starý dům s jasem našeho pixelu (tmavé části = „stín“). Silnice jsou 32bpp, čísla nemají, proto přes ně dům byl
+  vidět. Noc ztmavila jen 32bpp obraz a pixely z palety mají jas nulový = plný, takže tráva v noci svítila. Otočený
+  pohled si blok předem vyčistí, proto chybu neměl. V rigu nebyla vidět, protože rig kreslí bez OpenGL.
+- **Oprava:** `Blitter::RealizeAnimation()` (32bpp-anim a 40bpp-anim) udělá z pixelů obdélníku obyčejné barvy. Hra
+  ji zavolá před kreslením 3D objektu při pohledu 0 (obdélník jeho krabice s přesahem a postavami na střeše), před
+  obrázkem postavy či vozidla, pohledem z očí a náhledem v nákupu. 40bpp-anim má vlastní `DarkenRect()`: pixel
+  z palety se ztmaví jako ostatní, animovaná voda dál teče, jen tmavší.
+- Rig nově umí OpenGL: `scena_gl.sh` (Xvfb, `sdl-opengl`, 40bpp-anim; `VD=sdl BLIT=32bpp-anim` pro animaci palety).
+  Ověřeno: před opravou stejná chyba jako u hráče, po opravě domy celé, noc tmavá i na trávě, otočený pohled
+  beze změny. Pohled z očí se v rigu přes OpenGL otevřít nedá (vanilla kontrola `_screen.dst_ptr` v ladicím buildu).
+
 ## 20. 10. – Springfield nebude, limity trojúhelníků
 
 - **Springfield nebude** (hráč: „moe a lenny … nech je v grrrrf a auto pro ježdění ve springfieldu taky nech

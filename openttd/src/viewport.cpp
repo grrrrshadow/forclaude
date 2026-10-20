@@ -3129,6 +3129,25 @@ bool AddVehicleHullToDraw(int xmin, int ymin, int zmin, int xmax, int ymax, int 
 }
 
 /**
+ * Make the pixels of a rectangle of a block of the view facing north plain colours, the palette's no more
+ * (Blitter::RealizeAnimation()), before a 3D object or a picture is drawn straight into them: else with the OpenGL
+ * driver (40bpp-anim) the grass or the original house under it shows through, and is not darkened at night (the
+ * player, #287). The turned view clears its blocks of the palette before it draws them.
+ * @param frame the block
+ * @param x0,y0,x1,y1 the rectangle, pixels of the block, the end out
+ */
+static void RealizeNorthRect(const DrawPixelInfo &frame, int x0, int y0, int x1, int y1)
+{
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	x0 = std::max(x0, 0);
+	y0 = std::max(y0, 0);
+	x1 = std::min(x1, fw);
+	y1 = std::min(y1, fh);
+	if (x0 >= x1 || y0 >= y1) return;
+	BlitterFactory::GetCurrentBlitter()->RealizeAnimation(static_cast<uint32_t *>(frame.dst_ptr) + static_cast<size_t>(y0) * frame.pitch + x0, x1 - x0, y1 - y0);
+}
+
+/**
  * Draw a picture of the turned view hung from a world point (a vehicle's likeness, a figure); at night the pixels of
  * its lit glass kept bright (ThreeDModelPicture::lit, DrawNight()).
  * @param north drawn on a view facing north (a figure, a vehicle with lights at night): the point projected as the map
@@ -3148,6 +3167,7 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
 	int x0 = std::max(0, -ox), x1 = std::min(pic->width, fw - ox);
 	int y0 = std::max(0, -oy), y1 = std::min(pic->height, fh - oy);
+	if (north) RealizeNorthRect(frame, ox + x0, oy + y0, ox + x1, oy + y1);
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	for (int y = y0; y < y1; y++) {
 		const uint32_t *src = &pic->pixels[static_cast<size_t>(y) * pic->width];
@@ -3604,6 +3624,20 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_objects.size()) return;
 	const TurnedObject &to = _turned_objects[ps.box_dx];
 	double t0 = TurnedNow();
+	if (_north_house_objects_now) {
+		/* Facing north, its box on the screen (with what overhangs its plot and the figures on its roof) made plain
+		 * colours first (RealizeNorthRect()). */
+		const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
+		int l = INT32_MAX, r = INT32_MIN, t = INT32_MAX, b = INT32_MIN;
+		for (int corner = 0; corner < 4; corner++) {
+			for (int z : {ps.zmin, ps.zmax + figures}) {
+				const Point p = RemapCoords((corner & 1) ? ps.xmax + over : ps.xmin - over, (corner & 2) ? ps.ymax + over : ps.ymin - over, z);
+				l = std::min(l, p.x); r = std::max(r, p.x);
+				t = std::min(t, p.y); b = std::max(b, p.y);
+			}
+		}
+		RealizeNorthRect(frame, UnScaleByZoom(l - frame.left, frame.zoom) - 2, UnScaleByZoom(t - frame.top, frame.zoom) - 2, UnScaleByZoom(r - frame.left, frame.zoom) + 3, UnScaleByZoom(b - frame.top, frame.zoom) + 3);
+	}
 	const ObjectLay lay = MapLay(frame);
 	if (to.ground != nullptr) DrawTurnedObjectPart(frame, lay, to.ground, to.origin, to.z, to.ground->PaintAt(to.origin), {});
 	DrawTurnedObjectPart(frame, lay, to.obj, to.origin, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);

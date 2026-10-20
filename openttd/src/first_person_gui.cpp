@@ -1131,6 +1131,8 @@ struct FirstPersonWindow : Window {
 		Blitter *blitter = BlitterFactory::GetCurrentBlitter();
 		int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
 		int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+		/* Written straight into the screen: not the palette's colours of what was under it (Blitter::RealizeAnimation()). */
+		if (x0 < x1 && y0 < y1) blitter->RealizeAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
 		for (int y = y0; y < y1; y++) {
 			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
 			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));

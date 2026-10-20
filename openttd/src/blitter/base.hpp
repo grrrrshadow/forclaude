@@ -123,6 +123,17 @@ public:
 	virtual void DarkenRect([[maybe_unused]] void *video, [[maybe_unused]] int width, [[maybe_unused]] int height, [[maybe_unused]] uint r, [[maybe_unused]] uint g, [[maybe_unused]] uint b) {}
 
 	/**
+	 * Make the pixels of a rectangle of the screen plain colours, the palette's no more: before something is drawn
+	 * straight into the buffer, not by the blitter (the 3D objects facing north, three_d.h). A blitter that keeps the
+	 * palette's index of a pixel in its animation buffer (32bpp-anim; 40bpp-anim, whose colours the OpenGL driver
+	 * draws from that index) would draw the colour of what was there before over it.
+	 * @param video The destination pointer (video-buffer).
+	 * @param width The width of the rectangle.
+	 * @param height The height of the rectangle.
+	 */
+	virtual void RealizeAnimation([[maybe_unused]] void *video, [[maybe_unused]] int width, [[maybe_unused]] int height) {}
+
+	/**
 	 * Draw a line with a given colour.
 	 * @param video The destination pointer (video-buffer).
 	 * @param x The x coordinate from where the line starts.

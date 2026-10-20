@@ -38,6 +38,7 @@ public:
 	void DrawLine(void *video, int x, int y, int x2, int y2, int screen_width, int screen_height, PixelColour colour, int width, int dash) override;
 	void DrawRect(void *video, int width, int height, PixelColour colour) override;
 	void DarkenRect(void *video, int width, int height, uint r, uint g, uint b) override;
+	void RealizeAnimation(void *video, int width, int height) override;
 	void CopyFromBuffer(void *video, const void *src, int width, int height) override;
 	void CopyToBuffer(const void *video, void *dst, int width, int height) override;
 	void ScrollBuffer(void *video, int &left, int &top, int &width, int &height, int scroll_x, int scroll_y) override;

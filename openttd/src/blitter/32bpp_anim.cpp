@@ -366,6 +366,19 @@ void Blitter_32bppAnim::DarkenRect(void *video, int width, int height, uint r, u
 	}
 }
 
+void Blitter_32bppAnim::RealizeAnimation(void *video, int width, int height)
+{
+	if (_screen_disable_anim || this->anim_buf == nullptr) return;
+	const ptrdiff_t offset = static_cast<uint32_t *>(video) - static_cast<uint32_t *>(_screen.dst_ptr);
+	if (offset < 0 || offset >= static_cast<ptrdiff_t>(_screen.pitch) * _screen.height) return;
+	/* The colour of each pixel is in the buffer already; the palette's animation just does not draw it again. */
+	uint16_t *anim_line = this->ScreenToAnimOffset(static_cast<uint32_t *>(video)) + this->anim_buf;
+	for (int y = 0; y < height; y++) {
+		std::fill_n(anim_line, width, 0);
+		anim_line += this->anim_buf_pitch;
+	}
+}
+
 void Blitter_32bppAnim::DrawRect(void *video, int width, int height, PixelColour colour)
 {
 	if (_screen_disable_anim) {

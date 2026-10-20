@@ -83,6 +83,67 @@ void Blitter_40bppAnim::DrawLine(void *video, int x, int y, int x2, int y2, int 
 }
 
 /**
+ * The anim buffer under a pixel of the screen, or nullptr when the pixel is not of the screen or there is no buffer.
+ * @param video the pixel
+ */
+static uint8_t *AnimOfScreen(void *video)
+{
+	uint8_t *anim_buf = VideoDriver::GetInstance()->GetAnimBuffer();
+	if (anim_buf == nullptr) return nullptr;
+	const ptrdiff_t offset = static_cast<uint32_t *>(video) - static_cast<uint32_t *>(_screen.dst_ptr);
+	if (offset < 0 || offset >= static_cast<ptrdiff_t>(_screen.pitch) * _screen.height) return nullptr;
+	return anim_buf + offset;
+}
+
+void Blitter_40bppAnim::DarkenRect(void *video, int width, int height, uint r, uint g, uint b)
+{
+	uint8_t *anim_line = _screen_disable_anim ? nullptr : AnimOfScreen(video);
+	if (anim_line == nullptr) {
+		Blitter_32bppBase::DarkenRect(video, width, height, r, g, b);
+		return;
+	}
+	/* A pixel of the palette's has its colour drawn by the video driver from its index, with the brightness of its
+	 * RGB (none: the normal one): a plain one becomes the colour it shows and is darkened as the rest; one of the
+	 * palette's animation (the water) keeps animating, its brightness darkened by the channels' mean. */
+	const uint mean = (r + g + b) / 3;
+	Colour *line = static_cast<Colour *>(video);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			Colour &c = line[x];
+			uint8_t &a = anim_line[x];
+			if (a >= PALETTE_ANIM_START) {
+				const uint8_t v = static_cast<uint8_t>(std::max<uint>(1, GetColourBrightness(c) * mean >> 8));
+				c = Colour(v, 0, 0, c.a);
+				continue;
+			}
+			if (a != 0) {
+				c = RealizeBlendedColour(a, c);
+				a = 0;
+			}
+			c = Colour(static_cast<uint8_t>(c.r * r >> 8), static_cast<uint8_t>(c.g * g >> 8), static_cast<uint8_t>(c.b * b >> 8), c.a);
+		}
+		line += _screen.pitch;
+		anim_line += _screen.pitch;
+	}
+}
+
+void Blitter_40bppAnim::RealizeAnimation(void *video, int width, int height)
+{
+	uint8_t *anim_line = _screen_disable_anim ? nullptr : AnimOfScreen(video);
+	if (anim_line == nullptr) return;
+	Colour *line = static_cast<Colour *>(video);
+	for (int y = 0; y < height; y++) {
+		for (int x = 0; x < width; x++) {
+			if (anim_line[x] == 0) continue;
+			line[x] = RealizeBlendedColour(anim_line[x], line[x]);
+			anim_line[x] = 0;
+		}
+		line += _screen.pitch;
+		anim_line += _screen.pitch;
+	}
+}
+
+/**
  * Draws a sprite to a (screen) buffer. It is templated to allow faster operation.
  *
  * @tparam mode blitter mode

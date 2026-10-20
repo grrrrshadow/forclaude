@@ -122,6 +122,8 @@ static void BlitPicture(const ThreeDModelPicture &pic, int px, int py)
 	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
 	int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
 	int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
+	/* Under it plain colours first (Blitter::RealizeAnimation()): what it is blended with is the colour shown. */
+	if (x0 < x1 && y0 < y1) blitter->RealizeAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
 	for (int y = y0; y < y1; y++) {
 		const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
 		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
@@ -136,8 +138,6 @@ static void BlitPicture(const ThreeDModelPicture &pic, int px, int py)
 				uint al = sc.a, na = 255 - al;
 				out = Colour(static_cast<uint8_t>((sc.r * al + d.r * na + 127) / 255), static_cast<uint8_t>((sc.g * al + d.g * na + 127) / 255), static_cast<uint8_t>((sc.b * al + d.b * na + 127) / 255)).data;
 			}
-			/* Colour 0 of the palette is not animated: the pixel set to it, then to its own colour. */
-			if (sc.a >= 128) blitter->SetPixel(dpi->dst_ptr, x - dpi->left, y - dpi->top, PixelColour{0});
 			*dst = out;
 		}
 	}
