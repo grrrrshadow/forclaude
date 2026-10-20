@@ -436,7 +436,7 @@ struct GpuProgram {
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
 	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
 	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1;
-	GLint near = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
+	GLint near_plane = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
 };
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program;
 GLuint _fbo = 0, _colour_rb = 0, _lit_rb = 0, _depth_rb = 0;
@@ -987,7 +987,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.rust_colour = gl.glGetUniformLocation(p.program, "u_rust_colour");
 	p.rust_time = gl.glGetUniformLocation(p.program, "u_rust_time");
 	p.rust_ramp = gl.glGetUniformLocation(p.program, "u_rust_ramp");
-	p.near = gl.glGetUniformLocation(p.program, "u_near");
+	p.near_plane = gl.glGetUniformLocation(p.program, "u_near");
 	return true;
 }
 
@@ -1560,7 +1560,7 @@ bool EyeTargetOfSize(int w, int h)
 bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 {
 	const int w = pic.width, h = pic.height;
-	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target || pic.near <= 0) return false;
+	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target || pic.near_plane <= 0) return false;
 	_card_clock++;
 	Step(fmt::format("pohled z oci {}: {}x{}, {} budov, {} siti", _gpu_pictures + 1, w, h, pic.buildings.size(), pic.meshes.size()));
 	struct Draw {
@@ -1619,7 +1619,7 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 	gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	gl.glUseProgram(_eye_building_program.program);
 	gl.glUniform1i(_eye_building_program.tex, 0);
-	gl.glUniform1f(_eye_building_program.near, pic.near);
+	gl.glUniform1f(_eye_building_program.near_plane, pic.near_plane);
 	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glCullFace(GL_BACK);
 	Step(fmt::format("kresleni pohledu z oci {} (glDrawArrays)", _gpu_pictures + 1));
@@ -1644,7 +1644,7 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 	gl.glUseProgram(_eye_mesh_program.program);
 	gl.glUniform1i(_eye_mesh_program.tex, 0);
 	gl.glUniform1i(_eye_mesh_program.paint, 0);
-	gl.glUniform1f(_eye_mesh_program.near, pic.near);
+	gl.glUniform1f(_eye_mesh_program.near_plane, pic.near_plane);
 	auto draw_mesh_runs = [&](const MeshDraw &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
 		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
 		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
@@ -1690,7 +1690,7 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 		return false;
 	}
 	/* The depth as the eye's: 1 / how far ahead. */
-	const float to_eye = 1.0f / pic.near;
+	const float to_eye = 1.0f / pic.near_plane;
 	for (float &d : pic.depth) d *= to_eye;
 	TrimCard();
 	return true;

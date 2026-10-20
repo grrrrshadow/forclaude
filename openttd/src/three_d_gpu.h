@@ -163,7 +163,7 @@ struct ThreeDGpuEyeBuilding {
  */
 struct ThreeDGpuEyePicture {
 	int width = 0, height = 0;     ///< pixels
-	float near = 1;                ///< the nearest drawn, world units ahead
+	float near_plane = 1;          ///< the nearest drawn, world units ahead (not "near": a macro of windows.h)
 	std::vector<ThreeDGpuEyeBuilding> buildings;
 	std::vector<ThreeDGpuMesh> meshes; ///< the figures by their triangles (CabDrawFigureModel() of viewport.cpp), each matrix to the card's clip space; their glass after all else
 	float glass_alpha = 0.15f;     ///< how much of the glass's colour a layer of it lays over what is behind

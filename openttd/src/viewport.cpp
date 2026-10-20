@@ -10222,7 +10222,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ThreeDGpuEyePicture pic;
 			pic.width = width;
 			pic.height = height;
-			pic.near = static_cast<float>(near);
+			pic.near_plane = static_cast<float>(near);
 			for (const ObjectJob &job : jobs) {
 				if (job.shape.tri.empty() || job.shape.uid == 0) continue;
 				ThreeDGpuEyeBuilding &b = pic.buildings.emplace_back();
@@ -10488,7 +10488,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ThreeDGpuEyePicture pic;
 			pic.width = width;
 			pic.height = height;
-			pic.near = static_cast<float>(near);
+			pic.near_plane = static_cast<float>(near);
 			for (size_t k = 0; k < solid_figures.size(); k++) {
 				on_card[k] = EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, glow_after_night != nullptr, wheels_turn, pic.meshes);
 			}
