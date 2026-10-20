@@ -141,7 +141,7 @@ static const IntervalTimer<TimerWindow> _gpu_died_timer(std::chrono::seconds(2),
 
 /* The triangles of the shapes by the parts shown (ThreeDGpuTrianglesOf()), kept for the pictures to come. */
 static std::mutex _triangles_mutex;
-static std::map<std::tuple<uint64_t, ThreeDParts, bool>, std::pair<std::shared_ptr<const ThreeDGpuTriangles>, uint64_t>> _triangles_kept;
+static std::map<std::tuple<uint64_t, ThreeDParts, bool, bool>, std::pair<std::shared_ptr<const ThreeDGpuTriangles>, uint64_t>> _triangles_kept;
 static uint64_t _triangles_clock = 0;
 static constexpr size_t TRIANGLES_KEPT = 512;
 
@@ -153,9 +153,9 @@ static constexpr size_t TRIANGLES_KEPT = 512;
  * @param vehicle of the vehicle, else of a figure of its crew
  * @param textures how many textures it has (a simpler shape's are its whole shape's)
  */
-std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures)
+std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures, bool without_driver_seat)
 {
-	const auto key = std::make_tuple(shape.uid.value, vehicle ? parts : ThreeDParts{}, vehicle);
+	const auto key = std::make_tuple(shape.uid.value, vehicle ? parts : ThreeDParts{}, vehicle, without_driver_seat);
 	{
 		std::lock_guard lock(_triangles_mutex);
 		auto it = _triangles_kept.find(key);
@@ -177,6 +177,8 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 			if (vehicle) {
 				const uint8_t part = tn < shape.tri_part.size() ? shape.tri_part[tn] : 0;
 				if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
+				/* The cab the eye is in: the driver's seat and those by it, where the eye is, left out. */
+				if (without_driver_seat && ThreeDVehicleShape::AtDriverSeat(part)) continue;
 			}
 			const bool glass = shape.IsSeeThrough(tn);
 			if (glass != (pass == 1)) continue;
@@ -389,8 +391,9 @@ uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the pro
 /* What the card keeps, by the thing's number (ThreeDUniqueId): the corners of the shapes, their triangles, the
  * textures; let go of the longest not drawn when it holds more than GPU_BYTES_KEPT. Only the card's thread uses these. */
 struct GpuShape {
-	GLuint vao = 0, pos = 0, nrm = 0, uv = 0;
+	GLuint vao = 0, pos = 0, nrm = 0, uv = 0, wheel = 0;
 	bool has_nrm = false;
+	bool has_wheel = false; ///< each corner's turning wheel (ThreeDVehicleShape::corner_wheel) as attribute 3
 	size_t corners = 0;   ///< how many corners it has: no triangle drawn may name one beyond
 	size_t bytes = 0;
 	uint64_t used = 0;
@@ -437,12 +440,13 @@ struct GpuProgram {
 	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
 	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1;
 	GLint near_plane = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
+	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 };
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program;
 GLuint _fbo = 0, _colour_rb = 0, _lit_rb = 0, _depth_rb = 0;
 int _fbo_w = 0, _fbo_h = 0;
 /* The view from the eyes drawn into: its colours, and its depth as floats (near / how far ahead, the larger nearer). */
-GLuint _eye_fbo = 0, _eye_colour_rb = 0, _eye_depth_rb = 0;
+GLuint _eye_fbo = 0, _eye_colour_rb = 0, _eye_glow_rb = 0, _eye_depth_rb = 0;
 int _eye_w = 0, _eye_h = 0;
 GLuint _night_vao = 0, _night_vbo = 0;
 GLint _max_texture = 0, _max_target = 0;
@@ -615,8 +619,10 @@ uniform float u_near;
 in vec2 v_uv;
 flat in float v_light;
 layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_glow;
 void main()
 {
+	o_glow = vec4(0.0);
 	ivec2 size = textureSize(u_tex, 0);
 	ivec2 at = ivec2(floor(v_uv * vec2(size)));
 	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
@@ -637,10 +643,22 @@ void main()
 std::string EyeMeshSource(const char *source, bool fragment)
 {
 	std::string s = source;
+	auto replace = [&s](std::string_view what, std::string_view with) {
+		const size_t at = s.find(what);
+		if (at != std::string::npos) s.replace(at, what.size(), with);
+	};
 	for (size_t at; (at = s.find("noperspective ")) != std::string::npos;) s.erase(at, 14);
 	if (fragment) {
 		s.insert(s.find('\n') + 1, "uniform float u_near;\n");
 		s.insert(s.rfind('}'), "\tgl_FragDepth = u_near * gl_FragCoord.w;\n");
+		/* Its own light alone in the second picture, as glow_after_night of viewport.cpp draws it over the dark: the
+		 * texel by its colour's strongest; see-through by the glass's alpha. */
+		replace("o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);", "o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(floor(own * max(u_glow.r, max(u_glow.g, u_glow.b)) / 256.0) / 255.0, 1.0);\n\tif (u_glass != 0) o_lit *= u_glass_alpha;");
+	} else {
+		/* A wheel that turns (its corners' wheel in attribute 3): its corners and normals moved by its matrix first. */
+		s.insert(s.find('\n') + 1, "layout(location = 3) in float a_wheel;\nuniform mat4 u_wheels[32];\nuniform int u_wheel_count;\n");
+		replace("gl_Position = u_matrix * vec4(a_pos, 1.0);", "int k = int(a_wheel + 0.5);\n\tvec3 p = a_pos, n = a_nrm;\n\tif (k > 0 && k <= u_wheel_count) {\n\t\tp = (u_wheels[k - 1] * vec4(p, 1.0)).xyz;\n\t\tn = mat3(u_wheels[k - 1]) * n;\n\t}\n\tgl_Position = u_matrix * vec4(p, 1.0);");
+		replace("dot(a_nrm, u_light)", "dot(n, u_light)");
 	}
 	return s;
 }
@@ -988,6 +1006,8 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.rust_time = gl.glGetUniformLocation(p.program, "u_rust_time");
 	p.rust_ramp = gl.glGetUniformLocation(p.program, "u_rust_ramp");
 	p.near_plane = gl.glGetUniformLocation(p.program, "u_near");
+	p.wheels = gl.glGetUniformLocation(p.program, "u_wheels");
+	p.wheel_count = gl.glGetUniformLocation(p.program, "u_wheel_count");
 	return true;
 }
 
@@ -1031,6 +1051,7 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glGenRenderbuffers(1, &_depth_rb);
 	gl.glGenFramebuffers(1, &_eye_fbo);
 	gl.glGenRenderbuffers(1, &_eye_colour_rb);
+	gl.glGenRenderbuffers(1, &_eye_glow_rb);
 	gl.glGenRenderbuffers(1, &_eye_depth_rb);
 	gl.glGenVertexArrays(1, &_night_vao);
 	gl.glGenBuffers(1, &_night_vbo);
@@ -1054,7 +1075,7 @@ void ForgetCard()
 	Step("vse z karty pryc");
 	for (auto &[uid, s] : _card_shapes) {
 		gl.glDeleteVertexArrays(1, &s.vao);
-		const GLuint buffers[] = {s.pos, s.nrm, s.uv};
+		const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel};
 		for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 	}
 	for (auto &[uid, i] : _card_indices) gl.glDeleteBuffers(1, &i.ibo);
@@ -1076,7 +1097,7 @@ void EndCard()
 		ForgetCard();
 		if (_fbo != 0) gl.glDeleteFramebuffers(1, &_fbo);
 		if (_eye_fbo != 0) gl.glDeleteFramebuffers(1, &_eye_fbo);
-		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_depth_rb};
+		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb};
 		for (GLuint rb : rbs) if (rb != 0) gl.glDeleteRenderbuffers(1, &rb);
 		if (_night_vbo != 0) gl.glDeleteBuffers(1, &_night_vbo);
 		if (_night_vao != 0) gl.glDeleteVertexArrays(1, &_night_vao);
@@ -1109,7 +1130,7 @@ void TrimCard()
 		if (h.kind == 0) {
 			GpuShape &s = _card_shapes[h.uid];
 			gl.glDeleteVertexArrays(1, &s.vao);
-			const GLuint buffers[] = {s.pos, s.nrm, s.uv};
+			const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel};
 			for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 			_card_bytes -= s.bytes;
 			_card_shapes.erase(h.uid);
@@ -1159,8 +1180,17 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	buffer(g.pos, s.pos, corners * 3, 0, 3);
 	if (g.has_nrm) buffer(g.nrm, s.nrm, corners * 3, 1, 3);
 	buffer(g.uv, s.uv, corners * 2, 2, 2);
+	/* Each corner's turning wheel, a byte (the view from the eyes turns them, EyeMeshSource()). */
+	g.has_wheel = s.corner_wheel.size() == corners;
+	if (g.has_wheel) {
+		gl.glGenBuffers(1, &g.wheel);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, g.wheel);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners), s.corner_wheel.data(), GL_STATIC_DRAW);
+		gl.glVertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_FALSE, 0, nullptr);
+		gl.glEnableVertexAttribArray(3);
+	}
 	gl.glBindVertexArray(0);
-	g.bytes = corners * sizeof(float) * (g.has_nrm ? 8 : 5);
+	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0));
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
 	return &_card_shapes.emplace(s.uid.value, g).first->second;
@@ -1539,11 +1569,14 @@ bool EyeTargetOfSize(int w, int h)
 	Step(fmt::format("ramec pohledu z oci {}x{} (glRenderbufferStorage, glCheckFramebufferStatus)", _eye_w, _eye_h));
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, _eye_colour_rb);
 	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _eye_w, _eye_h);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, _eye_glow_rb);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _eye_w, _eye_h);
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, _eye_depth_rb);
 	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, _eye_w, _eye_h);
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _eye_fbo);
 	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _eye_colour_rb);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_RENDERBUFFER, _eye_glow_rb);
 	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _eye_depth_rb);
 	if (gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
 		_eye_w = _eye_h = 0;
@@ -1604,10 +1637,10 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 		mesh_draws.push_back(std::move(d));
 	}
 	if (!EyeTargetOfSize(w, h)) return false;
-	static const GLenum first[1] = {GL_COLOR_ATTACHMENT0};
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _eye_fbo);
 	gl.glViewport(0, 0, w, h);
-	gl.glDrawBuffers(1, first);
+	gl.glDrawBuffers(2, both);
 	gl.glDisable(GL_SCISSOR_TEST);
 	gl.glDisable(GL_DITHER);
 	gl.glDisable(GL_BLEND);
@@ -1653,6 +1686,10 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 		gl.glBindVertexArray(d.shape->vao);
 		gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, d.indices->ibo);
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
+		if (!d.shape->has_wheel) gl.glVertexAttrib3f(3, 0, 0, 0);
+		const size_t wheels = d.shape->has_wheel ? std::min(d.mesh->wheels.size(), THREE_D_GPU_EYE_WHEELS) : 0;
+		gl.glUniform1i(_eye_mesh_program.wheel_count, static_cast<GLint>(wheels));
+		if (wheels > 0) gl.glUniformMatrix4fv(_eye_mesh_program.wheels, static_cast<GLsizei>(wheels), GL_TRUE, d.mesh->wheels[0].data());
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
 			const uint32_t glow = d.mesh->shape->Glow(r.texture);
@@ -1682,6 +1719,13 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 	gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pic.pixels.data());
 	gl.glReadPixels(0, 0, w, h, GL_DEPTH_COMPONENT, GL_FLOAT, pic.depth.data());
+	if (pic.read_glow) {
+		pic.glow.resize(n);
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT1);
+		gl.glReadPixels(0, 0, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pic.glow.data());
+	} else {
+		pic.glow.clear();
+	}
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	const GLenum error = gl.glGetError();
 	if (error != 0) {

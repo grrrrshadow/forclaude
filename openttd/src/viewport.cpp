@@ -8631,26 +8631,42 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 /**
  * A figure near the eye by its triangles on the graphics card (the player, 20. 10.: "all the objects by the GPU"): its
  * shape, parts and textures as CabDrawFigureModel() draws them, its corners placed by a matrix -- turned as its state
- * has it, sized and foreshortened, raised up a hill, turned to where it faces --, its crew that walks so too. What the
- * card does not do yet the processor draws as before: the cab the eye is in, the wheels turning, and at night a
- * material with a light of its own (drawn again over the dark, glow_after_night).
- * @param night whether it is dark
+ * has it, sized and foreshortened, raised up a hill, turned to where it faces --, its wheels turning, its crew that
+ * walks so too; the cab the eye is in without the driver's seat. Its own light at night read back apart (glow).
  * @param[out] out its meshes
- * @return whether it goes to the card
+ * @return whether it goes to the card (else the processor draws it)
  */
-static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double near, const CabFigure &fg, const CabFigureModel &model, bool night, bool wheels_turn, std::vector<ThreeDGpuMesh> &out)
+static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double near, const CabFigure &fg, const CabFigureModel &model, bool wheels_turn, std::vector<ThreeDGpuMesh> &out)
 {
 	const ThreeDVehicleShape *shape = model.shape;
-	if (fg.own_cab || shape == nullptr || shape->tri.empty() || model.whole == nullptr) return false;
-	if (wheels_turn && !shape->corner_wheel.empty() && !model.fig->model_wheels.empty()) return false;
-	if (night) {
-		for (size_t i = 0; i < model.texs.size(); i++) {
-			if (shape->Glow(i) != 0) return false;
+	if (shape == nullptr || shape->tri.empty() || model.whole == nullptr) return false;
+	/* Its wheels that turn, the front ones steering, as CabDrawFigureModel() turns them: each a matrix in the model's
+	 * frame about its middle -- rolled about its axle (y), then steered about z. */
+	std::vector<ThreeDGpuMatrix> wheels;
+	const std::vector<ThreeDModelWheel> &model_wheels = model.fig->model_wheels;
+	if (wheels_turn && !shape->corner_wheel.empty() && !model_wheels.empty()) {
+		if (model_wheels.size() > THREE_D_GPU_EYE_WHEELS) return false;
+		const double across = fg.size * OBJECT_UNITS_PER_METRE, tc = std::cos(model.turn * M_PI / 180.0);
+		double front = -1e9, back_sum = 0;
+		int backs = 0;
+		for (const ThreeDModelWheel &w : model_wheels) {
+			if (w.steers) front = std::max(front, static_cast<double>(w.centre[0]));
+			else { back_sum += w.centre[0]; backs++; }
 		}
-		for (const CabFigureModel::Crew &crew : model.crew) {
-			for (size_t i = 0; i < crew.texs.size(); i++) {
-				if (crew.shape->Glow(i) != 0) return false;
+		const double wheelbase_m = backs > 0 && front > -1e8 ? front - back_sum / backs : 0;
+		for (const ThreeDModelWheel &w : model_wheels) {
+			const double roll = fg.rolled * tc / (w.radius * across);
+			double steer = 0;
+			if (w.steers && wheelbase_m > 0) steer = std::clamp(std::atan(fg.curvature * wheelbase_m * across), -w.max_angle * M_PI / 180.0, w.max_angle * M_PI / 180.0);
+			const double sc = std::cos(roll), ss = std::sin(roll), st = std::cos(steer), sn = std::sin(steer);
+			const double a[9] = {st * sc, -sn, st * ss, sn * sc, st, sn * ss, -ss, 0, sc};
+			ThreeDGpuMatrix m{};
+			for (int r = 0; r < 3; r++) {
+				for (int c = 0; c < 3; c++) m[r * 4 + c] = static_cast<float>(a[r * 3 + c]);
+				m[r * 4 + 3] = static_cast<float>(w.centre[r] - (a[r * 3] * w.centre[0] + a[r * 3 + 1] * w.centre[1] + a[r * 3 + 2] * w.centre[2]));
 			}
+			m[15] = 1;
+			wheels.push_back(m);
 		}
 	}
 	using M3 = std::array<double, 9>;
@@ -8687,7 +8703,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		const M3 n = mul(rotate, local_turn);
 		ThreeDGpuMesh &g = out.emplace_back();
 		g.shape = &s;
-		g.triangles = ThreeDGpuTrianglesOf(s, model.parts, true, texs.size());
+		g.triangles = ThreeDGpuTrianglesOf(s, model.parts, true, texs.size(), fg.own_cab);
 		g.matrix = EyeClipMatrix(clip, &m4);
 		/* The light in the shape's own frame: n . light there is the world's normal . L. */
 		for (int k = 0; k < 3; k++) g.light[k] = static_cast<float>(n[k] * L[0] + n[3 + k] * L[1] + n[6 + k] * L[2]);
@@ -8696,6 +8712,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 	};
 	const M3 same{1, 0, 0, 0, 1, 0, 0, 0, 1};
 	mesh(*shape, model.texs, same, {0, 0, 0}, same);
+	out.back().wheels = std::move(wheels);
 	for (const CabFigureModel::Crew &crew : model.crew) {
 		const ThreeDWalkingCrew &w = *crew.w;
 		const M3 wt = about_z(w.turn);
@@ -10479,7 +10496,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * model's cab the near plane is the cab's. At night what has a light of its own is kept to be drawn again over
 	 * the dark (glow_after_night). */
 	auto glow_after_night = IsNightNow() ? std::make_shared<std::vector<CabBatchTriangle>>() : nullptr;
-	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures), glow_after_night](uint32_t *dst, float *zb) {
+	/* And what the graphics card drew of them by its own light (ThreeDGpuEyePicture::glow), laid over the dark so too. */
+	auto card_glow = IsNightNow() ? std::make_shared<ThreeDGpuEyePicture>() : nullptr;
+	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures), glow_after_night, card_glow](uint32_t *dst, float *zb) {
 		AutoRestoreBackup near_backup(_cab_near, near);
 		AutoRestoreBackup glow_backup(_cab_glow_after_night, glow_after_night.get());
 		/* Those the graphics card draws (EyeFigureOnCard()) laid in first, the rest by the processor. */
@@ -10489,12 +10508,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			pic.width = width;
 			pic.height = height;
 			pic.near_plane = static_cast<float>(near);
+			pic.read_glow = card_glow != nullptr;
 			for (size_t k = 0; k < solid_figures.size(); k++) {
-				on_card[k] = EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, glow_after_night != nullptr, wheels_turn, pic.meshes);
+				on_card[k] = EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, wheels_turn, pic.meshes);
 			}
 			if (!pic.meshes.empty()) {
 				if (ThreeDGpuRenderEye(pic)) {
 					LayEyeCardPicture(pic, dst, zb);
+					if (card_glow != nullptr) *card_glow = std::move(pic);
 				} else {
 					on_card.assign(solid_figures.size(), false);
 				}
@@ -10637,9 +10658,24 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		out.Job([eye, width, height, moon, glows = CollectEyeNightGlows(eye, own)](uint32_t *dst, float *zb) { DrawEyeNight(eye, width, height, dst, zb, moon, glows); });
 		DrawEyeVehicleGlass(eye, dst, zb, width, height);
 		/* What has a light of its own (the beacon of the fire Tatra, the ghost) again over the dark. */
-		if (glow_after_night != nullptr) out.Job([glow_after_night](uint32_t *, float *) {
+		if (glow_after_night != nullptr) out.Job([glow_after_night, card_glow](uint32_t *dst, float *zb) {
 			const std::vector<CabBatchTriangle> *list = glow_after_night.get();
 			CabRasterLists({&list, 1});
+			/* The card's: where its figure is still what is seen (nothing nearer drawn over it since). */
+			if (card_glow == nullptr || card_glow->glow.empty()) return;
+			const ThreeDGpuEyePicture &g = *card_glow;
+			const size_t n = static_cast<size_t>(g.width) * g.height;
+			for (size_t i = 0; i < n; i++) {
+				const Colour c(g.glow[i]);
+				if (c.a == 0 || g.depth[i] < zb[i]) continue;
+				if (c.a == 255) {
+					dst[i] = Colour(c.r, c.g, c.b).data;
+					continue;
+				}
+				const Colour d(dst[i]);
+				const uint na = 255 - c.a;
+				dst[i] = Colour(static_cast<uint8_t>(std::min<uint>(255, c.r + (d.r * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.g + (d.g * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.b + (d.b * na + 127) / 255))).data;
+			}
 		});
 		/* The lamps and lit windows of the houses lighting what is about them (DrawEyeLampLight()). */
 		std::vector<std::array<double, 3>> lamps;

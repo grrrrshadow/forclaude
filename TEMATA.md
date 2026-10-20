@@ -38,12 +38,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   z karty a z procesoru se liší v 0,1–0,2 % pixelů (hrany).
 - **Hotovo – auta, postavy, zvířata a houby z očí na kartě** (`EyeFigureOnCard()`): tvar, díly stavu a textury jako
   na procesoru, rohy maticí (otočení stavu, velikost, zkrácení, náklon do kopce, natočení), světlo v rámci tvaru,
-  sklo průhledné přes to, co je za ním, posádka, která chodí. Procesor zatím kreslí: vlastní kabinu (oko je uvnitř),
-  točící se kola (nastavení), v noci svítící materiály (kreslí se znovu přes tmu). Rig: Tatra 603 vedle chodce,
+  sklo průhledné přes to, co je za ním, posádka, která chodí. Rig: Tatra 603 vedle chodce,
   karta a procesor se liší v 6–7 pixelech. Pozor na zjednodušený tvar: nemá seznam textur, počet textur je ze
   seznamu textur figury (jinak kola dostala texturu karoserie).
-- **Dál:** zbytek (kabina, kola, noční svit) na kartu; pak celý snímek z očí na kartě a ukázat ho bez čtení zpět
-  (krok 6) – tak se to dělá, aby to necukalo, na každém počítači.
+- **Hotovo – krok 1: vlastní kabina, točící se kola a noční svit na kartě.** Kabina na kartě bez místa řidiče (oko
+  je uvnitř). Kola maticí na kartě: otočení podle ujeté dráhy a zatočení předních podle zatáčky, stejně jako
+  procesor (nejvýš 32 kol na tvar, víc kreslí procesor). V noci svítící materiály do druhého výstupu karty (záře);
+  vloží se přes tmu tam, kde je figura nejblíž. Rig, karta proti procesoru: noční houby u Drakova 13–19 px, Tatra 603
+  s koly ve dne i v noci 11–38 px, kabina Tatry 148 ve dne i v noci 10–14 px (hra pauznutá, jinak auto mezi snímky
+  popojede a liší se celá zem).
+- **Dál:** krok 2 – celý snímek z očí na kartě (terén, plakáty, mosty a tunely, vzdálená krajina, obloha, mlha, noc,
+  světla lamp, stíny, věci v ruce); krok 3 – ukázat ho bez čtení zpět. Tak se to dělá, aby to necukalo, na každém
+  počítači.
 - **Deník karty:** `3d_karta.log` je ve složce hry vedle `openttd.cfg` (ne v `save`). Hráčův: zink (Vortek, Mali-G615),
   OpenGL 4.3, obrázky 5–19 ms. Hráč zavírá hru zavřením celého Winlatoru, takže hra nestihne zapsat „konec“ a příště
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra

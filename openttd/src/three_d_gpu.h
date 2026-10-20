@@ -56,7 +56,7 @@ struct ThreeDGpuTriangles {
 	std::vector<bool> used;          ///< by texture index, whether any triangle drawn has it
 };
 
-std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures);
+std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehicleShape &shape, const ThreeDParts &parts, bool vehicle, size_t textures, bool without_driver_seat = false);
 
 /**
  * How the card paints a texture's texels as it draws them -- as RasterObject() paints them on the processor, each step
@@ -98,7 +98,11 @@ struct ThreeDGpuMesh {
 	bool lit = false;                   ///< lit by its normals; else as its texture is
 	std::vector<const ThreeDObjectTexture *> textures; ///< by texture index, as they are; nullptr: those triangles not drawn
 	std::vector<ThreeDGpuPaint> paints; ///< by texture index, how it is painted as drawn; empty or shorter: as it is
+	/** The view from the eyes' (THREE_D_GPU_EYE_WHEELS at most): each turning wheel's corners moved so in the shape's own
+	 * frame (ThreeDVehicleShape::corner_wheel n: wheels[n - 1]); empty, they stand. */
+	std::vector<ThreeDGpuMatrix> wheels;
 };
+static constexpr size_t THREE_D_GPU_EYE_WHEELS = 32;
 
 /** A triangle of the glass of a light on at night, placed on the picture already: drawn in its colour, marked lit. */
 struct ThreeDGpuNightTriangle {
@@ -167,8 +171,12 @@ struct ThreeDGpuEyePicture {
 	std::vector<ThreeDGpuEyeBuilding> buildings;
 	std::vector<ThreeDGpuMesh> meshes; ///< the figures by their triangles (CabDrawFigureModel() of viewport.cpp), each matrix to the card's clip space; their glass after all else
 	float glass_alpha = 0.15f;     ///< how much of the glass's colour a layer of it lays over what is behind
+	bool read_glow = false;        ///< at night: what has a light of its own read back too (glow)
 	std::vector<uint32_t> pixels;  ///< what comes: the colours (Colour::data), top row first; alpha below 255 see-through, its colour multiplied in
 	std::vector<float> depth;      ///< and 1 / how far ahead each is, as the eye's depth has it; 0 where nothing
+	/** With read_glow, a material with a light of its own by that light alone (drawn again over the dark, as
+	 * glow_after_night of viewport.cpp), its alpha the glass's; 0 elsewhere. */
+	std::vector<uint32_t> glow;
 };
 
 bool ThreeDGpuAvailable();
