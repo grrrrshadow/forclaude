@@ -464,8 +464,10 @@ struct GpuBuilding {
 std::unordered_map<uint64_t, GpuTexture> _card_textures;
 std::unordered_map<uint64_t, GpuBuilding> _card_buildings;
 size_t _card_bytes = 0;
+std::atomic<size_t> _card_sent = 0; ///< the rig: bytes put on the card since the last ThreeDGpuTimes()
+std::atomic<int> _card_trims = 0;   ///< and how many times it let go of what it held the longest not drawn
 uint64_t _card_clock = 0;
-constexpr size_t GPU_BYTES_KEPT = 128u * 1024 * 1024; ///< (a phone's card has no memory of its own: it is the game's)
+constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.: "today's cards have 8 GB"; 128 MB after #285 was Winlator's old OpenGL)
 
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {
@@ -1673,6 +1675,7 @@ void TrimCard()
 	for (const auto &[uid, b] : _card_buildings) if (b.used < _card_clock) held.push_back({b.used, 3, uid});
 	std::ranges::sort(held, [](const Held &a, const Held &b) { return a.used < b.used; });
 	Step(fmt::format("uvolneni karty ({} MB)", _card_bytes >> 20));
+	_card_trims++;
 	for (const Held &h : held) {
 		if (_card_bytes <= GPU_BYTES_KEPT / 4 * 3) break;
 		if (h.kind == 0) {
@@ -1741,6 +1744,7 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0));
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_shapes.emplace(s.uid.value, g).first->second;
 }
 
@@ -1762,6 +1766,7 @@ const GpuIndices *IndicesOnCard(const ThreeDGpuTriangles &t)
 	g.bytes = t.indices.size() * sizeof(uint32_t);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_indices.emplace(t.uid, g).first->second;
 }
 
@@ -1789,6 +1794,7 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	g.bytes = static_cast<size_t>(t.w) * t.h * 4;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
 
@@ -1816,6 +1822,7 @@ const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 	g.bytes = static_cast<size_t>(m.w) * m.h;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_textures.emplace(m.uid.value, g).first->second;
 }
 
@@ -2105,6 +2112,7 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	g.bytes = all.size() * sizeof(float);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_buildings.emplace(b.uid, std::move(g)).first->second;
 }
 
@@ -2508,6 +2516,7 @@ const GpuTexture *KeptTextureOnCard(uint64_t uid, const uint32_t *px, int w, int
 	g.bytes = static_cast<size_t>(w) * h * 4;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_sent += g.bytes;
 	return &_card_textures.emplace(uid, g).first->second;
 }
 
@@ -3258,7 +3267,10 @@ std::string ThreeDGpuDescribe()
 std::string ThreeDGpuTimes()
 {
 	std::lock_guard lock(_gpu_mutex);
-	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string());
+	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
+			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load());
+	_card_sent = 0;
+	_card_trims = 0;
 	_gpu_ms = 0;
 	_gpu_pictures = 0;
 	_gpu_failed = 0;

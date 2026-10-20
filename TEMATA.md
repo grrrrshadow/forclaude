@@ -79,6 +79,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra
   nemusela vůbec spustit); pozdější konec si jen schová jako `3d_karta_minule.log`.
 
+## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
+
+- Hráč: *„co má #279 jinak, je plynulejší“*, *„otáčení plochou je plynulý“*, *„hlásil jsem 2 pády a tys všechno
+  povypínal… vrátil jsi všechno zpátky?“*, *„dnešní karty mají 8 GB RAM“*.
+- #279 (16. 10. večer) ještě neměl grafickou kartu: všechny obrázky 3D objektů na ploše kreslil procesor. Od #285
+  je kreslí karta, **každý obrázek zvlášť**: poslat, nakreslit, počkat na kartu, přečíst zpět. Rig, otočení plochy
+  o 360° po 5° u Sufingpoolu s auty: 1374 obrázků (auta, postavy, stromy, efekty), karta 1864 ms, procesor 478 ms.
+  Na telefonu podle deníku karty 5–19 ms na obrázek – to je to cukání při otáčení. Domy na ploše kreslí dál procesor.
+- Po pádech #285: karta zase výchozí zapnutá (`8f33958`), ale strop paměti karty zůstal 128 MB (dřív 384). Teď
+  **1 GB**. V rigu při otáčení strop nehrál roli (karta drží pod 1 MB tvarů), cukání je z jednotlivých obrázků.
+- Rig: `test3d casy` píše i kolik karta drží, kolik se na ni poslalo a kolikrát uvolňovala.
+- **Domluvit:** obrázky plochy na kartě po jednom jsou pomalejší než procesor. Buď je zase kreslí procesor jako
+  v #279 (karta zůstane pro pohled z očí a z kabiny, kde kreslí celý snímek najednou), nebo karta všechny obrázky
+  jednoho snímku plochy najednou s jedním čtením zpět.
+
 ## 20. 10. – pohled 0 s OpenGL: rozpadlé domy, marťanské domy jako stíny, noc jen na silnicích
 
 - Hráč (#287, telefon, karta zapnutá): při pohledu 0 mají 3D domy černá místa a prosvítají přes ně původní domy,
