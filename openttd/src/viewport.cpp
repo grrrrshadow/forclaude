@@ -7002,18 +7002,60 @@ static inline CabPoint CabToEye(const CabEye &eye, double wx, double wy, double 
  * @param ox,oy,oz the origin, world units (z the game's units of height)
  * @param near the near plane, world units ahead
  */
-static ThreeDGpuMatrix EyeClipMatrix(const CabEye &eye, int width, int height, double ox, double oy, double oz, double near)
+static std::array<double, 16> EyeClip(const CabEye &eye, int width, int height, double ox, double oy, double oz, double near)
 {
 	const double dx = ox - eye.x, dy = oy - eye.y;
 	const double f0 = dx * eye.fx + dy * eye.fy, r0 = dx * eye.rx + dy * eye.ry, u0 = (oz - eye.z) * CAB_Z_SCALE;
 	const double ax = 2 * eye.cx / width - 1, bx = 2 * eye.focal / width;
 	const double ay = 2 * eye.cy / height - 1, by = 2 * eye.focal / height;
 	return {
-		static_cast<float>(ax * eye.fx + bx * eye.rx), static_cast<float>(ax * eye.fy + bx * eye.ry), 0.0f, static_cast<float>(ax * f0 + bx * r0),
-		static_cast<float>(ay * eye.fx), static_cast<float>(ay * eye.fy), static_cast<float>(-by * CAB_Z_SCALE), static_cast<float>(ay * f0 - by * u0),
-		static_cast<float>(-eye.fx), static_cast<float>(-eye.fy), 0.0f, static_cast<float>(2 * near - f0),
-		static_cast<float>(eye.fx), static_cast<float>(eye.fy), 0.0f, static_cast<float>(f0),
+		ax * eye.fx + bx * eye.rx, ax * eye.fy + bx * eye.ry, 0.0, ax * f0 + bx * r0,
+		ay * eye.fx, ay * eye.fy, -by * CAB_Z_SCALE, ay * f0 - by * u0,
+		-eye.fx, -eye.fy, 0.0, 2 * near - f0,
+		eye.fx, eye.fy, 0.0, f0,
 	};
+}
+
+/** EyeClip() for the card, and after another matrix (a figure's corners to the world from its origin): rows first. */
+static ThreeDGpuMatrix EyeClipMatrix(const std::array<double, 16> &clip, const std::array<double, 16> *then = nullptr)
+{
+	ThreeDGpuMatrix m{};
+	for (int r = 0; r < 4; r++) {
+		for (int c = 0; c < 4; c++) {
+			double v = 0;
+			if (then == nullptr) {
+				v = clip[r * 4 + c];
+			} else {
+				for (int k = 0; k < 4; k++) v += clip[r * 4 + k] * (*then)[k * 4 + c];
+			}
+			m[r * 4 + c] = static_cast<float>(v);
+		}
+	}
+	return m;
+}
+
+/**
+ * Lay what the card drew of the view from the eyes (ThreeDGpuRenderEye()) into the eye's picture where it is nearer:
+ * whole, or see-through (the glass over nothing of the card's) over what is drawn there.
+ */
+static void LayEyeCardPicture(const ThreeDGpuEyePicture &pic, uint32_t *dst, float *zb)
+{
+	const size_t n = static_cast<size_t>(pic.width) * pic.height;
+	for (size_t i = 0; i < n; i++) {
+		if (pic.depth[i] <= zb[i]) continue;
+		const Colour c(pic.pixels[i]);
+		if (c.a == 0) continue;
+		if (c.a == 255) {
+			dst[i] = pic.pixels[i];
+			zb[i] = pic.depth[i];
+			continue;
+		}
+		const Colour d(dst[i]);
+		const uint na = 255 - c.a;
+		dst[i] = Colour(static_cast<uint8_t>(std::min<uint>(255, c.r + (d.r * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.g + (d.g * na + 127) / 255)), static_cast<uint8_t>(std::min<uint>(255, c.b + (d.b * na + 127) / 255))).data;
+		/* Over nothing (the sky): its depth, so the sky drawn after the dark (DrawEyeSky()) leaves it (as CabRasterRows()). */
+		if (zb[i] == 0.0f) zb[i] = pic.depth[i];
+	}
 }
 
 static inline CabVertex CabProject(const CabEye &eye, const CabPoint &p)
@@ -8587,6 +8629,83 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 }
 
 /**
+ * A figure near the eye by its triangles on the graphics card (the player, 20. 10.: "all the objects by the GPU"): its
+ * shape, parts and textures as CabDrawFigureModel() draws them, its corners placed by a matrix -- turned as its state
+ * has it, sized and foreshortened, raised up a hill, turned to where it faces --, its crew that walks so too. What the
+ * card does not do yet the processor draws as before: the cab the eye is in, the wheels turning, and at night a
+ * material with a light of its own (drawn again over the dark, glow_after_night).
+ * @param night whether it is dark
+ * @param[out] out its meshes
+ * @return whether it goes to the card
+ */
+static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double near, const CabFigure &fg, const CabFigureModel &model, bool night, bool wheels_turn, std::vector<ThreeDGpuMesh> &out)
+{
+	const ThreeDVehicleShape *shape = model.shape;
+	if (fg.own_cab || shape == nullptr || shape->tri.empty() || model.whole == nullptr) return false;
+	if (wheels_turn && !shape->corner_wheel.empty() && !model.fig->model_wheels.empty()) return false;
+	if (night) {
+		for (size_t i = 0; i < model.texs.size(); i++) {
+			if (shape->Glow(i) != 0) return false;
+		}
+		for (const CabFigureModel::Crew &crew : model.crew) {
+			for (size_t i = 0; i < crew.texs.size(); i++) {
+				if (crew.shape->Glow(i) != 0) return false;
+			}
+		}
+	}
+	using M3 = std::array<double, 9>;
+	auto mul = [](const M3 &a, const M3 &b) {
+		M3 m{};
+		for (int r = 0; r < 3; r++) {
+			for (int c = 0; c < 3; c++) m[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+		}
+		return m;
+	};
+	auto about_z = [](double degrees) {
+		const double a = degrees * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+		return M3{c, -s, 0, s, c, 0, 0, 0, 1};
+	};
+	const double pa = fg.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
+	/* As CabDrawFigureModel() places a corner: turned by its state, in metres sized (along it foreshortened, up stretched),
+	 * raised about its y, turned to where it faces, in world units; its normals turned alike. */
+	const M3 turn = about_z(model.turn), pitch{pc, 0, -ps, 0, 1, 0, ps, 0, pc}, facing = about_z(fg.facing);
+	const M3 size{fg.size * fg.along, 0, 0, 0, fg.size, 0, 0, 0, fg.size * fg.stretch};
+	const M3 units{OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_HEIGHT_PER_METRE};
+	const M3 rotate = mul(facing, mul(pitch, turn));
+	const M3 place = mul(units, mul(facing, mul(pitch, mul(size, turn))));
+	const std::array<double, 16> clip = EyeClip(eye, width, height, fg.x, fg.y, fg.z, near);
+	static constexpr double L[3] = {-0.45, 0.35, 0.82};
+	/* A shape whose corners are first placed in the model's frame by local and at (a figure of its crew). */
+	auto mesh = [&](const ThreeDVehicleShape &s, const std::vector<const ThreeDObjectTexture *> &texs, const M3 &local, const std::array<double, 3> &at, const M3 &local_turn) {
+		const M3 m3 = mul(place, local);
+		std::array<double, 16> m4{};
+		for (int r = 0; r < 3; r++) {
+			for (int c = 0; c < 3; c++) m4[r * 4 + c] = m3[r * 3 + c];
+			m4[r * 4 + 3] = place[r * 3] * at[0] + place[r * 3 + 1] * at[1] + place[r * 3 + 2] * at[2];
+		}
+		m4[15] = 1;
+		const M3 n = mul(rotate, local_turn);
+		ThreeDGpuMesh &g = out.emplace_back();
+		g.shape = &s;
+		g.triangles = ThreeDGpuTrianglesOf(s, model.parts, true, texs.size());
+		g.matrix = EyeClipMatrix(clip, &m4);
+		/* The light in the shape's own frame: n . light there is the world's normal . L. */
+		for (int k = 0; k < 3; k++) g.light[k] = static_cast<float>(n[k] * L[0] + n[3 + k] * L[1] + n[6 + k] * L[2]);
+		g.lit = s.nrm.size() == s.pos.size();
+		g.textures = texs;
+	};
+	const M3 same{1, 0, 0, 0, 1, 0, 0, 0, 1};
+	mesh(*shape, model.texs, same, {0, 0, 0}, same);
+	for (const CabFigureModel::Crew &crew : model.crew) {
+		const ThreeDWalkingCrew &w = *crew.w;
+		const M3 wt = about_z(w.turn);
+		const M3 local = mul(wt, M3{w.scale, 0, 0, 0, w.scale, 0, 0, 0, w.scale});
+		mesh(*crew.shape, crew.texs, local, {w.at[0], w.at[1], w.at[2]}, wt);
+	}
+	return true;
+}
+
+/**
  * DrawBridgeMiddle() tells where the sprites of a bridge over a tile begin and end, for the cab view and the turned
  * view to build the bridge from them. Nothing else when neither is collecting.
  */
@@ -10115,15 +10234,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				b.building.facing = job.shape.facing;
 				b.building.tri_tex = job.shape.tri_tex;
 				b.building.textures = job.texs;
-				b.matrix = EyeClipMatrix(eye, width, height, job.ox, job.oy, job.oz, near);
+				b.matrix = EyeClipMatrix(EyeClip(eye, width, height, job.ox, job.oy, job.oz, near));
 			}
 			if (ThreeDGpuRenderEye(pic)) {
-				const size_t n = static_cast<size_t>(width) * height;
-				for (size_t i = 0; i < n; i++) {
-					if (pic.depth[i] <= zb[i]) continue;
-					dst[i] = pic.pixels[i];
-					zb[i] = pic.depth[i];
-				}
+				LayEyeCardPicture(pic, dst, zb);
 				return;
 			}
 		}
@@ -10368,9 +10482,29 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	if (!solid_figures.empty()) out.Job([eye, width, height, near = _cab_near, wheels_turn = _settings_client.gui.three_d_wheels, solid_figures = std::move(solid_figures), glow_after_night](uint32_t *dst, float *zb) {
 		AutoRestoreBackup near_backup(_cab_near, near);
 		AutoRestoreBackup glow_backup(_cab_glow_after_night, glow_after_night.get());
+		/* Those the graphics card draws (EyeFigureOnCard()) laid in first, the rest by the processor. */
+		std::vector<bool> on_card(solid_figures.size(), false);
+		if (ThreeDGpuAvailable()) {
+			ThreeDGpuEyePicture pic;
+			pic.width = width;
+			pic.height = height;
+			pic.near = static_cast<float>(near);
+			for (size_t k = 0; k < solid_figures.size(); k++) {
+				on_card[k] = EyeFigureOnCard(eye, width, height, near, solid_figures[k].first, solid_figures[k].second, glow_after_night != nullptr, wheels_turn, pic.meshes);
+			}
+			if (!pic.meshes.empty()) {
+				if (ThreeDGpuRenderEye(pic)) {
+					LayEyeCardPicture(pic, dst, zb);
+				} else {
+					on_card.assign(solid_figures.size(), false);
+				}
+			}
+		}
 		{
 			CabBatchScope batch;
-			for (const auto &[fg, model] : solid_figures) CabDrawFigureModel(dst, zb, width, height, eye, fg, model, wheels_turn);
+			for (size_t k = 0; k < solid_figures.size(); k++) {
+				if (!on_card[k]) CabDrawFigureModel(dst, zb, width, height, eye, solid_figures[k].first, solid_figures[k].second, wheels_turn);
+			}
 		}
 		CabFlushGlass();
 	});

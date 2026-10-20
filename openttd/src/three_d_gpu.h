@@ -165,7 +165,9 @@ struct ThreeDGpuEyePicture {
 	int width = 0, height = 0;     ///< pixels
 	float near = 1;                ///< the nearest drawn, world units ahead
 	std::vector<ThreeDGpuEyeBuilding> buildings;
-	std::vector<uint32_t> pixels;  ///< what comes: the colours (Colour::data), top row first
+	std::vector<ThreeDGpuMesh> meshes; ///< the figures by their triangles (CabDrawFigureModel() of viewport.cpp), each matrix to the card's clip space; their glass after all else
+	float glass_alpha = 0.15f;     ///< how much of the glass's colour a layer of it lays over what is behind
+	std::vector<uint32_t> pixels;  ///< what comes: the colours (Colour::data), top row first; alpha below 255 see-through, its colour multiplied in
 	std::vector<float> depth;      ///< and 1 / how far ahead each is, as the eye's depth has it; 0 where nothing
 };
 

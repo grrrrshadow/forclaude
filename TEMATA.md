@@ -36,7 +36,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   `blízko / vzdálenost` jako float (32 bitů), zpět obraz a hloubka a vloží se tam, kde je blíž než terén. Tvar domu
   je na kartě jednou (číslo `ThreeDObjectShapeView::uid`). Co karta neudrží, kreslí procesor jako dřív. Rig: obraz
   z karty a z procesoru se liší v 0,1–0,2 % pixelů (hrany).
-- **Dál:** auta, postavy a zvířata ve stejném průchodu; pak celý snímek z očí na kartě a ukázat ho bez čtení zpět
+- **Hotovo – auta, postavy, zvířata a houby z očí na kartě** (`EyeFigureOnCard()`): tvar, díly stavu a textury jako
+  na procesoru, rohy maticí (otočení stavu, velikost, zkrácení, náklon do kopce, natočení), světlo v rámci tvaru,
+  sklo průhledné přes to, co je za ním, posádka, která chodí. Procesor zatím kreslí: vlastní kabinu (oko je uvnitř),
+  točící se kola (nastavení), v noci svítící materiály (kreslí se znovu přes tmu). Rig: Tatra 603 vedle chodce,
+  karta a procesor se liší v 6–7 pixelech. Pozor na zjednodušený tvar: nemá seznam textur, počet textur je ze
+  seznamu textur figury (jinak kola dostala texturu karoserie).
+- **Dál:** zbytek (kabina, kola, noční svit) na kartu; pak celý snímek z očí na kartě a ukázat ho bez čtení zpět
   (krok 6) – tak se to dělá, aby to necukalo, na každém počítači.
 - **Deník karty:** `3d_karta.log` je ve složce hry vedle `openttd.cfg` (ne v `save`). Hráčův: zink (Vortek, Mali-G615),
   OpenGL 4.3, obrázky 5–19 ms. Hráč zavírá hru zavřením celého Winlatoru, takže hra nestihne zapsat „konec“ a příště
