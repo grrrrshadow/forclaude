@@ -190,6 +190,8 @@ void ProjectTurnedF(double x, double y, double z, double &vx, double &vy);
 Point ProjectTurned(int x, int y, int z);
 void InverseTurnedFlatF(double vx, double vy, double z, double &x, double &y);
 void TurnDirtyRect(int &left, int &top, int &right, int &bottom);
+/** Forget the turned view's kept picture of the ground (viewport.cpp): its sprites are made again. */
+void ResetTurnedGround();
 
 /**
  * Where in the world the thing the game marks dirty is (DirtyPlaceScope): the rectangle of the view facing north

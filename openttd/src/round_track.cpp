@@ -747,6 +747,12 @@ void RegisterRoundTrackTile(TileIndex tile)
 	_round_track_tiles.push_back(tile);
 }
 
+/** How many times a tile was told to have its track drawn as a strip this pass: what a tile's draw procedure added is the count after it, less before. */
+size_t RoundTrackTileCount()
+{
+	return _round_track_tiles.size();
+}
+
 /** The ground of a tile whose track is drawn as a strip: the ground the game draws under no track. */
 void DrawRoundTrackGround(TileIndex tile)
 {
@@ -846,31 +852,40 @@ static const StripPatch &StripPatchOf(const std::vector<const Curve *> &pieces, 
  * or of a piece joining it across an edge (an arc crosses the edge off its midpoint), takes the pixel of the
  * straight track of its rail type the same way along and across that piece.
  */
-void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
+/** The pieces a pixel of a round tile may be on: its own, and those joining it across an edge. */
+static std::vector<const Curve *> PiecesAbout(TileIndex tile)
 {
-	if (_round_track_tiles.empty() || !RoundTrackEnabled()) return;
+	std::vector<std::pair<TileIndex, Track>> joining;
+	for (Track tr : GetTrackBits(tile)) {
+		joining.emplace_back(tile, tr);
+		JoiningPieces(tile, tr, joining);
+	}
+	std::sort(joining.begin(), joining.end());
+	joining.erase(std::unique(joining.begin(), joining.end()), joining.end());
+	std::vector<const Curve *> pieces;
+	for (const auto &[pt, ptr] : joining) pieces.push_back(&CurveOf(pt, ptr));
+	return pieces;
+}
+
+/**
+ * Draw the track of the given round tiles along their curves, into a block drawn facing north (the screen, or the
+ * turned view's picture of the ground): each pixel of such a tile near the centre line of one of its pieces, or of
+ * a piece joining it across an edge (an arc crosses the edge off its midpoint), takes the pixel of the straight
+ * track of its rail type the same way along and across that piece.
+ */
+void DrawRoundTrackStripsOf(const DrawPixelInfo &dpi, std::span<const TileIndex> tiles)
+{
+	if (tiles.empty() || !RoundTrackEnabled()) return;
 	auto t0 = std::chrono::steady_clock::now();
 	auto timed = [&]() { _round_strip_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - t0).count(); };
 	const int scale = ScaleByZoom(1, dpi.zoom);
 	const int pw = UnScaleByZoom(dpi.width, dpi.zoom), ph = UnScaleByZoom(dpi.height, dpi.zoom);
 	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
 
-	std::sort(_round_track_tiles.begin(), _round_track_tiles.end());
-	_round_track_tiles.erase(std::unique(_round_track_tiles.begin(), _round_track_tiles.end()), _round_track_tiles.end());
-	for (TileIndex tile : _round_track_tiles) {
+	for (TileIndex tile : tiles) {
 		if (!IsRoundTrackTile(tile)) continue;
 		const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE, z = TilePixelHeight(tile);
-
-		/* The pieces a pixel of the tile may be on: its own, and those joining it across an edge. */
-		std::vector<std::pair<TileIndex, Track>> joining;
-		for (Track tr : GetTrackBits(tile)) {
-			joining.emplace_back(tile, tr);
-			JoiningPieces(tile, tr, joining);
-		}
-		std::sort(joining.begin(), joining.end());
-		joining.erase(std::unique(joining.begin(), joining.end()), joining.end());
-		std::vector<const Curve *> pieces;
-		for (const auto &[pt, ptr] : joining) pieces.push_back(&CurveOf(pt, ptr));
+		const std::vector<const Curve *> pieces = PiecesAbout(tile);
 		const Reference &ref = ReferenceOf(tile, dpi.zoom);
 
 		/* The tile's pixels, kept by the shape of its pieces (the same curve elsewhere is the same picture): drawn
@@ -892,6 +907,26 @@ void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
 		}
 	}
 	timed();
+}
+
+/** Draw the track of the tiles collected this pass along their curves (DrawRoundTrackStripsOf()). */
+void DrawRoundTrackStrips(const DrawPixelInfo &dpi)
+{
+	std::sort(_round_track_tiles.begin(), _round_track_tiles.end());
+	_round_track_tiles.erase(std::unique(_round_track_tiles.begin(), _round_track_tiles.end()), _round_track_tiles.end());
+	DrawRoundTrackStripsOf(dpi, _round_track_tiles);
+}
+
+/**
+ * What the strip of a round tile looks like depends on, at a zoom: its pieces and those joining it, the picture of
+ * its rail and its height (the turned view's kept picture of the ground draws a tile again when it changes); 0 for
+ * a tile that is not round.
+ */
+uint64_t RoundTrackStripKey(TileIndex tile, ZoomLevel zoom)
+{
+	if (!IsRoundTrackTile(tile)) return 0;
+	const uint64_t key = StripKey(PiecesAbout(tile), TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE, ReferenceOf(tile, zoom), zoom, 0, 0);
+	return (key ^ (static_cast<uint64_t>(TilePixelHeight(tile)) * 0x9E3779B97F4A7C15ull)) | 1;
 }
 
 /** The piece of track a train's piece is on, or Track::Invalid. */

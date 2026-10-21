@@ -111,6 +111,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   s tolerancí: rozdíly v rigu (273 px při 1x, 2082 px při 4x) jsou tam, kde se procesor pletl (oknům chybělo sklo,
   šikmý proužek přes zeď). Při otáčení procesor na domy 0,4 ms místo 50 ms; rig nemá kartu (llvmpipe kreslí
   procesorem), takže rychlost karty ukáže až telefon.
+- **Bod 3, terén otočené plochy – první půlka hotová: obrázek terénu se drží** (`TurnedGround`, `UpdateTurnedGround()`
+  ve `viewport.cpp`). Dřív se každý snímek otáčení znovu kreslily sprity země všech dlaždic do obrázku ze severu
+  a ten se pak pokládal na otočenou plochu. Teď se obrázek ze severu drží mezi snímky; dlaždice se do něj kreslí
+  znovu, jen když se změní, co hra na ní kreslí (sprity země, kulatá kolej, označení kurzorem), a s ní sousedi
+  v políčkách 64×64, kterých se dotýká; černá pod domy se zarovná a kolej po oblouku nakreslí jako v celém obrázku.
+  Obrázek je položený s rezervou půl velikosti na každou stranu, při posunu dál se položí znovu a co má, si nechá.
+  Země se teď kreslí jen u dlaždic, jejichž zem je v kousku obrazovky vidět (dřív i dlaždice daleko pod obrazovkou,
+  sebrané kvůli vysokým domům). Rig: držený obrázek po otáčení, posunech, jízdě vlaku po kulatém oblouku a
+  pohybu myši je na pixel stejný jako nakreslený znovu i jako dřívější kreslení (`test3d zem 0|1|znovu`, čísla
+  v `test3d cas`). Otáčení po 1°, zem na snímek: při 1x sprity 2,9 → 0,6 ms, při 4x sprity 8,0 → 1,4 ms a stopy domů
+  3,4 → 1,5 ms; pokládání na plochu je 6–9 ms a to je druhá půlka: položí ho karta.
 
 ## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
 

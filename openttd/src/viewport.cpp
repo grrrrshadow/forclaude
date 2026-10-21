@@ -2101,6 +2101,8 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
+	extern void TurnedGroundTimingsPrint();
+	TurnedGroundTimingsPrint();
 	_turned_times = TurnedTimes();
 }
 
@@ -2133,6 +2135,358 @@ static void FillTurnedFootprint(uint32_t *tex, int tw, int x0, int y0, int x1, i
 			x = end;
 		}
 	}
+}
+
+/** A tile of the block being drawn turned (ViewportDoDrawTurned()): what its draw procedure gave, kept to draw it. */
+struct TurnedTile {
+	int x, y;
+	double near;
+	TileType type;
+	Slope raw_slope, top_slope;
+	int raw_z, top_z;
+	size_t first_sprite, end_sprite;
+	int foundation[2];
+	bool building;
+	bool round; ///< its track is drawn as a strip after the ground (round_track.h)
+};
+
+/** Pixels of a picture facing north, from the virtual (0, 0) at its zoom; the right and the bottom edge not in it. */
+struct GroundRect {
+	int l = 0, t = 0, r = 0, b = 0;
+	bool Empty() const { return this->r <= this->l || this->b <= this->t; }
+	bool Inside(const GroundRect &o) const { return this->Empty() || (this->l >= o.l && this->t >= o.t && this->r <= o.r && this->b <= o.b); }
+	bool Meets(const GroundRect &o) const { return !this->Empty() && !o.Empty() && this->l < o.r && o.l < this->r && this->t < o.b && o.t < this->b; }
+	size_t Pixels() const { return this->Empty() ? 0 : static_cast<size_t>(this->r - this->l) * (this->b - this->t); }
+	GroundRect With(const GroundRect &o) const
+	{
+		if (this->Empty()) return o;
+		if (o.Empty()) return *this;
+		return {std::min(this->l, o.l), std::min(this->t, o.t), std::max(this->r, o.r), std::max(this->b, o.b)};
+	}
+	GroundRect Within(const GroundRect &o) const { return {std::max(this->l, o.l), std::max(this->t, o.t), std::min(this->r, o.r), std::min(this->b, o.b)}; }
+};
+
+static inline int PixelFloor(int a, int s) { return (a >= 0) ? a / s : -((-a + s - 1) / s); }
+static inline int PixelCeil(int a, int s) { return -PixelFloor(-a, s); }
+
+/** A ground sprite of a tile, as the draw procedure gave it (TileSpriteToDraw, its part copied). */
+struct TurnedGroundSprite {
+	SpriteID image;
+	PaletteID pal;
+	int32_t x, y;
+	bool has_sub;
+	SubSprite sub;
+};
+
+/** A tile in the kept picture of the ground (TurnedGround). */
+struct TurnedGroundTile {
+	std::vector<TurnedGroundSprite> sprites; ///< its ground (none with a foundation: that is drawn by itself, DrawTurnedTileGround())
+	uint64_t key = 0;   ///< what its pixels depend on: when the tile gives another, it is drawn again
+	GroundRect area;    ///< the pixels its sprites and its strip of round track reach
+	GroundRect fill;    ///< a building's: the rows whose black is grown over (FillTurnedFootprint())
+	TileIndex round = INVALID_TILE; ///< its track is drawn as a strip (round_track.h)
+	uint32_t order = 0; ///< drawn far first facing north, as the game draws the ground: by this
+	GroundRect spot;    ///< the pixel of its north corner: where a tile that draws nothing is
+	GroundRect Reach() const { return this->area.With(this->fill); }
+};
+
+/**
+ * The ground of the turned view facing north, kept from frame to frame. Turning the view, every frame drew the same
+ * ground again and only laid it over the screen another way (the player, 21. 10.: "the card has more power to draw
+ * than the processor"; GPU point 3). A tile is drawn into it again only when what its draw procedure gives changes
+ * -- its ground sprites, its round track, the cursor's mark on it -- with the tiles reaching over the cells it
+ * covers, clipped to them, its round track and the black under its building grown over as the whole picture has
+ * them; the rest stays. The picture is placed over what the block needs and some more every way, so the view moves
+ * and turns on in it; placed again further, it keeps what it has where the two meet.
+ */
+struct TurnedGround {
+	bool valid = false;
+	ZoomLevel zoom = ZoomLevel::Normal;
+	GroundRect at;                 ///< its pixels
+	std::vector<uint32_t> px;
+	std::unordered_map<uint32_t, TurnedGroundTile> tiles; ///< by TurnedGroundTileKey()
+	int cw = 0, ch = 0;            ///< cells across and down
+	std::vector<std::vector<uint32_t>> cells; ///< the tiles reaching into each cell
+	std::vector<uint8_t> dirty;    ///< the cells to draw again
+	int Width() const { return this->at.r - this->at.l; }
+};
+static TurnedGround _turned_ground;
+static constexpr int TURNED_GROUND_CELL = 64; ///< pixels of a cell's side
+static constexpr size_t TURNED_GROUND_PIXELS = static_cast<size_t>(24) << 20; ///< at most so many pixels (96 MB); a block needing more is drawn as before
+bool _turned_ground_kept = true; ///< Rig: the ground kept (test3d zem); else drawn anew for every block as before
+
+/** Rig: what the kept picture of the ground drew since the last report (TurnedTimingsPrint()). */
+static struct {
+	int tiles_changed = 0; ///< tiles whose ground changed or came new
+	int tiles_replaced = 0; ///< of them, those it had before
+	int rects = 0;         ///< rects drawn again
+	size_t pixels = 0;     ///< their pixels
+	int placed = 0;        ///< times placed anew
+} _turned_ground_times;
+
+static inline uint32_t TurnedGroundTileKey(int x, int y)
+{
+	return static_cast<uint32_t>(x + 64) | static_cast<uint32_t>(y + 64) << 16;
+}
+
+/** Forget the kept picture of the ground: the sprites are made again (GfxClearSpriteCache()), or the rig asks. */
+void ResetTurnedGround()
+{
+	_turned_ground = TurnedGround();
+}
+
+/** Rig: what the kept picture of the ground holds. */
+std::string DescribeTurnedGround()
+{
+	const TurnedGround &g = _turned_ground;
+	if (!g.valid) return fmt::format("zem {}, prazdna", _turned_ground_kept ? "drzena" : "kreslena znovu");
+	return fmt::format("zem {}: zoom {}, {}x{} px ({} MB), dlazdic {}", _turned_ground_kept ? "drzena" : "kreslena znovu", to_underlying(g.zoom),
+			g.at.r - g.at.l, g.at.b - g.at.t, g.px.size() * 4 >> 20, g.tiles.size());
+}
+
+/** Rig: what the kept picture of the ground drew again since the last report, and start over (TurnedTimingsPrint()). */
+void TurnedGroundTimingsPrint()
+{
+	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
+			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed);
+	_turned_ground_times = {};
+}
+
+/** Call \a f with the index of each cell of the kept ground the pixels \a r reach into. */
+template <typename F>
+static void ForTurnedGroundCells(const TurnedGround &g, const GroundRect &r, F f)
+{
+	const GroundRect in = r.Within(g.at);
+	if (in.Empty()) return;
+	const int cx0 = (in.l - g.at.l) / TURNED_GROUND_CELL, cx1 = (in.r - 1 - g.at.l) / TURNED_GROUND_CELL;
+	const int cy0 = (in.t - g.at.t) / TURNED_GROUND_CELL, cy1 = (in.b - 1 - g.at.t) / TURNED_GROUND_CELL;
+	for (int cy = cy0; cy <= cy1; cy++) {
+		for (int cx = cx0; cx <= cx1; cx++) f(cy * g.cw + cx);
+	}
+}
+
+/**
+ * Place the kept picture of the ground over the pixels \a need at a zoom: as it is when it has them, else anew over
+ * them and half as much more every way, with what it had where the two meet.
+ * @return whether it is placed; not when the block needs more than it may have
+ */
+static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect &need)
+{
+	const size_t need_px = need.Pixels();
+	if (need_px == 0 || need_px > TURNED_GROUND_PIXELS) return false;
+	const bool keep = g.valid && g.zoom == zoom;
+	if (keep && need.Inside(g.at)) return true;
+
+	const int nw = need.r - need.l, nh = need.b - need.t;
+	double grow = 0.5;
+	if (static_cast<double>(need_px) * (1 + 2 * grow) * (1 + 2 * grow) > TURNED_GROUND_PIXELS) grow = (std::sqrt(static_cast<double>(TURNED_GROUND_PIXELS) / need_px) - 1) / 2;
+	const int mx = static_cast<int>(nw * grow), my = static_cast<int>(nh * grow);
+	GroundRect at{need.l - mx, need.t - my, need.r + mx, need.b + my};
+	if (keep && at.With(g.at).Pixels() <= TURNED_GROUND_PIXELS) at = at.With(g.at);
+
+	TurnedGround n;
+	n.valid = true;
+	n.zoom = zoom;
+	n.at = at;
+	n.px.assign(at.Pixels(), 0);
+	n.cw = (at.r - at.l + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
+	n.ch = (at.b - at.t + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
+	n.cells.resize(static_cast<size_t>(n.cw) * n.ch);
+	n.dirty.assign(n.cells.size(), 0);
+	if (keep) {
+		const GroundRect both = g.at.Within(at);
+		for (int y = both.t; y < both.b; y++) {
+			std::copy_n(&g.px[static_cast<size_t>(y - g.at.t) * g.Width() + (both.l - g.at.l)], both.r - both.l, &n.px[static_cast<size_t>(y - at.t) * n.Width() + (both.l - at.l)]);
+		}
+		/* The tiles reaching into it stay; where one reaches past what the old picture had, it is drawn again. */
+		for (auto &[k, t] : g.tiles) {
+			const GroundRect reach = t.Reach();
+			if (!reach.With(t.spot).Meets(at)) continue;
+			if (!reach.Inside(g.at)) ForTurnedGroundCells(n, reach, [&](int c) { n.dirty[c] = 1; });
+			ForTurnedGroundCells(n, reach, [&](int c) { n.cells[c].push_back(k); });
+			n.tiles.emplace(k, std::move(t));
+		}
+	}
+	g = std::move(n);
+	_turned_ground_times.placed++;
+	return true;
+}
+
+/**
+ * The tiles of the block into the kept picture of the ground: each whose ground changed (or came new) marks the
+ * cells it reached and reaches now; those are drawn again, from the tiles reaching into them.
+ */
+static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tiles)
+{
+	double t0 = TurnedNow();
+	const int s = ScaleByZoom(1, g.zoom);
+	for (const TurnedTile &t : tiles) {
+		const bool founded = t.foundation[0] != -1 || t.foundation[1] != -1;
+		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
+		uint64_t key = 1469598103934665603ull;
+		auto mix = [&](uint64_t v) {
+			v *= 0xbf58476d1ce4e5b9ull;
+			v ^= v >> 31;
+			key = (key ^ v) * 0x94d049bb133111ebull;
+			key ^= key >> 29;
+		};
+		mix(founded);
+		if (!founded) {
+			for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
+				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+				mix(ts.image);
+				mix(ts.pal);
+				mix(static_cast<uint32_t>(ts.x) | static_cast<uint64_t>(static_cast<uint32_t>(ts.y)) << 32);
+				if (ts.sub != nullptr) {
+					mix(static_cast<uint32_t>(ts.sub->left) | static_cast<uint64_t>(static_cast<uint32_t>(ts.sub->top)) << 32);
+					mix(static_cast<uint32_t>(ts.sub->right) | static_cast<uint64_t>(static_cast<uint32_t>(ts.sub->bottom)) << 32);
+				}
+			}
+			mix(t.building);
+			if (t.building) mix(to_underlying(t.top_slope) | static_cast<uint64_t>(static_cast<uint32_t>(t.top_z)) << 8);
+			if (t.round && inside) mix(RoundTrackStripKey(TileXY(t.x, t.y), g.zoom));
+		}
+		const uint32_t k = TurnedGroundTileKey(t.x, t.y);
+		auto it = g.tiles.find(k);
+		if (it != g.tiles.end() && it->second.key == key) continue;
+
+		_turned_ground_times.tiles_changed++;
+		TurnedGroundTile &rec = (it != g.tiles.end()) ? it->second : g.tiles[k];
+		if (it != g.tiles.end()) {
+			_turned_ground_times.tiles_replaced++;
+			if (_turned_debug_tile != INVALID_TILE) IConsolePrint(CC_DEFAULT, "ladeni: zem dlazdice {},{} jinak: spritu {} -> {}", t.x, t.y, rec.sprites.size(), founded ? 0 : t.end_sprite - t.first_sprite);
+			ForTurnedGroundCells(g, rec.Reach(), [&](int c) {
+				g.dirty[c] = 1;
+				std::vector<uint32_t> &cell = g.cells[c];
+				cell.erase(std::remove(cell.begin(), cell.end(), k), cell.end());
+			});
+		}
+		rec.key = key;
+		rec.sprites.clear();
+		rec.area = {};
+		rec.fill = {};
+		rec.round = INVALID_TILE;
+		rec.order = static_cast<uint32_t>(t.x + t.y + 128) << 15 | static_cast<uint32_t>(t.y - t.x + 16384);
+		const Point north = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.raw_z);
+		rec.spot = {PixelFloor(north.x, s), PixelFloor(north.y, s), PixelFloor(north.x, s) + 1, PixelFloor(north.y, s) + 1};
+		if (!founded) {
+			for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
+				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+				TurnedGroundSprite gs{ts.image, ts.pal, ts.x, ts.y, ts.sub != nullptr, ts.sub != nullptr ? *ts.sub : SubSprite{}};
+				rec.sprites.push_back(gs);
+				/* Where the blitter puts it (GfxBlitter()), a pixel more every way. */
+				const Sprite *spr = GetSprite(GB(ts.image, 0, SPRITE_WIDTH), SpriteType::Normal);
+				const int vx = ts.x + spr->x_offs, vy = ts.y + spr->y_offs;
+				rec.area = rec.area.With({PixelFloor(vx, s) - 1, PixelFloor(vy, s) - 1, PixelCeil(vx, s) + PixelCeil(spr->width, s) + 1, PixelCeil(vy, s) + PixelCeil(spr->height, s) + 1});
+			}
+			if (t.round && inside) {
+				/* The strip of its track: about its north corner, its west and east corners either side and its south
+				 * corner below, and some (StripPatchOf()). */
+				rec.round = TileXY(t.x, t.y);
+				const Point n = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, TilePixelHeight(rec.round));
+				const int half = 32 * ZOOM_BASE, pad = 4 * ZOOM_BASE;
+				rec.area = rec.area.With({PixelFloor(n.x - half - pad, s) - 2, PixelFloor(n.y - pad, s) - 2, PixelCeil(n.x + half + pad, s) + 3, PixelCeil(n.y + half + pad, s) + 3});
+			}
+			if (t.building) {
+				Point n = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_z + GetSlopeMaxPixelZ(RemoveHalftileSlope(t.top_slope)));
+				Point sth = RemapCoords(t.x * TILE_SIZE + TILE_SIZE, t.y * TILE_SIZE + TILE_SIZE, t.top_z);
+				rec.fill = {PixelFloor(n.x - TILE_SIZE * 2 * ZOOM_BASE, s), PixelFloor(n.y, s), PixelFloor(n.x + TILE_SIZE * 2 * ZOOM_BASE, s) + 1, PixelFloor(sth.y, s) + 1};
+			}
+		}
+		ForTurnedGroundCells(g, rec.Reach(), [&](int c) {
+			g.dirty[c] = 1;
+			g.cells[c].push_back(k);
+		});
+	}
+
+	/* The cells to draw again, as rects: runs of them along each row, one under another the same. */
+	std::vector<GroundRect> rects;
+	for (int cy = 0; cy < g.ch; cy++) {
+		for (int cx = 0; cx < g.cw;) {
+			if (g.dirty[cy * g.cw + cx] == 0) {
+				cx++;
+				continue;
+			}
+			int e = cx;
+			while (e < g.cw && g.dirty[cy * g.cw + e] != 0) e++;
+			GroundRect r{g.at.l + cx * TURNED_GROUND_CELL, g.at.t + cy * TURNED_GROUND_CELL, std::min(g.at.l + e * TURNED_GROUND_CELL, g.at.r), std::min(g.at.t + (cy + 1) * TURNED_GROUND_CELL, g.at.b)};
+			bool joined = false;
+			for (GroundRect &p : rects) {
+				if (p.l == r.l && p.r == r.r && p.b == r.t) {
+					p.b = r.b;
+					joined = true;
+					break;
+				}
+			}
+			if (!joined) rects.push_back(r);
+			cx = e;
+		}
+	}
+	if (rects.empty()) {
+		_turned_times.texture += TurnedNow() - t0;
+		return;
+	}
+
+	/* The tiles reaching into a rect, far first. */
+	auto tiles_in = [&](const GroundRect &r) {
+		std::vector<uint32_t> keys;
+		ForTurnedGroundCells(g, r, [&](int c) { keys.insert(keys.end(), g.cells[c].begin(), g.cells[c].end()); });
+		std::sort(keys.begin(), keys.end());
+		keys.erase(std::unique(keys.begin(), keys.end()), keys.end());
+		std::vector<const TurnedGroundTile *> in;
+		for (uint32_t k : keys) {
+			const TurnedGroundTile &rec = g.tiles.at(k);
+			if (rec.Reach().Meets(r)) in.push_back(&rec);
+		}
+		std::sort(in.begin(), in.end(), [](const TurnedGroundTile *a, const TurnedGroundTile *b) { return a->order < b->order; });
+		return in;
+	};
+
+	/* Each rect cleared and drawn as the whole picture is: the tiles' sprites, then the strips of round track. */
+	const int w = g.Width();
+	for (const GroundRect &r : rects) {
+		_turned_ground_times.rects++;
+		_turned_ground_times.pixels += r.Pixels();
+		for (int y = r.t; y < r.b; y++) std::fill_n(&g.px[static_cast<size_t>(y - g.at.t) * w + (r.l - g.at.l)], r.r - r.l, 0u);
+		DrawPixelInfo d{};
+		d.zoom = g.zoom;
+		d.dst_ptr = &g.px[static_cast<size_t>(r.t - g.at.t) * w + (r.l - g.at.l)];
+		d.pitch = w;
+		d.left = r.l * s;
+		d.top = r.t * s;
+		d.width = (r.r - r.l) * s;
+		d.height = (r.b - r.t) * s;
+		std::vector<TileIndex> round;
+		{
+			AutoRestoreBackup dpi_backup(_cur_dpi, &d);
+			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			for (const TurnedGroundTile *rec : tiles_in(r)) {
+				if (!rec->area.Meets(r)) continue;
+				for (const TurnedGroundSprite &gs : rec->sprites) DrawSpriteViewport(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
+				if (rec->round != INVALID_TILE) round.push_back(rec->round);
+			}
+		}
+		std::sort(round.begin(), round.end());
+		DrawRoundTrackStripsOf(d, round);
+	}
+	double t1 = TurnedNow();
+	_turned_times.texture += t1 - t0;
+
+	/* The black under the buildings reaching into them grown over, far first: where it was grown over before, there is no black left. */
+	std::vector<const TurnedGroundTile *> buildings;
+	for (const GroundRect &r : rects) {
+		for (const TurnedGroundTile *rec : tiles_in(r)) {
+			if (rec->fill.Meets(r)) buildings.push_back(rec);
+		}
+	}
+	std::sort(buildings.begin(), buildings.end(), [](const TurnedGroundTile *a, const TurnedGroundTile *b) { return a->order < b->order; });
+	buildings.erase(std::unique(buildings.begin(), buildings.end()), buildings.end());
+	for (const TurnedGroundTile *rec : buildings) {
+		const GroundRect f = rec->fill.Within(g.at);
+		if (!f.Empty()) FillTurnedFootprint(g.px.data(), w, f.l - g.at.l, f.t - g.at.t, f.r - g.at.l, f.b - g.at.t);
+	}
+	std::fill(g.dirty.begin(), g.dirty.end(), 0);
+	_turned_times.widen += TurnedNow() - t1;
 }
 
 /**
@@ -4118,12 +4472,13 @@ static void AddNorthHouseObject(size_t first_parent)
  * puts them: four triangles meeting in the middle, so slopes keep their folds.
  * @param frame the block of the screen being drawn
  * @param big the texture's DrawPixelInfo (virtual coordinates of the view facing north)
+ * @param tex the texture's pixels
  * @param bw,bh the texture's size in pixels
  * @param x0,y0 the north corner of the tile (world units)
  * @param slope the slope of the tile
  * @param z the height of its north corner on flat ground
  */
-static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelInfo &big, int bw, int bh, int x0, int y0, Slope slope, int z)
+static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelInfo &big, const uint32_t *tex, int bw, int bh, int x0, int y0, Slope slope, int z)
 {
 	double t0 = TurnedNow();
 	ZoomLevel zoom = frame.zoom;
@@ -4147,7 +4502,6 @@ static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelI
 	}
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
-	const uint32_t *tex = _turned_big.data();
 	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[0], v[1], v[4]);
 	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[1], v[2], v[4]);
 	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[2], v[3], v[4]);
@@ -4208,16 +4562,6 @@ static void ViewportDoDrawTurned()
 	BlitterFactory::GetCurrentBlitter()->DrawRect(frame.dst_ptr, fw, fh, PixelColour{0});
 
 	/* 4. The tiles that can reach into the block, far first. */
-	struct TurnedTile {
-		int x, y;
-		double near;
-		TileType type;
-		Slope raw_slope, top_slope;
-		int raw_z, top_z;
-		size_t first_sprite, end_sprite;
-		int foundation[2];
-		bool building;
-	};
 	std::vector<TurnedTile> tiles;
 	for (int ty = ty0; ty <= ty1; ty++) {
 		for (int tx = tx0; tx <= tx1; tx++) {
@@ -4238,7 +4582,7 @@ static void ViewportDoDrawTurned()
 			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
 			double xr, yr;
 			TurnWorldPoint(tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, xr, yr);
-			tiles.push_back({tx, ty, xr + yr, TileType::Void, SLOPE_FLAT, SLOPE_FLAT, 0, 0, 0, 0, {-1, -1}, false});
+			tiles.push_back({tx, ty, xr + yr, TileType::Void, SLOPE_FLAT, SLOPE_FLAT, 0, 0, 0, 0, {-1, -1}, false, false});
 		}
 	}
 	std::sort(tiles.begin(), tiles.end(), [](const TurnedTile &a, const TurnedTile &b) { return a.near < b.near; });
@@ -4292,7 +4636,9 @@ static void ViewportDoDrawTurned()
 		t.type = tile_type;
 		t.raw_slope = _cur_ti.tileh;
 		t.raw_z = _cur_ti.z;
+		const size_t round_before = RoundTrackTileCount();
 		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
+		t.round = RoundTrackTileCount() != round_before;
 		if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 		/* The ground lies on top of the foundation, if the tile has one. */
 		t.top_slope = t.raw_slope;
@@ -4435,6 +4781,36 @@ static void ViewportDoDrawTurned()
 
 	AddTurnedObjectsToDraw();
 
+	/* The tiles whose ground can be seen in the block, a tile more every way: the ground of the others is not drawn
+	 * (they were collected for what stands on them, which may reach in), and a foundation of one is taken off the
+	 * billboards, as DrawTurnedTileGround() does with what it draws. */
+	std::vector<TurnedTile> ground_tiles;
+	{
+		const double m = 64.0 * ZOOM_BASE;
+		const double fl = frame.left - m, fr = frame.left + frame.width + m, ft = frame.top - m, fb = frame.top + frame.height + m;
+		for (const TurnedTile &t : tiles) {
+			double l = 1e18, r = -1e18, top = 1e18, bottom = -1e18;
+			for (int corner = 0; corner < 4; corner++) {
+				for (int zz : {std::min(t.raw_z, t.top_z), std::max(t.raw_z, t.top_z) + 2 * static_cast<int>(TILE_HEIGHT)}) {
+					double vx, vy;
+					ProjectTurnedF(t.x * TILE_SIZE + ((corner & 1) ? TILE_SIZE : 0), t.y * TILE_SIZE + ((corner & 2) ? TILE_SIZE : 0), zz, vx, vy);
+					l = std::min(l, vx); r = std::max(r, vx);
+					top = std::min(top, vy); bottom = std::max(bottom, vy);
+				}
+			}
+			if (r >= fl && l <= fr && bottom >= ft && top <= fb) {
+				ground_tiles.push_back(t);
+				continue;
+			}
+			for (int k = 0; k < 2; k++) {
+				if (t.foundation[k] == -1) continue;
+				ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[t.foundation[k]];
+				ps.first_child = LAST_CHILD_NONE;
+				ps.image = SPR_EMPTY_BOUNDING_BOX;
+			}
+		}
+	}
+
 	/* The ground of the whole block, north-up, in one texture: the plain tiles' sprites drawn as the game draws
 	 * them, so neighbouring tiles fit together and the edges of the warped tiles meet at any zoom. A tile with a
 	 * foundation is drawn by itself (DrawTurnedTileGround()), since its raised ground and walls would lie over
@@ -4443,7 +4819,7 @@ static void ViewportDoDrawTurned()
 	int bw = 0, bh = 0;
 	{
 		int cl = INT32_MAX, cr = INT32_MIN, ct = INT32_MAX, cb = INT32_MIN;
-		for (const TurnedTile &t : tiles) {
+		for (const TurnedTile &t : ground_tiles) {
 			for (int corner = 0; corner < 4; corner++) {
 				int x = t.x * TILE_SIZE + ((corner & 1) ? TILE_SIZE : 0), y = t.y * TILE_SIZE + ((corner & 2) ? TILE_SIZE : 0);
 				Point lo = RemapCoords(x, y, t.raw_z), hi = RemapCoords(x, y, t.raw_z + 2 * TILE_HEIGHT);
@@ -4461,7 +4837,25 @@ static void ViewportDoDrawTurned()
 			bh = UnScaleByZoom(bigdpi.height, zoom);
 		}
 	}
-	if (bw > 0 && bh > 0) {
+	/* The ground's picture kept from frame to frame (TurnedGround), where it can be: only what changed is drawn again. */
+	const uint32_t *ground = nullptr;
+	const int vs = ScaleByZoom(1, zoom);
+	if (bw > 0 && bh > 0 && _turned_ground_kept &&
+			PlaceTurnedGround(_turned_ground, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh})) {
+		if (!_turned_big.empty()) {
+			_turned_big.clear();
+			_turned_big.shrink_to_fit();
+		}
+		UpdateTurnedGround(_turned_ground, ground_tiles);
+		const TurnedGround &g = _turned_ground;
+		bigdpi.left = g.at.l * vs;
+		bigdpi.top = g.at.t * vs;
+		bw = g.at.r - g.at.l;
+		bh = g.at.b - g.at.t;
+		bigdpi.width = bw * vs;
+		bigdpi.height = bh * vs;
+		ground = g.px.data();
+	} else if (bw > 0 && bh > 0) {
 		double t0 = TurnedNow();
 		_turned_big.assign(static_cast<size_t>(bw) * bh, 0);
 		bigdpi.dst_ptr = _turned_big.data();
@@ -4469,7 +4863,7 @@ static void ViewportDoDrawTurned()
 		{
 			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
-			for (const TurnedTile &t : tiles) {
+			for (const TurnedTile &t : ground_tiles) {
 				if (t.foundation[0] != -1 || t.foundation[1] != -1) continue;
 				for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
 					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
@@ -4483,7 +4877,7 @@ static void ViewportDoDrawTurned()
 		_turned_times.texture += t1 - t0;
 		/* The black under a building, grown over from the ground beside it: on the rows of that tile. */
 		double scale = 1.0 / (1 << to_underlying(zoom));
-		for (const TurnedTile &t : tiles) {
+		for (const TurnedTile &t : ground_tiles) {
 			if (!t.building || t.foundation[0] != -1 || t.foundation[1] != -1) continue;
 			Point n = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_z + GetSlopeMaxPixelZ(RemoveHalftileSlope(t.top_slope)));
 			Point sth = RemapCoords(t.x * TILE_SIZE + TILE_SIZE, t.y * TILE_SIZE + TILE_SIZE, t.top_z);
@@ -4494,17 +4888,18 @@ static void ViewportDoDrawTurned()
 			FillTurnedFootprint(_turned_big.data(), bw, x0, y0, x1, y1);
 		}
 		_turned_times.widen += TurnedNow() - t1;
+		ground = _turned_big.data();
 	}
 
 	/* 5. The ground, far first: a plain tile laid from the block's texture, a tile with a foundation as a box from its own. */
-	for (const TurnedTile &t : tiles) {
+	for (const TurnedTile &t : ground_tiles) {
 		if (t.foundation[0] != -1 || t.foundation[1] != -1) {
 			DrawTurnedTileGround(frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
-		} else if (bw > 0 && t.first_sprite < t.end_sprite) {
-			DrawTurnedTileFromBlock(frame, bigdpi, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
+		} else if (ground != nullptr && t.first_sprite < t.end_sprite) {
+			DrawTurnedTileFromBlock(frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
 		}
 	}
-	_turned_times.drawn += static_cast<int>(tiles.size());
+	_turned_times.drawn += static_cast<int>(ground_tiles.size());
 
 	ViewportAddVehicles(&cdpi);
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */

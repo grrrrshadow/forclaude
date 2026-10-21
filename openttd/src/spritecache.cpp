@@ -1908,6 +1908,8 @@ void GfxClearSpriteCache()
 	}
 
 	VideoDriver::GetInstance()->ClearSystemSprites();
+	/* The turned view's picture of the ground was drawn from them. */
+	ResetTurnedGround();
 }
 
 /**

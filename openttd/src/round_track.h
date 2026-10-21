@@ -30,6 +30,9 @@
 #define ROUND_TRACK_H
 
 #include "tile_type.h"
+#include "zoom_type.h"
+
+#include <span>
 
 struct Vehicle;
 struct DrawPixelInfo;
@@ -39,8 +42,11 @@ bool RoundTrackDrawing();
 bool IsRoundTrackTile(TileIndex tile);
 bool RoundTrackHidesCatenary(TileIndex tile);
 void RegisterRoundTrackTile(TileIndex tile);
+size_t RoundTrackTileCount();
 void DrawRoundTrackGround(TileIndex tile);
 void DrawRoundTrackStrips(const DrawPixelInfo &dpi);
+void DrawRoundTrackStripsOf(const DrawPixelInfo &dpi, std::span<const TileIndex> tiles);
+uint64_t RoundTrackStripKey(TileIndex tile, ZoomLevel zoom);
 
 /** Where a vehicle on a round curve is drawn: on the arc, along it. */
 struct RoundTrackPose {
