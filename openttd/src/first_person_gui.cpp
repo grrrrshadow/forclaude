@@ -1169,6 +1169,9 @@ struct FirstPersonWindow : Window {
 				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
 					/* At a shop: I opens the inventory, where it is bought. */
 					hint = GetString(STR_FIRST_PERSON_SHOP_HERE, shop);
+				} else if (ThreeDDogSellerNear(this->walker.x, this->walker.y, THREE_D_SELLER_REACH_M) != nullptr) {
+					/* At a seller of dogs: I opens the inventory, where its dogs are bought. */
+					hint = GetString(STR_FIRST_PERSON_SELLER_HERE);
 				} else if (const Vehicle *near = this->VehicleToBoard(); near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
 					hint = GetString(STR_FIRST_PERSON_BOARD_HERE, near->index);

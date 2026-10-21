@@ -62,9 +62,6 @@ static std::string WalkerWhere()
 	return GetString(STR_FIRST_PERSON_WHERE, town->index, TileX(tile), TileY(tile), deg);
 }
 
-/** How near a seller of dogs the walker buys of it, metres. */
-static constexpr double SELLER_REACH_M = 6.0;
-
 static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_CLOSEBOX, Colours::Brown),
@@ -107,7 +104,7 @@ struct WalkerInventoryWindow : Window {
 	bool SeeSeller() const
 	{
 		double x = 0, y = 0;
-		const ThreeDDogSeller *s = FirstPersonWalkerAt(x, y) ? ThreeDDogSellerNear(x, y, SELLER_REACH_M) : nullptr;
+		const ThreeDDogSeller *s = FirstPersonWalkerAt(x, y) ? ThreeDDogSellerNear(x, y, THREE_D_SELLER_REACH_M) : nullptr;
 		std::string name = s != nullptr ? s->name : std::string();
 		std::vector<std::string> dogs = s != nullptr ? s->offer : std::vector<std::string>();
 		if (name == this->seller && dogs == this->dogs) return false;

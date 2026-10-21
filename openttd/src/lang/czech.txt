@@ -2375,6 +2375,7 @@ STR_FIRST_PERSON_NEEDS_32BPP                                    :Pohled potřebu
 STR_FIRST_PERSON_INVENTORY                                      :Inventář (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chodec nese, nákup a použití věcí (klávesa I)
 STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: zmáčkni I
+STR_FIRST_PERSON_SELLER_HERE                                    :Prodavač psů: zmáčkni I
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš
