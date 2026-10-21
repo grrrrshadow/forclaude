@@ -3120,7 +3120,9 @@ void HandleMouseEvents()
 	 * mouse never runs off the edge of the screen; the motion comes in
 	 * _cursor.delta. Two clicks of it, one after the other without a drag,
 	 * put the view back to north (the player: the same button as the turn,
-	 * two clicks on it could centre the view back). */
+	 * two clicks on it could centre the view back). Dragged to the right it
+	 * turns the other way than it did (the player, 21. 10.: "swap left and
+	 * right, so that it turns the other way"). */
 	static bool middle_was = false;
 	static bool middle_dragged = false;
 	static std::chrono::steady_clock::time_point middle_clicked = {};
@@ -3130,7 +3132,7 @@ void HandleMouseEvents()
 			_cursor.fix_at = true;
 		} else if (_cursor.delta.x != 0) {
 			middle_dragged = true;
-			RotateViewByDrag(_cursor.delta.x);
+			RotateViewByDrag(-_cursor.delta.x);
 		}
 	} else if (middle_was) {
 		if (!_scrolling_viewport) _cursor.fix_at = false;

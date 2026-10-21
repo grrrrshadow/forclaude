@@ -79,6 +79,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra
   nemusela vůbec spustit); pozdější konec si jen schová jako `3d_karta_minule.log`.
 
+## 21. 10. – #290: otáčení prostředním obráceně, kurzor a šipky s prodlevou
+
+- Hráč: *„když držím prostřední a táhnu doleva doprava, tak prohoď doleva/doprava, ať se točí na druhou stranu“*.
+  Hotovo: tah doprava točí plochu na druhou stranu než dřív (`window.cpp`, `RotateViewByDrag(-delta)`).
+- Hráč (#290 = `3ee6dfd`): *„kurzor myši je na nějakým přetíženým jádru, a šipky taky trvá, než se dá do pohybu“*.
+  V rigu běžná hra (město, auta, 150 snímků) karta skoro nic nedělá a snímek trvá 0,2 ms – prodlevu tu nevidím.
+  Podezření: hlavní vlákno čeká na kartu (fronta karty je jedna: dávky vlákna obrázků, snímky z očí, obrázky
+  hlavního vlákna za nimi), nebo telefon vytěžují vlákna. **Domluvit:** kdy to je (plocha / okno z očí / otáčení),
+  a jestli to zmizí s vypnutou kartou (Nastavení › Grafika).
+
 ## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
 
 - Hráč: *„co má #279 jinak, je plynulejší“*, *„otáčení plochou je plynulý“*, *„hlásil jsem 2 pády a tys všechno
