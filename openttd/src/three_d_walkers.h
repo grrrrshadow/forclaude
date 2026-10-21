@@ -34,6 +34,7 @@ bool SendThreeDWalker();
 struct Town;
 bool IsThreeDWalkway(TileIndex t, const Town *town);
 bool ThreeDWalkerAt(int &x, int &y, int &z);
+bool ThreeDMatNear(double x, double y, double reach_m);
 void AddThreeDDriversToViewport(ZoomLevel zoom);
 void AddThreeDDriversToEye();
 struct ThreeDPictureLight;

@@ -47,6 +47,7 @@
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
+#include "three_d_walkers.h"
 #include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
@@ -418,6 +419,14 @@ struct FirstPersonWindow : Window {
 		if (this->Riding() != nullptr) {
 			this->GetOut();
 			return;
+		}
+		/* The walker's plant ripe, or dried to hay: harvested (WalkerPlant). */
+		if (const WalkerPlant *p = WalkerPlantNear(this->walker.x, this->walker.y, WALKER_PLANT_REACH_M); p != nullptr) {
+			const WalkerPlantStage stage = GetWalkerPlantStage(*p);
+			if (stage == WalkerPlantStage::Ripe || stage == WalkerPlantStage::Hay) {
+				Command<Commands::HarvestWalkerPlant>::Post(STR_ERROR_WALKER_CAN_T_HARVEST, p->x, p->y);
+				return;
+			}
 		}
 		if (PickThreeDMushroom(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M)) {
 			Command<Commands::PickWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WalkerItem::Mushrooms);
@@ -1162,6 +1171,13 @@ struct FirstPersonWindow : Window {
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
 					hint = GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type));
 					riding = true;
+				} else if (const WalkerPlant *plant = WalkerPlantNear(this->walker.x, this->walker.y, WALKER_PLANT_REACH_M); plant != nullptr) {
+					/* By the walker's plant: how long till the harvest, or E harvests it. */
+					switch (GetWalkerPlantStage(*plant)) {
+						case WalkerPlantStage::Ripe: hint = GetString(STR_FIRST_PERSON_PLANT_RIPE); break;
+						case WalkerPlantStage::Hay: hint = GetString(STR_FIRST_PERSON_PLANT_HAY); break;
+						default: hint = GetString(STR_FIRST_PERSON_PLANT_GROWING, std::max<int32_t>(1, WALKER_PLANT_RIPE_DAYS - WalkerPlantAgeDays(*plant))); break;
+					}
 				} else if (const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M); mushroom != nullptr) {
 					/* At a mushroom: E picks it. */
 					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
@@ -1169,6 +1185,9 @@ struct FirstPersonWindow : Window {
 				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
 					/* At a shop: I opens the inventory, where it is bought. */
 					hint = GetString(STR_FIRST_PERSON_SHOP_HERE, shop);
+				} else if (ThreeDMatNear(this->walker.x, this->walker.y, THREE_D_SELLER_REACH_M)) {
+					/* By Mat walking about the town: I opens the inventory, where his marijuana is bought. */
+					hint = GetString(STR_FIRST_PERSON_MAT_HERE);
 				} else if (ThreeDDogSellerNear(this->walker.x, this->walker.y, THREE_D_SELLER_REACH_M) != nullptr) {
 					/* At a seller of dogs: I opens the inventory, where its dogs are bought. */
 					hint = GetString(STR_FIRST_PERSON_SELLER_HERE);

@@ -36,6 +36,8 @@
 
 #include "industry.h"
 
+#include "walker_inventory.h"
+
 #include "safeguards.h"
 
 extern TileIndex _cur_tileloop_tile;
@@ -170,6 +172,7 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 	InitTextEffects();
 	NetworkInitChatMessage();
 	InitializeAnimatedTiles();
+	_walker_plants.clear();
 
 	InitializeEconomy();
 

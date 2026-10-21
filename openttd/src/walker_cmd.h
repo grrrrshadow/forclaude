@@ -21,6 +21,8 @@ CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health);
 CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver);
 CommandCost CmdBuyWalkerPet(DoCommandFlags flags, const std::string &name);
 CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item);
+CommandCost CmdPlantWalkerSeedling(DoCommandFlags flags, int32_t x, int32_t y);
+CommandCost CmdHarvestWalkerPlant(DoCommandFlags flags, int32_t x, int32_t y);
 Money WalkerPetPrice(std::string_view name);
 
 DEF_CMD_TRAIT(Commands::BuyWalkerItem, CmdBuyWalkerItem, {}, CommandType::OtherManagement)
@@ -31,5 +33,7 @@ DEF_CMD_TRAIT(Commands::ReviveWalker, CmdReviveWalker, CommandFlag::Location, Co
 DEF_CMD_TRAIT(Commands::WalkerCheat, CmdWalkerCheat, CommandFlag::Offline, CommandType::Cheat)
 DEF_CMD_TRAIT(Commands::BuyWalkerPet, CmdBuyWalkerPet, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::PickWalkerItem, CmdPickWalkerItem, {}, CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::PlantWalkerSeedling, CmdPlantWalkerSeedling, {}, CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::HarvestWalkerPlant, CmdHarvestWalkerPlant, {}, CommandType::OtherManagement)
 
 #endif /* WALKER_CMD_H */

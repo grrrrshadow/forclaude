@@ -116,6 +116,7 @@
 #include "cab_drive.h"
 #include "thread.h"
 #include "round_track.h"
+#include "walker_inventory.h"
 
 extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, off while the 3D views collect
 #include "fileio_type.h"
@@ -4632,6 +4633,72 @@ static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const
 	_turned_times.warp += TurnedNow() - t0;
 }
 
+/**
+ * How high the eye of a model's cab is, metres ("kabina"): where its index has it -- unless that is below the glass of
+ * the windscreen in front of it, when it is lifted to the middle of the windscreen. The colleague puts the eye in the
+ * driver's head, and the driver, a girl smaller than the cab was made for, looked at the dashboard under the window
+ * (the player, 21. 10., the Slovenská strela: "let the camera go higher so through the windows one sees in front of the
+ * train; those are your tiny girls" -- its eye 2.35 m, its windscreen from 2.38 m up).
+ */
+static double CabEyeHeight(const ThreeDVehicleObject &m)
+{
+	static std::unordered_map<const ThreeDVehicleObject *, double> lifted;
+	if (auto it = lifted.find(&m); it != lifted.end()) return it->second;
+	const ThreeDVehicleShape *shape = m.TryGetShape();
+	if (shape == nullptr) return m.cab[2];
+	/* The glass ahead of the eye, within a metre and a half and as wide as a windscreen before the driver. */
+	double lo = 1e9, hi = -1e9;
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
+		if (!shape->IsGlass(t)) continue;
+		for (int k = 0; k < 3; k++) {
+			const size_t c = shape->tri[t * 3 + k];
+			if (c * 3 + 2 >= shape->pos.size()) continue;
+			const double x = shape->pos[c * 3] - m.cab[0], y = shape->pos[c * 3 + 1] - m.cab[1], z = shape->pos[c * 3 + 2];
+			if (x < 0.2 || x > 1.5 || std::abs(y) > 0.8 || z < m.cab[2] - 0.6) continue;
+			lo = std::min(lo, z);
+			hi = std::max(hi, z);
+		}
+	}
+	double z = m.cab[2];
+	if (lo < hi && z < lo + 0.1) z = (lo + hi) / 2;
+	lifted[&m] = z;
+	return z;
+}
+
+/**
+ * The parts of the marijuana the walkers planted (WalkerPlant), as plants of the 3D views: its pot and the young plant
+ * in it for its first seconds, then the plant in the ground growing -- young, tall, bushy -- to its full size at half a
+ * year, and a heap of hay at a year (our objekty/nase/seno).
+ * @param f called with the plant's name, its size (metres), its height against its width, where it stands (world
+ *          units) and which way it faces (degrees)
+ */
+template <typename F>
+static void ForWalkerPlantParts(F f)
+{
+	for (const WalkerPlant &p : _walker_plants) {
+		const double x = p.x, y = p.y, z = GetSlopePixelZ(p.x, p.y);
+		const float facing = static_cast<float>((p.x * 37 + p.y * 101) % 360);
+		const WalkerPlantStage stage = GetWalkerPlantStage(p);
+		if (stage == WalkerPlantStage::InPot) {
+			f("kvetinac", WALKER_POT_M, WALKER_POT_HEIGHT_M / WALKER_POT_M, x, y, z, facing);
+			f("kytka_mari_mlada", WALKER_POT_PLANT_M, 1.0f, x, y, z + WALKER_POT_SOIL_M * OBJECT_HEIGHT_PER_METRE, facing);
+			continue;
+		}
+		if (stage == WalkerPlantStage::Hay) {
+			f("seno", 1.1f, 0.7f, x, y, z, facing);
+			continue;
+		}
+		const float age = static_cast<float>(std::min(WalkerPlantAgeDays(p), WALKER_PLANT_RIPE_DAYS));
+		if (age < 60) {
+			f("kytka_mari_mlada", WALKER_POT_PLANT_M + 0.3f * age / 60, 1.0f, x, y, z, facing);
+		} else if (age < 120) {
+			f("kytka_mari_vysoka", 1.2f + 0.4f * (age - 60) / 60, 1.0f, x, y, z, facing);
+		} else {
+			f("kytka_mari_kosata", 1.6f + 0.4f * (age - 120) / (WALKER_PLANT_RIPE_DAYS - 120), 1.0f, x, y, z, facing);
+		}
+	}
+}
+
 /** Forget the kept pictures of the tiles with a foundation (ResetTurnedGround()). */
 void ForgetTurnedFoundations()
 {
@@ -5123,6 +5190,14 @@ static void ViewportDoDrawTurned()
 	ViewportAddVehicles(&cdpi);
 	/* The people walking about the towns (three_d_walkers.h), the fireworks over the huts. */
 	AddThreeDWalkersToViewport(zoom);
+	/* The marijuana the walkers planted (walker_inventory.h). */
+	ForWalkerPlantParts([zoom](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) {
+		int height = 0;
+		const ThreeDModelPicture *pic = GetThreeDPlantPicture(name, scale, stretch, facing, zoom, &height);
+		if (pic == nullptr) return;
+		const int ix = static_cast<int>(std::lround(x)), iy = static_cast<int>(std::lround(y)), iz = static_cast<int>(std::lround(z));
+		AddTurnedVehiclePicture(pic, ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
+	});
 	AddThreeDDragonsToViewport(zoom);
 	AddThreeDAnimalsToViewport(zoom);
 	AddThreeDWitchesToViewport(zoom);
@@ -10695,7 +10770,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double cx = m.cab[0] * std::cos(ta) - m.cab[1] * std::sin(ta), cy = m.cab[0] * std::sin(ta) + m.cab[1] * std::cos(ta);
 		eye.x = own_model.x + cx * ahead * eye.fx - cy * across * eye.fy;
 		eye.y = own_model.y + cx * ahead * eye.fy + cy * across * eye.fx;
-		eye.z = own_model.z + m.cab[2] * own_model.scale * OBJECT_HEIGHT_PER_METRE;
+		eye.z = own_model.z + CabEyeHeight(m) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
 		eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
@@ -11046,6 +11121,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		};
 		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
 		for (const ThreeDObjectFigure &f : co.more) add(f);
+		/* And its plants (the marijuana about the hut and the statue, Matylda's pots by the pub), as on the map. */
+		for (const ThreeDObjectFigure &f : co.obj->plants) {
+			AddCabPlant(f.figure, f.scale, f.stretch, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
+		}
 	}
 	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
@@ -11056,6 +11135,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
 	AddThreeDDriversToEye();
+	ForWalkerPlantParts(AddCabPlant);
 
 	eye_stage(1);
 	/* 3. The ground of all of them, north-up, in one texture at the normal zoom. */

@@ -65,6 +65,8 @@
 #include <png.h>
 #endif /* WITH_PNG */
 
+#include "walker_inventory.h"
+
 #include "safeguards.h"
 
 /** Every object read, and whether they were looked for yet. */
@@ -2137,6 +2139,47 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 	}
 }
 
+/** Where Matylda stands by the pub, metres in its frame (the pub's object, its north corner), and her plants in front of her. */
+static constexpr float PUB_MATYLDA[3] = {6.0f, 22.0f, 0.0f};
+static constexpr float PUB_MATYLDA_FACING = 0.0f;
+
+/**
+ * Matylda by the pub with her marijuana in pots (the player, 21. 10.: "Matylda will sell the whole plant in a pot, by
+ * the pub there should be marijuana plants with a pot"; she sells them, walker_cmd.cpp): she always stands there, her
+ * pots on the grass in front of her, a plant in each (our kvetinac, the colleague's kytka_mari_*). Added to the pub's
+ * object here, its index the colleague's.
+ */
+static void AddMatyldaToPub(ThreeDObject &obj)
+{
+	ThreeDObjectFigure matylda;
+	matylda.figure = "matylda";
+	std::copy(std::begin(PUB_MATYLDA), std::end(PUB_MATYLDA), matylda.at);
+	matylda.facing = PUB_MATYLDA_FACING;
+	matylda.scale = 2.0f; // as the pub's own figures
+	obj.figures.push_back(std::move(matylda));
+	static const char *const PLANTS[] = {"kytka_mari_mlada", "kytka_mari_vysoka", "kytka_mari_kosata"};
+	static const float SIZES[] = {WALKER_POT_PLANT_M, 1.1f, 1.3f};
+	for (int i = 0; i < 3; i++) {
+		const float x = PUB_MATYLDA[0] + 1.5f, y = PUB_MATYLDA[1] - 1.3f + 1.3f * i;
+		ThreeDObjectFigure pot;
+		pot.figure = "kvetinac";
+		pot.at[0] = x;
+		pot.at[1] = y;
+		pot.facing = 30.0f * i;
+		pot.scale = WALKER_POT_M;
+		pot.stretch = WALKER_POT_HEIGHT_M / WALKER_POT_M;
+		obj.plants.push_back(std::move(pot));
+		ThreeDObjectFigure plant;
+		plant.figure = PLANTS[i];
+		plant.at[0] = x;
+		plant.at[1] = y;
+		plant.at[2] = WALKER_POT_SOIL_M;
+		plant.facing = 70.0f * i;
+		plant.scale = SIZES[i];
+		obj.plants.push_back(std::move(plant));
+	}
+}
+
 /** The game's own industry an index names ("prumysl"): its constant's name; 0xFF for one the game has not (yet). */
 static IndustryType IndexIndustryType(std::string_view name)
 {
@@ -2206,6 +2249,7 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 		const std::string variant = e.value("varianta", std::string());
 		obj.industry_variant = variant == "kamen" ? 0 : variant == "bronz" ? 1 : -1;
 		if (obj.industry == 0xFF) Debug(misc, 1, "3D object {}: the game has no industry {} (yet)", obj.name, obj.industry_name);
+		if (obj.industry == IT_PUB) AddMatyldaToPub(obj);
 	}
 	if (obj.tri.empty() && obj.plants.empty()) return;
 	_three_d_objects.push_back(std::move(obj));

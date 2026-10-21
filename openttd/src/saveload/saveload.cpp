@@ -282,6 +282,7 @@ static const std::vector<ChunkHandlerRef> &ChunkHandlers()
 	extern const ChunkHandlerTable _ai_chunk_handlers;
 	extern const ChunkHandlerTable _game_chunk_handlers;
 	extern const ChunkHandlerTable _animated_tile_chunk_handlers;
+	extern const ChunkHandlerTable _walker_chunk_handlers;
 	extern const ChunkHandlerTable _newgrf_chunk_handlers;
 	extern const ChunkHandlerTable _group_chunk_handlers;
 	extern const ChunkHandlerTable _cargopacket_chunk_handlers;
@@ -321,6 +322,7 @@ static const std::vector<ChunkHandlerRef> &ChunkHandlers()
 		_ai_chunk_handlers,
 		_game_chunk_handlers,
 		_animated_tile_chunk_handlers,
+		_walker_chunk_handlers,
 		_newgrf_chunk_handlers,
 		_group_chunk_handlers,
 		_cargopacket_chunk_handlers,

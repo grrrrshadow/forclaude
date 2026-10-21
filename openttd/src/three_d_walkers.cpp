@@ -784,6 +784,15 @@ bool ThreeDWalkerAt(int &x, int &y, int &z)
 	return true;
 }
 
+/** Whether Mat walks within reach of a point (the walker), metres: he sells marijuana a piece at a time (walker_inventory.h). */
+bool ThreeDMatNear(double x, double y, double reach_m)
+{
+	for (const Walker &w : _walkers) {
+		if (std::hypot(w.x - x, w.y - y) <= reach_m * OBJECT_UNITS_PER_METRE) return true;
+	}
+	return false;
+}
+
 /** Whether a tile is a road of a town to walk on (the rig). */
 bool IsThreeDWalkway(TileIndex t, const Town *town)
 {

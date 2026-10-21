@@ -9245,8 +9245,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const WalkerItem item = static_cast<WalkerItem>(*n);
 			AutoRestoreBackup cur_company(_current_company, _local_company);
 			CommandCost res;
-			if (argv[2] == "koupit") {
-				res = Command<Commands::BuyWalkerItem>::Do(DoCommandFlag::Execute, shop, item);
+			if (argv[2] == "koupit" || argv[2] == "mat") {
+				/* 'inventar mat <n>': bought of Mat walking by. */
+				res = Command<Commands::BuyWalkerItem>::Do(DoCommandFlag::Execute, argv[2] == "mat" ? WALKER_SOLD_BY_MAT : shop, item);
 				if (res.Succeeded()) c->money -= res.GetCost();
 			} else if (argv[2] == "pouzit") {
 				res = Command<Commands::UseWalkerItem>::Do(DoCommandFlag::Execute, item);
@@ -9770,6 +9771,39 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _eye_frame_on_card;
 		_eye_frame_on_card = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu snimek {}", _eye_frame_on_card ? "cely na karte" : "procesor, objekty na karte");
+	} else if (what == "kytky") {
+		/* The marijuana the walker planted (walker_inventory.h): 'kytky' lists them; 'kytky zasad' plants a seedling of
+		 * the inventory in front of the walker (one given when it has none); 'kytky stari <days>' makes them all so many
+		 * days older; 'kytky sklid' harvests the one in reach (E). */
+		extern bool FirstPersonWalkerAt(double &x, double &y);
+		extern double FirstPersonWalkerHeading();
+		double wx = 0, wy = 0;
+		const bool walker = FirstPersonWalkerAt(wx, wy);
+		Company *c = Company::GetIfValid(_local_company);
+		if (argv.size() > 2 && argv[2] == "zasad" && walker && c != nullptr) {
+			if (c->walker_items[to_underlying(WalkerItem::Seedling)] == 0) c->walker_items[to_underlying(WalkerItem::Seedling)] = 1;
+			const double h = FirstPersonWalkerHeading(), ahead = WALKER_PLANT_AHEAD_M * OBJECT_UNITS_PER_METRE;
+			const bool ok = Command<Commands::PlantWalkerSeedling>::Post(STR_ERROR_WALKER_CAN_T_PLANT, static_cast<int32_t>(std::lround(wx + std::cos(h) * ahead)), static_cast<int32_t>(std::lround(wy + std::sin(h) * ahead)));
+			IConsolePrint(CC_DEFAULT, "test3d: kytka {}", ok ? "zasazena" : "NEZASAZENA");
+		} else if (argv.size() > 3 && argv[2] == "stari") {
+			for (WalkerPlant &p : _walker_plants) {
+				p.planted -= static_cast<int32_t>(number(3).value_or(0));
+				p.planted_tick = 0;
+			}
+			MarkWholeScreenDirty();
+		} else if (argv.size() > 2 && argv[2] == "sklid" && walker) {
+			const WalkerPlant *p = WalkerPlantNear(wx, wy, WALKER_PLANT_REACH_M);
+			const bool ok = p != nullptr && Command<Commands::HarvestWalkerPlant>::Post(STR_ERROR_WALKER_CAN_T_HARVEST, p->x, p->y);
+			IConsolePrint(CC_DEFAULT, "test3d: sklizen {}", ok ? "ano" : "NE");
+		}
+		static const char *const STAGES[] = {"v kvetinaci", "roste", "zrala", "seno"};
+		for (const WalkerPlant &p : _walker_plants) {
+			IConsolePrint(CC_DEFAULT, "test3d: kytka na {},{} (dlazdice {},{}), {} dni, {}", p.x, p.y, p.x / TILE_SIZE, p.y / TILE_SIZE, WalkerPlantAgeDays(p), STAGES[to_underlying(GetWalkerPlantStage(p))]);
+		}
+		if (c != nullptr) {
+			IConsolePrint(CC_DEFAULT, "test3d: inventar: mari {}, sazenice {}, seno {}, houby {}, zdravi {}", c->walker_items[to_underlying(WalkerItem::Marijuana)], c->walker_items[to_underlying(WalkerItem::Seedling)],
+					c->walker_items[to_underlying(WalkerItem::Hay)], c->walker_items[to_underlying(WalkerItem::Mushrooms)], c->walker_health);
+		}
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.

@@ -21,6 +21,7 @@
 #include "company_base.h"
 #include "company_func.h"
 #include "three_d_animals.h"
+#include "three_d_walkers.h"
 #include "three_d_objects.h"
 #include "town.h"
 #include "tile_map.h"
@@ -85,6 +86,8 @@ struct WalkerInventoryWindow : Window {
 		Light, ///< a light into the left hand, or put out
 		BuyDog, ///< buy a dog of the seller near
 		LetDogGo, ///< let the walker's dog go
+		Plant, ///< plant a seedling in front of the walker
+		BuyOfMat, ///< buy one of Mat walking by
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
@@ -98,7 +101,18 @@ struct WalkerInventoryWindow : Window {
 	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
 	mutable std::string where;       ///< where the walker is (WalkerWhere()), as last drawn
 	mutable std::string seller;      ///< the seller of dogs near the walker, as last seen; empty none
+	mutable bool mat = false;        ///< Mat near the walker, as last seen (he sells marijuana)
 	mutable std::vector<std::string> dogs; ///< and the dogs it sells
+
+	/** Whether Mat walks near the walker now; whether that changed. */
+	bool SeeMat() const
+	{
+		double x = 0, y = 0;
+		const bool near = FirstPersonWalkerAt(x, y) && ThreeDMatNear(x, y, THREE_D_SELLER_REACH_M);
+		if (near == this->mat) return false;
+		this->mat = near;
+		return true;
+	}
 
 	/** The seller of dogs near the walker now, and what it sells; whether that changed. */
 	bool SeeSeller() const
@@ -127,7 +141,7 @@ struct WalkerInventoryWindow : Window {
 		TileIndex now = FirstPersonShopNearby();
 		const WalkerItem hand = FirstPersonWeaponInHand();
 		std::string where = WalkerWhere();
-		if (this->SeeSeller() || now != this->shop || hand != this->in_hand || where != this->where) {
+		if (this->SeeSeller() || this->SeeMat() || now != this->shop || hand != this->in_hand || where != this->where) {
 			this->shop = now;
 			this->in_hand = hand;
 			this->where = std::move(where);
@@ -182,6 +196,9 @@ struct WalkerInventoryWindow : Window {
 			if (spec.heal != 0) {
 				DrawString(ir.left, ir.right, y, GetString(STR_WALKER_USE, spec.heal), TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Use});
+			} else if (item == WalkerItem::Seedling && FirstPersonOpen()) {
+				DrawString(ir.left, ir.right, y, STR_WALKER_PLANT, TextColour::Orange, AlignmentH::End);
+				this->lines.push_back({y, y + lh, item, LineDoes::Plant});
 			} else if (key != 0 && FirstPersonOpen()) {
 				DrawString(ir.left, ir.right, y, GetString(item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, key), item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Hand});
@@ -218,21 +235,40 @@ struct WalkerInventoryWindow : Window {
 			y += 4;
 		}
 
-		/* What is sold here; bought with a click. */
+		/* Mat walking by: his marijuana, a piece at a time (the player, 21. 10.). */
+		this->SeeMat();
+		if (this->mat) {
+			DrawString(ir.left, ir.right, y, STR_WALKER_MAT_SELLS, TextColour::Yellow);
+			y += lh;
+			DrawString(ir.left + 8, ir.right, y, GetWalkerItemSpec(WalkerItem::Marijuana).name, TextColour::White);
+			DrawString(ir.left, ir.right, y, GetString(STR_WALKER_BUY, WalkerItemPrice(WalkerItem::Marijuana)), TextColour::Green, AlignmentH::End);
+			this->lines.push_back({y, y + lh, WalkerItem::Marijuana, LineDoes::BuyOfMat});
+			y += lh + 4;
+		}
+
+		/* What is sold here; bought with a click. Matylda's seedlings at the pub under her name. */
 		const StringID place = WalkerShopName(this->shop);
 		if (place == INVALID_STRING_ID) {
-			if (seller == nullptr) DrawStringMultiLine(ir.left, ir.right, y, ir.bottom, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
+			if (seller == nullptr && !this->mat) DrawStringMultiLine(ir.left, ir.right, y, ir.bottom, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
 			return;
 		}
-		DrawString(ir.left, ir.right, y, GetString(STR_WALKER_FOR_SALE, place), TextColour::Yellow);
-		y += lh;
-		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
-			const WalkerItem item = static_cast<WalkerItem>(i);
-			if (!IsWalkerItemSoldAt(item, this->shop)) continue;
+		auto sale = [&](WalkerItem item) {
 			DrawString(ir.left + 8, ir.right, y, GetWalkerItemSpec(item).name, TextColour::White);
 			DrawString(ir.left, ir.right, y, GetString(STR_WALKER_BUY, WalkerItemPrice(item)), TextColour::Green, AlignmentH::End);
 			this->lines.push_back({y, y + lh, item, LineDoes::Buy});
 			y += lh;
+		};
+		DrawString(ir.left, ir.right, y, GetString(STR_WALKER_FOR_SALE, place), TextColour::Yellow);
+		y += lh;
+		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
+			const WalkerItem item = static_cast<WalkerItem>(i);
+			if (item != WalkerItem::Seedling && IsWalkerItemSoldAt(item, this->shop)) sale(item);
+		}
+		if (IsWalkerItemSoldAt(WalkerItem::Seedling, this->shop)) {
+			y += 4;
+			DrawString(ir.left, ir.right, y, STR_WALKER_MATYLDA_SELLS, TextColour::Yellow);
+			y += lh;
+			sale(WalkerItem::Seedling);
 		}
 	}
 
@@ -264,6 +300,18 @@ struct WalkerInventoryWindow : Window {
 					break;
 				case LineDoes::LetDogGo:
 					Command<Commands::BuyWalkerPet>::Post(std::string());
+					break;
+				case LineDoes::Plant: {
+					/* In front of the walker, a step away. */
+					double x = 0, y = 0;
+					if (!FirstPersonWalkerAt(x, y)) break;
+					const double h = FirstPersonWalkerHeading();
+					const double ahead = WALKER_PLANT_AHEAD_M * OBJECT_UNITS_PER_METRE;
+					Command<Commands::PlantWalkerSeedling>::Post(STR_ERROR_WALKER_CAN_T_PLANT, static_cast<int32_t>(std::lround(x + std::cos(h) * ahead)), static_cast<int32_t>(std::lround(y + std::sin(h) * ahead)));
+					break;
+				}
+				case LineDoes::BuyOfMat:
+					Command<Commands::BuyWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WALKER_SOLD_BY_MAT, l.item);
 					break;
 			}
 			return;

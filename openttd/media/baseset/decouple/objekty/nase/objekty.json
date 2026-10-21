@@ -1,0 +1,4 @@
+[
+  {"soubor": "kvetinac.glb", "jmeno": "kvetinac", "druh": "rostlina", "autor": "forclaude: vlastní model nase/kvetinac.py", "licence": "GPL-2.0 (vlastní geometrie i textura)", "poznamka": "hliněný květináč s okrajem a hlínou (hráč 21. 10.: „udělej květináč“): pata v počátku, výška 1 a okraj 1 napříč (meritko v seznamu dává metry), 240 trojúhelníků, textura 32 px, s normálami; sazenice marihuany u hospody a ta zasazená hráčem, než se zasadí"},
+  {"soubor": "seno.glb", "jmeno": "seno", "druh": "rostlina", "autor": "forclaude: vlastní model nase/seno.py", "licence": "GPL-2.0 (vlastní geometrie i textura)", "poznamka": "kupka marihuanového sena (hráč 21. 10.: „za rok tam bude marihuanové seno“): kytka zasazená hráčem, nesklizená do roka; pata v počátku, výška 1 a šířka 1 (meritko v seznamu dává metry), textura 32 px slámy, s normálami"}
+]

@@ -2271,6 +2271,10 @@ STR_FIRST_PERSON_INVENTORY                                      :Inventory (I)
 STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the walker carries, buying and using things (key I)
 STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: press I
 STR_FIRST_PERSON_SELLER_HERE                                    :Dog seller: press I
+STR_FIRST_PERSON_MAT_HERE                                       :Mat sells marijuana: press I
+STR_FIRST_PERSON_PLANT_GROWING                                  :Marijuana growing: harvest in {NUM} day{P "" s}
+STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the marijuana
+STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
@@ -2293,6 +2297,9 @@ STR_WALKER_DOGS_FOR_SALE                                        :Dogs for sale (
 STR_WALKER_DOG                                                  :{RAW_STRING}
 STR_WALKER_YOUR_DOG                                             :Your dog: {RAW_STRING}
 STR_WALKER_LET_DOG_GO                                           :[let go]
+STR_WALKER_PLANT                                                :[plant in front of you]
+STR_WALKER_MAT_SELLS                                            :Mat sells:
+STR_WALKER_MATYLDA_SELLS                                        :Matylda sells:
 STR_WALKER_ITEM_HAMMER                                          :Big hammer
 STR_WALKER_ITEM_ARMOUR                                          :Armour
 STR_WALKER_ITEM_BOOTS                                           :Boots
@@ -2313,6 +2320,8 @@ STR_WALKER_ITEM_BULLETS                                         :Bullets
 STR_WALKER_ITEM_ROCKET_LAUNCHER                                 :Rocket launcher
 STR_WALKER_ITEM_ROCKETS                                         :Rockets
 STR_WALKER_ITEM_MUSHROOMS                                       :Mushrooms
+STR_WALKER_ITEM_SEEDLING                                        :Marijuana seedling in a pot
+STR_WALKER_ITEM_HAY                                             :Marijuana hay
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
@@ -2320,6 +2329,11 @@ STR_ERROR_WALKER_HAS_THIS_DOG                                   :{WHITE}This one
 STR_ERROR_WALKER_CARRIES_TOO_MANY                               :{WHITE}No more can be carried
 STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}It can't be used (yet)
 STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}You have none
+STR_ERROR_WALKER_CAN_T_PLANT                                    :{WHITE}Can't plant...
+STR_ERROR_WALKER_CAN_T_HARVEST                                  :{WHITE}Can't harvest...
+STR_ERROR_WALKER_CANNOT_PLANT_HERE                              :{WHITE}It won't grow here
+STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}You can't have more plants
+STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}It isn't ripe yet
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}
 STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vehicle
 STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Open the vehicle's window

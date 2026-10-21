@@ -79,6 +79,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   si myslela, že spadla karta, a vypnula ji. Teď kartu vypne jen pád před prvními 30 obrázky (jinak by se hra
   nemusela vůbec spustit); pozdější konec si jen schová jako `3d_karta_minule.log`.
 
+## 21. 10. – marihuana: Mat, Matylda, sazenice; Slovenská strela; houby (domluveno)
+
+- Hráč: u prodavače psů nebyla nápověda. **Hotovo** (`b4418a4`): vedle prodavače psů řádek dole píše
+  „Prodavač psů: zmáčkni I“.
+- Domluveno s hráčem (21. 10.): vše za peníze firmy (jiné peníze nejsou), **všechno, co se dá použít, léčí** (i houby
+  +8 a cigarety +5). **Mat** (chodí po městě) prodává **jen mari, kus do inventáře**; u Mata píše „Mat prodává mari:
+  zmáčkni I“, v inventáři „Mat prodává:“. **Matylda** stojí u hospody na trávníku se třemi kytkami v květináčích
+  a prodává **sazenici marihuany v květináči** (8 £) – věc, která zůstane: v inventáři „zasadit před sebe“ ji postaví
+  1,2 m před chodce. Pár vteřin stojí v květináči, pak je zasazená v zemi a roste (mladá → vysoká → košatá, až 2 m).
+  Za půl roku E sklidí 3× mari, když se nesklidí do roka, je z ní **kupka marihuanového sena** a E dá seno
+  (marihuanové seno, náklad FICR – pro draky, později dračí farma). Kytky se ukládají do savu (verze 380, `WPLT`).
+  Nápověda u kytky: „roste, sklizeň za N dní“, „E: sklidit marihuanu“, „E: sklidit marihuanové seno“.
+- Květináč a kupka sena jsou naše modely ze skriptu (`objekty/nase/kvetinac.py`, `seno.py`), kolegovy soubory beze
+  změny; Matylda a kytky jsou k hospodě přidané v kódu (`AddMatyldaToPub()`). Z očí se teď kreslí i rostliny objektů
+  (kytky u hulírny a sochy z očí chyběly).
+- Kódy nákladu: věci, které jsou náklad, ho mají v kódu (mari MARI, seno FICR, pivo BEER, zboží GOOD, houby MUSH);
+  v inventáři se nezobrazují (hráč: „asi není nutné“).
+- **Slovenská strela** (vg_strela kolegy): oko kabiny bylo 2,35 m, přední sklo od 2,38 m – byla vidět jen palubní
+  deska. Teď když je oko kabiny pod předním sklem, posune se doprostřed skla (strela 2,66 m); u ostatních vozidel beze
+  změny (`CabEyeHeight()`). Kolegův index se nemění.
+- **Houby (domluveno, ještě nedělám):** houby jako náklad MUSH; průmysl les dává houby, když se do něj vozí studentky,
+  houby rostou ve 3D lese průmyslu (sbírat do inventáře i vozit). Les kolem měst není průmysl. **Žádná nová 8bpp auta:**
+  houby povezou Tatry ze hry přestavbou, vagon na houby udělá grrrrf. Doručování nákladu chodcem „jako auto“ zatím ne
+  (hráč: „je brzo“). Hráč si koupí vlka a půjde na procházku do 3D lesa průmyslu.
+
 ## 21. 10. – #290: otáčení prostředním obráceně, kurzor a šipky s prodlevou
 
 - Hráč: *„když držím prostřední a táhnu doleva doprava, tak prohoď doleva/doprava, ať se točí na druhou stranu“*.

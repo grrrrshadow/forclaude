@@ -21,6 +21,11 @@
 #include "industry_map.h"
 #include "cargotype.h"
 #include "three_d_objects.h"
+#include "viewport_func.h"
+#include "water_map.h"
+#include "timer/timer.h"
+#include "timer/timer_game_economy.h"
+#include "timer/timer_game_tick.h"
 
 #include "table/strings.h"
 
@@ -31,10 +36,10 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_HAMMER, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_ARMOUR, 0, 0, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_BOOTS, 0, 0, WalkerItemKind::Thing},
-	{STR_WALKER_ITEM_BEER, 3, 10, WalkerItemKind::Thing},
-	{STR_WALKER_ITEM_CIGARETTES, 5, 0, WalkerItemKind::Thing},
-	{STR_WALKER_ITEM_MARIJUANA, 15, 25, WalkerItemKind::Thing},
-	{STR_WALKER_ITEM_GOODS, 40, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_BEER, 3, 10, WalkerItemKind::Thing, CT_ALCOHOL},
+	{STR_WALKER_ITEM_CIGARETTES, 5, 5, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_MARIJUANA, 15, 25, WalkerItemKind::Thing, CT_MARIJUANA},
+	{STR_WALKER_ITEM_GOODS, 40, 0, WalkerItemKind::Thing, CT_GOODS},
 	{STR_WALKER_ITEM_BOW, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_ARROWS, 0, 0, WalkerItemKind::Ammunition},
 	{STR_WALKER_ITEM_CROSSBOW, 0, 0, WalkerItemKind::Weapon},
@@ -47,7 +52,9 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_BULLETS, 0, 0, WalkerItemKind::Ammunition},
 	{STR_WALKER_ITEM_ROCKET_LAUNCHER, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_ROCKETS, 0, 0, WalkerItemKind::Ammunition},
-	{STR_WALKER_ITEM_MUSHROOMS, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_MUSHROOMS, 0, 8, WalkerItemKind::Thing, CargoLabel{'MUSH'}},
+	{STR_WALKER_ITEM_SEEDLING, 8, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_HAY, 0, 0, WalkerItemKind::Thing, CT_HEMP_FIBRE},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -78,16 +85,22 @@ static bool IsShopHouse(TileIndex tile)
 }
 
 /**
- * Whether a thing is sold at a tile: beer at the pub, marijuana at the vending machine and the coffeeshop, cigarettes
- * and goods at a shop of a town (the player), the torch and the lantern there too.
+ * Whether a thing is sold at a tile: beer at the pub, and Matylda's seedlings in their pots there (the player, 21. 10.),
+ * marijuana at the vending machine and the coffeeshop, cigarettes and goods at a shop of a town (the player), the torch
+ * and the lantern there too. At WALKER_SOLD_BY_MAT: by Mat walking about the town -- his marijuana, a piece at a time
+ * (the player: "Mat has only mari, a piece into the inventory"); where he walks is the drawing's, not the game's, so the
+ * walker's computer says he is near.
  */
 bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile)
 {
-	if (item >= WalkerItem::End || GetWalkerItemSpec(item).price == 0 || !IsValidTile(tile)) return false;
+	if (item >= WalkerItem::End || GetWalkerItemSpec(item).price == 0) return false;
+	if (tile == WALKER_SOLD_BY_MAT) return item == WalkerItem::Marijuana;
+	if (!IsValidTile(tile)) return false;
 	IndustryType type = IT_INVALID;
 	if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) type = Industry::GetByTile(tile)->type;
 	switch (item) {
-		case WalkerItem::Beer: return type == IT_PUB;
+		case WalkerItem::Beer:
+		case WalkerItem::Seedling: return type == IT_PUB;
 		case WalkerItem::Marijuana: return type == IT_WEED_MACHINE || type == IT_COFFEESHOP;
 		case WalkerItem::Cigarettes:
 		case WalkerItem::Goods:
@@ -309,3 +322,115 @@ CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item)
 	}
 	return CommandCost();
 }
+
+/** The plants the walkers planted (WalkerPlant), saved with the game. */
+std::vector<WalkerPlant> _walker_plants;
+
+/** How many days old a plant is. */
+int32_t WalkerPlantAgeDays(const WalkerPlant &p)
+{
+	return std::max<int32_t>(0, TimerGameEconomy::date.base() - p.planted);
+}
+
+/** How a plant is now: in its pot for its first seconds, then growing, ripe at half a year, hay at a year. */
+WalkerPlantStage GetWalkerPlantStage(const WalkerPlant &p)
+{
+	if (TimerGameTick::counter < p.planted_tick + WALKER_PLANT_POT_TICKS) return WalkerPlantStage::InPot;
+	const int32_t age = WalkerPlantAgeDays(p);
+	if (age >= WALKER_PLANT_HAY_DAYS) return WalkerPlantStage::Hay;
+	if (age >= WALKER_PLANT_RIPE_DAYS) return WalkerPlantStage::Ripe;
+	return WalkerPlantStage::Growing;
+}
+
+/** The nearest plant within reach of a point (the walker), metres; nullptr none. */
+const WalkerPlant *WalkerPlantNear(double x, double y, double reach_m)
+{
+	const WalkerPlant *best = nullptr;
+	double best_d = reach_m * OBJECT_UNITS_PER_METRE;
+	for (const WalkerPlant &p : _walker_plants) {
+		const double d = std::hypot(p.x - x, p.y - y);
+		if (d <= best_d) {
+			best_d = d;
+			best = &p;
+		}
+	}
+	return best;
+}
+
+/** The map where a plant grows drawn again: it changed. */
+static void MarkWalkerPlantDirty(const WalkerPlant &p)
+{
+	const TileIndex tile = TileVirtXY(p.x, p.y);
+	if (IsValidTile(tile)) MarkTileDirtyByTile(tile);
+}
+
+/** The plants of a company at the most: a garden, not a plantation (that is an industry). */
+static constexpr size_t WALKER_PLANTS_MAX = 64;
+
+/**
+ * Plant a seedling of the walker's inventory where it stands, in front of it: in its pot for a few seconds, then in
+ * the ground (WalkerPlant).
+ * @param flags operation to perform
+ * @param x,y where, world units
+ * @return nothing, or an error
+ */
+CommandCost CmdPlantWalkerSeedling(DoCommandFlags flags, int32_t x, int32_t y)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || x < 0 || y < 0) return CMD_ERROR;
+	const TileIndex tile = TileVirtXY(x, y);
+	if (!IsValidTile(tile) || x >= static_cast<int32_t>(Map::SizeX() * TILE_SIZE) || y >= static_cast<int32_t>(Map::SizeY() * TILE_SIZE)) return CMD_ERROR;
+	if (IsTileType(tile, TileType::Water)) return CommandCost(STR_ERROR_WALKER_CANNOT_PLANT_HERE);
+	if (c->walker_items[to_underlying(WalkerItem::Seedling)] == 0) return CommandCost(STR_ERROR_WALKER_HAS_NONE);
+	if (std::ranges::count_if(_walker_plants, [&](const WalkerPlant &p) { return p.owner == c->index.base(); }) >= static_cast<ptrdiff_t>(WALKER_PLANTS_MAX)) return CommandCost(STR_ERROR_WALKER_TOO_MANY_PLANTS);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(WalkerItem::Seedling)]--;
+		WalkerPlant &p = _walker_plants.emplace_back();
+		p.x = x;
+		p.y = y;
+		p.planted = TimerGameEconomy::date.base();
+		p.planted_tick = TimerGameTick::counter;
+		p.owner = c->index.base();
+		MarkWalkerPlantDirty(p);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * Harvest the walker's plant at a place: ripe, its marijuana into the inventory; too late, its hay.
+ * @param flags operation to perform
+ * @param x,y where it grows, world units (WalkerPlant::x, y)
+ * @return nothing, or an error
+ */
+CommandCost CmdHarvestWalkerPlant(DoCommandFlags flags, int32_t x, int32_t y)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	auto it = std::ranges::find_if(_walker_plants, [&](const WalkerPlant &p) { return p.x == x && p.y == y; });
+	if (it == _walker_plants.end()) return CMD_ERROR;
+	const WalkerPlantStage stage = GetWalkerPlantStage(*it);
+	if (stage != WalkerPlantStage::Ripe && stage != WalkerPlantStage::Hay) return CommandCost(STR_ERROR_WALKER_PLANT_NOT_RIPE);
+	const WalkerItem item = stage == WalkerPlantStage::Ripe ? WalkerItem::Marijuana : WalkerItem::Hay;
+	const uint16_t count = stage == WalkerPlantStage::Ripe ? WALKER_PLANT_HARVEST : 1;
+	if (c->walker_items[to_underlying(item)] + count > WALKER_ITEM_MAX) return CommandCost(STR_ERROR_WALKER_CARRIES_TOO_MANY);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(item)] += count;
+		MarkWalkerPlantDirty(*it);
+		_walker_plants.erase(it);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/** A plant out of its pot, or a day on (it grows), drawn again on the map. */
+static const IntervalTimer<TimerGameTick> _walker_plants_out_of_pot({TimerGameTick::Priority::None, 1}, [](auto) {
+	for (const WalkerPlant &p : _walker_plants) {
+		if (TimerGameTick::counter == p.planted_tick + WALKER_PLANT_POT_TICKS) MarkWalkerPlantDirty(p);
+	}
+});
+static const IntervalTimer<TimerGameEconomy> _walker_plants_grow({TimerGameEconomy::Trigger::Day, TimerGameEconomy::Priority::None}, [](auto) {
+	for (const WalkerPlant &p : _walker_plants) MarkWalkerPlantDirty(p);
+});
