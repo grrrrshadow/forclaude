@@ -704,7 +704,8 @@ static bool RoadVehCheckTrainCrash(RoadVehicle *v)
 
 		TileIndex tile = u->tile;
 
-		if (!IsLevelCrossingTile(tile)) continue;
+		/* At a level crossing; or on the rails anywhere, driven freely over them from the cab. */
+		if (!IsLevelCrossingTile(tile) && !(u->cab_free && IsPlainRailTile(tile))) continue;
 
 		/* Which train, not just whether there is one: it is the one that pays
 		 * and the one that breaks down. */
@@ -1833,8 +1834,8 @@ again:
 
 /**
  * Whether a road vehicle driven freely from its cab (cab_drive.h) may go onto a tile: land, fields, trees (it drives
- * through them) and roads; not a house or any building (it stops there, the player), water, rails but at a level
- * crossing, a steep slope, a bridge's end, a tunnel or a depot.
+ * through them), roads and rails (over them anywhere, not only at a level crossing: the player, 21. 10.); not a house
+ * or any building (it stops there, the player), water, a steep slope, a bridge's end, a tunnel or a depot.
  */
 static bool RoadVehFreeCanEnter(TileIndex tile)
 {
@@ -1842,6 +1843,8 @@ static bool RoadVehFreeCanEnter(TileIndex tile)
 		case TileType::Clear:
 		case TileType::Trees:
 			return !IsSteepSlope(GetTileSlope(tile));
+		case TileType::Railway:
+			return IsPlainRail(tile) && !IsSteepSlope(GetTileSlope(tile));
 		case TileType::Road:
 			return (IsNormalRoad(tile) || IsLevelCrossing(tile)) && HasTileRoadType(tile, RoadTramType::Road);
 		case TileType::Station:

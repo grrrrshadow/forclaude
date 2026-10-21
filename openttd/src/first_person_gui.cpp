@@ -79,6 +79,8 @@ static constexpr double FIRST_PERSON_RADIUS = THREE_D_WALKER_RADIUS_M * OBJECT_U
 static constexpr double FIRST_PERSON_SUBSTEP = 0.1;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
+/** An arrow pressed twice within this many seconds: the walker walks on by itself (the player, 21. 10.). */
+static constexpr double FIRST_PERSON_DOUBLE_TAP_S = 0.4;
 /** How long taking a weapon out or putting it away takes, and a swing of it, seconds. */
 static constexpr double FIRST_PERSON_DRAW_S = 0.35;
 static constexpr double FIRST_PERSON_SWING_S = 0.6;
@@ -307,6 +309,9 @@ struct FirstPersonWindow : Window {
 	bool full = false;                    ///< over the whole screen, between the toolbar and the status bar
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
+	int walk_on = 0;                      ///< walks on by itself, 1 ahead, -1 back (Up or Down pressed twice), 0 not
+	bool walk_held[2] = {};               ///< Up, Down held at the last step (their presses, Walk())
+	double walk_tapped[2] = {FIRST_PERSON_DOUBLE_TAP_S, FIRST_PERSON_DOUBLE_TAP_S}; ///< seconds since Up, Down was pressed
 	bool weapon_out = false;              ///< the weapon taken out (F, or its key), in the hand
 	int weapon = 0;                       ///< the weapon in the hand or put away (_first_person_weapons)
 	int wanted = 0;                       ///< the weapon asked for (its key): the one in the hand is put away first
@@ -368,6 +373,7 @@ struct FirstPersonWindow : Window {
 	void GetIn(const Vehicle *v)
 	{
 		this->riding = v->index;
+		this->walk_on = 0;
 		this->weapon_out = false;
 		this->swing_time = -1;
 		this->draw_time = -1;
@@ -576,14 +582,46 @@ struct FirstPersonWindow : Window {
 	}
 
 	/**
+	 * Up or Down pressed twice in a row: the walker walks on that way without the key held, till Up or Down is pressed
+	 * again (the player, 21. 10.: "when I press the arrow twice, I walk and do not have to hold it").
+	 * @param up Up (or W) held now
+	 * @param down Down (or S) held now
+	 * @param dt seconds since the last step
+	 */
+	void WalkOn(bool up, bool down, double dt)
+	{
+		const bool held[2] = {up, down};
+		for (int k = 0; k < 2; k++) {
+			this->walk_tapped[k] = std::min(this->walk_tapped[k] + dt, FIRST_PERSON_DOUBLE_TAP_S);
+			const bool pressed = held[k] && !this->walk_held[k];
+			this->walk_held[k] = held[k];
+			if (!pressed) continue;
+			if (this->walk_on != 0) {
+				/* Walking on: a press stops it, and is not the first of two again. */
+				this->walk_on = 0;
+				this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
+			} else if (this->walk_tapped[k] < FIRST_PERSON_DOUBLE_TAP_S) {
+				this->walk_on = k == 0 ? 1 : -1;
+				this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
+			} else {
+				this->walk_tapped[k] = 0;
+			}
+		}
+	}
+
+	/**
 	 * A step of the walker: the arrows held while they are its window's (ArrowsWindow(): the player, 17. 10.: "the
-	 * arrows always to that window, not to the map"), W, A, S and D while its window has the focus.
+	 * arrows always to that window, not to the map"), W, A, S and D while its window has the focus; on by itself after
+	 * Up or Down pressed twice (WalkOn()).
 	 */
 	void Walk(double dt)
 	{
 		const DirectionKeys arrows = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
 		const DirectionKeys wasd = _focused_window == this && !EditBoxInGlobalFocus() ? _walkkeys : DirectionKeys{};
-		if (arrows.None() && wasd.None()) return;
+		/* The keys not the walker's any more (the map or another window has them): it stops. */
+		if (ArrowsWindow() != this && _focused_window != this) this->walk_on = 0;
+		this->WalkOn(arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up), arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down), dt);
+		if (arrows.None() && wasd.None() && this->walk_on == 0) return;
 		if (arrows.Test(DirectionKey::Left)) this->walker.heading += FIRST_PERSON_TURN * dt;
 		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= FIRST_PERSON_TURN * dt;
 		this->walker.heading = std::remainder(this->walker.heading, 2 * M_PI);
@@ -592,6 +630,7 @@ struct FirstPersonWindow : Window {
 		if (arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down)) ahead -= 1;
 		if (wasd.Test(DirectionKey::Right)) aside += 1;
 		if (wasd.Test(DirectionKey::Left)) aside -= 1;
+		if (ahead == 0 && !this->walk_held[0] && !this->walk_held[1]) ahead = this->walk_on;
 		if (ahead == 0 && aside == 0) return;
 		const double norm = std::sqrt(ahead * ahead + aside * aside);
 		const double speed = ((this->running || _shift_pressed) ? FIRST_PERSON_RUN_MS : FIRST_PERSON_WALK_MS) * OBJECT_UNITS_PER_METRE * dt / norm;
@@ -1640,4 +1679,31 @@ double RigFirstPersonHoldW(int frame_ms, int frames)
 	}
 	_walkkeys.Reset(DirectionKey::Up);
 	return std::hypot(w->walker.x - x, w->walker.y - y) / OBJECT_UNITS_PER_METRE;
+}
+
+/**
+ * The rig: the arrow Up pressed twice (two frames held, so many frames let go between, frames of 40 ms), then let go so
+ * many frames, then pressed once and let go as long again; the metres walked after the two presses and after the one.
+ */
+std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return {};
+	auto frame = [w](bool up) {
+		_dirkeys.Set(DirectionKey::Up, up);
+		w->Step(1);
+	};
+	const double x0 = w->walker.x, y0 = w->walker.y;
+	for (int press = 0; press < 2; press++) {
+		frame(true);
+		frame(true);
+		for (int i = 0; i < gap_frames; i++) frame(false);
+	}
+	for (int i = 0; i < frames; i++) frame(false);
+	const double x1 = w->walker.x, y1 = w->walker.y;
+	frame(true);
+	frame(true);
+	for (int i = 0; i < frames; i++) frame(false);
+	_dirkeys.Reset();
+	return {std::hypot(x1 - x0, y1 - y0) / OBJECT_UNITS_PER_METRE, std::hypot(w->walker.x - x1, w->walker.y - y1) / OBJECT_UNITS_PER_METRE};
 }

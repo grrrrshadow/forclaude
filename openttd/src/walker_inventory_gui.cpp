@@ -69,10 +69,12 @@ static constexpr NWidgetPart _nested_walker_inventory_widgets[] = {
 		NWidget(WWT_CAPTION, Colours::Brown, WID_WI_CAPTION), SetStringTip(STR_WALKER_INVENTORY_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
 		NWidget(WWT_STICKYBOX, Colours::Brown),
 	EndContainer(),
-	NWidget(WWT_PANEL, Colours::Brown, WID_WI_LIST), SetMinimalSize(320, 220), SetResize(1, 1), SetFill(1, 1), EndContainer(),
 	NWidget(NWID_HORIZONTAL),
-		NWidget(NWID_SPACER), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_RESIZEBOX, Colours::Brown),
+		NWidget(WWT_PANEL, Colours::Brown, WID_WI_LIST), SetMinimalSize(320, 220), SetResize(1, 1), SetFill(1, 1), SetScrollbar(WID_WI_SCROLLBAR), EndContainer(),
+		NWidget(NWID_VERTICAL),
+			NWidget(NWID_VSCROLLBAR, Colours::Brown, WID_WI_SCROLLBAR),
+			NWidget(WWT_RESIZEBOX, Colours::Brown),
+		EndContainer(),
 	EndContainer(),
 };
 
@@ -91,12 +93,14 @@ struct WalkerInventoryWindow : Window {
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
-		int top, bottom;
+		int top, bottom; ///< from the top of the list, not scrolled (list_top the top of it in the window)
 		WalkerItem item;
 		LineDoes does;
 		std::string dog = {}; ///< the dog a line buys
 	};
 	mutable std::vector<Line> lines; ///< where the clickable lines were drawn
+	mutable int list_top = 0;        ///< where the list starts in the window, as last drawn
+	Scrollbar *vscroll = nullptr;    ///< the list scrolled, pixels (the player, 21. 10.: "to buy the last thing too")
 	TileIndex shop = INVALID_TILE;   ///< where things are sold near the walker, as last seen
 	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
 	mutable std::string where;       ///< where the walker is (WalkerWhere()), as last drawn
@@ -130,6 +134,8 @@ struct WalkerInventoryWindow : Window {
 	WalkerInventoryWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
 		this->CreateNestedTree();
+		this->vscroll = this->GetScrollbar(WID_WI_SCROLLBAR);
+		this->vscroll->SetStepSize(GetCharacterHeight(FontSize::Normal) + 3);
 		this->FinishInitNested(number);
 		this->shop = FirstPersonShopNearby();
 		this->SeeSeller();
@@ -154,16 +160,50 @@ struct WalkerInventoryWindow : Window {
 		this->SetWidgetDirty(WID_WI_LIST);
 	}
 
+	void OnResize() override
+	{
+		this->vscroll->SetCapacityFromWidget(this, WID_WI_LIST, WidgetDimensions::scaled.framerect.Vertical());
+	}
+
 	void DrawWidget(const Rect &r, WidgetID widget) const override
 	{
 		if (widget != WID_WI_LIST) return;
 		this->lines.clear();
-		const Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
-		const int lh = GetCharacterHeight(FontSize::Normal) + 3;
+		/* The list scrolled: drawn in the panel only (a line half out of it cut off, not over the window's edge). */
+		const Rect fr = r.Shrink(WidgetDimensions::scaled.framerect);
+		this->list_top = fr.top;
+		DrawPixelInfo tmp_dpi;
+		if (!FillDrawPixelInfo(&tmp_dpi, fr)) return;
+		AutoRestoreBackup dpi_backup(_cur_dpi, &tmp_dpi);
+		const int scroll = this->vscroll->GetPosition();
+		const Rect ir{0, -scroll, fr.Width() - 1, fr.Height() - 1};
 		int y = ir.top;
+		this->DrawList(ir, y);
+		for (Line &l : this->lines) {
+			l.top += scroll;
+			l.bottom += scroll;
+		}
+		/* How long the list is: the scrollbar's length (after the list, so drawn as it is now). */
+		const int height = y + scroll;
+		if (this->vscroll->GetCount() != height) {
+			this->vscroll->SetCount(height);
+			this->SetWidgetDirty(WID_WI_SCROLLBAR);
+			if (this->vscroll->GetPosition() != scroll) this->SetWidgetDirty(WID_WI_LIST);
+		}
+	}
+
+	/**
+	 * The list: the health, where the walker is, what it carries, what is sold near.
+	 * @param ir where, its top scrolled
+	 * @param[in,out] y the top of the next line
+	 */
+	void DrawList(const Rect &ir, int &y) const
+	{
+		const int lh = GetCharacterHeight(FontSize::Normal) + 3;
 		const Company *c = Company::GetIfValid(_local_company);
 		if (c == nullptr) {
 			DrawString(ir.left, ir.right, y, STR_WALKER_NO_COMPANY, TextColour::White);
+			y += lh;
 			return;
 		}
 
@@ -249,7 +289,7 @@ struct WalkerInventoryWindow : Window {
 		/* What is sold here; bought with a click. Matylda's seedlings at the pub under her name. */
 		const StringID place = WalkerShopName(this->shop);
 		if (place == INVALID_STRING_ID) {
-			if (seller == nullptr && !this->mat) DrawStringMultiLine(ir.left, ir.right, y, ir.bottom, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
+			if (seller == nullptr && !this->mat) y = DrawStringMultiLine(ir.left, ir.right, y, INT32_MAX, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
 			return;
 		}
 		auto sale = [&](WalkerItem item) {
@@ -275,8 +315,11 @@ struct WalkerInventoryWindow : Window {
 	void OnClick(Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		if (widget != WID_WI_LIST) return;
+		const Rect fr = this->GetWidget<NWidgetBase>(WID_WI_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		if (pt.y < fr.top || pt.y > fr.bottom) return;
+		const int at = pt.y - this->list_top + this->vscroll->GetPosition();
 		for (const Line &l : this->lines) {
-			if (pt.y < l.top || pt.y >= l.bottom) continue;
+			if (at < l.top || at >= l.bottom) continue;
 			switch (l.does) {
 				case LineDoes::Buy:
 					Command<Commands::BuyWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, this->shop, l.item);
@@ -343,8 +386,22 @@ std::string RigWalkerInventoryClick(WalkerItem item)
 	for (const WalkerInventoryWindow::Line &l : w->lines) {
 		if (l.item != item) continue;
 		SetFocusedWindow(w);
-		w->OnClick({w->width / 2, l.top + 1}, WID_WI_LIST, 1);
+		/* Scrolled to it first, as the player would. */
+		w->vscroll->ScrollTowards(l.bottom - 1);
+		w->vscroll->ScrollTowards(l.top);
+		w->SetDirty();
+		w->OnClick({w->width / 2, w->list_top + l.top - w->vscroll->GetPosition() + 1}, WID_WI_LIST, 1);
 		return l.does == WalkerInventoryWindow::LineDoes::Buy ? "koupit" : l.does == WalkerInventoryWindow::LineDoes::Use ? "pouzit" : "ruka";
 	}
 	return {};
+}
+
+/** The rig: the list in the inventory open scrolled so far, pixels; its length, how much of it is seen, where it is. */
+std::string RigWalkerInventoryScroll(int pos)
+{
+	WalkerInventoryWindow *w = static_cast<WalkerInventoryWindow *>(FindWindowById(WindowClass::WalkerInventory, 0));
+	if (w == nullptr) return "zadne okno";
+	w->vscroll->SetPosition(pos);
+	w->SetDirty();
+	return fmt::format("delka {} videt {} pozice {}", w->vscroll->GetCount(), w->vscroll->GetCapacity(), w->vscroll->GetPosition());
 }

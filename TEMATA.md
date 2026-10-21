@@ -27,6 +27,23 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 21. 10. večer – rolovací inventář, chůze dvojí šipkou, semafory v obloucích, auto přes koleje, pád 0xFFFF
+
+- **Inventář se roluje** (`walker_inventory_gui.cpp`): vpravo posuvník, kolečko myši; řádky se kreslí jen v okně
+  (poslední řádek byl rozbitý, protože se kreslil přes okraj okna). Dole jde koupit i to poslední (Hospoda, Matylda).
+- **Z očí: šipka nahoru (nebo W) dvakrát rychle za sebou** (do 0,4 s) – chodec jde sám bez držení; dolů dvakrát –
+  couvá sám. Další stisk nahoru/dolů ho zastaví, doleva/doprava za chůze zatáčí. Zastaví i nástup do auta a když
+  šipky patří jinému oknu. Rig: `test3d chodec dvakrat <mezera> <snímky>`.
+- **Semafory v kulatých obloucích:** dlaždice se semaforem už oblouk nerovná (dřív `IsSimpleTile` semafory
+  vylučovalo); semafor stojí vedle zakřivené koleje, posunutý a natočený s obloukem (`RoundTrackSignalAt()`).
+  Rig: `test3d oblouky semafory`.
+- **Auto mimo silnici přes koleje kdekoli** (`RoadVehFreeCanEnter`), ne jen na přejezdu; vlak ho na kolejích srazí
+  jako na přejezdu. Chodec přes koleje chodit uměl už předtím (ověřeno v rigu).
+- **Pád „String 0xFFFF is invalid“** (#291, 30. 12. 2010 na začátku dne, bez zásobníku, dmp prázdný): příčinu
+  ze záznamu nevyčtu. Hra kvůli neplatnému textu už nepadá: místo něj ukáže „(?)“ a do `texty.log` ve složce hráče
+  zapíše číslo textu, den a v jakých textech to bylo (prvních 50). Rig `test3d text 0x...` přeloží čísla z logu.
+- Deník karty z #291: země otočené plochy se na telefonu kreslí na kartě, obrázky 3–40 ms, bez chyb.
+
 ## 20. 10. – pohled z očí na kartě (GPU krok „pohled z očí“), deník karty
 
 - Hráč: *„z pohledu očí se to má kreslit gpu, všechny objekty přes gpu“*, *„kresli jak se má kreslit, aby to
@@ -99,10 +116,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Slovenská strela** (vg_strela kolegy): oko kabiny bylo 2,35 m, přední sklo od 2,38 m – byla vidět jen palubní
   deska. Teď když je oko kabiny pod předním sklem, posune se doprostřed skla (strela 2,66 m); u ostatních vozidel beze
   změny (`CabEyeHeight()`). Kolegův index se nemění.
-- **Houby (domluveno, ještě nedělám):** houby jako náklad MUSH; průmysl les dává houby, když se do něj vozí studentky,
-  houby rostou ve 3D lese průmyslu (sbírat do inventáře i vozit). Les kolem měst není průmysl. **Žádná nová 8bpp auta:**
-  houby povezou Tatry ze hry přestavbou, vagon na houby udělá grrrrf. Doručování nákladu chodcem „jako auto“ zatím ne
-  (hráč: „je brzo“). Hráč si koupí vlka a půjde na procházku do 3D lesa průmyslu.
+- **Houby: zrušeno (21. 10. večer).** Hráč: *„bude nový les, budou stát jinde holky a houby, nedělej houbový
+  průmysl“*. Houbový průmysl nedělám, čekám na nový les. Platí dál: žádná nová 8bpp auta (Tatry ze hry přestavbou,
+  vagony z grrrrf), doručování nákladu chodcem zatím ne.
 
 ## 21. 10. – #290: otáčení prostředním obráceně, kurzor a šipky s prodlevou
 

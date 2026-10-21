@@ -14,6 +14,7 @@
 enum WalkerInventoryWidgets : WidgetID {
 	WID_WI_CAPTION, ///< Caption of the window.
 	WID_WI_LIST,    ///< The health, the things carried and the things for sale here.
+	WID_WI_SCROLLBAR, ///< Scrollbar of the list.
 };
 
 #endif /* WIDGETS_WALKER_INVENTORY_WIDGET_H */

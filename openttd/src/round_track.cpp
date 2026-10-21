@@ -110,11 +110,14 @@ DiagDirection OtherEdge(Track t, DiagDirection e)
 	return e == a ? b : a;
 }
 
-/** A tile whose track may be part of a round curve: plain rail on flat ground, no signals; switches too. */
+/**
+ * A tile whose track may be part of a round curve: plain rail on flat ground; switches too, and signals (the player,
+ * 21. 10.: a signal made the curve straight; it stands by the arc, RoundTrackSignalAt()).
+ */
 bool IsSimpleTile(TileIndex t)
 {
 	if (!IsValidTile(t) || !IsTileType(t, TileType::Railway) || !IsPlainRail(t)) return false;
-	return !HasSignals(t) && GetTileSlope(t) == SLOPE_FLAT;
+	return GetTileSlope(t) == SLOPE_FLAT;
 }
 
 /** The way along a piece from one of its edges to the other, world units. */
@@ -927,6 +930,31 @@ uint64_t RoundTrackStripKey(TileIndex tile, ZoomLevel zoom)
 	if (!IsRoundTrackTile(tile)) return 0;
 	const uint64_t key = StripKey(PiecesAbout(tile), TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE, ReferenceOf(tile, zoom), zoom, 0, 0);
 	return (key ^ (static_cast<uint64_t>(TilePixelHeight(tile)) * 0x9E3779B97F4A7C15ull)) | 1;
+}
+
+/**
+ * Where a signal by a piece of a round tile stands: as far from the arc, and as far along it, as it stands from the
+ * straight piece (turned with the arc), so that it is by the round track, not off it or on it.
+ * @param tile the tile
+ * @param track the piece it is by
+ * @param[in,out] x the world point of the signal by the straight piece; by the arc
+ * @param[in,out] y
+ */
+void RoundTrackSignalAt(TileIndex tile, Track track, int &x, int &y)
+{
+	if (!RoundTrackDrawing() || !IsRoundTrackTile(tile) || !GetTrackBits(tile).Test(track)) return;
+	const Curve &c = CurveOf(tile, track);
+	const Vec p{static_cast<double>(x), static_cast<double>(y)};
+	const double s = std::clamp(Dot(p - c.v0, c.dir), 0.0, c.len);
+	if (!c.InZone(s)) return;
+	Vec q, tg;
+	c.Eval(s, q, tg);
+	/* Its side of the piece, turned as the arc is turned from the piece there. */
+	const Vec off = p - (c.v0 + c.dir * s);
+	const double cs = Dot(c.dir, tg), sn = Cross(c.dir, tg);
+	const Vec turned{off.x * cs - off.y * sn, off.x * sn + off.y * cs};
+	x = static_cast<int>(std::lround(q.x + turned.x));
+	y = static_cast<int>(std::lround(q.y + turned.y));
 }
 
 /** The piece of track a train's piece is on, or Track::Invalid. */

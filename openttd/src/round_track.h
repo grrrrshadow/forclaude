@@ -30,6 +30,7 @@
 #define ROUND_TRACK_H
 
 #include "tile_type.h"
+#include "track_type.h"
 #include "zoom_type.h"
 
 #include <span>
@@ -41,6 +42,7 @@ bool RoundTrackEnabled();
 bool RoundTrackDrawing();
 bool IsRoundTrackTile(TileIndex tile);
 bool RoundTrackHidesCatenary(TileIndex tile);
+void RoundTrackSignalAt(TileIndex tile, Track track, int &x, int &y);
 void RegisterRoundTrackTile(TileIndex tile);
 size_t RoundTrackTileCount();
 void DrawRoundTrackGround(TileIndex tile);

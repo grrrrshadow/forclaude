@@ -9039,6 +9039,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
 			const double metres = RigFirstPersonHoldW(frame_ms, frames);
 			IConsolePrint(CC_DEFAULT, "test3d: drzeni W {} snimku po {} ms ({:.2f} s): usel {:.2f} m, {:.2f} m/s", frames, frame_ms, frames * frame_ms / 1000.0, metres, metres / (frames * frame_ms / 1000.0));
+		} else if (argv.size() > 4 && argv[2] == "dvakrat") {
+			/* 'chodec dvakrat <frames between> <frames>': Up pressed twice, then once (RigFirstPersonDoubleTap()). */
+			extern std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames);
+			const auto [on, stopped] = RigFirstPersonDoubleTap(number(3).value_or(3), number(4).value_or(25));
+			IConsolePrint(CC_DEFAULT, "test3d: sipka dvakrat: usel sam {:.2f} m, po dalsim stisku {:.2f} m", on, stopped);
 		} else if (argv.size() > 3 && argv[2] == "klavesa") {
 			/* 'chodec klavesa <c> [inventar]': a key as the player presses it (HandleKeypress()), the focus on the view
 			 * from the first person, or on its inventory; what is in the hand after. */
@@ -9234,6 +9239,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			/* A dragon's blow, through the command, as the game deals it. */
 			AutoRestoreBackup cur_company(_current_company, _local_company);
 			Command<Commands::HurtWalker>::Do(DoCommandFlag::Execute, static_cast<uint8_t>(std::clamp(*n, 0, 255)));
+		} else if (argv.size() > 3 && argv[2] == "rolovat" && n.has_value()) {
+			/* 'inventar rolovat <pixels>': the list in the window scrolled so far; how long it is, how much is seen. */
+			extern std::string RigWalkerInventoryScroll(int pos);
+			IConsolePrint(CC_DEFAULT, "test3d: inventar rolovat {}", RigWalkerInventoryScroll(*n));
 		} else if (argv.size() > 3 && argv[2] == "klik" && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
 			/* 'inventar klik <n>': a click on the line of thing n in the window, as the player clicks. */
 			extern std::string RigWalkerInventoryClick(WalkerItem item);
@@ -9262,6 +9271,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: inventar zdravi {} veci{} penize {} chodec {},{} obchod {}", c->walker_health, items, c->money,
 				IsValidTile(here) ? static_cast<int>(TileX(here)) : -1, IsValidTile(here) ? static_cast<int>(TileY(here)) : -1,
 				IsValidTile(shop) ? fmt::format("{},{} {}", TileX(shop), TileY(shop), GetString(WalkerShopName(shop))) : std::string("-"));
+	} else if (what == "text" && argv.size() > 2) {
+		/* 'text <number>': the string of that number (0x for hex) as the game shows it: the numbers in texty.log read. */
+		const bool hex = argv[2].starts_with("0x");
+		const auto id = ParseInteger<uint32_t>(hex ? argv[2].substr(2) : argv[2], hex ? 16 : 10);
+		if (id.has_value()) IConsolePrint(CC_DEFAULT, "test3d: text 0x{:X}: {}", *id, GetString(static_cast<StringID>(*id)));
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {
@@ -10688,6 +10702,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const uint yx = a + (n - 1) / 2, yy = b + (n - 1) / 2;
 			for (uint i = 1; i <= 3; i++) lay(yx, yy + i, Track::Y);
 			where += fmt::format(" {}:{},{}", n, yx, b);
+			if (argv.size() > 2 && argv[2] == "semafory") {
+				/* 'oblouky semafory': a signal on the last tile of X before the turn and on the middle diagonal piece
+				 * (the player, 21. 10.: a signal made the round curve straight). */
+				auto signal = [&](uint x, uint y, Track tr) {
+					if (Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(x, y), tr, SignalType::Block, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Block, 0, 0).Failed()) failed++;
+				};
+				signal(ox + 2, y0, Track::X);
+				const uint j = n / 2;
+				signal(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
+			}
 			ox = yx + 3;
 		}
 		UpdateSignalsInBuffer();

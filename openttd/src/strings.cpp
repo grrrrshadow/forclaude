@@ -40,6 +40,7 @@
 #include "core/utf8.hpp"
 #include "core/string_consumer.hpp"
 #include <stack>
+#include <mutex>
 
 #include "table/strings.h"
 #include "table/control_codes.h"
@@ -366,12 +367,46 @@ std::string_view GetStringPtr(StringID string)
  * @param case_index  The "case index". This will only be set when FormatString wants to print the string in a different case.
  * @param game_script The string is coming directly from a game script.
  */
+/** The strings being formatted on this thread, the outermost first: in which an invalid one was asked for (NoteInvalidString()). */
+static thread_local std::vector<StringID> _strings_formatting;
+
+/**
+ * An invalid string asked for: not the game put down for a text (the player, 21. 10.: "String 0xFFFF is invalid", and
+ * the crash log without the stack to say from where), "(?)" shown instead; and the diary texty.log in the player's
+ * folder says which string it was, on which day, and in which strings it was (their numbers, outermost first), the
+ * first 50 times.
+ * @param string the invalid string
+ */
+static void NoteInvalidString(StringID string)
+{
+	static std::mutex lock;
+	static int written = 0;
+	static std::optional<FileHandle> diary;
+	std::lock_guard<std::mutex> guard(lock);
+	if (written >= 50) return;
+	written++;
+	std::string path;
+	for (StringID s : _strings_formatting) path += fmt::format(" 0x{:X}", s);
+	const TimerGameCalendar::YearMonthDay ymd = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
+	const std::string line = fmt::format("neplatny text 0x{:X}, den {}-{:02}-{:02}, v textech{}", string, ymd.year.base(), ymd.month + 1, ymd.day, path);
+	if (!diary.has_value()) diary = FileHandle::Open(_personal_dir + "texty.log", "w");
+	if (diary.has_value()) {
+		fmt::print(*diary, "{}\n", line);
+		fflush(*diary);
+	}
+}
+
 void GetStringWithArgs(StringBuilder &builder, StringID string, StringParameters &args, uint case_index, bool game_script)
 {
 	if (string == 0) {
 		GetStringWithArgs(builder, STR_UNDEFINED, args);
 		return;
 	}
+
+	struct Formatting {
+		explicit Formatting(StringID string) { _strings_formatting.push_back(string); }
+		~Formatting() { _strings_formatting.pop_back(); }
+	} formatting(string);
 
 	StringIndexInTab index = GetStringIndex(string);
 	StringTab tab = GetStringTab(string);
@@ -402,9 +437,11 @@ void GetStringWithArgs(StringBuilder &builder, StringID string, StringParameters
 			break;
 
 		case TEXT_TAB_OLD_CUSTOM:
-			/* Old table for custom names. This is no longer used */
+			/* Old table for custom names. This is no longer used: as an invalid string (NoteInvalidString()). */
 			if (!game_script) {
-				FatalError("Incorrect conversion of custom name string.");
+				NoteInvalidString(string);
+				builder += "(?)";
+				return;
 			}
 			break;
 
@@ -429,7 +466,9 @@ void GetStringWithArgs(StringBuilder &builder, StringID string, StringParameters
 		if (game_script) {
 			return GetStringWithArgs(builder, STR_UNDEFINED, args);
 		}
-		FatalError("String 0x{:X} is invalid. You are probably using an old version of the .lng file.\n", string);
+		NoteInvalidString(string);
+		builder += "(?)";
+		return;
 	}
 
 	FormatString(builder, GetStringPtr(string), args, case_index);

@@ -2106,8 +2106,10 @@ static void DrawSignalSprite(TileIndex tile, const RailTypeInfo *rti, Track trac
 	};
 
 	bool signal_on_right = IsTrainSignalSideRight();
-	uint x = TileX(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].x;
-	uint y = TileY(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].y;
+	int x = TileX(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].x;
+	int y = TileY(tile) * TILE_SIZE + SignalPositions[signal_on_right][pos].y;
+	/* By a round curve: by its arc (round_track.h). */
+	if (RoundTrackDrawing() && IsPlainRailTile(tile)) RoundTrackSignalAt(tile, track, x, y);
 
 	/* Which of the three this signal is showing. The warning is worked out
 	 * from the road ahead; every kind of signal can show it, a block signal
