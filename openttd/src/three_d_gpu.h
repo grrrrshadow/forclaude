@@ -149,6 +149,7 @@ struct ThreeDGpuBuildingPicture {
 	ThreeDGpuBuilding building;
 	std::vector<uint32_t> pixels;         ///< what comes: its colours (Colour::data), 0 where it is not; top row first
 	std::vector<float> depth;             ///< and how near each pixel is, -infinity where it is not
+	bool drawn = false;                   ///< whether the card drew it (ThreeDGpuRenderBuildings()); not, the processor draws it
 };
 
 /**
@@ -307,7 +308,7 @@ bool ThreeDGpuAvailable();
 bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
-bool ThreeDGpuRenderBuilding(ThreeDGpuBuildingPicture &pic);
+bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);

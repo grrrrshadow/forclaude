@@ -97,6 +97,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   obrázků jsou nejvýš 16. Rig, otočka plochy při 4x: hlavní vlákno udělalo 9 obrázků (dřív 1144), vlákno 1099,
   snímek medián 94 ms (dřív 198); po zastavení a dokreslení je plocha na pixel stejná jako nakreslená rovnou.
   Rig: po otočení před `test3d snimek` dát `test3d dokresli` a `smycka`, jinak jsou na snímku zástupci.
+- Hráč: *„2: GPU už jde plynuleji, trochu líp než bez karty; ve srovnání s #279 se kreslení procesorem zhoršilo… v #279
+  se otáčím po pixelu a teď o centimetr s prodlevou“*. Změřeno v rigu (otáčení po 1°, celá obrazovka): bez karty
+  62 ms na snímek při 1x, z toho domy 48 ms (rohy a řazení 31 ms, pixely 17 ms), při 4x 116 ms, z toho domy 86 ms.
+  Při otáčení se obrázky domů nedrží (`TurnedViewStands()`) a procesor domy promítá a řadí každý snímek znovu, dům ve
+  více kouscích obrazovky i vícekrát. Od #279 přibyly kolegovy open world domy s doplňky – mnohem víc trojúhelníků
+  (12–17 tisíc na dům).
+- **Hotovo – bod 2, domy otočené plochy na kartě** (`MakeTurnedObjectPicturesOnCard()`, `DrawBuildingsOnCard()`):
+  domy kousku obrazovky, které ještě nemají obrázek, nakreslí karta najednou (vedle sebe do jednoho rámce, barvy
+  a blízkost pixelů zpět jedním čtením) a hra si je drží jako dřív – i při otáčení; kousky obrazovky je pak jen
+  kopírují. Stejně jako procesor: texel pod středem pixelu, díra doplněná z nejbližšího do 3 texelů, světlo rohů
+  přes trojúhelník, odvrácené stěny pryč. Hloubku drží karta přesně, procesor řadil trojúhelníky podle středu
+  s tolerancí: rozdíly v rigu (273 px při 1x, 2082 px při 4x) jsou tam, kde se procesor pletl (oknům chybělo sklo,
+  šikmý proužek přes zeď). Při otáčení procesor na domy 0,4 ms místo 50 ms; rig nemá kartu (llvmpipe kreslí
+  procesorem), takže rychlost karty ukáže až telefon.
 
 ## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
 
