@@ -122,6 +122,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   pohybu myši je na pixel stejný jako nakreslený znovu i jako dřívější kreslení (`test3d zem 0|1|znovu`, čísla
   v `test3d cas`). Otáčení po 1°, zem na snímek: při 1x sprity 2,9 → 0,6 ms, při 4x sprity 8,0 → 1,4 ms a stopy domů
   3,4 → 1,5 ms; pokládání na plochu je 6–9 ms a to je druhá půlka: položí ho karta.
+- **Bod 3 hotový – zem otočené plochy pokládá karta** (`LayTurnedGround()`, `DrawGroundOnCard()`). Zem kousku obrazovky
+  se sebere jako seznam trojúhelníků (obyčejná dlaždice z drženého obrázku, dlaždice se základy ze svého obrázku,
+  který se teď taky drží, dokud se nezmění), karta je položí v pořadí od nejvzdálenějších a kousek se přečte zpět;
+  pak se na něj kreslí všechno ostatní jako dřív. Karta drží obrázek terénu u sebe a dostává jen překreslené
+  obdélníky; když se obrázek položí jinam, karta si ho posune sama (dřív by to bylo desítky MB znovu). Dlaždice se
+  základy jsou na kartě v jednom atlasu. Rig (llvmpipe): z 632 tisíc pixelů snímku se karta od procesoru liší v 10–65
+  pixelech na hranách trojúhelníků (desetinná čísla karty), na hotovém snímku 2–3 px; po startu jde na kartu
+  0–1 MB za snímek otáčení. Bez karty pokládá zem procesor na všech jádrech (stejný obrázek na pixel jako dřív).
+  Rig: `test3d zem karta 0|1`, `test3d zem kontrola 0|1`, v `test3d casy` počet kousků a čas karty.
+  Jak rychlé je to na telefonu, ukáže až build: čtení zpět je to jediné, co tam můžou stát navíc (bod 4 ho odstraní).
 
 ## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
 

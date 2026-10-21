@@ -9772,17 +9772,23 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: gpu snimek {}", _eye_frame_on_card ? "cely na karte" : "procesor, objekty na karte");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
-		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame. */
-		extern bool _turned_ground_kept;
+		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.
+		 * 'zem karta 0|1': laid on the turned map by the card where it can (1), or by the processor (0); 'zem kontrola
+		 * 0|1': by both, the pixels where they differ counted (test3d cas). */
+		extern bool _turned_ground_kept, _turned_ground_card, _turned_ground_check;
 		extern std::string DescribeTurnedGround();
 		if (argv.size() > 2 && argv[2] == "znovu") {
 			ResetTurnedGround();
+		} else if (argv.size() > 3 && argv[2] == "karta") {
+			_turned_ground_card = number(3).value_or(1) != 0;
+		} else if (argv.size() > 3 && argv[2] == "kontrola") {
+			_turned_ground_check = number(3).value_or(1) != 0;
 		} else if (auto on = number(2); on.has_value()) {
 			_turned_ground_kept = *on != 0;
 			ResetTurnedGround();
 		}
 		MarkWholeScreenDirty();
-		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeTurnedGround());
+		IConsolePrint(CC_DEFAULT, "test3d: {}, klade {}{}", DescribeTurnedGround(), _turned_ground_card ? "karta" : "procesor", _turned_ground_check ? ", kontrola" : "");
 	} else if (what == "gpu") {
 		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
 		 * and what draws them (three_d_gpu.h). */

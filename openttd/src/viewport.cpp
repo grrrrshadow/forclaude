@@ -2137,6 +2137,28 @@ static void FillTurnedFootprint(uint32_t *tex, int tw, int x0, int y0, int x1, i
 	}
 }
 
+/** What a picture of the ground is drawn from, as one number (the kept picture of the ground, a tile's picture). */
+struct GroundHash {
+	uint64_t key = 1469598103934665603ull;
+	void Mix(uint64_t v)
+	{
+		v *= 0xbf58476d1ce4e5b9ull;
+		v ^= v >> 31;
+		this->key = (this->key ^ v) * 0x94d049bb133111ebull;
+		this->key ^= this->key >> 29;
+	}
+	void Sprite(SpriteID image, PaletteID pal, int32_t x, int32_t y, const SubSprite *sub)
+	{
+		this->Mix(image);
+		this->Mix(pal);
+		this->Mix(static_cast<uint32_t>(x) | static_cast<uint64_t>(static_cast<uint32_t>(y)) << 32);
+		if (sub != nullptr) {
+			this->Mix(static_cast<uint32_t>(sub->left) | static_cast<uint64_t>(static_cast<uint32_t>(sub->top)) << 32);
+			this->Mix(static_cast<uint32_t>(sub->right) | static_cast<uint64_t>(static_cast<uint32_t>(sub->bottom)) << 32);
+		}
+	}
+};
+
 /** A tile of the block being drawn turned (ViewportDoDrawTurned()): what its draw procedure gave, kept to draw it. */
 struct TurnedTile {
 	int x, y;
@@ -2208,12 +2230,35 @@ struct TurnedGround {
 	int cw = 0, ch = 0;            ///< cells across and down
 	std::vector<std::vector<uint32_t>> cells; ///< the tiles reaching into each cell
 	std::vector<uint8_t> dirty;    ///< the cells to draw again
+	uint64_t generation = 0;       ///< for the card (ThreeDGpuGroundTexture): another when placed anew, or when too much was drawn again
+	uint64_t card_generation = 0;  ///< the generation the card last laid it in, 0 none
+	int card_x = 0, card_y = 0;    ///< where the first pixel of that one is in this one
+	bool card_whole = false;       ///< too much drawn again since: the card gets it whole
+	std::vector<GroundRect> card_changed; ///< the rects drawn again since
 	int Width() const { return this->at.r - this->at.l; }
+	int Height() const { return this->at.b - this->at.t; }
+	/** A rect of its pixels drawn again: the card gets it the next time it lays the ground; too many, the card gets it whole. */
+	void ChangedForCard(const GroundRect &r);
 };
 static TurnedGround _turned_ground;
+static uint64_t _turned_ground_generations = 0;
+
+void TurnedGround::ChangedForCard(const GroundRect &r)
+{
+	if (this->card_whole || r.Within(this->at).Empty()) return;
+	if (this->card_changed.size() >= 1024) {
+		this->generation = ++_turned_ground_generations;
+		this->card_whole = true;
+		this->card_changed.clear();
+		return;
+	}
+	this->card_changed.push_back(r);
+}
 static constexpr int TURNED_GROUND_CELL = 64; ///< pixels of a cell's side
 static constexpr size_t TURNED_GROUND_PIXELS = static_cast<size_t>(24) << 20; ///< at most so many pixels (96 MB); a block needing more is drawn as before
 bool _turned_ground_kept = true; ///< Rig: the ground kept (test3d zem); else drawn anew for every block as before
+bool _turned_ground_card = true; ///< Rig: the ground laid by the card where it can (test3d zem karta); else by the processor
+bool _turned_ground_check = false; ///< Rig: laid by both, the pixels where they differ counted (test3d zem kontrola)
 
 /** Rig: what the kept picture of the ground drew since the last report (TurnedTimingsPrint()). */
 static struct {
@@ -2222,6 +2267,10 @@ static struct {
 	int rects = 0;         ///< rects drawn again
 	size_t pixels = 0;     ///< their pixels
 	int placed = 0;        ///< times placed anew
+	int card_blocks = 0;   ///< blocks whose ground the card laid
+	int processor_blocks = 0; ///< and the processor
+	size_t checked = 0;    ///< pixels laid by both (_turned_ground_check)
+	size_t differ = 0;     ///< of them, those that differ
 } _turned_ground_times;
 
 static inline uint32_t TurnedGroundTileKey(int x, int y)
@@ -2233,6 +2282,8 @@ static inline uint32_t TurnedGroundTileKey(int x, int y)
 void ResetTurnedGround()
 {
 	_turned_ground = TurnedGround();
+	extern void ForgetTurnedFoundations();
+	ForgetTurnedFoundations();
 }
 
 /** Rig: what the kept picture of the ground holds. */
@@ -2247,8 +2298,9 @@ std::string DescribeTurnedGround()
 /** Rig: what the kept picture of the ground drew again since the last report, and start over (TurnedTimingsPrint()). */
 void TurnedGroundTimingsPrint()
 {
-	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
-			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed);
+	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x; polozila karta {}, procesor {}{}", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
+			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed, _turned_ground_times.card_blocks,
+			_turned_ground_times.processor_blocks, _turned_ground_times.checked > 0 ? fmt::format(", kontrola {} px, jinak {}", _turned_ground_times.checked, _turned_ground_times.differ) : std::string());
 	_turned_ground_times = {};
 }
 
@@ -2288,6 +2340,7 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 	n.valid = true;
 	n.zoom = zoom;
 	n.at = at;
+	n.generation = ++_turned_ground_generations;
 	n.px.assign(at.Pixels(), 0);
 	n.cw = (at.r - at.l + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
 	n.ch = (at.b - at.t + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
@@ -2306,6 +2359,12 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 			ForTurnedGroundCells(n, reach, [&](int c) { n.cells[c].push_back(k); });
 			n.tiles.emplace(k, std::move(t));
 		}
+		/* What the card has moves along (ThreeDGpuGroundTexture::from_generation). */
+		n.card_generation = g.card_generation;
+		n.card_x = g.card_x + (g.at.l - at.l);
+		n.card_y = g.card_y + (g.at.t - at.t);
+		n.card_whole = g.card_whole;
+		n.card_changed = std::move(g.card_changed);
 	}
 	g = std::move(n);
 	_turned_ground_times.placed++;
@@ -2323,29 +2382,18 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	for (const TurnedTile &t : tiles) {
 		const bool founded = t.foundation[0] != -1 || t.foundation[1] != -1;
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
-		uint64_t key = 1469598103934665603ull;
-		auto mix = [&](uint64_t v) {
-			v *= 0xbf58476d1ce4e5b9ull;
-			v ^= v >> 31;
-			key = (key ^ v) * 0x94d049bb133111ebull;
-			key ^= key >> 29;
-		};
-		mix(founded);
+		GroundHash hash;
+		hash.Mix(founded);
 		if (!founded) {
 			for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
 				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
-				mix(ts.image);
-				mix(ts.pal);
-				mix(static_cast<uint32_t>(ts.x) | static_cast<uint64_t>(static_cast<uint32_t>(ts.y)) << 32);
-				if (ts.sub != nullptr) {
-					mix(static_cast<uint32_t>(ts.sub->left) | static_cast<uint64_t>(static_cast<uint32_t>(ts.sub->top)) << 32);
-					mix(static_cast<uint32_t>(ts.sub->right) | static_cast<uint64_t>(static_cast<uint32_t>(ts.sub->bottom)) << 32);
-				}
+				hash.Sprite(ts.image, ts.pal, ts.x, ts.y, ts.sub);
 			}
-			mix(t.building);
-			if (t.building) mix(to_underlying(t.top_slope) | static_cast<uint64_t>(static_cast<uint32_t>(t.top_z)) << 8);
-			if (t.round && inside) mix(RoundTrackStripKey(TileXY(t.x, t.y), g.zoom));
+			hash.Mix(t.building);
+			if (t.building) hash.Mix(to_underlying(t.top_slope) | static_cast<uint64_t>(static_cast<uint32_t>(t.top_z)) << 8);
+			if (t.round && inside) hash.Mix(RoundTrackStripKey(TileXY(t.x, t.y), g.zoom));
 		}
+		const uint64_t key = hash.key;
 		const uint32_t k = TurnedGroundTileKey(t.x, t.y);
 		auto it = g.tiles.find(k);
 		if (it != g.tiles.end() && it->second.key == key) continue;
@@ -2447,6 +2495,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	for (const GroundRect &r : rects) {
 		_turned_ground_times.rects++;
 		_turned_ground_times.pixels += r.Pixels();
+		g.ChangedForCard(r);
 		for (int y = r.t; y < r.b; y++) std::fill_n(&g.px[static_cast<size_t>(y - g.at.t) * w + (r.l - g.at.l)], r.r - r.l, 0u);
 		DrawPixelInfo d{};
 		d.zoom = g.zoom;
@@ -2483,16 +2532,44 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	buildings.erase(std::unique(buildings.begin(), buildings.end()), buildings.end());
 	for (const TurnedGroundTile *rec : buildings) {
 		const GroundRect f = rec->fill.Within(g.at);
-		if (!f.Empty()) FillTurnedFootprint(g.px.data(), w, f.l - g.at.l, f.t - g.at.t, f.r - g.at.l, f.b - g.at.t);
+		if (f.Empty()) continue;
+		FillTurnedFootprint(g.px.data(), w, f.l - g.at.l, f.t - g.at.t, f.r - g.at.l, f.b - g.at.t);
+		g.ChangedForCard(f);
 	}
 	std::fill(g.dirty.begin(), g.dirty.end(), 0);
 	_turned_times.widen += TurnedNow() - t1;
 }
 
 /**
- * Draw the ground of one tile turned. The tile sprites it added (from index
+ * The north-up picture of a tile with a foundation (AddTurnedTileGround()), its foundation and the ground on it, kept
+ * while what it is drawn from stays: turning, the same was drawn again for every frame.
+ */
+struct TurnedFoundationTexture {
+	int left = 0, top = 0;  ///< virtual coordinates of its first pixel
+	int w = 0, h = 0;
+	std::vector<uint32_t> px;
+	uint64_t key = 0;       ///< what it is drawn from (GroundHash), its name on the card
+	uint32_t block = 0;     ///< the block it was last laid in (_turned_ground_block)
+	uint32_t index = 0;     ///< and which of that block's textures it is (TurnedGroundPiece::texture)
+};
+static std::unordered_map<uint64_t, TurnedFoundationTexture> _turned_foundations; ///< by GroundHash
+static size_t _turned_foundation_pixels = 0;
+static constexpr size_t TURNED_FOUNDATION_PIXELS = static_cast<size_t>(16) << 20; ///< kept at most (64 MB), then drawn anew
+static uint32_t _turned_ground_block = 0; ///< counts the blocks drawn turned
+
+/** A piece of the ground of a block (ViewportDoDrawTurned()): a triangle, and the texture its pixels come from. */
+struct TurnedGroundPiece {
+	const uint32_t *tex;
+	int tw, th;
+	uint32_t texture; ///< 0 the picture of the ground, else the tile's (TurnedFoundationTexture::index)
+	TurnedVertex a, b, c;
+};
+
+/**
+ * The ground of one tile with a foundation turned, as pieces of the block's
+ * ground (TurnedGroundPiece). The tile sprites it added (from index
  * \a first on), its foundations and the ground drawn on top of them are drawn
- * north-up into a texture. The tile is then a box: its top is the ground
+ * north-up into a texture, kept while they stay. The tile is then a box: its top is the ground
  * (four triangles meeting in the middle, so slopes keep their folds), its
  * sides are the walls of the foundation, from the land below up to the ground
  * on top, wherever the foundation raised the ground. Every face is laid over
@@ -2512,7 +2589,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
  * @param building whether a building stands on the tile, with the ground under it drawn black (FillTurnedFootprint())
  * @param foundation_index the tile's foundation sprites (normal and halftile part) in _vd.parent_sprites_to_draw, or -1
  */
-static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_t end, int x0, int y0, Slope top_slope, int top_z, Slope raw_slope, int raw_z, bool building, const int foundation_index[2])
+static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vector<const TurnedFoundationTexture *> &textures, const DrawPixelInfo &frame, size_t first, size_t end, int x0, int y0, Slope top_slope, int top_z, Slope raw_slope, int raw_z, bool building, const int foundation_index[2])
 {
 	bool foundation = foundation_index[0] != -1 || foundation_index[1] != -1;
 	if (first >= end && !foundation) return;
@@ -2555,65 +2632,113 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_
 	int theight = (static_cast<int>(std::ceil(maxvy)) + margin - ttop + ~mask) & mask;
 	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
 	if (tw <= 0 || th <= 0) return;
-	double t0 = TurnedNow();
-	_turned_texture.assign(static_cast<size_t>(tw) * th, 0);
-	DrawPixelInfo tdpi{
-		.dst_ptr = _turned_texture.data(),
-		.left = tleft,
-		.top = ttop,
-		.width = twidth,
-		.height = theight,
-		.pitch = tw,
-		.zoom = zoom
-	};
-	{
-		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
-		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
-		for (size_t i = first; i < end; i++) {
-			const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
-			DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+	/* What its picture is drawn from: kept while that stays (the player, 21. 10.: the same drawn again for every frame of turning). */
+	GroundHash key;
+	key.Mix(to_underlying(zoom));
+	key.Mix(static_cast<uint32_t>(x0) | static_cast<uint64_t>(static_cast<uint32_t>(y0)) << 32);
+	key.Mix(to_underlying(top_slope) | static_cast<uint64_t>(to_underlying(raw_slope)) << 8 | static_cast<uint64_t>(building) << 16);
+	key.Mix(static_cast<uint32_t>(top_z) | static_cast<uint64_t>(static_cast<uint32_t>(raw_z)) << 32);
+	for (size_t i = first; i < end; i++) {
+		const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+		key.Sprite(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+	}
+	for (int k = 0; k < 2; k++) {
+		if (foundation_index[k] == -1) continue;
+		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[foundation_index[k]];
+		key.Mix(k + 1);
+		if (ps.image != SPR_EMPTY_BOUNDING_BOX) key.Sprite(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+		key.Mix(static_cast<uint32_t>(ps.left) | static_cast<uint64_t>(static_cast<uint32_t>(ps.top)) << 32);
+		for (int child_idx = ps.first_child; child_idx >= 0;) {
+			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+			child_idx = cs.next;
+			key.Sprite(cs.image, cs.pal, cs.x, cs.y, cs.sub);
+			key.Mix(cs.relative);
 		}
-		/* The foundation and the ground on top of it, which is its child sprites: drawn here, taken off the billboards. */
+	}
+	auto [kept, made] = _turned_foundations.try_emplace(key.key);
+	TurnedFoundationTexture &ft = kept->second;
+	if (made || _turned_debug_tile != INVALID_TILE) {
+		double t0 = TurnedNow();
+		ft.key = key.key;
+		ft.left = tleft;
+		ft.top = ttop;
+		ft.w = tw;
+		ft.h = th;
+		_turned_foundation_pixels -= ft.px.size();
+		ft.px.assign(static_cast<size_t>(tw) * th, 0);
+		_turned_foundation_pixels += ft.px.size();
+		DrawPixelInfo tdpi{
+			.dst_ptr = ft.px.data(),
+			.left = tleft,
+			.top = ttop,
+			.width = twidth,
+			.height = theight,
+			.pitch = tw,
+			.zoom = zoom
+		};
+		{
+			AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
+			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			for (size_t i = first; i < end; i++) {
+				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+				DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+			}
+			/* The foundation and the ground on top of it, which is its child sprites: drawn here, taken off the billboards. */
+			for (int k = 0; k < 2; k++) {
+				if (foundation_index[k] == -1) continue;
+				ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[foundation_index[k]];
+				if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+				int child_idx = ps.first_child;
+				while (child_idx >= 0) {
+					const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+					child_idx = cs.next;
+					if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+						IConsolePrint(CC_DEFAULT, "ladeni:   dite zakladu {} pal {} na {},{} {}", cs.image, cs.pal, cs.x, cs.y, cs.relative ? "od rohu" : "od kotvy");
+					}
+					if (cs.relative) {
+						DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+					} else {
+						DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+					}
+				}
+				ps.first_child = LAST_CHILD_NONE;
+				ps.image = SPR_EMPTY_BOUNDING_BOX;
+			}
+		}
+		if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
+			/* Rig: the texture as a picture, textura.ppm next to the executable. */
+			auto f = FileHandle::Open(std::string("textura.ppm"), "wb");
+			if (f.has_value()) {
+				std::string head = fmt::format("P6\n{} {}\n255\n", tw, th);
+				fwrite(head.data(), 1, head.size(), *f);
+				for (uint32_t p : ft.px) {
+					Colour c;
+					c.data = p;
+					uint8_t rgb[3] = {c.r, c.g, c.b};
+					fwrite(rgb, 1, 3, *f);
+				}
+			}
+		}
+		double t1 = TurnedNow();
+		if (building) FillTurnedFootprint(ft.px.data(), tw, 0, 0, tw, th);
+		double t2 = TurnedNow();
+		_turned_times.texture += t1 - t0;
+		_turned_times.widen += t2 - t1;
+	} else {
+		/* Kept: its foundation still taken off the billboards, as drawing it into the picture does. */
 		for (int k = 0; k < 2; k++) {
 			if (foundation_index[k] == -1) continue;
 			ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[foundation_index[k]];
-			if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
-			int child_idx = ps.first_child;
-			while (child_idx >= 0) {
-				const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
-				child_idx = cs.next;
-				if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
-					IConsolePrint(CC_DEFAULT, "ladeni:   dite zakladu {} pal {} na {},{} {}", cs.image, cs.pal, cs.x, cs.y, cs.relative ? "od rohu" : "od kotvy");
-				}
-				if (cs.relative) {
-					DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
-				} else {
-					DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
-				}
-			}
 			ps.first_child = LAST_CHILD_NONE;
 			ps.image = SPR_EMPTY_BOUNDING_BOX;
 		}
 	}
-	if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
-		/* Rig: the texture as a picture, textura.ppm next to the executable. */
-		auto f = FileHandle::Open(std::string("textura.ppm"), "wb");
-		if (f.has_value()) {
-			std::string head = fmt::format("P6\n{} {}\n255\n", tw, th);
-			fwrite(head.data(), 1, head.size(), *f);
-			for (uint32_t p : _turned_texture) {
-				Colour c;
-				c.data = p;
-				uint8_t rgb[3] = {c.r, c.g, c.b};
-				fwrite(rgb, 1, 3, *f);
-			}
-		}
+	if (ft.block != _turned_ground_block) {
+		ft.block = _turned_ground_block;
+		ft.index = static_cast<uint32_t>(textures.size()) + 1;
+		textures.push_back(&ft);
 	}
-	double t1 = TurnedNow();
-	if (building) FillTurnedFootprint(_turned_texture.data(), tw, 0, 0, tw, th);
 	double t2 = TurnedNow();
-	_turned_times.texture += t1 - t0;
-	_turned_times.widen += t2 - t1;
 
 	/* A corner of a face: a world point on the screen, with its pixels taken at another (or the same) world point of the texture. */
 	double scale = 1.0 / (1 << to_underlying(zoom));
@@ -2628,9 +2753,9 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_
 		r.v = (cy - ttop) * scale;
 		return r;
 	};
-	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
-	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
-	const uint32_t *tex = _turned_texture.data();
+	auto add = [&](const TurnedVertex &a, const TurnedVertex &b, const TurnedVertex &c) {
+		pieces.push_back({ft.px.data(), ft.w, ft.h, ft.index, a, b, c});
+	};
 
 	/* The walls, far first: the edges N-E, E-S, S-W, W-N wherever the ground on top is above the land. */
 	struct Wall {
@@ -2660,8 +2785,8 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_
 			IConsolePrint(CC_DEFAULT, "ladeni:   stena {}-{} {} blok ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) textura ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f}) ({:.1f},{:.1f})",
 					a, b, drawn ? "kreslena" : "zrcadlena", a_top.x, a_top.y, b_top.x, b_top.y, b_bot.x, b_bot.y, a_bot.x, a_bot.y, a_top.u, a_top.v, b_top.u, b_top.v, b_bot.u, b_bot.v, a_bot.u, a_bot.v);
 		}
-		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a_top, b_top, b_bot);
-		DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, a_top, b_bot, a_bot);
+		add(a_top, b_top, b_bot);
+		add(a_top, b_bot, a_bot);
 	}
 
 	/* The top: the ground, four triangles meeting in the middle. */
@@ -2669,17 +2794,17 @@ static void DrawTurnedTileGround(const DrawPixelInfo &frame, size_t first, size_
 	for (int i = 0; i < 5; i++) v[i] = vertex(wx[i], wy[i], wz[i], wx[i], wy[i], wz[i]);
 	if (_turned_debug_tile != INVALID_TILE && _cur_ti.tile == _turned_debug_tile) {
 		size_t painted = 0;
-		for (uint32_t p : _turned_texture) if (p != 0) painted++;
+		for (uint32_t p : ft.px) if (p != 0) painted++;
 		IConsolePrint(CC_DEFAULT, "ladeni: dlazdice {},{} vrch svah {} z {} zem svah {} z {} spritu {} zaklady {} sten {} textura {}x{} ({},{}) kresleno {}", x0 / TILE_SIZE, y0 / TILE_SIZE,
 				to_underlying(top_slope), top_z, to_underlying(raw_slope), raw_z, end - first, foundation ? "ano" : "ne", num_walls, tw, th, tleft, ttop, painted);
 		for (int i = 0; i < 5; i++) {
 			IConsolePrint(CC_DEFAULT, "ladeni:   roh {} svet {},{},{} zem {} blok {:.1f},{:.1f} textura {:.1f},{:.1f}", i, wx[i], wy[i], wz[i], i < 4 ? bz[i] : wz[i], v[i].x, v[i].y, v[i].u, v[i].v);
 		}
 	}
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[0], v[1], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[1], v[2], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[2], v[3], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, tw, th, v[3], v[0], v[4]);
+	add(v[0], v[1], v[4]);
+	add(v[1], v[2], v[4]);
+	add(v[2], v[3], v[4]);
+	add(v[3], v[0], v[4]);
 	_turned_times.warp += TurnedNow() - t2;
 }
 
@@ -4467,7 +4592,7 @@ static void AddNorthHouseObject(size_t first_parent)
 }
 
 /**
- * Lay the ground of a plain tile (no foundation) from the block's north-up
+ * The ground of a plain tile (no foundation) from the block's north-up
  * texture (ViewportDoDrawTurned()) over its four corners where the turned view
  * puts them: four triangles meeting in the middle, so slopes keep their folds.
  * @param frame the block of the screen being drawn
@@ -4478,7 +4603,7 @@ static void AddNorthHouseObject(size_t first_parent)
  * @param slope the slope of the tile
  * @param z the height of its north corner on flat ground
  */
-static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelInfo &big, const uint32_t *tex, int bw, int bh, int x0, int y0, Slope slope, int z)
+static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const DrawPixelInfo &frame, const DrawPixelInfo &big, const uint32_t *tex, int bw, int bh, int x0, int y0, Slope slope, int z)
 {
 	double t0 = TurnedNow();
 	ZoomLevel zoom = frame.zoom;
@@ -4500,12 +4625,100 @@ static void DrawTurnedTileFromBlock(const DrawPixelInfo &frame, const DrawPixelI
 		v[i].u = (cx - big.left) * scale;
 		v[i].v = (cy - big.top) * scale;
 	}
+	pieces.push_back({tex, bw, bh, 0, v[0], v[1], v[4]});
+	pieces.push_back({tex, bw, bh, 0, v[1], v[2], v[4]});
+	pieces.push_back({tex, bw, bh, 0, v[2], v[3], v[4]});
+	pieces.push_back({tex, bw, bh, 0, v[3], v[0], v[4]});
+	_turned_times.warp += TurnedNow() - t0;
+}
+
+/** Forget the kept pictures of the tiles with a foundation (ResetTurnedGround()). */
+void ForgetTurnedFoundations()
+{
+	_turned_foundations.clear();
+	_turned_foundation_pixels = 0;
+}
+
+/**
+ * Lay the pieces of the ground of a block, in their order, each over those before: by the card where it can (the kept
+ * picture of the ground and the tiles' pictures on it, the block read back; GPU point 3), else by the processor on
+ * every core, the block in bands of rows.
+ * @param frame the block (just cleared)
+ * @param pieces the pieces, far first
+ * @param foundations the tiles' pictures they come from (TurnedGroundPiece::texture less one)
+ * @param kept the kept picture of the ground the other pieces come from, or nullptr when they come from a picture of
+ *             the block only (then the processor lays them)
+ */
+static void LayTurnedGround(const DrawPixelInfo &frame, std::span<const TurnedGroundPiece> pieces, std::span<const TurnedFoundationTexture *const> foundations, TurnedGround *kept)
+{
+	if (pieces.empty()) return;
+	double t0 = TurnedNow();
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
-	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[0], v[1], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[1], v[2], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[2], v[3], v[4]);
-	DrawTexturedTriangle(dst, frame.pitch, fw, fh, tex, bw, bh, v[3], v[0], v[4]);
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	bool laid = false;
+	std::vector<uint32_t> card_pixels;
+	if (kept != nullptr && _turned_ground_card && ThreeDGpuReady()) {
+		ThreeDGpuGround g;
+		g.width = fw;
+		g.height = fh;
+		g.clear = dst[0];
+		if (_turned_ground_check) {
+			card_pixels.assign(static_cast<size_t>(fw) * fh, g.clear);
+			g.out = card_pixels.data();
+			g.out_pitch = fw;
+		} else {
+			g.out = dst;
+			g.out_pitch = frame.pitch;
+		}
+		ThreeDGpuGroundTexture &whole = g.textures.emplace_back();
+		whole.key = 1;
+		whole.generation = kept->generation;
+		whole.from_generation = kept->card_whole ? 0 : kept->card_generation;
+		whole.from_x = kept->card_x;
+		whole.from_y = kept->card_y;
+		whole.width = kept->Width();
+		whole.height = kept->Height();
+		whole.pixels = kept->px.data();
+		for (const GroundRect &r : kept->card_changed) {
+			const GroundRect in = r.Within(kept->at);
+			if (!in.Empty()) whole.changed.push_back({in.l - kept->at.l, in.t - kept->at.t, in.r - in.l, in.b - in.t});
+		}
+		for (const TurnedFoundationTexture *f : foundations) {
+			ThreeDGpuGroundTexture &t = g.textures.emplace_back();
+			t.key = f->key;
+			t.generation = 1;
+			t.width = f->w;
+			t.height = f->h;
+			t.pixels = f->px.data();
+			t.atlas = true;
+		}
+		g.triangles.reserve(pieces.size());
+		for (const TurnedGroundPiece &p : pieces) {
+			g.triangles.push_back({{static_cast<float>(p.a.x), static_cast<float>(p.b.x), static_cast<float>(p.c.x)}, {static_cast<float>(p.a.y), static_cast<float>(p.b.y), static_cast<float>(p.c.y)},
+					{static_cast<float>(p.a.u), static_cast<float>(p.b.u), static_cast<float>(p.c.u)}, {static_cast<float>(p.a.v), static_cast<float>(p.b.v), static_cast<float>(p.c.v)}, p.texture});
+		}
+		laid = ThreeDGpuDrawGround(g);
+		if (laid) {
+			kept->card_generation = kept->generation;
+			kept->card_x = kept->card_y = 0;
+			kept->card_whole = false;
+			kept->card_changed.clear();
+		}
+	}
+	if (!laid || _turned_ground_check) {
+		ParallelBands(fh, [&](int lo, int hi) {
+			for (const TurnedGroundPiece &p : pieces) DrawTexturedTriangle(dst, frame.pitch, fw, fh, p.tex, p.tw, p.th, p.a, p.b, p.c, true, nullptr, nullptr, lo, hi);
+		}, pieces.size() >= 64);
+	}
+	if (laid && _turned_ground_check) {
+		/* Rig: laid by both, where they differ. */
+		for (int y = 0; y < fh; y++) {
+			const uint32_t *a = dst + static_cast<size_t>(y) * frame.pitch, *b = &card_pixels[static_cast<size_t>(y) * fw];
+			for (int x = 0; x < fw; x++) _turned_ground_times.differ += a[x] != b[x];
+		}
+		_turned_ground_times.checked += static_cast<size_t>(fw) * fh;
+	}
+	(laid ? _turned_ground_times.card_blocks : _turned_ground_times.processor_blocks)++;
 	_turned_times.warp += TurnedNow() - t0;
 }
 
@@ -4891,14 +5104,20 @@ static void ViewportDoDrawTurned()
 		ground = _turned_big.data();
 	}
 
-	/* 5. The ground, far first: a plain tile laid from the block's texture, a tile with a foundation as a box from its own. */
+	/* 5. The ground, far first: a plain tile from the block's texture, a tile with a foundation as a box from its own; its
+	 * pieces laid at once (LayTurnedGround()). */
+	if (_turned_foundation_pixels > TURNED_FOUNDATION_PIXELS) ForgetTurnedFoundations();
+	_turned_ground_block++;
+	std::vector<TurnedGroundPiece> pieces;
+	std::vector<const TurnedFoundationTexture *> foundations;
 	for (const TurnedTile &t : ground_tiles) {
 		if (t.foundation[0] != -1 || t.foundation[1] != -1) {
-			DrawTurnedTileGround(frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
+			AddTurnedTileGround(pieces, foundations, frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
 		} else if (ground != nullptr && t.first_sprite < t.end_sprite) {
-			DrawTurnedTileFromBlock(frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
+			AddTurnedTileFromBlock(pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
 		}
 	}
+	LayTurnedGround(frame, pieces, foundations, ground != nullptr && ground == _turned_ground.px.data() ? &_turned_ground : nullptr);
 	_turned_times.drawn += static_cast<int>(ground_tiles.size());
 
 	ViewportAddVehicles(&cdpi);

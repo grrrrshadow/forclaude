@@ -260,7 +260,9 @@ constexpr GLenum GL_DEPTH_TEST = 0x0B71;
 constexpr GLenum GL_DITHER = 0x0BD0;
 constexpr GLenum GL_BLEND = 0x0BE2;
 constexpr GLenum GL_SCISSOR_TEST = 0x0C11;
+constexpr GLenum GL_UNPACK_ROW_LENGTH = 0x0CF2;
 constexpr GLenum GL_UNPACK_ALIGNMENT = 0x0CF5;
+constexpr GLenum GL_PACK_ROW_LENGTH = 0x0D02;
 constexpr GLenum GL_PACK_ALIGNMENT = 0x0D05;
 constexpr GLenum GL_MAX_TEXTURE_SIZE = 0x0D33;
 constexpr GLenum GL_TEXTURE_2D = 0x0DE1;
@@ -306,6 +308,8 @@ constexpr GLenum GL_COLOR_ATTACHMENT0 = 0x8CE0;
 constexpr GLenum GL_COLOR_ATTACHMENT1 = 0x8CE1;
 constexpr GLenum GL_DEPTH_ATTACHMENT = 0x8D00;
 constexpr GLenum GL_FRAMEBUFFER = 0x8D40;
+constexpr GLenum GL_READ_FRAMEBUFFER = 0x8CA8;
+constexpr GLenum GL_DRAW_FRAMEBUFFER = 0x8CA9;
 constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 
 #ifdef THREE_D_GPU_WGL
@@ -350,6 +354,7 @@ constexpr GLenum GL_RENDERBUFFER = 0x8D41;
 	X(void, glFramebufferRenderbuffer, (GLenum target, GLenum attachment, GLenum rbtarget, GLuint rb)) \
 	X(void, glFramebufferTexture2D, (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level)) \
 	X(GLenum, glCheckFramebufferStatus, (GLenum target)) \
+	X(void, glBlitFramebuffer, (GLint sx0, GLint sy0, GLint sx1, GLint sy1, GLint dx0, GLint dy0, GLint dx1, GLint dy1, GLbitfield mask, GLenum filter)) \
 	X(void, glGenRenderbuffers, (GLsizei n, GLuint *rbs)) \
 	X(void, glDeleteRenderbuffers, (GLsizei n, const GLuint *rbs)) \
 	X(void, glBindRenderbuffer, (GLenum target, GLuint rb)) \
@@ -405,6 +410,7 @@ struct GpuJob {
 	ThreeDGpuEyeFrame *frame = nullptr; ///< else the view from the eyes whole (DrawEyeFrameOnCard())
 	struct ShownRead *read = nullptr;   ///< else a picture shown straight from the card read back (ReadShownOnCard())
 	std::span<ThreeDGpuBuildingPicture *const> buildings; ///< else the buildings of the turned map (DrawBuildingsOnCard())
+	ThreeDGpuGround *ground = nullptr;  ///< else the ground of a block of the turned map (DrawGroundOnCard())
 	bool done = false;
 	bool ok = false;
 };
@@ -442,6 +448,9 @@ std::string _gpu_describe = "not started";
 double _gpu_ms = 0;                 ///< the time the card took for the pictures since the last ThreeDGpuTimes()
 uint64_t _gpu_pictures = 0;         ///< and how many
 uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the processor did)
+double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes()
+uint64_t _gpu_grounds = 0;          ///< and how many blocks
+uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the processor did)
 
 /* What the card keeps, by the thing's number (ThreeDUniqueId): the corners of the shapes, their triangles, the
  * textures; let go of the longest not drawn when it holds more than GPU_BYTES_KEPT. Only the card's thread uses these. */
@@ -500,7 +509,7 @@ struct GpuProgram {
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
 };
-GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _map_building_program;
+GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _map_building_program, _ground_program;
 /* The buildings of the turned map drawn into (DrawBuildingsOnCard()): their colours, their nearness as floats, depths. */
 GLuint _bfbo = 0, _b_colour_rb = 0, _b_near_rb = 0, _b_depth_rb = 0;
 int _bfbo_w = 0, _bfbo_h = 0;
@@ -518,6 +527,22 @@ int _frame_w = 0, _frame_h = 0;
 GLuint _frame_atlas = 0;
 int _frame_atlas_w = 0, _frame_atlas_h = 0;
 std::vector<uint32_t> _frame_atlas_px;
+/* The ground of the turned map (DrawGroundOnCard()): the big textures by key, the small ones (the tiles with a foundation)
+ * in one atlas filled shelf by shelf and started over when full, the block drawn into. */
+struct GroundTextureOnCard {
+	GLuint name = 0;
+	int w = 0, h = 0;
+	uint64_t generation = 0;
+};
+std::unordered_map<uint64_t, GroundTextureOnCard> _ground_textures;
+std::unordered_map<uint64_t, std::array<int, 4>> _ground_atlas_places; ///< x, y, w, h by key
+GLuint _ground_atlas = 0;
+int _ground_atlas_size = 0, _ground_shelf_x = 0, _ground_shelf_y = 0, _ground_shelf_h = 0;
+GLuint _gfbo = 0, _g_colour_rb = 0;
+GLuint _g_move_fbo[2] = {0, 0}; ///< the kept picture of the ground moved on the card (GroundTextureOf()): from, to
+int _gfbo_w = 0, _gfbo_h = 0;
+GLuint _ground_vao = 0, _ground_vbo = 0;
+bool _ground_program_ok = false;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
@@ -771,6 +796,62 @@ void main()
 	c = min(vec3(255.0), floor(c * l / 256.0));
 	o_colour = vec4(c / 255.0, t.a);
 	o_near = vec4(v_near, 0.0, 0.0, 1.0);
+}
+)";
+
+/* The ground of the turned map (DrawGroundOnCard()), as the processor lays it (DrawTexturedTriangle() of viewport.cpp):
+ * a corner at its pixel of the block, rows down as the card's rows up; each pixel at its middle the texel under it of
+ * its texture (the kept picture of the ground, or a tile's in the atlas, where the texture is in it) -- one the
+ * texture has nothing for (0) takes the nearest drawn within three, in the processor's order --, as it is. */
+const char *const GROUND_VERTEX = R"(#version 330 core
+layout(location = 0) in vec2 a_pos;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in vec4 a_bounds;
+layout(location = 3) in float a_atlas;
+uniform vec2 u_size;
+noperspective out vec2 v_uv;
+flat out vec4 v_bounds;
+flat out float v_atlas;
+void main()
+{
+	gl_Position = vec4(a_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+	v_uv = a_uv;
+	v_bounds = a_bounds;
+	v_atlas = a_atlas;
+}
+)";
+
+const char *const GROUND_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_ground;
+uniform sampler2D u_atlas;
+noperspective in vec2 v_uv;
+flat in vec4 v_bounds;
+flat in float v_atlas;
+out vec4 o_colour;
+const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
+		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
+		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
+vec4 Texel(ivec2 at)
+{
+	ivec2 p = ivec2(v_bounds.xy) + at;
+	return v_atlas > 0.5 ? texelFetch(u_atlas, p, 0) : texelFetch(u_ground, p, 0);
+}
+void main()
+{
+	ivec2 size = ivec2(v_bounds.zw);
+	ivec2 at = ivec2(floor(v_uv));
+	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
+	vec4 t = Texel(at);
+	if (t == vec4(0.0)) {
+		for (int k = 0; k < 24; k++) {
+			ivec2 n = at + NEAR[k];
+			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
+			t = Texel(n);
+			if (t != vec4(0.0)) break;
+		}
+		if (t == vec4(0.0)) discard;
+	}
+	o_colour = t;
 }
 )";
 
@@ -1666,6 +1747,12 @@ bool StartCard(std::string &why, std::string &describe)
 	if (!MakeProgram(_eye_building_program, EYE_BUILDING_VERTEX, EYE_BUILDING_FRAGMENT, why)) return false;
 	Step("preklad programu budov plochy (shader)");
 	if (!MakeProgram(_map_building_program, MAP_BUILDING_VERTEX, MAP_BUILDING_FRAGMENT, why)) return false;
+	Step("preklad programu zeme plochy (shader)");
+	{
+		std::string ground_why;
+		_ground_program_ok = MakeProgram(_ground_program, GROUND_VERTEX, GROUND_FRAGMENT, ground_why);
+		if (!_ground_program_ok) Diary("zem plochy kresli procesor: " + ground_why, true);
+	}
 	Step("preklad programu postav z oci (shader)");
 	const std::string eye_vertex = EyeMeshSource(MESH_VERTEX, false), eye_fragment = EyeMeshSource(MESH_FRAGMENT, true);
 	if (!MakeProgram(_eye_mesh_program, eye_vertex.c_str(), eye_fragment.c_str(), why)) return false;
@@ -1685,6 +1772,22 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glGenRenderbuffers(1, &_eye_colour_rb);
 	gl.glGenRenderbuffers(1, &_eye_glow_rb);
 	gl.glGenRenderbuffers(1, &_eye_depth_rb);
+	gl.glGenFramebuffers(1, &_gfbo);
+	gl.glGenFramebuffers(2, _g_move_fbo);
+	gl.glGenRenderbuffers(1, &_g_colour_rb);
+	gl.glGenVertexArrays(1, &_ground_vao);
+	gl.glGenBuffers(1, &_ground_vbo);
+	gl.glBindVertexArray(_ground_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _ground_vbo);
+	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), nullptr);
+	gl.glEnableVertexAttribArray(0);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<const void *>(2 * sizeof(float)));
+	gl.glEnableVertexAttribArray(1);
+	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<const void *>(4 * sizeof(float)));
+	gl.glEnableVertexAttribArray(2);
+	gl.glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, 9 * sizeof(float), reinterpret_cast<const void *>(8 * sizeof(float)));
+	gl.glEnableVertexAttribArray(3);
+	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_night_vao);
 	gl.glGenBuffers(1, &_night_vbo);
 	gl.glBindVertexArray(_night_vao);
@@ -1723,6 +1826,12 @@ void ForgetCard()
 	_card_textures.clear();
 	_card_buildings.clear();
 	_card_bytes = 0;
+	for (auto &[key, t] : _ground_textures) gl.glDeleteTextures(1, &t.name);
+	_ground_textures.clear();
+	if (_ground_atlas != 0) gl.glDeleteTextures(1, &_ground_atlas);
+	_ground_atlas = 0;
+	_ground_atlas_size = 0;
+	_ground_atlas_places.clear();
 }
 
 void EndCard()
@@ -1732,7 +1841,12 @@ void EndCard()
 		if (_fbo != 0) gl.glDeleteFramebuffers(1, &_fbo);
 		if (_eye_fbo != 0) gl.glDeleteFramebuffers(1, &_eye_fbo);
 		if (_bfbo != 0) gl.glDeleteFramebuffers(1, &_bfbo);
-		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb};
+		if (_gfbo != 0) gl.glDeleteFramebuffers(1, &_gfbo);
+		if (_g_move_fbo[0] != 0) gl.glDeleteFramebuffers(2, _g_move_fbo);
+		if (_ground_vbo != 0) gl.glDeleteBuffers(1, &_ground_vbo);
+		if (_ground_vao != 0) gl.glDeleteVertexArrays(1, &_ground_vao);
+		if (_ground_program.program != 0) gl.glDeleteProgram(_ground_program.program);
+		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb, _g_colour_rb};
 		for (GLuint rb : rbs) if (rb != 0) gl.glDeleteRenderbuffers(1, &rb);
 		if (_night_vbo != 0) gl.glDeleteBuffers(1, &_night_vbo);
 		if (_night_vao != 0) gl.glDeleteVertexArrays(1, &_night_vao);
@@ -2451,6 +2565,243 @@ void DrawBuildingsOnCard(std::span<ThreeDGpuBuildingPicture *const> pics)
 		at = end;
 	}
 	TrimCard();
+}
+
+/** The block of the ground drawn into, at least as big as asked (grown in steps). */
+bool GroundTargetOfSize(int w, int h)
+{
+	if (w <= _gfbo_w && h <= _gfbo_h) return true;
+	_gfbo_w = std::min(_max_target, (std::max(_gfbo_w, w) + 255) / 256 * 256);
+	_gfbo_h = std::min(_max_target, (std::max(_gfbo_h, h) + 255) / 256 * 256);
+	Step(fmt::format("ramec zeme plochy {}x{} (glRenderbufferStorage, glCheckFramebufferStatus)", _gfbo_w, _gfbo_h));
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, _g_colour_rb);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _gfbo_w, _gfbo_h);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _gfbo);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _g_colour_rb);
+	if (gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+		_gfbo_w = _gfbo_h = 0;
+		return false;
+	}
+	return w <= _gfbo_w && h <= _gfbo_h;
+}
+
+/** Send a rect of a texture's pixels (ThreeDGpuGroundTexture::pixels) to the texture bound, at x, y of it plus an offset. */
+void SendGroundRect(const ThreeDGpuGroundTexture &t, int x, int y, int w, int h, int to_x, int to_y)
+{
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, t.width);
+	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, to_x + x, to_y + y, w, h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, t.pixels + static_cast<size_t>(y) * t.width + x);
+	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+	_card_sent += static_cast<size_t>(w) * h * 4;
+}
+
+/** A texture of nearest texels, of a size, none of its pixels sent. */
+GLuint NewGroundTexture(int w, int h)
+{
+	GLuint name = 0;
+	gl.glGenTextures(1, &name);
+	gl.glBindTexture(GL_TEXTURE_2D, name);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+	return name;
+}
+
+/** A big texture of the ground on the card as it is now: sent whole the first time and in another generation, else only its rects drawn again. */
+const GroundTextureOnCard *GroundTextureOf(const ThreeDGpuGroundTexture &t)
+{
+	if (t.width <= 0 || t.height <= 0 || t.width > _max_texture || t.height > _max_texture || t.pixels == nullptr) return nullptr;
+	GroundTextureOnCard &g = _ground_textures[t.key];
+	if (g.name != 0 && g.generation != t.generation && t.from_generation != 0 && g.generation == t.from_generation) {
+		/* Placed anew over the map: what the card has moves to its place in the new one (the rest nothing), the rects
+		 * drawn again since sent after. Sent whole, a picture of tens of megabytes went over for every few frames of
+		 * turning. */
+		Step(fmt::format("zem plochy na karte posunuta {}x{} -> {}x{} o {},{}", g.w, g.h, t.width, t.height, t.from_x, t.from_y));
+		const GLuint moved = NewGroundTexture(t.width, t.height);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _g_move_fbo[1]);
+		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, moved, 0);
+		static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
+		gl.glDrawBuffers(1, colour_only);
+		gl.glDisable(GL_SCISSOR_TEST);
+		gl.glClearColor(0, 0, 0, 0);
+		gl.glClear(GL_COLOR_BUFFER_BIT);
+		gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _g_move_fbo[0]);
+		gl.glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g.name, 0);
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+		const int x0 = std::max(0, t.from_x), y0 = std::max(0, t.from_y);
+		const int x1 = std::min(t.width, t.from_x + g.w), y1 = std::min(t.height, t.from_y + g.h);
+		if (x0 < x1 && y0 < y1) gl.glBlitFramebuffer(x0 - t.from_x, y0 - t.from_y, x1 - t.from_x, y1 - t.from_y, x0, y0, x1, y1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+		gl.glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+		gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		gl.glDeleteTextures(1, &g.name);
+		g.name = moved;
+		g.w = t.width;
+		g.h = t.height;
+		g.generation = t.generation;
+		gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	} else if (g.name != 0 && (g.w != t.width || g.h != t.height)) {
+		gl.glDeleteTextures(1, &g.name);
+		g.name = 0;
+	}
+	if (g.name == 0) {
+		Step(fmt::format("zem plochy na kartu {}x{}", t.width, t.height));
+		g.name = NewGroundTexture(t.width, t.height);
+		g.w = t.width;
+		g.h = t.height;
+		g.generation = t.generation - 1;
+	} else {
+		gl.glBindTexture(GL_TEXTURE_2D, g.name);
+	}
+	if (g.generation != t.generation) {
+		SendGroundRect(t, 0, 0, t.width, t.height, 0, 0);
+		g.generation = t.generation;
+	} else {
+		for (const auto &[x, y, w, h] : t.changed) {
+			if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > t.width || y + h > t.height) continue;
+			SendGroundRect(t, x, y, w, h, 0, 0);
+		}
+	}
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	return &g;
+}
+
+/**
+ * A small texture of the ground in the atlas: its place, sent there the first time. False when the atlas is full
+ * (it is then started over) or the texture is bigger than it.
+ */
+bool GroundAtlasPlace(const ThreeDGpuGroundTexture &t, std::array<int, 4> &place)
+{
+	auto it = _ground_atlas_places.find(t.key);
+	if (it != _ground_atlas_places.end()) {
+		place = it->second;
+		return true;
+	}
+	if (_ground_atlas == 0) {
+		_ground_atlas_size = std::min(4096, _max_texture);
+		Step(fmt::format("atlas zeme plochy {}x{}", _ground_atlas_size, _ground_atlas_size));
+		_ground_atlas = NewGroundTexture(_ground_atlas_size, _ground_atlas_size);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		_ground_shelf_x = _ground_shelf_y = _ground_shelf_h = 0;
+	}
+	if (t.width <= 0 || t.height <= 0 || t.width > _ground_atlas_size || t.height > _ground_atlas_size || t.pixels == nullptr) return false;
+	if (_ground_shelf_x + t.width > _ground_atlas_size) {
+		_ground_shelf_y += _ground_shelf_h;
+		_ground_shelf_x = 0;
+		_ground_shelf_h = 0;
+	}
+	if (_ground_shelf_y + t.height > _ground_atlas_size) {
+		/* Full: started over, the textures of the block sent again as they come. */
+		_ground_atlas_places.clear();
+		_ground_shelf_x = _ground_shelf_y = _ground_shelf_h = 0;
+		return false;
+	}
+	place = {_ground_shelf_x, _ground_shelf_y, t.width, t.height};
+	gl.glBindTexture(GL_TEXTURE_2D, _ground_atlas);
+	SendGroundRect(t, 0, 0, t.width, t.height, place[0], place[1]);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	_ground_shelf_x += t.width;
+	_ground_shelf_h = std::max(_ground_shelf_h, t.height);
+	_ground_atlas_places[t.key] = place;
+	return true;
+}
+
+/**
+ * The ground of a block of the turned map laid by the card (ThreeDGpuDrawGround(); GPU point 3, the player 21. 10.:
+ * "do 3"): its textures sent where they changed, its triangles drawn in their order, the block read back.
+ */
+bool DrawGroundOnCard(ThreeDGpuGround &g)
+{
+	if (!_ground_program_ok || g.width <= 0 || g.height <= 0 || g.width > _max_target || g.height > _max_target || g.out == nullptr) return false;
+	/* Where each texture is: in its own (the kept picture of the ground; one such) or in the atlas. */
+	std::vector<std::array<float, 5>> where(g.textures.size());
+	GLuint big = 0;
+	for (int round = 0;; round++) {
+		bool full = false;
+		for (size_t i = 0; i < g.textures.size(); i++) {
+			const ThreeDGpuGroundTexture &t = g.textures[i];
+			if (!t.atlas) continue;
+			std::array<int, 4> place;
+			if (!GroundAtlasPlace(t, place)) {
+				full = true;
+				break;
+			}
+			where[i] = {static_cast<float>(place[0]), static_cast<float>(place[1]), static_cast<float>(place[2]), static_cast<float>(place[3]), 1.0f};
+		}
+		if (!full) break;
+		if (round > 0) return false;
+	}
+	for (size_t i = 0; i < g.textures.size(); i++) {
+		const ThreeDGpuGroundTexture &t = g.textures[i];
+		if (t.atlas) continue;
+		if (big != 0) return false;
+		const GroundTextureOnCard *on = GroundTextureOf(t);
+		if (on == nullptr) return false;
+		big = on->name;
+		where[i] = {0.0f, 0.0f, static_cast<float>(t.width), static_cast<float>(t.height), 0.0f};
+	}
+	std::vector<float> corners;
+	corners.reserve(g.triangles.size() * 27);
+	for (const ThreeDGpuGroundTriangle &tri : g.triangles) {
+		if (tri.texture >= where.size()) continue;
+		const std::array<float, 5> &w = where[tri.texture];
+		for (int k = 0; k < 3; k++) corners.insert(corners.end(), {tri.x[k], tri.y[k], tri.u[k], tri.v[k], w[0], w[1], w[2], w[3], w[4]});
+	}
+	Step(fmt::format("zem plochy {}x{}: {} trojuhelniku", g.width, g.height, corners.size() / 27));
+	if (!GroundTargetOfSize(g.width, g.height)) return false;
+	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _gfbo);
+	gl.glDrawBuffers(1, colour_only);
+	gl.glViewport(0, 0, g.width, g.height);
+	gl.glDisable(GL_DITHER);
+	gl.glDisable(GL_BLEND);
+	gl.glDisable(GL_DEPTH_TEST);
+	gl.glDisable(GL_CULL_FACE);
+	gl.glDisable(GL_SCISSOR_TEST);
+	const float clear[4] = {static_cast<float>((g.clear >> 16) & 0xFF) / 255.0f, static_cast<float>((g.clear >> 8) & 0xFF) / 255.0f, static_cast<float>(g.clear & 0xFF) / 255.0f, static_cast<float>(g.clear >> 24) / 255.0f};
+	gl.glClearColor(clear[0], clear[1], clear[2], clear[3]);
+	gl.glClear(GL_COLOR_BUFFER_BIT);
+	if (!corners.empty()) {
+		const GLuint p = _ground_program.program;
+		gl.glUseProgram(p);
+		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(g.width), static_cast<float>(g.height));
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_ground"), 0);
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_atlas"), 1);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, _ground_atlas);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, big);
+		gl.glBindVertexArray(_ground_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _ground_vbo);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 9));
+		gl.glBindVertexArray(0);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	Step(fmt::format("cteni zeme plochy zpet (glReadPixels), {}x{}", g.width, g.height));
+	/* The card's rows up are the block's rows down: read straight into the block, its rows as far apart as its pitch. */
+	gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	gl.glPixelStorei(GL_PACK_ROW_LENGTH, g.out_pitch);
+	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+	gl.glReadPixels(0, 0, g.width, g.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, g.out);
+	gl.glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	const GLenum error = gl.glGetError();
+	if (error != 0) {
+		Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor lays the ground", error);
+		if (error == GL_OUT_OF_MEMORY) ForgetCard();
+		return false;
+	}
+	return true;
 }
 
 /** A building of the view from the eyes on the card: put there the first time (GpuBuilding). */
@@ -3445,6 +3796,8 @@ void GpuThreadMain()
 				drawn = DrawEyeFrameOnCard(*job->frame);
 			} else if (job->eye != nullptr) {
 				drawn = DrawEyeOnCard(*job->eye);
+			} else if (job->ground != nullptr) {
+				drawn = DrawGroundOnCard(*job->ground);
 			} else if (!job->buildings.empty()) {
 				DrawBuildingsOnCard(job->buildings);
 				drawn = std::ranges::any_of(job->buildings, [](const ThreeDGpuBuildingPicture *p) { return p->drawn; });
@@ -3456,6 +3809,22 @@ void GpuThreadMain()
 			drawn = false;
 		}
 		const double ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+		if (job->ground != nullptr) {
+			/* The ground of a block, every frame: counted apart, in the diary only when the card could not lay it. */
+			if (!drawn && _diary_pictures < DIARY_PICTURES) {
+				_diary_pictures++;
+				Diary(fmt::format("zem plochy {}x{} kresli procesor ({:.1f} ms)", job->ground->width, job->ground->height, ms), true);
+			}
+			Diary("ceka", false);
+			lock.lock();
+			job->ok = drawn;
+			job->done = true;
+			_gpu_ground_ms += ms;
+			_gpu_grounds++;
+			if (!drawn) _gpu_grounds_failed++;
+			_gpu_done.notify_all();
+			continue;
+		}
 		if (_diary_pictures < DIARY_PICTURES) {
 			_diary_pictures++;
 			Diary(fmt::format("obrazek {} {} ({:.1f} ms)", _gpu_pictures + 1, drawn ? "hotov" : "kresli procesor", ms), true);
@@ -3529,6 +3898,24 @@ bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics)
 	if (pics.empty() || !ThreeDGpuAvailable()) return false;
 	GpuJob job{};
 	job.buildings = pics;
+	std::unique_lock lock(_gpu_mutex);
+	if (_gpu_state != GpuState::Ready) return false;
+	QueueGpuJob(job);
+	_gpu_wake.notify_one();
+	_gpu_done.wait(lock, [&job] { return job.done; });
+	return job.ok;
+}
+
+/**
+ * Lay the ground of a block of the turned map on the card, on whichever thread asks (it waits): read back into the
+ * block's pixels.
+ * @return false: not laid (no card, or more than it holds): the processor lays it
+ */
+bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
+{
+	if (!ThreeDGpuAvailable()) return false;
+	GpuJob job{};
+	job.ground = &ground;
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
 	QueueGpuJob(job);
@@ -3696,6 +4083,10 @@ std::string ThreeDGpuTimes()
 	std::lock_guard lock(_gpu_mutex);
 	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
 			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load());
+	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
+	_gpu_ground_ms = 0;
+	_gpu_grounds = 0;
+	_gpu_grounds_failed = 0;
 	_card_sent = 0;
 	_card_trims = 0;
 	_gpu_ms = 0;
@@ -3717,6 +4108,7 @@ bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }
 bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const>) { return false; }
+bool ThreeDGpuDrawGround(ThreeDGpuGround &) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }
 std::string ThreeDGpuTimes() { return "card: none"; }

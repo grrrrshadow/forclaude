@@ -153,6 +153,42 @@ struct ThreeDGpuBuildingPicture {
 };
 
 /**
+ * A texture of the ground of the turned map on the card (ThreeDGpuGround): the kept picture of the ground facing north
+ * (TurnedGround of viewport.cpp), or the picture of a tile with a foundation. The card keeps it by its key; the kept
+ * picture of the ground sends only its rects drawn again since it was last laid by the card.
+ */
+struct ThreeDGpuGroundTexture {
+	uint64_t key = 0;                 ///< the same key, the same texture on the card
+	uint64_t generation = 0;          ///< another generation: its pixels sent whole, unless the card has the one before
+	uint64_t from_generation = 0;     ///< a generation the card may have: moved to from_x, from_y of this one, then the rects sent
+	int from_x = 0, from_y = 0;
+	int width = 0, height = 0;
+	const uint32_t *pixels = nullptr; ///< Colour::data, top row first, width a row
+	bool atlas = false;               ///< a small one, kept among others in one texture on the card (a tile's)
+	std::vector<std::array<int, 4>> changed; ///< x, y, w, h drawn again since the card last had it (or since from_generation)
+};
+
+/** A triangle of the ground: its corners where they land in the block and where they are in their texture, both in pixels. */
+struct ThreeDGpuGroundTriangle {
+	float x[3], y[3], u[3], v[3];
+	uint32_t texture; ///< in ThreeDGpuGround::textures
+};
+
+/**
+ * The ground of a block of the turned map laid by the card (GPU point 3; DrawTexturedTriangle() of viewport.cpp): the
+ * triangles in their order, each over those before, every pixel at its middle the texel under it -- one its texture has
+ * nothing for (0) takes the nearest drawn within three --, read back into the block's pixels.
+ */
+struct ThreeDGpuGround {
+	int width = 0, height = 0;   ///< the block, pixels
+	uint32_t clear = 0;          ///< what the block holds where no ground is
+	std::vector<ThreeDGpuGroundTexture> textures;
+	std::vector<ThreeDGpuGroundTriangle> triangles;
+	uint32_t *out = nullptr;     ///< the block's pixels, top row first, read back into
+	int out_pitch = 0;           ///< pixels a row of them
+};
+
+/**
  * A building of the view from the eyes on the card (ThreeDGpuEyePicture): its triangles as the processor draws them for
  * the view (the houses' job of the eye's frame, viewport.cpp) -- each pixel its texture's texel, none where the texel is
  * 0 or off the texture, shaded by its triangle's light (its corners' mean), the side facing away left out.
@@ -309,6 +345,7 @@ bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics);
+bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);
