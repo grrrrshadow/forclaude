@@ -2121,7 +2121,7 @@ struct PictureMade {
 /** Only so many wait to be made: the oldest asked for go when more come (a vehicle long gone round its curve). */
 static constexpr size_t PICTURES_WAITING = 128;
 /** So many the thread hands the graphics card at once (ThreeDGpuRender()): drawn side by side, read back once. */
-static constexpr size_t PICTURES_AT_ONCE = 64;
+static constexpr size_t PICTURES_AT_ONCE = 16; ///< (not more: the main thread's drawing waits for a job in hand, QueueGpuJob())
 
 /**
  * The pictures of objects drawn by the graphics card all at once (ThreeDGpuRender(); the player, 20. 10.: "fix the
@@ -2277,6 +2277,31 @@ static bool AskForPicture(PictureToMake &&p)
 	return true;
 }
 
+/** Drawing the map (ViewportDoDraw()): a picture not made yet has the nearest made stand in (ObjectPicture()). */
+bool _three_d_pictures_stand_in = false;
+/** The pictures given to stand in since the pictures last came, how many, and the places drawn with them, drawn again when they come. */
+static std::set<const ThreeDModelPicture *> _stand_in_pictures;
+static uint64_t _stand_ins_given = 0;
+static std::vector<std::array<double, 6>> _boxes_owed_pictures;
+
+/** How many pictures stood in so far: a building drawn with one has its box drawn again when the pictures come (OweThreeDPictureBox()). */
+uint64_t ThreeDStandInsGiven()
+{
+	return _stand_ins_given;
+}
+
+/** Whether a picture given was one standing in for another not made yet (ObjectPicture()). */
+bool ThreeDPictureStandsIn(const ThreeDModelPicture *pic)
+{
+	return _stand_in_pictures.contains(pic);
+}
+
+/** A box of the world drawn with a picture standing in: drawn again when the pictures come (TakePicturesMade()). */
+void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1)
+{
+	if (_boxes_owed_pictures.size() < 4096) _boxes_owed_pictures.push_back({x0, y0, x1, y1, static_cast<double>(z0), static_cast<double>(z1)});
+}
+
 /**
  * Keep the pictures the thread has made (the main thread).
  * @return whether there were any
@@ -2297,7 +2322,13 @@ static bool TakePicturesMade()
 		e.used = ++_object_pictures_clock;
 		e.picture = std::move(made.picture);
 	}
-	return !done.empty();
+	if (done.empty()) return false;
+	/* The places drawn with pictures standing in drawn again: with these, or with the nearest again till theirs come. */
+	std::vector<std::array<double, 6>> owed;
+	owed.swap(_boxes_owed_pictures);
+	_stand_in_pictures.clear();
+	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]));
+	return true;
 }
 
 /** The rig ('test3d dokresli'): the pictures the thread made kept now, not at the next round of the window's timer. */
@@ -2396,7 +2427,11 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	float f = cam_step * static_cast<float>(M_PI) / 180.0f;
 	float along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
 	const float pxm = PXM_16X / (1 << to_underlying(zoom));
-	if (_pictures_collected != nullptr || _object_picture_may_wait) {
+	/* Drawing the map (_three_d_pictures_stand_in): the drawing waits for no card -- the nearest made of the object stands
+	 * in, the thread makes this one and its place is drawn again when it comes (OweThreeDPictureBox()). Only the first of
+	 * an object at a zoom is made at once. */
+	const bool stand_in = _three_d_pictures_stand_in && !_object_picture_may_wait && !_three_d_load_at_once;
+	if (_pictures_collected != nullptr || _object_picture_may_wait || stand_in) {
 		PictureToMake p;
 		p.key = key;
 		p.obj = obj;
@@ -2417,25 +2452,30 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 		p.lights = lights;
 		p.state = fade;
 		p.walk = walk;
+		/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
+		const ThreeDModelPicture *nearest = nullptr;
+		int best = INT_MAX;
+		for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
+				n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
+			if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
+			auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
+			const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
+			if (off < best) {
+				best = off;
+				nearest = &n->second.picture;
+			}
+		}
+		if (stand_in && nearest != nullptr && AskForPicture(std::move(p))) {
+			_stand_ins_given++;
+			_stand_in_pictures.insert(nearest);
+			return nearest;
+		}
 		if (_pictures_collected != nullptr) {
 			/* Collected, made with the others after (MakeThreeDPicturesAtOnce()). */
 			if (_pictures_collected_keys.insert(key).second) _pictures_collected->push_back(std::move(p));
 			return nullptr;
 		}
-		if (AskForPicture(std::move(p))) {
-			/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
-			const ThreeDModelPicture *nearest = nullptr;
-			int best = INT_MAX;
-			for (auto n = _object_pictures.lower_bound(std::make_tuple(obj, to_underlying(zoom), INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, INT_MIN, uint64_t{0}));
-					n != _object_pictures.end() && std::get<0>(n->first) == obj && std::get<1>(n->first) == to_underlying(zoom); ++n) {
-				if (std::get<4>(n->first) != std::get<4>(key) || (std::get<5>(n->first) & 0xFFFF) != (std::get<5>(key) & 0xFFFF) || n->second.picture.width <= 0) continue;
-				auto apart = [](int a, int b) { const int d = std::abs(a - b) % 360; return std::min(d, 360 - d); };
-				const int off = apart(std::get<2>(n->first), cam_step) * 4 + apart(std::get<3>(n->first), world_step);
-				if (off < best) {
-					best = off;
-					nearest = &n->second.picture;
-				}
-			}
+		if (_object_picture_may_wait && AskForPicture(std::move(p))) {
 			_object_picture_waited = true;
 			return nearest;
 		}

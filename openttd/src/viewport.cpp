@@ -3053,6 +3053,11 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 	int right = left + pic->width * scale, bottom = top + pic->height * scale;
 	if (left >= _vd.dpi.left + _vd.dpi.width || right <= _vd.dpi.left || top >= _vd.dpi.top + _vd.dpi.height || bottom <= _vd.dpi.top) return;
 	if (_turned_vehicle_pictures.size() >= 32000) return;
+	if (ThreeDPictureStandsIn(pic)) {
+		/* Drawn with another standing in (ObjectPicture()): where it reaches, drawn again when its own comes. */
+		const int reach = std::max(pic->width, pic->height) * scale / ZOOM_BASE + 2;
+		OweThreeDPictureBox(std::min(xmin, ax) - reach, std::min(ymin, ay) - reach, std::max(xmax, ax) + reach, std::max(ymax, ay) + reach, std::min(zmin, az) - reach, std::max(zmax, az) + 2 * reach);
+	}
 
 	ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
 	ps.x = pt.x;
@@ -3662,8 +3667,14 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 		RealizeNorthRect(frame, UnScaleByZoom(l - frame.left, frame.zoom) - 2, UnScaleByZoom(t - frame.top, frame.zoom) - 2, UnScaleByZoom(r - frame.left, frame.zoom) + 3, UnScaleByZoom(b - frame.top, frame.zoom) + 3);
 	}
 	const ObjectLay lay = MapLay(frame);
+	const uint64_t stood_in = ThreeDStandInsGiven();
 	if (to.ground != nullptr) DrawTurnedObjectPart(frame, lay, to.ground, to.origin, to.z, to.ground->PaintAt(to.origin), {});
 	DrawTurnedObjectPart(frame, lay, to.obj, to.origin, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);
+	if (ThreeDStandInsGiven() != stood_in) {
+		/* A figure or a plant of it drawn with another standing in: the building drawn again when its own comes. */
+		const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
+		OweThreeDPictureBox(ps.xmin - over, ps.ymin - over, ps.xmax + over, ps.ymax + over, ps.zmin, ps.zmax + figures);
+	}
 	_turned_times.models += TurnedNow() - t0;
 }
 
@@ -4774,6 +4785,8 @@ static void DrawNight(bool turned)
 
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
+	/* The map's 3D pictures not made yet: the nearest made stands in, the thread makes them; the drawing waits for no card. */
+	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
 	RoundTrackPass round_track_pass(IsViewportTurned(vp));
 	_vd.dpi.zoom = vp.zoom;

@@ -411,6 +411,22 @@ std::condition_variable _gpu_wake;  ///< the card's thread: a job, or the end
 std::condition_variable _gpu_done;  ///< those asking: a job done, or the card ready (or not)
 GpuState _gpu_state = GpuState::NotStarted;
 std::deque<GpuJob *> _gpu_jobs;
+/** The thread that draws the game's windows (the first, the main thread): its jobs first, the others after (QueueGpuJob()). */
+const std::thread::id _gpu_main_thread = std::this_thread::get_id();
+
+/**
+ * A job for the card, under _gpu_mutex: the main thread's first -- the drawing of the screen waits for it, the cursor
+ * and the keys with it --, else after those waiting (the pictures of the thread in the background, the frames from
+ * the eyes).
+ */
+void QueueGpuJob(GpuJob &job)
+{
+	if (std::this_thread::get_id() == _gpu_main_thread) {
+		_gpu_jobs.push_front(&job);
+	} else {
+		_gpu_jobs.push_back(&job);
+	}
+}
 bool _gpu_stop = false;
 std::thread _gpu_thread;
 /* The video driver's OpenGL (ThreeDGpuVideoContext()): an EGL display and context, or a WGL device and context. The
@@ -3219,7 +3235,7 @@ bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics)
 	GpuJob job{pics};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
-	_gpu_jobs.push_back(&job);
+	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;
@@ -3236,7 +3252,7 @@ bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic)
 	GpuJob job{{}, &pic};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
-	_gpu_jobs.push_back(&job);
+	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;
@@ -3252,7 +3268,7 @@ bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame)
 	GpuJob job{{}, nullptr, &frame};
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
-	_gpu_jobs.push_back(&job);
+	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;
@@ -3274,7 +3290,7 @@ bool ThreeDGpuReadShown(uint32_t texture, int width, int height, std::vector<uin
 	job.read = &read;
 	std::unique_lock lock(_gpu_mutex);
 	if (_gpu_state != GpuState::Ready) return false;
-	_gpu_jobs.push_back(&job);
+	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;

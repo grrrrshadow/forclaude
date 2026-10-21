@@ -88,6 +88,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Podezření: hlavní vlákno čeká na kartu (fronta karty je jedna: dávky vlákna obrázků, snímky z očí, obrázky
   hlavního vlákna za nimi), nebo telefon vytěžují vlákna. **Domluvit:** kdy to je (plocha / okno z očí / otáčení),
   a jestli to zmizí s vypnutou kartou (Nastavení › Grafika).
+- Hráč odsouhlasil pořadí: 1) hlavní vlákno nikdy nečeká na kartu, 2) domy otočené plochy na kartu, 3) terén
+  plochy na kartu, 4) plocha bez čtení zpět, 5) kosti.
+- **Hotovo – bod 1, hlavní vlákno na kartu nečeká:** při kreslení plochy (`ViewportDoDraw()`) se obrázek, který ještě
+  není, zastoupí nejbližším hotovým (jiný úhel, jiný snímek) a vlákno udělá přesný; jeho místo (budova, postava,
+  auto hry, efekt) se překreslí, až přijde (`OweThreeDPictureBox()`). Hned se dělá jen úplně první obrázek objektu
+  při daném přiblížení. Úlohy hlavního vlákna jdou na kartě přede všemi ostatními (`QueueGpuJob()`), dávky vlákna
+  obrázků jsou nejvýš 16. Rig, otočka plochy při 4x: hlavní vlákno udělalo 9 obrázků (dřív 1144), vlákno 1099,
+  snímek medián 94 ms (dřív 198); po zastavení a dokreslení je plocha na pixel stejná jako nakreslená rovnou.
+  Rig: po otočení před `test3d snimek` dát `test3d dokresli` a `smycka`, jinak jsou na snímku zástupci.
 
 ## 20. 10. – #279 se otáčí plynuleji; co jsem po pádech #285 vypnul a nevrátil
 
