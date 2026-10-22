@@ -29,6 +29,8 @@
 
 #include "safeguards.h"
 
+bool FirstPersonWalkerAt(double &x, double &y);
+
 namespace {
 
 constexpr uint MAX_WITCHES = 3;           ///< at most so many in the air at once
@@ -40,6 +42,7 @@ constexpr double TURN = 0.8 * M_PI / 180; ///< how far a witch turns in a tick, 
 constexpr double CLIMB_M = 0.4;           ///< how far she rises or sinks in a tick, metres
 constexpr double FALLBACK_STEP_M = 0.12;  ///< metres a tick of her true size, when her animation does not say ("krok_m")
 constexpr double APPROACH_TILES = 14.0;   ///< how far from a town she comes from
+constexpr uint WALKER_TOWN_TILES = 40;    ///< the walker's town, this near it (Manhattan): most come to it
 constexpr float FACING_STEP = 10.0f;      ///< her pictures every so many degrees she turns (each made on the thread)
 /** The girls at a stop are drawn twice their size on the map, as they are from the eyes: a witch "as big as them" so. */
 constexpr float EYE_OF_MAP = 0.5f;
@@ -337,7 +340,10 @@ const IntervalTimer<TimerGameTick> _witches_timer({TimerGameTick::Priority::None
 	if (_witches.size() < Wanted() && (_witches.empty() || now - _last_came >= NEXT_TICKS)) {
 		const std::vector<ThreeDWitch> &kinds = GetThreeDWitches();
 		const ThreeDWitch &c = kinds[InteractiveRandomRange(static_cast<uint32_t>(kinds.size()))];
-		if (const Town *t = PickTown(TownID::Invalid()); t != nullptr) {
+		/* With the walker out, mostly to its town (the player, 22. 10.: the ghost and the witches were never met). */
+		double wx = 0, wy = 0;
+		const Town *near = FirstPersonWalkerAt(wx, wy) && InteractiveRandomRange(3) != 0 ? ClosestTownFromTile(TileVirtXY(static_cast<int>(wx), static_cast<int>(wy)), WALKER_TOWN_TILES) : nullptr;
+		if (const Town *t = near != nullptr ? near : PickTown(TownID::Invalid()); t != nullptr) {
 			/* From some way off a town, towards it. */
 			double mx, my;
 			TownMiddle(t, mx, my);

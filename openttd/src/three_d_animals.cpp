@@ -50,6 +50,7 @@
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (first_person_gui.cpp). */
 bool FirstPersonWalkerAt(double &x, double &y);
+double FirstPersonWalkerHeading();
 
 namespace {
 
@@ -60,7 +61,7 @@ constexpr uint STREET_KEPT = 5;            ///< so many in the streets about the
 constexpr uint DOOR_KEPT = 2;              ///< before the doors
 constexpr uint ROOF_KEPT = 4;              ///< on the roofs
 constexpr uint ROUND_KEPT = 5;             ///< in the land about the towns
-constexpr uint GHOSTS_KEPT = 2;            ///< ghosts at night
+constexpr uint GHOSTS_KEPT = 3;            ///< ghosts ("kdy": at night, by day, or always)
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
 constexpr uint64_t SELLER_TICKS = 20000;   ///< a seller stays so long (about nine minutes) ...
 constexpr uint64_t SELLER_AWAY_TICKS = 4000; ///< ... and the next comes after about so long
@@ -71,6 +72,9 @@ constexpr double GAP_M = 1.0;              ///< and strikes from its body this f
 constexpr double FLEE_M = 25.0;            ///< one struck that does not fight runs this far away
 constexpr double WANDER_TILES = 2.5;       ///< one wandering keeps this near its place
 constexpr double FOLLOW_M = 2.0;           ///< the walker's dog keeps this far beside it
+constexpr double AHEAD_M = 5.0;            ///< and this far before it, the walker walking (PAR14-PRO-HRU.md: 4-6 m, to be seen)
+constexpr double NEAR_REST_M = 10.0;       ///< resting, it stays where it is this near the walker standing
+constexpr uint64_t STILL_TICKS = 20;       ///< the walker not moving so long: standing
 constexpr double PAVEMENT = 5.5;           ///< the pavement from the middle of a road tile, world units (as Mat's)
 constexpr float EYE_OF_MAP = 0.5f;         ///< the eye sees them at their true size, the map at "meritko" (2 as the girls)
 
@@ -122,9 +126,14 @@ struct Beast {
 	size_t way_at = 0;
 	double way_tx = 0, way_ty = 0;
 	uint64_t way_made = 0;
+	std::string next_pose; ///< the pose it goes into when the one it is in (sitting down, getting up) is done
 };
 
 std::vector<Beast> _beasts;
+bool _walker_moving = false;      ///< the walker walked a moment ago (its dog goes before it; standing, it rests)
+double _walker_heading = 0;       ///< the way the walker faces, radians
+double _walker_last_x = 0, _walker_last_y = 0; ///< where the walker was the tick before
+uint64_t _walker_moved = 0;       ///< the tick the walker last moved
 uint _damage = 0;                 ///< the health they took from the walker since the view last asked
 uint64_t _next_seller = 0;        ///< when a seller may come again
 std::vector<ThreeDDogSeller> _sellers_seen; ///< ThreeDDogSellerNear(): the sellers as they are now
@@ -358,6 +367,103 @@ bool Fights(const Beast &b, const ThreeDAnimal &a)
 	return a.temper == ThreeDAnimal::Temper::Attacks || b.angry;
 }
 
+/** Whether a pose is of sitting or lying, or going into one: it gets up before it goes anywhere. */
+bool Down(std::string_view pose)
+{
+	return pose == "sedi" || pose == "sedani" || pose == "lezi" || pose == "lehani";
+}
+
+/**
+ * The walker's dog (the player, 19. 10., PROSBA-PAR14.md point 1: "the dogs will run before me; when I stand they sit
+ * quietly; when I set off, the dog sets off before me"; "when I stop it stops too and sits, lies, wags"): the walker
+ * walking, it goes before it the way it goes, running to get there; the walker standing, it stops near it and rests,
+ * now sitting, now lying, now looking about (its poses "sedi", "lezi", "klid", the colleague's carried over between the
+ * dogs), sitting down and getting up as its poses "sedani", "lehani", "vstavani", "vstavani_lezi" show; setting off, it
+ * gets up first. A dog without those poses stands.
+ */
+void Follow(Beast &b, const ThreeDAnimal &a, uint64_t now, double wx, double wy, double dist_m, std::string_view walk)
+{
+	if (dist_m > 60.0) {
+		/* Left far behind (the walker got into a vehicle, went off): it comes along. */
+		b.x = wx + FOLLOW_M * OBJECT_UNITS_PER_METRE;
+		b.y = wy;
+		if (!a.flies) NavNearestWalkable(b.x, b.y, 1);
+		b.way.clear();
+		b.next_pose.clear();
+		return;
+	}
+	/* Sitting down, lying down or getting up: that first. */
+	if (!b.next_pose.empty()) {
+		if (!PoseDone(b, now)) return;
+		SetPose(b, b.next_pose, now);
+		b.next_pose.clear();
+	}
+	const bool go = _walker_moving || dist_m > NEAR_REST_M;
+	if (go && Down(b.pose)) {
+		const bool lying = b.pose == "lezi" || b.pose == "lehani";
+		const std::string_view up = lying ? PoseOf(a, {"vstavani_lezi", "vstavani"}) : PoseOf(a, {"vstavani"});
+		if (!up.empty()) {
+			SetPose(b, up, now, 1.0, true);
+			b.next_pose = std::string(walk);
+			return;
+		}
+	}
+	if (go) {
+		/* Before the walker, the way it faces; standing, before it too, where it is seen. */
+		const double gx = wx + std::cos(_walker_heading) * AHEAD_M * OBJECT_UNITS_PER_METRE, gy = wy + std::sin(_walker_heading) * AHEAD_M * OBJECT_UNITS_PER_METRE;
+		const double gap_m = std::hypot(gx - b.x, gy - b.y) / OBJECT_UNITS_PER_METRE;
+		if (gap_m < 0.6) {
+			/* There: along with the walker, the way it goes. */
+			b.heading = _walker_heading;
+			SetPose(b, _walker_moving ? walk : RestPose(b, a), now, 1.3);
+			return;
+		}
+		const bool far = gap_m > 3.0 && a.Has("beh");
+		const std::string_view pose = far ? std::string_view("beh") : walk;
+		SetPose(b, pose, now, far ? 1.0 : 1.3);
+		/* As fast as it has to: past the walker to before it, and not behind it running. */
+		const double speed = std::max(Speed(b, pose, 0.03), std::min(gap_m * 0.08, 0.35));
+		/* Straight there where nothing stands between (the place moves with the walker every tick: a way found to
+		 * where it was is behind it already); round what stands between else. */
+		if (a.flies || NavStraight(b.x, b.y, gx, gy)) {
+			b.way.clear();
+			StepTo(b, gx, gy, speed);
+		} else {
+			WalkTo(b, gx, gy, speed, now, a.flies);
+		}
+		b.until = now + 60 + InteractiveRandomRange(120);
+		return;
+	}
+	/* The walker stands: so does the dog, looking at it; now and then it sits, lies down, gets up, looks about. */
+	b.heading = std::atan2(wy - b.y, wx - b.x);
+	if (b.pose == walk || b.pose == "beh") SetPose(b, PoseOf(a, {"klid", "stoji"}), now);
+	if (now < b.until) return;
+	b.until = now + 200 + InteractiveRandomRange(400);
+	const bool sits = b.pose == "sedi", lies = b.pose == "lezi";
+	std::vector<std::string_view> next;
+	if (a.Has("sedi") && !sits) next.push_back("sedi");
+	if (a.Has("lezi") && !lies) next.push_back("lezi");
+	if (a.Has("klid") && b.pose != "klid") next.push_back("klid");
+	if (next.empty()) return;
+	const std::string_view want = next[InteractiveRandomRange(static_cast<uint32_t>(next.size()))];
+	/* From sitting or lying, up first; then down into the next, as its poses show. */
+	if (sits || lies) {
+		const std::string_view up = lies ? PoseOf(a, {"vstavani_lezi", "vstavani"}) : PoseOf(a, {"vstavani"});
+		if (!up.empty() && want == "klid") {
+			SetPose(b, up, now, 1.0, true);
+			b.next_pose = std::string(want);
+			return;
+		}
+	}
+	const std::string_view into = want == "sedi" ? PoseOf(a, {"sedani"}) : want == "lezi" ? PoseOf(a, {"lehani"}) : std::string_view{};
+	if (!into.empty() && !sits && !lies) {
+		SetPose(b, into, now, 1.0, true);
+		b.next_pose = std::string(want);
+		return;
+	}
+	SetPose(b, want, now);
+}
+
 void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double wx, double wy)
 {
 	const double dist_m = walker ? std::hypot(wx - b.x, wy - b.y) / OBJECT_UNITS_PER_METRE : 1e9;
@@ -444,33 +550,9 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			break;
 		}
 
-		case State::Follow: {
-			/* The walker's dog: a little way from it on the side it is on; walking to it, running when it is far; still near it. */
-			if (!walker) break;
-			const double d = std::max(1e-6, dist_m * OBJECT_UNITS_PER_METRE);
-			const double gx = wx + (b.x - wx) / d * FOLLOW_M * OBJECT_UNITS_PER_METRE, gy = wy + (b.y - wy) / d * FOLLOW_M * OBJECT_UNITS_PER_METRE;
-			const double gap_m = std::hypot(gx - b.x, gy - b.y) / OBJECT_UNITS_PER_METRE;
-			if (dist_m > 60.0) {
-				/* Left far behind (the walker got into a vehicle, went off): it comes along. */
-				b.x = wx + FOLLOW_M * OBJECT_UNITS_PER_METRE;
-				b.y = wy;
-				if (!a.flies) NavNearestWalkable(b.x, b.y, 1);
-				b.way.clear();
-				break;
-			}
-			if (gap_m < 0.5) {
-				SetPose(b, PoseOf(a, {"klid", "sedi"}), now);
-				if (dist_m < 8.0) b.heading = std::atan2(wy - b.y, wx - b.x);
-			} else {
-				const bool far = gap_m > 6.0 && a.Has("beh");
-				const std::string_view pose = far ? std::string_view("beh") : walk;
-				SetPose(b, pose, now, far ? 1.0 : 1.3);
-				/* As fast as it has to, so that it does not drop behind the walker running. */
-				const double speed = std::max(Speed(b, pose, 0.03), std::min(gap_m * 0.06, 0.25));
-				WalkTo(b, gx, gy, speed, now, a.flies);
-			}
+		case State::Follow:
+			if (walker) Follow(b, a, now, wx, wy, dist_m, walk);
 			break;
-		}
 
 		case State::Dying:
 			SetPose(b, "smrt", now);
@@ -509,7 +591,7 @@ const ThreeDAnimal *PickKind(const Town *t, TileIndex tile, uint8_t where, std::
 	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
 		if ((a.places & where) == 0 || a.sold) continue;
 		if (std::ranges::find(kinds, a.kind) == kinds.end()) continue;
-		if (a.night && !night) continue;
+		if (!a.OutNow(night)) continue;
 		if (!TownFits(t, tile, a)) continue;
 		fit.push_back(&a);
 	}
@@ -525,7 +607,7 @@ Beast &Put(const ThreeDAnimal &a, Place place, double x, double y, double up, do
 	b.place = place;
 	b.x = b.home_x = b.tx = x;
 	b.y = b.home_y = b.ty = y;
-	b.up = up;
+	b.up = up + a.hover_m * OBJECT_HEIGHT_PER_METRE;
 	b.heading = heading;
 	b.born = now;
 	b.health = HealthOf(a);
@@ -680,7 +762,7 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			/* About the town (the mushroom warrior: about the clay towns, on their land), or in its streets (Billy). */
 			const bool street = InteractiveRandomRange(2) == 0;
 			if (street ? !PickPavement(t, middle, x, y) : !PickLand(t, middle, true, x, y)) return false;
-			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), street ? ThreeDAnimal::STREET : ThreeDAnimal::ROUND, {ThreeDAnimal::Kind::Ghost}, true);
+			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), street ? ThreeDAnimal::STREET : ThreeDAnimal::ROUND, {ThreeDAnimal::Kind::Ghost}, night);
 			if (a == nullptr) return false;
 			Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
 			return true;
@@ -737,6 +819,13 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 	double wx = 0, wy = 0;
 	const bool walker = FirstPersonWalkerAt(wx, wy);
 	const bool night = IsNightNow();
+	if (walker) {
+		if (std::hypot(wx - _walker_last_x, wy - _walker_last_y) > 0.01) _walker_moved = now;
+		_walker_last_x = wx;
+		_walker_last_y = wy;
+		_walker_moving = now - _walker_moved < STILL_TICKS;
+		_walker_heading = FirstPersonWalkerHeading();
+	}
 	KeepPet(walker, wx, wy, now);
 
 	for (auto it = _beasts.begin(); it != _beasts.end();) {
@@ -744,7 +833,7 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		const ThreeDAnimal *a = KindOf(b);
 		const TileIndex at = TileVirtXY(static_cast<int>(std::clamp(b.x, 0.0, (Map::SizeX() - 1.0) * TILE_SIZE)), static_cast<int>(std::clamp(b.y, 0.0, (Map::SizeY() - 1.0) * TILE_SIZE)));
 		const bool gone = a == nullptr || (b.place != Place::Pet && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
-				(b.place == Place::Ghost && !night) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle);
+				(b.place == Place::Ghost && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle);
 		if (gone) {
 			if (a != nullptr) MarkDirty(b, *a);
 			if (b.place == Place::Seller) _next_seller = now + SELLER_AWAY_TICKS / 2 + InteractiveRandomRange(SELLER_AWAY_TICKS);
@@ -773,7 +862,7 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 	};
 	const Wanted wanted[] = {
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
-		{Place::Ghost, night ? GHOSTS_KEPT : 0u}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u},
+		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u},
 	};
 	/* One a time, the place picked in turn. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];

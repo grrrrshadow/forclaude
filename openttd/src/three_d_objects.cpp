@@ -78,6 +78,8 @@ static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objec
 static std::vector<ThreeDCreature> _creatures;
 /** The witches of the indices ("druh": "carodejnice"). */
 static std::vector<ThreeDWitch> _witches;
+/** The night flyers an index of ours takes out of the sky ("nahrazuje": the colleague's ghost floats along the streets instead). */
+static std::set<std::string, std::less<>> _witches_replaced;
 /** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 /** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
@@ -2727,7 +2729,7 @@ static void ReadThreeDVehicleObjects()
 							w.torch_angle = std::clamp(lights.at("svitilna").value("uhel", 0.0f), 1.0f, 120.0f);
 						}
 					}
-					_witches.push_back(std::move(w));
+					if (!_witches_replaced.contains(w.name)) _witches.push_back(std::move(w));
 					continue;
 				}
 				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac"));
@@ -2774,6 +2776,7 @@ static void ReadThreeDVehicleObjects()
 						a.climate = climate == "mirne" ? ThreeDAnimal::TEMPERATE : climate == "poust" ? ThreeDAnimal::DESERT : climate == "subarkticke" ? ThreeDAnimal::ARCTIC : 0;
 						a.theme = ParseIndexTheme(e);
 						a.night = e.value("kdy", std::string()) == "noc";
+						a.day = e.value("kdy", std::string()) == "den";
 						a.sold = e.value("prodej", false);
 						a.flies = e.value("leta", false);
 						a.price = std::clamp(e.value("cena", 0), 0, 10000000);
@@ -2781,6 +2784,14 @@ static void ReadThreeDVehicleObjects()
 							for (int k = 0; k < 3; k++) a.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
 						}
 						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
+						a.hover_m = std::clamp(e.value("vyska_m", 0.0f), 0.0f, 50.0f);
+						/* In place of a night flyer of the indices (the player, 22. 10.: "the ghost in the bedsheet should not
+						 * attack, it should float along the street like the walkers"): that one out of the sky. */
+						if (e.contains("nahrazuje") && e.at("nahrazuje").is_string()) {
+							const std::string replaced = e.at("nahrazuje").get<std::string>();
+							_witches_replaced.insert(replaced);
+							std::erase_if(_witches, [&](const ThreeDWitch &w) { return w.name == replaced; });
+						}
 						if (e.contains("nazev") && e.at("nazev").is_object()) {
 							a.title_cs = e.at("nazev").value("cs", std::string());
 							a.title_en = e.at("nazev").value("en", a.title_cs);
@@ -3467,6 +3478,7 @@ void ResetThreeDVehicleObjects()
 	_three_d_theme_trees_night.clear();
 	_creatures.clear();
 	_witches.clear();
+	_witches_replaced.clear();
 	_animals.clear();
 	_mushrooms.clear();
 	_thing_sounds.clear();

@@ -372,21 +372,21 @@
   "vaha_kg": 0.6,
   "rozmer_m": {
    "x": [
-    -0.053,
-    0.053
+    -0.076,
+    0.022
    ],
    "y": [
-    -0.058,
-    0.069
+    -0.052,
+    0.067
    ],
    "z": [
     0.0,
-    0.83
+    0.849
    ]
   },
-  "trojuhelniku": 1576,
-  "autor": "grrrrf: vlastní model (predmety/noc_predmety.py); zvuk torch_out.wav z OpenMW Example Suite (CC0)",
-  "licence": "GPL-2.0 (vlastní geometrie), zvuk CC0",
+  "trojuhelniku": 2406,
+  "autor": "Torch stick, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/torch-stick-d8eadee1a5c14483aade99b1fe5bc150) s naším plamenem, převod predmety/par14_predmety.py bez renderu; zvuk torch_out.wav z OpenMW Example Suite (CC0)",
+  "licence": "CC BY 4.0 (uvést DJMaesen; změny: zmenšená na 0,65 m, plamen náš), zvuk CC0",
   "zvuky": {
    "zhasnuti": "pochoden_zhasnuti.wav"
   },
@@ -402,12 +402,12 @@
     0.18
    ],
    "svetlo": [
-    0.0,
-    0.0,
-    0.68
+    -0.027,
+    0.002,
+    0.705
    ]
   },
-  "poznamka": "pochodeň 0,62 m: dřevěná násada, železný kroužek, omotaná hlava; plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v plameni (teplá oranžová, dosah kolem 8 m), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo)"
+  "poznamka": "pochodeň 0,65 m z modelu Torch stick (hráč: „tady je pochodeň“; Example Suite pochodeň neměla, jen zvuk zhasnutí): násada a omotaná hlava modelu, nahoře náš plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v plameni (teplá oranžová, dosah kolem 8 m), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo); glb z gltfpacku"
  },
  {
   "soubor": "lucerna.glb",
@@ -454,5 +454,35 @@
    ]
   },
   "poznamka": "petrolejová lucerna 0,35 m (nádržka dole, sklo, víčko, ucho); uzel noc = sklo, které v noci svítí; plamen ve čtyřech snímcích plamen_00 až plamen_03 ve skle; prázdné uzly svetlo (ve skle) a uchyt (v uchu nahoře); počátek pod středem nádržky"
+ },
+ {
+  "soubor": "kladivo_valecne.glb",
+  "jmeno": "kladivo_valecne",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Železné válečné kladivo",
+   "en": "Iron and Wood Warhammer"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 4.5,
+  "rozmer_m": {
+   "x": [
+    -0.241,
+    0.239
+   ],
+   "y": [
+    -0.075,
+    0.075
+   ],
+   "z": [
+    0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 1322,
+  "uchyt": "uchyt",
+  "autor": "Iron and Wood Warhammer (Morrowind), Asylum Nox (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/iron-and-wood-warhammer-morrowind-8ba87567f2f04cd28438172e9d75e892), převod predmety/par14_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Asylum Nox; změny: otočené, zmenšené na 1 m)",
+  "poznamka": "další válečné kladivo (hráč: „další kladiva přidáme“) vedle kladiva z Example Suite; počátek na spodním konci násady, násada po +z, hlava nahoře, úderné plochy do ±x (jako kladivo); prázdný uzel uchyt na násadě 0,2 m nad koncem; textura modelu; mávání si dělá hra; glb z gltfpacku"
  }
 ]

@@ -409,5 +409,71 @@
   "autor": "JUST MONKEY BODY, HumAi Club (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/just-monkey-body-353a648db4034239b131b77c5d55186f), převod tvorove/par13_zvirata.py bez renderu",
   "licence": "CC BY 4.0 (uvést HumAi Club; změny: otočený, zmenšený na skutečnou velikost)",
   "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_1.glb",
+  "jmeno": "krysa_kreslena_1",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_2.glb",
+  "jmeno": "krysa_kreslena_2",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_3.glb",
+  "jmeno": "krysa_kreslena_3",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
  }
 ]

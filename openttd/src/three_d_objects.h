@@ -775,6 +775,11 @@ struct ThreeDAnimal {
 	uint8_t climate = 0;         ///< "klima"
 	uint8_t theme = 0;           ///< "tema": only about the towns of the theme (TownTheme), 0 any
 	bool night = false;          ///< "kdy": "noc": out only at night
+	bool day = false;            ///< "kdy": "den": out only by day (the colleague's gnome, PAR14-PRO-HRU.md)
+	float hover_m = 0;           ///< "vyska_m": it floats so high over the ground, metres (the ghost of the streets)
+
+	/** Whether it is out at this time of day ("kdy"; none: always). */
+	bool OutNow(bool is_night) const { return is_night ? !this->day : !this->night; }
 	bool sold = false;           ///< "prodej": a seller sells it, it walks with the walker
 	bool flies = false;          ///< "leta": flies beside the walker
 	int price = 0;               ///< "cena", pounds

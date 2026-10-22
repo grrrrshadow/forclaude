@@ -27,6 +27,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 22. 10. – par14 od kolegy ve hře, strašidlo v ulicích, pes před hráčem
+
+- Hráč: *„strašidla potkám jen Billa…, mushroom warrior… a draka; ostatní strašidla nejsou“*, *„já poslal víc
+  strašidel přece“*. Pravda: **par14 kolegy (grrrrf e860869, 740df57, 20. 10., `hra/3d/PAR14-PRO-HRU.md`) se do
+  sady hry nedostal.** Převzato beze změny do `objekty/`: strašidla trpaslík (ve dne, kolem hliněných měst, mírumilovný),
+  Baba Jaga a stará Baba Jaga (noc, kolem měst mírného klimatu, útočí), čarodějnice s koštětem (noc, útočí); psi
+  chodící pes, vlče, černá krysa a prodavačka psů farmářka, pohyby přenesené mezi psy (`sedi`, `lezi`, `klid`,
+  přechody), vlk bez slin; tři kreslené krysy (zvířata kolem hliněných měst); nová pochodeň a válečné kladivo
+  (zatím jen v indexu, do inventáře ne). Springfield (Moe, Lenny, auto Simpsonových) ne, jak domluveno.
+- **`kdy: "den"`** hra čte (jen ve dne; `noc` jen v noci; bez `kdy` pořád). Strašidla až 3 najednou (bylo 2).
+- **Pes před hráčem** (PROSBA-PAR14 bod 1, hráč 19. 10.): jdeš – pes běží před tebe (5 m ve směru chůze) a jde
+  před tebou; stojíš – zastaví, otočí se k tobě a střídá sedí/leží/rozhlíží se s přechody (sedání, lehání,
+  vstávání), když je model má; rozejdeš se – vstane a běží před tebe.
+- **Strašidlo s prostěradlem** (kolegovo `carodejnice/strasidlo`, ghost od remi136): hráč 22. 10.: *„asi neměl
+  útočit, proto byl létající. on by měl lítat po ulici jako chodci“*. Náš záznam v `objekty/nase/objekty.json`
+  (`strasidlo_ulice`, model kolegy beze změny, jeho index se nemění): v noci se vznáší ulicemi ve výšce chodce
+  (`vyska_m` 1,15 – střed těla nad zemí), rychlostí chůze, mírumilovné; `nahrazuje: "strasidlo"` ho stáhne z oblohy.
+  Nové klíče hry: `vyska_m` (vznáší se nad zemí), `nahrazuje` (náš záznam místo nočního letce).
+- Noční letci (3 čarodějnice, přízrak) létají se chodcem venku ze dvou třetin k jeho městu (dřív náhodné město).
+- Draci: útočí jen Cethielův drak (hnědý/černý), jen on má animaci útoku; kráčející drak jen chodí, ledový
+  a čínský létají. Návrh (zatím neschválený): ať útočí i kráčející.
+- 3D GRF z par14 (Tatra osobní v11, Vagony 3D v3 s Mikádem) hráč ve hře má. Chybí pára z komína Mikáda (uzel `komin`).
+
 ## 21. 10. večer – rolovací inventář, chůze dvojí šipkou, semafory v obloucích, auto přes koleje, pád 0xFFFF
 
 - **Inventář se roluje** (`walker_inventory_gui.cpp`): vpravo posuvník, kolečko myši; řádky se kreslí jen v okně
