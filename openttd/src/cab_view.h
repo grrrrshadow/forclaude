@@ -83,7 +83,8 @@ void CabToggleLights(const Vehicle *v);
  * as in the view from the first person"; "as soon as you get into the cab you drive"): the vehicle is driven freely as
  * soon as it can be (CmdCabDrive()), until the player asks for its route. Left and right turn it as the cab's buttons
  * do, up is the throttle (and off, a vehicle that stands), down the brake; an aircraft's up and down its height. Held,
- * again every so often; the turn at the next junction once. The view from the cab and the walker riding in the view
+ * again every so often; the turn at the next junction once. Up twice in a row: full speed, on by itself till braked
+ * (the player, 22. 10.: "and the driving on by itself too"). The view from the cab and the walker riding in the view
  * from the first person each have one.
  */
 struct CabArrows {
@@ -91,6 +92,7 @@ struct CabArrows {
 	std::array<int, 4> repeat_in{}; ///< for each arrow held, milliseconds till it does it again
 	bool route = false;             ///< the player asked for its route (CabToggleRoute()): the arrows do not drive
 	int free_wait = 0;              ///< milliseconds till the wheel is taken again, as the command takes its time
+	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (twice in a row: full speed, Drive())
 	void Drive(const Vehicle *v, DirectionKeys now, int ms);
 };
 void CabToggleRoute(const Vehicle *v, CabArrows &arrows);

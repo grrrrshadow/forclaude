@@ -32,8 +32,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Inventář se roluje** (`walker_inventory_gui.cpp`): vpravo posuvník, kolečko myši; řádky se kreslí jen v okně
   (poslední řádek byl rozbitý, protože se kreslil přes okraj okna). Dole jde koupit i to poslední (Hospoda, Matylda).
 - **Z očí: šipka nahoru (nebo W) dvakrát rychle za sebou** (do 0,4 s) – chodec jde sám bez držení; dolů dvakrát –
-  couvá sám. Další stisk nahoru/dolů ho zastaví, doleva/doprava za chůze zatáčí. Zastaví i nástup do auta a když
-  šipky patří jinému oknu. Rig: `test3d chodec dvakrat <mezera> <snímky>`.
+  couvá sám. Další stisk nahoru/dolů ho zastaví a (22. 10., hráč: *„v levo v pravo vypne tu chůzi bez šipky“*) i
+  doleva/doprava. Zastaví i nástup do auta a když šipky patří jinému oknu. Rig: `test3d chodec dvakrat <mezera>
+  <snímky> [bok]`.
+- **Autojízda** (22. 10., hráč: *„jo a autojízdu“*): v kabině i za volantem z očí šipka nahoru dvakrát rychle –
+  plná rychlost (bez omezení) a auto jede samo i s puštěnou šipkou; šipka dolů brzdí, doleva/doprava řídí (jízdu
+  nevypíná). Rig: `test3d autojizda <typ> <číslo>`.
 - **Semafory v kulatých obloucích:** dlaždice se semaforem už oblouk nerovná (dřív `IsSimpleTile` semafory
   vylučovalo); semafor stojí vedle zakřivené koleje, posunutý a natočený s obloukem (`RoundTrackSignalAt()`).
   Rig: `test3d oblouky semafory`.

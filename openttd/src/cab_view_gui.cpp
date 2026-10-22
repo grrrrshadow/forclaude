@@ -246,6 +246,9 @@ void CabLetGo(const Vehicle *v)
 }
 
 /** The arrows held: what is pressed now does it, what is held does it again in its time. Only the owner drives. */
+/** Up pressed twice within this many milliseconds: full speed, on by itself (CabArrows::Drive()). */
+static constexpr int CAB_DOUBLE_TAP_MS = 400;
+
 void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 {
 	if (v == nullptr || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed) || this->route) now = {};
@@ -284,13 +287,20 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		}
 		return false;
 	};
+	if (this->up_tapped != INT_MAX) this->up_tapped = std::min(this->up_tapped + ms, INT_MAX - 1);
 	for (DirectionKey key : {DirectionKey::Left, DirectionKey::Up, DirectionKey::Right, DirectionKey::Down}) {
 		int &left = this->repeat_in[to_underlying(key)];
 		if (!now.Test(key)) continue;
 		/* Turning and an aircraft's height: about seven steps a second (a quarter turn held a second and a quarter);
 		 * the speed three. */
 		const int again = key == DirectionKey::Left || key == DirectionKey::Right || flying ? 150 : 300;
-		if (!this->held.Test(key)) {
+		if (!this->held.Test(key) && key == DirectionKey::Up && !flying && !v->vehstatus.Test(VehState::Stopped) && this->up_tapped < CAB_DOUBLE_TAP_MS) {
+			/* Up the second time in a row: full speed (no limit), kept with the arrow let go, till braked. */
+			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+			this->up_tapped = INT_MAX;
+			left = INT_MAX;
+		} else if (!this->held.Test(key)) {
+			if (key == DirectionKey::Up) this->up_tapped = 0;
 			left = arrow(key) ? again + 150 : INT_MAX;
 		} else if (left != INT_MAX && (left -= ms) <= 0) {
 			left = arrow(key) ? again : INT_MAX;

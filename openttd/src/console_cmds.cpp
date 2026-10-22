@@ -9040,9 +9040,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const double metres = RigFirstPersonHoldW(frame_ms, frames);
 			IConsolePrint(CC_DEFAULT, "test3d: drzeni W {} snimku po {} ms ({:.2f} s): usel {:.2f} m, {:.2f} m/s", frames, frame_ms, frames * frame_ms / 1000.0, metres, metres / (frames * frame_ms / 1000.0));
 		} else if (argv.size() > 4 && argv[2] == "dvakrat") {
-			/* 'chodec dvakrat <frames between> <frames>': Up pressed twice, then once (RigFirstPersonDoubleTap()). */
-			extern std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames);
-			const auto [on, stopped] = RigFirstPersonDoubleTap(number(3).value_or(3), number(4).value_or(25));
+			/* 'chodec dvakrat <frames between> <frames> [bok]': Up pressed twice, then once, or Left with 'bok'
+			 * (RigFirstPersonDoubleTap()). */
+			extern std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames, bool side);
+			const auto [on, stopped] = RigFirstPersonDoubleTap(number(3).value_or(3), number(4).value_or(25), argv.size() > 5 && argv[5] == "bok");
 			IConsolePrint(CC_DEFAULT, "test3d: sipka dvakrat: usel sam {:.2f} m, po dalsim stisku {:.2f} m", on, stopped);
 		} else if (argv.size() > 3 && argv[2] == "klavesa") {
 			/* 'chodec klavesa <c> [inventar]': a key as the player presses it (HandleKeypress()), the focus on the view
@@ -10188,6 +10189,24 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "autojizda" && argv.size() > 3) {
+		/* 'autojizda <type> <unit>': Up pressed twice from the cab, as the player presses it (CabArrows::Drive(), 40 ms a
+		 * look): its speed limit before, after one press and after the second (0 is full speed). */
+		auto type = number(2), unit = number(3);
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!type.has_value() || !unit.has_value() || !u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			CabArrows arrows;
+			arrows.route = false;
+			const int before = u->cab_speed_limit;
+			for (int i = 0; i < 2; i++) arrows.Drive(u, DirectionKeys{DirectionKey::Up}, 40);
+			const int once = u->cab_speed_limit;
+			for (int i = 0; i < 3; i++) arrows.Drive(u, DirectionKeys{}, 40);
+			for (int i = 0; i < 2; i++) arrows.Drive(u, DirectionKeys{DirectionKey::Up}, 40);
+			arrows.Drive(u, DirectionKeys{}, 40);
+			IConsolePrint(CC_DEFAULT, "test3d: autojizda {} {}: omezeni {} -> po stisku {} -> po druhem {} (rychlost {}, max {})", *type, *unit, before, once, u->cab_speed_limit, u->GetDisplaySpeed(), u->GetDisplayMaxSpeed());
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: autojizda: takove vozidlo neni.");
 	} else if (what == "kabina") {
 		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
 		extern std::string DescribeCabViews();

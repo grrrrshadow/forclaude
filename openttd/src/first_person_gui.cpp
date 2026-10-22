@@ -310,7 +310,7 @@ struct FirstPersonWindow : Window {
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
 	int walk_on = 0;                      ///< walks on by itself, 1 ahead, -1 back (Up or Down pressed twice), 0 not
-	bool walk_held[2] = {};               ///< Up, Down held at the last step (their presses, Walk())
+	bool walk_held[3] = {};               ///< Up, Down, Left or Right held at the last step (their presses, Walk())
 	double walk_tapped[2] = {FIRST_PERSON_DOUBLE_TAP_S, FIRST_PERSON_DOUBLE_TAP_S}; ///< seconds since Up, Down was pressed
 	bool weapon_out = false;              ///< the weapon taken out (F, or its key), in the hand
 	int weapon = 0;                       ///< the weapon in the hand or put away (_first_person_weapons)
@@ -583,13 +583,17 @@ struct FirstPersonWindow : Window {
 
 	/**
 	 * Up or Down pressed twice in a row: the walker walks on that way without the key held, till Up or Down is pressed
-	 * again (the player, 21. 10.: "when I press the arrow twice, I walk and do not have to hold it").
+	 * again (the player, 21. 10.: "when I press the arrow twice, I walk and do not have to hold it"), or Left or Right
+	 * (the player, 22. 10.: "left, right turn the walking without the arrow off").
 	 * @param up Up (or W) held now
 	 * @param down Down (or S) held now
+	 * @param side Left or Right (or A or D) held now
 	 * @param dt seconds since the last step
 	 */
-	void WalkOn(bool up, bool down, double dt)
+	void WalkOn(bool up, bool down, bool side, double dt)
 	{
+		if (side && !this->walk_held[2]) this->walk_on = 0;
+		this->walk_held[2] = side;
 		const bool held[2] = {up, down};
 		for (int k = 0; k < 2; k++) {
 			this->walk_tapped[k] = std::min(this->walk_tapped[k] + dt, FIRST_PERSON_DOUBLE_TAP_S);
@@ -620,7 +624,8 @@ struct FirstPersonWindow : Window {
 		const DirectionKeys wasd = _focused_window == this && !EditBoxInGlobalFocus() ? _walkkeys : DirectionKeys{};
 		/* The keys not the walker's any more (the map or another window has them): it stops. */
 		if (ArrowsWindow() != this && _focused_window != this) this->walk_on = 0;
-		this->WalkOn(arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up), arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down), dt);
+		this->WalkOn(arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up), arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down),
+				arrows.Any({DirectionKey::Left, DirectionKey::Right}) || wasd.Any({DirectionKey::Left, DirectionKey::Right}), dt);
 		if (arrows.None() && wasd.None() && this->walk_on == 0) return;
 		if (arrows.Test(DirectionKey::Left)) this->walker.heading += FIRST_PERSON_TURN * dt;
 		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= FIRST_PERSON_TURN * dt;
@@ -1683,14 +1688,16 @@ double RigFirstPersonHoldW(int frame_ms, int frames)
 
 /**
  * The rig: the arrow Up pressed twice (two frames held, so many frames let go between, frames of 40 ms), then let go so
- * many frames, then pressed once and let go as long again; the metres walked after the two presses and after the one.
+ * many frames, then pressed once (Up, or Left with side) and let go as long again; the metres walked after the two
+ * presses and after the one.
  */
-std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames)
+std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames, bool side)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return {};
-	auto frame = [w](bool up) {
-		_dirkeys.Set(DirectionKey::Up, up);
+	auto frame = [w](bool up, DirectionKey key = DirectionKey::Up) {
+		_dirkeys.Reset();
+		_dirkeys.Set(key, up);
 		w->Step(1);
 	};
 	const double x0 = w->walker.x, y0 = w->walker.y;
@@ -1701,8 +1708,9 @@ std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames)
 	}
 	for (int i = 0; i < frames; i++) frame(false);
 	const double x1 = w->walker.x, y1 = w->walker.y;
-	frame(true);
-	frame(true);
+	const DirectionKey stop = side ? DirectionKey::Left : DirectionKey::Up;
+	frame(true, stop);
+	frame(true, stop);
 	for (int i = 0; i < frames; i++) frame(false);
 	_dirkeys.Reset();
 	return {std::hypot(x1 - x0, y1 - y0) / OBJECT_UNITS_PER_METRE, std::hypot(w->walker.x - x1, w->walker.y - y1) / OBJECT_UNITS_PER_METRE};
