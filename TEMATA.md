@@ -33,9 +33,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   strašidel přece“*. Pravda: **par14 kolegy (grrrrf e860869, 740df57, 20. 10., `hra/3d/PAR14-PRO-HRU.md`) se do
   sady hry nedostal.** Převzato beze změny do `objekty/`: strašidla trpaslík (ve dne, kolem hliněných měst, mírumilovný),
   Baba Jaga a stará Baba Jaga (noc, kolem měst mírného klimatu, útočí), čarodějnice s koštětem (noc, útočí); psi
-  chodící pes, vlče, černá krysa a prodavačka psů farmářka, pohyby přenesené mezi psy (`sedi`, `lezi`, `klid`,
-  přechody), vlk bez slin; tři kreslené krysy (zvířata kolem hliněných měst); nová pochodeň a válečné kladivo
-  (zatím jen v indexu, do inventáře ne). Springfield (Moe, Lenny, auto Simpsonových) ne, jak domluveno.
+  chodící pes, vlče, černá krysa, pohyby přenesené mezi psy (`sedi`, `lezi`, `klid`, přechody), vlk bez slin; tři
+  kreslené krysy (zvířata kolem hliněných měst); nová pochodeň. Springfield (Moe, Lenny, auto Simpsonových) ne.
+- **Farmářka (prodavačka psů) ve hře není** – vyřazená už 19. 10. (b00341d); při převzetí par14 jsem ji omylem
+  vrátil, hráč: *„tu farmářku jsme dávali pryč přece“*. Zase pryč (záznam z naší kopie `psi/objekty.json` i glb).
+  **Při každém převzetí `psi/` od kolegy ji vyřadit.**
+- **Válečné kladivo** (`kladivo_valecne`, hráč: *„kladivo iddqd“*): nová zbraň inventáře (WalkerItem 22), dává ho
+  `iddqd` jako ostatní zbraně, do ruky klávesou 8, máchá se jako kladivo (dosah 2,7 m, zásah 2).
 - **`kdy: "den"`** hra čte (jen ve dne; `noc` jen v noci; bez `kdy` pořád). Strašidla až 3 najednou (bylo 2).
 - **Pes před hráčem** (PROSBA-PAR14 bod 1, hráč 19. 10.): jdeš – pes běží před tebe (5 m ve směru chůze) a jde
   před tebou; stojíš – zastaví, otočí se k tobě a střídá sedí/leží/rozhlíží se s přechody (sedání, lehání,

@@ -53,6 +53,7 @@ enum class WalkerItem : uint8_t {
 	Mushrooms,  ///< mushrooms picked about the clay towns (the colleague's objekty/houby, E by one)
 	Seedling,   ///< a seedling of marijuana in a pot, Matylda's at the pub: planted in front of the walker (WalkerPlant)
 	Hay,        ///< marijuana hay, a plant harvested too late: for the dragons (the player, 21. 10.: "a dragon farm")
+	WarHammer,  ///< the war hammer (the colleague's objekty/predmety/kladivo_valecne.glb, par14), swung as the hammer; from iddqd
 	End,        ///< the end of the known things
 };
 

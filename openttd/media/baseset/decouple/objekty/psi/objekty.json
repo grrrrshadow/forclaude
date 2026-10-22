@@ -1413,33 +1413,6 @@
   }
  },
  {
-  "soubor": "prodavac_psu_farmarka.glb",
-  "jmeno": "prodavac_psu_farmarka",
-  "druh": "postava",
-  "nazev": {
-   "cs": "prodavačka psů (psí farmářka)",
-   "en": "dog seller (farmer dog)"
-  },
-  "meritko": 2,
-  "rozmer_m": [
-   0.94,
-   1.1,
-   1.65
-  ],
-  "prodavac": "psi",
-  "pozy": {
-   "klid": {
-    "animace": "female_skeleton.000|female_skeleton.000Action",
-    "snimku": 58,
-    "tiku": 4
-   }
-  },
-  "trojuhelniku": 27649,
-  "autor": "Farmer Dog, AKM (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/farmer-dog-d7bfa8ca8bdd4df08562099ea605d1f2), převod tvorove/par13_zvirata.py bez renderu",
-  "licence": "CC BY 4.0 (uvést AKM; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
- },
- {
   "soubor": "prodavac_psu_bodi.glb",
   "jmeno": "prodavac_psu_bodi",
   "druh": "postava",

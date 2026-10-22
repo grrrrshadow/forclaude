@@ -145,6 +145,7 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::TwoHandedSword, "mec_obourucni", WeaponUse::Swing, 2.8, 2, WalkerItem::End, {}, 0, 65},
 	{WalkerItem::MachineGun, "kulomet", WeaponUse::Burst, 0, 1, WalkerItem::Bullets, "naboj", 300},
 	{WalkerItem::RocketLauncher, "raketomet", WeaponUse::Rocket, 0, 6, WalkerItem::Rockets, "raketa", 40},
+	{WalkerItem::WarHammer, "kladivo_valecne", WeaponUse::Swing, 2.7, 2},
 };
 
 /**

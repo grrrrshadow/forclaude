@@ -2427,6 +2427,7 @@ STR_WALKER_ITEM_ROCKETS                                         :Rakety
 STR_WALKER_ITEM_MUSHROOMS                                       :Houby
 STR_WALKER_ITEM_SEEDLING                                        :Sazenice marihuany v květináči
 STR_WALKER_ITEM_HAY                                             :Marihuanové seno
+STR_WALKER_ITEM_WAR_HAMMER                                      :Válečné kladivo
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

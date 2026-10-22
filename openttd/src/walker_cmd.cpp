@@ -55,6 +55,7 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_MUSHROOMS, 0, 8, WalkerItemKind::Thing, CargoLabel{'MUSH'}},
 	{STR_WALKER_ITEM_SEEDLING, 8, 0, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_HAY, 0, 0, WalkerItemKind::Thing, CT_HEMP_FIBRE},
+	{STR_WALKER_ITEM_WAR_HAMMER, 0, 0, WalkerItemKind::Weapon},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 

@@ -2322,6 +2322,7 @@ STR_WALKER_ITEM_ROCKETS                                         :Rockets
 STR_WALKER_ITEM_MUSHROOMS                                       :Mushrooms
 STR_WALKER_ITEM_SEEDLING                                        :Marijuana seedling in a pot
 STR_WALKER_ITEM_HAY                                             :Marijuana hay
+STR_WALKER_ITEM_WAR_HAMMER                                      :War hammer
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
