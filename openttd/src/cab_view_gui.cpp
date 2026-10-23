@@ -49,6 +49,8 @@
 #include "newgrf_sound.h"
 #include "widgets/cab_view_widget.h"
 #include "video/video_driver.hpp"
+#include "fileio_func.h"
+#include "3rdparty/fmt/format.h"
 
 #include "table/strings.h"
 
@@ -56,6 +58,7 @@
 #include <climits>
 #include <optional>
 #include <cmath>
+#include <ctime>
 
 #include "safeguards.h"
 
@@ -245,12 +248,63 @@ void CabLetGo(const Vehicle *v)
 	}
 }
 
-/** The arrows held: what is pressed now does it, what is held does it again in its time. Only the owner drives. */
 /** Up pressed twice within this many milliseconds: full speed, on by itself (CabArrows::Drive()). */
 static constexpr int CAB_DOUBLE_TAP_MS = 400;
+/** Up pressed and the vehicle standing so long: why, into jizda.log (CabStandingRecord()). */
+static constexpr int CAB_STILL_MS = 2000;
+/** And no more lines than so many in it. */
+static constexpr int CAB_STILL_LINES = 200;
+
+std::string DescribeRoadVehFreeAhead(const Vehicle *v);
+
+/**
+ * A vehicle driven from the cab that stands though Up was pressed (the player, 23. 10.: "I stopped the car in front
+ * of the depot, walked to it in the first person view and wanted to drive; it only turned left and right"): all that
+ * keeps a vehicle where it is, a line in jizda.log beside the saved games' folder, so that the cause is seen.
+ */
+static void CabStandingRecord(const Vehicle *v, const CabArrows &arrows, DirectionKeys now)
+{
+	static std::optional<FileHandle> file;
+	static int lines = 0;
+	if (lines >= CAB_STILL_LINES) return;
+	if (!file.has_value()) {
+		file = FileHandle::Open(_personal_dir + "jizda.log", "w");
+		if (!file.has_value()) {
+			lines = CAB_STILL_LINES;
+			return;
+		}
+		fmt::print(*file, "OpenTTD Decouple: auto z kabiny stoji, ackoli byla zmacknuta sipka nahoru (radek po 2 s stani).\n");
+	}
+	const std::time_t t = std::time(nullptr);
+	char clock[16];
+	std::strftime(clock, sizeof(clock), "%H:%M:%S", std::localtime(&t));
+	const Window *aw = ArrowsWindow();
+	std::string order = "zadny";
+	if (v->current_order.IsType(OT_GOTO_DEPOT)) order = "do depa";
+	if (v->current_order.IsType(OT_GOTO_STATION)) order = "na stanici";
+	if (v->current_order.IsType(OT_LOADING)) order = "nakladka";
+	if (v->current_order.IsType(OT_GOTO_WAYPOINT)) order = "pres bod";
+	std::string road = "-";
+	if (v->type == VehicleType::Road) {
+		const RoadVehicle *rv = RoadVehicle::From(v);
+		road = fmt::format("stav {:#x} v depu {} tramvaj {} nalozeno na vlaku {} ", rv->state, rv->IsInDepot() ? "ano" : "ne", RoadTypeIsTram(rv->roadtype) ? "ano" : "ne", rv->IsCarried() ? "ano" : "ne");
+	}
+	fmt::print(*file, "{} vozidlo {} typ {} motor {} | moje {} stoji {} rozbite {} (porucha {}) zniceno {} | volne {} zpet {} yaw {} smer {} | omezeni {} rychlost {} max {} | dlazdice {},{} typu {} | {}| pred nim: {} | rozkaz {} | trasa {} | sipky {:#x} okno sipek {} | naposled: {}\n",
+			clock, v->unitnumber, to_underlying(v->type), v->engine_type, v->owner == _local_company ? "ano" : "NE", v->vehstatus.Test(VehState::Stopped) ? "ANO" : "ne",
+			v->breakdown_ctr == 1 ? "ANO" : "ne", v->breakdown_ctr, v->vehstatus.Test(VehState::Crashed) ? "ANO" : "ne",
+			v->cab_free ? "ano" : "ne", v->cab_rejoin ? "ano" : "ne", v->cab_yaw, to_underlying(v->direction),
+			v->cab_speed_limit, v->GetDisplaySpeed(), v->GetDisplayMaxSpeed(), TileX(v->tile), TileY(v->tile), to_underlying(GetTileType(v->tile)),
+			road, DescribeRoadVehFreeAhead(v), order, arrows.route ? "ANO (sipky neridi)" : "ne", now.base(),
+			aw == nullptr ? "zadne" : aw->window_class == WindowClass::CabView ? "kabina" : "oci", arrows.done.empty() ? "-" : arrows.done);
+	fflush(*file);
+	lines++;
+}
+
+/** The arrows held: what is pressed now does it, what is held does it again in its time. Only the owner drives. */
 
 void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 {
+	const DirectionKeys pressed = now;
 	if (v == nullptr || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed) || this->route) now = {};
 	/* As the player's click: the local company's command (the windows' timers run where nobody is). */
 	AutoRestoreBackup cur_company(_current_company, _local_company);
@@ -280,9 +334,11 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 				}
 				if (key == DirectionKey::Up && v->vehstatus.Test(VehState::Stopped)) {
 					CabStartStop(v);
+					this->done = fmt::format("nahoru: rozjet ({})", v->vehstatus.Test(VehState::Stopped) ? "NEPOVEDLO SE, stoji dal" : "rozjeto");
 					return false;
 				}
 				CabSpeed(v, key == DirectionKey::Up);
+				this->done = fmt::format("{}: omezeni {}", key == DirectionKey::Up ? "nahoru" : "dolu", v->cab_speed_limit);
 				return true;
 		}
 		return false;
@@ -297,6 +353,7 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		if (!this->held.Test(key) && key == DirectionKey::Up && !flying && !v->vehstatus.Test(VehState::Stopped) && this->up_tapped < CAB_DOUBLE_TAP_MS) {
 			/* Up the second time in a row: full speed (no limit), kept with the arrow let go, till braked. */
 			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+			this->done = fmt::format("nahoru dvakrat: plna rychlost (omezeni {})", v->cab_speed_limit);
 			this->up_tapped = INT_MAX;
 			left = INT_MAX;
 		} else if (!this->held.Test(key)) {
@@ -307,6 +364,20 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		}
 	}
 	this->held = now;
+	/* Up pressed, and it stands: after two seconds of that, why (CabStandingRecord()); once till it moves. */
+	if (v != nullptr && !flying) {
+		if (v->cur_speed != 0) {
+			this->still_ms = 0;
+			this->still_told = false;
+		} else if (pressed.Test(DirectionKey::Up) || this->up_tapped < CAB_STILL_MS) {
+			if (!this->still_told && (this->still_ms += ms) >= CAB_STILL_MS) {
+				CabStandingRecord(v, *this, pressed);
+				this->still_told = true;
+			}
+		} else {
+			this->still_ms = 0;
+		}
+	}
 }
 
 /**

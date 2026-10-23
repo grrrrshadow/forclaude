@@ -2504,6 +2504,7 @@ static EventState HandleViewportScroll()
 		MouseDebugLog(_last_scroll_window == nullptr ? "tazeni (hra): konec - zadne okno pod ukazatelem" : "tazeni (hra): konec - tlacitko uz neni dole");
 		_cursor.fix_at = false;
 		_scrolling_viewport = false;
+		_look_pinned = false;
 		_last_scroll_window = nullptr;
 		return EventState::NotHandled;
 	}

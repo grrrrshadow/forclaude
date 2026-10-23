@@ -27,6 +27,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 23. 10. odpoledne – rozhlížení pravým bez dorazu, dvouklik srovná hlavu, deník stojícího auta
+
+- Hráč: *„otáčím se šipkami po velkých skocích, 360° je asi 30 snímků; pravým je to jemnější, ale má doraz na 180;
+  dvouklik pravým srovná jen nahoru/dolů, hlava zůstane otočená“*.
+- **Doraz na 180 – příčina:** pohled z očí nebral pravé tlačítko jako naše tažení mapy: ukazatel se nevracel na místo
+  stisku, dojel na kraj obrazovky (od středu 640 px × 0,005 = 3,2 rad ≈ 183°) a dál nebylo kam. Teď je ukazatel
+  přišpendlený jako u našeho tažení mapy (`_look_pinned`, ve Windows i oříznutí do okna kvůli Wine) – otáčí se dokola.
+- **Hlava zvlášť od těla:** pravé tlačítko točí hlavou (`head`), dvouklik pravým vrátí pohled tam, kam tělo míří, a
+  rovně. Jakmile jdeš, tělo se otočí kam koukáš a jde tam (pravým se dá řídit chůze). Šipky točí celým tělem.
+  Rig `test3d chodec rozhled <dx> <pohybů> [chuze]`.
+- **Velké skoky šipkami = málo snímků z očí na telefonu** (~10/s). Rychlost otáčení neměním (hráč: příčinu, ne
+  následky); čeká se na `snimky.log` z buildu s 54c155c+, kde je vidět, co snímek z očí brzdí.
+- **Auto nejelo** (hráč: *„stopnul jsem auto před depem, došel k němu z očí, chtěl jet, ale jen se točilo doleva
+  doprava“*): v rigu se zastavené auto šipkou nahoru rozjede (i u depa) – příčinu nevidím. Proto **deník `jizda.log`**:
+  když je zmáčknutá šipka nahoru a auto 2 s stojí, zapíše se všechno, co ho drží (zastaveno, porucha, volná jízda,
+  omezení, dlaždice před ním a jestli se na ni smí, rozkaz, trasa, okno šipek, co šipka udělala naposled).
+  Rig `test3d stopni <typ> <číslo>`.
+
 ## 23. 10. – dvojí šipka a pomalé snímky, lidé z očí vyšší, tvorové na mapě 3×, deník snímků
 
 - **Dvojí šipka „fungovalo dvakrát a pak ne“ – příčina:** hra pozná stisk tak, že jednou za snímek koukne, jestli je

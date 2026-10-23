@@ -1857,6 +1857,25 @@ static bool RoadVehFreeCanEnter(TileIndex tile)
 }
 
 /**
+ * For the record of a vehicle that stands while driven from its cab (cab_view_gui.cpp, jizda.log): the tile a unit
+ * along its heading, and whether it may go onto it.
+ */
+std::string DescribeRoadVehFreeAhead(const Vehicle *v)
+{
+	if (v->type != VehicleType::Road || !v->cab_free) return "-";
+	const int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
+	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
+			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {
+		return "kraj mapy";
+	}
+	const TileIndex tile = TileVirtXY(x, y);
+	if (tile == v->tile) return fmt::format("stejna dlazdice {},{}", TileX(tile), TileY(tile));
+	return fmt::format("dlazdice {},{} typu {}{} {}", TileX(tile), TileY(tile), to_underlying(GetTileType(tile)),
+			IsRoadDepotTile(tile) ? " (depo)" : "", RoadVehFreeCanEnter(tile) ? "lze vjet" : "NELZE VJET");
+}
+
+/**
  * A road vehicle driven freely and asked back to its orders comes onto a road's end: into the lane its orders choose
  * there, at the tile's edge, as if it had come along that road.
  * @param tile the tile it comes onto

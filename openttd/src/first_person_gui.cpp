@@ -60,6 +60,8 @@
 #include <chrono>
 #include <cmath>
 
+#include "map_drag.h"
+
 #include "safeguards.h"
 
 /** The walker's eyes over the ground, metres (a girl of the indices is 1.62 m tall). */
@@ -333,6 +335,7 @@ struct FirstPersonWindow : Window {
 	double light_time = 0;                ///< seconds it burns, for its flame's frames
 	std::chrono::steady_clock::time_point look_clicked{}; ///< when the right button was last pressed without a look about after it
 	bool looked = false;                  ///< the view moved since the right button was pressed (OnScroll())
+	double head = 0;                      ///< radians the head is turned by the right button from where the body faces, left positive
 	/*
 	 * In a vehicle (the player, 17. 10.: "in the first person game, E gets into the car, into the cab view; no other
 	 * window of the cab view should open, it stays in the window of the first person -- a special window, the game
@@ -375,6 +378,7 @@ struct FirstPersonWindow : Window {
 	{
 		this->riding = v->index;
 		this->walk_on = 0;
+		this->head = 0;
 		this->weapon_out = false;
 		this->swing_time = -1;
 		this->draw_time = -1;
@@ -402,6 +406,7 @@ struct FirstPersonWindow : Window {
 			const int yaw = v->cab_free ? v->cab_yaw : (v->direction != Direction::Invalid ? DirectionToCabYaw(v->direction) : 0);
 			const double heading = yaw * 2 * M_PI / CAB_YAW_TURN, fx = std::cos(heading), fy = std::sin(heading);
 			this->walker.heading = std::remainder(heading, 2 * M_PI);
+			this->head = 0;
 			bool placed = false;
 			for (double side : {1.0, -1.0}) {
 				for (double metres : {2.5, 3.5, 5.0}) {
@@ -638,6 +643,8 @@ struct FirstPersonWindow : Window {
 		if (wasd.Test(DirectionKey::Left)) aside -= 1;
 		if (ahead == 0 && !this->walk_held[0] && !this->walk_held[1]) ahead = this->walk_on;
 		if (ahead == 0 && aside == 0) return;
+		/* Going: the body turns to where the eyes look, and goes there (the right button steers the walk). */
+		this->head = 0;
 		const double norm = std::sqrt(ahead * ahead + aside * aside);
 		const double speed = ((this->running || _shift_pressed) ? FIRST_PERSON_RUN_MS : FIRST_PERSON_WALK_MS) * OBJECT_UNITS_PER_METRE * dt / norm;
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
@@ -1132,10 +1139,13 @@ struct FirstPersonWindow : Window {
 	{
 		/* Looking about with the right mouse button held, as the map is dragged (OnScroll()). Pressed twice without
 		 * looking about between (the player, 18. 10.: "two clicks of the right button and the view is centred again,
-		 * as the map's turn is"): looking straight ahead, level. */
+		 * as the map's turn is"; 23. 10.: "it puts only up and down back, the head stays turned right or left"):
+		 * looking straight ahead the way the body faces, level. */
 		if (widget != WID_FP_CANVAS || _scrolling_viewport) return false;
 		const auto now = std::chrono::steady_clock::now();
 		if (!this->looked && now - this->look_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+			this->walker.heading = std::remainder(this->walker.heading - this->head, 2 * M_PI);
+			this->head = 0;
 			this->walker.pitch = 0;
 			this->look_clicked = {};
 			this->SetWidgetDirty(WID_FP_CANVAS);
@@ -1143,7 +1153,12 @@ struct FirstPersonWindow : Window {
 			this->look_clicked = now;
 		}
 		this->looked = false;
+		/* The pointer pinned where the button went down, as in our drag of the map (map_drag.cpp): each move only how
+		 * far the hand went, so no edge of the screen stops the look about (the player, 23. 10.: "it stops at 180" --
+		 * the pointer had run from the middle to the edge of the screen). */
 		_scrolling_viewport = true;
+		_cursor.fix_at = true;
+		_look_pinned = true;
 		return true;
 	}
 
@@ -1153,6 +1168,7 @@ struct FirstPersonWindow : Window {
 		 * the right button on the map"): the pointer to the right looks to the right, down looks down. */
 		if (delta.x != 0 || delta.y != 0) this->looked = true;
 		this->walker.heading = std::remainder(this->walker.heading - delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
+		this->head = std::remainder(this->head - delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
 		this->walker.pitch = std::clamp(this->walker.pitch - delta.y * FIRST_PERSON_MOUSE, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
 		this->SetWidgetDirty(WID_FP_CANVAS);
 	}
@@ -1741,4 +1757,41 @@ std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames, bo
 	for (int i = 0; i < frames; i++) frame(false);
 	_dirkeys.Reset();
 	return {std::hypot(x1 - x0, y1 - y0) / OBJECT_UNITS_PER_METRE, std::hypot(w->walker.x - x1, w->walker.y - y1) / OBJECT_UNITS_PER_METRE};
+}
+
+/**
+ * The rig: the right button held over the picture and the pointer moved so many times by dx (as the game's drag sends
+ * it, OnScroll()), let go; then a walk of a few steps if asked, else two clicks of the right button. What it says: the
+ * pointer pinned while held, the turn of the head and the look after the moves, and the look after the two clicks.
+ */
+std::string RigFirstPersonLook(int dx, int moves, bool walk)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny pohled z oci";
+	auto deg = [](double r) { return r * 180.0 / M_PI; };
+	const double h0 = w->walker.heading;
+	auto release = [] {
+		_scrolling_viewport = false;
+		_cursor.fix_at = false;
+		_look_pinned = false;
+	};
+	w->OnRightClick({}, WID_FP_CANVAS);
+	const bool pinned = _cursor.fix_at && _look_pinned;
+	for (int i = 0; i < moves; i++) w->OnScroll({dx, 0});
+	release();
+	std::string s = fmt::format("pred {:.0f}, po tazeni {:.0f} (hlava {:.0f}), ukazatel prisp. {}", deg(h0), deg(w->walker.heading), deg(w->head), pinned ? "ano" : "NE");
+	if (walk) {
+		_dirkeys.Reset();
+		_dirkeys.Set(DirectionKey::Up);
+		for (int i = 0; i < 5; i++) w->Step(1);
+		_dirkeys.Reset();
+		s += fmt::format(", po chuzi {:.0f} (hlava {:.0f})", deg(w->walker.heading), deg(w->head));
+	}
+	w->walker.pitch = 0.5;
+	w->OnRightClick({}, WID_FP_CANVAS);
+	release();
+	w->OnRightClick({}, WID_FP_CANVAS);
+	release();
+	s += fmt::format(", po dvojkliku {:.0f} (hlava {:.0f}, sklon {:.0f})", deg(w->walker.heading), deg(w->head), deg(w->walker.pitch));
+	return s;
 }

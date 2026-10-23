@@ -562,10 +562,10 @@ static bool AnyMouseButtonHeld()
  */
 static bool _pin_clipped = false; ///< the pointer is clipped to the window for this feature's own pin
 
-/** Whether the pin is this feature's own: its drag of the map, the turn of the view with the middle button. */
+/** Whether the pin is this feature's own: its drag of the map, the turn of the view with the middle button, the look about from the eyes. */
 static bool PinnedOurOwn()
 {
-	return _cursor.fix_at && (MapDragOn() || _middle_button_down);
+	return _cursor.fix_at && (MapDragOn() || _middle_button_down || _look_pinned);
 }
 
 /** The pointer clipped to the window while this feature's own pin holds a button, and free otherwise. */

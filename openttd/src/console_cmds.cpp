@@ -9044,6 +9044,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			extern double RigFirstPersonTapTimeline(int frame_ms);
 			const int frame_ms = number(3).value_or(40);
 			IConsolePrint(CC_DEFAULT, "test3d: tuktuk snimky po {} ms: usel {:.2f} m za 2 s", frame_ms, RigFirstPersonTapTimeline(frame_ms));
+		} else if (argv.size() > 4 && argv[2] == "rozhled") {
+			/* 'chodec rozhled <dx> <moves> [chuze]': the look about with the right button (RigFirstPersonLook()). */
+			extern std::string RigFirstPersonLook(int dx, int moves, bool walk);
+			IConsolePrint(CC_DEFAULT, "test3d: rozhled: {}", RigFirstPersonLook(number(3).value_or(10), number(4).value_or(10), argv.size() > 5 && argv[5] == "chuze"));
 		} else if (argv.size() > 4 && argv[2] == "dvakrat") {
 			/* 'chodec dvakrat <frames between> <frames> [bok]': Up pressed twice, then once, or Left with 'bok'
 			 * (RigFirstPersonDoubleTap()). */
@@ -10212,6 +10216,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: autojizda: takove vozidlo neni.");
+	} else if (what == "stopni" && argv.size() > 3) {
+		/* 'stopni <type> <unit>': its stop button pressed, as the player stops it in its window. */
+		auto type = number(2), unit = number(3);
+		for (const Vehicle *u : Vehicle::Iterate()) {
+			if (!type.has_value() || !unit.has_value() || !u->IsPrimaryVehicle() || to_underlying(u->type) != *type || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			CommandCost cost = Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, u->index, false);
+			IConsolePrint(CC_DEFAULT, "test3d: stopni {} {}: {} stoji {} na {},{}", *type, *unit, cost.Succeeded() ? "ok" : "nejde", u->vehstatus.Test(VehState::Stopped) ? "ano" : "ne", TileX(u->tile), TileY(u->tile));
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: stopni: takove vozidlo neni.");
 	} else if (what == "kabina") {
 		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
 		extern std::string DescribeCabViews();

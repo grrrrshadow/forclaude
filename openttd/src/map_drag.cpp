@@ -28,6 +28,7 @@
 #include "safeguards.h"
 
 std::optional<bool> _right_button_system;
+bool _look_pinned = false;
 
 /** How far the pointer has to have tried to go, in pixels, before the map is expected to have followed. */
 static constexpr int MAP_DRAG_EXPECT_MOVE_PX = 24;

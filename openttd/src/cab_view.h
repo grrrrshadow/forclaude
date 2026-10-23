@@ -93,6 +93,9 @@ struct CabArrows {
 	bool route = false;             ///< the player asked for its route (CabToggleRoute()): the arrows do not drive
 	int free_wait = 0;              ///< milliseconds till the wheel is taken again, as the command takes its time
 	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (twice in a row: full speed, Drive())
+	int still_ms = 0;               ///< milliseconds it has stood since Up was pressed (its record, jizda.log)
+	bool still_told = false;        ///< that standing written down, till it moves
+	std::string done;               ///< what the arrows did last, and how it came out, for that record
 	void Drive(const Vehicle *v, DirectionKeys now, int ms);
 };
 void CabToggleRoute(const Vehicle *v, CabArrows &arrows);

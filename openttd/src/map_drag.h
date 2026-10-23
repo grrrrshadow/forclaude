@@ -41,6 +41,13 @@
  */
 extern std::optional<bool> _right_button_system;
 
+/**
+ * The right button held turns the view from the eyes (first_person_gui.cpp): the pointer pinned where it went down as
+ * in our drag, and clipped to the window under Windows likewise (win32_v.cpp). Ends with the game's drag that carries
+ * it (HandleViewportScroll()).
+ */
+extern bool _look_pinned;
+
 bool MapDragOurs();
 bool MapDragOn();
 EventState MapDragMouse(bool right_press, bool left_press);
