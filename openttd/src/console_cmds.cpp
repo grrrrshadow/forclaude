@@ -8911,6 +8911,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					bw->OnEditboxChanged(WID_BV_FILTER);
 				}
 			}
+		} else if (argv[2] == "prumysl" && argv.size() > 4 && argv[3] == "typ") {
+			/* 'okno prumysl typ <n>': the window of the first industry of the type n (3 the forest). */
+			auto type = number(4);
+			for (const Industry *i : Industry::Iterate()) {
+				if (!type.has_value() || i->type != static_cast<IndustryType>(*type)) continue;
+				ShowIndustryViewWindow(i->index);
+				IConsolePrint(CC_DEFAULT, "test3d: prumysl typu {} na {},{}", *type, TileX(i->location.tile), TileY(i->location.tile));
+				break;
+			}
 		} else if (argv[2] == "prumysl") {
 			auto x = number(3), y = number(4);
 			if (x.has_value() && y.has_value() && IsTileType(TileXY(*x, *y), TileType::Industry)) {

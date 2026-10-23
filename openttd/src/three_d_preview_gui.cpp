@@ -43,6 +43,7 @@
 #include "vehicle_func.h"
 #include "industry.h"
 #include "industry_map.h"
+#include "industrytype.h"
 #include "spritecache.h"
 #include "zoom_func.h"
 #include "landscape.h"
@@ -399,6 +400,27 @@ struct IndustryPiece {
 	double near;
 };
 
+/**
+ * The parts of a tile of an industry of the original game, as the map draws it from the parts the industries share
+ * (GetThreeDOriginalIndustryTile()); nullptr for a tile not the industry's, of a set (NewGRF), or one the sets have none for.
+ */
+static const ThreeDIndustryTileParts *OriginalIndustryTileOf(const Industry *ind, TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index) return nullptr;
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	return GetThreeDOriginalIndustryTile(gfx);
+}
+
+/** Whether an industry of the original game has tiles drawn from the parts the industries share (the forest). */
+static bool HasOriginalIndustryParts(const Industry *ind)
+{
+	for (TileIndex tile : ind->location) {
+		if (OriginalIndustryTileOf(ind, tile) != nullptr) return true;
+	}
+	return false;
+}
+
 /** The pictures of the industries' objects at the angles the previews were at, by the industry, the angle (tenths of a degree) and the zoom. */
 static std::map<std::tuple<uint, int, int, size_t>, ThreeDModelPicture> _preview_object_pictures;
 
@@ -427,25 +449,40 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		top = static_cast<int>(std::ceil(obj->top));
 		return true;
 	}
-	if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) return false;
 	const double a = yaw * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
 	std::vector<std::pair<double, ThreeDObjectPlacement>> laid;
+	auto lay = [&](TileIndex at, const ThreeDObject *o, const ThreeDObject *ground, std::span<const ThreeDObjectFigure> more, double bias) {
+		ThreeDObjectPlacement p;
+		p.obj = o;
+		p.ground = ground;
+		p.more = more;
+		p.x = (static_cast<int>(TileX(at)) - static_cast<int>(TileX(ind->location.tile))) * TILE_SIZE;
+		p.y = (static_cast<int>(TileY(at)) - static_cast<int>(TileY(ind->location.tile))) * TILE_SIZE;
+		p.z = GetTilePixelZ(at) - base_z;
+		double mx = p.x + TILE_SIZE / 2.0, my = p.y + TILE_SIZE / 2.0;
+		laid.emplace_back((c * mx - s * my) + (s * mx + c * my) + bias, p);
+		if (o != nullptr) top = std::max(top, static_cast<int>(std::ceil(o->top)));
+	};
+	if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
+		/* An industry of the original game from the parts the industries share, as the map lays it
+		 * (AddOriginalIndustryTile() of viewport.cpp): each tile's ground, first; the parts and the plants of each
+		 * built tile that is no member of a block (a block's anchor stands for all of it). The forest's trees on each
+		 * of its tiles: before, the preview knew only an industry of one object and the two fields, and the forest's
+		 * did not open (the player, 23. 10.: "the 3D preview by the window of the forest did not work"). */
+		for (TileIndex tile : ind->location) {
+			const ThreeDIndustryTileParts *tp = OriginalIndustryTileOf(ind, tile);
+			if (tp == nullptr) continue;
+			if (tp->ground != nullptr) lay(tile, tp->ground, nullptr, {}, -1e6);
+			if (tp->member || !IsIndustryCompleted(tile)) continue;
+			for (const ThreeDObject *part : tp->parts) lay(tile, part, nullptr, {}, 0);
+			if (tp->plants != nullptr) lay(tile, tp->plants, nullptr, {}, 0);
+		}
+	}
 	for (TileIndex tile : ind->location) {
 		ThreeDPlantationTile pt;
 		ThreeDFieldTile ft;
+		if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) break;
 		if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index || !GetThreeDPlantationTile(tile, pt) || !GetThreeDFieldTile(pt, ft)) continue;
-		auto lay = [&](TileIndex at, const ThreeDObject *o, const ThreeDObject *ground, std::span<const ThreeDObjectFigure> more, double bias) {
-			ThreeDObjectPlacement p;
-			p.obj = o;
-			p.ground = ground;
-			p.more = more;
-			p.x = (static_cast<int>(TileX(at)) - static_cast<int>(TileX(ind->location.tile))) * TILE_SIZE;
-			p.y = (static_cast<int>(TileY(at)) - static_cast<int>(TileY(ind->location.tile))) * TILE_SIZE;
-			p.z = GetTilePixelZ(at) - base_z;
-			double mx = p.x + TILE_SIZE / 2.0, my = p.y + TILE_SIZE / 2.0;
-			laid.emplace_back((c * mx - s * my) + (s * mx + c * my) + bias, p);
-			if (o != nullptr) top = std::max(top, static_cast<int>(std::ceil(o->top)));
-		};
 		lay(tile, ft.plants != nullptr ? ft.plants : ft.soil, ft.plants != nullptr ? ft.soil : nullptr, ft.worker, 0);
 		if (ft.road != nullptr) {
 			const TileIndex road_tile = TileAddXY(tile, 0, 1);
@@ -681,14 +718,15 @@ void ShowThreeDVehiclePreview(WindowNumber parent_number)
 
 /**
  * Show the preview beside an industry's window, when the 3D is on and the
- * industry is one of the game's own drawn as a 3D object.
+ * industry is one of the game's own drawn as a 3D object, a field, or one of the original game's laid from the parts.
  * @param industry the industry
  */
 void ShowThreeDIndustryPreview(IndustryID industry)
 {
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
-	if (GetThreeDIndustryObjectOf(ind) == nullptr && ((ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) || GetThreeDFieldPart("zem") == nullptr)) return;
+	const bool field = (ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDFieldPart("zem") != nullptr;
+	if (GetThreeDIndustryObjectOf(ind) == nullptr && !field && !HasOriginalIndustryParts(ind)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }
 
