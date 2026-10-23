@@ -50,7 +50,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Dračí farma** (hráč): draci kolem farmy občas létají a dělají poruchy vlakům, autům a lodím; když dostanou
   studentku, nelétají a poruchy nedělají; studentka (college girl, velká) je na farmě u draků a stará se o ně.
 - Hráč: *„kdo řídí starou Volgu kabriolet, to je ošklivý, to není college girl“* – GAZ-21 kabriolet je kolegův GRF
-  (Tatra osobní v11, řidička `to_gaz21_ridicka`); prosba kolegovi.
+  (Tatra osobní v11, řidička `to_gaz21_ridicka`). Hráč: *„no jo, grrrrf dává řidiče“* – řidiče dává kolega v `posadka`,
+  hra kreslí, koho záznam jmenuje; prosba kolegovi o college girl (`college_girl_ridicka`).
+- **Houby v lese** (hráč): *„porostou furt bez studentek, abych tam mohl chodit na houby; se studentkama les produkuje
+  houby; houby budou vozit osobáky“* – houby na zemi pořád, studentky přidají jen náklad `MUSH`, ten vozí osobní auta
+  (kolegovi: přestavba osobáků v jeho GRF na `MUSH`). Kolegovi doplněno v `ODPOVED-LES-PRUMYSL-SVETLA.md`.
 
 ## 23. 10. odpoledne – rozhlížení pravým bez dorazu, dvouklik srovná hlavu, deník stojícího auta
 
