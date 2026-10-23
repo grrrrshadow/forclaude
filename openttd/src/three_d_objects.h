@@ -262,6 +262,8 @@ struct ThreeDObject {
 	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
 	std::string industry_name; ///< "prumysl" as the index writes it ("IT_GYMNASIUM", "lihovar")
 	int8_t industry_variant = -1; ///< "varianta": the statue of stone 0 ("kamen") or bronze 1 ("bronz", the industry's random bit 0); -1 any
+	std::array<int8_t, 2> variant_paint = {-1, -1}; ///< "varianty": one object for both (the colleague's socha.glb), the colour of its palette its first part takes for stone 0 and bronze 1; -1 by the place
+	std::vector<std::string> shared_with; ///< "sdili": the game's industries of another kind that show it too ("IT_OIL_REFINERY": the refinery the distillery), on a square of their tiles as big as it
 	std::string field_part;    ///< "dil" of a field ("druh": "pole"): "zem", "cesta", "bouda", "seno", "mari_male", "brambory_vzrostle", ...
 	std::array<std::vector<ThreeDObjectFigure>, 2> work;    ///< "prace" of the soil: the girls at work on a tile of marijuana [0], of potatoes [1]
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
@@ -643,6 +645,9 @@ struct ThreeDVehicleObject {
 	std::string only_node;          ///< a figure of one node of a file of several ("uzel", the colleague's girls of the lorries: a pose a node, the textures once): only that node of it is drawn
 	std::string skip_node;          ///< a node of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni")
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
+	uint32_t light_colour = 0;      ///< a light's thing: "svetlo" "barva", 0xRRGGBB; 0 the game's own for it
+	float light_reach_m = 0;        ///< and "dosah_m", how far it lights; 0 the game's own
+	bool light_flickers = false;    ///< and "blika": its light flickers with its flame (the torch's fire)
 	/* An articulated vehicle of several objects, one an article (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
 	 * point 3): where an article is coupled to the one before it and the one after, the next one drawn with its front
 	 * coupling on the back one of the one before, turned as its own article. */
@@ -829,6 +834,7 @@ const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant);
 std::string ThreeDPackagePlaces();
 struct Industry;
 const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind);
+TileIndex GetThreeDIndustryObjectOrigin(const Industry *ind);
 std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
@@ -848,6 +854,7 @@ struct ThreeDIndustryTileParts {
 	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
 };
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
+const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile);
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 
 struct ThreeDPlantationTile;

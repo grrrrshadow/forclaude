@@ -102,6 +102,8 @@ static uint8_t ParseIndexTheme(const nlohmann::json &e)
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
 /** The game's own industries' objects by the industry and the variant (-1 any), and the parts of the fields by their name ("dil"). */
 static std::map<std::pair<IndustryType, int8_t>, size_t> _three_d_industry_objects;
+/** The objects the game's industries of another kind show ("sdili": the refinery the distillery), by the industry. */
+static std::map<IndustryType, size_t> _three_d_shared_industry_objects;
 static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 /** The add-ons of the buildings ("druh": "doplnek"), by their name: their objects in _three_d_objects (ThreeDObject::addon_places). */
 static std::map<std::string, size_t, std::less<>> _three_d_addons;
@@ -1943,6 +1945,9 @@ static std::string PackageOf(const std::string &index)
 	return set == std::string::npos ? std::string() : index.substr(0, set + 1);
 }
 
+/** The most parts painted a colour by number an object has: ten of three bits below the top bit of its paint (PaintBits()). */
+static constexpr size_t THREE_D_PAINT_PARTS_MAX = 10;
+
 /** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
 static void ReadColourParts(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
 {
@@ -1960,7 +1965,7 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 			Debug(misc, 0, "3D object {}: the colour part {} has no mask or no colours", obj.name, part.name);
 			continue;
 		}
-		if (obj.colours.size() < 7) obj.colours.push_back(std::move(part));
+		if (obj.colours.size() < THREE_D_PAINT_PARTS_MAX) obj.colours.push_back(std::move(part));
 	}
 }
 
@@ -2194,6 +2199,7 @@ static IndustryType IndexIndustryType(std::string_view name)
 	if (name == "IT_MARIJUANA_PLANTATION") return IT_MARIJUANA_PLANTATION;
 	if (name == "lihovar" || name == "IT_DISTILLERY") return IT_DISTILLERY;
 	if (name == "hospoda" || name == "IT_PUB") return IT_PUB;
+	if (name == "IT_OIL_REFINERY") return 4; // the original game's, IT_OIL_REFINERY of table/build_industry.h
 	return 0xFF;
 }
 
@@ -2252,6 +2258,20 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 		obj.industry = IndexIndustryType(obj.industry_name);
 		const std::string variant = e.value("varianta", std::string());
 		obj.industry_variant = variant == "kamen" ? 0 : variant == "bronz" ? 1 : -1;
+		/* One statue for both, its stone or bronze a colour of its palette (the colleague's hra/3d/SOCHA-BARVA-PRO-HRU.md;
+		 * the player: "the statue is there twice, make it one with a colour"). */
+		if (e.contains("varianty") && e.at("varianty").is_object()) {
+			for (const auto &[name, at] : e.at("varianty").items()) {
+				if (!at.is_number_integer()) continue;
+				if (name == "kamen") obj.variant_paint[0] = static_cast<int8_t>(std::clamp(at.get<int>(), 0, 15));
+				if (name == "bronz") obj.variant_paint[1] = static_cast<int8_t>(std::clamp(at.get<int>(), 0, 15));
+			}
+		}
+		if (e.contains("sdili") && e.at("sdili").is_array()) {
+			for (const auto &sh : e.at("sdili")) {
+				if (sh.is_object() && sh.contains("prumysl")) obj.shared_with.push_back(sh.at("prumysl").get<std::string>());
+			}
+		}
 		if (obj.industry == 0xFF) Debug(misc, 1, "3D object {}: the game has no industry {} (yet)", obj.name, obj.industry_name);
 		if (obj.industry == IT_PUB) AddMatyldaToPub(obj);
 	}
@@ -2553,8 +2573,24 @@ static void ReadThreeDObjects()
 	MakeStreetLamps();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
-		if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
-			Debug(misc, 0, "3D objects: industry {} variant {} has two records, {} is not drawn", o.industry_name, o.industry_variant, o.name);
+		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
+			/* One object for both of its variants by colour: it, and not the old one of each (kept in the set a while). */
+			for (int8_t v = 0; v < 2; v++) {
+				if (o.variant_paint[v] >= 0) _three_d_industry_objects.insert_or_assign(std::make_pair(o.industry, v), i);
+			}
+		} else if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
+			const auto it = _three_d_industry_objects.find(std::make_pair(o.industry, o.industry_variant));
+			if (_three_d_objects[it->second].variant_paint[0] < 0 && _three_d_objects[it->second].variant_paint[1] < 0) {
+				Debug(misc, 0, "3D objects: industry {} variant {} has two records, {} is not drawn", o.industry_name, o.industry_variant, o.name);
+			}
+		}
+		for (const std::string &name : o.shared_with) {
+			const IndustryType type = IndexIndustryType(name);
+			if (type == 0xFF) {
+				Debug(misc, 1, "3D object {}: the game has no industry {} to share it", o.name, name);
+			} else {
+				_three_d_shared_industry_objects.emplace(type, i);
+			}
 		}
 		if (!o.field_part.empty()) _three_d_field_parts.emplace(o.field_part, i);
 		for (uint slot = 0; slot < 4; slot++) {
@@ -2894,7 +2930,17 @@ static void ReadThreeDVehicleObjects()
 					}
 					/* A light (the colleague's torch and lantern): its glass ("noc") drawn with it, lit by its flame; and
 					 * a weapon that shoots rockets, a figure of it shot (its loaded rocket, "raketa_v_hlavni", left out). */
-					if (fig.thing && e.value("kategorie", std::string()) == "svetlo") fig.night_glass = true;
+					if (fig.thing && e.value("kategorie", std::string()) == "svetlo") {
+						fig.night_glass = true;
+						/* Its light as the index has it (the colleague's torch, 23. 10.: "the fire lights about, 10 m, it flickers"). */
+						if (e.contains("svetlo") && e.at("svetlo").is_object()) {
+							const auto &l = e.at("svetlo");
+							auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+							if (n.has_value()) fig.light_colour = *n & 0xFFFFFF;
+							fig.light_reach_m = std::clamp(l.value("dosah_m", 0.0f), 0.0f, 50.0f);
+							fig.light_flickers = l.value("blika", false);
+						}
+					}
 					/* A thing glowing at night (the colleague's glowing mushrooms, "kdy": "noc" with "noc"): its glass
 					 * part of it, lit; and a mushroom to pick among the mushrooms, its glowing one beside it. */
 					if (fig.thing && e.value("kdy", std::string()) == "noc" && e.contains("noc")) fig.night_glass = true;
@@ -3657,7 +3703,7 @@ enum LazyThing : int {
 	LAZY_SIMPLER = 5000,     ///< + the level
 	LAZY_HOUSE_SHAPE = 6000, ///< + the level
 	LAZY_HOUSE_MASK = 7000,  ///< + the part painted a colour
-	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its low sixteen bits)
+	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its halves mixed into sixteen bits)
 };
 
 /**
@@ -5083,6 +5129,40 @@ const ThreeDObject *GetThreeDIndustryObject(IndustryType type, bool variant)
 }
 
 /**
+ * The object of another kind an industry of the original game shows ("sdili": the refinery the distillery, the player,
+ * 23. 10.: "the refinery and the distillery may share, it is the same plant") and where: on the square of the
+ * industry's own tiles as big as the object nearest its middle, the other tiles its yard (GetThreeDIndustryYard()).
+ * @param[out] square the square's north tile
+ * @return the object, nullptr none or no square of the industry's tiles big enough
+ */
+static const ThreeDObject *SharedIndustryObject(const Industry *ind, TileIndex &square)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_shared_industry_objects.find(ind->type);
+	if (it == _three_d_shared_industry_objects.end() || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
+	const ThreeDObject *obj = &_three_d_objects[it->second];
+	const int w = ind->location.w, h = ind->location.h;
+	double best = -1;
+	for (int y0 = 0; y0 + obj->tiles_y <= h; y0++) {
+		for (int x0 = 0; x0 + obj->tiles_x <= w; x0++) {
+			bool own = true;
+			for (int y = 0; y < obj->tiles_y && own; y++) {
+				for (int x = 0; x < obj->tiles_x && own; x++) {
+					const TileIndex t = TileAddXY(ind->location.tile, x0 + x, y0 + y);
+					own = IsTileType(t, TileType::Industry) && GetIndustryIndex(t) == ind->index;
+				}
+			}
+			if (!own) continue;
+			const double off = std::hypot(x0 + obj->tiles_x / 2.0 - w / 2.0, y0 + obj->tiles_y / 2.0 - h / 2.0);
+			if (best >= 0 && off >= best) continue;
+			best = off;
+			square = TileAddXY(ind->location.tile, x0, y0);
+		}
+	}
+	return best >= 0 ? obj : nullptr;
+}
+
+/**
  * The 3D object an industry is drawn as: its type's, if the industry is as big as the object -- a pub of one tile
  * built before the pub was two by two (the colleague, 16. 10.: "the pub twice as big, on 2 x 2 tiles"), or a
  * coffeeshop of one tile from before the hut, stays as it was drawn then rather than lie over its neighbours.
@@ -5091,8 +5171,45 @@ const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind)
 {
 	if (ind == nullptr) return nullptr;
 	const ThreeDObject *obj = GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0));
-	if (obj == nullptr || obj->tiles_x != ind->location.w || obj->tiles_y != ind->location.h) return nullptr;
+	if (obj == nullptr) {
+		TileIndex square;
+		return SharedIndustryObject(ind, square);
+	}
+	if (obj->tiles_x != ind->location.w || obj->tiles_y != ind->location.h) return nullptr;
 	return obj;
+}
+
+/** The north tile of the 3D object an industry is drawn as (GetThreeDIndustryObjectOf()): its own, or the square of a shared one. */
+TileIndex GetThreeDIndustryObjectOrigin(const Industry *ind)
+{
+	TileIndex square;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) == nullptr && SharedIndustryObject(ind, square) != nullptr) return square;
+	return ind->location.tile;
+}
+
+/**
+ * A tile of an industry drawn as a shared object outside the object's square: its own tanks and columns of the original
+ * game (GetThreeDOriginalIndustryTile()) on trodden earth as the distillery's yard -- the colleague asked for asphalt,
+ * the player: "away with the asphalt about the distillery, it looks silly; the refinery is the same plant, the
+ * distilling of oil, tanks". nullptr for any other tile.
+ */
+const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile)
+{
+	TileIndex square;
+	if (GetThreeDIndustryObject(ind->type, HasBit(ind->random, 0)) != nullptr) return nullptr;
+	const ThreeDObject *obj = SharedIndustryObject(ind, square);
+	if (obj == nullptr) return nullptr;
+	const uint dx = TileX(tile) - TileX(square), dy = TileY(tile) - TileY(square);
+	if (dx < static_cast<uint>(obj->tiles_x) && dy < static_cast<uint>(obj->tiles_y)) return nullptr;
+	static std::map<IndustryGfx, ThreeDIndustryTileParts> yards;
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	auto [it, added] = yards.try_emplace(gfx);
+	if (added) {
+		if (const ThreeDIndustryTileParts *own = GetThreeDOriginalIndustryTile(gfx); own != nullptr) it->second = *own;
+		it->second.ground = GetThreeDObjectByName("pv_dvur_hlina");
+		it->second.member = false;
+	}
+	return &it->second;
 }
 
 /**
@@ -5629,6 +5746,15 @@ static std::atomic<size_t> _painted_bytes = 0;
 static constexpr size_t PAINTED_BUDGET = static_cast<size_t>(192) << 20;
 
 /**
+ * The bits of a part's colour in a paint (PaintAt()): four, sixteen colours a palette, for up to seven parts; three,
+ * eight colours, for more (the colleague's distillery has nine parts, 23. 10.), all of them below the top bit.
+ */
+static uint8_t PaintBits(size_t parts)
+{
+	return parts <= 7 ? 4 : 3;
+}
+
+/**
  * The colours of the house whose north tile is a tile ("barvy", the colleague: "each house another"): for each part
  * a colour of its palette by a hash of the tile, another bit of it for each part; 0 for a house without parts.
  * @return the colours' numbers, four bits a part, with the top bit set
@@ -5638,6 +5764,7 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 	if (this->colours.empty()) return 0;
 	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u;
 	uint32_t paint = 1u << 31;
+	const uint8_t bits = PaintBits(this->colours.size());
 	for (size_t k = 0; k < this->colours.size(); k++) {
 		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
 		x ^= x >> 15;
@@ -5645,7 +5772,13 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 		x ^= x >> 12;
 		x *= 0x297A2D39u;
 		x ^= x >> 15;
-		paint |= (x % std::min<size_t>(this->colours[k].palette.size(), 16)) << (4 * k);
+		paint |= (x % std::min<size_t>(this->colours[k].palette.size(), 1u << bits)) << (bits * k);
+	}
+	/* The statue of stone or of bronze (variant_paint): its first part the colour of its variant, by a bit of the
+	 * tile's hash -- of the tile only, as the rest: the frame from the eyes paints on threads of its own. */
+	if (this->variant_paint[0] >= 0 || this->variant_paint[1] >= 0) {
+		const int8_t c = this->variant_paint[(h >> 7) & 1];
+		if (c >= 0 && c < (1 << bits) && static_cast<size_t>(c) < this->colours[0].palette.size()) paint = (paint & ~((1u << bits) - 1)) | static_cast<uint32_t>(c);
 	}
 	return paint;
 }
@@ -5664,6 +5797,7 @@ uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
 	const uint32_t place = texture <= this->addon_places_of.size() ? this->addon_places_of[texture - 1] : 0;
 	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u ^ (place + 1) * 0x165667B1u;
 	uint32_t paint = 1u << 31;
+	const uint8_t bits = PaintBits(a.colours.size());
 	for (size_t k = 0; k < a.colours.size(); k++) {
 		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
 		x ^= x >> 15;
@@ -5671,7 +5805,7 @@ uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
 		x ^= x >> 12;
 		x *= 0x297A2D39u;
 		x ^= x >> 15;
-		paint |= (x % std::min<size_t>(a.colours[k].palette.size(), 16)) << (4 * k);
+		paint |= (x % std::min<size_t>(a.colours[k].palette.size(), 1u << bits)) << (bits * k);
 	}
 	return paint;
 }
@@ -6144,7 +6278,7 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
 /** Which thing of a building a painted texture is (MakeOnce()): its level and paint. */
 static int LazyHousePaint(int level, uint32_t paint)
 {
-	return LAZY_HOUSE_PAINT + level + 16 * static_cast<int>(paint & 0xFFFF);
+	return LAZY_HOUSE_PAINT + level + 16 * static_cast<int>((paint ^ (paint >> 16)) & 0xFFFF);
 }
 
 /**
@@ -6232,6 +6366,7 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint32_t paint) const
 {
 	ThreeDObjectTexture t = plain;
+	const uint8_t bits = PaintBits(this->colours.size());
 	for (size_t k = 0; k < this->colours.size(); k++) {
 		const ThreeDObjectColourPart &part = this->colours[k];
 		/* The mask, read the first time (on either thread). */
@@ -6248,7 +6383,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 				break;
 			}
 		}
-		const Colour colour(part.palette[GB(paint, static_cast<uint8_t>(4 * k), 4) % part.palette.size()]);
+		const Colour colour(part.palette[GB(paint, static_cast<uint8_t>(bits * k), bits) % part.palette.size()]);
 		const float start = static_cast<float>(part.start);
 		for (int y = 0; y < t.h; y++) {
 			const int my = std::min(mask->h - 1, y * mask->h / t.h);

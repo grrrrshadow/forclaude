@@ -439,7 +439,8 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 	top = 0;
 	const int base_z = GetTileMaxPixelZ(ind->location.tile);
 	const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
-	if (obj != nullptr) {
+	const TileIndex origin = obj != nullptr ? GetThreeDIndustryObjectOrigin(ind) : INVALID_TILE;
+	if (obj != nullptr && origin == ind->location.tile && obj->tiles_x == ind->location.w && obj->tiles_y == ind->location.h) {
 		ThreeDObjectPlacement &p = parts.emplace_back();
 		p.obj = obj;
 		p.paint = obj->PaintAt(ind->location.tile);
@@ -463,7 +464,18 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		laid.emplace_back((c * mx - s * my) + (s * mx + c * my) + bias, p);
 		if (o != nullptr) top = std::max(top, static_cast<int>(std::ceil(o->top)));
 	};
-	if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
+	if (obj != nullptr) {
+		/* The refinery as the distillery (GetThreeDIndustryYard()): the distillery on its square, the refinery's tanks and columns on the other tiles. */
+		for (TileIndex tile : ind->location) {
+			if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != ind->index) continue;
+			const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, tile);
+			if (yard == nullptr) continue;
+			if (yard->ground != nullptr) lay(tile, yard->ground, nullptr, {}, -1e6);
+			for (const ThreeDObject *part : yard->parts) lay(tile, part, nullptr, {}, 0);
+		}
+		lay(origin, obj, nullptr, GetThreeDIndustryGirls(ind, obj), 0);
+		laid.back().second.paint = obj->PaintAt(origin);
+	} else if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
 		/* An industry of the original game from the parts the industries share, as the map lays it
 		 * (AddOriginalIndustryTile() of viewport.cpp): each tile's ground, first; the parts and the plants of each
 		 * built tile that is no member of a block (a block's anchor stands for all of it). The forest's trees on each

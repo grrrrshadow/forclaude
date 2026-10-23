@@ -8766,7 +8766,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* Where the game's own industries drawn as 3D objects stand on the map, and the plantations. */
 		for (const Industry *ind : Industry::Iterate()) {
 			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
-			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{} {}x{}{}, girls {}", obj->name, ind->type, TileX(ind->location.tile), TileY(ind->location.tile), ind->location.w, ind->location.h, IsIndustryCompleted(ind->location.tile) ? "" : " (being built)", GetThreeDIndustryGirls(ind, obj).size());
+			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{} {}x{}{}, girls {}", obj->name, ind->type, TileX(GetThreeDIndustryObjectOrigin(ind)), TileY(GetThreeDIndustryObjectOrigin(ind)), ind->location.w, ind->location.h, IsIndustryCompleted(ind->location.tile) ? "" : " (being built)", GetThreeDIndustryGirls(ind, obj).size());
 			ThreeDPlantationTile pt;
 			if ((ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDPlantationTile(ind->location.tile, pt)) {
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");

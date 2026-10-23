@@ -2326,6 +2326,8 @@ STR_WALKER_ITEM_SEEDLING                                        :Marijuana seedl
 STR_WALKER_ITEM_HAY                                             :Marijuana hay
 STR_WALKER_ITEM_WAR_HAMMER                                      :War hammer
 STR_WALKER_ITEM_PITCHFORK                                       :Pitchfork
+STR_WALKER_ITEM_PAPER_LANTERN                                   :Paper lantern
+STR_WALKER_ITEM_IRON_LANTERN                                    :Candle lantern
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

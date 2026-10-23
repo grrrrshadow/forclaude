@@ -214,10 +214,10 @@
    "uzel": "noc",
    "svetla": 1
   },
-  "barva_svetla": "B48CFF",
+  "barva_svetla": "40FF40",
   "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
   "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
-  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #B48CFF (emissive), prázdný uzel svetlo_00 v klobouku"
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #40FF40 (emissive), prázdný uzel svetlo_00 v klobouku"
  },
  {
   "soubor": "houba_ryzec.glb",

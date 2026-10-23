@@ -2431,6 +2431,8 @@ STR_WALKER_ITEM_SEEDLING                                        :Sazenice marihu
 STR_WALKER_ITEM_HAY                                             :Marihuanové seno
 STR_WALKER_ITEM_WAR_HAMMER                                      :Válečné kladivo
 STR_WALKER_ITEM_PITCHFORK                                       :Vidle
+STR_WALKER_ITEM_PAPER_LANTERN                                   :Papírová lucerna
+STR_WALKER_ITEM_IRON_LANTERN                                    :Kovaná lucerna
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

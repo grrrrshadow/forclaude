@@ -4456,7 +4456,9 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 	if (!built) return;
 	if (obj != nullptr) {
 		LeaveOutTileSprites(first_parent, north);
-		const TileIndex origin = ind->location.tile;
+		/* The refinery as the distillery (GetThreeDIndustryYard()): its tanks and columns beside the distillery. */
+		if (const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, _cur_ti.tile); yard != nullptr) AddOriginalIndustryTile(_cur_ti.tile, *yard, true);
+		const TileIndex origin = GetThreeDIndustryObjectOrigin(ind);
 		bool known = false;
 		for (const TurnedObject &to : _turned_objects) {
 			if (to.origin == origin && to.obj == obj) known = true;
@@ -10681,7 +10683,10 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 						const Industry *ind = Industry::GetByTile(tile);
 						const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 						if (obj != nullptr) {
-							if (ind->location.tile == tile) far_object(obj, tile);
+							if (GetThreeDIndustryObjectOrigin(ind) == tile) far_object(obj, tile);
+							if (const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, tile); yard != nullptr) {
+								for (const ThreeDObject *p : yard->parts) far_object(p, tile);
+							}
 						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member) {
 							/* An industry of the original game from the shared parts: its buildings from their anchors. */
 							for (const ThreeDObject *p : parts->parts) far_object(p, tile);
@@ -11107,7 +11112,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ThreeDFieldTile ft;
 			if (obj != nullptr) {
 				kind = 5;
-				const TileIndex origin = ind->location.tile;
+				if (const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, _cur_ti.tile); yard != nullptr) {
+					const int z = GetTileMaxPixelZ(_cur_ti.tile);
+					if (yard->ground != nullptr) objects.push_back({yard->ground, _cur_ti.tile, z});
+					for (const ThreeDObject *p : yard->parts) objects.push_back({p, _cur_ti.tile, z});
+				}
+				const TileIndex origin = GetThreeDIndustryObjectOrigin(ind);
 				bool known = false;
 				for (const CabObject &co : objects) {
 					if (co.origin == origin) known = true;

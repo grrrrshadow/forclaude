@@ -372,19 +372,19 @@
   "vaha_kg": 0.6,
   "rozmer_m": {
    "x": [
-    -0.076,
-    0.022
+    -0.127,
+    0.073
    ],
    "y": [
-    -0.052,
-    0.067
+    -0.097,
+    0.102
    ],
    "z": [
     0.0,
-    0.849
+    1.105
    ]
   },
-  "trojuhelniku": 2406,
+  "trojuhelniku": 4894,
   "autor": "Torch stick, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/torch-stick-d8eadee1a5c14483aade99b1fe5bc150) s naším plamenem, převod predmety/par14_predmety.py bez renderu; zvuk torch_out.wav z OpenMW Example Suite (CC0)",
   "licence": "CC BY 4.0 (uvést DJMaesen; změny: zmenšená na 0,65 m, plamen náš), zvuk CC0",
   "zvuky": {
@@ -392,8 +392,8 @@
   },
   "plamen": {
    "uzly": "plamen_",
-   "snimku": 4,
-   "tiku": 3
+   "snimku": 6,
+   "tiku": 2
   },
   "uzly": {
    "uchyt": [
@@ -404,10 +404,16 @@
    "svetlo": [
     -0.027,
     0.002,
-    0.705
+    0.725
    ]
   },
-  "poznamka": "pochodeň 0,65 m z modelu Torch stick (hráč: „tady je pochodeň“; Example Suite pochodeň neměla, jen zvuk zhasnutí): násada a omotaná hlava modelu, nahoře náš plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v plameni (teplá oranžová, dosah kolem 8 m), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo); glb z gltfpacku"
+  "svetlo": {
+   "barva": "FF9A3C",
+   "dosah_m": 10,
+   "blika": true,
+   "poznamka": "hráč 23. 10.: „to ma svitit okolo“ – oheň svítí kolem: světlo z uzlu svetlo, dosah 10 m, bliká se snímky plamene"
+  },
+  "poznamka": "pochodeň 0,65 m z modelu Torch stick (hráč: „tady je pochodeň“; Example Suite pochodeň neměla, jen zvuk zhasnutí): násada a omotaná hlava modelu, nahoře náš oheň v šesti snímcích plamen_00 až plamen_05 (od 23. 10. predmety/ohen.py: jádro, plamen, tři jazyky, průsvitná záře kolem a jiskry; hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v ohni (oranžová, dosah 10 m, bliká), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo); glb z gltfpacku"
  },
  {
   "soubor": "lucerna.glb",
@@ -418,24 +424,24 @@
    "en": "lantern"
   },
   "kategorie": "svetlo",
-  "vaha_kg": 1.2,
+  "vaha_kg": 0.8,
   "rozmer_m": {
    "x": [
-    -0.055,
-    0.055
+    -0.077,
+    0.077
    ],
    "y": [
-    -0.055,
-    0.055
+    -0.077,
+    0.077
    ],
    "z": [
     0.0,
-    0.35
+    0.343
    ]
   },
-  "trojuhelniku": 2541,
-  "autor": "Roblox Lantern, Luigi2013 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/roblox-lantern-09e8f799eb2646ccb3e1fdeee69c42d2), převod predmety/noc_predmety.py bez renderu; plamen vlastní",
-  "licence": "CC BY 4.0 (uvést Luigi2013; změny: zmenšená, svítící sklo, plamen)",
+  "trojuhelniku": 2370,
+  "autor": "grrrrf: vlastní model (predmety/lucerna_svicka.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
   "plamen": {
    "uzly": "plamen_",
    "snimku": 4,
@@ -445,15 +451,19 @@
    "uchyt": [
     0.0,
     0.0,
-    0.33999999999999997
+    0.336
    ],
    "svetlo": [
     0.0,
-    0.005,
-    0.071
+    0.0,
+    0.142
    ]
   },
-  "poznamka": "petrolejová lucerna 0,35 m (nádržka dole, sklo, víčko, ucho); uzel noc = sklo, které v noci svítí; plamen ve čtyřech snímcích plamen_00 až plamen_03 ve skle; prázdné uzly svetlo (ve skle) a uchyt (v uchu nahoře); počátek pod středem nádržky"
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 6
+  },
+  "poznamka": "lucerna na svíčku (hráč 23. 10.: „normální skleněná krabička na svíčku“): skleněná krabička 13 × 13 × 18 cm v černém železném rámečku, jehlanová stříška s komínkem a kruhem na nošení; uvnitř bílá svíčka na mosazné misce, plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, svítí samy, bez normál); skla ve dne průhledná, v noci uzel noc = svítící skla; prázdné uzly svetlo (v plameni) a uchyt (v kruhu nahoře); počátek pod středem dna, z nahoru; glb z gltfpacku; nahrazuje lucernu z Roblox Lantern (vypadala jako svítilna na baterky)"
  },
  {
   "soubor": "kladivo_valecne.glb",
@@ -514,5 +524,124 @@
   "autor": "pitchfork Animated, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/pitchfork-animated-54ea2a82f7d74e8fabbc7245bec7be14), jen vidle bez rukou, převod tvorove/par15_tvorove.py bez renderu",
   "licence": "CC BY 4.0 (uvést DJMaesen; změny: jen vidle bez rukou a kostry, otočené, 1,5 m)",
   "poznamka": "zbraň do ruky (hráč: „vidle zbraň“) jako válečné kladivo: počátek na spodním konci násady, násada po +z, hroty nahoře v rovině x (bodá se dopředu), prázdný uzel uchyt na násadě 0,45 m nad koncem; ruce s animacemi z modelu zatím ne (PROSBA-LES-PRUMYSL-SVETLA.md bod 5); glb z gltfpacku"
+ },
+ {
+  "soubor": "lucerna_papirova.glb",
+  "jmeno": "lucerna_papirova",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "papírová lucerna",
+   "en": "paper lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 0.4,
+  "rozmer_m": {
+   "x": [
+    -0.11,
+    0.11
+   ],
+   "y": [
+    -0.11,
+    0.11
+   ],
+   "z": [
+    -0.36,
+    0.007
+   ]
+  },
+  "trojuhelniku": 1012,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lucerna_svicka.py, tvar z predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "svetlo": [
+    0.0,
+    0.0,
+    -0.207
+   ]
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lucerna_papirova_maska_papir.png",
+    "zacatek": 224,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc"
+  },
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 6
+  },
+  "poznamka": "papírová lucerna do ruky ve stylu Morrowindu (hráč 23. 10.: „ukazoval jsi mi lucernu ve stylu morrowindu“; stejný tvar jako závěsná lampa_papirova z 18. 10., 0,6×): vejčitý papír, tmavá dřevěná víčka a obruče, šňůra s háčkem; počátek a uchyt v háčku, lucerna visí pod rukou; papír oranžový, barvou číslem z palety jako lampa (barvy, cast papir); uzel noc = papír, který v noci svítí; prázdný uzel svetlo uprostřed; glb z gltfpacku"
+ },
+ {
+  "soubor": "lucerna_kovana.glb",
+  "jmeno": "lucerna_kovana",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "kovaná lucerna",
+   "en": "candle lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 1.0,
+  "rozmer_m": {
+   "x": [
+    -0.088,
+    0.088
+   ],
+   "y": [
+    -0.088,
+    0.088
+   ],
+   "z": [
+    0.0,
+    0.32
+   ]
+  },
+  "trojuhelniku": 9713,
+  "autor": "Candle Lantern, Laetitia Irata (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/candle-lantern-dd0a255416fa47ddb9e5c179d86ef437) s naším ohněm, převod predmety/par15_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Laetitia Irata; změny: zmenšená na 0,32 m, plamen náš, svítící sklo)",
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 6,
+   "tiku": 3
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.312
+   ],
+   "svetlo": [
+    -0.002,
+    0.002,
+    0.103
+   ]
+  },
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 7,
+   "blika": true
+  },
+  "noc": {
+   "uzel": "noc"
+  },
+  "poznamka": "kovaná lucerna na svíčku (poslal hráč 23. 10.: „koukni jak pěkně sviti“): černý rámeček s křížky přes skla, uvnitř svíčka, která sama svítí jako v modelu; plamen náš (predmety/ohen.py) v šesti snímcích plamen_00 až plamen_05 na knotu, skla ve dne jako v modelu, v noci uzel noc = teplá svítící skla; prázdné uzly svetlo (v plameni) a uchyt (v kruhu nahoře); počátek pod středem dna, z nahoru; glb z gltfpacku"
  }
 ]

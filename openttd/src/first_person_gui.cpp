@@ -168,6 +168,8 @@ struct FirstPersonLight {
 static const FirstPersonLight _first_person_lights[] = {
 	{WalkerItem::Torch, "pochoden", 0xFF9A40, 8.0},
 	{WalkerItem::Lantern, "lucerna", 0xFFC070, 8.0},
+	{WalkerItem::PaperLantern, "lucerna_papirova", 0xFFB24A, 6.0},
+	{WalkerItem::IronLantern, "lucerna_kovana", 0xFFB24A, 7.0},
 };
 
 /** An arrow or a bolt the walker shot: flying, or stuck where it hit. Only the screen, never saved. */
@@ -259,10 +261,10 @@ static bool FirstPersonWalkable(double x, double y)
 			if (!IsIndustryCompleted(tile)) return false;
 			const Industry *ind = Industry::GetByTile(tile);
 			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
-			const TileIndex origin = ind->location.tile;
-			if (obj == nullptr) {
-				/* One of the original game from the parts the industries share (the forest): by its buildings' shapes
-				 * and its trees' trunks. */
+			const TileIndex origin = GetThreeDIndustryObjectOrigin(ind);
+			if (obj == nullptr || GetThreeDIndustryYard(ind, tile) != nullptr) {
+				/* One of the original game from the parts the industries share (the forest; the refinery's tanks beside
+				 * the distillery it shows): by its buildings' shapes and its trees' trunks. */
 				const std::optional<bool> blocks = ThreeDOriginalIndustryBlocks(tile, x, y);
 				return blocks.has_value() && !*blocks;
 			}
@@ -784,8 +786,11 @@ struct FirstPersonWindow : Window {
 		std::copy(at.begin(), at.end(), left.grip);
 		const ThreeDVehicleObject *fig = GetThreeDFigure(l.thing);
 		left.frame = fig != nullptr && fig->frames >= 2 ? static_cast<int>(this->light_time * 1000.0 / (MILLISECONDS_PER_TICK * fig->frame_ticks)) % fig->frames : 0;
-		this->walker.light_colour = l.colour;
-		this->walker.light_reach_m = l.reach_m * left.raise;
+		/* Its light as its index has it (the torch's fire 10 m about, flickering with the flame), else the game's own. */
+		this->walker.light_colour = fig != nullptr && fig->light_colour != 0 ? fig->light_colour : l.colour;
+		double reach = fig != nullptr && fig->light_reach_m > 0 ? fig->light_reach_m : l.reach_m;
+		if (fig != nullptr && fig->light_flickers) reach *= 0.9 + 0.1 * std::abs(std::sin(this->light_time * 7.3) * std::sin(this->light_time * 2.9 + left.frame));
+		this->walker.light_reach_m = reach * left.raise;
 	}
 
 	/** L: the next light the walker carries into the left hand, after the last one out (the torch, the lantern, none). */
@@ -1470,7 +1475,7 @@ std::string RigFirstPersonLight()
 	w->light_held = w->light;
 	w->walker.left.raise = w->light >= 0 ? 1.0f : 0.0f;
 	w->HoldLight(0);
-	return w->walker.left.thing.empty() ? std::string("nic") : fmt::format("{} snimek {} uchyt {:.2f},{:.2f},{:.2f}", w->walker.left.thing, w->walker.left.frame, w->walker.left.grip[0], w->walker.left.grip[1], w->walker.left.grip[2]);
+	return w->walker.left.thing.empty() ? std::string("nic") : fmt::format("{} snimek {} uchyt {:.2f},{:.2f},{:.2f} barva {:06X} dosah {:.1f} m", w->walker.left.thing, w->walker.left.frame, w->walker.left.grip[0], w->walker.left.grip[1], w->walker.left.grip[2], w->walker.light_colour, w->walker.light_reach_m);
 }
 
 std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)

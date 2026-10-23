@@ -27,6 +27,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 23. 10. noc – socha jedna s barvou, lihovar 7 barev, rafinerie jako lihovar, nové lucerny
+
+- Převzato od kolegy (`SOCHA-BARVA`, `PRUCHOZI-PRUMYSL`, `TATRA-OSOBNI-V12`, `LIHOVAR-7-CASTI`): socha, gymnázium,
+  hospoda, chatka, automat, lihovar (světlejší atlasy, průchody v plotech), dračí farma (zatím jen model, průmysl
+  hry ještě není), lucerna na svíčku (skleněná krabička místo „svítilny na baterky“), papírová a kovaná lucerna,
+  pochodeň s ohněm, `college_girl_za_volantem` (řidička Volgy cabrio – vybírá ji GRF), kobold, dinosaurus, zelená
+  pečárka. **Moe a Lenny (Springfield) vynechaní**, farmářka dál pryč.
+- **Socha jednou:** `socha.glb` s barvou číslem, `varianty` kámen 0 / bronz 1. Hra bere novou sochu místo
+  socha_kamen/socha_bronz (ty zatím v sadě zůstávají). Kámen/bronz podle dlaždice (ne podle průmyslu – barvy se
+  počítají i na vlákně kreslení, kde se na průmysl sahat nesmí). V rigu jedna kamenná, druhá bronzová.
+- **Barvy číslem až 10 částí** (hráč: *„tak nech ten s deseti částmi“*): do 7 částí 4 bity na část (16 barev),
+  nad 7 částí 3 bity (8 barev). Kolega mezitím lihovar zmenšil na 7 částí – obojí funguje.
+- **Rafinerie jako lihovar** (`sdili`, hráč: *„rafinerie a lihovar můžou sdílet, stejné zařízení – destilace“*):
+  na rafinerii (původní hra) stojí lihovar 3×3 na čtverci jejích políček nejblíž středu. Kolega navrhl kolem
+  asfalt (`pv_dvur_asfalt`) – hráč: *„dej to pryč ten asfalt kolem lihovaru, vypadá to blbě“*, *„destilace ropy,
+  nádrže“*: na zbylých políčkách jsou pece, nádrže a kolony rafinerie z `prumysl_vanilla` na udusané hlíně
+  (`pv_dvur_hlina`). Mapa, pohled z očí, náhled u okna i chůze (díly blokují tvarem).
+- **Nové lucerny do levé ruky:** papírová (Morrowind) a kovaná – věci inventáře od začátku, koupit v obchodě,
+  L je střídá s pochodní a lucernou, jdou dát pod 1–9. Barva a dosah světla teď z indexu (`svetlo`: pochodeň 10 m,
+  bliká; lucerna 6 m; kovaná 7 m, bliká). Papírová lucerna zatím bez barvy číslem (věci v ruce barvy neumí).
+- `pruchody` hra nečte: chodec chodí podle tvaru, mezera v plotě je průchod sama.
+- Zbývá: dračí farma jako průmysl (#177), nový les s MUSH (#178), vagony v5 světla, snimky.log, jizda.log, texty.log.
+
 ## 23. 10. večer – les: náhled a vstup, houby, lucerna, vidle, dračí farma
 
 - **Náhled 3D u okna lesa** (hráč: *„les nefungoval 3D náhled u okna průmyslu“*): náhled znal jen průmysl z jednoho

@@ -57,6 +57,8 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_HAY, 0, 0, WalkerItemKind::Thing, CT_HEMP_FIBRE},
 	{STR_WALKER_ITEM_WAR_HAMMER, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_PITCHFORK, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_PAPER_LANTERN, 6, 0, WalkerItemKind::Light},
+	{STR_WALKER_ITEM_IRON_LANTERN, 15, 0, WalkerItemKind::Light},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -107,7 +109,9 @@ bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile)
 		case WalkerItem::Cigarettes:
 		case WalkerItem::Goods:
 		case WalkerItem::Torch:
-		case WalkerItem::Lantern: return IsShopHouse(tile);
+		case WalkerItem::Lantern:
+		case WalkerItem::PaperLantern:
+		case WalkerItem::IronLantern: return IsShopHouse(tile);
 		default: return false;
 	}
 }

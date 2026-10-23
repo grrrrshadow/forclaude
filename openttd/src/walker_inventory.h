@@ -55,6 +55,8 @@ enum class WalkerItem : uint8_t {
 	Hay,        ///< marijuana hay, a plant harvested too late: for the dragons (the player, 21. 10.: "a dragon farm")
 	WarHammer,  ///< the war hammer (the colleague's objekty/predmety/kladivo_valecne.glb, par14), swung as the hammer; from iddqd
 	Pitchfork,  ///< the pitchfork (the colleague's objekty/predmety/vidle.glb, par15), struck as the hammer; from iddqd
+	PaperLantern, ///< the paper lantern of Morrowind (the colleague's objekty/predmety/lucerna_papirova.glb): a light, hung from the left hand
+	IronLantern,  ///< the wrought candle lantern (the colleague's objekty/predmety/lucerna_kovana.glb): a light
 	End,        ///< the end of the known things
 };
 
@@ -107,6 +109,8 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::Bolts)] = WALKER_AMMUNITION_FULL;
 	items[static_cast<size_t>(WalkerItem::Torch)] = 1;
 	items[static_cast<size_t>(WalkerItem::Lantern)] = 1;
+	items[static_cast<size_t>(WalkerItem::PaperLantern)] = 1;
+	items[static_cast<size_t>(WalkerItem::IronLantern)] = 1;
 	items[static_cast<size_t>(WalkerItem::MachineGun)] = 1;
 	items[static_cast<size_t>(WalkerItem::Bullets)] = WALKER_BULLETS_FULL;
 	items[static_cast<size_t>(WalkerItem::RocketLauncher)] = 1;

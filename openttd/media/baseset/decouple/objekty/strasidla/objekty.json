@@ -163,5 +163,35 @@
   "autor": "Witch, MAXDESIGN-3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-2a7672475d514543b618b5a82fd5582b) s koštětem z Witch Roll, xinus22 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-roll-1aa67a75063a42cb8cfe273c04186021), převod tvorove/par14_tvorove.py bez renderu",
   "licence": "CC BY 4.0 (uvést MAXDESIGN-3D a xinus22; změny: hůl pryč, v pravé ruce koště z Witch Roll, otočená, zmenšená na skutečnou velikost)",
   "poznamka": "strašidlo: v noci kolem měst, útočí sama (hráč: „soubor witch do ruky koště, to je strašidlo“); skutečné metry (1.65 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; kostra a pohyb modelu (pozy klid: stojí, kývá se; chůzi model nemá); místo hole koště (0.92 m) jako síť se skinem: štětiny na kořenové kosti (stojí na zemi), k pěsti plynule na kosti pravé ruky (drží ho, koště se naklání kolem špičky)"
+ },
+ {
+  "soubor": "kobold.glb",
+  "jmeno": "kobold",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "kobold",
+   "en": "kobold"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   0.98,
+   0.87,
+   1.3
+  ],
+  "pozy": {
+   "klid": {
+    "animace": "Idle",
+    "snimku": 49,
+    "tiku": 3
+   }
+  },
+  "trojuhelniku": 12746,
+  "autor": "Animated Kobold, greeneyed3DArtist (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/animated-kobold-0da9989223424d4d80137c0bbf4979fa), převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést greeneyed3DArtist; změny: otočený, zmenšený na skutečnou velikost, dýka připnutá na ruku, záběr T-póza pryč)",
+  "poznamka": "strašidlo (hráč: „strašidlo vlk“): v noci kolem mírných měst, útočí; až bude les, v noci v lese (PROSBA-LES-PRUMYSL-SVETLA.md); skutečné metry (1.3 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; kostra a pohyb modelu (pozy klid: stojí s dýkou, kývá se; chůzi model nemá); dýka (Dagger.001_Dagger_0) je na kosti levé ruky"
  }
 ]

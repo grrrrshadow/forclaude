@@ -475,5 +475,26 @@
   "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
   "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
   "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "dinosaurus.glb",
+  "jmeno": "dinosaurus",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "dinosaurus",
+   "en": "funny dinosaur"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.7,
+   0.77,
+   1.6
+  ],
+  "kde": "okoli",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 15058,
+  "autor": "Funny Dinosaur, emelyarules (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/funny-dinosaur-bb5cd2c390e0403885b6f9bf04daf2d6), převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést emelyarules; změny: otočený, zmenšený na 1,6 m)",
+  "poznamka": "zvíře (hráč: „zvířata funny dinosaur“) kolem měst, neútočí; 1,6 m vysoký, meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
  }
 ]
