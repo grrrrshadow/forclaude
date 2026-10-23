@@ -57,6 +57,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   `dvere_NN` (pant, E otevře), `okno_NN` (otvor pro pohled i střelu), `noc`+`svetlo_NN`, `truhla_NN` (později).
   Dům s interiérem: průchod za každými dveřmi, křídlo vchodu `dvere_NN` v glb domu. OpenMW jen nápady (GPL 3).
   **Napřed kino** (kolega pošle interiér); hra se kóduje, až přijde.
+- **`snimky.log` rozšířený:** u kreslení z očí na kartě zvlášť `priprava` (procesor chystá trojúhelníky), `karta`
+  (posílání a kreslení kartou), `rohu` (rohů trojúhelníků na snímek) a `procesorem` (snímky bez karty). Na tomhle
+  stroji (llvmpipe, karta v procesoru): ~9 snímků z očí/s, příprava 2 ms, karta ~78 ms, 84 tisíc rohů. Telefon
+  (~10 snímků/s, 30 na otočku) ukáže, jestli brzdí karta (Vortek/zink) nebo procesor.
 - **Auto nejelo** (hráč: *„stopnul jsem auto před depem, došel k němu z očí, chtěl jet, ale jen se točilo doleva
   doprava“*): v rigu se zastavené auto šipkou nahoru rozjede (i u depa) – příčinu nevidím. Proto **deník `jizda.log`**:
   když je zmáčknutá šipka nahoru a auto 2 s stojí, zapíše se všechno, co ho drží (zastaveno, porucha, volná jízda,

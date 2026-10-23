@@ -55,6 +55,10 @@ struct Times {
 Times _game_ticks;    ///< the game's ticks (its own thread)
 Times _eye_collected; ///< the view from the eyes collected (the main thread)
 Times _eye_drawn;     ///< and drawn (its thread)
+Times _eye_prepared;  ///< of that on the card: its steps and triangles made ready by the processor
+Times _eye_card;      ///< and the card's own work (ThreeDGpuRenderEyeFrame(): sent, drawn, shown)
+std::atomic<uint64_t> _eye_corners{0};   ///< the triangles' corners sent to the card, all the frames together
+std::atomic<uint32_t> _eye_by_cpu{0};    ///< frames the processor drew (no card, or one the card could not)
 
 /* The frames of the drawing since the last line (the main thread only). */
 int _frames = 0;
@@ -84,21 +88,38 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 		}
 		fmt::print(*_diary, "OpenTTD Decouple: denik snimku (kazdych 5 s). snimky/s = jak casto hra kresli a cte klavesy; nejdelsi snimek a z ceho byl:"
 				" buffer = cekani na obrazovku, zamek = cekani na tik hry, klavesy, okna = okna a jejich kresleni (i sber pohledu z oci), obraz = predani obrazu karte;"
-				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne.\n");
+				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
+				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
+				" procesorem = snimky kreslene bez karty.\n");
 	}
 	const std::time_t t = std::time(nullptr);
 	char clock[16];
 	std::strftime(clock, sizeof(clock), "%H:%M:%S", std::localtime(&t));
 	const int n = std::max(1, _frames);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | tiky hry {} | oci sber {} | oci kresleni {}\n",
+	const uint32_t card_frames = _eye_card.count.load();
+	const uint64_t corners = _eye_corners.exchange(0);
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
-			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take());
+			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
+			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0));
 	fflush(*_diary);
 	_lines++;
 }
 
 } // namespace
+
+/** A frame of the view from the eyes drawn (its thread): on the card, what the processor made ready and what the card did, and how many corners went; else by the processor. */
+void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t corners)
+{
+	if (!on_card) {
+		_eye_by_cpu++;
+		return;
+	}
+	_eye_prepared.Add(prepare_ms);
+	_eye_card.Add(card_ms);
+	_eye_corners += corners;
+}
 
 /** A frame of the drawing done (the main thread): its parts. */
 void FrameDiaryDraw(const FrameDiaryParts &parts)

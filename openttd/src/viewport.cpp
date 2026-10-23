@@ -12053,6 +12053,7 @@ bool _eye_synchronous = false;
 static bool DrawEyeFrameOnCard(EyeFrame &f)
 {
 	if (!_eye_frame_on_card || !ThreeDGpuAvailable()) return false;
+	const double start = TurnedNow();
 	EyeCard card(f);
 	ThreeDGpuEyeFrame &c = card.frame;
 	c.width = f.width;
@@ -12070,7 +12071,10 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 			return false;
 		}
 	}
+	const double prepared = TurnedNow();
 	if (!ThreeDGpuRenderEyeFrame(c)) return false;
+	/* Where the time goes on the player's machine (snimky.log): the processor's part and the card's. */
+	FrameDiaryEyeCard(true, prepared - start, TurnedNow() - prepared, c.corners.size());
 	if (c.shown != 0) {
 		f.shown = c.shown;
 		return true;
@@ -12087,6 +12091,7 @@ static void DrawEyeFrame(EyeFrame &f)
 	f.shown = 0;
 	const bool on_card = DrawEyeFrameOnCard(f);
 	if (!on_card) {
+		FrameDiaryEyeCard(false, 0, 0, 0);
 		for (EyePass &p : f.passes) {
 			if (p.work) {
 				p.work(f.pixels.data(), f.depth.data());

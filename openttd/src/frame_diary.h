@@ -15,6 +15,8 @@
 #ifndef FRAME_DIARY_H
 #define FRAME_DIARY_H
 
+#include <cstddef>
+
 /** The parts of a frame of the drawing (VideoDriver::Tick()), milliseconds. */
 struct FrameDiaryParts {
 	double buffer = 0; ///< the video buffer locked (a wait for the screen)
@@ -29,5 +31,6 @@ void FrameDiaryDraw(const FrameDiaryParts &parts);
 void FrameDiaryGameTick(double ms);
 void FrameDiaryEyeCollected(double ms);
 void FrameDiaryEyeDrawn(double ms);
+void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t corners);
 
 #endif /* FRAME_DIARY_H */
