@@ -58,6 +58,10 @@ static constexpr float THREE_D_MAP_CREATURE_SCALE = 3.0f;
 static constexpr float THREE_D_EYE_PEOPLE_SCALE = 1.15f;
 /** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
 static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
+
+/** The glow of a lone light of an object ("svetlo_NN", a lit window's), its radius, world units. */
+static constexpr double THREE_D_GLOW_UNITS = 1.2;
+float ThreeDGlowShare(const std::vector<float> &lights, size_t i);
 /**
  * How far the walker of the view from the first person keeps from a wall, metres: half a body across and a little
  * (first_person_gui.cpp; ThreeDObject::Blocks() shuts a door narrower than that). It was 1.4 m, a walker three metres

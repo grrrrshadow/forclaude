@@ -1981,7 +1981,7 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
  */
 static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
-static std::vector<std::array<double, 3>> _night_glows;
+static std::vector<std::array<double, 4>> _night_glows;
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
 static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
@@ -4012,7 +4012,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 		}
 	}
 	if (_night_windows_now && o != nullptr) {
-		for (size_t i = 0; i + 2 < o->lights.size(); i += 3) _night_glows.push_back({ox + o->lights[i], oy + o->lights[i + 1], oz + o->lights[i + 2]});
+		for (size_t i = 0; i + 2 < o->lights.size(); i += 3) _night_glows.push_back({ox + o->lights[i], oy + o->lights[i + 1], oz + o->lights[i + 2], ThreeDGlowShare(o->lights, i)});
 	}
 }
 
@@ -5471,7 +5471,7 @@ static void DrawNight(bool turned)
 		project(g[0], g[1], g[2], px, py);
 		if (px < 0 || py < 0 || px >= w || py >= h) continue;
 		if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
-		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit, 1.4 * unit, window, 0.35);
+		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit * g[3], 1.4 * unit * g[3], window, 0.35);
 	}
 	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block. */
 	auto model_light = [&](double hx, double hy, const ThreeDPictureLight &l) {
@@ -10291,38 +10291,79 @@ static std::vector<ThreeDGpuEyeLight> EyeLampsLit(const CabEye &eye, int width, 
 	return lit;
 }
 
+/**
+ * The lights (EyeLampsLit(), EyeWitchLightsLit()) lighting what is about them, all at once: each pixel its own colour
+ * out of the dark in the light of all of them together -- that own colour taken from the dark picture once, and the
+ * light of all of them as much as a day's at most. One after the other, each light took the pixel the one before
+ * had lit for its colour in the dark and lit that again: under the sixteen bulbs of the cinema's entrance the light
+ * grew on itself to white (the player, 23. 10.: "the cinema shines too much at night"; the doors not to be seen).
+ */
+static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDGpuEyeLight> &lit)
+{
+	if (lit.empty()) return;
+	const NightLight moon = GetNightLight();
+	/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground. */
+	const double zu_per_unit = CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+	int x0 = width, x1 = -1, y0 = height, y1 = -1;
+	for (const ThreeDGpuEyeLight &g : lit) {
+		x0 = std::min(x0, g.x0);
+		x1 = std::max(x1, g.x1);
+		y0 = std::min(y0, g.y0);
+		y1 = std::max(y1, g.y1);
+	}
+	if (x0 > x1 || y0 > y1) return;
+	ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
+		for (int py = y0 + lo; py < y0 + hi; py++) {
+			for (int px = x0; px <= x1; px++) {
+				const size_t i = static_cast<size_t>(py) * width + px;
+				if (zb[i] <= 0.0f) continue;
+				double x, y, zu;
+				CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
+				double lr = 0, lg = 0, lb = 0;
+				for (const ThreeDGpuEyeLight &g : lit) {
+					if (px < g.x0 || py < g.y0 || px > g.x1 || py > g.y1) continue;
+					const double lx = eye.x + g.x, ly = eye.y + g.y, lzu = g.zu + eye.z * CAB_Z_SCALE;
+					double k;
+					if (g.kind == ThreeDGpuEyeLight::LAMP) {
+						/* Down from it: what is above it it does not light (a lamp shines down, a window out and down). */
+						if (zu > lzu + 0.5) continue;
+						const double d = std::sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (zu - lzu) * (zu - lzu));
+						if (d >= g.reach) continue;
+						k = (1.0 - d / g.reach) * (1.0 - d / g.reach) * 0.7;
+					} else {
+						const double ox = x - lx, oy = y - ly, oz = (zu - lzu) / zu_per_unit;
+						const double d = std::sqrt(ox * ox + oy * oy + oz * oz);
+						if (g.kind != ThreeDGpuEyeLight::TORCH) {
+							if (d >= g.reach) continue;
+							k = (1.0 - d / g.reach) * (1.0 - d / g.reach) * 0.8;
+						} else {
+							const double along = ox * g.dx + oy * g.dy + oz * g.dz;
+							if (along <= 0 || along >= g.reach || d < 1e-6) continue;
+							const double cosa = along / d;
+							if (cosa <= g.cos_edge) continue;
+							const double middle = (cosa - g.cos_edge) / (1.0 - g.cos_edge);
+							k = (1.0 - along / g.reach) * std::min(1.0, middle * 2.5) * 0.9;
+						}
+					}
+					lr += g.r / 255.0 * k;
+					lg += g.g / 255.0 * k;
+					lb += g.b / 255.0 * k;
+				}
+				if (lr <= 0 && lg <= 0 && lb <= 0) continue;
+				const Colour o(dst[i]);
+				auto add = [](uint8_t now, uint night, double light) {
+					const double own = std::min(255.0, now * 256.0 / night);
+					return static_cast<uint8_t>(std::min(255.0, now + own * std::min(light, 1.0)));
+				};
+				dst[i] = Colour(add(o.r, moon.r, lr), add(o.g, moon.g, lg), add(o.b, moon.b, lb)).data;
+			}
+		}
+	}, (y1 - y0) * (x1 - x0) > 20000);
+}
+
 static void DrawEyeLampLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, std::vector<std::array<double, 3>> lights)
 {
-	static constexpr double REACH = CAB_LAMP_REACH;
-	const Colour warm(255, 214, 150);
-	const NightLight moon = GetNightLight();
-	for (const ThreeDGpuEyeLight &g : EyeLampsLit(eye, width, height, std::move(lights))) {
-		const std::array<double, 3> l = {eye.x + g.x, eye.y + g.y, 0.0};
-		const int x0 = g.x0, x1 = g.x1, y0 = g.y0, y1 = g.y1;
-		const double lzu = g.zu + eye.z * CAB_Z_SCALE;
-		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
-			for (int py = y0 + lo; py < y0 + hi; py++) {
-				for (int px = x0; px <= x1; px++) {
-					const size_t i = static_cast<size_t>(py) * width + px;
-					if (zb[i] <= 0.0f) continue;
-					double x, y, zu;
-					CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
-					/* Down from it: what is above it it does not light (a lamp shines down, a window out and down). */
-					if (zu > lzu + 0.5) continue;
-					const double d = std::sqrt((x - l[0]) * (x - l[0]) + (y - l[1]) * (y - l[1]) + (zu - lzu) * (zu - lzu));
-					if (d >= REACH) continue;
-					const double k = (1.0 - d / REACH) * (1.0 - d / REACH) * 0.7;
-					/* Its own colour out of the dark (DrawEyeNight()), in the warm light. */
-					const Colour o(dst[i]);
-					auto add = [&](uint8_t now, uint night, uint8_t light) {
-						const double own = std::min(255.0, now * 256.0 / night);
-						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
-					};
-					dst[i] = Colour(add(o.r, moon.r, warm.r), add(o.g, moon.g, warm.g), add(o.b, moon.b, warm.b)).data;
-				}
-			}
-		}, (y1 - y0) * (x1 - x0) > 20000);
-	}
+	DrawEyeLights(eye, dst, zb, width, height, EyeLampsLit(eye, width, height, std::move(lights)));
 }
 
 /**
@@ -10422,47 +10463,7 @@ static std::vector<ThreeDGpuEyeLight> EyeWitchLightsLit(const CabEye &eye, int w
 
 static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights)
 {
-	const NightLight moon = GetNightLight();
-	for (const ThreeDGpuEyeLight &g : EyeWitchLightsLit(eye, width, height, lights)) {
-		const double lx = eye.x + g.x, ly = eye.y + g.y;
-		const bool torch = g.kind == ThreeDGpuEyeLight::TORCH;
-		const Colour colour(static_cast<uint8_t>(g.r), static_cast<uint8_t>(g.g), static_cast<uint8_t>(g.b));
-		const double reach = g.reach;
-		const int x0 = g.x0, x1 = g.x1, y0 = g.y0, y1 = g.y1;
-		const double lzu = g.zu + eye.z * CAB_Z_SCALE, cos_edge = g.cos_edge;
-		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground. */
-		const double zu_per_unit = CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
-		ParallelRows(y1 - y0 + 1, [&](int lo, int hi) {
-			for (int py = y0 + lo; py < y0 + hi; py++) {
-				for (int px = x0; px <= x1; px++) {
-					const size_t i = static_cast<size_t>(py) * width + px;
-					if (zb[i] <= 0.0f) continue;
-					double x, y, zu;
-					CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
-					const double ox = x - lx, oy = y - ly, oz = (zu - lzu) / zu_per_unit;
-					const double d = std::sqrt(ox * ox + oy * oy + oz * oz);
-					double k;
-					if (!torch) {
-						if (d >= reach) continue;
-						k = (1.0 - d / reach) * (1.0 - d / reach) * 0.8;
-					} else {
-						const double along = ox * g.dx + oy * g.dy + oz * g.dz;
-						if (along <= 0 || along >= reach || d < 1e-6) continue;
-						const double cosa = along / d;
-						if (cosa <= cos_edge) continue;
-						const double middle = (cosa - cos_edge) / (1.0 - cos_edge);
-						k = (1.0 - along / reach) * std::min(1.0, middle * 2.5) * 0.9;
-					}
-					const Colour o(dst[i]);
-					auto add = [&](uint8_t now, uint night, uint8_t light) {
-						const double own = std::min(255.0, now * 256.0 / night);
-						return static_cast<uint8_t>(std::min(255.0, now + own * light / 255.0 * k));
-					};
-					dst[i] = Colour(add(o.r, moon.r, colour.r), add(o.g, moon.g, colour.g), add(o.b, moon.b, colour.b)).data;
-				}
-			}
-		}, (y1 - y0) * (x1 - x0) > 20000);
-	}
+	DrawEyeLights(eye, dst, zb, width, height, EyeWitchLightsLit(eye, width, height, lights));
 }
 
 /** How far the far land reaches (DrawEyeFarLand()), tiles. */
@@ -12001,7 +12002,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const CabPoint p = CabToEye(eye, ox + o.lights[i], oy + o.lights[i + 1], oz + o.lights[i + 2], 0, 0);
 				if (p.f < CAB_NEAR) continue;
 				const CabVertex v = CabProject(eye, p);
-				window_glows.push_back({v.sx, v.sy, std::max(1.0, 1.2 * eye.focal / p.f), static_cast<float>(v.iw)});
+				window_glows.push_back({v.sx, v.sy, std::max(1.0, THREE_D_GLOW_UNITS * ThreeDGlowShare(o.lights, i) * eye.focal / p.f), static_cast<float>(v.iw)});
 			}
 		}
 		if (!window_glows.empty()) out.Job([width, height, window, window_glows](uint32_t *dst, float *zb) {

@@ -6530,3 +6530,21 @@ std::string RigForgetThreeDObjects(uint seconds)
 	}
 	return fmt::format("hodiny {} s, domu s texturou {}, zjednodusenych tvaru {}, prechodu {}, tvaru vozidel {}", _three_d_clock.load(), textures, shapes, _passages.size(), VehicleShapesKept());
 }
+
+/**
+ * How big the glow of a light of an object ("svetlo_NN", its x, y, z at i in lights) is drawn, a share of a lone
+ * light's (THREE_D_GLOW_UNITS): no bigger than the way to the nearest other light of it. Bulbs set close in a row -- the
+ * cinema's marquee, eleven of them 0.44 m apart -- light as a row of bulbs; with each the glow of a window they added
+ * up to one white blot over the door (the player, 23. 10.: "the cinema shines too much at night").
+ */
+float ThreeDGlowShare(const std::vector<float> &lights, size_t i)
+{
+	double nearest = THREE_D_GLOW_UNITS;
+	for (size_t j = 0; j + 2 < lights.size(); j += 3) {
+		if (j == i) continue;
+		const double dx = lights[j] - lights[i], dy = lights[j + 1] - lights[i + 1];
+		const double dz = (lights[j + 2] - lights[i + 2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		nearest = std::min(nearest, std::sqrt(dx * dx + dy * dy + dz * dz));
+	}
+	return static_cast<float>(std::clamp(nearest / THREE_D_GLOW_UNITS, 0.3, 1.0));
+}

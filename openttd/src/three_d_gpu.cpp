@@ -1109,8 +1109,9 @@ void main()
 }
 )";
 
-/* The lights lighting what is about them (DrawEyeLampLight(), DrawEyeWitchLight()), one after the other: each pixel
- * within reach its own colour out of the dark (u_night) in the light's. The lights four texels each of u_lights. */
+/* The lights lighting what is about them (DrawEyeLights()), all at once: each pixel within reach its own colour out of
+ * the dark (u_night, taken from the dark pixel once) in the light of all of them together, a day's at most. The lights
+ * four texels each of u_lights. */
 const char *const EYE_LAMPS_FRAGMENT = R"(
 uniform sampler2D u_lights;
 uniform int u_count;
@@ -1123,6 +1124,7 @@ void main()
 	float iw = IwAt(p);
 	if (iw > 0.0) {
 		vec3 w = InWorld(vec2(p) + 0.5, iw);
+		vec3 light = vec3(0.0);
 		for (int i = 0; i < u_count; i++) {
 			vec4 l0 = texelFetch(u_lights, ivec2(i * 4, 0), 0), l1 = texelFetch(u_lights, ivec2(i * 4 + 1, 0), 0);
 			vec4 l2 = texelFetch(u_lights, ivec2(i * 4 + 2, 0), 0), l3 = texelFetch(u_lights, ivec2(i * 4 + 3, 0), 0);
@@ -1150,9 +1152,10 @@ void main()
 					k = (1.0 - along / reach) * min(1.0, middle * 2.5) * 0.9;
 				}
 			}
-			vec3 own = min(vec3(255.0), c * 256.0 / u_night);
-			c = floor(min(vec3(255.0), c + own * l1.rgb / 255.0 * k));
+			light += l1.rgb / 255.0 * k;
 		}
+		vec3 own = min(vec3(255.0), c * 256.0 / u_night);
+		c = floor(min(vec3(255.0), c + own * min(light, vec3(1.0))));
 	}
 	Put(c);
 }

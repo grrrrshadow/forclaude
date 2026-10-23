@@ -39,6 +39,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Rig `test3d chodec rozhled <dx> <pohybů> [chuze]`.
 - **Velké skoky šipkami = málo snímků z očí na telefonu** (~10/s). Rychlost otáčení neměním (hráč: příčinu, ne
   následky); čeká se na `snimky.log` z buildu s 54c155c+, kde je vidět, co snímek z očí brzdí.
+- **Kino v noci moc svítí, dveře z očí nevidět – příčina:** světla domů (`svetlo_NN`) svítí v pohledu z očí na okolí po
+  pixelech; každé další světlo bralo „vlastní barvu ve tmě“ z pixelu, který už rozsvítilo to předchozí, a svítilo
+  na něj znovu – pod 16 žárovkami vchodu kina se světlo samo na sobě nafouklo do bílé. Teď se světla všech lamp
+  sečtou najednou, vlastní barva se bere z tmavého pixelu jednou a dohromady svítí nejvýš jako den (karta i procesor,
+  `DrawEyeLights()`, shader lamp). Jedna lampa svítí jako dřív. Záře (kolečka) žárovek v řadě jsou menší – nejvýš
+  jako vzdálenost k sousední (`ThreeDGlowShare()`), na mapě i z očí.
 - **Auto nejelo** (hráč: *„stopnul jsem auto před depem, došel k němu z očí, chtěl jet, ale jen se točilo doleva
   doprava“*): v rigu se zastavené auto šipkou nahoru rozjede (i u depa) – příčinu nevidím. Proto **deník `jizda.log`**:
   když je zmáčknutá šipka nahoru a auto 2 s stojí, zapíše se všechno, co ho drží (zastaveno, porucha, volná jízda,
