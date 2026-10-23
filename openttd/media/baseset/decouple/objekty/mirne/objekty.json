@@ -129,7 +129,7 @@
    {
     "cast": "omitka",
     "maska": "dum_03_kostel_maska_omitka.png",
-    "zacatek": 232,
+    "zacatek": 233,
     "paleta": [
      "E8E6DE",
      "F0DCB0",
@@ -146,15 +146,15 @@
   "dvere": [
    {
     "poloha": [
-     7.59,
-     12.99,
+     7.38,
+     12.96,
      0.0
     ],
     "smer": [
      0,
      1
     ],
-    "sirka": 1.55
+    "sirka": 1.8
    }
   ],
   "interier": true,
@@ -162,10 +162,50 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     3.112,
+     3.112,
+     0.0
+    ],
+    "otoceni": 157.0,
+    "meritko": 0.5417
+   },
+   {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     11.686,
+     3.112,
+     0.0
+    ],
+    "otoceni": 223.0,
+    "meritko": 0.5417
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.795,
+     12.366,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     13.052,
+     11.967,
+     0.0
+    ],
+    "otoceni": 64.0,
+    "meritko": 0.9286
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
-     12.345,
-     7.84,
+     12.885,
+     7.48,
      0.0
     ],
     "otoceni": 0.0,
@@ -174,8 +214,8 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     6.042,
-     13.104,
+     5.585,
+     13.102,
      0.0
     ],
     "otoceni": 90.0,
@@ -184,8 +224,8 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     9.142,
-     13.104,
+     9.175,
+     13.102,
      0.0
     ],
     "otoceni": 90.0,
@@ -201,7 +241,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kostel s věží; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo u zdi, dvě lavičky u vchodu; 8114 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 22.14 m"
+  "poznamka": "Kostel s věží; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo u zdi, dvě lavičky u vchodu; 1018 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 22.14 m"
  },
  {
   "soubor": "dum_06_mestske_0.glb",
@@ -268,26 +308,26 @@
    {
     "poloha": [
      11.17,
-     5.09,
+     5.19,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 1.07
+    "sirka": 1.1
    },
    {
     "poloha": [
      11.17,
-     10.34,
+     10.57,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 1.07
+    "sirka": 1.1
    }
   ],
   "interier": true,
@@ -295,10 +335,60 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.169,
+     2.394,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.169,
+     7.98,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.369,
+     12.536,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.394,
+     2.394,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     2.593,
+     11.97,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 0.7857
+   },
+   {
     "jmeno": "kolo_7c9fe836",
     "poloha": [
      11.491,
-     3.821,
+     3.89,
      0.0
     ],
     "otoceni": 0.0,
@@ -308,7 +398,7 @@
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
      11.77,
-     11.7,
+     11.97,
      0.0
     ],
     "otoceni": 0.0,
@@ -318,7 +408,7 @@
     "jmeno": "klepac_5c888211",
     "poloha": [
      1.556,
-     7.323,
+     7.481,
      0.0
     ],
     "otoceni": 0.0,
@@ -328,7 +418,7 @@
     "jmeno": "kocarek_99914b93",
     "poloha": [
      12.369,
-     8.004,
+     8.179,
      0.0
     ],
     "otoceni": 90.0,
@@ -340,7 +430,7 @@
     "postava": "matylda",
     "poloha": [
      11.77,
-     5.08,
+     5.19,
      0.0
     ],
     "otoceni": 0,
@@ -351,7 +441,7 @@
     "postava": "college_girl_kouri",
     "poloha": [
      11.67,
-     7.71,
+     7.88,
      3.24
     ],
     "otoceni": 0,
@@ -367,7 +457,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Městský dvojdům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dámské kolo s košíkem, popelnice, prádlo, klepač s kobercem, kočárek; 13364 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.07 m"
+  "poznamka": "Městský dvojdům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dámské kolo s košíkem, popelnice, prádlo, klepač s kobercem, kočárek; 3052 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.07 m"
  },
  {
   "soubor": "dum_06_mestske_2.glb",
@@ -433,15 +523,15 @@
   "dvere": [
    {
     "poloha": [
-     11.48,
-     8.45,
+     11.57,
+     8.78,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 1.03
+    "sirka": 1.1
    }
   ],
   "interier": true,
@@ -449,10 +539,60 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.995,
+     2.194,
+     0.0
+    ],
+    "otoceni": 220.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.967,
+     1.995,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     13.084,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     5.187,
+     3.142,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.536,
+     12.536,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
-     11.787,
-     4.423,
+     11.89,
+     4.489,
      0.0
     ],
     "otoceni": 0.0,
@@ -461,8 +601,8 @@
    {
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
-     12.057,
-     10.14,
+     12.169,
+     10.573,
      0.0
     ],
     "otoceni": 0.0,
@@ -471,8 +611,8 @@
    {
     "jmeno": "kralikarna_99914b93",
     "poloha": [
-     4.545,
-     5.876,
+     4.389,
+     6.035,
      0.0
     ],
     "otoceni": 180.0,
@@ -481,8 +621,8 @@
    {
     "jmeno": "konev_99914b93",
     "poloha": [
-     12.635,
-     5.829,
+     12.768,
+     5.985,
      0.0
     ],
     "otoceni": 0.0,
@@ -493,8 +633,8 @@
    {
     "postava": "people_girl_stoji",
     "poloha": [
-     12.05,
-     8.45,
+     12.17,
+     8.78,
      0.0
     ],
     "otoceni": 0,
@@ -504,8 +644,8 @@
    {
     "postava": "college_girl_stoji",
     "poloha": [
-     4.54,
-     4.8,
+     4.39,
+     4.89,
      0.0
     ],
     "otoceni": 90,
@@ -521,7 +661,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Přízemní městský dům do L; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo, králíkárna, konev, okenice; 18340 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 7.08 m"
+  "poznamka": "Přízemní městský dům do L; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo, králíkárna, konev, okenice; 6072 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 7.08 m"
  },
  {
   "soubor": "dum_0e_obchody.glb",
@@ -710,6 +850,16 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.051,
+     12.327,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 0.7857
+   },
+   {
     "jmeno": "kolo_3a822c38",
     "poloha": [
      13.218,
@@ -761,7 +911,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře s pekařstvím v křídle; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice; 11336 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.17 m"
+  "poznamka": "Kanceláře s pekařstvím v křídle; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice; 8100 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.17 m"
  },
  {
   "soubor": "dum_10_obchody_vez.glb",
@@ -830,6 +980,16 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v1",
+    "poloha": [
+     8.076,
+     1.736,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 0.8571
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
      13.218,
@@ -871,7 +1031,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře, šestipatrový dům s mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 13274 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
+  "poznamka": "Kanceláře, šestipatrový dům s mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 10038 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
  },
  {
   "soubor": "dum_18_stare_0.glb",
@@ -888,7 +1048,7 @@
    {
     "cast": "strecha",
     "maska": "dum_18_stare_0_maska_strecha.png",
-    "zacatek": 145,
+    "zacatek": 144,
     "paleta": [
      "8E3C28",
      "50565E",
@@ -936,8 +1096,8 @@
   "dvere": [
    {
     "poloha": [
-     9.6,
-     4.95,
+     9.58,
+     4.93,
      0.0
     ],
     "smer": [
@@ -952,10 +1112,50 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     12.382,
+     0.0
+    ],
+    "otoceni": 330.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.568,
+     11.985,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.374,
+     3.046,
+     0.0
+    ],
+    "otoceni": 300.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.369,
+     2.321,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
-     9.922,
-     7.032,
+     9.895,
+     7.019,
      0.0
     ],
     "otoceni": 0.0,
@@ -964,8 +1164,8 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     7.819,
-     12.236,
+     7.78,
+     12.233,
      0.0
     ],
     "otoceni": 90.0,
@@ -974,8 +1174,8 @@
    {
     "jmeno": "drivi_12825a67",
     "poloha": [
-     5.437,
-     10.006,
+     5.386,
+     9.999,
      0.0
     ],
     "otoceni": 90.0,
@@ -984,8 +1184,8 @@
    {
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
-     10.299,
-     1.871,
+     10.274,
+     1.846,
      0.0
     ],
     "otoceni": 0.0,
@@ -996,8 +1196,8 @@
    {
     "postava": "matylda",
     "poloha": [
-     10.2,
-     4.95,
+     10.17,
+     4.93,
      0.0
     ],
     "otoceni": 0,
@@ -1007,8 +1207,8 @@
    {
     "postava": "college_girl_kouri",
     "poloha": [
-     3.45,
-     6.54,
+     3.39,
+     6.52,
      0.0
     ],
     "otoceni": 0,
@@ -1024,7 +1224,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý bílý dům s valbovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, lavička, prádlo, dříví, popelnice, trpaslík; 14990 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Starý bílý dům s valbovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, lavička, prádlo, dříví, popelnice, trpaslík; 5958 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_18_stare_1.glb",
@@ -1073,15 +1273,15 @@
   "dvere": [
    {
     "poloha": [
-     10.24,
-     6.87,
+     10.37,
+     6.98,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 0.98
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -1089,10 +1289,40 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.995,
+     1.995,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.768,
+     12.369,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.484,
+     12.316,
+     0.0
+    ],
+    "otoceni": 160.0,
+    "meritko": 1.2857
+   },
+   {
     "jmeno": "kolo_766fab94",
     "poloha": [
-     7.094,
-     11.091,
+     7.182,
+     11.291,
      0.0
     ],
     "otoceni": 0.0,
@@ -1101,8 +1331,8 @@
    {
     "jmeno": "bouda_99914b93",
     "poloha": [
-     12.397,
-     8.822,
+     12.568,
+     8.977,
      0.0
     ],
     "otoceni": 0.0,
@@ -1111,8 +1341,8 @@
    {
     "jmeno": "drivi_f294556a",
     "poloha": [
-     3.559,
-     6.866,
+     3.591,
+     6.982,
      0.0
     ],
     "otoceni": 90.0,
@@ -1121,8 +1351,8 @@
    {
     "jmeno": "konev_99914b93",
     "poloha": [
-     12.692,
-     3.736,
+     12.867,
+     3.79,
      0.0
     ],
     "otoceni": 0.0,
@@ -1133,8 +1363,8 @@
    {
     "postava": "people_girl_stoji",
     "poloha": [
-     10.82,
-     6.86,
+     10.97,
+     6.98,
      0.0
     ],
     "otoceni": 0,
@@ -1144,8 +1374,8 @@
    {
     "postava": "college_girl_stoji",
     "poloha": [
-     12.0,
-     3.83,
+     12.17,
+     3.89,
      0.0
     ],
     "otoceni": 270,
@@ -1161,7 +1391,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý kamenný dům s okenicemi a studnou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, prádlo, psí bouda, dříví, konev, trpaslík, okenice; 13874 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.18 m"
+  "poznamka": "Starý kamenný dům s okenicemi a studnou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, prádlo, psí bouda, dříví, konev, trpaslík, okenice; 6122 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.18 m"
  },
  {
   "soubor": "dum_18_stare_2.glb",
@@ -1194,7 +1424,7 @@
    {
     "cast": "omitka",
     "maska": "dum_18_stare_2_maska_omitka.png",
-    "zacatek": 231,
+    "zacatek": 232,
     "paleta": [
      "E8E6DE",
      "F0DCB0",
@@ -1226,7 +1456,7 @@
   "dvere": [
    {
     "poloha": [
-     9.78,
+     9.97,
      7.38,
      0.0
     ],
@@ -1242,10 +1472,50 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     2.394,
+     0.0
+    ],
+    "otoceni": 190.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.568,
+     2.194,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     2.194,
+     12.967,
+     0.0
+    ],
+    "otoceni": 284.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.426,
+     12.426,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 1.1429
+   },
+   {
     "jmeno": "kolo_2dbcdd4c",
     "poloha": [
-     10.094,
-     4.882,
+     10.294,
+     4.888,
      0.0
     ],
     "otoceni": 0.0,
@@ -1254,8 +1524,8 @@
    {
     "jmeno": "kolo_3a822c38",
     "poloha": [
-     10.094,
-     9.67,
+     10.294,
+     9.675,
      0.0
     ],
     "otoceni": 0.0,
@@ -1264,8 +1534,8 @@
    {
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
-     10.368,
-     11.964,
+     10.573,
+     11.97,
      0.0
     ],
     "otoceni": 0.0,
@@ -1274,8 +1544,8 @@
    {
     "jmeno": "klepac_7ee4f811",
     "poloha": [
-     7.049,
-     1.59,
+     7.182,
+     1.596,
      0.0
     ],
     "otoceni": 0.0,
@@ -1286,8 +1556,8 @@
    {
     "postava": "college_girl_kouri",
     "poloha": [
-     10.32,
-     7.37,
+     10.52,
+     7.38,
      3.24
     ],
     "otoceni": 0,
@@ -1297,7 +1567,7 @@
    {
     "postava": "matylda",
     "poloha": [
-     7.05,
+     7.18,
      2.29,
      0.0
     ],
@@ -1314,7 +1584,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý cihlový dům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, popelnice, prádlo, klepač s kobercem; 17496 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Starý cihlový dům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, popelnice, prádlo, klepač s kobercem; 6508 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_18_stare_3.glb",
@@ -1379,15 +1649,15 @@
   "dvere": [
    {
     "poloha": [
-     6.82,
-     10.44,
+     6.78,
+     10.37,
      0.0
     ],
     "smer": [
      0,
      1
     ],
-    "sirka": 0.94
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -1395,10 +1665,70 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "ker_v2",
+    "poloha": [
+     11.072,
+     5.187,
+     0.0
+    ],
+    "otoceni": 163.0,
+    "meritko": 0.6429
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     11.072,
+     7.78,
+     0.0
+    ],
+    "otoceni": 304.0,
+    "meritko": 0.6429
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.795,
+     12.967,
+     0.0
+    ],
+    "otoceni": 300.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.768,
+     12.568,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.374,
+     2.374,
+     0.0
+    ],
+    "otoceni": 240.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.536,
+     2.264,
+     0.0
+    ],
+    "otoceni": 287.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "kolo_180d54e0",
     "poloha": [
-     5.039,
-     10.755,
+     4.888,
+     10.693,
      0.0
     ],
     "otoceni": 0.0,
@@ -1407,8 +1737,8 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     12.248,
-     10.833,
+     12.568,
+     10.773,
      0.0
     ],
     "otoceni": 0.0,
@@ -1417,8 +1747,8 @@
    {
     "jmeno": "kocarek_99914b93",
     "poloha": [
-     8.69,
-     11.615,
+     8.778,
+     11.571,
      0.0
     ],
     "otoceni": 0.0,
@@ -1427,8 +1757,8 @@
    {
     "jmeno": "sud_99914b93",
     "poloha": [
-     9.252,
-     10.931,
+     9.376,
+     10.872,
      0.0
     ],
     "otoceni": 0.0,
@@ -1439,8 +1769,8 @@
    {
     "postava": "matylda",
     "poloha": [
-     6.82,
-     11.03,
+     6.78,
+     10.97,
      0.0
     ],
     "otoceni": 90,
@@ -1450,8 +1780,8 @@
    {
     "postava": "people_girl_stoji",
     "poloha": [
-     9.72,
-     11.61,
+     9.87,
+     11.57,
      0.0
     ],
     "otoceni": 180,
@@ -1467,7 +1797,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý bílý dům se zimní zahradou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dámské kolo, lavička, kočárek, sud na dešťovku, okenice; 17436 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.38 m"
+  "poznamka": "Starý bílý dům se zimní zahradou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dámské kolo, lavička, kočárek, sud na dešťovku, okenice; 5844 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.38 m"
  },
  {
   "soubor": "dum_19_chatky.glb",
@@ -1535,7 +1865,7 @@
   "dvere": [
    {
     "poloha": [
-     9.91,
+     10.17,
      4.75,
      0.0
     ],
@@ -1547,7 +1877,7 @@
    },
    {
     "poloha": [
-     6.81,
+     6.98,
      13.25,
      0.0
     ],
@@ -1555,7 +1885,7 @@
      0,
      1
     ],
-    "sirka": 0.97
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -1563,9 +1893,49 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.306,
+     10.288,
+     0.0
+    ],
+    "otoceni": 50.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     2.194,
+     2.376,
+     0.0
+    ],
+    "otoceni": 97.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.369,
+     2.574,
+     0.0
+    ],
+    "otoceni": 100.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.394,
+     12.431,
+     0.0
+    ],
+    "otoceni": 147.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
-     10.218,
+     10.493,
      6.53,
      0.0
     ],
@@ -1575,7 +1945,7 @@
    {
     "jmeno": "drivi_bea240e1",
     "poloha": [
-     5.455,
+     5.586,
      4.75,
      0.0
     ],
@@ -1585,7 +1955,7 @@
    {
     "jmeno": "kralikarna_99914b93",
     "poloha": [
-     11.977,
+     12.306,
      12.562,
      0.0
     ],
@@ -1595,7 +1965,7 @@
    {
     "jmeno": "bouda_99914b93",
     "poloha": [
-     10.711,
+     11.109,
      8.508,
      0.0
     ],
@@ -1605,7 +1975,7 @@
    {
     "jmeno": "konev_99914b93",
     "poloha": [
-     12.583,
+     12.931,
      7.321,
      0.0
     ],
@@ -1615,7 +1985,7 @@
    {
     "jmeno": "sud_99914b93",
     "poloha": [
-     9.521,
+     9.775,
      12.859,
      0.0
     ],
@@ -1627,7 +1997,7 @@
    {
     "postava": "people_girl_stoji",
     "poloha": [
-     10.49,
+     10.77,
      4.75,
      0.0
     ],
@@ -1638,7 +2008,7 @@
    {
     "postava": "college_girl_kouri",
     "poloha": [
-     7.68,
+     7.88,
      13.85,
      0.0
     ],
@@ -1655,7 +2025,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Dvě vybílené chalupy s doškovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, dříví, králíkárna, prádlo, psí bouda, konev, trpaslík, sud, okenice; 16002 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.98 m"
+  "poznamka": "Dvě vybílené chalupy s doškovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, dříví, králíkárna, prádlo, psí bouda, konev, trpaslík, sud, okenice; 6970 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.98 m"
  },
  {
   "soubor": "dum_1a_domy_0.glb",
@@ -1721,7 +2091,7 @@
    {
     "poloha": [
      3.79,
-     12.61,
+     12.57,
      0.0
     ],
     "smer": [
@@ -1733,14 +2103,14 @@
    {
     "poloha": [
      8.4,
-     6.29,
+     5.98,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 0.96
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -1748,10 +2118,40 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v0",
+    "poloha": [
+     11.976,
+     1.995,
+     0.0
+    ],
+    "otoceni": 160.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     11.778,
+     12.169,
+     0.0
+    ],
+    "otoceni": 207.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     9.594,
+     11.571,
+     0.0
+    ],
+    "otoceni": 320.0,
+    "meritko": 1.1429
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
      8.721,
-     8.49,
+     8.279,
      0.0
     ],
     "otoceni": 0.0,
@@ -1761,7 +2161,7 @@
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
      8.999,
-     3.415,
+     2.992,
      0.0
     ],
     "otoceni": 0.0,
@@ -1773,7 +2173,7 @@
     "postava": "matylda",
     "poloha": [
      3.79,
-     13.18,
+     13.16,
      0.0
     ],
     "otoceni": 90,
@@ -1784,7 +2184,7 @@
     "postava": "college_girl_kouri",
     "poloha": [
      9.0,
-     6.29,
+     5.98,
      0.0
     ],
     "otoceni": 0,
@@ -1800,7 +2200,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Krémový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo; 14320 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Krémový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo; 6568 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_1.glb",
@@ -1866,7 +2266,7 @@
    {
     "poloha": [
      9.38,
-     7.32,
+     7.31,
      0.0
     ],
     "smer": [
@@ -1881,10 +2281,50 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.795,
+     12.77,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.768,
+     2.052,
+     0.0
+    ],
+    "otoceni": 317.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.426,
+     12.426,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     2.264,
+     2.449,
+     0.0
+    ],
+    "otoceni": 227.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "kolo_3a822c38",
     "poloha": [
      9.695,
-     9.502,
+     9.495,
      0.0
     ],
     "otoceni": 0.0,
@@ -1894,7 +2334,7 @@
     "jmeno": "kolo_2dbcdd4c",
     "poloha": [
      9.296,
-     2.847,
+     2.846,
      0.0
     ],
     "otoceni": 0.0,
@@ -1904,7 +2344,7 @@
     "jmeno": "kocarek_99914b93",
     "poloha": [
      10.573,
-     5.231,
+     5.228,
      0.0
     ],
     "otoceni": 90.0,
@@ -1916,7 +2356,7 @@
     "postava": "college_girl_kouri",
     "poloha": [
      9.92,
-     7.32,
+     7.31,
      3.24
     ],
     "otoceni": 0,
@@ -1943,7 +2383,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Bílý dům s balkonem a okenicemi; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, kočárek, prádlo, okenice; 16828 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Bílý dům s balkonem a okenicemi; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, kočárek, prádlo, okenice; 7796 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_2.glb",
@@ -1993,14 +2433,14 @@
    {
     "poloha": [
      10.37,
-     5.65,
+     5.69,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 0.96
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -2008,10 +2448,40 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v0",
+    "poloha": [
+     2.394,
+     12.568,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.568,
+     12.768,
+     0.0
+    ],
+    "otoceni": 67.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.374,
+     2.374,
+     0.0
+    ],
+    "otoceni": 40.0,
+    "meritko": 1.1429
+   },
+   {
     "jmeno": "kolo_2dbcdd4c",
     "poloha": [
      10.693,
-     4.021,
+     3.99,
      0.0
     ],
     "otoceni": 0.0,
@@ -2021,7 +2491,7 @@
     "jmeno": "kolo_75ba3225",
     "poloha": [
      10.693,
-     9.958,
+     10.174,
      0.0
     ],
     "otoceni": 0.0,
@@ -2031,7 +2501,7 @@
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
      10.872,
-     1.914,
+     1.795,
      0.0
     ],
     "otoceni": 0.0,
@@ -2041,7 +2511,7 @@
     "jmeno": "klepac_7ee4f811",
     "poloha": [
      7.98,
-     12.831,
+     13.167,
      0.0
     ],
     "otoceni": 0.0,
@@ -2053,7 +2523,7 @@
     "postava": "matylda",
     "poloha": [
      10.97,
-     5.65,
+     5.68,
      0.0
     ],
     "otoceni": 0,
@@ -2064,7 +2534,7 @@
     "postava": "college_girl_kouri",
     "poloha": [
      7.98,
-     12.16,
+     12.47,
      0.0
     ],
     "otoceni": 90,
@@ -2080,7 +2550,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice, prádlo, klepač; 13560 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+  "poznamka": "Cihlový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice, prádlo, klepač; 5808 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
  },
  {
   "soubor": "dum_1a_domy_3.glb",
@@ -2097,7 +2567,7 @@
    {
     "cast": "strecha",
     "maska": "dum_1a_domy_3_maska_strecha.png",
-    "zacatek": 145,
+    "zacatek": 146,
     "paleta": [
      "8E3C28",
      "50565E",
@@ -2145,15 +2615,15 @@
   "dvere": [
    {
     "poloha": [
-     8.52,
-     5.06,
+     8.58,
+     4.79,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 0.97
+    "sirka": 1.0
    }
   ],
   "interier": true,
@@ -2161,10 +2631,40 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.795,
+     12.768,
+     0.0
+    ],
+    "otoceni": 130.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.768,
+     12.568,
+     0.0
+    ],
+    "otoceni": 177.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.426,
+     2.374,
+     0.0
+    ],
+    "otoceni": 260.0,
+    "meritko": 1.1429
+   },
+   {
     "jmeno": "kolo_caddeb0b",
     "poloha": [
-     11.604,
-     8.638,
+     11.69,
+     8.478,
      0.0
     ],
     "otoceni": 0.0,
@@ -2173,8 +2673,8 @@
    {
     "jmeno": "popelnice_53d21dfb",
     "poloha": [
-     9.31,
-     2.742,
+     9.376,
+     2.394,
      0.0
     ],
     "otoceni": 0.0,
@@ -2183,8 +2683,8 @@
    {
     "jmeno": "kocarek_99914b93",
     "poloha": [
-     9.903,
-     6.222,
+     9.975,
+     5.985,
      0.0
     ],
     "otoceni": 0.0,
@@ -2195,8 +2695,8 @@
    {
     "postava": "people_girl_stoji",
     "poloha": [
-     9.11,
-     5.06,
+     9.18,
+     4.79,
      0.0
     ],
     "otoceni": 0,
@@ -2206,8 +2706,8 @@
    {
     "postava": "college_girl_stoji",
     "poloha": [
-     10.99,
-     6.22,
+     11.07,
+     5.98,
      0.0
     ],
     "otoceni": 180,
@@ -2223,7 +2723,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Bílý dům s přístavkem a předzahrádkou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, kočárek, prádlo, žebřík; 13824 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+  "poznamka": "Bílý dům s přístavkem a předzahrádkou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, kočárek, prádlo, žebřík; 6072 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
  },
  {
   "soubor": "dum_1d_obchody_0.glb",
@@ -2532,6 +3032,26 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.828,
+     1.937,
+     0.0
+    ],
+    "otoceni": 110.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.828,
+     12.863,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.7143
+   },
+   {
     "jmeno": "kolo_766fab94",
     "poloha": [
      4.543,
@@ -2594,7 +3114,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 8432 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
+  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 1960 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
  },
  {
   "soubor": "dum_14_stadion_stary.glb",
@@ -2663,6 +3183,26 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     26.741,
+     3.052,
+     0.0
+    ],
+    "otoceni": 282.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     26.741,
+     26.548,
+     0.0
+    ],
+    "otoceni": 301.0,
+    "meritko": 0.8571
+   },
+   {
     "jmeno": "kolo_4b4adb95",
     "poloha": [
      27.359,
@@ -2686,7 +3226,7 @@
   "postavy": [],
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Starý stadion s krytou tribunou (2×2, HouseID 0x14–0x17); bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola u zdi; 10060 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.38 m"
+  "poznamka": "Starý stadion s krytou tribunou (2×2, HouseID 0x14–0x17); bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola u zdi; 3588 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.38 m"
  },
  {
   "soubor": "dum_1f_uv_ksc.glb",
@@ -2744,7 +3284,7 @@
    {
     "poloha": [
      9.51,
-     6.39,
+     6.4,
      0.0
     ],
     "smer": [
@@ -2768,7 +3308,7 @@
    {
     "poloha": [
      9.51,
-     8.41,
+     8.4,
      0.0
     ],
     "smer": [
@@ -2781,7 +3321,48 @@
   "interier": true,
   "pruchody": [],
   "okraje_textur": 16,
-  "doplnky": [],
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.044,
+     1.964,
+     0.0
+    ],
+    "otoceni": 210.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     13.044,
+     12.836,
+     0.0
+    ],
+    "otoceni": 101.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.852,
+     1.756,
+     0.0
+    ],
+    "otoceni": 329.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.852,
+     13.044,
+     0.0
+    ],
+    "otoceni": 220.0,
+    "meritko": 1.0
+   }
+  ],
   "postavy": [],
   "noc": {
    "uzel": "noc",
@@ -2800,7 +3381,7 @@
   },
   "autor": "grrrrf: vlastní model domy/uv_ksc.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 25080 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
+  "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 12136 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
  },
  {
   "soubor": "dum_00_vysoky_0.glb",
@@ -2988,8 +3569,8 @@
    {
     "jmeno": "slunecnik_ctverec_241eb6f8",
     "poloha": [
-     12.376,
-     11.684,
+     11.227,
+     10.799,
      0.0
     ],
     "otoceni": 0.0,
@@ -2998,8 +3579,8 @@
    {
     "jmeno": "stolek_kavarna_dc02192d",
     "poloha": [
-     12.376,
-     11.684,
+     11.227,
+     10.799,
      0.0
     ],
     "otoceni": 0.0,
@@ -3044,6 +3625,16 @@
     ],
     "otoceni": 0.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.71,
+     13.074,
+     0.0
+    ],
+    "otoceni": 67.0,
+    "meritko": 0.7857
    }
   ],
   "postavy": [
@@ -3111,7 +3702,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 10676 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
+  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 7440 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
  },
  {
   "soubor": "dum_00_vysoky_1.glb",
@@ -3556,6 +4147,16 @@
     ],
     "otoceni": 0.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.751,
+     12.513,
+     0.0
+    ],
+    "otoceni": 177.0,
+    "meritko": 0.7143
    }
   ],
   "postavy": [
@@ -3612,7 +4213,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 11104 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
+  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 7868 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
  },
  {
   "soubor": "dum_02_bytovky.glb",
@@ -3783,8 +4384,8 @@
    {
     "jmeno": "kolo_766fab94",
     "poloha": [
-     4.389,
-     11.69,
+     4.718,
+     11.568,
      0.0
     ],
     "otoceni": 0.0,
@@ -3793,8 +4394,8 @@
    {
     "jmeno": "kolo_19227a85",
     "poloha": [
-     5.386,
-     11.69,
+     5.716,
+     11.568,
      0.0
     ],
     "otoceni": 0.0,
@@ -3819,6 +4420,26 @@
     ],
     "otoceni": 180.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     1.925,
+     12.446,
+     0.0
+    ],
+    "otoceni": 287.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.074,
+     1.726,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.7857
    }
   ],
   "postavy": [
@@ -3875,7 +4496,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 13336 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
+  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 6864 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
  },
  {
   "soubor": "dum_04_velky.glb",
@@ -4375,6 +4996,16 @@
     ],
     "otoceni": 0.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.507,
+     6.246,
+     0.0
+    ],
+    "otoceni": 37.0,
+    "meritko": 0.7143
    }
   ],
   "postavy": [
@@ -4431,7 +5062,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 9946 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
+  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 6710 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
  },
  {
   "soubor": "dum_12_skladiste.glb",
@@ -5483,7 +6114,7 @@
     "jmeno": "slunecnik_0f12a3e3",
     "poloha": [
      8.952,
-     6.242,
+     6.238,
      36.008
     ],
     "otoceni": 0.0,
@@ -5493,7 +6124,7 @@
     "jmeno": "stolek_kavarna_d3c6f580",
     "poloha": [
      8.952,
-     6.242,
+     6.238,
      36.008
     ],
     "otoceni": 0.0,
@@ -5503,7 +6134,7 @@
     "jmeno": "slunecnik_0f12a3e3",
     "poloha": [
      7.47,
-     8.461,
+     8.456,
      36.008
     ],
     "otoceni": 0.0,
@@ -5513,7 +6144,7 @@
     "jmeno": "stolek_kavarna_3c93aa8c",
     "poloha": [
      7.47,
-     8.461,
+     8.456,
      36.008
     ],
     "otoceni": 0.0,
@@ -5523,7 +6154,7 @@
     "jmeno": "slunecnik_0f12a3e3",
     "poloha": [
      5.203,
-     8.746,
+     8.74,
      36.008
     ],
     "otoceni": 0.0,
@@ -5533,7 +6164,7 @@
     "jmeno": "stolek_kavarna_d34c0817",
     "poloha": [
      5.203,
-     8.746,
+     8.74,
      36.008
     ],
     "otoceni": 0.0,
@@ -5543,7 +6174,7 @@
     "jmeno": "slunecnik_0f12a3e3",
     "poloha": [
      3.269,
-     4.789,
+     4.786,
      36.008
     ],
     "otoceni": 0.0,
@@ -5553,7 +6184,7 @@
     "jmeno": "stolek_kavarna_3d216658",
     "poloha": [
      3.269,
-     4.789,
+     4.786,
      36.008
     ],
     "otoceni": 0.0,
@@ -5563,7 +6194,7 @@
     "jmeno": "slunecnik_0f12a3e3",
     "poloha": [
      5.203,
-     3.241,
+     3.239,
      36.008
     ],
     "otoceni": 0.0,
@@ -5573,7 +6204,7 @@
     "jmeno": "stolek_kavarna_d3becd19",
     "poloha": [
      5.203,
-     3.241,
+     3.239,
      36.008
     ],
     "otoceni": 0.0,
@@ -5583,7 +6214,7 @@
     "jmeno": "slunecnik_b557592a",
     "poloha": [
      11.95,
-     9.021,
+     9.015,
      0.0
     ],
     "otoceni": 0.0,
@@ -5593,7 +6224,7 @@
     "jmeno": "stolek_kavarna_175b81c4",
     "poloha": [
      11.95,
-     9.021,
+     9.015,
      0.0
     ],
     "otoceni": 0.0,
@@ -5603,7 +6234,7 @@
     "jmeno": "slunecnik_b557592a",
     "poloha": [
      11.857,
-     11.693,
+     11.661,
      0.0
     ],
     "otoceni": 0.0,
@@ -5613,7 +6244,7 @@
     "jmeno": "stolek_kavarna_d4a5015b",
     "poloha": [
      11.857,
-     11.693,
+     11.661,
      0.0
     ],
     "otoceni": 0.0,
@@ -5623,7 +6254,7 @@
     "jmeno": "slunecnik_b557592a",
     "poloha": [
      8.963,
-     11.782,
+     11.773,
      0.0
     ],
     "otoceni": 0.0,
@@ -5633,7 +6264,7 @@
     "jmeno": "stolek_kavarna_bbbc6626",
     "poloha": [
      8.963,
-     11.782,
+     11.773,
      0.0
     ],
     "otoceni": 0.0,
@@ -5643,7 +6274,7 @@
     "jmeno": "stojan_destniku_a0180099",
     "poloha": [
      10.55,
-     7.418,
+     7.413,
      0.0
     ],
     "otoceni": 0.0,
@@ -5653,11 +6284,31 @@
     "jmeno": "lavicka_99914b93",
     "poloha": [
      2.294,
-     12.761,
+     12.752,
      0.0
     ],
     "otoceni": 90.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.668,
+     11.328,
+     0.0
+    ],
+    "otoceni": 147.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.07,
+     13.084,
+     0.0
+    ],
+    "otoceni": 194.0,
+    "meritko": 0.7143
    }
   ],
   "postavy": [
@@ -5687,7 +6338,7 @@
     "postava": "people_girl_sedi",
     "poloha": [
      11.37,
-     9.02,
+     9.01,
      0.47
     ],
     "otoceni": 0,
@@ -5698,7 +6349,7 @@
     "postava": "matylda",
     "poloha": [
      12.14,
-     3.86,
+     3.85,
      0.0
     ],
     "otoceni": 270,
@@ -5714,7 +6365,7 @@
   },
   "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 22276 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
+  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 15804 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
  },
  {
   "soubor": "dum_07_hotel.glb",
@@ -5781,7 +6432,48 @@
   "interier": true,
   "pruchody": [],
   "okraje_textur": 16,
-  "doplnky": [],
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     13.009,
+     3.579,
+     0.0
+    ],
+    "otoceni": 141.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.009,
+     25.831,
+     0.0
+    ],
+    "otoceni": 142.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.18,
+     21.57,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.18,
+     7.84,
+     0.0
+    ],
+    "otoceni": 329.0,
+    "meritko": 1.0
+   }
+  ],
   "postavy": [
    {
     "postava": "college_girl_kouri",
@@ -5803,7 +6495,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23036 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
+  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 10092 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
  },
  {
   "soubor": "dum_09_socha.glb",
@@ -5910,7 +6602,7 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     7.363,
+     7.4,
      1.696,
      0.0
     ],
@@ -5920,7 +6612,7 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     7.363,
+     7.4,
      13.104,
      0.0
     ],
@@ -5930,7 +6622,7 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     1.696,
+     1.756,
      7.4,
      0.0
     ],
@@ -5940,12 +6632,32 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     13.031,
+     13.104,
      7.4,
      0.0
     ],
     "otoceni": 0.0,
     "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.155,
+     7.381,
+     0.0
+    ],
+    "otoceni": 298.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.645,
+     9.576,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.8571
    }
   ],
   "postavy": [],
@@ -5957,7 +6669,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 8948 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
+  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 6388 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
  },
  {
   "soubor": "dum_0b_park_rybnik.glb",
@@ -5998,8 +6710,8 @@
    {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     8.615,
-     8.893,
+     8.379,
+     9.177,
      0.0
     ],
     "otoceni": 270.0,
@@ -6008,11 +6720,101 @@
    {
     "jmeno": "kos_99914b93",
     "poloha": [
-     7.299,
-     8.987,
+     6.982,
+     9.276,
      0.0
     ],
     "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     4.369,
+     4.858,
+     0.0
+    ],
+    "otoceni": 235.0,
+    "meritko": 1.0417
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     4.169,
+     10.643,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 1.2143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.369,
+     2.394,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     7.561,
+     2.663,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.374,
+     7.85,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.536,
+     7.182,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     6.763,
+     7.351,
+     0.0
+    ],
+    "otoceni": 221.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.972,
+     12.536,
+     0.0
+    ],
+    "otoceni": 268.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.573,
+     2.264,
+     0.0
+    ],
+    "otoceni": 315.0,
     "meritko": 1.0
    }
   ],
@@ -6025,7 +6827,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 23084 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 13.22 m"
+  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 8620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 3.85 m"
  },
  {
   "soubor": "dum_0c_park_kopec.glb",
@@ -6048,10 +6850,80 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v3",
+    "poloha": [
+     5.586,
+     7.78,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 1.5714
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     9.975,
+     2.394,
+     0.0
+    ],
+    "otoceni": 64.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.394,
+     12.369,
+     0.0
+    ],
+    "otoceni": 111.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.374,
+     10.573,
+     0.0
+    ],
+    "otoceni": 190.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.484,
+     2.593,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     8.778,
+     12.536,
+     0.0
+    ],
+    "otoceni": 284.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.755,
+     5.985,
+     0.0
+    ],
+    "otoceni": 331.0,
+    "meritko": 0.7143
+   },
+   {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     10.273,
-     7.259,
+     10.773,
+     7.581,
      0.0
     ],
     "otoceni": 180.0,
@@ -6060,8 +6932,8 @@
    {
     "jmeno": "kos_99914b93",
     "poloha": [
-     10.365,
-     8.771,
+     10.872,
+     9.177,
      0.0
     ],
     "otoceni": 0.0,
@@ -6077,7 +6949,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 19284 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.2 m"
+  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 4456 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 3.85 m"
  },
  {
   "soubor": "dum_11_kancelare_moderni.glb",
@@ -6146,6 +7018,36 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.857,
+     2.456,
+     0.0
+    ],
+    "otoceni": 110.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.857,
+     7.256,
+     0.0
+    ],
+    "otoceni": 157.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     12.857,
+     12.824,
+     0.0
+    ],
+    "otoceni": 204.0,
+    "meritko": 0.7857
+   },
+   {
     "jmeno": "lavicka_99914b93",
     "poloha": [
      12.767,
@@ -6175,7 +7077,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 16956 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
+  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7248 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
  },
  {
   "soubor": "dum_13_kancelarsky_blok.glb",
@@ -6242,7 +7144,28 @@
   "interier": true,
   "pruchody": [],
   "okraje_textur": 16,
-  "doplnky": [],
+  "doplnky": [
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     13.054,
+     2.48,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     13.054,
+     12.32,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 0.9286
+   }
+  ],
   "postavy": [],
   "noc": {
    "uzel": "noc",
@@ -6252,7 +7175,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 13672 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
+  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7200 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
  },
  {
   "soubor": "dum_1b_byty_cihlove.glb",
@@ -6320,7 +7243,7 @@
   "dvere": [
    {
     "poloha": [
-     3.86,
+     3.83,
      10.57,
      0.0
     ],
@@ -6328,7 +7251,7 @@
      0,
      1
     ],
-    "sirka": 1.24
+    "sirka": 1.23
    }
   ],
   "interier": true,
@@ -6336,9 +7259,59 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v1",
+    "poloha": [
+     10.25,
+     10.972,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     11.923,
+     1.995,
+     0.0
+    ],
+    "otoceni": 34.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     7.176,
+     11.571,
+     0.0
+    ],
+    "otoceni": 50.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.252,
+     12.169,
+     0.0
+    ],
+    "otoceni": 97.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.536,
+     8.179,
+     0.0
+    ],
+    "otoceni": 144.0,
+    "meritko": 1.0
+   },
+   {
     "jmeno": "lavicka_99914b93",
     "poloha": [
-     7.58,
+     7.436,
      12.967,
      0.0
     ],
@@ -6348,7 +7321,7 @@
    {
     "jmeno": "kos_99914b93",
     "poloha": [
-     6.515,
+     6.472,
      12.967,
      0.0
     ],
@@ -6365,7 +7338,7 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 18160 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
+  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7848 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
  },
  {
   "soubor": "dum_28_obchodni_stredisko.glb",
@@ -6401,7 +7374,7 @@
    {
     "cast": "omitka",
     "maska": "dum_28_obchodni_stredisko_maska_omitka.png",
-    "zacatek": 230,
+    "zacatek": 231,
     "paleta": [
      "E8E6DE",
      "F0DCB0",
@@ -6434,6 +7407,46 @@
   "okraje_textur": 16,
   "doplnky": [
    {
+    "jmeno": "strom_v2",
+    "poloha": [
+     27.292,
+     5.985,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     27.292,
+     10.972,
+     0.0
+    ],
+    "otoceni": 19.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     27.292,
+     18.453,
+     0.0
+    ],
+    "otoceni": 303.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     27.292,
+     23.44,
+     0.0
+    ],
+    "otoceni": 148.0,
+    "meritko": 0.8571
+   },
+   {
     "jmeno": "lavicka_99914b93",
     "poloha": [
      26.301,
@@ -6463,6 +7476,6 @@
   },
   "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 24332 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
+  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 11388 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
  }
 ]

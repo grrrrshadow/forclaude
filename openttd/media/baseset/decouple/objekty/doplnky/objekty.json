@@ -195,6 +195,162 @@
  },
  {
   "druh": "doplnek",
+  "jmeno": "ker_v0",
+  "soubor": "ker_v0.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v0_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.7,
+    0.58
+   ],
+   "y": [
+    -0.77,
+    0.47
+   ],
+   "z": [
+    -0.14,
+    0.76
+   ]
+  },
+  "trojuhelniku": 900,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 9,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 201,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ker_v1",
+  "soubor": "ker_v1.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v1_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.74,
+    0.68
+   ],
+   "y": [
+    -0.8,
+    0.47
+   ],
+   "z": [
+    -0.15,
+    0.78
+   ]
+  },
+  "trojuhelniku": 900,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 12,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 202,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ker_v2",
+  "soubor": "ker_v2.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "ker_v2_maska_koruna.png",
+    "zacatek": 212,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.41,
+    0.66
+   ],
+   "y": [
+    -0.72,
+    0.56
+   ],
+   "z": [
+    -0.17,
+    0.85
+   ]
+  },
+  "trojuhelniku": 900,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 14,
+  "tvar": {
+   "vyska": 1.05,
+   "r": 0.7,
+   "seed": 203,
+   "kmen": false
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
   "jmeno": "klepac_5c888211",
   "soubor": "klepac_5c888211.glb",
   "nazev": {
@@ -2464,6 +2620,54 @@
  },
  {
   "druh": "doplnek",
+  "jmeno": "smrk_v1",
+  "soubor": "smrk_v1.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "barvy": [
+   {
+    "cast": "jehlici",
+    "maska": "smrk_v1_maska_jehlici.png",
+    "zacatek": 216,
+    "paleta": [
+     "284C2E",
+     "1F3F2A",
+     "2E5636",
+     "3A5E4A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -2.83,
+    2.83
+   ],
+   "y": [
+    -2.83,
+    2.83
+   ],
+   "z": [
+    0.0,
+    12.69
+   ]
+  },
+  "trojuhelniku": 312,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 3,
+  "tvar": {
+   "vyska": 12.0,
+   "r": 2.6,
+   "seed": 302
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.16,
+  "poznamka": "společný doplněk domů (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
   "jmeno": "stojan_destniku_a0180099",
   "soubor": "stojan_destniku_a0180099.glb",
   "nazev": {
@@ -3317,6 +3521,218 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "společný doplněk domů (stolek se židlemi): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v0",
+  "soubor": "strom_v0.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v0_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.71,
+    1.81
+   ],
+   "y": [
+    -1.45,
+    1.7
+   ],
+   "z": [
+    0.0,
+    6.32
+   ]
+  },
+  "trojuhelniku": 2400,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 12,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 101,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v1",
+  "soubor": "strom_v1.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v1_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.87,
+    1.72
+   ],
+   "y": [
+    -1.53,
+    1.74
+   ],
+   "z": [
+    0.0,
+    6.31
+   ]
+  },
+  "trojuhelniku": 2400,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 16,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 102,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v2",
+  "soubor": "strom_v2.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v2_maska_koruna.png",
+    "zacatek": 214,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.94,
+    1.48
+   ],
+   "y": [
+    -1.43,
+    2.17
+   ],
+   "z": [
+    0.0,
+    6.64
+   ]
+  },
+  "trojuhelniku": 2400,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 19,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 103,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "strom_v3",
+  "soubor": "strom_v3.glb",
+  "nazev": {
+   "cs": "strom"
+  },
+  "barvy": [
+   {
+    "cast": "koruna",
+    "maska": "strom_v3_maska_koruna.png",
+    "zacatek": 213,
+    "paleta": [
+     "3E682C",
+     "467030",
+     "38602A",
+     "4E7434",
+     "5A8A3A",
+     "2F5226",
+     "6B7A34",
+     "C0602A"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.54,
+    1.46
+   ],
+   "y": [
+    -1.88,
+    1.79
+   ],
+   "z": [
+    0.0,
+    6.49
+   ]
+  },
+  "trojuhelniku": 2400,
+  "atlas_px": 512,
+  "okraje_textur": 16,
+  "pouziti": 16,
+  "tvar": {
+   "vyska": 7.0,
+   "r": 1.8,
+   "seed": 104,
+   "kmen": true
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "kmen_r": 0.26,
+  "poznamka": "společný doplněk domů (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",

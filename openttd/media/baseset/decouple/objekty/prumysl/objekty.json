@@ -430,446 +430,6 @@
   "okraje_textur": 16
  },
  {
-  "soubor": "socha_kamen.glb",
-  "jmeno": "socha_kamen",
-  "druh": "prumysl",
-  "prumysl": "IT_STATUE",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "varianta": "kamen",
-  "rostliny": [
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     0.717,
-     0.717,
-     0.0
-    ],
-    "otoceni": 22.9,
-    "meritko": [
-     5.292,
-     5.292,
-     9.975
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     6.103,
-     0.617,
-     0.0
-    ],
-    "otoceni": 171.9,
-    "meritko": [
-     4.723,
-     4.723,
-     8.778
-    ]
-   },
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     8.697,
-     0.617,
-     0.0
-    ],
-    "otoceni": 234.9,
-    "meritko": [
-     5.292,
-     5.292,
-     9.376
-    ]
-   },
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     0.617,
-     6.103,
-     0.0
-    ],
-    "otoceni": 126.1,
-    "meritko": [
-     5.292,
-     5.292,
-     9.177
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     0.617,
-     8.697,
-     0.0
-    ],
-    "otoceni": 74.5,
-    "meritko": [
-     4.723,
-     4.723,
-     8.578
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     2.812,
-     0.0
-    ],
-    "otoceni": 17.2,
-    "meritko": [
-     1.994,
-     1.994,
-     2.693
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     5.405,
-     0.0
-    ],
-    "otoceni": 114.6,
-    "meritko": [
-     1.994,
-     1.994,
-     2.394
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     11.988,
-     0.0
-    ],
-    "otoceni": 252.1,
-    "meritko": [
-     1.994,
-     1.994,
-     2.793
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     2.812,
-     13.943,
-     0.0
-    ],
-    "otoceni": 63.0,
-    "meritko": [
-     1.994,
-     1.994,
-     2.793
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     5.405,
-     13.943,
-     0.0
-    ],
-    "otoceni": 189.1,
-    "meritko": [
-     1.994,
-     1.994,
-     2.494
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     11.988,
-     13.943,
-     0.0
-    ],
-    "otoceni": 297.9,
-    "meritko": [
-     1.994,
-     1.994,
-     2.593
-    ]
-   }
-  ],
-  "postavy_s_holkami": [
-   {
-    "postava": "galaxia_sedi",
-    "poloha": [
-     8.24,
-     3.01,
-     0.94
-    ],
-    "otoceni": 90.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "people_girl_sedi",
-    "poloha": [
-     6.64,
-     3.01,
-     0.94
-    ],
-    "otoceni": 90.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "anime_girl_sedi",
-    "poloha": [
-     3.01,
-     7.64,
-     0.94
-    ],
-    "otoceni": 0.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "bikini_jde",
-    "poloha": [
-     11.7,
-     8.65,
-     0.06
-    ],
-    "otoceni": 70.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "college_girl_objima",
-    "poloha": [
-     7.31,
-     8.39,
-     2.79
-    ],
-    "otoceni": 275.2,
-    "meritko": 2.0
-   }
-  ],
-  "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=kamen)",
-  "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
-  "poznamka": "socha Karla Máchy z kamene s kapucí, vousy a jointem, lavičky, keře, odpadky, kytky marihuany kolem; 36000 trojúhelníků (model 69212), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny); Nahrazuje ji socha.glb (barva číslem): smažu ji, až hra socha převezme"
- },
- {
-  "soubor": "socha_bronz.glb",
-  "jmeno": "socha_bronz",
-  "druh": "prumysl",
-  "prumysl": "IT_STATUE",
-  "dlazdic_x": 1,
-  "dlazdic_y": 1,
-  "varianta": "bronz",
-  "rostliny": [
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     0.717,
-     0.717,
-     0.0
-    ],
-    "otoceni": 22.9,
-    "meritko": [
-     5.292,
-     5.292,
-     9.975
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     6.103,
-     0.617,
-     0.0
-    ],
-    "otoceni": 171.9,
-    "meritko": [
-     4.723,
-     4.723,
-     8.778
-    ]
-   },
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     8.697,
-     0.617,
-     0.0
-    ],
-    "otoceni": 234.9,
-    "meritko": [
-     5.292,
-     5.292,
-     9.376
-    ]
-   },
-   {
-    "soubor": "kytka_mari_vysoka.glb",
-    "poloha": [
-     0.617,
-     6.103,
-     0.0
-    ],
-    "otoceni": 126.1,
-    "meritko": [
-     5.292,
-     5.292,
-     9.177
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     0.617,
-     8.697,
-     0.0
-    ],
-    "otoceni": 74.5,
-    "meritko": [
-     4.723,
-     4.723,
-     8.578
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     2.812,
-     0.0
-    ],
-    "otoceni": 17.2,
-    "meritko": [
-     1.994,
-     1.994,
-     2.693
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     5.405,
-     0.0
-    ],
-    "otoceni": 114.6,
-    "meritko": [
-     1.994,
-     1.994,
-     2.394
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     13.943,
-     11.988,
-     0.0
-    ],
-    "otoceni": 252.1,
-    "meritko": [
-     1.994,
-     1.994,
-     2.793
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     2.812,
-     13.943,
-     0.0
-    ],
-    "otoceni": 63.0,
-    "meritko": [
-     1.994,
-     1.994,
-     2.793
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     5.405,
-     13.943,
-     0.0
-    ],
-    "otoceni": 189.1,
-    "meritko": [
-     1.994,
-     1.994,
-     2.494
-    ]
-   },
-   {
-    "soubor": "kytka_mari_kosata.glb",
-    "poloha": [
-     11.988,
-     13.943,
-     0.0
-    ],
-    "otoceni": 297.9,
-    "meritko": [
-     1.994,
-     1.994,
-     2.593
-    ]
-   }
-  ],
-  "postavy_s_holkami": [
-   {
-    "postava": "galaxia_sedi",
-    "poloha": [
-     8.24,
-     3.01,
-     0.94
-    ],
-    "otoceni": 90.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "people_girl_sedi",
-    "poloha": [
-     6.64,
-     3.01,
-     0.94
-    ],
-    "otoceni": 90.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "anime_girl_sedi",
-    "poloha": [
-     3.01,
-     7.64,
-     0.94
-    ],
-    "otoceni": 0.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "bikini_jde",
-    "poloha": [
-     11.7,
-     8.65,
-     0.06
-    ],
-    "otoceni": 70.0,
-    "meritko": 2.0
-   },
-   {
-    "postava": "college_girl_objima",
-    "poloha": [
-     7.31,
-     8.39,
-     2.79
-    ],
-    "otoceni": 275.2,
-    "meritko": 2.0
-   }
-  ],
-  "autor": "grrrrf: vlastní model socha/render_socha.py (SOCHA=bronz)",
-  "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
-  "poznamka": "socha Karla Máchy z bronzu, jinak jako kamenná; 36000 trojúhelníků (model 69212), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny); Nahrazuje ji socha.glb (barva číslem): smažu ji, až hra socha převezme"
- },
- {
   "soubor": "automat.glb",
   "jmeno": "automat",
   "druh": "prumysl",
@@ -1717,7 +1277,7 @@
   },
   "autor": "grrrrf: vlastní model lihovar/render_lihovar.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "lihovar 3 × 3: kotelna s komínem, hlavní budova s nápisem LIHOVAR, žlab s bramborami, sklady, nádrže; 25610 trojúhelníků (model 26914), atlas 2048 px jen barva bez světla, s normálami, výška 27.49 m. Barvy číslem (hráč 23. 10.: „hrej si s těma barvama. ne blaznivy barvy ale vic variant at to je pestry“): 7 částí, každá vlastní maska a paleta tlumených barev, každá budova své cihly; atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
+  "poznamka": "lihovar 3 × 3: kotelna s komínem, hlavní budova s nápisem LIHOVAR, žlab s bramborami, sklady, nádrže; 25610 trojúhelníků (model 26914), atlas 2048 px jen barva bez světla, s normálami, výška 27.49 m. Barvy číslem (hráč 23. 10.: „hrej si s těma barvama. ne blaznivy barvy ale vic variant at to je pestry“): 10 částí, každá vlastní maska a paleta tlumených barev, každá budova své cihly; atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
   "barvy": [
    {
     "cast": "cihly_hlavni",
@@ -1752,6 +1312,22 @@
     "popis": "cihly kotelny a komína"
    },
    {
+    "cast": "cihly_kvasirna",
+    "maska": "lihovar_maska_cihly_kvasirna.png",
+    "zacatek": 165,
+    "paleta": [
+     "9E4A36",
+     "B0583C",
+     "8A3C2C",
+     "7A4A36",
+     "C08A5A",
+     "A86A4A",
+     "6E3A30",
+     "B89270"
+    ],
+    "popis": "cihly kvasírny"
+   },
+   {
     "cast": "cihly_ostatni",
     "maska": "lihovar_maska_cihly_ostatni.png",
     "zacatek": 165,
@@ -1765,7 +1341,7 @@
      "6E3A30",
      "B89270"
     ],
-    "popis": "cihly kvasírny, váhovny a zídek"
+    "popis": "cihly váhovny a zídek"
    },
    {
     "cast": "omitka",
@@ -1779,15 +1355,25 @@
      "E6CFC0",
      "D4DCCF",
      "F0E2C4",
-     "CFC6B4",
+     "CFC6B4"
+    ],
+    "popis": "světlé římsy a šambrány"
+   },
+   {
+    "cast": "omitka_sklady",
+    "maska": "lihovar_maska_omitka_sklady.png",
+    "zacatek": 221,
+    "paleta": [
      "D6BA80",
      "C9A66B",
      "D9C9A0",
+     "B9A27A",
      "D8B4A0",
      "A9B496",
-     "E0C890"
+     "E0C890",
+     "C8B8A8"
     ],
-    "popis": "římsy, šambrány a omítka skladu lihu a váhovny"
+    "popis": "omítka skladu lihu a váhovny"
    },
    {
     "cast": "strecha",
@@ -1834,13 +1420,29 @@
      "355E5A"
     ],
     "popis": "vrata a dveře"
+   },
+   {
+    "cast": "nadrze",
+    "maska": "lihovar_maska_nadrze.png",
+    "zacatek": 219,
+    "paleta": [
+     "D4D6D2",
+     "E8E8E2",
+     "B8C0C4",
+     "9FB4A8",
+     "C8D4DC",
+     "D8CCB0",
+     "A8ACB0",
+     "E0D8C8"
+    ],
+    "popis": "nádrže na líh"
    }
   ],
   "okraje_textur": 16,
   "sdili": [
    {
     "prumysl": "IT_OIL_REFINERY",
-    "poznamka": "rafinerie původní hry smí místo dílů z prumysl_vanilla ukázat celý lihovar (hráč 23. 10.: „rafinerie a lihovar mužou sdilet, to je stejny zařizeni“ – destilace je destilace): lihovar 3 × 3 na rafinerii, políčka rafinerie navíc jako dvůr (pv_dvur_asfalt), barvy losuj jako u lihovaru; nápis LIHOVAR a brambory ve žlabu zůstávají, jsou v atlasu"
+    "poznamka": "rafinerie původní hry smí místo dílů z prumysl_vanilla ukázat celý lihovar (hráč 23. 10.: „rafinerie a lihovar mužou sdilet, to je stejny zařizeni“ – destilace je destilace): lihovar 3 × 3 na čtverci políček rafinerie nejblíž středu, barvy losuje hra jako u lihovaru; na zbylých políčkách vlastní díly rafinerie (pece, nádrže, kolony) na pv_dvur_hlina, asfalt ne (hra 23. 10. v noci, hráč: „dej to pryč ten asfalt kolem lihovaru, vypadá to blbě“); nápis LIHOVAR a brambory ve žlabu zůstávají, jsou v atlasu"
    }
   ]
  },

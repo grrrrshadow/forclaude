@@ -27,6 +27,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 23. 10. noc – společné stromy a keře (kolega), lihovar 10 barev
+
+- Kolega (`STROMY-SPOLECNE`, hráč: *„křoví máš doufám pár variant a rozmísťuješ je, šetříš, u každého domu,
+  průmyslu stejné“*): stromy, keře a smrky už nejsou upečené v každém domě, jsou to společné doplňky `strom_v0–3`,
+  `ker_v0–2`, `smrk_v0–1` (barva koruny číslem, každé místo jiná). 41 domů přepečených: 580 000 → 330 000
+  trojúhelníků. Velikosti holek u domů nezměněné. Převzato.
+- **Strom blokuje chůzi jen kmenem** (`kmen_r` v záznamu doplňku × `meritko`), koruna ne; keř tvarem jako dřív.
+  V půdorysu domu (`test3d pudorys`) jsou stromy jen tečky kmenů.
+- `doplnky` u záznamů průmyslu hra četla už dřív (stejná funkce jako u domů). Nově i u dlaždic `prumysl_vanilla`
+  (objekt jen z doplňků, jako pouliční lampa), takže kolega může vanilla stromy nahradit `strom_v*`/`smrk_v*`.
+- Lihovar zase 10 částí (nová část nádrže), staré sochy `socha_kamen`/`socha_bronz` ze sady pryč.
+
 ## 23. 10. noc – socha jedna s barvou, lihovar 7 barev, rafinerie jako lihovar, nové lucerny
 
 - Převzato od kolegy (`SOCHA-BARVA`, `PRUCHOZI-PRUMYSL`, `TATRA-OSOBNI-V12`, `LIHOVAR-7-CASTI`): socha, gymnázium,

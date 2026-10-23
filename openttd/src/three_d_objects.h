@@ -243,6 +243,9 @@ struct ThreeDObject {
 	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s; empty all its own
 	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
+	float trunk_r = 0;                ///< an add-on's "kmen_r" (a tree), metres at size 1: only its trunk stands in the way, not its crown; 0 all of it
+	std::vector<uint32_t> passable_tris; ///< the triangles of its laid trees that stand in no one's way (trunk_r), first and end of each run
+	std::vector<float> trunks;           ///< the trunks of its laid trees instead: x, y and radius of each, world units (Blocks())
 	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's
 	float extent[4] = {};             ///< x0, x1, y0, y1 of its corners as read, world units
 	/** Night triangle t's texture (night_tex): 0 its own, n its add-on n's. */

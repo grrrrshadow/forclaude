@@ -2414,6 +2414,20 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 			_three_d_objects.push_back(PlaceIndustryPart(it->second, name + "/" + part, at, d.value("otoceni", 0.0f), d.value("meritko", 1.0f), bx, by));
 		}
 	}
+	/* Its add-ons ("doplnky", as a house's: the shared trees and bushes of the colleague's STROMY-SPOLECNE-PRO-HRU.md):
+	 * one object of them alone, without a file of its own (as a street lamp, MakeStreetLamps()). */
+	if (e.contains("doplnky")) {
+		ThreeDObject addons;
+		addons.name = name + "/doplnky";
+		addons.variants = 0; // no house's
+		addons.tiles_x = bx;
+		addons.tiles_y = by;
+		ReadBuildingFigures(e, addons);
+		if (!addons.addon_places.empty()) {
+			tile.parts.push_back(_three_d_objects.size());
+			_three_d_objects.push_back(std::move(addons));
+		}
+	}
 	ThreeDObject plants;
 	plants.name = name + "/rostliny";
 	plants.variants = 0; // no house's
@@ -2493,6 +2507,7 @@ static void ReadThreeDObjects()
 					addon.glb_path = folder + addon.file;
 					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
 					ReadColourParts(e, folder, addon);
+					addon.trunk_r = std::clamp(e.value("kmen_r", 0.0f), 0.0f, 5.0f);
 					addon.addon = true;
 					addon.variants = 0;
 					if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) {
@@ -5966,6 +5981,12 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		} else if (!read.light.empty()) {
 			read.light.resize(read.pos.size() / 3, 256);
 		}
+		/* A tree ("kmen_r", the colleague's STROMY-SPOLECNE-PRO-HRU.md): its crown in no one's way, only its trunk. */
+		if (a.trunk_r > 0) {
+			read.passable_tris.push_back(static_cast<uint32_t>(read.tri.size() / 3));
+			read.passable_tris.push_back(static_cast<uint32_t>((read.tri.size() + a.tri.size()) / 3));
+			read.trunks.insert(read.trunks.end(), {place.at[0] * OBJECT_UNITS_PER_METRE, place.at[1] * OBJECT_UNITS_PER_METRE, a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE});
+		}
 		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) */
 		for (size_t t = 0; t + 2 < a.tri.size(); t += 3) {
 			read.tri.insert(read.tri.end(), {base + a.tri[t], base + a.tri[t + 1], base + a.tri[t + 2]});
@@ -6056,6 +6077,8 @@ bool ThreeDObject::Read() const
 			self.corner_tex = std::move(r.corner_tex);
 			self.addon_objects = std::move(r.addon_objects);
 			self.addon_places_of = std::move(r.addon_places_of);
+			self.passable_tris = std::move(r.passable_tris);
+			self.trunks = std::move(r.trunks);
 			self.nrm = std::move(r.nrm);
 		}
 		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
@@ -6118,7 +6141,10 @@ bool ThreeDObject::Blocks(double x, double y) const
 			const int cx = static_cast<int>(std::floor(px / cell)), cy = static_cast<int>(std::floor(py / cell));
 			if (cx >= 0 && cy >= 0 && cx < w && cy < h) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
 		};
+		size_t run = 0; // the run of passable triangles (a tree's crown) at or after this one
 		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
+			while (run + 1 < this->passable_tris.size() && t / 3 >= this->passable_tris[run + 1]) run += 2;
+			if (run + 1 < this->passable_tris.size() && t / 3 >= this->passable_tris[run]) continue;
 			/* The triangle cut to the height of a body (a polygon, cut by z >= lo and z <= hi). */
 			std::vector<std::array<double, 3>> poly;
 			for (int k = 0; k < 3; k++) {
@@ -6161,6 +6187,16 @@ bool ThreeDObject::Blocks(double x, double y) const
 						if ((a[1] > py) != (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) in = !in;
 					}
 					if (in) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
+		/* The trunks of its trees: the cells within each, and the one its middle is in. */
+		for (size_t i = 0; i + 2 < this->trunks.size(); i += 3) {
+			const double tx = this->trunks[i], ty = this->trunks[i + 1], tr = this->trunks[i + 2];
+			mark(tx, ty);
+			for (int cy = std::max(0, static_cast<int>((ty - tr) / cell)); cy <= std::min(h - 1, static_cast<int>((ty + tr) / cell)); cy++) {
+				for (int cx = std::max(0, static_cast<int>((tx - tr) / cell)); cx <= std::min(w - 1, static_cast<int>((tx + tr) / cell)); cx++) {
+					if (std::hypot((cx + 0.5) * cell - tx, (cy + 0.5) * cell - ty) <= tr) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
 				}
 			}
 		}
