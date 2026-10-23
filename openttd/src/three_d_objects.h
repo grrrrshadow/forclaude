@@ -48,6 +48,14 @@
 
 /** World units along x and y to a metre of the objects: a tile, 16 units, is 14.83765 m (the renders' scale). */
 static constexpr double OBJECT_UNITS_PER_METRE = 16.0 / 14.83765;
+/**
+ * The creatures on the map -- the witches, the dragons, the ghosts, the animals and the dogs -- not in the view from the
+ * eyes: three times as big as they were drawn (the player, 23. 10.: "the witches at night 3x bigger, at the other
+ * angles too, and not only the witches, the dragons too, everything we enlarge when it is not the first person view").
+ */
+static constexpr float THREE_D_MAP_CREATURE_SCALE = 3.0f;
+/** The people in the view from the eyes (the girls, Mat, the sellers): a head taller than true (the player, 23. 10.: "I want to look them in the eyes"). */
+static constexpr float THREE_D_EYE_PEOPLE_SCALE = 1.15f;
 /** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
 static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
 /**

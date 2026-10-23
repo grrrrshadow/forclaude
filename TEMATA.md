@@ -27,6 +27,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 23. 10. – dvojí šipka a pomalé snímky, lidé z očí vyšší, tvorové na mapě 3×, deník snímků
+
+- **Dvojí šipka „fungovalo dvakrát a pak ne“ – příčina:** hra pozná stisk tak, že jednou za snímek koukne, jestli je
+  šipka dole (`_dirkeys`, `InputLoop()`). Rig `test3d chodec tuktuk <ms snímku>`: do 100 ms na snímek dvojí stisk
+  chodce rozejde (5,7 m za 2 s), od 150 ms se rychlé puštění mezi stisky ztratí a dva stisky jsou jedno držení. Hráč:
+  *„oprav to pomalé snímkování, příčinu ne následky“* – stisky z událostí kláves (moje první oprava) **vráceny**,
+  řeší se snímky. Pozor: 250 ms v logu myši ze 17. 10. jsou jen interval zápisu řádku „dotaz na systém“, ne snímek
+  (na mapě tam zprávy chodí po 20 ms). Na tomhle stroji (rig s OpenGL, obraz z očí na vlákně) hlavní smyčka 60/s,
+  sběr z očí 5–6 ms, kreslení na vlákně ~73 ms (klávesy neblokuje). **Na telefonu nevíme – měří to deník.**
+- **Deník snímků `snimky.log`** (`frame_diary.cpp`, ve složce hráče): každých 5 s řádek: pohled (mapa/oči/kabina),
+  snímků za sekundu, nejdelší snímek a z čeho (buffer, zámek = čekání na tik hry, klávesy, okna, obraz), průměry,
+  tiky hry na svém vlákně, sběr z očí (hlavní vlákno) a kreslení z očí (jeho vlákno). Max 5000 řádků.
+- **Mat, holky, prodavači z očí o hlavu vyšší** (×1,15, hráč: *„chci jim koukat do očí“*); jen z očí, mapa beze změny.
+- **Tvorové na mapě 3× větší** (čarodějnice, draci, strašidla, zvířata, psi; prodavači ne – lidé jako holky), i jejich
+  světla a překreslovaná místa; vznášející se (duch) o tolik výš. Z očí beze změny.
+
 ## 22. 10. – par14 od kolegy ve hře, strašidlo v ulicích, pes před hráčem
 
 - Hráč: *„strašidla potkám jen Billa…, mushroom warrior… a draka; ostatní strašidla nejsou“*, *„já poslal víc

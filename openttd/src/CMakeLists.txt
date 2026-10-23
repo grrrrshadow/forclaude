@@ -556,6 +556,8 @@ add_files(
     cab_view.h
     cab_view_gui.cpp
     first_person_gui.cpp
+    frame_diary.cpp
+    frame_diary.h
     walker_cmd.cpp
     walker_cmd.h
     walker_inventory.h

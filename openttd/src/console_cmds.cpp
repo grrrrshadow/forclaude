@@ -9039,6 +9039,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
 			const double metres = RigFirstPersonHoldW(frame_ms, frames);
 			IConsolePrint(CC_DEFAULT, "test3d: drzeni W {} snimku po {} ms ({:.2f} s): usel {:.2f} m, {:.2f} m/s", frames, frame_ms, frames * frame_ms / 1000.0, metres, metres / (frames * frame_ms / 1000.0));
+		} else if (argv.size() > 3 && argv[2] == "tuktuk") {
+			/* 'chodec tuktuk <frame ms>': a quick double tap of Up, the keys looked at once a frame so long (RigFirstPersonTapTimeline()). */
+			extern double RigFirstPersonTapTimeline(int frame_ms);
+			const int frame_ms = number(3).value_or(40);
+			IConsolePrint(CC_DEFAULT, "test3d: tuktuk snimky po {} ms: usel {:.2f} m za 2 s", frame_ms, RigFirstPersonTapTimeline(frame_ms));
 		} else if (argv.size() > 4 && argv[2] == "dvakrat") {
 			/* 'chodec dvakrat <frames between> <frames> [bok]': Up pressed twice, then once, or Left with 'bok'
 			 * (RigFirstPersonDoubleTap()). */

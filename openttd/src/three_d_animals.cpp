@@ -283,7 +283,9 @@ int HealthOf(const ThreeDAnimal &a)
 /** Its part of the screen dirty, as big as it is drawn. */
 void MarkDirty(const Beast &b, const ThreeDAnimal &a)
 {
-	const double len_m = std::max(a.size[0], a.size[1]) * a.scale, tall_m = a.size[2] * a.scale;
+	/* As big as it is drawn on the map (AddThreeDAnimalsToViewport()), floating as high. */
+	const float scale = a.scale * (a.kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
+	const double len_m = std::max(a.size[0], a.size[1]) * scale, tall_m = (a.size[2] + a.hover_m) * scale;
 	const Point pt = RemapCoords(static_cast<int>(b.x), static_cast<int>(b.y), b.z);
 	const int r = static_cast<int>(len_m * OBJECT_UNITS_PER_METRE * 4 * ZOOM_BASE) + 32 * ZOOM_BASE;
 	const int up = static_cast<int>(tall_m * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE) + r;
@@ -939,7 +941,11 @@ bool InBody(const Beast &b, const ThreeDAnimal &a, double x, double y, double z,
 
 } // namespace
 
-/** The dogs, the animals and the ghosts on the map, as figures at their "meritko" (the turned view, and north with the houses as objects). */
+/**
+ * The dogs, the animals and the ghosts on the map, as figures at their "meritko", three times that (the sellers, people,
+ * as the girls); one floating ("vyska_m") floats as much higher as it is bigger (the turned view, and north with the
+ * houses as objects).
+ */
 void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 {
 	for (const Beast &b : _beasts) {
@@ -947,11 +953,13 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 		if (a == nullptr) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
-		AddThreeDFigureToViewport(figure, a->scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), zoom, INVALID_TILE, 0, frame);
+		const float scale = a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
+		const int z = b.z + static_cast<int>(std::lround(a->hover_m * OBJECT_HEIGHT_PER_METRE * (scale - 1.0f)));
+		AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), z, Facing(b), zoom, INVALID_TILE, 0, frame);
 	}
 }
 
-/** And in the view from an eye, at their true size (AddCabFigure()). */
+/** And in the view from an eye, at their true size; the sellers, people, a head taller as the girls (AddCabFigure()). */
 void AddThreeDAnimalsToEye()
 {
 	for (const Beast &b : _beasts) {
@@ -959,7 +967,8 @@ void AddThreeDAnimalsToEye()
 		if (a == nullptr) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
-		AddCabFigure(figure, a->scale * EYE_OF_MAP, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
+		const float people = a->kind == ThreeDAnimal::Kind::Seller ? THREE_D_EYE_PEOPLE_SCALE : 1.0f;
+		AddCabFigure(figure, a->scale * EYE_OF_MAP * people, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
 	}
 }
 

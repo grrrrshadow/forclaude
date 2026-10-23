@@ -1692,6 +1692,32 @@ double RigFirstPersonHoldW(int frame_ms, int frames)
  * many frames, then pressed once (Up, or Left with side) and let go as long again; the metres walked after the two
  * presses and after the one.
  */
+/**
+ * The rig: a quick double tap of Up as a player's fingers make it (down 90 ms, up 90 ms, down 90 ms, then let go), the
+ * game looking at the keys once a frame of so many milliseconds (InputLoop()), as a slow frame does; the metres walked
+ * in the two seconds after.
+ */
+double RigFirstPersonTapTimeline(int frame_ms)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || frame_ms <= 0) return 0;
+	const double x0 = w->walker.x, y0 = w->walker.y;
+	int elapsed = 0;
+	for (int t = 0; t < 2000; t += frame_ms) {
+		const bool down = t < 90 || (t >= 180 && t < 270);
+		_dirkeys.Reset();
+		_dirkeys.Set(DirectionKey::Up, down);
+		elapsed += frame_ms;
+		const uint count = elapsed / FIRST_PERSON_TICK_MS;
+		elapsed %= FIRST_PERSON_TICK_MS;
+		if (count > 0) w->Step(count);
+	}
+	_dirkeys.Reset();
+	const double metres = std::hypot(w->walker.x - x0, w->walker.y - y0) / OBJECT_UNITS_PER_METRE;
+	w->walk_on = 0;
+	return metres;
+}
+
 std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames, bool side)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));

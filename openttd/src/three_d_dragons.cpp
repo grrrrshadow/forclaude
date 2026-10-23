@@ -152,18 +152,20 @@ bool OnMap(double x, double y)
 void MarkDirty(const Dragon &d)
 {
 	const Point pt = RemapCoords(static_cast<int>(d.x), static_cast<int>(d.y), d.z);
-	const int r = static_cast<int>(d.length_m * OBJECT_UNITS_PER_METRE * 4 * ZOOM_BASE) + 32 * ZOOM_BASE;
-	const int up = static_cast<int>(d.height_m * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE) + r;
+	/* As big as it is drawn on the map (AddThreeDDragonsToViewport()). */
+	const double length_m = d.length_m * THREE_D_MAP_CREATURE_SCALE, height_m = d.height_m * THREE_D_MAP_CREATURE_SCALE;
+	const int r = static_cast<int>(length_m * OBJECT_UNITS_PER_METRE * 4 * ZOOM_BASE) + 32 * ZOOM_BASE;
+	const int up = static_cast<int>(height_m * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE) + r;
 	/* Turned (three_d.h): the box it flies in, down to the ground for its shadow. */
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
-	const double reach = d.length_m * OBJECT_UNITS_PER_METRE + TILE_SIZE;
+	const double reach = length_m * OBJECT_UNITS_PER_METRE + TILE_SIZE;
 	place.x0 = d.x - reach;
 	place.x1 = d.x + reach;
 	place.y0 = d.y - reach;
 	place.y1 = d.y + reach;
 	place.z0 = 0;
-	place.z1 = d.z + d.height_m * OBJECT_HEIGHT_PER_METRE + reach;
+	place.z1 = d.z + height_m * OBJECT_HEIGHT_PER_METRE + reach;
 	DirtyPlaceScope scope(place);
 	MarkAllViewportsDirty(pt.x - r, pt.y - up, pt.x + r, pt.y + r);
 }
@@ -419,7 +421,7 @@ void AddThreeDDragonsToViewport(ZoomLevel zoom)
 	for (const Dragon &d : _dragons) {
 		int frame;
 		const std::string figure = Figure(d, frame);
-		AddThreeDFigureToViewport(figure, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, frame);
+		AddThreeDFigureToViewport(figure, THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, frame);
 	}
 }
 

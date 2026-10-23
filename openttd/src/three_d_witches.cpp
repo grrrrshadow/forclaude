@@ -173,7 +173,7 @@ void LightsOf(const Witch &w, const ThreeDWitch &c, bool eye, std::vector<ThreeD
 	const ThreeDVehicleObject *f = Flying(c);
 	const ThreeDVehicleShape *shape = f != nullptr ? f->TryGetShape(w.frame) : nullptr;
 	if (shape == nullptr) return;
-	const double size = w.scale * (eye ? EYE_OF_MAP : 1.0f);
+	const double size = w.scale * (eye ? EYE_OF_MAP : THREE_D_MAP_CREATURE_SCALE);
 	const double a = Facing(w) * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
 	/* A place of her frame in the world. */
 	auto place = [&](const std::vector<float> &list, size_t i, double &x, double &y, double &z) {
@@ -227,7 +227,7 @@ void LightsOf(const Witch &w, const ThreeDWitch &c, bool eye, std::vector<ThreeD
 void MarkDirty(const Witch &w, const ThreeDWitch &c)
 {
 	const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
-	const double body = std::max({c.size[0], c.size[1], c.size[2], 1.0f}) * w.scale * 0.6 * OBJECT_UNITS_PER_METRE + 2;
+	const double body = std::max({c.size[0], c.size[1], c.size[2], 1.0f}) * w.scale * THREE_D_MAP_CREATURE_SCALE * 0.6 * OBJECT_UNITS_PER_METRE + 2;
 	double x0 = w.x - body, x1 = w.x + body, y0 = w.y - body, y1 = w.y + body, z0 = w.z - body * up, z1 = w.z + body * up;
 	auto take = [&](double x, double y, double z, double r) {
 		x0 = std::min(x0, x - r);
@@ -475,7 +475,7 @@ void AddThreeDWitchesToViewport(ZoomLevel zoom)
 		const ThreeDWitch *c = Kind(w.kind);
 		const ThreeDVehicleObject *f = c != nullptr ? Flying(*c) : nullptr;
 		if (f == nullptr) continue;
-		AddThreeDFigureToViewport(f->name, w.scale, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, Facing(w), zoom, INVALID_TILE, 0, w.frame);
+		AddThreeDFigureToViewport(f->name, w.scale * THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, Facing(w), zoom, INVALID_TILE, 0, w.frame);
 	}
 }
 

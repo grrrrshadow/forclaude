@@ -148,6 +148,8 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include "table/strings.h"
 #include "table/string_colours.h"
 
+#include "frame_diary.h"
+
 #include "safeguards.h"
 
 Point _tile_fract_coords;
@@ -9231,8 +9233,12 @@ static std::vector<CabFigure> _cab_figures;
 double _cab_detail_pixels = 2.0;
 /** The rig: 'test3d detail <px> textura': its textures at their full size, whatever its distance. */
 bool _cab_full_textures = false;
-/** The size of the figures standing on the buildings and fields in the view from the eyes: true, as they are (twice it outside). */
-static constexpr float CAB_FIGURE_SCALE = 1.0f;
+/**
+ * The size of the people standing on the buildings and fields, at the stops, and of Mat walking, in the view from the
+ * eyes: a head taller than true (the player, 23. 10.: "Mat, the girls a head taller, I want to look them in the eyes
+ * when I come to them; their heads cannot be somewhere down"). Twice true outside, on the map.
+ */
+static constexpr float CAB_FIGURE_SCALE = THREE_D_EYE_PEOPLE_SCALE;
 
 /** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
 void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
@@ -12132,8 +12138,10 @@ static void EyeFrameThread()
 		std::unique_ptr<EyeFrame> f = std::move(_eye_to_draw);
 		_eye_drawing = true;
 		lock.unlock();
+		const auto started = std::chrono::steady_clock::now();
 		DrawEyeFrame(*f);
 		f->drawn_at = std::chrono::steady_clock::now();
+		FrameDiaryEyeDrawn(std::chrono::duration<double, std::milli>(f->drawn_at - started).count());
 		lock.lock();
 		_eye_drawn = std::move(f);
 		_eye_drawing = false;
@@ -12295,7 +12303,10 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 		_eye_asked_client = nullptr;
 		_eye_last_client = &camera;
 		std::unique_ptr<EyeFrame> f = NewEyeFrame(&camera);
-		if (!CollectEyeFrame(v, walker, width, height, camera, *f)) {
+		const auto collecting = std::chrono::steady_clock::now();
+		const bool collected = CollectEyeFrame(v, walker, width, height, camera, *f);
+		FrameDiaryEyeCollected(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - collecting).count());
+		if (!collected) {
 			FreeEyeFrame(std::move(f));
 		} else if (f->depot) {
 			/* Nothing to draw: the picture is as filled. */

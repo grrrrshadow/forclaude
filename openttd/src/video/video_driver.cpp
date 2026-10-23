@@ -21,6 +21,7 @@
 #include "../thread.h"
 #include "../window_func.h"
 #include "video_driver.hpp"
+#include "../frame_diary.h"
 
 #include "../safeguards.h"
 
@@ -38,7 +39,9 @@ void VideoDriver::GameLoop()
 	{
 		std::lock_guard<std::mutex> lock(this->game_state_mutex);
 
+		const auto started = std::chrono::steady_clock::now();
 		::GameLoop();
+		FrameDiaryGameTick(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
 	}
 }
 
@@ -121,13 +124,25 @@ void VideoDriver::Tick()
 		/* Avoid next_draw_tick getting behind more and more if it cannot keep up. */
 		if (this->next_draw_tick < now - ALLOWED_DRIFT * this->GetDrawInterval()) this->next_draw_tick = now;
 
+		/* Where the time of the frame goes (frame_diary.h). */
+		FrameDiaryParts parts;
+		auto mark = std::chrono::steady_clock::now();
+		const auto started = mark;
+		auto lap = [&mark](double &part) {
+			const auto t = std::chrono::steady_clock::now();
+			part += std::chrono::duration<double, std::milli>(t - mark).count();
+			mark = t;
+		};
+
 		/* Locking video buffer can block (especially with vsync enabled), do it before taking game state lock. */
 		this->LockVideoBuffer();
+		lap(parts.buffer);
 
 		{
 			/* Tell the game-thread to stop so we can have a go. */
 			std::lock_guard<std::mutex> lock_wait(this->game_thread_wait_mutex);
 			std::lock_guard<std::mutex> lock_state(this->game_state_mutex);
+			lap(parts.lock);
 
 			/* Keep the interactive randomizer a bit more random by requesting
 			 * new values when-ever we can. */
@@ -148,6 +163,7 @@ void VideoDriver::Tick()
 			}
 
 			::InputLoop();
+			lap(parts.input);
 
 			/* Prevent drawing when switching mode, as windows can be removed when they should still appear. */
 			if (_game_mode == GameMode::Bootstrap || _switch_mode == SwitchMode::None || HasModalProgress()) {
@@ -155,12 +171,16 @@ void VideoDriver::Tick()
 			}
 
 			this->PopulateSystemSprites();
+			lap(parts.windows);
 		}
 
 		this->CheckPaletteAnim();
 		this->Paint();
 
 		this->UnlockVideoBuffer();
+		lap(parts.paint);
+		parts.total = std::chrono::duration<double, std::milli>(mark - started).count();
+		FrameDiaryDraw(parts);
 
 		/* Wait till the first successful drawing tick before marking the driver as operational. */
 		static bool first_draw_tick = true;
