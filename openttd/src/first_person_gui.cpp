@@ -257,7 +257,13 @@ static bool FirstPersonWalkable(double x, double y)
 			const Industry *ind = Industry::GetByTile(tile);
 			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 			const TileIndex origin = ind->location.tile;
-			return obj != nullptr && !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
+			if (obj == nullptr) {
+				/* One of the original game from the parts the industries share (the forest): by its buildings' shapes
+				 * and its trees' trunks. */
+				const std::optional<bool> blocks = ThreeDOriginalIndustryBlocks(tile, x, y);
+				return blocks.has_value() && !*blocks;
+			}
+			return !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
 		}
 		case TileType::Station:
 			return HasStationRail(tile) || IsAnyRoadStop(tile);

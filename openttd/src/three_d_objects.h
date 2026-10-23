@@ -848,6 +848,7 @@ struct ThreeDIndustryTileParts {
 	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
 };
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
+std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 
 struct ThreeDPlantationTile;
 /**

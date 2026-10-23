@@ -13,6 +13,8 @@
 #include "beamng.h"
 #include "industry.h"
 #include "climate_industries.h"
+#include "industry_map.h"
+#include "industrytype.h"
 #include "three_d_vehicle_object.h"
 #include "cab_view.h"
 #include "debug.h"
@@ -6548,4 +6550,45 @@ float ThreeDGlowShare(const std::vector<float> &lights, size_t i)
 		nearest = std::min(nearest, std::sqrt(dx * dx + dy * dy + dz * dz));
 	}
 	return static_cast<float>(std::clamp(nearest / THREE_D_GLOW_UNITS, 0.3, 1.0));
+}
+
+/** A tree's trunk blocks the walker so far about its foot, metres; a plant lower than THREE_D_TRUNK_PLANT_M none (the crops, the flowers). */
+static constexpr double THREE_D_TRUNK_M = 0.3;
+static constexpr double THREE_D_TRUNK_PLANT_M = 4.0;
+
+/**
+ * Whether what stands on a tile of an industry of the original game drawn from the parts the industries share keeps
+ * the walker off a world point: its buildings by their shape (ThreeDObject::Blocks(), from the anchor of their block),
+ * its trees by their trunks only -- the crown is over the head. Before, every such tile was a wall, and the forest
+ * could not be walked into (the player, 23. 10.: "the distillery can be walked through and the forest I cannot enter").
+ * @return whether it blocks; nullopt for a tile the parts do not draw (a set's, one being built: as before)
+ */
+std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y)
+{
+	if (!IsTileType(tile, TileType::Industry) || !IsIndustryCompleted(tile)) return std::nullopt;
+	auto parts_of = [](TileIndex t) -> const ThreeDIndustryTileParts * {
+		const IndustryGfx gfx = GetIndustryGfx(t);
+		if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+		return GetThreeDOriginalIndustryTile(gfx);
+	};
+	const ThreeDIndustryTileParts *tp = parts_of(tile);
+	if (tp == nullptr) return std::nullopt;
+	TileIndex anchor = tile;
+	if (tp->member) {
+		anchor = TileAddWrap(tile, -tp->anchor_dx, -tp->anchor_dy);
+		if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return false;
+		tp = parts_of(anchor);
+		if (tp == nullptr || tp->member) return false;
+	}
+	const double ox = x - TileX(anchor) * TILE_SIZE, oy = y - TileY(anchor) * TILE_SIZE;
+	for (const ThreeDObject *part : tp->parts) {
+		if (part->Blocks(ox, oy)) return true;
+	}
+	if (tp->plants != nullptr) {
+		for (const ThreeDObjectFigure &p : tp->plants->plants) {
+			if (p.scale * p.stretch < THREE_D_TRUNK_PLANT_M) continue;
+			if (std::hypot(ox - p.at[0] * OBJECT_UNITS_PER_METRE, oy - p.at[1] * OBJECT_UNITS_PER_METRE) < THREE_D_TRUNK_M * OBJECT_UNITS_PER_METRE) return true;
+		}
+	}
+	return false;
 }

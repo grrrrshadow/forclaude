@@ -27,6 +27,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 23. 10. večer – les: náhled a vstup, houby, lucerna, vidle, dračí farma
+
+- **Náhled 3D u okna lesa** (hráč: *„les nefungoval 3D náhled u okna průmyslu“*): náhled znal jen průmysl z jednoho
+  objektu a dvě pole, vanilla les (`prumysl_vanilla`, stromy po políčkách) se neotevřel. Teď skládá políčka jako mapa.
+- **Do lesa nešlo vejít – příčina:** každé políčko průmyslu bez celého objektu (les a ostatní vanilla průmysly
+  z dílů) bylo pro chodce zeď. Teď blokují jen budovy svým tvarem a stromy kmenem (0,3 m, rostliny pod 4 m vůbec);
+  koruna nepřekáží. V rigu chodec prošel lesem z 72 na 78. Smrky vanilla lesa mají větve až k zemi – kolega je předělá.
+- **Houby:** v rigu E utrhne houbu a v inventáři přibude (0→1→2). Houby rostou na trávě a mezi stromy (každé třetí
+  políčko), v průmyslu les zatím ne (přijdou s novým lesem od kolegy). Utrhnout jde ta, u které dole svítí nápověda E.
+  Velké houby kolem hliněných měst jsou stromy, ty se netrhají.
+- Hráč: *„kde je lucerna, normální skleněná krabička na svíčku; místo lucerny žlutá svítilna na baterky“* – model
+  `lucerna` (Roblox Lantern) tak opravdu vypadá; prosba kolegovi o lucernu se svíčkou. *„Čísla zbraní nejsou
+  potřeba, to si přiřadí hráč jako v Morrowindu; chci světel a zbraní hodně; levá ruka světla, pravá zbraně.“*
+- **Dračí farma** (hráč): draci kolem farmy občas létají a dělají poruchy vlakům, autům a lodím; když dostanou
+  studentku, nelétají a poruchy nedělají; studentka (college girl, velká) je na farmě u draků a stará se o ně.
+- Hráč: *„kdo řídí starou Volgu kabriolet, to je ošklivý, to není college girl“* – GAZ-21 kabriolet je kolegův GRF
+  (Tatra osobní v11, řidička `to_gaz21_ridicka`); prosba kolegovi.
+
 ## 23. 10. odpoledne – rozhlížení pravým bez dorazu, dvouklik srovná hlavu, deník stojícího auta
 
 - Hráč: *„otáčím se šipkami po velkých skocích, 360° je asi 30 snímků; pravým je to jemnější, ale má doraz na 180;
