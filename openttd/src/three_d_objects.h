@@ -774,6 +774,7 @@ struct ThreeDAnimal {
 	static constexpr uint8_t DOOR = 2;   ///< "dvere": before the doors of the houses
 	static constexpr uint8_t ROUND = 4;  ///< "okoli": in the land about the towns
 	static constexpr uint8_t ROOF = 8;   ///< "strecha": on the flat roofs ("strechy")
+	static constexpr uint8_t RAIL = 16;  ///< "koleje": along the railway lines (where the game puts any ghost too)
 	/* The towns it is found at ("klima"): 0 any. */
 	static constexpr uint8_t TEMPERATE = 1; ///< "mirne"
 	static constexpr uint8_t DESERT = 2;    ///< "poust": the desert towns

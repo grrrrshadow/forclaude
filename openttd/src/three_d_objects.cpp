@@ -2765,6 +2765,7 @@ static void ReadThreeDVehicleObjects()
 							if (where == "dvere") a.places |= ThreeDAnimal::DOOR;
 							if (where == "okoli") a.places |= ThreeDAnimal::ROUND;
 							if (where == "strecha") a.places |= ThreeDAnimal::ROOF;
+							if (where == "koleje") a.places |= ThreeDAnimal::RAIL;
 						};
 						if (e.contains("kde") && e.at("kde").is_string()) place(e.at("kde").get<std::string>());
 						if (e.contains("kde") && e.at("kde").is_array()) {

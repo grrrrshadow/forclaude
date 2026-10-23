@@ -45,6 +45,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   sečtou najednou, vlastní barva se bere z tmavého pixelu jednou a dohromady svítí nejvýš jako den (karta i procesor,
   `DrawEyeLights()`, shader lamp). Jedna lampa svítí jako dřív. Záře (kolečka) žárovek v řadě jsou menší – nejvýš
   jako vzdálenost k sousední (`ThreeDGlowShare()`), na mapě i z očí.
+- **Strašidla u kolejí** (hráč: *„strašidla u kolejí podél tratě zvýšený výskyt, můžou tam lítat i neškodná
+  prostěradla, Billy na tříkolce pojede po kolejích“*): k městským strašidlům ještě až 3 na rovných kolejích kolem
+  hráče (i mimo města; země podle nejbližšího města – klima, téma, den/noc z indexu). Jakékoli strašidlo, které
+  je venku (Billy, prostěradlo, Baba Jaga…); kdo má chůzi, jede/letí po kolejích kus trati a zpátky. Index může
+  dát i `"kde": "koleje"` (jen u kolejí). Rig: `test3d kolej …`, `test3d zvirata` ukazuje místo `koleje`.
 - **Auto nejelo** (hráč: *„stopnul jsem auto před depem, došel k němu z očí, chtěl jet, ale jen se točilo doleva
   doprava“*): v rigu se zastavené auto šipkou nahoru rozjede (i u depa) – příčinu nevidím. Proto **deník `jizda.log`**:
   když je zmáčknutá šipka nahoru a auto 2 s stojí, zapíše se všechno, co ho drží (zastaveno, porucha, volná jízda,
