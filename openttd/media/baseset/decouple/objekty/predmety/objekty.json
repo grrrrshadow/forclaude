@@ -484,5 +484,35 @@
   "autor": "Iron and Wood Warhammer (Morrowind), Asylum Nox (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/iron-and-wood-warhammer-morrowind-8ba87567f2f04cd28438172e9d75e892), převod predmety/par14_predmety.py bez renderu",
   "licence": "CC BY 4.0 (uvést Asylum Nox; změny: otočené, zmenšené na 1 m)",
   "poznamka": "další válečné kladivo (hráč: „další kladiva přidáme“) vedle kladiva z Example Suite; počátek na spodním konci násady, násada po +z, hlava nahoře, úderné plochy do ±x (jako kladivo); prázdný uzel uchyt na násadě 0,2 m nad koncem; textura modelu; mávání si dělá hra; glb z gltfpacku"
+ },
+ {
+  "soubor": "vidle.glb",
+  "jmeno": "vidle",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "vidle",
+   "en": "pitchfork"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 2.0,
+  "rozmer_m": {
+   "x": [
+    -0.136,
+    0.136
+   ],
+   "y": [
+    -0.021,
+    0.021
+   ],
+   "z": [
+    -0.0,
+    1.5
+   ]
+  },
+  "trojuhelniku": 986,
+  "uchyt": "uchyt",
+  "autor": "pitchfork Animated, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/pitchfork-animated-54ea2a82f7d74e8fabbc7245bec7be14), jen vidle bez rukou, převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést DJMaesen; změny: jen vidle bez rukou a kostry, otočené, 1,5 m)",
+  "poznamka": "zbraň do ruky (hráč: „vidle zbraň“) jako válečné kladivo: počátek na spodním konci násady, násada po +z, hroty nahoře v rovině x (bodá se dopředu), prázdný uzel uchyt na násadě 0,45 m nad koncem; ruce s animacemi z modelu zatím ne (PROSBA-LES-PRUMYSL-SVETLA.md bod 5); glb z gltfpacku"
  }
 ]

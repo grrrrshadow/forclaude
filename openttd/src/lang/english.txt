@@ -2284,11 +2284,13 @@ STR_WALKER_NO_COMPANY                                           :A spectator car
 STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :You carry:
 STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
+STR_WALKER_ITEM_COUNT_KEY                                       :{NUM}: {STRING} × {NUM}
+STR_WALKER_QUICK_KEYS_HINT                                      :Mouse over a thing and press 1 to 9: its quick key
 STR_WALKER_USE                                                  :[use, +{NUM} health]
-STR_WALKER_TAKE                                                 :[{NUM}: take in hand]
-STR_WALKER_IN_HAND                                              :[{NUM}: in hand, put away]
-STR_WALKER_TAKE_LIGHT                                           :[L: take in the left hand]
-STR_WALKER_LIGHT_IN_HAND                                        :[L: in the left hand, put out]
+STR_WALKER_TAKE                                                 :[take in hand]
+STR_WALKER_IN_HAND                                              :[in hand, put away]
+STR_WALKER_TAKE_LIGHT                                           :[take in the left hand]
+STR_WALKER_LIGHT_IN_HAND                                        :[in the left hand, put out]
 STR_WALKER_FOR_SALE                                             :For sale here ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Nothing for sale here. Walk to a pub, a vending machine, a coffeeshop or a shop of a town.
 STR_WALKER_BUY                                                  :[buy for {CURRENCY_LONG}]
@@ -2323,6 +2325,7 @@ STR_WALKER_ITEM_MUSHROOMS                                       :Mushrooms
 STR_WALKER_ITEM_SEEDLING                                        :Marijuana seedling in a pot
 STR_WALKER_ITEM_HAY                                             :Marijuana hay
 STR_WALKER_ITEM_WAR_HAMMER                                      :War hammer
+STR_WALKER_ITEM_PITCHFORK                                       :Pitchfork
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

@@ -9262,6 +9262,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			/* 'inventar rolovat <pixels>': the list in the window scrolled so far; how long it is, how much is seen. */
 			extern std::string RigWalkerInventoryScroll(int pos);
 			IConsolePrint(CC_DEFAULT, "test3d: inventar rolovat {}", RigWalkerInventoryScroll(*n));
+		} else if (argv.size() > 4 && argv[2] == "klavesa" && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
+			/* 'inventar klavesa <n> <1-9>': thing n put under the quick key, the mouse over its line (as the player does). */
+			extern std::string RigWalkerInventoryQuickKey(WalkerItem item, int key);
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			IConsolePrint(CC_DEFAULT, "test3d: inventar klavesa {}: {}", *n, RigWalkerInventoryQuickKey(static_cast<WalkerItem>(*n), number(4).value_or(1)));
 		} else if (argv.size() > 3 && argv[2] == "klik" && n.has_value() && *n >= 0 && *n < to_underlying(WalkerItem::End)) {
 			/* 'inventar klik <n>': a click on the line of thing n in the window, as the player clicks. */
 			extern std::string RigWalkerInventoryClick(WalkerItem item);

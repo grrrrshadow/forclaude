@@ -43,6 +43,8 @@ bool FirstPersonOpen();
 /** The light in the left hand of the walker (first_person_gui.cpp): the one there, one taken or put out. */
 WalkerItem FirstPersonLightInHand();
 void FirstPersonTakeLight(WalkerItem item);
+/** A quick key of the walker pressed in the view from the first person (first_person_gui.cpp). */
+void FirstPersonQuickKey(int key);
 /** Where the walker of the view from the first person stands, world units; false when the view is not open. */
 bool FirstPersonWalkerAt(double &x, double &y);
 /** The direction the walker of the view from the first person faces, radians (first_person_gui.cpp). */
@@ -100,6 +102,7 @@ struct WalkerInventoryWindow : Window {
 	};
 	mutable std::vector<Line> lines; ///< where the clickable lines were drawn
 	mutable int list_top = 0;        ///< where the list starts in the window, as last drawn
+	Point mouse = {-1, -1};          ///< where the mouse is over the list (OnMouseOver()): the thing under it takes a quick key
 	Scrollbar *vscroll = nullptr;    ///< the list scrolled, pixels (the player, 21. 10.: "to buy the last thing too")
 	TileIndex shop = INVALID_TILE;   ///< where things are sold near the walker, as last seen
 	WalkerItem in_hand = WalkerItem::End; ///< the weapon in the walker's hand, as last drawn
@@ -225,13 +228,20 @@ struct WalkerInventoryWindow : Window {
 		 * does in the view from the first person, Morrowind's quick keys) or put away. */
 		DrawString(ir.left, ir.right, y, STR_WALKER_CARRIED, TextColour::Yellow);
 		y += lh;
+		if (FirstPersonOpen()) {
+			DrawString(ir.left + 8, ir.right, y, STR_WALKER_QUICK_KEYS_HINT, TextColour::Silver);
+			y += lh;
+		}
 		const WalkerItem hand = FirstPersonWeaponInHand();
 		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
 			const WalkerItem item = static_cast<WalkerItem>(i);
 			const uint count = c->walker_items[i];
 			if (count == 0) continue;
 			const WalkerItemSpec &spec = GetWalkerItemSpec(item);
-			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_ITEM_COUNT, spec.name, count), item == hand ? TextColour::Yellow : TextColour::White);
+			/* Its quick key before it, when the player put it under one. */
+			const auto quick = std::ranges::find(c->walker_quick, i);
+			const std::string name = quick != c->walker_quick.end() ? GetString(STR_WALKER_ITEM_COUNT_KEY, quick - c->walker_quick.begin() + 1, spec.name, count) : GetString(STR_WALKER_ITEM_COUNT, spec.name, count);
+			DrawString(ir.left + 8, ir.right, y, name, item == hand ? TextColour::Yellow : TextColour::White);
 			const int key = FirstPersonWeaponKey(item);
 			if (spec.heal != 0) {
 				DrawString(ir.left, ir.right, y, GetString(STR_WALKER_USE, spec.heal), TextColour::Orange, AlignmentH::End);
@@ -240,7 +250,7 @@ struct WalkerInventoryWindow : Window {
 				DrawString(ir.left, ir.right, y, STR_WALKER_PLANT, TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Plant});
 			} else if (key != 0 && FirstPersonOpen()) {
-				DrawString(ir.left, ir.right, y, GetString(item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, key), item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
+				DrawString(ir.left, ir.right, y, item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Hand});
 			} else if (spec.kind == WalkerItemKind::Light && FirstPersonOpen()) {
 				const bool lit = FirstPersonLightInHand() == item;
@@ -310,6 +320,41 @@ struct WalkerInventoryWindow : Window {
 			y += lh;
 			sale(WalkerItem::Seedling);
 		}
+	}
+
+	void OnMouseOver(Point pt, WidgetID widget) override
+	{
+		this->mouse = widget == WID_WI_LIST ? pt : Point{-1, -1};
+	}
+
+	/** The line drawn at a point of the window, nullptr none. */
+	const Line *LineAt(Point pt) const
+	{
+		const Rect fr = this->GetWidget<NWidgetBase>(WID_WI_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		if (pt.x < fr.left || pt.x > fr.right || pt.y < fr.top || pt.y > fr.bottom) return nullptr;
+		const int at = pt.y - this->list_top + this->vscroll->GetPosition();
+		for (const Line &l : this->lines) {
+			if (at >= l.top && at < l.bottom) return &l;
+		}
+		return nullptr;
+	}
+
+	/**
+	 * 1 to 9 (Morrowind's quick keys; the player, 23. 10.: "the player assigns them, what is under 1 and under 2"): the
+	 * thing carried under the mouse put under the key; with the mouse over no such thing, the key does what it does in
+	 * the view from the first person.
+	 */
+	EventState OnKeyPress(char32_t key, [[maybe_unused]] uint16_t keycode) override
+	{
+		if (key < '1' || key > '9') return EventState::NotHandled;
+		const int k = static_cast<int>(key - '1');
+		const Line *l = this->LineAt(this->mouse);
+		if (l != nullptr && (l->does == LineDoes::Use || l->does == LineDoes::Hand || l->does == LineDoes::Light)) {
+			Command<Commands::SetWalkerQuickKey>::Post(static_cast<uint8_t>(k), l->item);
+		} else {
+			FirstPersonQuickKey(k);
+		}
+		return EventState::Handled;
 	}
 
 	void OnClick(Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
@@ -394,6 +439,30 @@ std::string RigWalkerInventoryClick(WalkerItem item)
 		return l.does == WalkerInventoryWindow::LineDoes::Buy ? "koupit" : l.does == WalkerInventoryWindow::LineDoes::Use ? "pouzit" : "ruka";
 	}
 	return {};
+}
+
+/**
+ * The rig: the mouse over the line of a thing in the inventory open and a key pressed, as the player puts it under a
+ * quick key (OnKeyPress()); what is under the keys after.
+ */
+std::string RigWalkerInventoryQuickKey(WalkerItem item, int key)
+{
+	WalkerInventoryWindow *w = static_cast<WalkerInventoryWindow *>(FindWindowById(WindowClass::WalkerInventory, 0));
+	if (w == nullptr) return "zadne okno";
+	for (const WalkerInventoryWindow::Line &l : w->lines) {
+		if (l.item != item) continue;
+		w->vscroll->ScrollTowards(l.bottom - 1);
+		w->vscroll->ScrollTowards(l.top);
+		w->OnMouseOver({w->width / 2, w->list_top + l.top - w->vscroll->GetPosition() + 1}, WID_WI_LIST);
+		w->OnKeyPress(static_cast<char32_t>('0' + key), 0);
+		const Company *c = Company::GetIfValid(_local_company);
+		std::string s;
+		if (c != nullptr) {
+			for (uint8_t k : c->walker_quick) s += fmt::format(" {}", k);
+		}
+		return "klavesy" + s;
+	}
+	return "zadny radek";
 }
 
 /** The rig: the list in the inventory open scrolled so far, pixels; its length, how much of it is seen, where it is. */

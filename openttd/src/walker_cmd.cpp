@@ -56,6 +56,7 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_SEEDLING, 8, 0, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_HAY, 0, 0, WalkerItemKind::Thing, CT_HEMP_FIBRE},
 	{STR_WALKER_ITEM_WAR_HAMMER, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_PITCHFORK, 0, 0, WalkerItemKind::Weapon},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -319,6 +320,27 @@ CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item)
 	if (flags.Test(DoCommandFlag::Execute)) {
 		c->walker_items[to_underlying(item)]++;
 		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * A thing put under a quick key of the walker (the player, 23. 10.: "the player assigns them as in Morrowind, what is
+ * under 1 and under 2"): off any other key it was under, the one there before taken off.
+ * @param key the key, 0 for 1 to 8 for 9
+ * @param item the thing, End to empty the key
+ */
+CommandCost CmdSetWalkerQuickKey(DoCommandFlags flags, uint8_t key, WalkerItem item)
+{
+	if (key >= WALKER_QUICK_KEYS || item > WalkerItem::End) return CMD_ERROR;
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	if (flags.Test(DoCommandFlag::Execute)) {
+		for (uint8_t &k : c->walker_quick) {
+			if (k == to_underlying(item)) k = to_underlying(WalkerItem::End);
+		}
+		c->walker_quick[key] = to_underlying(item);
 		InvalidateWindowData(WindowClass::WalkerInventory, 0);
 	}
 	return CommandCost();

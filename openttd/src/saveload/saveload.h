@@ -432,6 +432,7 @@ enum class SaveLoadVersion : uint16_t {
 	CabAltitude, ///< Saveload version: 378\n The height an aircraft flown freely from its cab climbs or sinks to (Vehicle::cab_altitude, cab_drive.h).
 	WalkerPet, ///< Saveload version: 379\n The walker's dog, bought of a seller of dogs, the company's (CompanyProperties::walker_pet, three_d_animals.h).
 	WalkerPlants, ///< Saveload version: 380\n The marijuana the walkers planted, where and since when (WalkerPlant, walker_inventory.h; the WPLT chunk).
+	WalkerQuickKeys, ///< Saveload version: 381\n The walker's quick keys 1 to 9, the things the player put under them (CompanyProperties::walker_quick).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

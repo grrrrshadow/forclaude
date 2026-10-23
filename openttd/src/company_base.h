@@ -117,6 +117,7 @@ struct CompanyProperties {
 	std::array<uint16_t, WALKER_ITEM_SLOTS> walker_items = WalkerStartItems(); ///< The inventory of the walker of the view from the first person: how many of each WalkerItem (the hammer, the bow and the crossbow from the start; walker_inventory.h).
 	uint8_t walker_health = WALKER_HEALTH_MAX; ///< And its health, 0 to WALKER_HEALTH_MAX.
 	std::string walker_pet; ///< And its dog, bought of a seller of dogs: a ThreeDAnimal ("prodej") that walks with it; empty none.
+	std::array<uint8_t, WALKER_QUICK_KEYS> walker_quick = WalkerNoQuickKeys(); ///< And its quick keys 1 to 9: the WalkerItem under each, WalkerItem::End none (walker_inventory.h).
 
 	/**
 	 * If \c true, the company is (also) controlled by the computer (a NoAI program).

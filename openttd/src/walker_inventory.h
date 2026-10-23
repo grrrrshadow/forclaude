@@ -54,6 +54,7 @@ enum class WalkerItem : uint8_t {
 	Seedling,   ///< a seedling of marijuana in a pot, Matylda's at the pub: planted in front of the walker (WalkerPlant)
 	Hay,        ///< marijuana hay, a plant harvested too late: for the dragons (the player, 21. 10.: "a dragon farm")
 	WarHammer,  ///< the war hammer (the colleague's objekty/predmety/kladivo_valecne.glb, par14), swung as the hammer; from iddqd
+	Pitchfork,  ///< the pitchfork (the colleague's objekty/predmety/vidle.glb, par15), struck as the hammer; from iddqd
 	End,        ///< the end of the known things
 };
 
@@ -70,6 +71,20 @@ static constexpr TileIndex WALKER_SOLD_BY_MAT{0};
 
 /** The places of the inventory kept and saved: room for the things to come. */
 static constexpr size_t WALKER_ITEM_SLOTS = 32;
+/**
+ * The quick keys, 1 to 9 (the player, 23. 10.: "the numbers of the weapons are not needed, the player assigns them as in
+ * Morrowind, what is under 1 and under 2"): each the thing the player put under it in the inventory, End none.
+ */
+static constexpr size_t WALKER_QUICK_KEYS = 9;
+
+/** The quick keys as they start: none under any (the player puts things under them). */
+constexpr std::array<uint8_t, WALKER_QUICK_KEYS> WalkerNoQuickKeys()
+{
+	std::array<uint8_t, WALKER_QUICK_KEYS> keys{};
+	keys.fill(static_cast<uint8_t>(WalkerItem::End));
+	return keys;
+}
+
 /** The most of one thing carried. */
 static constexpr uint16_t WALKER_ITEM_MAX = 999;
 /** The arrows and the bolts the cheat fills up to. */

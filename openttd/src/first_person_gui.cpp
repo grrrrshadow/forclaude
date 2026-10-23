@@ -128,6 +128,8 @@ enum class WeaponUse : uint8_t {
  * are there", and the colleague's swords): the thing of the inventory, and the colleague's thing of the indices
  * (objekty/predmety/, hra/3d/LUK-SIP-PRO-HRU.md).
  */
+void FirstPersonTakeLight(WalkerItem item);
+
 struct FirstPersonWeapon {
 	WalkerItem item;        ///< the thing of the inventory
 	std::string_view thing; ///< its thing of the indices
@@ -148,6 +150,7 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::MachineGun, "kulomet", WeaponUse::Burst, 0, 1, WalkerItem::Bullets, "naboj", 300},
 	{WalkerItem::RocketLauncher, "raketomet", WeaponUse::Rocket, 0, 6, WalkerItem::Rockets, "raketa", 40},
 	{WalkerItem::WarHammer, "kladivo_valecne", WeaponUse::Swing, 2.7, 2},
+	{WalkerItem::Pitchfork, "vidle", WeaponUse::Swing, 2.6, 2},
 };
 
 /**
@@ -1068,6 +1071,35 @@ struct FirstPersonWindow : Window {
 		}
 	}
 
+	/**
+	 * A quick key (the player, 23. 10.: "the numbers of the weapons are not needed, the player assigns them as in
+	 * Morrowind; the left hand the lights, the right the weapons"): the thing under it -- a weapon into the right hand
+	 * (or put away when it is there), a light into the left (or put out), the beer or the marijuana used.
+	 */
+	void QuickKey(int k)
+	{
+		const Company *c = Company::GetIfValid(_local_company);
+		if (c == nullptr || k < 0 || k >= static_cast<int>(WALKER_QUICK_KEYS)) return;
+		const WalkerItem item = static_cast<WalkerItem>(c->walker_quick[k]);
+		if (item >= WalkerItem::End || Carried(item) == 0) return;
+		for (size_t w = 0; w < std::size(_first_person_weapons); w++) {
+			if (_first_person_weapons[w].item != item) continue;
+			if (this->InHand() == item) {
+				this->weapon_out = false;
+			} else {
+				this->Choose(static_cast<int>(w));
+			}
+			return;
+		}
+		const WalkerItemSpec &spec = GetWalkerItemSpec(item);
+		if (spec.kind == WalkerItemKind::Light) {
+			FirstPersonTakeLight(item);
+		} else if (spec.heal != 0) {
+			const TileIndex here = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
+			Command<Commands::UseWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_USE, here, item);
+		}
+	}
+
 	/** A weapon by its key, out in the hand (another put away first), when the walker carries it. */
 	void Choose(int k)
 	{
@@ -1119,10 +1151,10 @@ struct FirstPersonWindow : Window {
 			ShowWalkerInventoryWindow();
 			return EventState::Handled;
 		}
-		/* 1 to 5: a weapon (the hammer, the bow, the crossbow, the sword, the two-handed sword); F: it out or away (as
-		 * the weapon in Morrowind); Space: a swing of it, a shot. */
-		if (key >= '1' && key < static_cast<char32_t>('1' + std::size(_first_person_weapons))) {
-			this->Choose(static_cast<int>(key - '1'));
+		/* 1 to 9: what the player put under the key in the inventory (Morrowind's quick keys, QuickKey()); F: the weapon
+		 * out or away (as in Morrowind); Space: a swing of it, a shot. */
+		if (key >= '1' && key <= '9') {
+			this->QuickKey(static_cast<int>(key - '1'));
 			return EventState::Handled;
 		}
 		if (key == 'f' || key == 'F') {
@@ -1800,4 +1832,11 @@ std::string RigFirstPersonLook(int dx, int moves, bool walk)
 	release();
 	s += fmt::format(", po dvojkliku {:.0f} (hlava {:.0f}, sklon {:.0f})", deg(w->walker.heading), deg(w->head), deg(w->walker.pitch));
 	return s;
+}
+
+/** A quick key of the walker pressed in its inventory over no thing (walker_inventory_gui.cpp): as in the view from the first person. */
+void FirstPersonQuickKey(int key)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w != nullptr) w->QuickKey(key);
 }

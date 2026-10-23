@@ -40,6 +40,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: *„kde je lucerna, normální skleněná krabička na svíčku; místo lucerny žlutá svítilna na baterky“* – model
   `lucerna` (Roblox Lantern) tak opravdu vypadá; prosba kolegovi o lucernu se svíčkou. *„Čísla zbraní nejsou
   potřeba, to si přiřadí hráč jako v Morrowindu; chci světel a zbraní hodně; levá ruka světla, pravá zbraně.“*
+- **Rychlé klávesy 1–9 jako v Morrowindu** (hotovo): v inventáři najedeš myší na věc a zmáčkneš 1–9 – věc je pod tou
+  klávesou (číslo před jménem v inventáři; jedna věc pod jednou klávesou, stará se přepíše). Z očí klávesa: zbraň do
+  pravé ruky (znovu = schovat), světlo do levé (znovu = zhasnout), pivo/marihuana se použije. Pevná čísla zbraní pryč,
+  na začátku je pod klávesami nic. Ukládá se do savu (verze 381, `walker_quick`). L dál přepíná světla, F tasí.
+  Rig `test3d inventar klavesa <věc> <1-9>`.
+- **Vidle** (kolegovy `predmety/vidle.glb`, par15) jako zbraň do pravé ruky (WalkerItem 23), dává `iddqd`, máchá se
+  jako kladivo (dosah 2,6 m, zásah 2).
 - **Dračí farma** (hráč): draci kolem farmy občas létají a dělají poruchy vlakům, autům a lodím; když dostanou
   studentku, nelétají a poruchy nedělají; studentka (college girl, velká) je na farmě u draků a stará se o ně.
 - Hráč: *„kdo řídí starou Volgu kabriolet, to je ošklivý, to není college girl“* – GAZ-21 kabriolet je kolegův GRF

@@ -2389,11 +2389,13 @@ STR_WALKER_NO_COMPANY                                           :Divák nic nene
 STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :Neseš:
 STR_WALKER_ITEM_COUNT                                           :{STRING} × {NUM}
+STR_WALKER_ITEM_COUNT_KEY                                       :{NUM}: {STRING} × {NUM}
+STR_WALKER_QUICK_KEYS_HINT                                      :Najeď myší na věc a zmáčkni 1 až 9: její rychlá klávesa
 STR_WALKER_USE                                                  :[použít, +{NUM} zdraví]
-STR_WALKER_TAKE                                                 :[{NUM}: vzít do ruky]
-STR_WALKER_IN_HAND                                              :[{NUM}: v ruce, schovat]
-STR_WALKER_TAKE_LIGHT                                           :[L: vzít do levé ruky]
-STR_WALKER_LIGHT_IN_HAND                                        :[L: v levé ruce, zhasnout]
+STR_WALKER_TAKE                                                 :[vzít do ruky]
+STR_WALKER_IN_HAND                                              :[v ruce, schovat]
+STR_WALKER_TAKE_LIGHT                                           :[vzít do levé ruky]
+STR_WALKER_LIGHT_IN_HAND                                        :[v levé ruce, zhasnout]
 STR_WALKER_FOR_SALE                                             :Tady se prodává ({STRING}):
 STR_WALKER_NOTHING_FOR_SALE                                     :Tady se nic neprodává. Dojdi do hospody, k automatu, do hulírny nebo do obchodu ve městě.
 STR_WALKER_BUY                                                  :[koupit za {CURRENCY_LONG}]
@@ -2428,6 +2430,7 @@ STR_WALKER_ITEM_MUSHROOMS                                       :Houby
 STR_WALKER_ITEM_SEEDLING                                        :Sazenice marihuany v květináči
 STR_WALKER_ITEM_HAY                                             :Marihuanové seno
 STR_WALKER_ITEM_WAR_HAMMER                                      :Válečné kladivo
+STR_WALKER_ITEM_PITCHFORK                                       :Vidle
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
