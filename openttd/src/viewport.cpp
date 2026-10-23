@@ -5376,6 +5376,35 @@ static void AddNightLight(uint32_t *dst, int pitch, int w, int h, double cx, dou
 }
 
 /**
+ * A soft spot of light in the view from the eyes (AddNightLight()), but not over what is drawn nearer than its lamp:
+ * a lamp seen through a car's window does not spill over the car before it (the player, 23. 10.: "the lights of the
+ * cars are seen through the car, up close when I go to get in"). As the card's glows (EYE_GLOW_FRAGMENT).
+ * @param zb the depth of the picture (1 / how far, as the frame's)
+ * @param iw the lamp's 1 / how far
+ */
+static void AddEyeNightLight(uint32_t *dst, const float *zb, int w, int h, double cx, double cy, double rx, double ry, Colour colour, double strength, float iw)
+{
+	if (rx < 0.5 || ry < 0.5) return;
+	const int x0 = std::max(0, static_cast<int>(std::floor(cx - rx))), x1 = std::min(w - 1, static_cast<int>(std::ceil(cx + rx)));
+	const int y0 = std::max(0, static_cast<int>(std::floor(cy - ry))), y1 = std::min(h - 1, static_cast<int>(std::ceil(cy + ry)));
+	const float nearer = iw * 1.05f;
+	for (int y = y0; y <= y1; y++) {
+		uint32_t *row = dst + static_cast<size_t>(y) * w;
+		const float *zrow = zb + static_cast<size_t>(y) * w;
+		const double dy = (y + 0.5 - cy) / ry;
+		for (int x = x0; x <= x1; x++) {
+			if (zrow[x] > nearer) continue;
+			const double dx = (x + 0.5 - cx) / rx;
+			const double d2 = dx * dx + dy * dy;
+			if (d2 >= 1.0) continue;
+			const double f = strength * (1.0 - d2) * (1.0 - d2);
+			Colour c(row[x]);
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+		}
+	}
+}
+
+/**
  * Add a beam of light to the pixels of the block being drawn (a witch's hand torch, three_d_witches.h): from a point
  * widening to another, brightest along its middle and at its start, gone at its end (where its pool is), its colour
  * times its strength added to what is there.
@@ -9876,6 +9905,7 @@ struct EyeGlow {
 	double x, y, z, radius;
 	Colour colour;
 	double strength, squash;
+	bool lamp = false; ///< a lamp's (a headlight, a red light): not over what is nearer than it (AddEyeNightLight()); else a pool of light, all of it
 };
 
 /**
@@ -9886,8 +9916,19 @@ struct EyeGlow {
 static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicle *own)
 {
 	std::vector<EyeGlow> glows;
-	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash) {
-		glows.push_back({wx, wy, wz, radius, colour, strength, squash});
+	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash, bool lamp = false) {
+		glows.push_back({wx, wy, wz, radius, colour, strength, squash, lamp});
+	};
+	/*
+	 * A lamp shining one way (a headlight ahead, a red light back) is seen from before it and from its side, not from
+	 * behind it: there its car stands between. The depth of the picture told it only where the car is drawn by its
+	 * triangles; a car farther off is a flat picture at its middle, and its headlights shone through it as it drove
+	 * away (the player, 23. 10.: "the lights of the cars are seen through the car").
+	 */
+	auto faces_eye = [&](double lx, double ly, double fx, double fy) {
+		if (fx == 0 && fy == 0) return true;
+		const double ex = eye.x - lx, ey = eye.y - ly;
+		return ex * fx + ey * fy >= -0.2 * std::sqrt(ex * ex + ey * ey) * std::sqrt(fx * fx + fy * fy);
 	};
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
@@ -9896,9 +9937,10 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 	std::vector<ThreeDWorldLight> model_lights;
 	auto shine = [&](const std::vector<ThreeDWorldLight> &lights) {
 		for (const ThreeDWorldLight &l : lights) {
+			if (!faces_eye(l.x, l.y, l.fx, l.fy)) continue;
 			switch (l.kind) {
-				case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0); break;
-				case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0); break;
+				case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0, true); break;
+				case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0, true); break;
 				case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
 				case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
 			}
@@ -9947,11 +9989,17 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 				for (int k = 1; k <= 4; k++) glow(u->x_pos + fx * (half + 6 * k), u->y_pos + fy * (half + 6 * k), z, 3.0 + k, pool, 0.35, 0.35);
 			} else {
 				glow(u->x_pos + fx * (half + 8), u->y_pos + fy * (half + 8), z, 6, pool, 0.3, 0.4);
-				for (int side = -1; side <= 1; side += 2) glow(u->x_pos + fx * half + sx * side * 1.5, u->y_pos + fy * half + sy * side * 1.5, z + 2, 0.8, lamp, 1.2, 1.0);
+				for (int side = -1; side <= 1; side += 2) {
+					const double lx = u->x_pos + fx * half + sx * side * 1.5, ly = u->y_pos + fy * half + sy * side * 1.5;
+					if (faces_eye(lx, ly, fx, fy)) glow(lx, ly, z + 2, 0.8, lamp, 1.2, 1.0, true);
+				}
 			}
 		}
 		if (last && !mine && u->type != VehicleType::Ship) {
-			for (int side = -1; side <= 1; side += 2) glow(u->x_pos - fx * half + sx * side * 1.5, u->y_pos - fy * half + sy * side * 1.5, z + 2, 0.5, tail, 0.9, 1.0);
+			for (int side = -1; side <= 1; side += 2) {
+				const double lx = u->x_pos - fx * half + sx * side * 1.5, ly = u->y_pos - fy * half + sy * side * 1.5;
+				if (faces_eye(lx, ly, -fx, -fy)) glow(lx, ly, z + 2, 0.5, tail, 0.9, 1.0, true);
+			}
 		}
 	}
 	/* The witches' lanterns and torches (three_d_witches.h): the flame and its light all round, the torch's glass, its
@@ -9997,7 +10045,11 @@ static void DrawEyeNight(const CabEye &eye, int width, int height, uint32_t *dst
 			if (zb[static_cast<size_t>(py) * width + px] > v.iw * 1.05f) continue;
 		}
 		const double r = std::max(1.0, g.radius * eye.focal / p.f);
-		AddNightLight(dst, width, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength);
+		if (g.lamp) {
+			AddEyeNightLight(dst, zb, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength, static_cast<float>(v.iw));
+		} else {
+			AddNightLight(dst, width, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength);
+		}
 	}
 }
 
@@ -11869,7 +11921,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const CabVertex v = CabProject(eye, p);
 				const double r = std::max(1.0, g.radius * eye.focal / p.f);
 				st.glows.push_back({static_cast<float>(v.sx), static_cast<float>(v.sy), static_cast<float>(r), static_cast<float>(r * g.squash),
-						static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), static_cast<float>(g.strength), static_cast<float>(v.iw)});
+						static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), static_cast<float>(g.strength), static_cast<float>(v.iw), 1.05f, g.lamp ? 1.0f : 0.0f});
 			}
 			return true;
 		});
@@ -12009,13 +12061,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			for (const WindowGlow &g : window_glows) {
 				const int px = static_cast<int>(g.sx), py = static_cast<int>(g.sy);
 				if (px >= 0 && py >= 0 && px < width && py < height && zb[static_cast<size_t>(py) * width + px] > g.iw * 1.05f) continue;
-				AddNightLight(dst, width, width, height, g.sx, g.sy, g.r, g.r, window, 0.35);
+				AddEyeNightLight(dst, zb, width, height, g.sx, g.sy, g.r, g.r, window, 0.35, g.iw);
 			}
 		}, [window, window_glows](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Glows);
 			for (const WindowGlow &g : window_glows) {
 				st.glows.push_back({static_cast<float>(g.sx), static_cast<float>(g.sy), static_cast<float>(g.r), static_cast<float>(g.r),
-						static_cast<float>(window.r), static_cast<float>(window.g), static_cast<float>(window.b), 0.35f, g.iw});
+						static_cast<float>(window.r), static_cast<float>(window.g), static_cast<float>(window.b), 0.35f, g.iw, 1.05f, 1.0f});
 			}
 			return true;
 		});

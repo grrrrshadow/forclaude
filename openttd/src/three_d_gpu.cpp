@@ -1226,21 +1226,25 @@ void main()
 )";
 
 /* A soft spot of light added (AddNightLight() of viewport.cpp): a quad about it, the whole of it gone where the picture
- * is nearer than its middle (by hidden_by). Its corner, middle and sizes, colour and strength, depth and hidden_by. */
+ * is nearer than its middle (by hidden_by); a lamp's also each of its pixels where what is drawn there is nearer than
+ * it -- a lamp seen through a car's window does not spill over the car before it (a pool of light on the ground is
+ * all drawn). Its corner, middle and sizes, colour and strength, depth, hidden_by and whether it is a lamp's. */
 const char *const EYE_GLOW_VERTEX = R"(#version 330 core
 layout(location = 0) in vec2 a_corner;
 layout(location = 1) in vec4 a_spot;   // sx, sy, rx, ry
 layout(location = 2) in vec4 a_colour; // r, g, b, strength
-layout(location = 3) in vec2 a_hidden; // iw, hidden_by
+layout(location = 3) in vec3 a_hidden; // iw, hidden_by, lamp
 uniform sampler2D u_depth;
 uniform float u_near;
 uniform vec2 u_size;
 flat out vec4 v_spot;
 flat out vec4 v_colour;
+flat out vec3 v_hidden;
 void main()
 {
 	v_spot = a_spot;
 	v_colour = a_colour;
+	v_hidden = a_hidden;
 	ivec2 m = ivec2(int(a_spot.x), int(a_spot.y));
 	bool hidden = a_hidden.x > 0.0 && m.x >= 0 && m.y >= 0 && m.x < int(u_size.x) && m.y < int(u_size.y) && texelFetch(u_depth, m, 0).r / u_near > a_hidden.x * a_hidden.y;
 	vec2 at = a_spot.xy + a_corner * (a_spot.zw + 1.0);
@@ -1249,14 +1253,18 @@ void main()
 )";
 
 const char *const EYE_GLOW_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_depth;
+uniform float u_near;
 flat in vec4 v_spot;
 flat in vec4 v_colour;
+flat in vec3 v_hidden;
 layout(location = 0) out vec4 o_colour;
 void main()
 {
 	vec2 d = (gl_FragCoord.xy - v_spot.xy) / v_spot.zw;
 	float d2 = dot(d, d);
 	if (d2 >= 1.0) discard;
+	if (v_hidden.z > 0.5 && v_hidden.x > 0.0 && texelFetch(u_depth, ivec2(gl_FragCoord.xy), 0).r / u_near > v_hidden.x * v_hidden.y) discard;
 	float f = v_colour.a * (1.0 - d2) * (1.0 - d2);
 	o_colour = vec4(floor(v_colour.rgb * f) / 255.0, 1.0);
 }
@@ -3139,11 +3147,11 @@ void StartEyeFrame()
 	gl.glBindVertexArray(_frame_glow_vao);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_glow_vbo);
 	/* A glow's corner: the corner (-1, 1), its middle and sizes, colour and strength, depth and hidden_by. */
-	const GLsizei glow_stride = 12 * sizeof(float);
+	const GLsizei glow_stride = 13 * sizeof(float);
 	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, glow_stride, nullptr);
 	gl.glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(2 * sizeof(float)));
 	gl.glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(6 * sizeof(float)));
-	gl.glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(10 * sizeof(float)));
+	gl.glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, glow_stride, reinterpret_cast<const void *>(10 * sizeof(float)));
 	for (GLuint a = 0; a < 4; a++) gl.glEnableVertexAttribArray(a);
 	gl.glGenVertexArrays(1, &_frame_star_vao);
 	gl.glGenBuffers(1, &_frame_star_vbo);
@@ -3440,11 +3448,11 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 	auto glows = [&](const std::vector<ThreeDGpuEyeGlow> &list) {
 		if (list.empty()) return;
 		std::vector<float> v;
-		v.reserve(list.size() * 6 * 12);
+		v.reserve(list.size() * 6 * 13);
 		static const float quad[6][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, -1}, {1, 1}, {-1, 1}};
 		for (const ThreeDGpuEyeGlow &g : list) {
 			if (g.rx < 0.5f || g.ry < 0.5f) continue;
-			for (const auto &q : quad) v.insert(v.end(), {q[0], q[1], g.sx, g.sy, g.rx, g.ry, g.r, g.g, g.b, g.strength, g.iw, g.hidden_by});
+			for (const auto &q : quad) v.insert(v.end(), {q[0], q[1], g.sx, g.sy, g.rx, g.ry, g.r, g.g, g.b, g.strength, g.iw, g.hidden_by, g.lamp});
 		}
 		if (v.empty()) return;
 		over(_frame_glow_program);
@@ -3453,7 +3461,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glBindVertexArray(_frame_glow_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_glow_vbo);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(v.size() * sizeof(float)), v.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(v.size() / 12));
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(v.size() / 13));
 		gl.glDisable(GL_BLEND);
 	};
 	/* The figures' glass, after what is solid; seen through, its depth not kept (what is behind it is lit, hazed and

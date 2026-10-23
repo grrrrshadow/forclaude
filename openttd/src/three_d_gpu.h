@@ -263,6 +263,7 @@ struct ThreeDGpuEyeGlow {
 	float strength;
 	float iw;              ///< its middle's 1 / how far ahead: hidden where the picture is nearer there by more than hidden_by; 0 never hidden
 	float hidden_by = 1.05f;
+	float lamp = 0;        ///< 1: a lamp's (a car's light, a window): none of it over what is drawn nearer than the lamp; 0: a pool of light, all of it
 };
 
 /** A ball of smoke or a blast laid over the eye's frame (DrawEyeBlasts()), hidden by the pixel behind what is nearer than its middle. */

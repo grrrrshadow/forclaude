@@ -40,6 +40,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: *„kde je lucerna, normální skleněná krabička na svíčku; místo lucerny žlutá svítilna na baterky“* – model
   `lucerna` (Roblox Lantern) tak opravdu vypadá; prosba kolegovi o lucernu se svíčkou. *„Čísla zbraní nejsou
   potřeba, to si přiřadí hráč jako v Morrowindu; chci světel a zbraní hodně; levá ruka světla, pravá zbraně.“*
+- **Světla aut prosvítala autem** (hráč: *„světla aut jsou vidět skrz auto“*, *„bylo to hodně zblízka, když jdu
+  nastoupit“*, *„auto světla by měla svítit jedním směrem, dopředu/dozadu, svíčka do všech stran“*) – příčina dvojí:
+  záře lampy se kreslila jako skvrna přes všechno kolem, když byl střed lampy vidět (např. oknem auta), rozlila se
+  přes karoserii před ní; a lampa neměla směr, takže přední světlo bylo vidět i zezadu (u vzdálených aut, kreslených
+  jako plochý obrázek, i skrz auto). Teď: přední světla svítí dopředu, zadní dozadu (vidět zepředu/zezadu a z boku,
+  ne zezadu přes auto), záře lampy (auta, okna) nesvítí přes nic, co je blíž než lampa (karta i procesor); kužely na
+  silnici a lucerny/svíčky do všech stran jako dřív.
 - **Rychlé klávesy 1–9 jako v Morrowindu** (hotovo): v inventáři najedeš myší na věc a zmáčkneš 1–9 – věc je pod tou
   klávesou (číslo před jménem v inventáři; jedna věc pod jednou klávesou, stará se přepíše). Z očí klávesa: zbraň do
   pravé ruky (znovu = schovat), světlo do levé (znovu = zhasnout), pivo/marihuana se použije. Pevná čísla zbraní pryč,

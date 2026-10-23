@@ -2919,10 +2919,13 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 	const double wa = ev.facing * M_PI / 180.0;
 	const double fx = std::cos(wa), fy = std::sin(wa), lx = -fy, ly = fx;
 	const double ta = StateTurn(ev.obj, ev.state) * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
+	/* Its front in the world, turned as its state has it: where the headlights shine, the red lights the other way. */
+	const double ahead_x = tc * fx + ts * lx, ahead_y = tc * fy + ts * ly;
 	auto add = [&](float ox, float oy, float pz, ThreeDPictureLight::Kind kind) {
 		const double px = ox * tc - oy * ts, py = ox * ts + oy * tc;
 		const double x = px * ev.scale * ev.along * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE;
-		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind});
+		const double way = kind == ThreeDPictureLight::Kind::Front ? 1.0 : kind == ThreeDPictureLight::Kind::Back ? -1.0 : 0.0;
+		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind, ahead_x * way, ahead_y * way});
 	};
 	/* The lamps of the parts its state shows only (the cab's on the cab shown). */
 	const ThreeDParts parts = ev.obj->PartsOf(ev.state);

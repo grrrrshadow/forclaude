@@ -97,6 +97,7 @@ struct ThreeDPictureLight {
 struct ThreeDWorldLight {
 	double x = 0, y = 0, z = 0;
 	ThreeDPictureLight::Kind kind = ThreeDPictureLight::Kind::Front;
+	double fx = 0, fy = 0; ///< the way its lamp shines in the world (a headlight ahead, a red light back), 0, 0 all round
 };
 
 /** A picture of the turned view at an angle and a zoom: a vehicle or a figure drawn from its object, the preview of an industry. */
