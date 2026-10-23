@@ -50,6 +50,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   hráče (i mimo města; země podle nejbližšího města – klima, téma, den/noc z indexu). Jakékoli strašidlo, které
   je venku (Billy, prostěradlo, Baba Jaga…); kdo má chůzi, jede/letí po kolejích kus trati a zpátky. Index může
   dát i `"kde": "koleje"` (jen u kolejí). Rig: `test3d kolej …`, `test3d zvirata` ukazuje místo `koleje`.
+- **Interiéry – formát pro tvůrce** (hráč: *„připrav s grrrrf systém interiérů; tvůrce udělá dům i interiér; naše
+  interiéry ve hře jako náš průmysl, rozšiřitelné tvůrci; inspirace OpenMW“*): grrrrf `hra/3d/PROSBA-INTERIERY.md`
+  (1ea69b0), navazuje na `INTERIERY-PLAN.md` 16. 10. (interiér v domě, okny ven). Index `interier`: false / true
+  (`<dům>_interier.glb`) / jméno souboru / `{soubor, postavy}`. Stejný rámec jako dům. Uzly: `podlaha[_N]`,
+  `dvere_NN` (pant, E otevře), `okno_NN` (otvor pro pohled i střelu), `noc`+`svetlo_NN`, `truhla_NN` (později).
+  Dům s interiérem: průchod za každými dveřmi, křídlo vchodu `dvere_NN` v glb domu. OpenMW jen nápady (GPL 3).
+  **Napřed kino** (kolega pošle interiér); hra se kóduje, až přijde.
 - **Auto nejelo** (hráč: *„stopnul jsem auto před depem, došel k němu z očí, chtěl jet, ale jen se točilo doleva
   doprava“*): v rigu se zastavené auto šipkou nahoru rozjede (i u depa) – příčinu nevidím. Proto **deník `jizda.log`**:
   když je zmáčknutá šipka nahoru a auto 2 s stojí, zapíše se všechno, co ho drží (zastaveno, porucha, volná jízda,
