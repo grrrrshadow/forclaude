@@ -66,6 +66,7 @@
 #include "three_d.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_objects.h"
+#include "three_d_dragons.h"
 
 #include "safeguards.h"
 
@@ -823,6 +824,16 @@ static void SetupPotatoChain()
 	pub.produced_cargo_label[0] = CT_PASSENGERS;
 	pub.production_rate[0] = 0;
 	pub.input_cargo_multiplier[0][0] = 256;
+
+	/* The dragon farm, 3x3 out in the country, the colleague's ruined castle (objekty/prumysl/draci_farma.glb). */
+	IndustryTileLayout farm;
+	for (int16_t y = 0; y < 3; y++) {
+		for (int16_t x = 0; x < 3; x++) {
+			farm.push_back({TileIndexDiffC{x, y}, x == 1 && y == 1 ? GFX_DRAGON_FARM : GFX_DRAGON_FARM_YARD});
+		}
+	}
+	SetupTownIndustry(IT_DRAGON_FARM, farm, STR_INDUSTRY_NAME_DRAGON_FARM, 0x9C);
+	_industry_specs[IT_DRAGON_FARM].behaviour.Reset(IndustryBehaviour::OnlyInTown);
 }
 
 /**
@@ -874,6 +885,8 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE_ON(SPR_CONCRETE_GROUND, 0x5C3, 31), // GFX_DISTILLERY: the warehouse (house 0x12)
 	OWN_TILE(0x5D4, 22),                // GFX_PUB: the old house (house 0x18)
 	OWN_TILE(0, 0),                     // GFX_PUB_YARD: its garden, grass
+	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0, 0),      // GFX_DRAGON_FARM_YARD: trodden earth
+	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0x5D4, 22), // GFX_DRAGON_FARM: the old house (house 0x18), the castle drawn as a 3D object
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -900,6 +913,12 @@ static const DrawBuildingsTileStruct *GameOwnIndustryDrawTile(IndustryGfx gfx, u
 
 /** For how many days after a delivery the girls are about the school, the machine, the statue or the coffeeshop's hut: the player's word. */
 static const int GIRLS_DAYS = 30;
+/** The heaps of hay a dragon farm shows as the hay comes (the colleague's seno_00 to seno_07), and the days each lasts. */
+static const uint DRAGON_HAY_HEAPS = 8;
+static const int32_t DRAGON_HAY_DAYS = 4;
+/** At a dragon farm without girls, one day in so many its dragons break down a vehicle within so many tiles. */
+static const uint DRAGON_BREAKDOWN_ONE_IN = 6;
+static const uint DRAGON_REACH_TILES = 12;
 
 static bool DeliveredLately(const Industry *ind, CargoLabel label);
 
@@ -1059,13 +1078,54 @@ static void TendMarijuanaPlantations()
  */
 static void LetGirlsGo()
 {
-	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP}) for (IndustryID id : Industry::industries[type]) {
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP, IT_DRAGON_FARM}) for (IndustryID id : Industry::industries[type]) {
 		const Industry *i = Industry::Get(id);
 		for (const Industry::AcceptedCargo &a : i->accepted) {
 			if (a.last_accepted == TimerGameEconomy::Date{} || TimerGameEconomy::date.base() - a.last_accepted.base() != GIRLS_DAYS) continue;
 			MarkGameOwnIndustryDirty(i);
 			break;
 		}
+	}
+}
+
+/** Of the hay a dragon farm has, how many heaps: all of them as the hay comes, one fewer every DRAGON_HAY_DAYS after. */
+uint DragonFarmHay(const Industry *ind)
+{
+	const CargoType cargo = GetCargoTypeByLabel(CT_HEMP_FIBRE);
+	if (!IsValidCargoType(cargo)) return 0;
+	auto it = ind->GetCargoAccepted(cargo);
+	if (it == std::end(ind->accepted) || it->last_accepted == TimerGameEconomy::Date{}) return 0;
+	const int32_t days = TimerGameEconomy::date.base() - it->last_accepted.base();
+	return static_cast<uint>(std::max<int32_t>(0, static_cast<int32_t>(DRAGON_HAY_HEAPS) - days / DRAGON_HAY_DAYS));
+}
+
+/**
+ * A day at the dragon farms (the player, 23. 10.: "now and then some of the dragons fly about the farm and break down
+ * the trains, the cars and the ships; once they get a studentka they do not fly and break nothing"): at a farm without
+ * girls, one day in DRAGON_BREAKDOWN_ONE_IN a vehicle near it breaks down -- a train, a road vehicle or a ship going
+ * about within DRAGON_REACH_TILES, one not broken down already. Its hay, fewer heaps by the days, drawn afresh.
+ */
+static void DragonFarmsDay()
+{
+	for (IndustryID id : Industry::industries[IT_DRAGON_FARM]) {
+		Industry *i = Industry::Get(id);
+		MarkGameOwnIndustryDirty(i);
+		if (HasGirls(i) || !Chance16(1, DRAGON_BREAKDOWN_ONE_IN)) continue;
+		const TileIndex middle = TileAddXY(i->location.tile, 1, 1);
+		std::vector<Vehicle *> near;
+		for (Vehicle *v : Vehicle::Iterate()) {
+			if (!v->IsPrimaryVehicle() || (v->type != VehicleType::Train && v->type != VehicleType::Road && v->type != VehicleType::Ship)) continue;
+			if (v->vehstatus.Any({VehState::Hidden, VehState::Crashed, VehState::Stopped}) || v->breakdown_ctr != 0 || v->IsInDepot()) continue;
+			if (DistanceManhattan(v->tile, middle) > DRAGON_REACH_TILES) continue;
+			near.push_back(v);
+		}
+		if (near.empty()) continue;
+		Vehicle *v = near[RandomRange(static_cast<uint32_t>(near.size()))];
+		/* Counting down to the breakdown as CheckVehicleBreakdown() starts one: it comes in a tick or two. */
+		v->breakdown_ctr = 3;
+		v->breakdown_delay = static_cast<uint8_t>(GB(Random(), 0, 7) + 0x80);
+		NoteThreeDDragonAttack(i->index.base(), v->index.base());
+		Debug(misc, 1, "Dragon farm {}: its dragons break down vehicle {}", i->index, v->unitnumber);
 	}
 }
 
@@ -1329,6 +1389,9 @@ static const std::array<CargoLabel, 1> DISTILLERY_CARGOES{CT_POTATOES};
 /** What the pub takes: the alcohol its guests drink. */
 static const std::array<CargoLabel, 1> PUB_CARGOES{CT_ALCOHOL};
 
+/** What the dragon farm takes: the marijuana hay its dragons eat, and the studentky who tend them. */
+static const std::array<CargoLabel, 2> DRAGON_FARM_CARGOES{CT_HEMP_FIBRE, CT_STUDENTKY};
+
 /** How many studentky the girls' grammar school makes, as an industry's production rate. */
 static const uint8_t GYMNASIUM_PRODUCTION_RATE = 10;
 
@@ -1507,7 +1570,7 @@ void UpdateExtraIndustryCargoes()
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
 		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
-				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB) continue;
+				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1575,6 +1638,7 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_POTATO_FIELD, PLANTATION_CARGOES);
 	ResolveTownIndustryCargoes(IT_DISTILLERY, DISTILLERY_CARGOES);
 	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
+	ResolveTownIndustryCargoes(IT_DRAGON_FARM, DRAGON_FARM_CARGOES);
 }
 
 /**
@@ -5079,6 +5143,7 @@ static const IntervalTimer<TimerGameEconomy> _economy_industries_daily({TimerGam
 {
 	TendMarijuanaPlantations();
 	LetGirlsGo();
+	DragonFarmsDay();
 
 	_economy.industry_daily_change_counter += _economy.industry_daily_increment;
 

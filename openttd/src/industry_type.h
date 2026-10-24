@@ -72,6 +72,12 @@ static const IndustryType IT_POTATO_FIELD = NUM_INDUSTRYTYPES - 6;
 static const IndustryType IT_DISTILLERY = NUM_INDUSTRYTYPES - 7;
 /** The pub (hospoda), one tile in a town (economy.extra_industries): takes alcohol, gives passengers, its guests. */
 static const IndustryType IT_PUB = NUM_INDUSTRYTYPES - 8;
+/**
+ * The dragon farm, 3x3 out in the country (economy.extra_industries): a ruined castle where dragons are kept, fed the
+ * marijuana hay (CT_HEMP_FIBRE), tended by the studentky; without them its dragons fly about and break down the
+ * vehicles near (the player, 23. 10.). Makes nothing.
+ */
+static const IndustryType IT_DRAGON_FARM = NUM_INDUSTRYTYPES - 9;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -118,8 +124,11 @@ static const IndustryGfx  GFX_DISTILLERY = NUM_INDUSTRYTILES - 13;
  */
 static const IndustryGfx  GFX_PUB = NUM_INDUSTRYTILES - 14;
 static const IndustryGfx  GFX_PUB_YARD = NUM_INDUSTRYTILES - 15;
+/** The tiles of the dragon farm (IT_DRAGON_FARM): its yard, and its keep in the middle. */
+static const IndustryGfx  GFX_DRAGON_FARM_YARD = NUM_INDUSTRYTILES - 16;
+static const IndustryGfx  GFX_DRAGON_FARM = NUM_INDUSTRYTILES - 17;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PUB_YARD;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_DRAGON_FARM;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

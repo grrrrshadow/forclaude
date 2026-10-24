@@ -6324,6 +6324,7 @@ STR_INDUSTRY_NAME_STATUE                                        :Statue of Karel
 STR_INDUSTRY_NAME_POTATO_FIELD                                  :Potato Field
 STR_INDUSTRY_NAME_DISTILLERY                                    :Distillery
 STR_INDUSTRY_NAME_PUB                                           :Pub
+STR_INDUSTRY_NAME_DRAGON_FARM                                   :Dragon Farm
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

@@ -2364,6 +2364,7 @@ static IndustryType IndexIndustryType(std::string_view name)
 	if (name == "IT_MARIJUANA_PLANTATION") return IT_MARIJUANA_PLANTATION;
 	if (name == "lihovar" || name == "IT_DISTILLERY") return IT_DISTILLERY;
 	if (name == "hospoda" || name == "IT_PUB") return IT_PUB;
+	if (name == "draci_farma" || name == "IT_DRAGON_FARM") return IT_DRAGON_FARM;
 	if (name == "IT_OIL_REFINERY") return 4; // the original game's, IT_OIL_REFINERY of table/build_industry.h
 	return 0xFF;
 }
@@ -2439,6 +2440,32 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 		}
 		if (obj.industry == 0xFF) Debug(misc, 1, "3D object {}: the game has no industry {} (yet)", obj.name, obj.industry_name);
 		if (obj.industry == IT_PUB) AddMatyldaToPub(obj);
+		/* The dragon farm's places of its dragons, and its heaps of hay (the colleague's hra/3d/LES-FARMA-LUCERNY-PRO-HRU.md):
+		 * each heap the node alone, read as a door's wing is (ReadGlbDoor()), not turned. */
+		if (e.contains("mista_draku") && e.at("mista_draku").is_array()) {
+			for (const auto &m : e.at("mista_draku")) {
+				if (!m.is_object() || !m.contains("poloha") || !m.at("poloha").is_array() || m.at("poloha").size() != 3) continue;
+				ThreeDObjectFigure place;
+				place.figure = m.value("drak", std::string("drak_hnedy"));
+				for (int k = 0; k < 3; k++) place.at[k] = m.at("poloha").at(k).get<float>();
+				place.facing = m.value("otoceni", 0.0f);
+				obj.dragon_places.push_back(std::move(place));
+			}
+		}
+		if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly") && !obj.file.empty()) {
+			for (const auto &n : e.at("seno").at("uzly")) {
+				if (!n.is_string()) continue;
+				ThreeDObject heap;
+				heap.name = obj.name + "/" + n.get<std::string>();
+				heap.variants = 0;
+				heap.tiles_x = obj.tiles_x;
+				heap.tiles_y = obj.tiles_y;
+				heap.glb_path = folder + obj.file;
+				heap.door_node = n.get<std::string>();
+				obj.hay.push_back(_three_d_objects.size());
+				_three_d_objects.push_back(std::move(heap));
+			}
+		}
 	}
 	if (obj.tri.empty() && obj.plants.empty()) return;
 	_three_d_objects.push_back(std::move(obj));
@@ -5441,6 +5468,12 @@ const ThreeDObject *GetThreeDObjectByName(std::string_view name)
 		if (o.name == name) return &o;
 	}
 	return nullptr;
+}
+
+/** An object by its place in the list (the heaps of hay of the dragon farm, ThreeDObject::hay). */
+const ThreeDObject *GetThreeDObjectNumbered(size_t index)
+{
+	return &_three_d_objects[index];
 }
 
 /** The interior of a house (ReadInterior()), nullptr for a house without one. */

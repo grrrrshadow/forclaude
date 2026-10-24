@@ -6575,6 +6575,10 @@ STR_INDUSTRY_NAME_PUB                                           :{G=f}Hospoda
 STR_INDUSTRY_NAME_PUB.gen                                       :hospody
 STR_INDUSTRY_NAME_PUB.loc                                       :v hospodě
 STR_INDUSTRY_NAME_PUB.small                                     :hospoda
+STR_INDUSTRY_NAME_DRAGON_FARM                                   :{G=f}Dračí farma
+STR_INDUSTRY_NAME_DRAGON_FARM.gen                               :dračí farmy
+STR_INDUSTRY_NAME_DRAGON_FARM.loc                               :na dračí farmě
+STR_INDUSTRY_NAME_DRAGON_FARM.small                             :dračí farma
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

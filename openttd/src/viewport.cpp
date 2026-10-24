@@ -3701,6 +3701,7 @@ struct TurnedObject {
 	const ThreeDObject *ground = nullptr;     ///< drawn first under it, whole (the soil of a field under its plants)
 	std::span<const ThreeDObjectFigure> more; ///< figures on it besides its own (the girl at work, the girls by the road)
 	int sort_z = 0;                           ///< added to the bottom of its box (the field road flat and first, under the cars)
+	std::vector<const ThreeDObject *> with;   ///< drawn with it, among its own triangles (the dragon farm's hay, the wings of a house's doors)
 
 	TurnedObject(const ThreeDObject *obj, TileIndex origin, int z, const ThreeDObject *ground = nullptr, std::span<const ThreeDObjectFigure> more = {}, int sort_z = 0) :
 			obj(obj), origin(origin), z(z), ground(ground), more(more), sort_z(sort_z) {}
@@ -3803,6 +3804,9 @@ static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure 
  * @param triangles_only only its triangles, their depth to depth_out (a picture of it, GetTurnedObjectPicture())
  * @param depth_out the depth of each pixel of the frame, -infinity where it is not
  */
+/** DrawObjectInto(): over the depth of what it drew last, among its triangles (the parts drawn with a building, TurnedObject::with). */
+static bool _turned_over_last = false;
+
 static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const ObjectLay &lay, const ThreeDObject *o, double ox, double oy, double oz, uint32_t paint, std::span<const ThreeDObjectFigure> more, const TurnedObjectPicture *picture = nullptr, bool triangles_only = false, std::vector<float> *depth_out = nullptr)
 {
 	static std::vector<TurnedVertex> verts;
@@ -3923,11 +3927,36 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	if (depth_out != nullptr) depth_out->assign(static_cast<size_t>(fw) * fh, -std::numeric_limits<float>::infinity());
 	const double t_projected = TurnedNow();
 	_turned_times.models_project += t_projected - t_start;
-	if (zx1 < zx0 || zy1 < zy0) return;
+	/* The rectangle of the depth drawn last: over it, drawn with what was drawn there (_turned_over_last). */
+	static int last_x0 = 0, last_y0 = 0, last_x1 = -1, last_y1 = -1;
+	const bool over = _turned_over_last && depth_out == nullptr && last_x1 >= last_x0 && last_y1 >= last_y0;
+	if (zx1 < zx0 || zy1 < zy0) {
+		if (!over) last_x1 = last_y1 = -1;
+		return;
+	}
+	if (over) {
+		/* Over what was drawn last: nothing yet only where it was not, the rectangle of both. */
+		const int ux0 = std::min(zx0, last_x0), ux1 = std::max(zx1, last_x1), uy0 = std::min(zy0, last_y0), uy1 = std::max(zy1, last_y1);
+		for (int y = uy0; y <= uy1; y++) {
+			float *zrow = &zb[static_cast<size_t>(y) * fw];
+			for (int x = ux0; x <= ux1; x++) {
+				if (y < last_y0 || y > last_y1 || x < last_x0 || x > last_x1) zrow[x] = -std::numeric_limits<float>::infinity();
+			}
+		}
+		last_x0 = ux0; last_x1 = ux1;
+		last_y0 = uy0; last_y1 = uy1;
+	} else if (depth_out == nullptr) {
+		last_x0 = zx0; last_x1 = zx1;
+		last_y0 = zy0; last_y1 = zy1;
+	} else {
+		last_x1 = last_y1 = -1;
+	}
 	/* Its triangles and figures in their order, a stripe of its rows a core (the technologies of OpenMW, the player,
 	 * 16. 10.): each stripe all of them in the same order, only its rows -- the picture as drawn one after the other. */
 	auto draw_rows = [&](int row_lo, int row_hi) {
-	for (int y = row_lo; y < row_hi; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
+	if (!over) {
+		for (int y = row_lo; y < row_hi; y++) std::fill_n(&zb[static_cast<size_t>(y) * fw + zx0], zx1 - zx0 + 1, -std::numeric_limits<float>::infinity());
+	}
 	/* Its picture first, its depth with it: the figures go behind its walls as among its triangles. */
 	if (picture != nullptr) {
 		const int x0 = std::max(0, pic_x), x1 = std::min(fw, pic_x + picture->width);
@@ -3938,6 +3967,7 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 			for (int x = x0; x < x1; x++) {
 				const uint32_t p = picture->pixels[from + x];
 				if (p == 0) continue;
+				if (over && picture->depth[from + x] < zrow[x]) continue;
 				row[x] = p;
 				zrow[x] = picture->depth[from + x];
 			}
@@ -4209,6 +4239,7 @@ static void MakeTurnedObjectPicturesOnCard()
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.ground != nullptr) want(to.ground, to.origin, to.z, to.ground->PaintAt(to.origin));
 		if (to.obj != nullptr) want(to.obj, to.origin, to.z, to.obj->PaintAt(to.origin));
+		for (const ThreeDObject *w : to.with) want(w, to.origin, to.z, w->PaintAt(to.origin));
 	}
 	if (wanted.empty()) return;
 	std::vector<ThreeDGpuBuildingPicture *> pics;
@@ -4232,13 +4263,18 @@ size_t GetTurnedObjectPictureBytes(size_t &count)
 }
 
 /** Draw a part of a building drawn as a 3D object: from its picture when it is kept (GetTurnedObjectPicture()). */
-static void DrawTurnedObjectPart(const DrawPixelInfo &frame, const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z, uint32_t paint, std::span<const ThreeDObjectFigure> more)
+static void DrawTurnedObjectPart(const DrawPixelInfo &frame, const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z, uint32_t paint, std::span<const ThreeDObjectFigure> more, const TurnedObjectPicture *picture)
 {
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
 	const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
-	const TurnedObjectPicture *picture = o != nullptr && _turned_object_pictures_on ? GetTurnedObjectPicture(lay, o, origin, z, paint) : nullptr;
 	DrawObjectInto(dst, frame.pitch, fw, fh, lay, o, ox, oy, z, paint, more, picture);
+}
+
+/** The picture of a part of a building drawn as a 3D object, when it is kept or can be made (GetTurnedObjectPicture()). */
+static const TurnedObjectPicture *TurnedObjectPartPicture(const ObjectLay &lay, const ThreeDObject *o, TileIndex origin, int z)
+{
+	return o != nullptr && _turned_object_pictures_on ? GetTurnedObjectPicture(lay, o, origin, z, o->PaintAt(origin)) : nullptr;
 }
 
 /**
@@ -4266,8 +4302,18 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 	}
 	const ObjectLay lay = MapLay(frame);
 	const uint64_t stood_in = ThreeDStandInsGiven();
-	if (to.ground != nullptr) DrawTurnedObjectPart(frame, lay, to.ground, to.origin, to.z, to.ground->PaintAt(to.origin), {});
-	DrawTurnedObjectPart(frame, lay, to.obj, to.origin, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more);
+	/* Their pictures all first: a picture made draws in the depth the parts drawn with it are drawn over. */
+	const TurnedObjectPicture *ground_pic = TurnedObjectPartPicture(lay, to.ground, to.origin, to.z);
+	const TurnedObjectPicture *pic = TurnedObjectPartPicture(lay, to.obj, to.origin, to.z);
+	static std::vector<const TurnedObjectPicture *> with_pics;
+	with_pics.clear();
+	for (const ThreeDObject *w : to.with) with_pics.push_back(TurnedObjectPartPicture(lay, w, to.origin, to.z));
+	if (to.ground != nullptr) DrawTurnedObjectPart(frame, lay, to.ground, to.origin, to.z, to.ground->PaintAt(to.origin), {}, ground_pic);
+	DrawTurnedObjectPart(frame, lay, to.obj, to.origin, to.z, to.obj != nullptr ? to.obj->PaintAt(to.origin) : 0, to.more, pic);
+	/* The parts drawn with it among its triangles, behind its walls where they are behind (the farm's hay, the doors). */
+	_turned_over_last = true;
+	for (size_t k = 0; k < to.with.size(); k++) DrawTurnedObjectPart(frame, lay, to.with[k], to.origin, to.z, to.with[k]->PaintAt(to.origin), {}, with_pics[k]);
+	_turned_over_last = false;
 	if (ThreeDStandInsGiven() != stood_in) {
 		/* A figure or a plant of it drawn with another standing in: the building drawn again when its own comes. */
 		const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
@@ -4338,6 +4384,7 @@ static void AddTurnedObjectsToDraw()
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.obj != nullptr) wanted.push_back({to.obj, to_underlying(_vd.dpi.zoom), to.obj->PaintAt(to.origin)});
 		if (to.ground != nullptr) wanted.push_back({to.ground, to_underlying(_vd.dpi.zoom), to.ground->PaintAt(to.origin)});
+		for (const ThreeDObject *w : to.with) wanted.push_back({w, to_underlying(_vd.dpi.zoom), w->PaintAt(to.origin)});
 	}
 	PrepareThreeDObjectTextures(wanted);
 	/* Their pictures by the card, all at once (MakeTurnedObjectPicturesOnCard()). */
@@ -4439,6 +4486,8 @@ static void LeaveOutTileSprites(size_t first_parent, bool keep_foundation)
  * @param first_parent the first of the sprites the tile added
  * @param north whether the view faces north (the foundations stay, LeaveOutTileSprites())
  */
+uint DragonFarmHay(const Industry *ind);
+
 static void AddIndustryObjects(size_t first_parent, bool north)
 {
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries)) return;
@@ -4463,8 +4512,11 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 		for (const TurnedObject &to : _turned_objects) {
 			if (to.origin == origin && to.obj == obj) known = true;
 		}
-		/* With the girls that came with the deliveries, when they are there. */
-		if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDIndustryGirls(ind, obj)});
+		/* With the girls that came with the deliveries, when they are there; the dragon farm's heaps of its hay. */
+		if (!known) {
+			TurnedObject &to = _turned_objects.emplace_back(obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDIndustryGirls(ind, obj));
+			for (size_t k = 0; k < std::min<size_t>(obj->hay.size(), DragonFarmHay(ind)); k++) to.with.push_back(GetThreeDObjectNumbered(obj->hay[k]));
+		}
 	} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
 		LeaveOutTileSprites(first_parent, north);
 		if (ft.plants != nullptr) {
@@ -4593,8 +4645,8 @@ static void AddNorthHouseObject(size_t first_parent)
 		if (to.origin == origin) return;
 	}
 	/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()), the wings of its doors. */
-	_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
-	for (size_t k = 0; k < obj->door_wings.size(); k++) _turned_objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, GetTileMaxPixelZ(origin)});
+	TurnedObject &to = _turned_objects.emplace_back(obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin));
+	for (size_t k = 0; k < obj->door_wings.size(); k++) to.with.push_back(GetThreeDDoorWing(obj, origin, k));
 }
 
 /**
@@ -4979,8 +5031,8 @@ static void ViewportDoDrawTurned()
 					/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()), and the wings of
 					 * its doors as they stand (a house with an interior, the colleague's hra/3d/PROSBA-INTERIERY.md). */
 					if (!known) {
-						_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
-						for (size_t k = 0; k < obj->door_wings.size(); k++) _turned_objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, GetTileMaxPixelZ(origin)});
+						TurnedObject &to = _turned_objects.emplace_back(obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin));
+						for (size_t k = 0; k < obj->door_wings.size(); k++) to.with.push_back(GetThreeDDoorWing(obj, origin, k));
 					}
 				} else if (north >= NEW_HOUSE_OFFSET && _settings_client.gui.three_d_houses == 0) {
 					/* A set's house without an object (ITL Houses): its boxes below, the set told of once. */
@@ -11161,7 +11213,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				for (const CabObject &co : objects) {
 					if (co.origin == origin) known = true;
 				}
-				if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDIndustryGirls(ind, obj)});
+				if (!known) {
+					objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDIndustryGirls(ind, obj)});
+					for (size_t k = 0; k < std::min<size_t>(obj->hay.size(), DragonFarmHay(ind)); k++) objects.push_back({GetThreeDObjectNumbered(obj->hay[k]), origin, GetTileMaxPixelZ(origin)});
+				}
 			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
 				/* A tile of a field as in the turned view (AddIndustryObjects()): on the game's ground its plants -- a
 				 * model of potatoes, or the marijuana plant by plant (AddCabPlant()) -- and the girl at work; the shed,

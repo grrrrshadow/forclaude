@@ -254,6 +254,8 @@ struct ThreeDObject {
 	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
+	std::vector<ThreeDObjectFigure> dragon_places; ///< "mista_draku" (the dragon farm): where each of its dragons stands, its creature ("drak") as figure
+	std::vector<size_t> hay;                  ///< "seno" "uzly" (the dragon farm): its heaps of hay, each an object of its node alone, shown as many as it has (DragonFarmHay())
 	std::optional<double> FloorAt(double x, double y, double up_to) const;
 	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's
 	float extent[4] = {};             ///< x0, x1, y0, y1 of its corners as read, world units
@@ -851,6 +853,7 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, 
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
+const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);
 bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y);
 const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origin, size_t door);

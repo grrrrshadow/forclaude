@@ -27,6 +27,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – dračí farma jako průmysl hry
+
+- Hráč: *„dáme interiér, dračí farmu“* (domluveno 23. 10.: FICR + STUD, draci létají a dělají poruchy, se studentkou
+  přistanou). Model `draci_farma` od kolegy (hrad 3×3, `mista_draku`, `seno` s uzly `seno_00–07`).
+- **Ve hře:** průmysl ve městě (jeden na město, 3×3, střed hrad), bere konopné vlákno (FICR, jako seno) a studentky.
+  Nic nevyrábí. Jméno „Dračí farma“ / „Dragon Farm“.
+- **Seno:** po dovozu FICR 8 kup, každé 4 dny o kupu míň (po měsíci prázdno). Kupa je uzel modelu sám (čte se jako
+  křídlo dveří). Na mapě se kupy kreslí spolu s hradem do jedné hloubky – dřív je obrázek hradu přemaloval; stejně
+  teď i křídla dveří kina.
+- **Bez studentek (30 dní od posledních):** draci se střídají – část sedí na svých místech, ostatní krouží nad farmou
+  (`let`). Jednou za ~6 dní porouchají vlak, auto nebo loď do 12 dlaždic od hradu (běžná porucha OpenTTD) a nad
+  vozidlem krouží útočící drak. Rig: 4 autobusy u farmy, 5 poruch za 47 dní.
+- **Se studentkami:** všichni draci sedí na `mista_draku` (klid), holky u nich, žádné poruchy.
+- Hnědý a černý drak nemají animaci `let`, létají proto ledový a čínský.
+
 ## 24. 10. – interiér kina (první interiér ve hře)
 
 - Hráč: *„dáme interiér, dračí farmu“*. Kolega poslal kino podle `PROSBA-INTERIERY.md` (`KINO-INTERIER-PRO-HRU.md`):

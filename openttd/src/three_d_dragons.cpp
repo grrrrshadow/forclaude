@@ -22,13 +22,18 @@
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
 #include "debug.h"
+#include "industry.h"
+#include "industry_map.h"
+#include "vehicle_base.h"
 
 #include <cmath>
+#include <functional>
 
 #include "safeguards.h"
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (first_person_gui.cpp). */
 bool FirstPersonWalkerAt(double &x, double &y);
+bool HasGirls(const Industry *ind);
 
 namespace {
 
@@ -347,12 +352,148 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
 	}
 }
 
+/*
+ * The dragons of the dragon farms (the player, 23. 10.: "now and then some of the dragons fly about the farm and break
+ * down the trains, the cars and the ships; once they get a studentka they do not fly"): each on its place in the yard
+ * (the colleague's "mista_draku"), standing; at a farm without girls one in three of them out flying round it at a time,
+ * as a dragon that flies (one with "let"), and one over each vehicle the farm broke down (DragonFarmsDay()) a while.
+ * Where they are is reckoned anew for every picture from the farm and the clock: nothing kept, nothing saved.
+ */
+constexpr uint64_t FARM_TURN_TICKS = 2400;  ///< a farm dragon's turn out or home, about a minute
+constexpr double FARM_CIRCLE_TILES = 3.0;   ///< the out ones fly round their farm about so far from its middle
+constexpr double FARM_FLY_M = 28.0;         ///< and so high
+constexpr double FARM_ROUND_TICKS = 900.0;  ///< a round of it in so many ticks
+constexpr uint64_t ATTACK_TICKS = 600;      ///< over a vehicle it broke down, so long (about sixteen seconds)
+
+/** A vehicle a farm's dragons broke down (NoteThreeDDragonAttack()), when. */
+struct DragonAttack {
+	uint16_t farm;
+	uint32_t vehicle;
+	uint64_t at;
+};
+std::vector<DragonAttack> _attacks;
+
+/** A farm's dragon as drawn now. */
+struct FarmDragon {
+	std::string figure;
+	int frame = 0;
+	double x = 0, y = 0; ///< world units
+	int z = 0;           ///< height units
+	float facing = 0;    ///< degrees
+	float map_scale = 1; ///< so many times its size on the map: the standing ones true to the farm, the flying ones as the other dragons
+	bool flying = false;
+};
+
+/** The k-th of the dragons that fly ("let"), the farm dragons out; nullptr none. */
+const ThreeDCreature *Flyer(size_t k)
+{
+	std::vector<const ThreeDCreature *> flyers;
+	for (const ThreeDCreature &c : GetThreeDCreatures()) {
+		if (c.Has("let")) flyers.push_back(&c);
+	}
+	return flyers.empty() ? nullptr : flyers[k % flyers.size()];
+}
+
+/** A figure's frame at a time, its frames going round. */
+int LoopFrame(const std::string &figure, uint64_t now)
+{
+	const ThreeDVehicleObject *f = GetThreeDFigure(figure);
+	if (f == nullptr || f->frames < 2) return 0;
+	return static_cast<int>((now / std::max(1, f->frame_ticks)) % f->frames);
+}
+
+/** Each dragon of the dragon farms as it is now. */
+void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
+{
+	const uint64_t now = TimerGameTick::counter;
+	for (IndustryID id : Industry::industries[IT_DRAGON_FARM]) {
+		const Industry *i = Industry::Get(id);
+		if (!IsIndustryCompleted(i->location.tile)) continue;
+		const ThreeDObject *obj = GetThreeDIndustryObjectOf(i);
+		if (obj == nullptr || obj->dragon_places.empty()) continue;
+		const TileIndex origin = GetThreeDIndustryObjectOrigin(i);
+		const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
+		const double mx = ox + obj->tiles_x * TILE_SIZE / 2.0, my = oy + obj->tiles_y * TILE_SIZE / 2.0;
+		const bool calm = HasGirls(i);
+		const size_t n = obj->dragon_places.size();
+		for (size_t k = 0; k < n; k++) {
+			const ThreeDObjectFigure &p = obj->dragon_places[k];
+			const bool out = !calm && (now / FARM_TURN_TICKS + k * 2 + id.base()) % 3 == 0;
+			const ThreeDCreature *flyer = out ? Flyer(k + id.base()) : nullptr;
+			FarmDragon d;
+			if (flyer == nullptr) {
+				const ThreeDCreature *c = Creature(p.figure);
+				if (c == nullptr || c->animations.empty()) continue;
+				d.figure = c->Figure(RestAnim(*c));
+				d.x = ox + p.at[0] * OBJECT_UNITS_PER_METRE;
+				d.y = oy + p.at[1] * OBJECT_UNITS_PER_METRE;
+				d.z = static_cast<int>(GetTileMaxPixelZ(origin) + p.at[2] * OBJECT_HEIGHT_PER_METRE);
+				d.facing = p.facing;
+			} else {
+				const double a = (now % static_cast<uint64_t>(FARM_ROUND_TICKS)) / FARM_ROUND_TICKS * 2 * M_PI + k * 2 * M_PI / n;
+				const double r = (FARM_CIRCLE_TILES + 0.7 * k) * TILE_SIZE;
+				d.x = mx + std::cos(a) * r;
+				d.y = my + std::sin(a) * r;
+				d.z = static_cast<int>(std::lround(FirstPersonGroundZ(d.x, d.y) + FARM_FLY_M * OBJECT_HEIGHT_PER_METRE));
+				d.facing = static_cast<float>(std::fmod((a + M_PI / 2) * 180.0 / M_PI, 360.0));
+				d.figure = flyer->Figure("let");
+				d.map_scale = THREE_D_MAP_CREATURE_SCALE;
+				d.flying = true;
+			}
+			d.frame = LoopFrame(d.figure, now + k * 37);
+			each(d);
+		}
+	}
+	/* Over each vehicle a farm broke down, a while: a flyer circling low over it. */
+	for (const DragonAttack &a : _attacks) {
+		if (now - a.at > ATTACK_TICKS) continue;
+		const Vehicle *v = Vehicle::GetIfValid(a.vehicle);
+		const ThreeDCreature *flyer = Flyer(a.vehicle);
+		if (v == nullptr || flyer == nullptr) continue;
+		const double t = static_cast<double>(now - a.at) / 120.0 * M_PI;
+		FarmDragon d;
+		d.x = v->x_pos + std::cos(t) * TILE_SIZE;
+		d.y = v->y_pos + std::sin(t) * TILE_SIZE;
+		d.z = static_cast<int>(v->z_pos + 15 * OBJECT_HEIGHT_PER_METRE);
+		d.facing = static_cast<float>(std::fmod((t + M_PI / 2) * 180.0 / M_PI, 360.0));
+		d.figure = flyer->Figure("let");
+		d.frame = LoopFrame(d.figure, now);
+		d.map_scale = THREE_D_MAP_CREATURE_SCALE;
+		d.flying = true;
+		each(d);
+	}
+}
+
+/** The farm dragons marked dirty last (MarkFarmDragons()): their places again, as they move off them. */
+std::vector<Dragon> _farm_marked;
+
+/** The farm dragons' parts of the screen dirty: the flying ones every tick, the standing ones (slow to breathe) every sixteenth. */
+void MarkFarmDragons(uint64_t now)
+{
+	for (const Dragon &d : _farm_marked) MarkDirty(d);
+	_farm_marked.clear();
+	ForFarmDragons([&](const FarmDragon &f) {
+		if (!f.flying && now % 16 != 0) return;
+		Dragon d;
+		d.x = f.x;
+		d.y = f.y;
+		d.z = f.z;
+		d.length_m = f.flying ? 16 : 8 / THREE_D_MAP_CREATURE_SCALE;
+		d.height_m = f.flying ? 10 : 6 / THREE_D_MAP_CREATURE_SCALE;
+		MarkDirty(d);
+		if (f.flying) _farm_marked.push_back(d);
+	});
+}
+
 /** Every tick: a dragon comes now and then; those here live on, the fallen ones go after a while. */
 const IntervalTimer<TimerGameTick> _dragons_timer({TimerGameTick::Priority::None, 1}, [](auto) {
 	if (_game_mode != GameMode::Normal) {
 		_dragons.clear();
+		_attacks.clear();
+		_farm_marked.clear();
 		return;
 	}
+	MarkFarmDragons(TimerGameTick::counter);
 	const std::vector<ThreeDCreature> &kinds = GetThreeDCreatures();
 	if (kinds.empty()) return;
 	const uint64_t now = TimerGameTick::counter;
@@ -423,6 +564,9 @@ void AddThreeDDragonsToViewport(ZoomLevel zoom)
 		const std::string figure = Figure(d, frame);
 		AddThreeDFigureToViewport(figure, THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, frame);
 	}
+	ForFarmDragons([zoom](const FarmDragon &d) {
+		AddThreeDFigureToViewport(d.figure, d.map_scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, INVALID_TILE, 0, d.frame);
+	});
 }
 
 /** The dragons in the view from an eye: billboards of their pictures (AddCabFigure()). */
@@ -433,6 +577,17 @@ void AddThreeDDragonsToEye()
 		const std::string figure = Figure(d, frame);
 		AddCabFigure(figure, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), frame);
 	}
+	ForFarmDragons([](const FarmDragon &d) {
+		AddCabFigure(d.figure, 1.0f, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, d.frame);
+	});
+}
+
+/** A dragon farm's dragons broke down a vehicle (DragonFarmsDay()): one flies over it a while. Only the screen. */
+void NoteThreeDDragonAttack(uint16_t farm, uint32_t vehicle)
+{
+	const uint64_t now = TimerGameTick::counter;
+	std::erase_if(_attacks, [now](const DragonAttack &a) { return now - a.at > ATTACK_TICKS; });
+	_attacks.push_back({farm, vehicle, now});
 }
 
 namespace {
