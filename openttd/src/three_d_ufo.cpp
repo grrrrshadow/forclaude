@@ -556,7 +556,7 @@ void AddThreeDUfosToViewport(ZoomLevel zoom)
 {
 	ForPoses([zoom](const Pose &p) {
 		Draw(p, MAP_SCALE, [zoom](const std::string &figure, float scale, double x, double y, double z, float facing, int frame) {
-			AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, zoom, INVALID_TILE, 0, frame);
+			AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, zoom, INVALID_TILE, 0, ThreeDMapPose(figure, frame));
 		});
 	});
 }

@@ -3493,7 +3493,7 @@ static void TurnedBridgeHead(TileIndex head, size_t first_parent)
 	}
 }
 
-/** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index. */
+/** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index, box_dy how many times its pixels are doubled. */
 static std::vector<const ThreeDModelPicture *> _turned_vehicle_pictures;
 /** Whether the turned renderer is collecting what to draw (ViewportDoDrawTurned()): the vehicles then come as their likeness. */
 static bool _drawing_turned = false;
@@ -3525,13 +3525,14 @@ bool ViewportDrawingNorthObjects()
  * @param pic the picture, its left and top from the point it hangs from
  * @param ax,ay,az the world point it hangs from: the middle of the vehicle's parts
  * @param xmin,ymin,zmin,xmax,ymax,zmax the box of the parts, world units
+ * @param up its pixels drawn doubled so many times (a picture made at a coarser zoom, GetThreeDFigurePicture())
  */
-void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax)
+void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up)
 {
 	if (pic == nullptr || pic->width <= 0) return;
 	/* Not in the block at all? The picture about its point, in the units of the collecting dpi (16x). */
 	Point pt = RemapCoords(ax, ay, az);
-	int scale = 1 << to_underlying(_vd.dpi.zoom);
+	int scale = (1 << to_underlying(_vd.dpi.zoom)) << up;
 	int left = pt.x + pic->left * scale, top = pt.y + pic->top * scale;
 	int right = left + pic->width * scale, bottom = top + pic->height * scale;
 	if (left >= _vd.dpi.left + _vd.dpi.width || right <= _vd.dpi.left || top >= _vd.dpi.top + _vd.dpi.height || bottom <= _vd.dpi.top) return;
@@ -3566,7 +3567,7 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 	ps.box_oy = ay;
 	ps.box_oz = az;
 	ps.box_dx = static_cast<int16_t>(_turned_vehicle_pictures.size());
-	ps.box_dy = 0;
+	ps.box_dy = static_cast<int16_t>(up);
 	ps.box_kind = 5;
 	_turned_vehicle_pictures.push_back(pic);
 	_vd.last_child = LAST_CHILD_NONE;
@@ -3641,8 +3642,9 @@ static void RealizeNorthRect(const DrawPixelInfo &frame, int x0, int y0, int x1,
  * Draw a picture of the turned view hung from a world point (a vehicle's likeness, a figure); at night the pixels of
  * its lit glass kept bright (ThreeDModelPicture::lit, DrawNight()).
  * @param north drawn on a view facing north (a figure, a vehicle with lights at night): the point projected as the map
+ * @param up its pixels drawn doubled so many times (made at a coarser zoom, as the map's sprites at 16x are doubled from 8x)
  */
-static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPicture &picture, double wx, double wy, double wz, bool north = false)
+static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPicture &picture, double wx, double wy, double wz, bool north = false, int up = 0)
 {
 	const ThreeDModelPicture *pic = &picture;
 	double vx, vy;
@@ -3652,18 +3654,20 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 		ProjectTurnedF(wx, wy, wz, vx, vy);
 	}
 	double scale = 1.0 / (1 << to_underlying(frame.zoom));
-	int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + pic->left;
-	int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + pic->top;
+	/* Its pixels on the block (each 1 << up of them one of the picture's). */
+	const int pw = pic->width << up, ph = pic->height << up;
+	int ox = static_cast<int>(std::lround((vx - frame.left) * scale)) + (pic->left << up);
+	int oy = static_cast<int>(std::lround((vy - frame.top) * scale)) + (pic->top << up);
 	int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
-	int x0 = std::max(0, -ox), x1 = std::min(pic->width, fw - ox);
-	int y0 = std::max(0, -oy), y1 = std::min(pic->height, fh - oy);
+	int x0 = std::max(0, -ox), x1 = std::min(pw, fw - ox);
+	int y0 = std::max(0, -oy), y1 = std::min(ph, fh - oy);
 	if (north) RealizeNorthRect(frame, ox + x0, oy + y0, ox + x1, oy + y1);
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	for (int y = y0; y < y1; y++) {
-		const uint32_t *src = &pic->pixels[static_cast<size_t>(y) * pic->width];
+		const uint32_t *src = &pic->pixels[static_cast<size_t>(y >> up) * pic->width];
 		uint32_t *row = dst + static_cast<size_t>(oy + y) * frame.pitch + ox;
 		for (int x = x0; x < x1; x++) {
-			Colour s(src[x]);
+			Colour s(src[x >> up]);
 			if (s.a == 0) continue;
 			if (s.a == 255) {
 				row[x] = Colour(s.r, s.g, s.b).data;
@@ -3676,10 +3680,14 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 	}
 	if (_night_windows_now) {
 		for (uint32_t i : pic->lit) {
-			const int x = static_cast<int>(i % pic->width), y = static_cast<int>(i / pic->width);
-			if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
-			uint32_t *at = dst + static_cast<size_t>(oy + y) * frame.pitch + ox + x;
-			_night_lit.emplace_back(at, *at);
+			const int px = static_cast<int>(i % pic->width) << up, py = static_cast<int>(i / pic->width) << up;
+			for (int y = py; y < py + (1 << up); y++) {
+				for (int x = px; x < px + (1 << up); x++) {
+					if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
+					uint32_t *at = dst + static_cast<size_t>(oy + y) * frame.pitch + ox + x;
+					_night_lit.emplace_back(at, *at);
+				}
+			}
 		}
 	}
 }
@@ -3688,7 +3696,7 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, bool north)
 {
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
-	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz, north);
+	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz, north, ps.box_dy);
 }
 
 /**
@@ -5686,6 +5694,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 {
 	/* The map's 3D pictures not made yet: the nearest made stands in, the thread makes them; the drawing waits for no card. */
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
+	/* The pictures it asks for kept till it draws them (the memory of the pictures is bounded, MakeRoomForPicture()). */
+	KeepThreeDPicturesOfBlock();
 	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
 	RoundTrackPass round_track_pass(IsViewportTurned(vp));
 	_vd.dpi.zoom = vp.zoom;

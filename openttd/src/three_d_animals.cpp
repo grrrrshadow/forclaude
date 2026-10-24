@@ -1043,11 +1043,11 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 	for (const Beast &b : _beasts) {
 		const ThreeDAnimal *a = KindOf(b);
 		if (a == nullptr) continue;
-		int frame;
-		const std::string figure = Figure(b, frame);
+		/* A few poses of each, no passages between them (ThreeDMapPose()). */
+		const std::string figure = FigureIn(b, b.pose);
 		const float scale = a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
 		const int z = b.z + static_cast<int>(std::lround(a->hover_m * OBJECT_HEIGHT_PER_METRE * (scale - 1.0f)));
-		AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), z, Facing(b), zoom, INVALID_TILE, 0, frame);
+		AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), z, Facing(b), zoom, INVALID_TILE, 0, ThreeDMapPose(figure, b.frame));
 	}
 }
 

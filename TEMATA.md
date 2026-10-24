@@ -29,6 +29,34 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – pád při přiblížení na draka: obří obrázky a tisíce póz
+
+- Hráč: *„úhel 0°, jen jsem koukal na draka nad mořem a ve chvíli kdy jsem přiblížil zoom ještě víc tak to
+  spadlo“*, *„pokaždý spadne i hudba z aplikace pod androidem a firefox byl zavřený tak ten pád je hluboko do
+  systému“* → Android zabíjí aplikace, došla paměť celého telefonu. Log (stále build 296): 35 min hry, konec zase
+  při čtení obrázků z karty (`cteni obrazku 116990-117005`), mapa se po pohledu z očí zpomalila na 6–10 snímků/s.
+- Příčina (rig přes zink, 16× zoom zapnutý jako u hráče, `zoom_min = 0`):
+  - **Obrázek tvora větší než obrazovka**: čínský drak 24,75 m × 3 na mapě × 48,8 px/m × 2 (vyhlazení) = rámec
+    **5608×4188**, přes 90 MB čtených z karty naráz, 47 MB držených v paměti.
+  - **Tisíce póz**: draci s kostrou mají na mapě pózu každý tik (hnědý klid 156, let 36, ledový 120), k tomu
+    přechody mezi animacemi a natočení po 10° → nový obrázek skoro každý tik.
+  - **Zásobník obrázků jen podle počtu** (1024), ne podle velikosti → u přiblíženého draka gigabajty.
+  - Trojúhelníky problém nejsou: na snímek hnědý/černý 1262, ledový 2474, kráčející 4034, čínský 5000 (hráč chtěl
+    draky optimalizovat přes grrrrf – není co, kolegu jsem neotravoval).
+- Hráč: *„proč kreslí tisíc obrázků? animace letu stačí 4 obrázky“* → hotovo:
+  - Na mapě má každá animace tvorů (draci, draci farmy, zvířata a strašidla, čarodějnice, UFO) **nejvýš 4 pózy
+    za kolo** a **bez přechodů** (`ThreeDMapPose()`); pohled z očí zůstává plynulý. Rig, 2 draci 900 tiků na 4×:
+    dřív 325 nových obrázků (23 MB, fronta 129), teď 62 (1,9 MB) a pak už žádné.
+  - Obrázek postavy na mapu nejvýš **2048 bodů** napříč; větší se udělá o zoom hrubší a na mapě se zdvojí
+    (`FigurePictureZoom()`, jako vanilla zdvojuje sprity z 8× na 16×). Rig: největší rámec 2048×1864 místo
+    5608×4188.
+  - Zásobník obrázků i podle velikosti: **128 MB** (`PICTURE_BYTES_KEPT`), při přeplnění zbude polovina; obrázky
+    právě kresleného bloku mapy se nikdy nemažou. Při běžném zoomu je 312 obrázků ~3 MB, strop nic neomezuje.
+- Hráč: *„paměť si už jednou omezil a pak jsme paměť vraceli“* – tenkrát se snížila paměť karty kvůli starému
+  Winlatoru; teď se karta (1 GB) ani sprity nemění, jde o obří obrázky a nekonečné pózy.
+- Pozn.: hráčovo nastavení `sprite_cache_size_mb = 6016` (cfg z 19. 10.) a zapnutý 16× zoom – na telefonu může
+  cache spritů sama narůst do gigabajtů; nechávám na hráči.
+
 ## 24. 10. – pád na telefonu při stavění trati (build 296)
 
 - Hráč poslal logy: *„neotáčel jsem plochou, nebyl jsem ve first person view, furt 0° a stavění tratě“*, karta

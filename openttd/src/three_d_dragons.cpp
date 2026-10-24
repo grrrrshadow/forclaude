@@ -561,13 +561,13 @@ float Facing(const Dragon &d)
 /** The dragons on the map, as figures (the turned view, and facing north with the houses as objects). */
 void AddThreeDDragonsToViewport(ZoomLevel zoom)
 {
+	/* A few poses of each animation, no passages between them (ThreeDMapPose()). */
 	for (const Dragon &d : _dragons) {
-		int frame;
-		const std::string figure = Figure(d, frame);
-		AddThreeDFigureToViewport(figure, THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, frame);
+		const std::string figure = d.kind + "/" + d.anim;
+		AddThreeDFigureToViewport(figure, THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, Facing(d), zoom, INVALID_TILE, 0, ThreeDMapPose(figure, d.frame));
 	}
 	ForFarmDragons([zoom](const FarmDragon &d) {
-		AddThreeDFigureToViewport(d.figure, d.map_scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, INVALID_TILE, 0, d.frame);
+		AddThreeDFigureToViewport(d.figure, d.map_scale, static_cast<int>(std::lround(d.x)), static_cast<int>(std::lround(d.y)), d.z, d.facing, zoom, INVALID_TILE, 0, ThreeDMapPose(d.figure, d.frame));
 	});
 }
 

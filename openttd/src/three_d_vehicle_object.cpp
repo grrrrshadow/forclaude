@@ -71,6 +71,13 @@ static constexpr int SUPERSAMPLE = 2;
 static constexpr int SPIN_STEPS = 24;
 /** The pictures of the turned view kept: the vehicles ask for the same few over and over. */
 static constexpr size_t PICTURES_KEPT = 1024;
+/**
+ * And no more memory than this for them: a figure close up is a big picture, and one moving is a new picture each frame
+ * and each angle -- a flying dragon (120 frames, three times its size on the map) zoomed 16 times in, some 10 MB a
+ * picture, took a phone's memory in seconds (the player, 24. 10.: "I zoomed in on the dragon over the sea and it went
+ * down", the music of another app and the browser killed with it).
+ */
+static constexpr size_t PICTURE_BYTES_KEPT = 128u * 1024 * 1024;
 
 /** The game's unit step of a direction (Direction: N, NE, E, SE, S, SW, W, NW), world units. */
 static const int8_t DIR_DX[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
@@ -1563,6 +1570,35 @@ static void ShapeExtent(const ThreeDVehicleShape &s, float e[6])
 	}
 }
 
+/**
+ * A figure's picture for the map no more pixels across than this as it is drawn (SUPERSAMPLE times its own): one bigger
+ * is made at a coarser zoom and its pixels doubled on the map (FigurePictureZoom()), as the map's sprites at 16x are
+ * doubled from 8x. A dragon three times its size zoomed 16 times in was 5608 x 4188, some 90 MB read back from the
+ * card at once and 47 MB kept, each frame of its flight a new one (the player, 24. 10.: the phone went down as he
+ * zoomed in on the dragon over the sea).
+ */
+static constexpr float FIGURE_PICTURE_SIDE = 2048.0f;
+
+/**
+ * The zoom a figure's picture for the map is made at: the map's, or coarser while the picture would be more than
+ * FIGURE_PICTURE_SIDE across.
+ * @param[out] up how many times coarser: its pixels drawn doubled so many times (AddTurnedVehiclePicture())
+ */
+static ZoomLevel FigurePictureZoom(const ThreeDVehicleShape &shape, float scale, ZoomLevel zoom, int &up)
+{
+	float e[6];
+	ShapeExtent(shape, e);
+	/* Seen from above at the camera's angle: as wide as its diagonal, as tall as that foreshortened and its height. */
+	const float across = std::hypot(e[1] - e[0], e[3] - e[2]), tall = std::max(0.0f, e[5] - e[4]);
+	const float side_m = std::max(across, across * CAM_SIN + tall * CAM_COS) * scale * SUPERSAMPLE;
+	up = 0;
+	while (zoom < ZoomLevel::Max && side_m * PXM_16X / (1 << to_underlying(zoom)) > FIGURE_PICTURE_SIDE) {
+		zoom = static_cast<ZoomLevel>(to_underlying(zoom) + 1);
+		up++;
+	}
+	return zoom;
+}
+
 /** A picture of an object for the card (PrepareGpuObject()), drawn with others at once (ThreeDGpuRender()), shrunk to its pixels (FinishGpuObject()). */
 struct GpuObjectPicture {
 	ThreeDGpuPicture pic;
@@ -2062,6 +2098,8 @@ uint64_t _object_pictures_made = 0, _object_pictures_made_thread = 0;
 
 /** The pictures asked for since this clock stay (PinThreeDPictures()). */
 static uint64_t _pictures_pinned_from = UINT64_MAX;
+/** And those asked for by the block of the map being drawn: it draws them after it asked for them (KeepThreeDPicturesOfBlock()). */
+static uint64_t _pictures_block_from = UINT64_MAX;
 
 /**
  * Keep the pictures of the 3D objects asked for from now on until unpinned: a view that collects its triangles and
@@ -2072,21 +2110,40 @@ void PinThreeDPictures(bool pin)
 	_pictures_pinned_from = pin ? _object_pictures_clock + 1 : UINT64_MAX;
 }
 
-/** Room for one more picture kept: at PICTURES_KEPT the older half goes. */
+/**
+ * A block of the map is drawn from now on (ViewportDoDraw()): the pictures it asks for are kept till it is drawn, as it
+ * draws them after it asked for them all.
+ */
+void KeepThreeDPicturesOfBlock()
+{
+	_pictures_block_from = _object_pictures_clock + 1;
+}
+
+/** The memory of a picture kept: its pixels and its lit pixels. */
+static size_t PictureBytes(const ThreeDModelPicture &p)
+{
+	return (p.pixels.capacity() + p.lit.capacity()) * sizeof(uint32_t);
+}
+
+/** Room for one more picture kept: at PICTURES_KEPT pictures, or PICTURE_BYTES_KEPT of them, the longest not asked for go till half is left. */
 static void MakeRoomForPicture()
 {
-	if (_object_pictures.size() < PICTURES_KEPT) return;
-	std::vector<uint64_t> ages;
-	for (const auto &e : _object_pictures) ages.push_back(e.second.used);
-	std::nth_element(ages.begin(), ages.begin() + ages.size() / 2, ages.end());
-	/* Never those of the picture being drawn (PinThreeDPictures()): their pixels are still to be drawn. */
-	uint64_t limit = std::min(ages[ages.size() / 2], _pictures_pinned_from - 1);
-	for (auto i = _object_pictures.begin(); i != _object_pictures.end();) {
-		if (i->second.used <= limit) {
-			i = _object_pictures.erase(i);
-		} else {
-			++i;
-		}
+	size_t bytes = 0;
+	for (const auto &e : _object_pictures) bytes += PictureBytes(e.second.picture);
+	if (_object_pictures.size() < PICTURES_KEPT && bytes <= PICTURE_BYTES_KEPT) return;
+	std::vector<std::pair<uint64_t, std::map<ObjectPictureKey, ObjectPictureEntry>::iterator>> ages;
+	ages.reserve(_object_pictures.size());
+	for (auto i = _object_pictures.begin(); i != _object_pictures.end(); ++i) ages.emplace_back(i->second.used, i);
+	std::ranges::sort(ages, {}, &std::pair<uint64_t, std::map<ObjectPictureKey, ObjectPictureEntry>::iterator>::first);
+	/* Never those of the picture being drawn (PinThreeDPictures()) or the block (KeepThreeDPicturesOfBlock()): their
+	 * pixels are still to be drawn. */
+	const uint64_t keep_from = std::min(_pictures_pinned_from, _pictures_block_from);
+	size_t count = _object_pictures.size();
+	for (const auto &[used, it] : ages) {
+		if (used >= keep_from || (count <= PICTURES_KEPT / 2 && bytes <= PICTURE_BYTES_KEPT / 2)) break;
+		bytes -= PictureBytes(it->second.picture);
+		count--;
+		_object_pictures.erase(it);
 	}
 }
 
@@ -3490,12 +3547,37 @@ const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const ThreeDVehicle
 	return pic != nullptr ? &pic->lights : nullptr;
 }
 
+/** The poses of a round of a creature's animation on the map (ThreeDMapPose()). */
+static constexpr int MAP_POSES = 4;
+
+/**
+ * The frame of a creature's animation drawn on the map: one of MAP_POSES poses of its round, evenly through it (one that
+ * does not go round: its first and its last among them). Each pose at each angle is a picture of its own; with its bones
+ * a frame a tick -- the brown dragon's rest 156 of them, its flight 36 -- the map made a new picture every tick (the
+ * player, 24. 10.: "why does it draw a thousand pictures? four pictures are enough for the flight"). The view from the
+ * eyes draws them all.
+ * @param figure the figure of the animation (GetThreeDFigure())
+ * @param frame the frame it is at
+ */
+int ThreeDMapPose(std::string_view figure, int frame)
+{
+	const ThreeDVehicleObject *fig = GetThreeDFigure(figure);
+	if (fig == nullptr || fig->frames <= MAP_POSES || frame <= 0) return frame;
+	const int frames = fig->frames;
+	frame = std::min(frame, frames - 1);
+	if (!fig->loop) {
+		const int step = (frame * (MAP_POSES - 1) + (frames - 1) / 2) / (frames - 1);
+		return step * (frames - 1) / (MAP_POSES - 1);
+	}
+	return frame * MAP_POSES / frames * frames / MAP_POSES;
+}
+
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
 {
-	int height = 0;
-	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y);
+	int height = 0, up = 0;
+	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up);
 	if (pic == nullptr) return false;
-	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
 	return true;
 }
 
@@ -3508,6 +3590,8 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
  * @param yaw the angle of the view it is seen from (the preview beside an industry's window), NaN the map's
  * @param z the height it stands at, units, INT_MIN not known: its tile drawn again as high as a building may be
  * @param x,y where it stands, world units, when z is known
+ * @param[out] up nullptr: the picture at the zoom asked for; else made coarser when it would be too big
+ *                (FigurePictureZoom()), how many times coarser -- for the map, which draws its pixels doubled
  * @return the picture, or nullptr when the figure is not there
  */
 /**
@@ -3541,8 +3625,9 @@ bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 	return true;
 }
 
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y)
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up)
 {
+	if (up != nullptr) *up = 0;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	if (name.starts_with("vozidlo:")) {
 		/* A vehicle standing as a figure: at its true size against the building, empty, still. */
@@ -3552,6 +3637,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 		const ThreeDParts parts = ev.obj->PartsOf(ev.state);
 		const ThreeDVehicleShape *shape = for_eye ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
 		if (shape == nullptr) return nullptr;
+		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up);
 		const float world_az = facing - 135.0f;
 		_object_picture_may_wait = for_eye;
 		const ThreeDModelPicture *pic = ObjectPicture(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state);
@@ -3570,6 +3656,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	const bool later = for_eye || fig->frame_lights;
 	const ThreeDVehicleShape *shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
 	if (shape == nullptr) return nullptr;
+	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up);
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
 	const int spin_step = fig->spin_ticks > 0 ? static_cast<int>((TimerGameTick::counter % fig->spin_ticks) * SPIN_STEPS / fig->spin_ticks) : 0;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */

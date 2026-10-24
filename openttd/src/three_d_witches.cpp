@@ -172,7 +172,8 @@ float Facing(const Witch &w)
 void LightsOf(const Witch &w, const ThreeDWitch &c, bool eye, std::vector<ThreeDWitchLight> &out)
 {
 	const ThreeDVehicleObject *f = Flying(c);
-	const ThreeDVehicleShape *shape = f != nullptr ? f->TryGetShape(w.frame) : nullptr;
+	/* On the map of the pose drawn there (ThreeDMapPose()). */
+	const ThreeDVehicleShape *shape = f != nullptr ? f->TryGetShape(eye ? w.frame : ThreeDMapPose(f->name, w.frame)) : nullptr;
 	if (shape == nullptr) return;
 	const double size = w.scale * (eye ? EYE_OF_MAP : THREE_D_MAP_CREATURE_SCALE);
 	const double a = Facing(w) * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
@@ -476,7 +477,7 @@ void AddThreeDWitchesToViewport(ZoomLevel zoom)
 		const ThreeDWitch *c = Kind(w.kind);
 		const ThreeDVehicleObject *f = c != nullptr ? Flying(*c) : nullptr;
 		if (f == nullptr) continue;
-		AddThreeDFigureToViewport(f->name, w.scale * THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, Facing(w), zoom, INVALID_TILE, 0, w.frame);
+		AddThreeDFigureToViewport(f->name, w.scale * THREE_D_MAP_CREATURE_SCALE, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, Facing(w), zoom, INVALID_TILE, 0, ThreeDMapPose(f->name, w.frame));
 	}
 }
 

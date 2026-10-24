@@ -54,7 +54,7 @@ void DrawGroundSprite(SpriteID image, PaletteID pal, const SubSprite *sub = null
 void DrawGroundSpriteAt(SpriteID image, PaletteID pal, int32_t x, int32_t y, int z, const SubSprite *sub = nullptr, int extra_offs_x = 0, int extra_offs_y = 0);
 void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z, const SpriteBounds &bounds, bool transparent = false, const SubSprite *sub = nullptr, Point pixel_offset = {});
 struct ThreeDModelPicture;
-void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax);
+void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up = 0);
 bool ViewportDrawingTurned();
 bool ViewportDrawingNorthObjects();
 bool ViewportDrawingEye();
