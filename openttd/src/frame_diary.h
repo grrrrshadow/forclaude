@@ -32,5 +32,6 @@ void FrameDiaryGameTick(double ms);
 void FrameDiaryEyeCollected(double ms);
 void FrameDiaryEyeDrawn(double ms);
 void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t corners);
+size_t FrameDiaryMemoryMB();
 
 #endif /* FRAME_DIARY_H */

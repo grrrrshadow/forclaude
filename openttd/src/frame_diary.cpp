@@ -13,12 +13,21 @@
 #include "window_func.h"
 #include "window_type.h"
 #include "openttd.h"
+#include "three_d_gpu.h"
 #include "3rdparty/fmt/format.h"
 
 #include <atomic>
+#include <charconv>
 #include <chrono>
 #include <ctime>
 #include <optional>
+
+#if defined(_WIN32)
+#	include <windows.h>
+#	include <psapi.h>
+#elif defined(__linux__)
+#	include <unistd.h>
+#endif
 
 #include "safeguards.h"
 
@@ -90,7 +99,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" buffer = cekani na obrazovku, zamek = cekani na tik hry, klavesy, okna = okna a jejich kresleni (i sber pohledu z oci), obraz = predani obrazu karte;"
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
-				" procesorem = snimky kreslene bez karty.\n");
+				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta.\n");
 	}
 	const std::time_t t = std::time(nullptr);
 	char clock[16];
@@ -98,16 +107,43 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
-			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0));
+			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB());
 	fflush(*_diary);
 	_lines++;
 }
 
 } // namespace
+
+/**
+ * How much memory the game holds now, megabytes: what it took of the system for itself (on Windows its private bytes,
+ * elsewhere its resident pages); 0 not known. On the player's phone the card shares it (the player, 24. 10.: Winlator
+ * gone without a crash log of the game, in the middle of reading pictures back from the card).
+ */
+size_t FrameDiaryMemoryMB()
+{
+#if defined(_WIN32)
+	PROCESS_MEMORY_COUNTERS_EX m{};
+	m.cb = sizeof(m);
+	if (!K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&m), sizeof(m))) return 0;
+	return m.PrivateUsage >> 20;
+#elif defined(__linux__)
+	auto f = FileHandle::Open(std::string{"/proc/self/statm"}, "r");
+	if (!f.has_value()) return 0;
+	char text[128];
+	const size_t n = fread(text, 1, sizeof(text) - 1, *f);
+	/* Its size, then its resident pages. */
+	const char *at = std::find(text, text + n, ' ');
+	size_t pages = 0;
+	if (at == text + n || std::from_chars(at + 1, text + n, pages).ec != std::errc{}) return 0;
+	return pages * static_cast<size_t>(sysconf(_SC_PAGESIZE)) >> 20;
+#else
+	return 0;
+#endif
+}
 
 /** A frame of the view from the eyes drawn (its thread): on the card, what the processor made ready and what the card did, and how many corners went; else by the processor. */
 void FrameDiaryEyeCard(bool on_card, double prepare_ms, double card_ms, size_t corners)

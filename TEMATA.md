@@ -29,6 +29,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – pád na telefonu při stavění trati (build 296)
+
+- Hráč poslal logy: *„neotáčel jsem plochou, nebyl jsem ve first person view, furt 0° a stavění tratě“*, karta
+  zink (virgl). Crash log hry nezůstal → zmizel celý Winlator (ovladač, nebo Android kvůli paměti). Hráč: *„ten pád
+  ale nemusí být vina karty že jo“* – nemusí, deník karty ukazuje jen, co karta dělala ve chvíli konce.
+- Co je v logu: karta skončila uprostřed čtení dávky 9 obrázků zpět (`cteni obrazku 27305-27313 zpet
+  (glReadPixels)`). Poslední 5 s běžela hra 5× rychleji (935 tiků), jinak ~45 snímků/s bez záseků. Dva tiky po 31 s
+  na začátku = načítání hry.
+- V rigu přes **zink nad lavapipe** (stejná vrstva jako telefon, `LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=zink`,
+  i s kontrolní vrstvou Vulkanu) žádná chyba karty. Ale dávka obrázků se skládala do jednoho rámce omezeného jen
+  výškou 16384: při přiblížení u města **2048×10378** najednou (rámec ~190 MB na kartě, 85 MB čteno naráz, hra přes
+  1,4 GB). Na telefonu karta sdílí paměť s hrou – nejpravděpodobnější příčina, jistá ne.
+- Opraveno: rámec obrázků i budov plochy nejvýš 2048 řádků (`FRAME_ROWS`), víc rámců za sebou; vyšší obrázek sám
+  má vlastní. Rámec budov se po velkém zase zmenší. Rig: nejvýš ~2460×2250, špička hry 1,19 GB.
+- Diagnostika: `snimky.log` má na každém řádku `pamet` (soukromá paměť hry) a `karta` (co karta drží); krok čtení
+  obrázků i budov v `3d_karta.log` píše velikost rámce a paměť hry a karty – další pád ukáže, jestli to byla paměť.
+  Rig: `test3d casy` píše největší čtený rámec.
+
 ## 24. 10. – UFO: katastrofy a noční talíř (kolega PROSBA-UFO)
 
 - Hráč kolegovi: *„ufo talíř pro katastrofy 3D a v noci může létat jako strašidla a neničit koleje, ať svítí paprsek

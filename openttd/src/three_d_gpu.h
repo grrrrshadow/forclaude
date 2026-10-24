@@ -358,6 +358,7 @@ bool ThreeDGpuReadShown(uint32_t texture, int width, int height, std::vector<uin
 void ThreeDGpuStop();
 std::string ThreeDGpuDescribe();
 std::string ThreeDGpuTimes();
+size_t ThreeDGpuHeldMB();
 
 extern std::atomic<bool> _three_d_gpu_show; ///< the view from the eyes shown straight from the card where it can (ThreeDGpuShows()); the rig's test3d gpu ukaz 0: read back
 extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0

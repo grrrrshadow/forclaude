@@ -21,6 +21,7 @@
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "table/strings.h"
+#include "frame_diary.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -491,11 +492,23 @@ struct GpuBuilding {
 };
 std::unordered_map<uint64_t, GpuTexture> _card_textures;
 std::unordered_map<uint64_t, GpuBuilding> _card_buildings;
-size_t _card_bytes = 0;
+std::atomic<size_t> _card_bytes = 0; ///< (read by the diary of the frames too, ThreeDGpuHeldMB())
 std::atomic<size_t> _card_sent = 0; ///< the rig: bytes put on the card since the last ThreeDGpuTimes()
 std::atomic<int> _card_trims = 0;   ///< and how many times it let go of what it held the longest not drawn
+std::atomic<int64_t> _card_biggest = 0; ///< and the most pixels of a frame of pictures read back at once (its width << 32 | its height)
 uint64_t _card_clock = 0;
 constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.: "today's cards have 8 GB"; 128 MB after #285 was Winlator's old OpenGL)
+/* The rows of a frame of pictures drawn and read back at once (DrawPicturesOnCard(), DrawBuildingsOnCard()): more of
+ * them in more frames -- one picture taller has a frame of its own. A batch on 2048 x 10378 at once (the rig zoomed in
+ * by the town, zink), its frame some 190 MB on the card and its 85 MB read back in one go, the player's phone sharing
+ * its memory with its card (24. 10.: Winlator gone in the middle of reading pictures back, no crash log of the game). */
+constexpr int FRAME_ROWS = 2048;
+
+/** How much the game and the card hold now, for the diary of the card (the step it may die at says it too). */
+std::string MemoryNow()
+{
+	return fmt::format("hra {} MB, karta {} MB", FrameDiaryMemoryMB(), _card_bytes.load() >> 20);
+}
 
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {
@@ -2310,7 +2323,7 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 				x = 0;
 				row = 0;
 			}
-			if (y + pic.height > _max_target) break;
+			if (y + pic.height > (end > at ? FRAME_ROWS : _max_target)) break;
 			placed[end].x = x;
 			placed[end].y = y;
 			x += pic.width;
@@ -2318,6 +2331,8 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 			read_lit |= pic.read_lit;
 		}
 		const int frame_h = y + row;
+		const int64_t was = _card_biggest.load();
+		if (static_cast<int64_t>(frame_w) * frame_h > (was >> 32) * (was & 0xFFFFFFFF)) _card_biggest = static_cast<int64_t>(frame_w) << 32 | frame_h;
 		Step(fmt::format("obrazky {}-{}: {} najednou, {}x{}", _gpu_pictures + 1 + at, _gpu_pictures + end, end - at, frame_w, frame_h));
 		if (!TargetOfSize(frame_w, frame_h)) return;
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, _fbo);
@@ -2334,7 +2349,7 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 		Step(fmt::format("kresleni obrazku {}-{} (glDrawElements)", _gpu_pictures + 1 + at, _gpu_pictures + end));
 		for (size_t k = at; k < end; k++) DrawPictureAt(*placed[k].pic, placed[k].draws, placed[k].x, placed[k].y);
 		/* Read back once, each picture's rows out of it. */
-		Step(fmt::format("cteni obrazku {}-{} zpet (glReadPixels)", _gpu_pictures + 1 + at, _gpu_pictures + end));
+		Step(fmt::format("cteni obrazku {}-{} zpet (glReadPixels), {}x{}, {}", _gpu_pictures + 1 + at, _gpu_pictures + end, frame_w, frame_h, MemoryNow()));
 		colours.resize(static_cast<size_t>(frame_w) * frame_h);
 		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
 		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -2373,9 +2388,11 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 /** The buildings of the turned map drawn into, at least as big as asked (grown in steps; DrawBuildingsOnCard()). */
 bool BuildingTargetOfSize(int w, int h)
 {
-	if (w <= _bfbo_w && h <= _bfbo_h) return true;
-	_bfbo_w = std::min(_max_target, (std::max(_bfbo_w, w) + 255) / 256 * 256);
-	_bfbo_h = std::min(_max_target, (std::max(_bfbo_h, h) + 255) / 256 * 256);
+	/* Shrunk again after a very big one, as TargetOfSize(). */
+	const bool too_big = static_cast<int64_t>(_bfbo_w) * _bfbo_h > 16 * 1024 * 1024 && static_cast<int64_t>(w) * h * 4 < static_cast<int64_t>(_bfbo_w) * _bfbo_h;
+	if (w <= _bfbo_w && h <= _bfbo_h && !too_big) return true;
+	_bfbo_w = std::min(_max_target, ((too_big ? w : std::max(_bfbo_w, w)) + 255) / 256 * 256);
+	_bfbo_h = std::min(_max_target, ((too_big ? h : std::max(_bfbo_h, h)) + 255) / 256 * 256);
 	Step(fmt::format("ramec budov plochy {}x{} (glRenderbufferStorage, glCheckFramebufferStatus)", _bfbo_w, _bfbo_h));
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, _b_colour_rb);
 	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _bfbo_w, _bfbo_h);
@@ -2493,7 +2510,7 @@ void DrawBuildingsOnCard(std::span<ThreeDGpuBuildingPicture *const> pics)
 				x = 0;
 				row = 0;
 			}
-			if (y + pic.height > _max_target) break;
+			if (y + pic.height > (end > at ? FRAME_ROWS : _max_target)) break;
 			placed[end].x = x;
 			placed[end].y = y;
 			x += pic.width;
@@ -2556,7 +2573,7 @@ void DrawBuildingsOnCard(std::span<ThreeDGpuBuildingPicture *const> pics)
 		gl.glDisable(GL_CULL_FACE);
 		gl.glDisable(GL_DEPTH_TEST);
 		gl.glBindVertexArray(0);
-		Step(fmt::format("cteni budov plochy zpet (glReadPixels), {}x{}", frame_w, frame_h));
+		Step(fmt::format("cteni budov plochy zpet (glReadPixels), {}x{}, {}", frame_w, frame_h, MemoryNow()));
 		colours.resize(static_cast<size_t>(frame_w) * frame_h);
 		nearness.resize(static_cast<size_t>(frame_w) * frame_h);
 		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
@@ -4099,12 +4116,19 @@ std::string ThreeDGpuDescribe()
 	return _gpu_describe;
 }
 
+/** How much the card holds now (the shapes, triangles, textures and buildings put on it), megabytes. */
+size_t ThreeDGpuHeldMB()
+{
+	return _card_bytes.load() >> 20;
+}
+
 /** The rig: the pictures the card drew since asked last, and its time. */
 std::string ThreeDGpuTimes()
 {
 	std::lock_guard lock(_gpu_mutex);
-	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
-			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load());
+	const int64_t biggest = _card_biggest.exchange(0);
+	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x, read back at most {}x{}", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
+			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	_gpu_ground_ms = 0;
 	_gpu_grounds = 0;
@@ -4134,5 +4158,6 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }
 std::string ThreeDGpuTimes() { return "card: none"; }
+size_t ThreeDGpuHeldMB() { return 0; }
 
 #endif
