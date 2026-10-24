@@ -29,6 +29,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – trainset.simtrains.eu chce heslo
+
+- Hráč: *„copak je s adresou https://trainset.simtrains.eu/ chce heslo, před 14 dny to bylo bez hesla, koukni do
+  diskusí co se děje“*. Zjištěno: **celá doména simtrains.eu** (trainset, fórum railsimulator, msts, forum, hlavní
+  stránka) vrací HTTP 401 s heslem serveru (Basic, realm „DOOMikovo“, za Cloudflare) – zavřel to provozovatel pro
+  všechny, nejde o účet hráče. Archive.org má poslední otevřený snímek 10. 8. 2026. V diskusích nic: forum.msts.cz
+  (Dan J. tam píše) o tom vlákno nemá, vlastní fórum simtrains je za stejným heslem. Hry se to netýká, vlaky
+  simtrains máme v `newgrf/simtrains`.
+
 ## 24. 10. – božské oko: druhá řada ikon pod lištou
 
 - Hráč: *„udělame druhou řadu ikonek pod hlavní lištu ikon, pod otazníček dáme ikonku božského oka a přesuneme tam
@@ -41,7 +50,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   stisknuté; klik na mapu = pohled z první osoby s chodcem uprostřed té dlaždice (nebo nejbližší místo, kde stát
   může); **pravé tlačítko zaměřovač zruší** (jen ten náš, režimy myši hry beze změny), Esc taky.
 - Pohled z první osoby je pryč z nabídky pod otazníkem, noc tam zůstala; v nabídce mapy zůstal.
-- Grafika: oko 20×20 a 40×40 (zmenšené z hráčových 48×48) a kurzor 32×32 zavěšený za střed, 32bpp, jako sprity
+- Grafika (ikonky z icons8.com, hráč: *„icons8.com jsou ikonky“*; v CREDITS): oko 20×20 a 40×40 (zmenšené z 48×48) a kurzor 32×32 zavěšený za střed, 32bpp, jako sprity
   0x0118 a 0x0119 v `openttd.grf` (yagl, skript `openttdgui_oko.py`, `GUI_ICONS_32` v `openttd_yagl.py`).
   Červený zaměřovač bomb zůstal.
 - Rig: `test3d oko` (kde je oko a otazník), `oko klik`, `oko prave`, `oko <x> <y>`.

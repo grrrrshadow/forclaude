@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Generate the god's eye sprites: the button icon and its yellow crosshair cursor.
 
-Both pictures are the player's (24. 10.: "under the question mark the icon of
-the god's eye, the first person view moved there, and the crosshair instead
-of the cursor"): openttdgui_oko_src.png, an eye in a triangle, 48x48, and
+Both pictures are icons from Icons8 (https://icons8.com -- see CREDITS.md), as
+the player brought them (24. 10.: "under the question mark the icon of the
+god's eye, the first person view moved there, and the crosshair instead of
+the cursor"): openttdgui_oko_src.png, an eye in a triangle, 48x48, and
 openttdgui_zamerovac_oko_src.png, a yellow crosshair, 32x32. They go in as
 32bpp, alpha and all (the player's word: no palette pictures of ours).
 
