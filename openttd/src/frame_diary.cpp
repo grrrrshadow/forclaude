@@ -128,7 +128,7 @@ size_t FrameDiaryMemoryMB()
 #if defined(_WIN32)
 	PROCESS_MEMORY_COUNTERS_EX m{};
 	m.cb = sizeof(m);
-	if (!K32GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&m), sizeof(m))) return 0;
+	if (!GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&m), sizeof(m))) return 0;
 	return m.PrivateUsage >> 20;
 #elif defined(__linux__)
 	auto f = FileHandle::Open(std::string{"/proc/self/statm"}, "r");

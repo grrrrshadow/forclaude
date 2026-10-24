@@ -10,6 +10,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Build (Windows) dělá hráč, ne já. Commit a push po každém hotovém kroku.
 - Před pushem kontrola i clangem s `-Werror=c++11-narrowing` (MSVC bere zúžení double → float ve `{}` jako chybu,
   MinGW jen varuje: build 295 umřel na kmenech stromů, 24. 10.).
+- Kontrola MinGW s definicemi jako build na GitHubu, hlavně `-DPSAPI_VERSION=1` (build 297 umřel na
+  `K32GetProcessMemoryInfo`, s verzí 1 není deklarovaná; hra linkuje `psapi`, správně je `GetProcessMemoryInfo`).
 - Žádná vyskakovací okna s povolením (nový host, add_repo apod.).
 - **Mody a hra jsou dva oddělené světy.** GRF je mod: objekt místo spritu, jinak funguje jako dřív. Co GRF chce
   (barva, blednutí, rez, blikání majáku), vybírá GRF svým spritem (`stavy`). Hra sama nic nerozhoduje a nic do GRF
