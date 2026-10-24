@@ -12764,7 +12764,33 @@ static bool ConTestFlipInDepot(std::span<std::string_view> argv)
 static bool ConTestMoveInDepot(std::span<std::string_view> argv)
 {
 	if (argv.size() < 3) {
-		IConsolePrint(CC_HELP, "Hang a train on the tail of another in a depot. Usage: 'testpresun <unit number> <unit number of the train to join> [ctrl]' ('ctrl' drags the whole chain, as Ctrl does).");
+		IConsolePrint(CC_HELP, "Hang a train on the tail of another in a depot. Usage: 'testpresun <unit number> <unit number of the train to join> [ctrl]' ('ctrl' drags the whole chain, as Ctrl does),"
+				" or 'testpresun <unit number> novy [position]' (one unit of it to a row of its own, as dragging it to the empty row does; 0 = head).");
+		return true;
+	}
+	if (argv[2] == "novy") {
+		auto punit = ParseInteger(argv[1]);
+		if (!punit.has_value()) return false;
+		uint pos = 0;
+		if (argv.size() > 3) {
+			auto ppos = ParseInteger(argv[3]);
+			if (!ppos.has_value()) return false;
+			pos = (uint)*ppos;
+		}
+		Train *t = FindTrainByUnit((uint)*punit);
+		if (t == nullptr) {
+			IConsolePrint(CC_ERROR, "testpresun: vlak {} nenalezen.", argv[1]);
+			return true;
+		}
+		Train *u = t;
+		for (uint i = 0; i < pos && u != nullptr; i++) u = u->GetNextVehicle();
+		if (u == nullptr) {
+			IConsolePrint(CC_ERROR, "testpresun: vlak {} nema clanek c.{}.", argv[1], pos);
+			return true;
+		}
+		AutoRestoreBackup cur_company(_current_company, t->owner);
+		CommandCost ret = Command<Commands::MoveRailVehicle>::Do(DoCommandFlag::Execute, u->index, VehicleID::Invalid(), false);
+		IConsolePrint(CC_DEFAULT, "testpresun: vlak {} clanek {} do nove rady: {}", *punit, u->index.base(), ret.Failed() ? GetString(ret.GetErrorMessage()) : "presunut");
 		return true;
 	}
 	bool ctrl = argv.size() > 3 && argv[3] == "ctrl";

@@ -2933,6 +2933,7 @@ static bool CheckReverseTrain(const Train *consist);
 static void ReverseTrainDirection(Train *consist, const char *why);
 static void TurnTrainInsideDepot(Train *consist);
 static void UpdateStatusAfterSwap(Train *v, bool reverse = true);
+static uint FaceTrainOutOfDepot(Train *head);
 
 /**
  * Move a rail vehicle around inside the depot.
@@ -3040,20 +3041,41 @@ CommandCost CmdMoveRailVehicle(DoCommandFlags flags, VehicleID src_veh, VehicleI
 	 * cannot be flipped (a multiple unit, an articulated engine), which comes
 	 * out as before. The train it left keeps being drawn as it was: the
 	 * turn-round moves to its new head when the old one is what was taken. */
-	bool keep_look = !move_chain && !flags.Test(DoCommandFlag::AutoReplace) && dst_head != src_head &&
-			src_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards) &&
+	bool from_turned = !move_chain && !flags.Test(DoCommandFlag::AutoReplace) && dst_head != src_head &&
+			src_head->vehicle_flags.Test(VehicleFlag::DrivingBackwards);
+	bool keep_look = from_turned &&
 			!src->IsMultiheaded() && !EngInfo(src->engine_type)->callback_mask.Test(VehicleCallbackMask::ArticEngine);
-	Train *rest = (keep_look && src == src_head) ? src->GetNextUnit() : nullptr;
+	/* The rest keeps its turn-round whatever the unit taken off it was: a unit
+	 * that cannot be flipped only changes how that unit comes out, not how the
+	 * train it left goes on. Left to the unit's kind, the rest of a train turned
+	 * round with an MSTS unit at its front (articulated by its set) came out
+	 * straight. */
+	Train *rest = (from_turned && src == src_head) ? src->GetNextUnit() : nullptr;
 
 	ret = TryConsistSplice(flags, src, dst, move_chain);
-	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute) || !keep_look) return ret;
+	if (ret.Failed() || !flags.Test(DoCommandFlag::Execute) || !from_turned) return ret;
 
-	src->flags.Flip(VehicleRailFlag::Flipped);
-	src->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	if (keep_look) {
+		src->flags.Flip(VehicleRailFlag::Flipped);
+		src->vehicle_flags.Reset(VehicleFlag::DrivingBackwards);
+	}
 	if (rest != nullptr && rest->IsFrontEngine()) rest->vehicle_flags.Set(VehicleFlag::DrivingBackwards);
+	/* The splice faced every vehicle the way its head faces, which is right
+	 * for a head that faces right itself, and neither does here: the unit
+	 * taken off the front faced the wall with the turn-round gone, the rest
+	 * had a head that was never turned. Started, either drove at the back
+	 * wall and left the rest of itself in the shed. Both are faced by which
+	 * end leads them; see FaceTrainOutOfDepot(). Only here: autoreplace moves
+	 * vehicles through this command too, and hands the new head its
+	 * turn-round only after the last move, so facing a train by its flag
+	 * midway through that turns it the wrong way. */
+	FaceTrainOutOfDepot(src);
+	if (rest != nullptr) FaceTrainOutOfDepot(rest);
 	if (_show_train_orientation) {
-		IConsolePrint(CC_INFO, "Vlak {}: clanek {} vzat z otoceneho vlaku - vzhled zachovan preklopenim (otoceny {})",
-				src->First()->unitnumber, src->index.base(), src->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne");
+		IConsolePrint(CC_INFO, "Vlak {}: clanek {} vzat z otoceneho vlaku - vzhled zachovan {} (otoceny {}, couva {}){}",
+				src->First()->unitnumber, src->index.base(), keep_look ? "preklopenim" : "jak byl", src->flags.Test(VehicleRailFlag::Flipped) ? "ano" : "ne",
+				src->IsDrivingBackwards() ? "ano" : "ne",
+				rest != nullptr ? fmt::format(", zbytek couva {}", rest->IsDrivingBackwards() ? "ano" : "ne") : std::string{});
 	}
 	src->First()->ConsistChanged(CCF_ARRANGE);
 	if (rest != nullptr) rest->ConsistChanged(CCF_ARRANGE);
@@ -11070,6 +11092,46 @@ bool IsWholeTrainInsideDepot(const Train *v)
 }
 
 /**
+ * Face every vehicle of a train that is wholly inside a depot the way it is
+ * going to drive out.
+ *
+ * Inside a shed the facing is not a fact about where anything is, it is the
+ * other half of which end leads: a train moves the way its vehicles face,
+ * reversed when it drives backwards, and a depot has one way out. So the two
+ * have to agree -- facing the door for a train led by its head, facing the
+ * wall for one led by its tail -- and every way into a shed keeps them so
+ * (the entry, TurnTrainInsideDepot(), RestoreCasualtyOrientation()).
+ *
+ * Taking a train apart by hand did not. An engine taken off the front of a
+ * turned train came away facing the wall but no longer turned round, and the
+ * rest of that train got a new head that had never been turned either. Either
+ * one, started, drove at the back wall, read the wall as the end of the line
+ * and backed up -- by then with its first vehicle out on the depot tile and
+ * the rest still hidden behind it, so it backed out of the door alone, every
+ * other vehicle left in the shed, and the game came down on the step assert
+ * a few tiles on (the player's MSTS unit, forced out past a red). Which end
+ * leads is what the depot window draws and what the player arranged, so that
+ * is kept, and the facing follows it.
+ *
+ * @param head any vehicle of the train
+ * @return how many vehicles had to be turned; 0 also when the train is not wholly inside a depot
+ */
+static uint FaceTrainOutOfDepot(Train *head)
+{
+	head = head->First();
+	if (!IsWholeTrainInsideDepot(head) || !IsRailDepotTile(head->tile)) return 0;
+	Direction out = DiagDirToDir(GetRailDepotDirection(head->tile));
+	Direction facing = head->IsDrivingBackwards() ? ReverseDir(out) : out;
+	uint turned = 0;
+	for (Train *u = head; u != nullptr; u = u->Next()) {
+		if (u->direction == facing) continue;
+		u->direction = facing;
+		turned++;
+	}
+	return turned;
+}
+
+/**
  * Is any part of this train still standing inside a depot?
  *
  * A train inside a depot is hidden on a single tile and has no extent, and a
@@ -11588,6 +11650,19 @@ static bool CheckTrainStayInDepot(Train *v)
 	/* bail out if not all wagons are in the same depot or not in a depot at all */
 	for (const Train *u = v; u != nullptr; u = u->Next()) {
 		if (u->track != Track::Depot || u->tile != v->tile) return false;
+	}
+
+	/* Whatever way into the shed left it facing the wall while led by its
+	 * head, or the door while led by its tail, it does not leave like that:
+	 * it drove at the back wall, backed up with only its first vehicle out of
+	 * hiding, and left the rest of itself in the shed. Said in the record,
+	 * because it means some way into a shed still gets this wrong; a save
+	 * made before the depot window was mended gets it put right here. See
+	 * FaceTrainOutOfDepot(). */
+	if (uint turned = FaceTrainOutOfDepot(v); turned != 0) {
+		LogAnomaly("Vlak {}: v depu ({},{}) mirilo {} vozidel jinam, nez vlak vyjede (couva {}) - natocena podle vedouciho konce",
+				v->unitnumber, TileX(v->tile), TileY(v->tile), turned, v->IsDrivingBackwards() ? "ano" : "ne");
+		for (Train *u = v; u != nullptr; u = u->Next()) u->UpdateViewport(false, false);
 	}
 
 	/* A rescue engine held in here with a call-out on it says why, the same

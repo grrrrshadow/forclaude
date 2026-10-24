@@ -628,6 +628,27 @@ the source. Where along the wagon the lorry stands is not chosen by eye: its
 chain's middle goes on the wagon's middle, which needs no number and comes out
 right for a wagon of any length.
 
+## A train taken apart in the shed after it was turned round
+
+Inside a depot which way a vehicle faces only says, together with which end
+leads, which way the train drives out: the door for a train led by its head,
+the wall for one led by its tail (`FaceTrainOutOfDepot()`). Dragging a train
+apart in the depot window broke that: the engine dragged off the front of a
+turned train, and the rest of the train it left, each got a head whose facing
+no longer matched which end leads. Either one, started, drove at the wall,
+backed up with the rest of itself hidden behind it and went down on the step
+assert (the player's MSTS unit, forced out past a red).
+
+`testpresun <unit> novy [position]` drags one unit of a train to a row of its
+own, as dropping it on the empty row of the depot window does (0 = head).
+
+    depoodpoj    two four-piece engines, turned, the front one dragged off
+
+Both halves come out whole, no assert, no `krok ROZBITY`. A train that still
+reaches the door facing the wrong way is put right at the door and says so in
+the record (`mirilo ... vozidel jinam`): zaznam above zero in any scene means
+some other way into a shed gets it wrong.
+
 ## A wagon holding an order list, and a window left on the wrong vehicle
 
 Two faults the rig cannot see by counting, because both are a state that

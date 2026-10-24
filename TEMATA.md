@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. večer – pád při výjezdu z depa (MSTS jednotka, vynucená jízda na červenou, build 298)
+
+- Hráč: *„nutil jsem ho vyjet z depa na červenou, model z MSTS, špatně poskládaný lokomotivy asi jsem dal
+  obráceně“*, *„narazila do zdi, bylo vidět že vyjela do zdi depa“*, *„do vrat ven z depa měla červenou“*. Záznam:
+  `krok ROZBITY … couva ano, clanek 0 z 6`, mašina venku, pět dílů dál schovaných v depu, assert
+  `IsValidDiagDirection(exitdir)`.
+- **Příčina:** v depu je natočení vozů jen druhá polovina toho, který konec vede (vede hlava → čelem k vratům,
+  vede zadek → čelem ke zdi). Mašina odtažená z čela **otočeného** vlaku zůstala čelem ke zdi, ale už ne
+  otočená; zbytek vlaku dostal novou hlavu, která otočená nikdy nebyla. Rozjetá jela do zdi, u zdi se otočila
+  s prvním dílem už venku a zbytkem schovaným → vyjela sama, ostatní zůstali v depu, za tři dlaždice pád.
+- **Teď:** `FaceTrainOutOfDepot()` natočí vozy celého vlaku v depu podle toho, který konec vede – po vzetí
+  vozu z otočeného vlaku (oba vlaky, odtažený i zbytek) a ještě jednou těsně před výjezdem (to spraví i vlak
+  uložený v savu a cokoli jiného; zapíše `mirilo … vozidel jinam` do záznamu). Zbytek otočeného vlaku zůstává
+  otočený, ať je odtažená jednotka jakákoli (dřív jen u překlopitelných).
+- Rig: `testpresun <vlak> novy [pozice]` (jednotka do vlastní řady). Scéna `depoodpoj`: dvě čtyřdílné mašiny,
+  otočit, přední odtáhnout, vynutit výjezd – dřív přesně hráčův záznam a assert, teď obě poloviny vyjedou celé.
+  Pozor na slepou uličku: natáčet vozy po každém spojování / přetažení v depu rozbije autoreplace – ten přesouvá
+  vozy stejným příkazem a „couvá“ dá nové mašině (natočené jako stará) až po posledním přesunu. Ochrana u vrat to
+  hned ohlásila ve třech scénách (`mezera`, `odtahotoc`, `odtahvyhybka`). Teď jen po vzetí z otočeného vlaku;
+  baterie starý build proti novému beze změny.
+
 ## 24. 10. večer – les s pasekou místo normálního lesa, houbový guláš v hospodě, pád stínů z očí
 
 - Hráč: *„to má nahradit normální les“*, *„v minulém buildu už normální les nebyl vůbec“*, *„nemáme staré savy“*.

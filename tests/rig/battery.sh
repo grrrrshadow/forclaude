@@ -965,6 +965,28 @@ testpauza
 testzatik 10 testskip 1
 testzatik 300 testmezera 1 6
 testzatik 1500 testbrzda 1" 4000 -g $S/obmena.sav
+# Two engines of four pieces each (testclanky, the player's MSTS unit has
+# three) coupled in the shed at (111,19), the train turned round there, and
+# its front engine dragged to a row of its own (testpresun ... novy). That
+# engine used to come away facing the back wall while no longer turned, drove
+# at the wall when it was forced out past the red, backed up with the rest of
+# itself still hidden and went down on the step assert three tiles out. Now
+# both halves come out whole, the rest of the train tail first as it was
+# drawn, the second one later so the two do not share the doorway: no assert,
+# no krok ROZBITY, no "mirilo" record (FaceTrainOutOfDepot()).
+run_scene depoodpoj "vlak123 on
+testpauza
+testclanky 74 3
+testclanky 76 3
+testpresun 76 74
+testotoc 74
+testpresun 74 novy 0
+testbrzda 74
+testzatik 40 testprojet 74
+testzatik 400 testbrzda 41
+testzatik 440 testprojet 41
+testzatik 900 testdelka 74
+testzatik 900 testdelka 41" 1000 -g $S/rig.sav
 # Automatic departure, single-engine half (TEMATA 2.41): on obmena.sav the
 # wait flags are cleared and trains 1 (came in pushing) and 3 (pulling) get
 # "automatic" on their station order, 2 gets reverse-out and 4 nothing, then
