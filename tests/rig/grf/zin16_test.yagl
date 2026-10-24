@@ -1,0 +1,41 @@
+// The rig's set for the 16x level of a sprite (zoom code 7, ZoomLevel::In16x,
+// LoadSpriteV2() in src/spriteloader/grf.cpp), read by the scene zin16 with
+// 'testzoom8 sprite <id>'. Two sprites, replaced with Action A
+// (SPR_FLAT_GRASS_TILE and the one after it, 3981 and 3982 of the base set),
+// each a square with a plain colour per level so the middle pixel the probe
+// reads says which level it came from:
+//
+//     3981  4x 16 px red, 8x 32 px green, 16x 64 px blue
+//           -- 16x off: 8x is the set's green, the 16x record stays unread
+//           (the set has an 8x); 16x on: 16x is the set's blue
+//     3982  16x only, 64 px, red and blue pixels alternating like a chessboard
+//           -- 16x off: 8x is made from it, the mean of each 2x2 block,
+//           (128, 0, 128); the 4x the same; 16x on: 16x is the set's own
+//     yagl -e <out>/zin16_test.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+grf // Action08
+{
+    grf_id: "RIG6";
+    version: GRF8;
+    name: "Rig: zin16";
+    description: "Two sprites with a 16x level (zoom code 7)";
+}
+replacement_sprite_sets // Action0A
+{
+    replacement_sprite_set<0x0F8D> // <first_sprite>
+    {
+        // Replace sprite 0x0F8D:
+        sprite_id<0x00000001>
+        {
+            [16, 16, 0, 0], zin4, c32bpp, "zin16_test-32bpp-zin4-0.png", [10, 10];
+            [32, 32, 0, 0], zin8, c32bpp, "zin16_test-32bpp-zin8-0.png", [10, 10];
+            [64, 64, 0, 0], zin16, c32bpp, "zin16_test-32bpp-zin16-0.png", [10, 10];
+        }
+        // Replace sprite 0x0F8E:
+        sprite_id<0x00000002>
+        {
+            [64, 64, 0, 0], zin16, c32bpp, "zin16_test-32bpp-zin16-0.png", [84, 10];
+        }
+    }
+}

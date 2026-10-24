@@ -1,0 +1,234 @@
+[
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_papirova",
+  "soubor": "lampa_papirova.glb",
+  "nazev": {
+   "cs": "papírová lucerna",
+   "en": "paper lantern"
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lampa_papirova_maska_papir.png",
+    "zacatek": 210,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.182,
+    0.182
+   ],
+   "y": [
+    -0.182,
+    0.182
+   ],
+   "z": [
+    -0.6,
+    0.01
+   ]
+  },
+  "trojuhelniku": 1012,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "závěsná papírová lucerna jako v Morrowindu (vejčitá, tmavá dřevěná víčka a obruče, šňůra), 0,62 m, počátek v háčku (visí dolů, pod trám, strom nebo rameno); papír barvou číslem (barvy, cast papir); uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_na_sloupu",
+  "soubor": "lampa_na_sloupu.glb",
+  "nazev": {
+   "cs": "lampa na sloupu",
+   "en": "lamp post"
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lampa_na_sloupu_maska_papir.png",
+    "zacatek": 210,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.18,
+    0.782
+   ],
+   "y": [
+    -0.182,
+    0.182
+   ],
+   "z": [
+    0.0,
+    2.86
+   ]
+  },
+  "trojuhelniku": 1096,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "dřevěný sloup 2,8 m na kamenné patce s ramenem a papírovou lucernou na konci ramene (0,6 m od sloupu po +x), k cestám a ulicím; počátek na zemi uprostřed sloupu; papír barvou číslem; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_nastenna",
+  "soubor": "lampa_nastenna.glb",
+  "nazev": {
+   "cs": "pochodeň na zeď",
+   "en": "wall torch"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.309
+   ],
+   "y": [
+    -0.05,
+    0.05
+   ],
+   "z": [
+    -0.105,
+    0.445
+   ]
+  },
+  "trojuhelniku": 556,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "pochodeň v železném držáku na zeď, šikmo od zdi; počátek na zdi v místě držáku, +x od zdi ven (u dveří domů ve výšce asi 2 m); plamen v uzlu noc (v noci hoří); uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "svicen",
+  "soubor": "svicen.glb",
+  "nazev": {
+   "cs": "svícen",
+   "en": "candlestick"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 3
+  },
+  "rozmer_m": {
+   "x": [
+    -0.125,
+    0.125
+   ],
+   "y": [
+    -0.078,
+    0.078
+   ],
+   "z": [
+    0.0,
+    0.456
+   ]
+  },
+  "trojuhelniku": 1588,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "mosazný trojramenný svícen se svíčkami, lampička na stůl, 0,45 m; plamínky v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampicka",
+  "soubor": "lampicka.glb",
+  "nazev": {
+   "cs": "olejová lampička",
+   "en": "oil lamp"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.06,
+    0.06
+   ],
+   "y": [
+    -0.058,
+    0.058
+   ],
+   "z": [
+    0.0,
+    0.3
+   ]
+  },
+  "trojuhelniku": 852,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "olejová lampička s mosaznou nádobkou a skleněným cylindrem, 0,30 m; sklo a plamínek v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "ohnivy_kos",
+  "soubor": "ohnivy_kos.glb",
+  "nazev": {
+   "cs": "ohnivý koš",
+   "en": "fire basket"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.34,
+    0.34
+   ],
+   "y": [
+    -0.331,
+    0.331
+   ],
+   "z": [
+    -0.003,
+    1.186
+   ]
+  },
+  "trojuhelniku": 1684,
+  "atlas_px": 64,
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "železný koš na třech nohách s uhlíky a ohněm, 1,0 m (k bránám, na náměstí, k tábořišti); uhlíky a oheň v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ }
+]

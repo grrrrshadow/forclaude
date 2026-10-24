@@ -1,0 +1,1679 @@
+[
+ {
+  "soubor": "gepard.glb",
+  "jmeno": "gepard",
+  "druh": "pes",
+  "nazev": {
+   "cs": "gepard",
+   "en": "cheetah"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.07,
+   0.55,
+   0.95
+  ],
+  "prodej": true,
+  "cena": 3000,
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "Idle",
+    "snimku": 51,
+    "tiku": 3
+   },
+   "chuze": {
+    "animace": "Walk",
+    "snimku": 46,
+    "tiku": 1,
+    "krok_m": 1.14
+   },
+   "beh": {
+    "animace": "Run",
+    "snimku": 15,
+    "tiku": 1,
+    "krok_m": 4.1
+   },
+   "skok": {
+    "animace": "Jump",
+    "snimku": 40,
+    "tiku": 1
+   },
+   "utok": {
+    "animace": "Attack Right Paw",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "smrt": {
+    "animace": "Death",
+    "snimku": 29,
+    "tiku": 1
+   },
+   "zere": {
+    "animace": "Eating",
+    "snimku": 39,
+    "tiku": 2
+   },
+   "pije": {
+    "animace": "CheetahDrinking",
+    "snimku": 54,
+    "tiku": 4
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 2688,
+  "autor": "Cheetah, planeta-elefante (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/cheetah-8d3ba32a2ff34acc9b5c590bc06cb561), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést planeta-elefante; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "kocka_somalska.glb",
+  "jmeno": "kocka_somalska",
+  "druh": "pes",
+  "nazev": {
+   "cs": "somálská kočka",
+   "en": "Somali cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.3,
+   0.12,
+   0.32
+  ],
+  "prodej": true,
+  "cena": 300,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Idle",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "chuze": {
+    "animace": "WalkClean",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.1
+   },
+   "sedi": {
+    "animace": "SittingIdle",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "SitDown",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "StandUp",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.41
+   }
+  },
+  "trojuhelniku": 7620,
+  "autor": "Somali Cat Animated ver 1.2, DreamNoms (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/somali-cat-animated-ver-12-e185c3fd92b64c32b4515a32b29252fc), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést DreamNoms; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "kocka_chodi.glb",
+  "jmeno": "kocka_chodi",
+  "druh": "pes",
+  "nazev": {
+   "cs": "kočka",
+   "en": "cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.41,
+   0.11,
+   0.3
+  ],
+  "prodej": true,
+  "cena": 250,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "chuze": {
+    "animace": "Take 001",
+    "snimku": 31,
+    "tiku": 1,
+    "krok_m": 0.18
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.52
+   }
+  },
+  "trojuhelniku": 7744,
+  "autor": "Cat - Walking, pamoan10 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/cat-walking-827aa2c7951747599629700703050673), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést pamoan10; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "kocka_kreslena.glb",
+  "jmeno": "kocka_kreslena",
+  "druh": "pes",
+  "nazev": {
+   "cs": "kreslená kočka",
+   "en": "toon cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.44,
+   0.16,
+   0.32
+  ],
+  "prodej": true,
+  "cena": 200,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "chuze": {
+    "animace": "Scene",
+    "snimku": 31,
+    "tiku": 1,
+    "krok_m": 0.2
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.5
+   }
+  },
+  "trojuhelniku": 2636,
+  "autor": "Toon Cat FREE, Omabuarts Studio (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/toon-cat-free-b2bd1ee7858444bda366110a2d960386), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Omabuarts Studio; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "liska.glb",
+  "jmeno": "liska",
+  "druh": "pes",
+  "nazev": {
+   "cs": "liška",
+   "en": "fox"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.98,
+   0.21,
+   0.5
+  ],
+  "prodej": true,
+  "cena": 600,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "beh": {
+    "animace": "Take 001",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.03
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.47
+   }
+  },
+  "trojuhelniku": 2508,
+  "autor": "Low poly fox running animation, dragonsnap (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-fox-running-animation-d3ea521c69a34307b0c149864031520c), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést dragonsnap; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "fenek.glb",
+  "jmeno": "fenek",
+  "druh": "pes",
+  "nazev": {
+   "cs": "fenek",
+   "en": "fennec fox"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.66,
+   0.24,
+   0.32
+  ],
+  "prodej": true,
+  "cena": 800,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "chuze": {
+    "animace": "Take 01",
+    "snimku": 29,
+    "tiku": 1,
+    "krok_m": 0.33
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.41
+   }
+  },
+  "trojuhelniku": 4294,
+  "autor": "Fennec Fox, Dylan Martínez Sánchez (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/fennec-fox-f1a74a0a076b403cb78be57efe31bea8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Dylan Martínez Sánchez; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "vlk.glb",
+  "jmeno": "vlk",
+  "druh": "pes",
+  "nazev": {
+   "cs": "vlk",
+   "en": "wolf"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.54,
+   0.35,
+   0.9
+  ],
+  "prodej": true,
+  "cena": 1200,
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "beh": {
+    "animace": "Take 001",
+    "snimku": 25,
+    "tiku": 1,
+    "krok_m": 1.37
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.87
+   }
+  },
+  "trojuhelniku": 6940,
+  "autor": "Wolf, OLEKSO (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/wolf-e319f122c2474d3186b841b019fb0edd), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést OLEKSO; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); bez slin (hráč 20. 10.: „dej vlkovi pryč ty sliny“, tvorove/par14_psi.py)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "falkor.glb",
+  "jmeno": "falkor",
+  "druh": "pes",
+  "nazev": {
+   "cs": "Falkor, drak-pes",
+   "en": "Falkor, the luck dragon"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   6.0,
+   2.13,
+   0.98
+  ],
+  "prodej": true,
+  "cena": 25000,
+  "leta": true,
+  "povaha": "mirumilovne",
+  "trojuhelniku": 43234,
+  "autor": "chris_vienna's Falkor, sharksie (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/chris-viennas-falkor-100d817cef1f491f919053ca0c0e613b), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést sharksie; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku; létá vedle hráče"
+ },
+ {
+  "soubor": "pes_roztomily.glb",
+  "jmeno": "pes_roztomily",
+  "druh": "pes",
+  "nazev": {
+   "cs": "roztomilý pes",
+   "en": "cute dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.4,
+   0.15,
+   0.6
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 18556,
+  "autor": "3d dog cute, Tech developers (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/3d-dog-cute-206d1a40d4654d1e940c9ec05b2cc14f), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Tech developers; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "vlk_sedy.glb",
+  "jmeno": "vlk_sedy",
+  "druh": "pes",
+  "nazev": {
+   "cs": "šedý vlk",
+   "en": "grey wolf"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.46,
+   0.27,
+   0.85
+  ],
+  "kde": "ulice",
+  "povaha": "vyprovokovat",
+  "trojuhelniku": 5358,
+  "autor": "3d wolf, Stakler (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/3d-wolf-4b9e8f90045b45a0afabdb7ecbefe9f9), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Stakler; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_maly.glb",
+  "jmeno": "pes_maly",
+  "druh": "pes",
+  "nazev": {
+   "cs": "malý pes",
+   "en": "small dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.44,
+   0.19,
+   0.45
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 14058,
+  "autor": "Cute Dog, samuelsgr art (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/cute-dog-330ac22eb9bc4b618223b65a85c96f0c), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést samuelsgr art; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_lovecky.glb",
+  "jmeno": "pes_lovecky",
+  "druh": "pes",
+  "nazev": {
+   "cs": "lovecký pes",
+   "en": "hunting dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.82,
+   0.32,
+   0.7
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1224,
+  "autor": "Dinosaur Hunting Dog, Jurassic Radassic (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dinosaur-hunting-dog-35fccd33aebb44738a29483f1fabf721), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Jurassic Radassic; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_hnedy.glb",
+  "jmeno": "pes_hnedy",
+  "druh": "pes",
+  "nazev": {
+   "cs": "hnědý pes",
+   "en": "brown dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.61,
+   0.26,
+   0.55
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1382,
+  "autor": "Dog, 1-3D.com (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/dog-4bbbf9a318974a50b4298deb2079a613), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést 1-3D.com; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_veseli.glb",
+  "jmeno": "pes_veseli",
+  "druh": "pes",
+  "nazev": {
+   "cs": "veselý pes",
+   "en": "happy dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.24,
+   0.24,
+   0.6
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 19484,
+  "autor": "Dog, Stakler (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-224aff266e0148049e00078c8639dabd), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Stakler; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_ulicni.glb",
+  "jmeno": "pes_ulicni",
+  "druh": "pes",
+  "nazev": {
+   "cs": "pouliční pes",
+   "en": "street dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.45,
+   0.6,
+   0.55
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 10000,
+  "autor": "Dog, MAROUANE (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-3df1138f25d348b8b5c662439b00d436), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést MAROUANE; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "pes_nafoceny.glb",
+  "jmeno": "pes_nafoceny",
+  "druh": "pes",
+  "nazev": {
+   "cs": "pes",
+   "en": "dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.48,
+   0.29,
+   0.45
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 20006,
+  "autor": "Dog 3D Capture, 3DigitalArtist (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-3d-capture-ee8d0281536a472c9b0bf6ad4ce880c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést 3DigitalArtist; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "liska_skace.glb",
+  "jmeno": "liska_skace",
+  "druh": "pes",
+  "nazev": {
+   "cs": "skákající liška",
+   "en": "jumping fox"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.47,
+   0.38,
+   0.45
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 966,
+  "autor": "Jumping Fox, sheana (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/jumping-fox-a9dbdb1a689f4b8399bf0bcd0330177f), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést sheana; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "kocka_seda.glb",
+  "jmeno": "kocka_seda",
+  "druh": "pes",
+  "nazev": {
+   "cs": "kočka",
+   "en": "cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.54,
+   0.11,
+   0.3
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 3238,
+  "autor": "Cat, savounited (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/cat-a7add72acfd54016af7681ff3d938803), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést savounited; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "kocka_rezava.glb",
+  "jmeno": "kocka_rezava",
+  "druh": "pes",
+  "nazev": {
+   "cs": "zrzavá kočka",
+   "en": "orange cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.48,
+   0.11,
+   0.3
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 9154,
+  "autor": "Orange Cat, ilhamtr (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/orange-cat-2b722183b60e4fcfbe3c2263536d2fa6), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ilhamtr; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "vlk_lesni.glb",
+  "jmeno": "vlk_lesni",
+  "druh": "pes",
+  "nazev": {
+   "cs": "lesní vlk",
+   "en": "forest wolf"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.67,
+   0.33,
+   0.85
+  ],
+  "kde": "ulice",
+  "povaha": "vyprovokovat",
+  "trojuhelniku": 3192,
+  "autor": "Wolf, AX-7YK (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/wolf-f53173981deb44559419fd0370d5a4c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést AX-7YK; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "kocka_dvoubarevna.glb",
+  "jmeno": "kocka_dvoubarevna",
+  "druh": "pes",
+  "nazev": {
+   "cs": "dvoubarevná kočka",
+   "en": "bicolor cat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.58,
+   0.11,
+   0.3
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Animation",
+    "snimku": 53,
+    "tiku": 6
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.29
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.62
+   }
+  },
+  "trojuhelniku": 8646,
+  "autor": "Bicolor Cat, kenchoo (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/bicolor-cat-e623a618ca344a8393d7ba4d63ec23cf), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést kenchoo; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); síť na kosti dostala vlastní skin: Object_32",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "vlk_stylizovany.glb",
+  "jmeno": "vlk_stylizovany",
+  "druh": "pes",
+  "nazev": {
+   "cs": "vlk",
+   "en": "wolf"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.62,
+   0.49,
+   0.9
+  ],
+  "kde": "ulice",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "metarig|Idle",
+    "snimku": 60,
+    "tiku": 1
+   },
+   "klid2": {
+    "animace": "metarig|Idle_2",
+    "snimku": 52,
+    "tiku": 3
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.83
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.77
+   }
+  },
+  "trojuhelniku": 7928,
+  "autor": "Stylized Wolf, ESO (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-wolf-2b369cacbd3a4d19b39353f6cf60b8a9), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ESO; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "bulterier.glb",
+  "jmeno": "bulterier",
+  "druh": "pes",
+  "nazev": {
+   "cs": "bulteriér",
+   "en": "bull terrier"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.65,
+   0.26,
+   0.55
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Take 01",
+    "snimku": 54,
+    "tiku": 5
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.42
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.89
+   }
+  },
+  "trojuhelniku": 1906,
+  "autor": "low poly dog pack, compost the second (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/low-poly-dog-pack-b27eaa571da14c3b93bf664fe7d950c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést compost the second; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "baset.glb",
+  "jmeno": "baset",
+  "druh": "pes",
+  "nazev": {
+   "cs": "baset",
+   "en": "basset hound"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.87,
+   0.16,
+   0.42
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Take 01",
+    "snimku": 1,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.21
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.45
+   }
+  },
+  "trojuhelniku": 849,
+  "autor": "low poly dog pack, compost the second (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/low-poly-dog-pack-b27eaa571da14c3b93bf664fe7d950c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést compost the second; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "malamut.glb",
+  "jmeno": "malamut",
+  "druh": "pes",
+  "nazev": {
+   "cs": "malamut",
+   "en": "malamute"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.03,
+   0.38,
+   0.75
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Take 01",
+    "snimku": 1,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.75
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.59
+   }
+  },
+  "trojuhelniku": 1586,
+  "autor": "low poly dog pack, compost the second (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/low-poly-dog-pack-b27eaa571da14c3b93bf664fe7d950c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést compost the second; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "jack_russell.glb",
+  "jmeno": "jack_russell",
+  "druh": "pes",
+  "nazev": {
+   "cs": "jack russell",
+   "en": "Jack Russell"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.51,
+   0.14,
+   0.36
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Take 01",
+    "snimku": 1,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.27
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.58
+   }
+  },
+  "trojuhelniku": 1306,
+  "autor": "low poly dog pack, compost the second (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/low-poly-dog-pack-b27eaa571da14c3b93bf664fe7d950c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést compost the second; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "bulmastif.glb",
+  "jmeno": "bulmastif",
+  "druh": "pes",
+  "nazev": {
+   "cs": "bulmastif",
+   "en": "bullmastiff"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.62,
+   0.37,
+   0.75
+  ],
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Take 01",
+    "snimku": 54,
+    "tiku": 5
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.59
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.25
+   }
+  },
+  "trojuhelniku": 1546,
+  "autor": "low poly dog pack, compost the second (Sketchfab, CC BY SA 4.0, https://sketchfab.com/3d-models/low-poly-dog-pack-b27eaa571da14c3b93bf664fe7d950c8), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY SA 4.0 (uvést compost the second; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "vlk_u_dveri.glb",
+  "jmeno": "vlk_u_dveri",
+  "druh": "pes",
+  "nazev": {
+   "cs": "vlk u dveří",
+   "en": "wolf at the door"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.33,
+   0.32,
+   0.9
+  ],
+  "kde": "dvere",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "lezi": {
+    "animace": "metarig.002|SLEEP",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "klid": {
+    "animace": "metarig.002|IDLE",
+    "snimku": 49,
+    "tiku": 2
+   },
+   "zere": {
+    "animace": "metarig.002|eating",
+    "snimku": 47,
+    "tiku": 2
+   },
+   "vrci": {
+    "animace": "metarig.002|RRAR",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.87
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.86
+   }
+  },
+  "trojuhelniku": 9948,
+  "autor": "wolf animated, victory_mirosya (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést victory_mirosya; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "prodavac_psu_bodi.glb",
+  "jmeno": "prodavac_psu_bodi",
+  "druh": "postava",
+  "nazev": {
+   "cs": "prodavač psů (Bodi)",
+   "en": "dog seller (Bodi)"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.71,
+   0.72,
+   1.55
+  ],
+  "prodavac": "psi",
+  "pozy": {
+   "klid": {
+    "animace": "Action",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 90052,
+  "autor": "Bodi V2025 - Rock Dog, Jacob Quintana (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/bodi-v2025-rock-dog-f2a83f5cd32049bcb6ac91faf1c1f2b2), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Jacob Quintana; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "prodavac_psu_dalmatin.glb",
+  "jmeno": "prodavac_psu_dalmatin",
+  "druh": "postava",
+  "nazev": {
+   "cs": "prodavač psů (dalmatin)",
+   "en": "dog seller (Dalmatian)"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.71,
+   0.68,
+   1.8
+  ],
+  "prodavac": "psi",
+  "trojuhelniku": 18769,
+  "autor": "Dog warrior 3D character model free, iRahulRajput (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-warrior-3d-character-model-free-1b9ed8294c514a08b1df2b27e678155f), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést iRahulRajput; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "chodici_pes.glb",
+  "jmeno": "chodici_pes",
+  "druh": "pes",
+  "nazev": {
+   "cs": "pes",
+   "en": "dog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.14,
+   0.28,
+   0.75
+  ],
+  "prodej": true,
+  "cena": 500,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.67
+   },
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 48,
+    "tiku": 3
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "klid": {
+    "animace": "prenos|klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "beh": {
+    "animace": "prenos|beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 1.43
+   }
+  },
+  "trojuhelniku": 11786,
+  "autor": "Dog animated, MAXDESIGN-3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-animated-21b7336c58a442578ab88fc47233ef11), převod tvorove/par14_psi.py bez renderu",
+  "licence": "CC BY 4.0 (uvést MAXDESIGN-3D; změny: otočený, zmenšený na skutečnou velikost, záběr modelu rozdělený na pohyby)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy); jeden záběr modelu (8 s) rozdělený na chuze (jedno kolo, 1,33 s) a stoji (stojí, dýchá); sedí, leží, vstává, lehá, rozhlíží se (klid) a běží přenesené z jiných psů (tvorove/prenos_pohybu.py)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "klid": "z vlce (tvorove/prenos_pohybu.py)",
+   "beh": "z vlce (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "vlce.glb",
+  "jmeno": "vlce",
+  "druh": "pes",
+  "nazev": {
+   "cs": "vlče",
+   "en": "wolf cub"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.79,
+   0.21,
+   0.55
+  ],
+  "prodej": true,
+  "cena": 900,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "klid",
+    "snimku": 48,
+    "tiku": 4
+   },
+   "beh": {
+    "animace": "beh",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.99
+   },
+   "sedi": {
+    "animace": "prenos|sedi",
+    "snimku": 37,
+    "tiku": 2
+   },
+   "sedani": {
+    "animace": "prenos|sedani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "vstavani": {
+    "animace": "prenos|vstavani",
+    "snimku": 56,
+    "tiku": 1
+   },
+   "lezi": {
+    "animace": "prenos|lezi",
+    "snimku": 46,
+    "tiku": 2
+   },
+   "lehani": {
+    "animace": "prenos|lehani",
+    "snimku": 44,
+    "tiku": 1
+   },
+   "vstavani_lezi": {
+    "animace": "prenos|vstavani_lezi",
+    "snimku": 37,
+    "tiku": 1
+   },
+   "chuze": {
+    "animace": "prenos|chuze",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 0.47
+   }
+  },
+  "trojuhelniku": 10694,
+  "autor": "Baby Wolf, MAXDESIGN-3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/baby-wolf-abbc029879e84f3ab63959f13fb7c181), převod tvorove/par14_psi.py bez renderu",
+  "licence": "CC BY 4.0 (uvést MAXDESIGN-3D; změny: otočený, zmenšený na skutečnou velikost, záběr modelu rozdělený na pohyby)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy); jeden záběr modelu (14,6 s) rozdělený na klid (rozhlíží se, čichá, 5,2 s) a beh (jedno kolo, 0,86 s); sedí, leží, vstává, lehá a chodí přenesené z jiných psů (tvorove/prenos_pohybu.py)",
+  "prenesene_pozy": {
+   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
+   "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
+   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)"
+  }
+ },
+ {
+  "soubor": "cerna_krysa.glb",
+  "jmeno": "cerna_krysa",
+  "druh": "pes",
+  "nazev": {
+   "cs": "černá krysa",
+   "en": "black rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.4,
+   0.23,
+   0.23
+  ],
+  "prodej": true,
+  "cena": 100,
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "Mammals|idle_A1",
+    "snimku": 49,
+    "tiku": 1
+   },
+   "klid2": {
+    "animace": "Mammals|idle_A2",
+    "snimku": 62,
+    "tiku": 2
+   },
+   "klid3": {
+    "animace": "Mammals|idle_A3",
+    "snimku": 47,
+    "tiku": 2
+   },
+   "chuze": {
+    "animace": "Mammals|walk_A2",
+    "snimku": 32,
+    "tiku": 1,
+    "krok_m": 0.2
+   },
+   "beh": {
+    "animace": "Mammals|run_A2",
+    "snimku": 47,
+    "tiku": 1,
+    "krok_m": 0.67
+   }
+  },
+  "trojuhelniku": 31358,
+  "autor": "Black Rat ( Free download ), Nestaeric (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/black-rat-free-download-3db3acb4140d4de8bd62a171212bad9c), převod tvorove/par14_psi.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Nestaeric; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy); 40 cm i s ocasem; vlastní klid (tři: rozhlíží se ve stoje na zadních), chůze a běh modelu (ostatní záběry modelu vynechané); sedět a ležet z jiných psů neumí (kostra s ovladači IK, tvorove/prenos_pohybu.py BEZ_PRENOSU)"
+ }
+]

@@ -1,0 +1,647 @@
+[
+ {
+  "soubor": "kladivo.glb",
+  "jmeno": "kladivo",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Válečné kladivo",
+   "en": "War Hammer"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 4.0,
+  "rozmer_m": [
+   0.348,
+   0.215,
+   1.135
+  ],
+  "uchyt": "uchyt",
+  "zdroj": "the_hub/data/meshes/weapons/basic_hammer2h.dae (Basic_Hammer2h)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/predmety_example_suite.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "válečné kladivo na obě ruce; počátek na spodním konci násady (uprostřed spodku), násada po +z, hlava nahoře, úderné plochy do ±x; prázdný uzel uchyt na násadě 0.2 m nad koncem, kde ho drží ruka; kožený úchop spodních 33 cm; model bez materiálu, barvy naše (ocel, tmavší objímka, dřevo, kůže), bez textury; 1146 trojúhelníků, normály z modelu; mávání si dělá hra (hráč: „to si uděla machani kladivem, jen modely potřebujem“)"
+ },
+ {
+  "soubor": "truhla.glb",
+  "jmeno": "truhla",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Truhla",
+   "en": "Chest"
+  },
+  "kategorie": "kontejner",
+  "vaha_kg": 15.0,
+  "rozmer_m": [
+   0.582,
+   0.763,
+   0.589
+  ],
+  "stavy": {
+   "zavreno": "víko zavřené",
+   "otevreno": "víko otevřené o 100° kolem pantu vzadu"
+  },
+  "zdroj": "the_hub/data/meshes/containers/Hub_Chest01.dae (Hub_Chest01, „Ammo Chest“)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/predmety_example_suite.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "dřevěná truhla s kováním a zámkem, stojí ve světě (do inventáře se nenosí, váha prázdné truhly); dva uzly zavreno a otevreno (celá truhla v každém, hra ukáže jeden); šev víka ve výšce 0.379 m; počátek uprostřed dna, zámek k +x; barvy z modelu (tmavé dřevo, tmavé železo), bez textury; 496 trojúhelníků na uzel, normály z modelu"
+ },
+ {
+  "soubor": "luk.glb",
+  "jmeno": "luk",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Luk",
+   "en": "Bow"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 1.0,
+  "rozmer_m": [
+   0.2,
+   0.039,
+   1.442
+  ],
+  "uchyt": "uchyt",
+  "strelivo": "sip",
+  "stavy": {
+   "volno": "tětiva v klidu 0.17 m za úchopem",
+   "napnuto": "tětiva natažená na 0.7 m, ramena víc ohnutá"
+  },
+  "zarez": {
+   "volno": [
+    -0.17,
+    0.021,
+    0.03
+   ],
+   "napnuto": [
+    -0.7,
+    0.021,
+    0.03
+   ]
+  },
+  "natazeni_m": 0.7,
+  "zvuky": {
+   "napnuti": "luk_napnuti.wav",
+   "vystrel": "luk_vystrel.wav"
+  },
+  "zdroj": "vlastní (Example Suite luk nemá)",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "zvuky_zdroj": "bow_pull.wav a bow_shoot.wav z Example Suite (the_hub/data/sound, CC0)",
+  "poznamka": "dřevěný luk 1.5 m, kožený úchop, rohové konce ramen, lněná tětiva; počátek ve středu úchopu (levá ruka), luk svisle po +z, tětiva k −x, šíp letí po +x; dva uzly volno a napnuto (celý luk v každém, hra ukáže jeden); prázdné uzly uchyt (počátek), zarez (tětiva v klidu, kde sedí zářez šípu, 0.03 m nad středem úchopu a 0.021 m vlevo (+y), aby šíp po +x šel vedle úchopu), zarez_volno a zarez_napnuto pod uzly stavů (polohy i v klíči zarez); šíp v zarez_napnuto míří hrotem 0.05 m před úchop; 908 trojúhelníků na uzel; zvuky napnuti (při držení tlačítka) a vystrel (puštění)"
+ },
+ {
+  "soubor": "sip.glb",
+  "jmeno": "sip",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Šíp",
+   "en": "Arrow"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.03,
+  "rozmer_m": [
+   0.75,
+   0.027,
+   0.028
+  ],
+  "zbran": "luk",
+  "zdroj": "vlastní",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "poznamka": "šíp 0.75 m: dřevěný dřík, ocelový listový hrot, tři pera (dvě světlá, vodicí červené k +y), tmavý zářez; leží po +x, hrot na +x, počátek v zářezu (zadní konec na tětivě); 180 trojúhelníků"
+ },
+ {
+  "soubor": "kuse.glb",
+  "jmeno": "kuse",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Kuše",
+   "en": "Crossbow"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 4.0,
+  "rozmer_m": [
+   1.183,
+   0.74,
+   0.122
+  ],
+  "uchyt": "uchyt",
+  "strelivo": "sipka",
+  "stavy": {
+   "natazeno": "tětiva natažená na ořech, šipka může ležet v drážce",
+   "vystreleno": "tětiva rovně mezi konci lučiště"
+  },
+  "zarez": {
+   "natazeno": [
+    0.1904,
+    0.0,
+    0.0222
+   ],
+   "vystreleno": [
+    0.3168,
+    0.0,
+    0.0222
+   ]
+  },
+  "natazeni_m": 0.126,
+  "zvuky": {
+   "vystrel": "luk_vystrel.wav"
+  },
+  "zdroj": "the_hub/data/meshes/weapons/basic_crossbow.dae (crossbow, kosti string a arrowbone)",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "kuše; šipka letí po +x, nahoru +z, lučiště napříč (±y), počátek v úchopu pravé ruky (pažba nad spouští); dva uzly natazeno a vystreleno (celá kuše v každém, hra ukáže jeden): kuše v modelu natahuje tětivu kostí string, vystreleno je model, jak je, natazeno má tětivu posunutou o 0.126 m dozadu na ořech, ke kosti arrowbone (tam leží šipka); prázdné uzly uchyt (počátek), zarez (zadní konec šipky v natažené kuši), zarez_natazeno a zarez_vystreleno pod uzly stavů; model bez materiálu, barvy naše (dřevěná pažba, ocelové lučiště, tmavé kování, třmen a spoušť, tětiva), bez textury; 572 trojúhelníků na uzel, normály z modelu; zvuk výstřelu jako u luku (Example Suite zvuk kuše nemá)"
+ },
+ {
+  "soubor": "sipka.glb",
+  "jmeno": "sipka",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Šipka do kuše",
+   "en": "Crossbow Bolt"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.05,
+  "rozmer_m": [
+   0.4,
+   0.029,
+   0.013
+  ],
+  "zbran": "kuse",
+  "zdroj": "vlastní (Example Suite šipku nemá)",
+  "autor": "grrrrf: vlastní model predmety/luk_kuse.py (ve stylu Example Suite)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy bez textury)",
+  "poznamka": "šipka 0.4 m: dřevěný dřík, ocelový čtyřhranný hrot, dvě plochá kožená pera (±y, leží v drážce); leží po +x, hrot na +x, počátek na zadním konci (na tětivě, v uzlu zarez kuše); 136 trojúhelníků"
+ },
+ {
+  "soubor": "mec.glb",
+  "jmeno": "mec",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Meč",
+   "en": "Sword"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 1.3,
+  "rozmer_m": [
+   0.2,
+   0.063,
+   1.101
+  ],
+  "uchyt": "uchyt",
+  "zdroj": "the_hub/data/meshes/weapons/basic_sword1h.dae",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "jednoruční meč, čepel 0.86 m; jako kladivo: počátek na konci hlavice, čepel po +z, ostří do ±x; prázdný uzel uchyt uprostřed rukojeti 0.128 m nad koncem; model bez materiálu, barvy naše (ocelová čepel, tmavá záštita a hlavice, kožená rukojeť 0.171 m), bez textury; 318 trojúhelníků, normály z modelu"
+ },
+ {
+  "soubor": "mec_obourucni.glb",
+  "jmeno": "mec_obourucni",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Obouruční meč",
+   "en": "Two-handed Sword"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 3.0,
+  "rozmer_m": [
+   0.364,
+   0.052,
+   1.606
+  ],
+  "uchyt": "uchyt",
+  "zdroj": "the_hub/data/meshes/weapons/basic_sword2h.dae",
+  "autor": "OpenMW Example Suite (gitlab.com/OpenMW/example-suite, modely CC0), převod predmety/luk_kuse.py bez renderu",
+  "licence": "CC0 1.0 (volné dílo)",
+  "poznamka": "obouruční meč, čepel 1.222 m; jako kladivo: počátek na konci hlavice, čepel po +z, ostří do ±x; prázdný uzel uchyt uprostřed rukojeti 0.214 m nad koncem; model bez materiálu, barvy naše (ocelová čepel, tmavá záštita a hlavice, kožená rukojeť 0.301 m), bez textury; 288 trojúhelníků, normály z modelu"
+ },
+ {
+  "soubor": "kulomet.glb",
+  "jmeno": "kulomet",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "kulomet",
+   "en": "machine gun"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 14.0,
+  "rozmer_m": {
+   "x": [
+    -0.074,
+    1.22
+   ],
+   "y": [
+    -0.346,
+    0.123
+   ],
+   "z": [
+    -0.632,
+    0.161
+   ]
+  },
+  "trojuhelniku": 2794,
+  "autor": "Machine Gun, Alexeykzm425 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/machine-gun-9b5220a1ba104999832c11dfcf3fa01c), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Alexeykzm425; změny: zmenšený, otočený)",
+  "strelivo": "naboj",
+  "strelba": "davka",
+  "kadence": 10,
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hlaven": [
+    1.22,
+    -0.0,
+    -0.095
+   ]
+  },
+  "poznamka": "šestihlavňový rotační kulomet s nosným uchem a pásem nábojů; střílí po +x, počátek v zadní rukojeti (uchyt), prázdný uzel hlaven na ústí hlavní (záblesk, odkud letí kulky); barvy modelu bez textury"
+ },
+ {
+  "soubor": "raketa.glb",
+  "jmeno": "raketa",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "raketa",
+   "en": "rocket"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 15.0,
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.878
+   ],
+   "y": [
+    -0.062,
+    0.058
+   ],
+   "z": [
+    -0.06,
+    0.06
+   ]
+  },
+  "trojuhelniku": 1496,
+  "autor": "Rocket (AGM-114), photon (that one larry) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/rocket-30011aad307544f6bbcdf47d7c2caaaf), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést photon; změny: zmenšená na trubku raketometu)",
+  "strela": "raketa",
+  "poznamka": "raketa raketometu 0.88 m, leží po +x, hrot na +x, počátek na zádi; prázdný uzel plamen na trysce (tam kouř a oheň za letu); návrh: letí rovně 40 m/s, na konci výbuch o poloměru 4 m"
+ },
+ {
+  "soubor": "raketomet.glb",
+  "jmeno": "raketomet",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "raketomet",
+   "en": "rocket launcher"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 7.0,
+  "rozmer_m": {
+   "x": [
+    -0.365,
+    0.835
+   ],
+   "y": [
+    -0.114,
+    0.114
+   ],
+   "z": [
+    -0.046,
+    0.242
+   ]
+  },
+  "trojuhelniku": 2434,
+  "autor": "Roblox Classic Rocket Launcher, OrangeSauceu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/roblox-classic-rocket-launcher-b7507d2fdad04aa3b359765bd4898856), převod predmety/noc_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést OrangeSauceu; změny: zmenšený na 1,2 m, otočený, raketa v trubce)",
+  "strelivo": "raketa",
+  "strelba": "raketa",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "hlaven": [
+    0.835,
+    -0.0,
+    0.121
+   ]
+  },
+  "poznamka": "trubka na rameno 1,2 m, střílí po +x, počátek v rukojeti (uchyt), prázdný uzel hlaven na ústí trubky, uzel raketa_v_hlavni s nabitou raketou (po výstřelu ho schovej, po nabití ukaž; návrh nabíjení 2 s)"
+ },
+ {
+  "soubor": "naboj.glb",
+  "jmeno": "naboj",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "náboj",
+   "en": "cartridge"
+  },
+  "kategorie": "strelivo",
+  "vaha_kg": 0.025,
+  "rozmer_m": {
+   "x": [
+    -0.0,
+    0.071
+   ],
+   "y": [
+    -0.006,
+    0.006
+   ],
+   "z": [
+    -0.006,
+    0.006
+   ]
+  },
+  "trojuhelniku": 240,
+  "autor": "grrrrf: vlastní model (predmety/noc_predmety.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "náboj 7,62 × 51 do kulometu: mosazná nábojnice, měděná střela, 71 mm po +x, počátek na dně nábojnice; ve hře do inventáře, let kulky kreslí hra"
+ },
+ {
+  "soubor": "pochoden.glb",
+  "jmeno": "pochoden",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "pochodeň",
+   "en": "torch"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 0.6,
+  "rozmer_m": {
+   "x": [
+    -0.127,
+    0.073
+   ],
+   "y": [
+    -0.097,
+    0.102
+   ],
+   "z": [
+    0.0,
+    1.105
+   ]
+  },
+  "trojuhelniku": 4894,
+  "autor": "Torch stick, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/torch-stick-d8eadee1a5c14483aade99b1fe5bc150) s naším plamenem, převod predmety/par14_predmety.py bez renderu; zvuk torch_out.wav z OpenMW Example Suite (CC0)",
+  "licence": "CC BY 4.0 (uvést DJMaesen; změny: zmenšená na 0,65 m, plamen náš), zvuk CC0",
+  "zvuky": {
+   "zhasnuti": "pochoden_zhasnuti.wav"
+  },
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 6,
+   "tiku": 2
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.18
+   ],
+   "svetlo": [
+    -0.027,
+    0.002,
+    0.725
+   ]
+  },
+  "svetlo": {
+   "barva": "FF9A3C",
+   "dosah_m": 10,
+   "blika": true,
+   "poznamka": "hráč 23. 10.: „to ma svitit okolo“ – oheň svítí kolem: světlo z uzlu svetlo, dosah 10 m, bliká se snímky plamene"
+  },
+  "poznamka": "pochodeň 0,65 m z modelu Torch stick (hráč: „tady je pochodeň“; Example Suite pochodeň neměla, jen zvuk zhasnutí): násada a omotaná hlava modelu, nahoře náš oheň v šesti snímcích plamen_00 až plamen_05 (od 23. 10. predmety/ohen.py: jádro, plamen, tři jazyky, průsvitná záře kolem a jiskry; hra je střídá, plápolá; svítí samy, bez normál), prázdný uzel svetlo v ohni (oranžová, dosah 10 m, bliká), uchyt 0,18 m nad koncem; počátek na spodním konci, násada po +z (jako kladivo); glb z gltfpacku"
+ },
+ {
+  "soubor": "lucerna.glb",
+  "jmeno": "lucerna",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "lucerna",
+   "en": "lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 0.8,
+  "rozmer_m": {
+   "x": [
+    -0.077,
+    0.077
+   ],
+   "y": [
+    -0.077,
+    0.077
+   ],
+   "z": [
+    0.0,
+    0.343
+   ]
+  },
+  "trojuhelniku": 2370,
+  "autor": "grrrrf: vlastní model (predmety/lucerna_svicka.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 4,
+   "tiku": 4
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.336
+   ],
+   "svetlo": [
+    0.0,
+    0.0,
+    0.142
+   ]
+  },
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 6
+  },
+  "poznamka": "lucerna na svíčku (hráč 23. 10.: „normální skleněná krabička na svíčku“): skleněná krabička 13 × 13 × 18 cm v černém železném rámečku, jehlanová stříška s komínkem a kruhem na nošení; uvnitř bílá svíčka na mosazné misce, plamen ve čtyřech snímcích plamen_00 až plamen_03 (hra je střídá, svítí samy, bez normál); skla ve dne průhledná, v noci uzel noc = svítící skla; prázdné uzly svetlo (v plameni) a uchyt (v kruhu nahoře); počátek pod středem dna, z nahoru; glb z gltfpacku; nahrazuje lucernu z Roblox Lantern (vypadala jako svítilna na baterky)"
+ },
+ {
+  "soubor": "kladivo_valecne.glb",
+  "jmeno": "kladivo_valecne",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Železné válečné kladivo",
+   "en": "Iron and Wood Warhammer"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 4.5,
+  "rozmer_m": {
+   "x": [
+    -0.241,
+    0.239
+   ],
+   "y": [
+    -0.075,
+    0.075
+   ],
+   "z": [
+    0.0,
+    1.0
+   ]
+  },
+  "trojuhelniku": 1322,
+  "uchyt": "uchyt",
+  "autor": "Iron and Wood Warhammer (Morrowind), Asylum Nox (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/iron-and-wood-warhammer-morrowind-8ba87567f2f04cd28438172e9d75e892), převod predmety/par14_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Asylum Nox; změny: otočené, zmenšené na 1 m)",
+  "poznamka": "další válečné kladivo (hráč: „další kladiva přidáme“) vedle kladiva z Example Suite; počátek na spodním konci násady, násada po +z, hlava nahoře, úderné plochy do ±x (jako kladivo); prázdný uzel uchyt na násadě 0,2 m nad koncem; textura modelu; mávání si dělá hra; glb z gltfpacku"
+ },
+ {
+  "soubor": "vidle.glb",
+  "jmeno": "vidle",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "vidle",
+   "en": "pitchfork"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 2.0,
+  "rozmer_m": {
+   "x": [
+    -0.136,
+    0.136
+   ],
+   "y": [
+    -0.021,
+    0.021
+   ],
+   "z": [
+    -0.0,
+    1.5
+   ]
+  },
+  "trojuhelniku": 986,
+  "uchyt": "uchyt",
+  "autor": "pitchfork Animated, DJMaesen (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/pitchfork-animated-54ea2a82f7d74e8fabbc7245bec7be14), jen vidle bez rukou, převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést DJMaesen; změny: jen vidle bez rukou a kostry, otočené, 1,5 m)",
+  "poznamka": "zbraň do ruky (hráč: „vidle zbraň“) jako válečné kladivo: počátek na spodním konci násady, násada po +z, hroty nahoře v rovině x (bodá se dopředu), prázdný uzel uchyt na násadě 0,45 m nad koncem; ruce s animacemi z modelu zatím ne (PROSBA-LES-PRUMYSL-SVETLA.md bod 5); glb z gltfpacku"
+ },
+ {
+  "soubor": "lucerna_papirova.glb",
+  "jmeno": "lucerna_papirova",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "papírová lucerna",
+   "en": "paper lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 0.4,
+  "rozmer_m": {
+   "x": [
+    -0.11,
+    0.11
+   ],
+   "y": [
+    -0.11,
+    0.11
+   ],
+   "z": [
+    -0.36,
+    0.007
+   ]
+  },
+  "trojuhelniku": 1012,
+  "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lucerna_svicka.py, tvar z predmety/lampy.py)",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "svetlo": [
+    0.0,
+    0.0,
+    -0.207
+   ]
+  },
+  "barvy": [
+   {
+    "cast": "papir",
+    "maska": "lucerna_papirova_maska_papir.png",
+    "zacatek": 224,
+    "paleta": [
+     "E07A2A",
+     "E8C04A",
+     "B83A2A",
+     "3A6AB8",
+     "4A9A5A",
+     "7A4AA8",
+     "E8E4D8",
+     "D86A8A"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc"
+  },
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 6
+  },
+  "poznamka": "papírová lucerna do ruky ve stylu Morrowindu (hráč 23. 10.: „ukazoval jsi mi lucernu ve stylu morrowindu“; stejný tvar jako závěsná lampa_papirova z 18. 10., 0,6×): vejčitý papír, tmavá dřevěná víčka a obruče, šňůra s háčkem; počátek a uchyt v háčku, lucerna visí pod rukou; papír oranžový, barvou číslem z palety jako lampa (barvy, cast papir); uzel noc = papír, který v noci svítí; prázdný uzel svetlo uprostřed; glb z gltfpacku"
+ },
+ {
+  "soubor": "lucerna_kovana.glb",
+  "jmeno": "lucerna_kovana",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "kovaná lucerna",
+   "en": "candle lantern"
+  },
+  "kategorie": "svetlo",
+  "vaha_kg": 1.0,
+  "rozmer_m": {
+   "x": [
+    -0.088,
+    0.088
+   ],
+   "y": [
+    -0.088,
+    0.088
+   ],
+   "z": [
+    0.0,
+    0.32
+   ]
+  },
+  "trojuhelniku": 9713,
+  "autor": "Candle Lantern, Laetitia Irata (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/candle-lantern-dd0a255416fa47ddb9e5c179d86ef437) s naším ohněm, převod predmety/par15_predmety.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Laetitia Irata; změny: zmenšená na 0,32 m, plamen náš, svítící sklo)",
+  "plamen": {
+   "uzly": "plamen_",
+   "snimku": 6,
+   "tiku": 3
+  },
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.312
+   ],
+   "svetlo": [
+    -0.002,
+    0.002,
+    0.103
+   ]
+  },
+  "svetlo": {
+   "barva": "FFB24A",
+   "dosah_m": 7,
+   "blika": true
+  },
+  "noc": {
+   "uzel": "noc"
+  },
+  "poznamka": "kovaná lucerna na svíčku (poslal hráč 23. 10.: „koukni jak pěkně sviti“): černý rámeček s křížky přes skla, uvnitř svíčka, která sama svítí jako v modelu; plamen náš (predmety/ohen.py) v šesti snímcích plamen_00 až plamen_05 na knotu, skla ve dne jako v modelu, v noci uzel noc = teplá svítící skla; prázdné uzly svetlo (v plameni) a uchyt (v kruhu nahoře); počátek pod středem dna, z nahoru; glb z gltfpacku"
+ }
+]

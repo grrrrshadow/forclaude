@@ -1,0 +1,32 @@
+// A set with FIRS 5's id (F1250009) and nothing else, so that a scene can be "a
+// game with FIRS 5" without the real FIRS: what the game does about the CZTR
+// wagons hangs on that id alone (HasFirs5()). Played by the scene cztrvymena
+// (see README.md).
+//     yagl -e <out>/firs5_like.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "\xF1%\x00\x09";
+    version: GRF8;
+    name: "Rig: FIRS 5 look-alike";
+    description: "Rig: a set with FIRS 5's id and nothing else.";
+}
+properties<GlobalSettings, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        cargo_translation_table: "COAL";
+    }
+}

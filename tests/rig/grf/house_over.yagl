@@ -1,0 +1,98 @@
+// Test GRF: puts a four-tile block (made from the stadium, house 32) in place of
+// the statue (original house 9, one tile), as house sets put their houses in
+// place of the originals, and switches the stadium (32..35) off, as sets switch
+// originals off. An original placed by hand is read off the map as the house in
+// its place (GetHouseType()), so the place-by-hand commands place that one, its
+// size and all (CmdPlaceHouse()). A size that differs is what nml refuses to
+// write and older sets do. Its one picture is a palette sprite, as such sets
+// have.
+//     yagl -e <out>/house_over.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+grf // Action08
+{
+    grf_id: "RIGh";
+    version: GRF8;
+    name: "Rig: block for the statue";
+    description: "Four-tile block for the statue";
+}
+properties<Houses, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        substitute_building_id: 0x20;
+        building_flags: 0x10;
+    }
+    // instance_id: 0x0001
+    {
+        substitute_building_id: 0x21;
+        building_flags: 0x00;
+    }
+    // instance_id: 0x0002
+    {
+        substitute_building_id: 0x22;
+        building_flags: 0x00;
+    }
+    // instance_id: 0x0003
+    {
+        substitute_building_id: 0x23;
+        building_flags: 0x00;
+    }
+}
+properties<Houses, 0x0000> // Action00
+{
+    // instance_id: 0x0000
+    {
+        override_byte: 0x09;
+    }
+}
+properties<Houses, 0x0020> // Action00
+{
+    // instance_id: 0x0020
+    {
+        substitute_building_id: 0xFF;
+    }
+    // instance_id: 0x0021
+    {
+        substitute_building_id: 0xFF;
+    }
+    // instance_id: 0x0022
+    {
+        substitute_building_id: 0xFF;
+    }
+    // instance_id: 0x0023
+    {
+        substitute_building_id: 0xFF;
+    }
+}
+sprite_sets<Houses, 0x0000> // <feature, first_set> Action01
+{
+    sprite_set // 0x0000
+    {
+        sprite_id<0x00000005>
+        {
+            [64, 32, -31, 0], normal, c8bpp, "house_over-8bpp-normal-0.png", [10, 10];
+        }
+    }
+}
+sprite_layout<Houses, 0x00> // Action02 sprite layout
+{
+    ground_sprite<0x00000F8D>
+    {
+    }
+    building_sprite<0x80000000>
+    {
+        offset: 0x00, 0x00, 0x00;
+        extent: 0x10, 0x10, 0x18;
+    }
+}
+feature_graphics<Houses> // Action03
+{
+    livery_override: false;
+    default_set_id: 0x0000;
+    feature_ids: [ 0x0000 0x0001 0x0002 0x0003 ];
+    cargo_types:
+    {
+        // <cargo_type>: <cargo_id>;
+    };
+}

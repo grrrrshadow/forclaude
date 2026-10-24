@@ -1,0 +1,310 @@
+[
+ {
+  "soubor": "houba_hliva_ruzova.glb",
+  "jmeno": "houba_hliva_ruzova",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "růžová hlíva",
+   "en": "pink oyster mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.053,
+  "sirka_m": 0.103,
+  "vaha_kg": 0.056,
+  "trojuhelniku": 1200,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_hliva_ruzova_svitici.glb",
+  "jmeno": "houba_hliva_ruzova_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "růžová hlíva svítící",
+   "en": "glowing pink oyster mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.053,
+  "sirka_m": 0.103,
+  "vaha_kg": 0.056,
+  "trojuhelniku": 2400,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "FF8FD0",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #FF8FD0 (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_hrib.glb",
+  "jmeno": "houba_hrib",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "hřib",
+   "en": "bolete"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.101,
+  "sirka_m": 0.11,
+  "vaha_kg": 0.122,
+  "trojuhelniku": 1008,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_hrib_svitici.glb",
+  "jmeno": "houba_hrib_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "hřib svítící",
+   "en": "glowing bolete"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.101,
+  "sirka_m": 0.11,
+  "vaha_kg": 0.122,
+  "trojuhelniku": 2016,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "7FE8FF",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #7FE8FF (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_muchomurka.glb",
+  "jmeno": "houba_muchomurka",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "muchomůrka",
+   "en": "fly agaric"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.109,
+  "sirka_m": 0.105,
+  "vaha_kg": 0.121,
+  "trojuhelniku": 1152,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_muchomurka_svitici.glb",
+  "jmeno": "houba_muchomurka_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "muchomůrka svítící",
+   "en": "glowing fly agaric"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.109,
+  "sirka_m": 0.105,
+  "vaha_kg": 0.121,
+  "trojuhelniku": 2304,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "FF5A7A",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #FF5A7A (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_zelenka.glb",
+  "jmeno": "houba_zelenka",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "zelenka",
+   "en": "green brittlegill"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.112,
+  "sirka_m": 0.089,
+  "vaha_kg": 0.09,
+  "trojuhelniku": 1864,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_zelenka_svitici.glb",
+  "jmeno": "houba_zelenka_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "zelenka svítící",
+   "en": "glowing green brittlegill"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.112,
+  "sirka_m": 0.089,
+  "vaha_kg": 0.09,
+  "trojuhelniku": 3728,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "8CFF8A",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #8CFF8A (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_pecarka.glb",
+  "jmeno": "houba_pecarka",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "pečárka",
+   "en": "field mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.1,
+  "sirka_m": 0.109,
+  "vaha_kg": 0.119,
+  "trojuhelniku": 1032,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_pecarka_svitici.glb",
+  "jmeno": "houba_pecarka_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "pečárka svítící",
+   "en": "glowing field mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.1,
+  "sirka_m": 0.109,
+  "vaha_kg": 0.119,
+  "trojuhelniku": 2064,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "40FF40",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #40FF40 (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_ryzec.glb",
+  "jmeno": "houba_ryzec",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "ryzec",
+   "en": "saffron milk cap"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.099,
+  "sirka_m": 0.139,
+  "vaha_kg": 0.19,
+  "trojuhelniku": 1344,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_ryzec_svitici.glb",
+  "jmeno": "houba_ryzec_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "ryzec svítící",
+   "en": "glowing saffron milk cap"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.099,
+  "sirka_m": 0.139,
+  "vaha_kg": 0.19,
+  "trojuhelniku": 2688,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "FFB050",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #FFB050 (emissive), prázdný uzel svetlo_00 v klobouku"
+ },
+ {
+  "soubor": "houba_bedla_zlata.glb",
+  "jmeno": "houba_bedla_zlata",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "zlatá bedla",
+   "en": "golden parasol mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.16,
+  "sirka_m": 0.088,
+  "vaha_kg": 0.125,
+  "trojuhelniku": 1770,
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; ve dne, ke sbírání"
+ },
+ {
+  "soubor": "houba_bedla_zlata_svitici.glb",
+  "jmeno": "houba_bedla_zlata_svitici",
+  "druh": "predmet",
+  "kategorie": "houba",
+  "nazev": {
+   "cs": "zlatá bedla svítící",
+   "en": "glowing golden parasol mushroom"
+  },
+  "kde": "okoli",
+  "tema": "hlinene",
+  "vyska_m": 0.16,
+  "sirka_m": 0.088,
+  "vaha_kg": 0.125,
+  "trojuhelniku": 3540,
+  "kdy": "noc",
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "barva_svetla": "FFE066",
+  "autor": "Mushrooms, leha_pu (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushrooms-f9dbd4c34a4f4389bf3901527ecc89a0), převod predmety/houby_sber.py bez renderu",
+  "licence": "CC BY 4.0 (uvést leha_pu; změny: rozdělený na jednotlivé houby, skutečná velikost, svítící obal v noci)",
+  "poznamka": "počátek pod třeněm na zemi, metry, čelem k +x (jedno), glb z gltfpacku; jen v noci: v uzlu noc obal 2 mm nad celou houbou, klobouk nahoře i zespodu, svítí barvou #FFE066 (emissive), prázdný uzel svetlo_00 v klobouku"
+ }
+]

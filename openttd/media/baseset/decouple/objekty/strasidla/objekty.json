@@ -1,0 +1,228 @@
+[
+ {
+  "soubor": "houbovy_bojovnik.glb",
+  "jmeno": "houbovy_bojovnik",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "houbový bojovník",
+   "en": "mushroom warrior"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   1.05,
+   0.65,
+   1.94
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 4,
+    "smycka": true,
+    "krok_m": 1.48
+   }
+  },
+  "trojuhelniku": 71229,
+  "autor": "Mushroom Warrior, POTVORA (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mushroom-warrior-391de0aa11d44635a53fa927e47dd1cb), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY 4.0 (uvést POTVORA; změny: zjednodušený z 1 187 000 na 71229 trojúhelníků, otočený, chůze ze snímků)",
+  "poznamka": "v noci kolem hliněných měst, útočí sám; skutečné metry (1,9 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; chůze z 12 snímků chuze_00 až chuze_11: horní polovina (50295 trojúhelníků) jako instance jedné sítě, nohy (20934) v každém snímku vlastní, kývají se kolem kyčlí ±24°, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); bez kostry; glb z gltfpacku"
+ },
+ {
+  "soubor": "billy_tricykl.glb",
+  "jmeno": "billy_tricykl",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "loutka na tříkolce",
+   "en": "puppet on a tricycle"
+  },
+  "kdy": "noc",
+  "kde": "ulice",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   0.82,
+   0.61,
+   1.2
+  ],
+  "pozy": {
+   "chuze": {
+    "animace": "Armature|CINEMA_4D_Main|Layer0",
+    "snimku": 36,
+    "tiku": 2,
+    "krok_m": 1.26
+   },
+   "klid": {
+    "animace": "Armature|CINEMA_4D_Main|Layer0",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 5033,
+  "autor": "Billy On Bike, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/billy-on-bike-cfdf86390bdf4c2592732178ee4a6d57), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; nekomerčně; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "v noci jezdí ulicemi a útočí sám; skutečné metry (1,2 m i s tříkolkou), meritko 2, čelem k +x, počátek mezi koly na zemi; kostra a šlapání modelu (pozy chuze, klid = první snímek); krok_m = kolik ujede přední kolo (poloměr 0.207 m, otočí se o 348°) za jedno kolo šlapání"
+ },
+ {
+  "soubor": "trpaslik.glb",
+  "jmeno": "trpaslik",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "trpaslík",
+   "en": "gnome"
+  },
+  "kdy": "den",
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "poznamka": "ve dne chodí kolem hliněných měst, neútočí (hráč: „budou chodit ve dne kolem hliněnýho města a nenapadat“); kdy den = jen ve dne (nový klíč, PROSBA-PAR14.md bod 2); skutečné metry (0,9 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí); textura měla KHR_texture_transform (měřítko 16), zapečený do UV; glb z gltfpacku",
+  "meritko": 2,
+  "rozmer_m": [
+   0.51,
+   0.89,
+   0.9
+  ],
+  "trojuhelniku": 10000,
+  "autor": "Blue Gnome in Red Hat, alghoul9 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/blue-gnome-in-red-hat-21c7939b6f954ba5986c41c33377b9c1), převod tvorove/par14_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést alghoul9; změny: otočený, zmenšený na skutečnou velikost, posun textury zapečený do UV)"
+ },
+ {
+  "soubor": "baba_jaga.glb",
+  "jmeno": "baba_jaga",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "Baba Jaga",
+   "en": "Baba Yaga"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "utoci",
+  "poznamka": "v noci kolem měst mírného klimatu, útočí sama (hráč: „babayaga dvě strašidla kolem temperate měst“); skutečné metry (1,6 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí shrbená s holí); zjednodušená gltfpackem; glb z gltfpacku",
+  "meritko": 2,
+  "rozmer_m": [
+   0.62,
+   0.87,
+   1.6
+  ],
+  "trojuhelniku": 50089,
+  "autor": "Baba Yaga, Azura_SQ (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/baba-yaga-1a1c90d011894b92ba5da5bcc35b9ad0), převod tvorove/par14_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Azura_SQ; změny: zjednodušený z 626157 na 50089 trojúhelníků, otočený, zmenšený na skutečnou velikost)"
+ },
+ {
+  "soubor": "baba_jaga_stara.glb",
+  "jmeno": "baba_jaga_stara",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "stará Baba Jaga",
+   "en": "old Baba Yaga"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "utoci",
+  "poznamka": "v noci kolem měst mírného klimatu, útočí sama (hráč: „babayaga dvě strašidla kolem temperate měst“); skutečné metry (1,8 i se zdviženou rukou m), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (v cárech, jednu ruku zdviženou); zjednodušená gltfpackem; glb z gltfpacku",
+  "meritko": 2,
+  "rozmer_m": [
+   0.94,
+   0.87,
+   1.8
+  ],
+  "trojuhelniku": 49444,
+  "autor": "Baba Yaga (the old, terrible witch), DENNISS75 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/baba-yaga-the-old-terrible-witch-b1236de8aa724e38baf6d1cac695dd61), převod tvorove/par14_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést DENNISS75; změny: zjednodušený z 494446 na 49444 trojúhelníků, otočený, zmenšený na skutečnou velikost)"
+ },
+ {
+  "soubor": "carodejnice_s_kostetem.glb",
+  "jmeno": "carodejnice_s_kostetem",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "čarodějnice s koštětem",
+   "en": "witch with a broom"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   1.02,
+   0.81,
+   1.65
+  ],
+  "pozy": {
+   "klid": {
+    "animace": "Take 001",
+    "snimku": 62,
+    "tiku": 2
+   }
+  },
+  "trojuhelniku": 13303,
+  "autor": "Witch, MAXDESIGN-3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-2a7672475d514543b618b5a82fd5582b) s koštětem z Witch Roll, xinus22 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-roll-1aa67a75063a42cb8cfe273c04186021), převod tvorove/par14_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést MAXDESIGN-3D a xinus22; změny: hůl pryč, v pravé ruce koště z Witch Roll, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "strašidlo: v noci kolem měst, útočí sama (hráč: „soubor witch do ruky koště, to je strašidlo“); skutečné metry (1.65 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; kostra a pohyb modelu (pozy klid: stojí, kývá se; chůzi model nemá); místo hole koště (0.92 m) jako síť se skinem: štětiny na kořenové kosti (stojí na zemi), k pěsti plynule na kosti pravé ruky (drží ho, koště se naklání kolem špičky)"
+ },
+ {
+  "soubor": "kobold.glb",
+  "jmeno": "kobold",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "kobold",
+   "en": "kobold"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "utoci",
+  "meritko": 2,
+  "rozmer_m": [
+   0.98,
+   0.87,
+   1.3
+  ],
+  "pozy": {
+   "klid": {
+    "animace": "Idle",
+    "snimku": 49,
+    "tiku": 3
+   }
+  },
+  "trojuhelniku": 12746,
+  "autor": "Animated Kobold, greeneyed3DArtist (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/animated-kobold-0da9989223424d4d80137c0bbf4979fa), převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést greeneyed3DArtist; změny: otočený, zmenšený na skutečnou velikost, dýka připnutá na ruku, záběr T-póza pryč)",
+  "poznamka": "strašidlo (hráč: „strašidlo vlk“): v noci kolem mírných měst, útočí; až bude les, v noci v lese (PROSBA-LES-PRUMYSL-SVETLA.md); skutečné metry (1.3 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; kostra a pohyb modelu (pozy klid: stojí s dýkou, kývá se; chůzi model nemá); dýka (Dagger.001_Dagger_0) je na kosti levé ruky"
+ },
+ {
+  "soubor": "ufon.glb",
+  "jmeno": "ufon",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "zelený ufon",
+   "en": "green alien"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "povaha": "mirumilovne",
+  "meritko": 2,
+  "rozmer_m": [
+   0.66,
+   0.52,
+   1.42
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 4,
+    "smycka": true,
+    "krok_m": 0.96
+   }
+  },
+  "trojuhelniku": 8647,
+  "autor": "ufo, ilarioseb (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ufo-1ce1c10eaa5f4288b63c2c635d0c04f7), převod tvorove/ufo.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ilarioseb; změny: zjednodušený na 8647 trojúhelníků, kůže přebarvená na zelenou, ruce z A-pózy stažené k tělu, otočený, chůze ze snímků)",
+  "poznamka": "v noci chodí kolem měst a kolem přistálého UFO (pilot talíře ufo_talir je týž ufon), neútočí; skutečné metry (1.4 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; chůze z 12 snímků chuze_00 až chuze_11: tělo (3596 trojúhelníků) jako instance jedné sítě, nohy a ruce (5051) v každém snímku vlastní, nohy se kývají kolem kyčlí ±22°, ruce kolem ramen ±18° proti noze na své straně, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); bez kostry; glb z gltfpacku"
+ }
+]
