@@ -37,6 +37,7 @@ copy (grrrrf, yagl/yagl-main, his yagl/POSTUP.md: cmake -G Ninja .. && ninja).
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -72,6 +73,16 @@ GUI_ICONS = (
     (0x00E4, "openttdgui_cargo_rola.png", 2, 2, 10, 10, 0, 0),
     (0x00E5, "openttdgui_cargo_marijuana.png", 2, 2, 11, 11, 0, 0),
     (0x00E6, "openttdgui_crosshair_armed.png", 2, 2, 16, 16, 0, 0),
+)
+
+#: Our GUI icons of 32bpp, after the manifest's sprites (openttdgui_oko.py draws
+#: them): the OpenTTD GUI sprite, then each level of it -- its size, its
+#: offsets, the level as yagl names it and the picture. Their blocks are put
+#: in after the sprite before them when the set has none yet, with a sprite id
+#: of their own past the others'.
+GUI_ICONS_32 = (
+    (0x0118, ((20, 20, 0, 0, "normal", "openttdgui_oko.png"), (40, 40, 0, 0, "zin2", "openttdgui_oko_2x.png"))),
+    (0x0119, ((32, 32, -16, -16, "normal", "openttdgui_zamerovac_oko.png"),)),
 )
 
 
@@ -180,11 +191,33 @@ def rewrite_icons(text: str) -> str:
     return out
 
 
+def rewrite_icons_32(text: str) -> str:
+    """The blocks of our 32bpp GUI icons: made anew, put in after the sprite before them when missing."""
+    out = text
+    for number, levels in GUI_ICONS_32:
+        body = "".join(f'        [{w}, {h}, {xo}, {yo}], {zoom}, c32bpp, "{picture}", [0, 0];\n' for w, h, xo, yo, zoom, picture in levels)
+        head = f"    // Replace OpenTTDGUI sprite 0x{number:04X}\n"
+        at = out.find(head)
+        if at < 0:
+            before = f"    // Replace OpenTTDGUI sprite 0x{number - 1:04X}\n"
+            prev = out.find(before)
+            if prev < 0:
+                sys.exit(f"openttd.yagl has no OpenTTD GUI sprite 0x{number - 1:04X} to put 0x{number:04X} after")
+            end = out.index("    }\n", prev) + len("    }\n")
+            ids = [int(m, 16) for m in re.findall(r"sprite_id<0x([0-9A-Fa-f]+)>", out)]
+            out = out[:end] + head + f"    sprite_id<0x{max(ids) + 1:08X}>\n    {{\n    }}\n" + out[end:]
+            at = out.find(head)
+        open_brace = out.index("    {\n", at)
+        close_brace = out.index("    }\n", open_brace)
+        out = out[:open_brace + len("    {\n")] + body + out[close_brace:]
+    return out
+
+
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     where = make_sheets(manifest)
     text = YAGL_FILE.read_text()
-    new = rewrite_icons(rewrite(text, manifest, where))
+    new = rewrite_icons_32(rewrite_icons(rewrite(text, manifest, where)))
     if new != text:
         YAGL_FILE.write_text(new)
         print(f"openttd.yagl: {len(manifest)} sprites of our own written in")

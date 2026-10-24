@@ -57,6 +57,8 @@ enum MainToolbarHotkeys : int32_t {
 };
 
 void AllocateToolbar();
+void PositionGodEye();
+bool GodEyeCrosshairTakesRightClick();
 void ToggleBoundingBoxes();
 void ToggleDirtyBlocks();
 void ToggleWidgetOutlines();

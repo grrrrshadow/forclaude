@@ -1632,7 +1632,7 @@ static Point GetAutoPlacePosition(int width, int height)
 	bool rtl = _current_text_dir == TD_RTL;
 
 	/* First attempt, try top-left of the screen */
-	const Window *main_toolbar = FindWindowByClass(WindowClass::MainToolbar);
+	const Window *main_toolbar = FindWindowById(WindowClass::MainToolbar, 0);
 	const int toolbar_y =  main_toolbar != nullptr ? main_toolbar->height : 0;
 	if (IsGoodAutoPlace1(rtl ? _screen.width - width : 0, toolbar_y, width, height, toolbar_y, pt)) return pt;
 
@@ -2957,6 +2957,10 @@ static void MouseLoop(MouseClick click, int mousewheel)
 	HandlePlacePresize();
 	UpdateTileSelection();
 
+	/* The god's eye's crosshair out: the right button lets it go wherever it is pressed (the player, 24. 10.), before
+	 * the map's drag could take the press; no mode of the game's own is touched, its crosshair alone. */
+	if (click == MouseClick::Right && GodEyeCrosshairTakesRightClick()) return;
+
 	/* This feature's own map drag, first. Everything below may claim the event
 	 * and return before the next; a press of the right button over the map has
 	 * to reach the drag whatever else is going on, and a drag that is on has
@@ -3630,7 +3634,10 @@ static int PositionWindow(Window *w, WindowClass clss, int setting)
 int PositionMainToolbar(Window *w)
 {
 	Debug(misc, 5, "Repositioning Main Toolbar...");
-	return PositionWindow(w, WindowClass::MainToolbar, _settings_client.gui.toolbar_pos);
+	const int left = PositionWindow(w, WindowClass::MainToolbar, _settings_client.gui.toolbar_pos);
+	/* The god's eye under its help button goes with it (toolbar_gui.cpp). */
+	PositionGodEye();
+	return left;
 }
 
 /**

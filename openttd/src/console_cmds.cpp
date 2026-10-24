@@ -9158,6 +9158,33 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ShowFirstPersonWindow();
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
+	} else if (what == "oko") {
+		/* The god's eye under the main toolbar (toolbar_gui.cpp): 'oko' tells where it is and where the help button is;
+		 * 'oko klik' clicks it; 'oko prave' a press of the right button; 'oko <x> <y>' clicks it and then the tile. */
+		Window *eye = FindWindowById(WindowClass::MainToolbar, 1);
+		const Window *bar = FindWindowById(WindowClass::MainToolbar, 0);
+		if (eye == nullptr || bar == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: oko: no god's eye or no toolbar.");
+			return true;
+		}
+		auto x = number(2), y = number(3);
+		if (argv.size() > 2 && argv[2] == "klik") {
+			eye->OnClick({0, 0}, WID_GE_FIRST_PERSON, 1);
+		} else if (argv.size() > 2 && argv[2] == "prave") {
+			IConsolePrint(CC_DEFAULT, "test3d: oko prave {}", GodEyeCrosshairTakesRightClick() ? "zrusilo zamerovac" : "nic");
+		} else if (x.has_value() && y.has_value()) {
+			eye->OnClick({0, 0}, WID_GE_FIRST_PERSON, 1);
+			if (_thd.window_class == WindowClass::MainToolbar && _thd.window_number == 1) eye->OnPlaceObject({0, 0}, TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())));
+			extern bool FirstPersonWalkerAt(double &x, double &y);
+			double wx = 0, wy = 0;
+			const bool walker = FirstPersonWalkerAt(wx, wy);
+			IConsolePrint(CC_DEFAULT, "test3d: oko na {},{}: {}", *x, *y, walker ? fmt::format("chodec na {:.2f},{:.2f}", wx / TILE_SIZE, wy / TILE_SIZE) : std::string("ZADNY CHODEC"));
+		}
+		const NWidgetBase *help = bar->GetWidget<NWidgetBase>(WID_TN_HELP);
+		IConsolePrint(CC_DEFAULT, "test3d: oko {}x{} na {},{}; lista {}x{} na {},{}, otaznik {}x{} na {},{}; zamerovac {}, tlacitko {}", eye->width, eye->height, eye->left, eye->top,
+				bar->width, bar->height, bar->left, bar->top, help->current_x, help->current_y, bar->left + help->pos_x, bar->top + help->pos_y,
+				_thd.window_class == WindowClass::MainToolbar && _thd.window_number == 1 && _thd.place_mode != HT_NONE ? "venku" : "ne",
+				eye->IsWidgetLowered(WID_GE_FIRST_PERSON) ? "stisknute" : "nahore");
 	} else if (what == "draci") {
 		/* The dragons (three_d_dragons.h): 'draci' tells where they are; 'draci posli [jmeno]' sends one near the walker
 		 * of the view from the first person (or the middle of the main view); 'draci uder' a blow of the hammer. */

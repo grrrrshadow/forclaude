@@ -27,6 +27,7 @@
 
 #include "vehicle_type.h"
 #include "gfx_type.h"
+#include "tile_type.h"
 
 #include <array>
 #include <vector>
@@ -151,5 +152,6 @@ struct FirstPersonEye {
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);
 void ShowFirstPersonWindow();
+void ShowFirstPersonWindowAt(TileIndex tile);
 
 #endif /* CAB_VIEW_H */

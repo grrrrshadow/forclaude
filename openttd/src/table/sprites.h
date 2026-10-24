@@ -60,7 +60,7 @@ static const SpriteID SPR_OPENTTD_BASE   = 4896;
 /** How many of the extra sprites the game upstream has; a base set can supply those and no others. */
 static const uint16_t OPENTTD_VANILLA_SPRITE_COUNT = 192;
 /** All extra sprites, this build's own (blueprint, rescue engine, station waypoint) included. */
-static const uint16_t OPENTTD_SPRITE_COUNT = 280;
+static const uint16_t OPENTTD_SPRITE_COUNT = 282;
 /** @} */
 
 /** @{
@@ -298,6 +298,10 @@ static const SpriteID SPR_BUS_STOP_GIRL_Y_NEAR       = SPR_OPENTTD_BASE + 269;
  * phases each, SPR_FIREWORK_BALL + colour * 3 + phase. */
 static const SpriteID SPR_FIREWORK_START             = SPR_OPENTTD_BASE + 270;
 static const SpriteID SPR_FIREWORK_BALL              = SPR_OPENTTD_BASE + 271;
+/* The god's eye, under the help button (toolbar_gui.cpp): the view from the first person put where the player clicks
+ * with its yellow crosshair, hung on the mouse by its middle -- the player's own pictures (openttdgui_oko.py). */
+static const SpriteID SPR_IMG_GOD_EYE                = SPR_OPENTTD_BASE + 280;
+static const CursorID SPR_CURSOR_GOD_EYE             = SPR_OPENTTD_BASE + 281;
 
 static const SpriteID SPR_SIGNALS_BASE  = SPR_OPENTTD_BASE + OPENTTD_SPRITE_COUNT;
 static const uint16_t PRESIGNAL_SPRITE_COUNT                   =  48;

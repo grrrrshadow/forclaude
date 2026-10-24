@@ -67,6 +67,7 @@
 #include "timer/timer_window.h"
 #include "timer/timer_game_calendar.h"
 #include "help_gui.h"
+#include "core/backup_type.hpp"
 #include "core/string_consumer.hpp"
 
 #include "widgets/toolbar_widget.h"
@@ -1142,10 +1143,9 @@ static CallBackFunction PlaceLandBlockInfo()
 	}
 }
 
-/** The help menu's item of the night (gui.night), after the console's: its value, past the others. */
+/** The help menu's item of the night (gui.night), after the console's: its value, past the others. The view from the
+ * first person beside it went to the god's eye under the help button (GodEyeWindow; the player, 24. 10.). */
 static constexpr int HELP_MENU_NIGHT = 11;
-/** The help menu's item of the view from the first person, after the night's (the player: "put it beside the night and day"). */
-static constexpr int HELP_MENU_FIRST_PERSON = 12;
 
 static CallBackFunction ToolbarHelpClick(Window *w)
 {
@@ -1160,7 +1160,6 @@ static CallBackFunction ToolbarHelpClick(Window *w)
 		}
 		if (string == STR_ABOUT_MENU_TOGGLE_CONSOLE) {
 			list.push_back(MakeDropDownListCheckedItem(_settings_client.gui.night, STR_ABOUT_MENU_NIGHT, HELP_MENU_NIGHT));
-			if (_game_mode == GameMode::Normal) list.push_back(MakeDropDownListStringItem(STR_MAP_MENU_FIRST_PERSON, HELP_MENU_FIRST_PERSON));
 		}
 	};
 	for (StringID string : {STR_ABOUT_MENU_LAND_BLOCK_INFO, STR_ABOUT_MENU_HELP, STR_NULL, STR_ABOUT_MENU_TOGGLE_CONSOLE, STR_ABOUT_MENU_AI_DEBUG,
@@ -1271,7 +1270,6 @@ static CallBackFunction MenuClickHelp(int index)
 		case  9: ToggleDirtyBlocks();              break;
 		case 10: ToggleWidgetOutlines();           break;
 		case HELP_MENU_NIGHT: ToggleNight();       break;
-		case HELP_MENU_FIRST_PERSON: ShowFirstPersonWindow(); break;
 	}
 	return CallBackFunction::None;
 }
@@ -2107,6 +2105,12 @@ struct MainToolbarWindow : Window {
 		Window::FindWindowPlacementAndResize(_toolbar_width, def_height, allow_resize);
 	}
 
+	void OnResize() override
+	{
+		/* The god's eye under the help button, wherever that went. */
+		PositionGodEye();
+	}
+
 	void OnPaint() override
 	{
 		/* If spectator, disable all construction buttons
@@ -2714,6 +2718,91 @@ static WindowDesc _toolb_scen_desc(
 	&ScenarioEditorToolbarWindow::hotkeys
 );
 
+/* --- The god's eye: a second row of buttons under the main toolbar --- */
+
+/**
+ * The second row of buttons under the main toolbar (the player, 24. 10.: "a second row of icons under the main
+ * toolbar, under the question mark the icon of the god's eye, the first person view moved there"): for now the god's
+ * eye alone, under the help button. Clicked, the cursor is a yellow crosshair; where the player clicks with it, there
+ * the view from the first person opens; the right mouse button lets it go (GodEyeCrosshairTakesRightClick()). A
+ * window of the main toolbar's class, its second (number 1): on top as the toolbar is, never closed with the others.
+ */
+struct GodEyeWindow : Window {
+	GodEyeWindow(WindowDesc &desc) : Window(desc)
+	{
+		this->InitNested(1);
+		this->flags.Reset(WindowFlag::WhiteBorder);
+		PositionGodEye();
+	}
+
+	void OnResize() override
+	{
+		PositionGodEye();
+	}
+
+	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		if (widget != WID_GE_FIRST_PERSON) return;
+		/* The map to aim at: the view from the first person over it goes. */
+		CloseWindowById(WindowClass::FirstPerson, 0);
+		HandlePlacePushButton(this, WID_GE_FIRST_PERSON, SPR_CURSOR_GOD_EYE, HT_RECT);
+	}
+
+	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override
+	{
+		ResetObjectToPlace();
+		ShowFirstPersonWindowAt(tile);
+	}
+
+	void OnPlaceObjectAbort() override
+	{
+		this->RaiseButtons();
+	}
+};
+
+static constexpr std::initializer_list<NWidgetPart> _nested_god_eye_widgets = {
+	NWidget(WWT_IMGBTN, Colours::Grey, WID_GE_FIRST_PERSON), SetSpriteTip(SPR_IMG_GOD_EYE, STR_TOOLBAR_TOOLTIP_GOD_EYE), SetResize(1, 1),
+};
+
+/** Window definition for the god's eye under the main toolbar. */
+static WindowDesc _god_eye_desc(
+	WindowPosition::Manual, {}, 0, 0,
+	WindowClass::MainToolbar, WindowClass::None,
+	{WindowDefaultFlag::NoFocus, WindowDefaultFlag::NoClose},
+	_nested_god_eye_widgets
+);
+
+/** The god's eye under the main toolbar's help button, as big as that button (the toolbar moved or made anew). */
+void PositionGodEye()
+{
+	Window *eye = FindWindowById(WindowClass::MainToolbar, 1);
+	const Window *bar = FindWindowById(WindowClass::MainToolbar, 0);
+	if (eye == nullptr || bar == nullptr || eye == bar) return;
+	static bool positioning = false;
+	if (positioning) return;
+	AutoRestoreBackup guard(positioning, true);
+	/* Under the help button; a toolbar split in two halves may have it in its other half: under its end then. */
+	const NWidgetBase *help = bar->GetWidget<NWidgetBase>(WID_TN_HELP);
+	const bool shown = help != nullptr && help->current_x > 0;
+	const int w = shown ? help->current_x : eye->width, h = shown ? help->current_y : eye->height;
+	/* Resized only when it is not that size: a resize is an OnResize of its own (it would come back here every frame). */
+	if (w != eye->width || h != eye->height) ResizeWindow(eye, w - eye->width, h - eye->height, false, false);
+	const int left = shown ? bar->left + help->pos_x : bar->left + bar->width - eye->width, top = bar->top + bar->height;
+	if (left == eye->left && top == eye->top) return;
+	eye->SetDirty();
+	eye->left = left;
+	eye->top = top;
+	eye->SetDirty();
+}
+
+/** Whether the god's eye's crosshair is out: a press of the right button then lets it go, and is nothing else (window.cpp). */
+bool GodEyeCrosshairTakesRightClick()
+{
+	if (_thd.place_mode == HT_NONE || _thd.window_class != WindowClass::MainToolbar || _thd.window_number != 1) return false;
+	ResetObjectToPlace();
+	return true;
+}
+
 /** Allocate the toolbar. */
 void AllocateToolbar()
 {
@@ -2721,5 +2810,6 @@ void AllocateToolbar()
 		new ScenarioEditorToolbarWindow(_toolb_scen_desc);
 	} else {
 		new MainToolbarWindow(_toolb_normal_desc);
+		new GodEyeWindow(_god_eye_desc);
 	}
 }

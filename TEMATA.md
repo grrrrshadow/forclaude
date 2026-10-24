@@ -29,6 +29,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – božské oko: druhá řada ikon pod lištou
+
+- Hráč: *„udělame druhou řadu ikonek pod hlavní lištu ikon, pod otazníček dáme ikonku božského oka a přesuneme tam
+  first person view a crosshair bude místo kurzoru, kam hráč klikne crosshairem tam se objeví ve first person view,
+  pravej čudlík myši akci zruší“*, *„noc zůstane v menu pod otazníčkem, jenom first person view odtamtud dáme pod
+  ikonku“*. Obrázky dal hráč: oko v trojúhelníku 48×48, žlutý zaměřovač 32×32.
+- Hotovo: okno druhé řady (`GodEyeWindow`, třída hlavní lišty, číslo 1 – je nahoře jako lišta, „zavřít vše“ ho
+  nezavře) přesně pod otazníkem a stejně velké; jde s lištou při přesunu i změně velikosti rozhraní
+  (`PositionGodEye()`). Klik na oko: pohled z první osoby přes mapu se zavře, kurzor je žlutý zaměřovač, tlačítko
+  stisknuté; klik na mapu = pohled z první osoby s chodcem uprostřed té dlaždice (nebo nejbližší místo, kde stát
+  může); **pravé tlačítko zaměřovač zruší** (jen ten náš, režimy myši hry beze změny), Esc taky.
+- Pohled z první osoby je pryč z nabídky pod otazníkem, noc tam zůstala; v nabídce mapy zůstal.
+- Grafika: oko 20×20 a 40×40 (zmenšené z hráčových 48×48) a kurzor 32×32 zavěšený za střed, 32bpp, jako sprity
+  0x0118 a 0x0119 v `openttd.grf` (yagl, skript `openttdgui_oko.py`, `GUI_ICONS_32` v `openttd_yagl.py`).
+  Červený zaměřovač bomb zůstal.
+- Rig: `test3d oko` (kde je oko a otazník), `oko klik`, `oko prave`, `oko <x> <y>`.
+- Hráč: *„ta paměť 6 giga není pro objekty? tak to napiš do nápovědy že paměť pro sprity už není tolik potřeba
+  protože zin16 je zastaralá technologie nahrazená 3D objekty“* → nápověda nastavení „Paměť pro sprity“ (cs i en):
+  jen sprity základní sady a NewGRF, ne 3D objekty; sprity 16× (zin16) jsou zastaralé, nahradily je 3D objekty;
+  výchozích 2048 MB stačí.
+
 ## 24. 10. – pád při přiblížení na draka: obří obrázky a tisíce póz
 
 - Hráč: *„úhel 0°, jen jsem koukal na draka nad mořem a ve chvíli kdy jsem přiblížil zoom ještě víc tak to

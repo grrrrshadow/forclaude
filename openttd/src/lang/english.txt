@@ -442,6 +442,7 @@ STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Open lan
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Open sound/music window
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Open last message/news report, messages history or delete all messages
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Open land information, screenshot menu, OpenTTD credits, or developer tools
+STR_TOOLBAR_TOOLTIP_GOD_EYE                                     :{BLACK}God's eye: click a place on the map to be there in the view from the first person; the right mouse button cancels
 STR_TOOLBAR_TOOLTIP_SWITCH_TOOLBAR                              :{BLACK}Switch toolbars
 
 # Extra tooltips for the scenario editor toolbar
@@ -2221,7 +2222,7 @@ STR_CONFIG_SETTING_ZOOM_LVL_OUT_8X                              :8x
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN                              :Highest resolution sprites to use: {STRING2}
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Limit the maximum resolution to use for sprites. Limiting sprite resolution will avoid using high resolution graphics even when available. This can help keep the game appearance unified when using a mix of NewGRF files with and without high resolution graphics
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Memory for sprites: {STRING2}
-STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :How much memory the game may keep sprites in, with a 32bpp blitter (a quarter of it with 8bpp). When it is full the game drops sprites and loads them again as the view moves, which shows as stutter. A game with many NewGRFs wants more; 8x zoom keeps four times the sprite memory of 4x and 16x four times that again. The default, 2048 MB, is for this game's default zoom, 8x: four times the 512 MB vanilla OpenTTD has for 4x. 16x wants about 8192 MB
+STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :How much memory the game may keep sprites in -- the pictures of the base set and of the NewGRFs, not the 3D objects, which have memory of their own --, with a 32bpp blitter (a quarter of it with 8bpp). When it is full the game drops sprites and loads them again as the view moves, which shows as stutter. Much sprite memory is not needed any more: 16x sprites (zin16) are an outdated technology, replaced by the 3D objects. The default, 2048 MB, is enough for this game's default zoom, 8x
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Use Mitchell for scaling sprites down: {STRING2}
 STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x zoom of a 32bpp set that draws only finer pictures (zin16 or zin8) are made straight from its finest picture with Mitchell's filter: sharper edges, rails and lettering, light parts not darkened. Off, they are made by halves from the mean of each 2x2 block. Mitchell takes about twice as long to load a sprite, which can show as a short stutter when many new pictures appear at once. Sets that draw their own 8x and 4x are not touched

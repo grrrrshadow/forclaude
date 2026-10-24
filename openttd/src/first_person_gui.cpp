@@ -1427,6 +1427,20 @@ void ShowFirstPersonWindow()
 }
 
 /**
+ * Open the view from the first person with the walker on a tile (the god's eye's crosshair, toolbar_gui.cpp): in its
+ * middle, or the nearest place it can stand.
+ */
+void ShowFirstPersonWindowAt(TileIndex tile)
+{
+	ShowFirstPersonWindow();
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || w->Riding() != nullptr) return;
+	w->PutNear(TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0);
+	w->MakePicture();
+	w->SetDirty();
+}
+
+/**
  * Where things are sold near the walker of the view from the first person (walker_inventory.h): the nearest tile
  * of a pub, a vending machine, a coffeeshop or a shop of a town, within a tile of where it stands.
  * @return the tile, or INVALID_TILE when there is no walker or nothing is sold near it

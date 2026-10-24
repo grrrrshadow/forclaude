@@ -9348,6 +9348,17 @@ replace_sprites<OpenTTDGUI, 0x0000> // <new_feature_type, offset>  Action05
     {
         [501, 509, -241, -694], zin8, c32bpp | chunked, "openttd-nase-zin8.png", [1443, 4418];
     }
+    // Replace OpenTTDGUI sprite 0x0118
+    sprite_id<0x00000BC3>
+    {
+        [20, 20, 0, 0], normal, c32bpp, "openttdgui_oko.png", [0, 0];
+        [40, 40, 0, 0], zin2, c32bpp, "openttdgui_oko_2x.png", [0, 0];
+    }
+    // Replace OpenTTDGUI sprite 0x0119
+    sprite_id<0x00000BC4>
+    {
+        [32, 32, -16, -16], normal, c32bpp, "openttdgui_zamerovac_oko.png", [0, 0];
+    }
 }
 // Record #56
 ignore // Action0C

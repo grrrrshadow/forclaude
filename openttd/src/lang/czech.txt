@@ -535,6 +535,7 @@ STR_TOOLBAR_TOOLTIP_LANDSCAPING                                 :{BLACK}Otevří
 STR_TOOLBAR_TOOLTIP_SHOW_SOUND_MUSIC_WINDOW                     :{BLACK}Otevřít zvukové/hudební okno
 STR_TOOLBAR_TOOLTIP_SHOW_LAST_MESSAGE_NEWS                      :{BLACK}Otevřít poslední zprávu/zprávu o novinkách, historii zpráv nebo smazat všechny zprávy
 STR_TOOLBAR_TOOLTIP_LAND_BLOCK_INFORMATION                      :{BLACK}Informace o území, snímek obrazovky, zásluhy na vývoj OpenTTD nebo vývojářské nástroje
+STR_TOOLBAR_TOOLTIP_GOD_EYE                                     :{BLACK}Božské oko: klikni na místo na mapě a ocitneš se tam v pohledu z první osoby, pravé tlačítko myši zruší
 STR_TOOLBAR_TOOLTIP_SWITCH_TOOLBAR                              :{BLACK}Prohodit lišty
 
 # Extra tooltips for the scenario editor toolbar
@@ -2326,7 +2327,7 @@ STR_CONFIG_SETTING_ZOOM_LVL_OUT_8X                              :8x
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN                              :Nejvyšší dovolené rozlišení spritů: {STRING}
 STR_CONFIG_SETTING_SPRITE_ZOOM_MIN_HELPTEXT                     :Omezte maximální rozlišení používané pro sprity. Omezení rozlišení spritů zabrání použití grafiky ve vysokém rozlišení, i když je k dispozici. To může pomoci udržet jednotný vzhled hry při použití kombinace souborů NewGRF s grafikou ve vysokém rozlišení a bez ní.
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE                            :Paměť pro sprity: {STRING}
-STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :Kolik paměti smí hra držet sprity, s 32bpp blitterem (s 8bpp čtvrtinu). Když je plná, hra sprity zahazuje a při posunu pohledu je načítá znova, což se projeví škubáním. Hra s mnoha NewGRF chce víc; přiblížení 8x drží čtyřikrát víc paměti spritů než 4x a 16x zase čtyřikrát víc. Výchozích 2048 MB je pro výchozí přiblížení této hry, 8x: čtyřikrát víc než 512 MB, které má vanilla pro 4x. 16x chce asi 8192 MB
+STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_HELPTEXT                   :Kolik paměti smí hra držet sprity – obrázky základní sady a NewGRF, ne 3D objekty, ty mají paměť svou –, s 32bpp blitterem (s 8bpp čtvrtinu). Když je plná, hra sprity zahazuje a při posunu pohledu je načítá znova, což se projeví škubáním. Paměti pro sprity už není potřeba tolik: sprity 16x (zin16) jsou zastaralá technologie nahrazená 3D objekty. Výchozích 2048 MB stačí pro výchozí přiblížení této hry, 8x
 STR_CONFIG_SETTING_SPRITE_CACHE_SIZE_VALUE                      :{COMMA} MB
 STR_CONFIG_SETTING_SPRITE_MITCHELL                              :Použít Mitchell pro zmenšování spritů: {STRING}
 STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 8x a 4x u 32bpp sady, která kreslí jen jemnější obrázky (zin16 nebo zin8), se udělá rovnou z jejího nejjemnějšího obrázku Mitchellovým filtrem: ostřejší hrany, koleje i nápisy, světlá místa neztmavnou. Vypnuté se dělá po polovinách průměrem bloku 2×2. Mitchell načítá sprite asi dvakrát déle, což se může projevit krátkým škubnutím, když se naráz objeví hodně nových obrázků. Sady, které kreslí vlastní 8x a 4x, se to netýká

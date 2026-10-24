@@ -88,6 +88,10 @@ which stays theirs and is named here.
   crosshair mouse cursor are drawn from, the car the cargo icon for road
   vehicles carried on wagons, ships and aircraft is drawn from, and the
   cannabis leaf the cargo icon for marijuana is drawn from.
+- The god's eye button under the help button (an eye in a triangle) and its
+  yellow crosshair mouse cursor are pictures the player gave
+  (media/baseset/openttd/openttdgui_oko_src.png and
+  openttdgui_zamerovac_oko_src.png).
 - Figures and plants in the pictures of the game's own industries and bus
   stops - the girls' grammar school, the vending machine, the statue of Karel
   Mácha, the marijuana plantation and the girls at a drive-through bus stop

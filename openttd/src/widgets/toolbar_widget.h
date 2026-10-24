@@ -48,6 +48,11 @@ enum ToolbarNormalWidgets : WidgetID {
 	WID_TN_END,           ///< Helper for knowing the amount of widgets.
 };
 
+/** Widgets of the #GodEyeWindow class: the second row under the main toolbar. */
+enum GodEyeWidgets : WidgetID {
+	WID_GE_FIRST_PERSON, ///< The god's eye: the view from the first person where the player clicks.
+};
+
 /** Widgets of the #ScenarioEditorToolbarWindow class. */
 enum ToolbarEditorWidgets : WidgetID {
 	WID_TE_PAUSE,         ///< Pause the game.
