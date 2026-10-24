@@ -797,7 +797,8 @@ static const uint8_t GAME_FOREST_MUSHROOM_RATE = 8;
  * The forest with a clearing (IT_GAME_FOREST), 4x4, the colleague's parts (hra/3d/LES-PRO-HRU.md): the original forest
  * as it is -- where it may stand, how often, its wood -- on all its tiles one gfx of its own, and besides the wood the
  * mushrooms (GAME_FOREST_MUSHROOM_RATE) while the girls of a delivery of studentky are there (ProduceIndustryGoodsHelper()).
- * In the climates of the original forest.
+ * In the climates of the original forest, in its place (the player, 24. 10.: "it is to replace the normal forest"): the
+ * original forest is neither built nor founded any more; those standing in a game saved before stay as they are.
  */
 static void SetupGameForest()
 {
@@ -822,6 +823,7 @@ static void SetupGameForest()
 	spec.production_rate[1] = GAME_FOREST_MUSHROOM_RATE;
 	spec.accepts_cargo_label.fill(CT_INVALID);
 	spec.grf_prop.subst_id = IT_FOREST;
+	_industry_specs[IT_FOREST].enabled = false;
 }
 
 static void SetupPotatoChain()
@@ -970,6 +972,17 @@ static bool DeliveredLately(const Industry *ind, CargoLabel label);
 bool HasGirls(const Industry *ind)
 {
 	return DeliveredLately(ind, ind->type == IT_WEED_MACHINE ? CT_MARIJUANA : CT_STUDENTKY);
+}
+
+/**
+ * Does the pub cook its mushroom goulash? While mushrooms came to it in the last GIRLS_DAYS (the player, 24. 10.: "the pub
+ * will take the mushrooms and sell mushroom goulash into the inventory").
+ * @param ind the pub
+ * @return whether it is sold there
+ */
+bool PubCooksGoulash(const Industry *ind)
+{
+	return ind->type == IT_PUB && DeliveredLately(ind, CT_MUSHROOMS);
 }
 
 /**
@@ -1423,8 +1436,8 @@ static const std::array<CargoLabel, 1> PLANTATION_CARGOES{CT_STUDENTKY};
 /** What the distillery takes: the potatoes it makes alcohol of. */
 static const std::array<CargoLabel, 1> DISTILLERY_CARGOES{CT_POTATOES};
 
-/** What the pub takes: the alcohol its guests drink. */
-static const std::array<CargoLabel, 1> PUB_CARGOES{CT_ALCOHOL};
+/** What the pub takes: the alcohol its guests drink, and the mushrooms of its goulash (PubCooksGoulash()). */
+static const std::array<CargoLabel, 2> PUB_CARGOES{CT_ALCOHOL, CT_MUSHROOMS};
 
 /** What the dragon farm takes: the marijuana hay its dragons eat, and the studentky who tend them. */
 static const std::array<CargoLabel, 2> DRAGON_FARM_CARGOES{CT_HEMP_FIBRE, CT_STUDENTKY};
@@ -2227,7 +2240,9 @@ std::vector<ClimateIndustrySpriteUse> ClimateIndustrySpriteUses()
 	std::vector<ClimateIndustrySpriteUse> uses;
 	for (IndustryType type = 0; type < NEW_INDUSTRYOFFSET; type++) {
 		const IndustrySpec *spec = GetIndustrySpec(type);
-		if (!spec->enabled || spec->grf_prop.HasGrfFile()) continue;
+		/* The original forest's sprites drawn by the forest with a clearing in its place (SetupGameForest()). */
+		const bool replaced = type == IT_FOREST && GetIndustrySpec(IT_GAME_FOREST)->enabled;
+		if ((!spec->enabled && !replaced) || spec->grf_prop.HasGrfFile()) continue;
 		LandscapeType climate = IndustryHomeClimate(type);
 		std::vector<SpriteID> seen;
 		for (const IndustryTileLayout &layout : spec->layouts) {

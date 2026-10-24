@@ -10306,6 +10306,16 @@ static const CabShadowMap &EyeShadowMap(std::span<const CabShadowCaster> casters
 				tris.push_back(st);
 			}
 		}
+		if (tris.empty()) {
+			/* Nothing that casts a shadow drawn yet (their shapes still being read, a frame from the eye opened
+			 * among houses not read): one texel of no shadow. Before, the size came from the bounds of nothing, an
+			 * overflow, and the vector of it threw ("cannot create std::vector larger than max_size()"). */
+			map.texel = CAB_SHADOW_TEXEL;
+			map.u0 = map.v0 = 0;
+			map.nu = map.nv = 1;
+			map.nearest.assign(1, -std::numeric_limits<float>::infinity());
+			return map;
+		}
 		map.texel = std::max(CAB_SHADOW_TEXEL, std::max(u1 - u0, v1 - v0) / 2048);
 		map.u0 = u0;
 		map.v0 = v0;

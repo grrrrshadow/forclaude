@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. večer – les s pasekou místo normálního lesa, houbový guláš v hospodě, pád stínů z očí
+
+- Hráč: *„to má nahradit normální les“*, *„v minulém buildu už normální les nebyl vůbec“*, *„nemáme staré savy“*.
+  **Teď:** s rozšířeným průmyslem se normální (vanilla) les nestaví ani negeneruje, na jeho místě je náš les
+  4 × 4 se jménem **„Les“** (stejná místa, četnost, klimata; jeho sprity hra dál načítá pro 2D). Bez rozšířeného
+  průmyslu zůstává vanilla les. Rig: nová mapa s rozšířeným průmyslem má jen `les s pasekou`.
+- Hráč: *„houby bude přijímat hospoda a bude prodávat houbový guláš do inventáře“*. **Teď:** hospoda bere náklad
+  houby (MUSH) vedle alkoholu; 30 dní po dovozu hub prodává **houbový guláš** (věc inventáře, cena 6, léčí 30 – víc
+  než pivo). Rig: bez hub `koupit 26` chyba, po `dovoz … houby` ok, `pouzit 26` zdraví 50 → 80.
+- **Pád vlákna z očí** (rig, u hospody): mapa stínů z objektů, které ještě nemají načtený tvar (žádné
+  trojúhelníky), počítala velikost z rozsahu ničeho → přetečení → výjimka „vector larger than max_size“ a konec hry.
+  Mohlo se stát i na telefonu hned po otevření pohledu z očí mezi nenačtenými domy. Teď je mapa jeden texel bez stínu.
+
 ## 24. 10. večer – les s pasekou od kolegy (náš průmysl 4 × 4), náklad houby, zelený mimozemšťan
 
 - Hráč: *„máme les?“* – kolega poslal `LES-PRO-HRU.md` (díly `les_zem`, `les_cesta`, `les_paseka`,
@@ -38,7 +51,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   nedávej“*).
 - **Průmysl „Les s pasekou“** (`IT_GAME_FOREST`, s rozšířeným průmyslem): 4 × 4 jako vanilla les (kde smí stát,
   jak často, klimata mírné a subarktické), dřevo pořád; bere studentky a 30 dní po dovozu dává i **houby (MUSH)**.
-  Vanilla les zůstává vanilla.
+  (Večer hráč: nahrazuje vanilla les, jméno „Les“ – viz výš.)
 - **Náklad houby (MUSH)** nový: jako ovoce, rychle se kazí, třída express; z vozidel hry je berou poštovní auta a
   vagony (přestavba), kolegovy osobáky ho jmenují.
 - **Skládání:** paseka na prostředních 4 dlaždicích (každá severním rohem ven, na jedné srub hajného), cesta od

@@ -57,6 +57,7 @@ enum class WalkerItem : uint8_t {
 	Pitchfork,  ///< the pitchfork (the colleague's objekty/predmety/vidle.glb, par15), struck as the hammer; from iddqd
 	PaperLantern, ///< the paper lantern of Morrowind (the colleague's objekty/predmety/lucerna_papirova.glb): a light, hung from the left hand
 	IronLantern,  ///< the wrought candle lantern (the colleague's objekty/predmety/lucerna_kovana.glb): a light
+	MushroomGoulash, ///< mushroom goulash of the pub, while mushrooms come to it (PubCooksGoulash()): heals
 	End,        ///< the end of the known things
 };
 

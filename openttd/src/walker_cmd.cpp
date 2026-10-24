@@ -19,6 +19,7 @@
 #include "town_map.h"
 #include "industry.h"
 #include "industry_map.h"
+#include "climate_industries.h"
 #include "cargotype.h"
 #include "three_d_objects.h"
 #include "viewport_func.h"
@@ -59,6 +60,7 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_PITCHFORK, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_PAPER_LANTERN, 6, 0, WalkerItemKind::Light},
 	{STR_WALKER_ITEM_IRON_LANTERN, 15, 0, WalkerItemKind::Light},
+	{STR_WALKER_ITEM_MUSHROOM_GOULASH, 6, 30, WalkerItemKind::Thing},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -90,6 +92,7 @@ static bool IsShopHouse(TileIndex tile)
 
 /**
  * Whether a thing is sold at a tile: beer at the pub, and Matylda's seedlings in their pots there (the player, 21. 10.),
+ * its mushroom goulash while mushrooms come to it (the player, 24. 10.),
  * marijuana at the vending machine and the coffeeshop, cigarettes and goods at a shop of a town (the player), the torch
  * and the lantern there too. At WALKER_SOLD_BY_MAT: by Mat walking about the town -- his marijuana, a piece at a time
  * (the player: "Mat has only mari, a piece into the inventory"); where he walks is the drawing's, not the game's, so the
@@ -105,6 +108,7 @@ bool IsWalkerItemSoldAt(WalkerItem item, TileIndex tile)
 	switch (item) {
 		case WalkerItem::Beer:
 		case WalkerItem::Seedling: return type == IT_PUB;
+		case WalkerItem::MushroomGoulash: return type == IT_PUB && PubCooksGoulash(Industry::GetByTile(tile));
 		case WalkerItem::Marijuana: return type == IT_WEED_MACHINE || type == IT_COFFEESHOP;
 		case WalkerItem::Cigarettes:
 		case WalkerItem::Goods:

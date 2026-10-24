@@ -2335,6 +2335,7 @@ STR_WALKER_ITEM_WAR_HAMMER                                      :War hammer
 STR_WALKER_ITEM_PITCHFORK                                       :Pitchfork
 STR_WALKER_ITEM_PAPER_LANTERN                                   :Paper lantern
 STR_WALKER_ITEM_IRON_LANTERN                                    :Candle lantern
+STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Mushroom goulash
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
@@ -6330,7 +6331,7 @@ STR_INDUSTRY_NAME_POTATO_FIELD                                  :Potato Field
 STR_INDUSTRY_NAME_DISTILLERY                                    :Distillery
 STR_INDUSTRY_NAME_PUB                                           :Pub
 STR_INDUSTRY_NAME_DRAGON_FARM                                   :Dragon Farm
-STR_INDUSTRY_NAME_GAME_FOREST                                   :Forest with a Clearing
+STR_INDUSTRY_NAME_GAME_FOREST                                   :Forest
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

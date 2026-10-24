@@ -8769,6 +8769,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		for (const Industry *ind : Industry::Iterate()) {
 			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 			if (obj != nullptr) IConsolePrint(CC_DEFAULT, "test3d: {} (industry {}) at {},{} {}x{}{}, girls {}", obj->name, ind->type, TileX(GetThreeDIndustryObjectOrigin(ind)), TileY(GetThreeDIndustryObjectOrigin(ind)), ind->location.w, ind->location.h, IsIndustryCompleted(ind->location.tile) ? "" : " (being built)", GetThreeDIndustryGirls(ind, obj).size());
+			/* The forests: the game's with a clearing, and the original ones (of a game saved before it took their place). */
+			if (ind->type == IT_GAME_FOREST || GetIndustrySpec(ind->type)->name == STR_INDUSTRY_NAME_FOREST) {
+				IConsolePrint(CC_DEFAULT, "test3d: {} at {},{} {}x{}", ind->type == IT_GAME_FOREST ? "les s pasekou" : "vanilla les", TileX(ind->location.tile), TileY(ind->location.tile), ind->location.w, ind->location.h);
+			}
 			ThreeDPlantationTile pt;
 			if ((ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDPlantationTile(ind->location.tile, pt)) {
 				IConsolePrint(CC_DEFAULT, "test3d: plantation at {},{}: stage {}, girls {}", TileX(ind->location.tile), TileY(ind->location.tile), pt.stage, pt.girls ? "yes" : "no");
@@ -8942,7 +8946,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDPreviews());
 	} else if (what == "dovoz" && argv.size() > 4) {
-		/* A delivery today to the industry at a tile, for the rig: 'dovoz <x> <y> <stud|mari|boom|seno|nic>...' -- nic forgets them all. */
+		/* A delivery today to the industry at a tile, for the rig: 'dovoz <x> <y> <stud|mari|boom|seno|houby|nic>...' -- nic forgets them all. */
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value() || !IsTileType(TileXY(*x, *y), TileType::Industry)) {
 			IConsolePrint(CC_ERROR, "test3d: usage 'test3d dovoz <x> <y> <stud|mari|boom|nic>...' on a tile of an industry.");
@@ -8950,8 +8954,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		Industry *ind = Industry::GetByTile(TileXY(*x, *y));
 		for (size_t a = 4; a < argv.size(); a++) {
-			for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA, CT_EXPLOSIVES, CT_HEMP_FIBRE}) {
-				const bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA) || (argv[a] == "boom" && label == CT_EXPLOSIVES) || (argv[a] == "seno" && label == CT_HEMP_FIBRE);
+			for (CargoLabel label : {CT_STUDENTKY, CT_MARIJUANA, CT_EXPLOSIVES, CT_HEMP_FIBRE, CT_MUSHROOMS}) {
+				const bool today = (argv[a] == "stud" && label == CT_STUDENTKY) || (argv[a] == "mari" && label == CT_MARIJUANA) || (argv[a] == "boom" && label == CT_EXPLOSIVES) || (argv[a] == "seno" && label == CT_HEMP_FIBRE) || (argv[a] == "houby" && label == CT_MUSHROOMS);
 				if (!today && argv[a] != "nic") continue;
 				CargoType cargo = GetCargoTypeByLabel(label);
 				auto it = IsValidCargoType(cargo) ? ind->GetCargoAccepted(cargo) : std::end(ind->accepted);

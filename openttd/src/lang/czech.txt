@@ -2443,6 +2443,7 @@ STR_WALKER_ITEM_WAR_HAMMER                                      :Válečné klad
 STR_WALKER_ITEM_PITCHFORK                                       :Vidle
 STR_WALKER_ITEM_PAPER_LANTERN                                   :Papírová lucerna
 STR_WALKER_ITEM_IRON_LANTERN                                    :Kovaná lucerna
+STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Houbový guláš
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
@@ -6587,10 +6588,10 @@ STR_INDUSTRY_NAME_DRAGON_FARM                                   :{G=f}Dračí fa
 STR_INDUSTRY_NAME_DRAGON_FARM.gen                               :dračí farmy
 STR_INDUSTRY_NAME_DRAGON_FARM.loc                               :na dračí farmě
 STR_INDUSTRY_NAME_DRAGON_FARM.small                             :dračí farma
-STR_INDUSTRY_NAME_GAME_FOREST                                   :{G=m}Les s pasekou
-STR_INDUSTRY_NAME_GAME_FOREST.gen                               :lesa s pasekou
-STR_INDUSTRY_NAME_GAME_FOREST.loc                               :v lese s pasekou
-STR_INDUSTRY_NAME_GAME_FOREST.small                             :les s pasekou
+STR_INDUSTRY_NAME_GAME_FOREST                                   :{G=m}Les
+STR_INDUSTRY_NAME_GAME_FOREST.gen                               :lesa
+STR_INDUSTRY_NAME_GAME_FOREST.loc                               :v lese
+STR_INDUSTRY_NAME_GAME_FOREST.small                             :les
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!
