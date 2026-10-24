@@ -6411,7 +6411,7 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		if (a.trunk_r > 0) {
 			read.passable_tris.push_back(static_cast<uint32_t>(read.tri.size() / 3));
 			read.passable_tris.push_back(static_cast<uint32_t>((read.tri.size() + a.tri.size()) / 3));
-			read.trunks.insert(read.trunks.end(), {place.at[0] * OBJECT_UNITS_PER_METRE, place.at[1] * OBJECT_UNITS_PER_METRE, a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE});
+			read.trunks.insert(read.trunks.end(), {static_cast<float>(place.at[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(place.at[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE)});
 		}
 		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) */
 		for (size_t t = 0; t + 2 < a.tri.size(); t += 3) {
