@@ -8832,8 +8832,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		const ThreeDObject *obj = GetThreeDObjectByName(argv[4]);
 		/* The fields have no object of their own, only parts: by their names. */
 		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : IT_INVALID;
+		/* The forest of the original game, of the climate's: no object, its tiles from the parts the industries share;
+		 * left being built, as the game builds it (its trees stand at once). */
+		IndustryType forest = IT_INVALID;
+		for (IndustryType it = 0; it < NUM_INDUSTRYTYPES; it++) {
+			if (GetIndustrySpec(it)->enabled && GetIndustrySpec(it)->name == STR_INDUSTRY_NAME_FOREST) forest = it;
+		}
+		if (argv[4] == "les") type = forest;
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory>' (test3d objekty lists them).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les>' (test3d objekty lists them).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
@@ -9181,10 +9188,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: oko na {},{}: {}", *x, *y, walker ? fmt::format("chodec na {:.2f},{:.2f}", wx / TILE_SIZE, wy / TILE_SIZE) : std::string("ZADNY CHODEC"));
 		}
 		const NWidgetBase *help = bar->GetWidget<NWidgetBase>(WID_TN_HELP);
-		IConsolePrint(CC_DEFAULT, "test3d: oko {}x{} na {},{}; lista {}x{} na {},{}, otaznik {}x{} na {},{}; zamerovac {}, tlacitko {}", eye->width, eye->height, eye->left, eye->top,
+		int eyes = 0;
+		for (const Window *w : Window::Iterate()) eyes += w->window_class == WindowClass::MainToolbar && w->window_number == 1;
+		IConsolePrint(CC_DEFAULT, "test3d: oko {}x{} na {},{}; lista {}x{} na {},{}, otaznik {}x{} na {},{}; zamerovac {}, tlacitko {}, oci {}", eye->width, eye->height, eye->left, eye->top,
 				bar->width, bar->height, bar->left, bar->top, help->current_x, help->current_y, bar->left + help->pos_x, bar->top + help->pos_y,
 				_thd.window_class == WindowClass::MainToolbar && _thd.window_number == 1 && _thd.place_mode != HT_NONE ? "venku" : "ne",
-				eye->IsWidgetLowered(WID_GE_FIRST_PERSON) ? "stisknute" : "nahore");
+				eye->IsWidgetLowered(WID_GE_FIRST_PERSON) ? "stisknute" : "nahore", eyes);
 	} else if (what == "draci") {
 		/* The dragons (three_d_dragons.h): 'draci' tells where they are; 'draci posli [jmeno]' sends one near the walker
 		 * of the view from the first person (or the middle of the main view); 'draci uder' a blow of the hammer. */

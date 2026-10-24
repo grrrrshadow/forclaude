@@ -3562,6 +3562,7 @@ void CloseConstructionWindows()
 void HideVitalWindows()
 {
 	CloseWindowById(WindowClass::MainToolbar, 0);
+	CloseWindowById(WindowClass::MainToolbar, 1); // the god's eye under it (toolbar_gui.cpp), or ShowVitalWindows() makes a second one
 	CloseWindowById(WindowClass::Statusbar, 0);
 }
 

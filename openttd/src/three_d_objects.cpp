@@ -2496,6 +2496,7 @@ struct OriginalIndustryTile {
 	size_t plants = SIZE_MAX;    ///< "rostliny"
 	bool member = false;         ///< "soucast_bloku"
 	int anchor_dx = 0, anchor_dy = 0;
+	bool buildings = false;      ///< a part of "dily" on it: built in the industry's stages; without, its trees stand at once
 };
 /** The tiles of the original industries by their gfx (GetThreeDOriginalIndustryTile()). */
 static std::map<IndustryGfx, OriginalIndustryTile> _original_industry_tiles;
@@ -2605,12 +2606,14 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 				 * when every set is read. Placed elsewhere or turned it would need its mesh, which is not kept. */
 				if (d.contains("sada") && at[0] == 0 && at[1] == 0 && at[2] == 0 && d.value("otoceni", 0.0f) == 0 && d.value("meritko", 1.0f) == 1) {
 					tile.whole.push_back(part);
+					tile.buildings = true;
 				} else {
 					Debug(misc, 0, "3D objects {}: no part {}", name, part);
 				}
 				continue;
 			}
 			tile.parts.push_back(_three_d_objects.size());
+			tile.buildings = true;
 			_three_d_objects.push_back(PlaceIndustryPart(it->second, name + "/" + part, at, d.value("otoceni", 0.0f), d.value("meritko", 1.0f), bx, by));
 		}
 	}
@@ -5723,10 +5726,21 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
 			r.member = t.member;
 			r.anchor_dx = t.anchor_dx;
 			r.anchor_dy = t.anchor_dy;
+			r.at_once = !t.buildings;
 		}
 	}
 	auto it = resolved.find(gfx);
 	return it == resolved.end() ? nullptr : &it->second;
+}
+
+/**
+ * Whether what stands on a tile of an original industry from the shared parts is there: its buildings when the
+ * industry is built; the trees of the forest from the first (the player, 24. 10.: "the trees may grow at once, not as
+ * on the field where the potatoes grow when the girls come").
+ */
+bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts)
+{
+	return parts.at_once || IsIndustryCompleted(tile);
 }
 
 /**
@@ -7172,14 +7186,14 @@ static constexpr double THREE_D_TRUNK_PLANT_M = 4.0;
  */
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y)
 {
-	if (!IsTileType(tile, TileType::Industry) || !IsIndustryCompleted(tile)) return std::nullopt;
+	if (!IsTileType(tile, TileType::Industry)) return std::nullopt;
 	auto parts_of = [](TileIndex t) -> const ThreeDIndustryTileParts * {
 		const IndustryGfx gfx = GetIndustryGfx(t);
 		if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
 		return GetThreeDOriginalIndustryTile(gfx);
 	};
 	const ThreeDIndustryTileParts *tp = parts_of(tile);
-	if (tp == nullptr) return std::nullopt;
+	if (tp == nullptr || !ThreeDOriginalIndustryTileStands(tile, *tp)) return std::nullopt;
 	TileIndex anchor = tile;
 	if (tp->member) {
 		anchor = TileAddWrap(tile, -tp->anchor_dx, -tp->anchor_dy);

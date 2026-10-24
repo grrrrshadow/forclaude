@@ -4506,9 +4506,10 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
 	if (const ThreeDIndustryTileParts *parts = obj == nullptr ? OriginalIndustryTileParts(_cur_ti.tile) : nullptr; parts != nullptr) {
-		/* An industry of the original game, from the parts the industries share; being built, its ground only. */
+		/* An industry of the original game, from the parts the industries share; being built, its ground only (the
+		 * forest's trees at once). */
 		LeaveOutTileSprites(first_parent, north);
-		AddOriginalIndustryTile(_cur_ti.tile, *parts, built);
+		AddOriginalIndustryTile(_cur_ti.tile, *parts, ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts));
 		return;
 	}
 	if (!built) return;
@@ -10776,15 +10777,15 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 						if (GetHouseNorthPart(north) != 0) continue;
 						const ThreeDObject *obj = GetThreeDHouseObjectAt(north, tile);
 						if (obj != nullptr) far_object(obj, tile);
-					} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
+					} else if (IsTileType(tile, TileType::Industry)) {
 						const Industry *ind = Industry::GetByTile(tile);
-						const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+						const ThreeDObject *obj = IsIndustryCompleted(tile) ? GetThreeDIndustryObjectOf(ind) : nullptr;
 						if (obj != nullptr) {
 							if (GetThreeDIndustryObjectOrigin(ind) == tile) far_object(obj, tile);
 							if (const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, tile); yard != nullptr) {
 								for (const ThreeDObject *p : yard->parts) far_object(p, tile);
 							}
-						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member) {
+						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member && ThreeDOriginalIndustryTileStands(tile, *parts)) {
 							/* An industry of the original game from the shared parts: its buildings from their anchors. */
 							for (const ThreeDObject *p : parts->parts) far_object(p, tile);
 						}
@@ -11195,7 +11196,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			};
 			if (parts->ground != nullptr) add(parts->ground, _cur_ti.tile);
 			const ThreeDIndustryTileParts *of = parts;
-			const TileIndex anchor = IsIndustryCompleted(_cur_ti.tile) ? OriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
+			const TileIndex anchor = ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts) ? OriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
 			if (anchor != INVALID_TILE) {
 				for (const ThreeDObject *p : of->parts) add(p, anchor);
 				if (of->plants != nullptr && anchor == _cur_ti.tile) {

@@ -485,7 +485,7 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 			const ThreeDIndustryTileParts *tp = OriginalIndustryTileOf(ind, tile);
 			if (tp == nullptr) continue;
 			if (tp->ground != nullptr) lay(tile, tp->ground, nullptr, {}, -1e6);
-			if (tp->member || !IsIndustryCompleted(tile)) continue;
+			if (tp->member || !ThreeDOriginalIndustryTileStands(tile, *tp)) continue;
 			for (const ThreeDObject *part : tp->parts) lay(tile, part, nullptr, {}, 0);
 			if (tp->plants != nullptr) lay(tile, tp->plants, nullptr, {}, 0);
 		}

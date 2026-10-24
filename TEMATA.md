@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. večer – dvě božská oka, les bez stromů
+
+- Hráč: *„máme navíc jednu ikonku božího oka, v levém horním rohu; zavřel jsem křížkem first person, ona se
+  neodmáčkla a podruhé zmáčknout oko nešlo, ta druhá fungovala; tu zamáčkávací vlevo nahoře dáme pryč“*.
+- **Příčina:** oko (okno lišty číslo 1) se při nové mapě nezavíralo – `HideVitalWindows()` zavřela jen lištu a
+  stavový řádek, `ShowVitalWindows()` pak udělala druhé oko (vlevo nahoře, na místo se posouvá jen jedno). Klik
+  na tile zrušil zaměřovač u toho druhého, takže kliknuté oko zůstalo zmáčknuté. Teď se oko zavírá s lištou;
+  rig: 4 nové mapy po sobě, vždy `oci 1`. Oko už netočí pohled na sever (to je jen pro stavění, oko je na koukání).
+- Hráč: *„v lese nerostou stromy, jsou tam dlaždice pole bez kytek; stromy můžou vyrůst hned, ne jako na poli,
+  kde brambory rostou až se studentkami“*. **Příčina:** stromy lesa (kolegovy `doplnky` na `pv_gfx_016`) jsou
+  objekt bez vlastního souboru; hra ho brala jako „načtený“ (`IsRead()`) a stromy do něj nikdy nevložila. Teď se
+  doplňky načtou. Stromy lesa (dlaždice jen se stromy, bez `dily`) stojí hned, i když se les ještě staví
+  (`ThreeDOriginalIndustryTileStands()`): mapa, z očí, náhled u okna, chůze mezi kmeny.
+- Rig: `test3d postav <x> <y> les` postaví vanilla les (nechá ho stavět jako hra).
+
 ## 24. 10. – trainset.simtrains.eu chce heslo
 
 - Hráč: *„copak je s adresou https://trainset.simtrains.eu/ chce heslo, před 14 dny to bylo bez hesla, koukni do

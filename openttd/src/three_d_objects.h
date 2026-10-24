@@ -286,8 +286,9 @@ struct ThreeDObject {
 	bool Read() const;
 	bool TryRead() const;
 	/** Whether its shape and texture are read (Read()): what is read of it may be looked at then, on any thread. */
-	/** Whether it is read (Read()): one made in memory (an industry's part) is from the first; a street lamp, its add-on alone, when laid. */
-	bool IsRead() const { return (this->glb_path.empty() && !this->street) || this->glb_state.value.load(std::memory_order_acquire) == 1; }
+	/** Whether it is read (Read()): one made in memory (an industry's part) is from the first; one of add-ons alone (a street
+	 * lamp, the trees of a tile of the forest) when they are laid -- before, the forest's trees were never laid in. */
+	bool IsRead() const { return (this->glb_path.empty() && !this->street && this->addon_places.empty()) || this->glb_state.value.load(std::memory_order_acquire) == 1; }
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
@@ -904,8 +905,10 @@ struct ThreeDIndustryTileParts {
 	const ThreeDObject *plants = nullptr;          ///< "rostliny": an object of the plants alone
 	bool member = false;                           ///< a tile of a block its anchor draws ("soucast_bloku"): its ground only
 	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
+	bool at_once = false;                          ///< trees and plants alone, no building: they stand from the first, the industry being built or not (the forest)
 };
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
+bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile);
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 

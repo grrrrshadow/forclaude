@@ -2743,9 +2743,17 @@ struct GodEyeWindow : Window {
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		if (widget != WID_GE_FIRST_PERSON) return;
-		/* The map to aim at: the view from the first person over it goes. */
+		/* The map to aim at: the view from the first person over it goes. Not HandlePlacePushButton(): that turns the
+		 * view to north for building, the eye is for looking (three_d.cpp, ThreeDViewForBuilding()). */
 		CloseWindowById(WindowClass::FirstPerson, 0);
-		HandlePlacePushButton(this, WID_GE_FIRST_PERSON, SPR_CURSOR_GOD_EYE, HT_RECT);
+		SndClickBeep();
+		this->SetDirty();
+		if (this->IsWidgetLowered(WID_GE_FIRST_PERSON)) {
+			ResetObjectToPlace();
+			return;
+		}
+		SetObjectToPlace(SPR_CURSOR_GOD_EYE, PAL_NONE, HT_RECT, this->window_class, this->window_number);
+		this->LowerWidget(WID_GE_FIRST_PERSON);
 	}
 
 	void OnPlaceObject([[maybe_unused]] Point pt, TileIndex tile) override

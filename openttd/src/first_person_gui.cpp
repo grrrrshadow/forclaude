@@ -269,10 +269,10 @@ static bool FirstPersonWalkable(double x, double y)
 		case TileType::Industry: {
 			const IndustryGfx gfx = GetIndustryGfx(tile);
 			if (gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD) return true;
-			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. */
-			if (!IsIndustryCompleted(tile)) return false;
+			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. Being built a
+			 * wall, but the forest: its trees stand at once (ThreeDOriginalIndustryTileStands()). */
 			const Industry *ind = Industry::GetByTile(tile);
-			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+			const ThreeDObject *obj = IsIndustryCompleted(tile) ? GetThreeDIndustryObjectOf(ind) : nullptr;
 			const TileIndex origin = GetThreeDIndustryObjectOrigin(ind);
 			if (obj == nullptr || GetThreeDIndustryYard(ind, tile) != nullptr) {
 				/* One of the original game from the parts the industries share (the forest; the refinery's tanks beside
