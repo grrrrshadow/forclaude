@@ -8831,7 +8831,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		const ThreeDObject *obj = GetThreeDObjectByName(argv[4]);
 		/* The fields have no object of their own, only parts: by their names. */
-		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : IT_INVALID;
+		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : argv[4] == "paseka" ? IT_GAME_FOREST : IT_INVALID;
 		/* The forest of the original game, of the climate's: no object, its tiles from the parts the industries share;
 		 * left being built, as the game builds it (its trees stand at once). */
 		IndustryType forest = IT_INVALID;
@@ -8840,15 +8840,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		if (argv[4] == "les") type = forest;
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les>' (test3d objekty lists them).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka>' (test3d objekty lists them; paseka the forest with a clearing).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
 		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
-		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && obj != nullptr) {
+		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST)) {
 			Industry *ind = Industry::GetByTile(tile);
-			SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
+			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
 			/* Built at once, for the pictures (the game builds it in stages). */
 			for (TileIndex t : ind->location) {
 				if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index) continue;
@@ -8963,8 +8963,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
 		extern uint DragonFarmHay(const Industry *ind);
-		IConsolePrint(CC_DEFAULT, "test3d: dovoz {} at {},{}: girls {}, hay {} of {}, accepts {}", obj != nullptr ? obj->name : std::string("(no object)"), TileX(ind->location.tile), TileY(ind->location.tile), GetThreeDIndustryGirls(ind, obj).size(),
-				ind->type == IT_DRAGON_FARM ? DragonFarmHay(ind) : 0, obj != nullptr ? obj->hay.size() : 0, ind->accepted.size());
+		/* What it makes: each cargo, waiting and made this month (the forest with a clearing: its mushrooms with girls only). */
+		std::string made;
+		for (const Industry::ProducedCargo &p : ind->produced) {
+			if (!IsValidCargoType(p.cargo)) continue;
+			const uint32_t l = CargoSpec::Get(p.cargo)->label.base();
+			made += fmt::format(" {}{}{}{} {} cekajici {} tento mesic", static_cast<char>(l >> 24), static_cast<char>(l >> 16), static_cast<char>(l >> 8), static_cast<char>(l), p.waiting, p.history[THIS_MONTH].production);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: dovoz {} at {},{}: girls {}, hay {} of {}, accepts {}, makes{}", obj != nullptr ? obj->name : std::string("(no object)"), TileX(ind->location.tile), TileY(ind->location.tile), GetThreeDIndustryGirls(ind, obj).size(),
+				ind->type == IT_DRAGON_FARM ? DragonFarmHay(ind) : 0, obj != nullptr ? obj->hay.size() : 0, ind->accepted.size(), made);
 	} else if (what == "plantaz" && argv.size() > 4) {
 		/* The state of a marijuana plantation, for the rig: 'plantaz <x> <y> <care> [holky]' -- care 0 bare, 1 small plants, 28 grown; holky brings the girls. */
 		auto x = number(2), y = number(3), care = number(4);

@@ -269,6 +269,11 @@ static bool FirstPersonWalkable(double x, double y)
 		case TileType::Industry: {
 			const IndustryGfx gfx = GetIndustryGfx(tile);
 			if (gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD) return true;
+			/* The forest with a clearing: among the trunks of its trees, round the cabin, the high seat and the logs. */
+			if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
+				const double lx = x - TileX(tile) * TILE_SIZE, ly = y - TileY(tile) * TILE_SIZE;
+				return forest->ground == nullptr || !forest->ground->Blocks(lx, ly);
+			}
 			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. Being built a
 			 * wall, but the forest: its trees stand at once (ThreeDOriginalIndustryTileStands()). */
 			const Industry *ind = Industry::GetByTile(tile);

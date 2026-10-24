@@ -97,6 +97,8 @@ static constexpr CargoLabel CT_STUDENTKY{'STUD'};
 static constexpr CargoLabel CT_POTATOES{'BRAM'};
 /** Alcohol, of the game's own distillery, to the pub (FIRS's label for it). */
 static constexpr CargoLabel CT_ALCOHOL{'BEER'};
+/** Mushrooms, which the girls pick in the game's own forest (the player, 23. 10.: "the cars will carry the mushrooms"). */
+static constexpr CargoLabel CT_MUSHROOMS{'MUSH'};
 
 static constexpr CargoLabel CT_INVALID{UINT32_MAX}; ///< Invalid cargo type.
 

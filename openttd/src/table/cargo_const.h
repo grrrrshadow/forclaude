@@ -158,6 +158,12 @@ static const CargoSpec _default_cargo[] = {
 	 * tankers (OfferIndustryCargoesToOriginalVehicles()). */
 	MK(  58, CT_POTATOES,     191, 16, 0x100, 4778,  4,  40,  true,       TownAcceptanceEffect::None,     POTATOES,     POTATOES,       STR_TONS, CargoClasses({CargoClass::Bulk})),
 	MK(  57, CT_ALCOHOL,       39, 16, 0x100, 5688,  8,  60,  true,       TownAcceptanceEffect::None,      ALCOHOL,      ALCOHOL,     STR_LITERS, CargoClasses({CargoClass::Liquid, CargoClass::Potable})),
+
+	/* Mushrooms (CT_MUSHROOMS) the girls pick in the game's own forest, with economy.extra_industries, placed the way
+	 * marijuana is (the player, 23. 10.: "the mushrooms the cars will carry"). Weighed, paid and carried like fruit,
+	 * quick to spoil; express, as the colleague's cars name them outright, and of the game's own vehicles the mail vans
+	 * and lorries take them (OfferIndustryCargoesToOriginalVehicles()). */
+	MK(  56, CT_MUSHROOMS,     70,  8, 0x100, 4500,  0,  10,  true,       TownAcceptanceEffect::None,    MUSHROOMS,    MUSHROOMS,       STR_TONS, CargoClasses({CargoClass::Express, CargoClass::Refrigerated})),
 };
 
 

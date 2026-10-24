@@ -31,6 +31,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. večer – les s pasekou od kolegy (náš průmysl 4 × 4), náklad houby, zelený mimozemšťan
+
+- Hráč: *„máme les?“* – kolega poslal `LES-PRO-HRU.md` (díly `les_zem`, `les_cesta`, `les_paseka`,
+  `les_paseka_srub`; zajíc, veverka, ježek) a zeleného mimozemšťana. Převzato (Putin dál ne – hráč: *„putina
+  nedávej“*).
+- **Průmysl „Les s pasekou“** (`IT_GAME_FOREST`, s rozšířeným průmyslem): 4 × 4 jako vanilla les (kde smí stát,
+  jak často, klimata mírné a subarktické), dřevo pořád; bere studentky a 30 dní po dovozu dává i **houby (MUSH)**.
+  Vanilla les zůstává vanilla.
+- **Náklad houby (MUSH)** nový: jako ovoce, rychle se kazí, třída express; z vozidel hry je berou poštovní auta a
+  vagony (přestavba), kolegovy osobáky ho jmenují.
+- **Skládání:** paseka na prostředních 4 dlaždicích (každá severním rohem ven, na jedné srub hajného), cesta od
+  strany, kde je nejvíc silnice (bez silnice náhodná strana), jinde lesní zem různě natočená. Díl = celá scéna glb
+  (`ReadGlbScene()`, jako interiér) otočená o čtvrtotáčky, stromy a keře vložené jako doplňky. Stromy stojí hned.
+- **Holky** z dílů po dovozu studentek (mapa, z očí, náhled u okna). **Houby** na místech `houby` pořád, každá
+  zvlášť utrhnutelná. **Zvířata** na místech `zvirata` z jejich `druhy` (laň, jelen, liška, vlče, zajíc,
+  veverka, ježek), až 5 kolem chodce. **V noci strašidla** na místech `noc_postavy` – zatím jen kobold;
+  `strasidlo` a `prizrak` jsou figury čarodějnic, ne strašidla (prosba kolegovi). Zajíc a veverka skáčou (`skok`
+  bere hra jako chůzi). Chodec projde kapradím a trávou, srub, posed, klády a ohniště blokují.
+- Rig: `test3d postav <x> <y> paseka` (rovnou dostavěný), `test3d dovoz … stud`, výpis `makes WOOD … MUSH …`.
+  Ověřeno: dřevo bez holek, houby jen s holkami (0 → 15), houba utržena, zvířata na místech. Snímek z očí v rigu
+  nejde (softwarová grafika je pomalá), mapa ve 3D ano.
+
 ## 24. 10. večer – houby a zvířata v lese, Billy po kolejích
 
 - Hráč: *„stromy, houby a zvířátka mají být v lese furt, holky přibydou, když je přivezou, a pak les produkuje

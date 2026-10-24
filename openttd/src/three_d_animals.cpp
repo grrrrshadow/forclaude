@@ -64,7 +64,8 @@ constexpr uint STREET_KEPT = 5;            ///< so many in the streets about the
 constexpr uint DOOR_KEPT = 2;              ///< before the doors
 constexpr uint ROOF_KEPT = 4;              ///< on the roofs
 constexpr uint ROUND_KEPT = 5;             ///< in the land about the towns
-constexpr uint FOREST_KEPT = 3;            ///< in the forests about the middle
+constexpr uint FOREST_KEPT = 5;            ///< in the forests about the middle (the game told the colleague: 4 to 6 a forest)
+constexpr uint FOREST_GHOSTS_KEPT = 2;     ///< and at night the ghosts of the forest with a clearing ("noc_postavy")
 constexpr uint GHOSTS_KEPT = 3;            ///< ghosts ("kdy": at night, by day, or always)
 constexpr uint RAIL_KEPT = 3;              ///< and ghosts along the railway lines about the middle, besides
 constexpr double RAIL_RIDE_M = 0.05;       ///< one riding the rails without a pose of walking goes so far a tick, metres
@@ -97,6 +98,7 @@ enum class Place : uint8_t {
 	Seller, ///< a seller of dogs in a street
 	Pet,    ///< the walker's dog, walking with it
 	Forest, ///< in a forest, always (the player, 24. 10.: "trees, mushrooms and the little animals are to be in the forest all the time")
+	ForestNight, ///< a ghost of the forest with a clearing at night, at its places ("noc_postavy")
 };
 
 enum class State : uint8_t {
@@ -162,10 +164,11 @@ constexpr int MUSHROOM_SEEN_TILES = 3;       ///< seen this many tiles about the
  * make them much bigger"): a quarter to half a metre. */
 constexpr float MUSHROOM_SCALE = 5.0f;
 constexpr uint64_t MUSHROOM_REGROW_TICKS = 74 * 30; ///< a picked one grows again after about a month
-std::map<uint32_t, uint64_t> _mushrooms_picked; ///< the tiles picked, and when
+std::map<uint64_t, uint64_t> _mushrooms_picked; ///< the mushrooms picked (MushroomAt::key), and when
 
 /** A mushroom where it grows. */
 struct MushroomAt {
+	uint64_t key = 0;    ///< which: its tile, and in the forest with a clearing its place there besides
 	const ThreeDMushroom *kind = nullptr;
 	double x = 0, y = 0; ///< world units
 	float facing = 0;
@@ -189,9 +192,34 @@ bool MushroomOnTile(TileIndex t, MushroomAt &at)
 		if (TimerGameTick::counter - picked->second < MUSHROOM_REGROW_TICKS) return false;
 		_mushrooms_picked.erase(picked);
 	}
+	at.key = t.base();
 	at.kind = &m;
 	at.x = TileX(t) * TILE_SIZE + 2 + (h >> 13) % (TILE_SIZE - 4);
 	at.y = TileY(t) * TILE_SIZE + 2 + (h >> 18) % (TILE_SIZE - 4);
+	at.facing = static_cast<float>((h >> 23) % 24 * 15);
+	return true;
+}
+
+/**
+ * A mushroom of the forest with a clearing at one of the places of the part of its tile ("houby" of the colleague's
+ * hra/3d/LES-PRO-HRU.md), if it has one now: there all the time, a kind of any theme by the place, gone a while when
+ * picked.
+ */
+bool ForestMushroom(TileIndex t, const ThreeDForestPart &part, size_t place, MushroomAt &at)
+{
+	const std::vector<ThreeDMushroom> &kinds = GetThreeDMushrooms();
+	if (kinds.empty() || place >= part.mushrooms.size()) return false;
+	at.key = (static_cast<uint64_t>(place) + 1) << 32 | t.base();
+	auto picked = _mushrooms_picked.find(at.key);
+	if (picked != _mushrooms_picked.end()) {
+		if (TimerGameTick::counter - picked->second < MUSHROOM_REGROW_TICKS) return false;
+		_mushrooms_picked.erase(picked);
+	}
+	const uint32_t h = (TileX(t) * 2654435761u) ^ (TileY(t) * 40503u) ^ (static_cast<uint32_t>(place) * 0x9e3779b9u);
+	at.kind = &kinds[(h >> 9) % kinds.size()];
+	const ThreeDObjectFigure &f = part.mushrooms[place];
+	at.x = TileX(t) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE;
+	at.y = TileY(t) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE;
 	at.facing = static_cast<float>((h >> 23) % 24 * 15);
 	return true;
 }
@@ -204,6 +232,13 @@ void ForMushroomsNear(double x, double y, int tiles, F fn)
 	for (int ty = std::max(1, cy - tiles); ty <= std::min<int>(Map::MaxY() - 1, cy + tiles); ty++) {
 		for (int tx = std::max(1, cx - tiles); tx <= std::min<int>(Map::MaxX() - 1, cx + tiles); tx++) {
 			const TileIndex t = TileXY(tx, ty);
+			if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(t); forest != nullptr) {
+				for (size_t place = 0; place < forest->mushrooms.size(); place++) {
+					MushroomAt at;
+					if (ForestMushroom(t, *forest, place, at)) fn(t, at);
+				}
+				continue;
+			}
 			MushroomAt at;
 			if (MushroomOnTile(t, at)) fn(t, at);
 		}
@@ -275,7 +310,7 @@ double Speed(const Beast &b, std::string_view pose, double fallback)
 /** Whether it can go anywhere: a pose of walking or running, or it flies. */
 bool Moves(const ThreeDAnimal &a)
 {
-	return a.flies || a.Has("chuze") || a.Has("beh");
+	return a.flies || a.Has("chuze") || a.Has("beh") || a.Has("skok");
 }
 
 bool OnMap(double x, double y)
@@ -563,7 +598,9 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 {
 	const double dist_m = walker ? std::hypot(wx - b.x, wy - b.y) / OBJECT_UNITS_PER_METRE : 1e9;
 	const double reach_m = std::max(a.size[0], a.size[1]) / 2 + GAP_M;
-	const std::string_view walk = PoseOf(a, {"chuze", "beh"}), run = PoseOf(a, {"beh", "chuze"});
+	/* The hare and the squirrel hop ("skok", the colleague's hra/3d/LES-PRO-HRU.md: up and down on the spot, moved on
+	 * "krok_m" a round by the game) where others walk. */
+	const std::string_view walk = PoseOf(a, {"chuze", "skok", "beh"}), run = PoseOf(a, {"beh", "skok", "chuze"});
 	switch (b.state) {
 		case State::Idle:
 			SetPose(b, RestPose(b, a), now);
@@ -572,7 +609,7 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			if (b.place == Place::Door && dist_m < 4.0 && a.Has("vrci")) SetPose(b, "vrci", now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
-			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Forest || b.place == Place::Ghost || (b.place == Place::Rail && !RidesRails(b, a)) || (b.place == Place::Street && a.Has("chuze")))) {
+			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Forest || b.place == Place::ForestNight || b.place == Place::Ghost || (b.place == Place::Rail && !RidesRails(b, a)) || (b.place == Place::Street && a.Has("chuze")))) {
 				PickWander(b);
 				b.state = State::Wander;
 			} else if (RidesRails(b, a)) {
@@ -762,6 +799,43 @@ bool PickLand(const Town *t, TileIndex middle, bool town_land, double &x, double
 	return false;
 }
 
+/**
+ * A place of the game, or at night of the ghosts, of the forest with a clearing near the middle, at random ("zvirata",
+ * "noc_postavy" of its parts): where, world units, the way it faces, and the kinds that come there; false none.
+ */
+bool PickGameForestPlace(TileIndex middle, bool ghosts, double &x, double &y, double &heading, std::span<const std::string> &kinds)
+{
+	std::vector<std::pair<TileIndex, const ThreeDForestPlace *>> found;
+	const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+	for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r); ty++) {
+		for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r); tx++) {
+			const TileIndex t = TileXY(tx, ty);
+			const ThreeDForestPart *part = ThreeDGameForestPartAt(t);
+			if (part == nullptr) continue;
+			for (const ThreeDForestPlace &p : ghosts ? part->ghosts : part->animals) found.emplace_back(t, &p);
+		}
+	}
+	if (found.empty()) return false;
+	const auto &[t, p] = found[InteractiveRandomRange(static_cast<uint32_t>(found.size()))];
+	x = TileX(t) * TILE_SIZE + p->at.at[0] * OBJECT_UNITS_PER_METRE;
+	y = TileY(t) * TILE_SIZE + p->at.at[1] * OBJECT_UNITS_PER_METRE;
+	heading = p->at.facing * M_PI / 180.0;
+	kinds = p->kinds;
+	return true;
+}
+
+/** One of the animals of the indices named, of the kinds, out now; nullptr none. */
+const ThreeDAnimal *PickNamed(std::span<const std::string> names, bool night, std::initializer_list<ThreeDAnimal::Kind> kinds)
+{
+	std::vector<const ThreeDAnimal *> fit;
+	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
+		if (a.sold || !a.OutNow(night) || std::ranges::find(kinds, a.kind) == kinds.end()) continue;
+		if (std::ranges::find(names, a.name) != names.end()) fit.push_back(&a);
+	}
+	if (fit.empty()) return nullptr;
+	return fit[InteractiveRandomRange(static_cast<uint32_t>(fit.size()))];
+}
+
 /** A tile of a forest near the middle, at random (ThreeDForestTile()): a place on it to stand, world units; false none found. */
 bool PickForest(TileIndex middle, double &x, double &y)
 {
@@ -879,11 +953,31 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			return true;
 		}
 		case Place::Forest: {
-			/* The game of the forests (the deer, the elk, the bear of the climate) among their trees. */
+			/* The game of the forest with a clearing at the places of its parts, of their kinds (the doe, the deer, the
+			 * fox, the wolf cub, the hare, the squirrel, the hedgehog); of the original forests among their trees, of the
+			 * climate (the deer, the elk, the bear). */
+			double heading = 0;
+			std::span<const std::string> kinds;
+			if (PickGameForestPlace(middle, false, x, y, heading, kinds)) {
+				const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Animal, ThreeDAnimal::Kind::Dog});
+				if (a == nullptr || Taken(x, y, 8)) return false;
+				Put(*a, place, x, y, 0, heading, now);
+				return true;
+			}
 			if (!PickForest(middle, x, y) || Taken(x, y, 24)) return false;
 			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), ThreeDAnimal::ROUND, {ThreeDAnimal::Kind::Animal}, night);
 			if (a == nullptr) return false;
 			Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
+			return true;
+		}
+		case Place::ForestNight: {
+			/* At night the ghosts of the forest with a clearing at its places, of their kinds (the kobold). */
+			double heading = 0;
+			std::span<const std::string> kinds;
+			if (!night || !PickGameForestPlace(middle, true, x, y, heading, kinds) || Taken(x, y, 8)) return false;
+			const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Ghost});
+			if (a == nullptr) return false;
+			Put(*a, place, x, y, 0, heading, now);
 			return true;
 		}
 		case Place::Ghost: {
@@ -975,7 +1069,7 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		const ThreeDAnimal *a = KindOf(b);
 		const TileIndex at = TileVirtXY(static_cast<int>(std::clamp(b.x, 0.0, (Map::SizeX() - 1.0) * TILE_SIZE)), static_cast<int>(std::clamp(b.y, 0.0, (Map::SizeY() - 1.0) * TILE_SIZE)));
 		const bool gone = a == nullptr || (b.place != Place::Pet && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
-				((b.place == Place::Ghost || b.place == Place::Rail) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle);
+				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle);
 		if (gone) {
 			if (a != nullptr) MarkDirty(b, *a);
 			if (b.place == Place::Seller) _next_seller = now + SELLER_AWAY_TICKS / 2 + InteractiveRandomRange(SELLER_AWAY_TICKS);
@@ -1007,11 +1101,11 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 	const Wanted wanted[] = {
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
-		{Place::Forest, FOREST_KEPT},
+		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u},
 	};
-	/* One a time, the place picked in turn. The forests' game is there without a town near too. */
+	/* One a time, the place picked in turn. The forests' game and ghosts are there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
-	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest) return;
+	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight) return;
 	if (Count(w.place) < w.kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
 
@@ -1163,17 +1257,17 @@ bool ThreeDMushroomPlace(double x, double y, int tiles, double &mx, double &my, 
 /** The mushroom nearest a point within reach picked: gone till it grows again. @return whether one was */
 bool PickThreeDMushroom(double x, double y, double reach_m)
 {
-	TileIndex best = INVALID_TILE;
+	std::optional<uint64_t> best;
 	double best_d = reach_m * OBJECT_UNITS_PER_METRE;
-	ForMushroomsNear(x, y, 1, [&](TileIndex t, const MushroomAt &at) {
+	ForMushroomsNear(x, y, 1, [&](TileIndex, const MushroomAt &at) {
 		const double d = std::hypot(at.x - x, at.y - y);
 		if (d <= best_d) {
 			best_d = d;
-			best = t;
+			best = at.key;
 		}
 	});
-	if (best == INVALID_TILE) return false;
-	_mushrooms_picked[best.base()] = TimerGameTick::counter;
+	if (!best.has_value()) return false;
+	_mushrooms_picked[*best] = TimerGameTick::counter;
 	return true;
 }
 
@@ -1278,7 +1372,7 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 /** The rig: those about, a line each. */
 std::string DescribeThreeDAnimals()
 {
-	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les"};
+	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci"};
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
 	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
 	for (const Beast &b : _beasts) {

@@ -124,6 +124,7 @@ extern bool _draw_fences; ///< clear_cmd.cpp: the fences of fields and rails, of
 #include "transparency.h"
 #include "console_func.h"
 #include "industry.h"
+#include "climate_industries.h"
 #include "industry_map.h"
 #include "industrytype.h"
 
@@ -4502,6 +4503,15 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries)) return;
 	const bool built = IsIndustryCompleted(_cur_ti.tile);
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
+	if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(_cur_ti.tile); forest != nullptr) {
+		/* The forest with a clearing, a part of it on each tile (ThreeDGameForestPartAt()): its ground and trees at once,
+		 * being built or not; its girls after a delivery of studentky. */
+		LeaveOutTileSprites(first_parent, north);
+		std::span<const ThreeDObjectFigure> girls;
+		if (built && HasGirls(ind)) girls = forest->girls;
+		if (forest->ground != nullptr) _turned_objects.push_back({forest->ground, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile), nullptr, girls});
+		return;
+	}
 	const ThreeDObject *obj = built ? GetThreeDIndustryObjectOf(ind) : nullptr;
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
@@ -10788,6 +10798,9 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member && ThreeDOriginalIndustryTileStands(tile, *parts)) {
 							/* An industry of the original game from the shared parts: its buildings from their anchors. */
 							for (const ThreeDObject *p : parts->parts) far_object(p, tile);
+						} else if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
+							/* The forest with a clearing, a part on each tile. */
+							if (forest->ground != nullptr) far_object(forest->ground, tile);
 						}
 					}
 				}
@@ -11217,7 +11230,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
-		if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
+		if (const ThreeDForestPart *forest = tile_type == TileType::Industry ? ThreeDGameForestPartAt(_cur_ti.tile) : nullptr; forest != nullptr) {
+			/* The forest with a clearing as in the turned view (AddIndustryObjects()): its ground and trees at once, its
+			 * girls after a delivery of studentky. */
+			kind = 5;
+			const int z = GetTileMaxPixelZ(_cur_ti.tile);
+			std::span<const ThreeDObjectFigure> girls;
+			if (IsIndustryCompleted(_cur_ti.tile) && HasGirls(Industry::GetByTile(_cur_ti.tile))) girls = forest->girls;
+			if (forest->ground != nullptr) objects.push_back({forest->ground, _cur_ti.tile, z, girls});
+		} else if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
 			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
 			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
 			const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);

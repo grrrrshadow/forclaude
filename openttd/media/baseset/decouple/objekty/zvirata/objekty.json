@@ -496,5 +496,98 @@
   "autor": "Funny Dinosaur, emelyarules (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/funny-dinosaur-bb5cd2c390e0403885b6f9bf04daf2d6), převod tvorove/par15_tvorove.py bez renderu",
   "licence": "CC BY 4.0 (uvést emelyarules; změny: otočený, zmenšený na 1,6 m)",
   "poznamka": "zvíře (hráč: „zvířata funny dinosaur“) kolem měst, neútočí; 1,6 m vysoký, meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "zajic.glb",
+  "jmeno": "zajic",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "zajíc",
+   "en": "hare"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.54,
+   0.26,
+   0.65
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 3840,
+  "animace": {
+   "skok": {
+    "uzly": "skok_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.7
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: hnědý zajíc sedí na dlouhých zadních nohách, uši nahoru s černými špičkami, bílý ocásek; skáče; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků skok_00 až skok_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 60 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "veverka.glb",
+  "jmeno": "veverka",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "veverka",
+   "en": "red squirrel"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.33,
+   0.14,
+   0.35
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5656,
+  "animace": {
+   "skok": {
+    "uzly": "skok_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.45
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: rezavá veverka sedí na zadních s tlapkami u sebe, štětičky na uších, huňatý ocas stočený po zádech; skáče; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků skok_00 až skok_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 86 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "jezek.glb",
+  "jmeno": "jezek",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ježek",
+   "en": "hedgehog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.36,
+   0.23,
+   0.19
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 3712,
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.3
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: ježek s bodlinami na hřbetě (hnědošedé se světlými špičkami), špičatý čumák s černým nosem; cupitá; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků chuze_00 až chuze_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 55 kB, glb z gltfpacku"
  }
 ]

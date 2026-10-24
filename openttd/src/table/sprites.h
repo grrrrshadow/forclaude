@@ -1506,6 +1506,7 @@ static const SpriteID SPR_CARGO_HEMP_FIBRE            = SPR_CARGO_MARIJUANA_ICON
 static const SpriteID SPR_CARGO_EXPLOSIVES            = 4323; ///< Explosives (CT_EXPLOSIVES): the battery of the base set, until they have an icon of their own.
 static const SpriteID SPR_CARGO_POTATOES              = SPR_CARGO_GRAIN; ///< Potatoes (CT_POTATOES): the sack of grain, until they have an icon of their own.
 static const SpriteID SPR_CARGO_ALCOHOL               = SPR_CARGO_COLA;  ///< Alcohol (CT_ALCOHOL): the bottle of toyland's cola, until it has an icon of its own.
+static const SpriteID SPR_CARGO_MUSHROOMS             = SPR_CARGO_FRUIT; ///< Mushrooms (CT_MUSHROOMS): the fruit of the base set, until they have an icon of their own.
 static const SpriteID SPR_CARGO_STUDENTKY             = SPR_CARGO_PASSENGERS; ///< Studentky (CT_STUDENTKY): the passenger of the base set, until they have an icon of their own.
 static const SpriteID SPR_CARGO_TOFFEE                = 4320;
 static const SpriteID SPR_CARGO_BUBBLES               = 4321;

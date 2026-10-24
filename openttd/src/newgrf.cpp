@@ -1082,7 +1082,8 @@ static void OfferExplosivesToArmouredOnly()
  * coal wagon will not be in the purchase list once more but will be with the coal one as a refit, to save room in the
  * 8bpp list"; "marijuana hay, plant, fibres we carry by the coal wagon"; "the oil tanker will be for alcohol"; "potatoes
  * another refit of goods"): a vehicle of the game (of no set) that carries coal -- or the bulk of a climate without
- * it -- is refitted to marijuana and hemp fibre too, one for oil (cola) to alcohol, one for goods (sweets) to potatoes.
+ * it -- is refitted to marijuana and hemp fibre too, one for oil (cola) to alcohol, one for goods (sweets) to potatoes,
+ * one for mail to the mushrooms of the game's forest.
  * The marijuana wagons and lorries of their own are no longer offered (ApplyOriginalVehicleSettings()); a coal wagon
  * with marijuana draws its load green as they did. Done after OfferMarijuanaToShipsAndAircraft(), which takes
  * marijuana out of every other mask.
@@ -1101,6 +1102,7 @@ static void OfferIndustryCargoesToOriginalVehicles()
 		{CT_COLA,       {CT_ALCOHOL, CT_INVALID}},
 		{CT_GOODS,      {CT_POTATOES, CT_INVALID}},
 		{CT_CANDY,      {CT_POTATOES, CT_INVALID}},
+		{CT_MAIL,       {CT_MUSHROOMS, CT_INVALID}},
 	};
 	for (Engine *e : Engine::Iterate()) {
 		if (e->GetGRF() != nullptr || (e->type != VehicleType::Train && e->type != VehicleType::Road)) continue;

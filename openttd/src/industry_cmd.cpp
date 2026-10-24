@@ -790,6 +790,40 @@ static void SetupMarijuanaPlantation()
  */
 static void SetupTownIndustry(IndustryType type, const IndustryTileLayout &layout, StringID name, uint8_t map_colour);
 
+/** How many tons of mushrooms the forest with a clearing gives each production round while the girls pick them. */
+static const uint8_t GAME_FOREST_MUSHROOM_RATE = 8;
+
+/**
+ * The forest with a clearing (IT_GAME_FOREST), 4x4, the colleague's parts (hra/3d/LES-PRO-HRU.md): the original forest
+ * as it is -- where it may stand, how often, its wood -- on all its tiles one gfx of its own, and besides the wood the
+ * mushrooms (GAME_FOREST_MUSHROOM_RATE) while the girls of a delivery of studentky are there (ProduceIndustryGoodsHelper()).
+ * In the climates of the original forest.
+ */
+static void SetupGameForest()
+{
+	const IndustrySpec &forest = _industry_specs[IT_FOREST]; // enabled as ResetIndustries() set it
+	const IndustryGfx forest_tile = forest.layouts.front().front().gfx;
+	IndustryTileSpec &tile = _industry_tile_specs[GFX_GAME_FOREST];
+	tile = _origin_industry_tile_specs[forest_tile];
+	tile.grf_prop.subst_id = forest_tile;
+	tile.accepts_cargo_label.fill(CT_INVALID);
+	tile.accepts_cargo.fill(INVALID_CARGO);
+	tile.acceptance.fill(0);
+
+	IndustryTileLayout layout;
+	for (int16_t y = 0; y < 4; y++) {
+		for (int16_t x = 0; x < 4; x++) layout.push_back({TileIndexDiffC{x, y}, GFX_GAME_FOREST});
+	}
+	IndustrySpec &spec = _industry_specs[IT_GAME_FOREST];
+	spec = forest;
+	spec.layouts = {layout};
+	spec.name = STR_INDUSTRY_NAME_GAME_FOREST;
+	spec.produced_cargo_label[1] = CT_MUSHROOMS;
+	spec.production_rate[1] = GAME_FOREST_MUSHROOM_RATE;
+	spec.accepts_cargo_label.fill(CT_INVALID);
+	spec.grf_prop.subst_id = IT_FOREST;
+}
+
 static void SetupPotatoChain()
 {
 	SetupField(IT_POTATO_FIELD, GFX_POTATO_FIELD);
@@ -834,6 +868,8 @@ static void SetupPotatoChain()
 	}
 	SetupTownIndustry(IT_DRAGON_FARM, farm, STR_INDUSTRY_NAME_DRAGON_FARM, 0x9C);
 	_industry_specs[IT_DRAGON_FARM].behaviour.Reset(IndustryBehaviour::OnlyInTown);
+
+	SetupGameForest();
 }
 
 /**
@@ -887,6 +923,7 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE(0, 0),                     // GFX_PUB_YARD: its garden, grass
 	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0, 0),      // GFX_DRAGON_FARM_YARD: trodden earth
 	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0x5D4, 22), // GFX_DRAGON_FARM: the old house (house 0x18), the castle drawn as a 3D object
+	OWN_TILE_ON(0x81D, 0x81B, 39),              // GFX_GAME_FOREST: the original forest's trees, the parts drawn as 3D objects
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -1078,7 +1115,7 @@ static void TendMarijuanaPlantations()
  */
 static void LetGirlsGo()
 {
-	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP, IT_DRAGON_FARM}) for (IndustryID id : Industry::industries[type]) {
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP, IT_DRAGON_FARM, IT_GAME_FOREST}) for (IndustryID id : Industry::industries[type]) {
 		const Industry *i = Industry::Get(id);
 		for (const Industry::AcceptedCargo &a : i->accepted) {
 			if (a.last_accepted == TimerGameEconomy::Date{} || TimerGameEconomy::date.base() - a.last_accepted.base() != GIRLS_DAYS) continue;
@@ -1392,6 +1429,9 @@ static const std::array<CargoLabel, 1> PUB_CARGOES{CT_ALCOHOL};
 /** What the dragon farm takes: the marijuana hay its dragons eat, and the studentky who tend them. */
 static const std::array<CargoLabel, 2> DRAGON_FARM_CARGOES{CT_HEMP_FIBRE, CT_STUDENTKY};
 
+/** What the forest with a clearing takes: the studentky who pick its mushrooms. */
+static const std::array<CargoLabel, 1> GAME_FOREST_CARGOES{CT_STUDENTKY};
+
 /** How many studentky the girls' grammar school makes, as an industry's production rate. */
 static const uint8_t GYMNASIUM_PRODUCTION_RATE = 10;
 
@@ -1570,7 +1610,7 @@ void UpdateExtraIndustryCargoes()
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
 		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
-				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM) continue;
+				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1639,6 +1679,7 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_DISTILLERY, DISTILLERY_CARGOES);
 	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
 	ResolveTownIndustryCargoes(IT_DRAGON_FARM, DRAGON_FARM_CARGOES);
+	ResolveTownIndustryCargoes(IT_GAME_FOREST, GAME_FOREST_CARGOES);
 }
 
 /**
@@ -1819,6 +1860,7 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 		labels.push_back(CT_STUDENTKY);
 		labels.push_back(CT_POTATOES);
 		labels.push_back(CT_ALCOHOL);
+		labels.push_back(CT_MUSHROOMS);
 	}
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {
@@ -3079,6 +3121,9 @@ static void ProduceIndustryGoodsHelper(Industry *i, bool scale)
 {
 	for (auto &p : i->produced) {
 		if (!IsValidCargoType(p.cargo)) continue;
+		/* The forest with a clearing: its mushrooms only while the girls are there to pick them; they grow all the time
+		 * (the player, 24. 10.: "the mushrooms grow there all the time, the girls only pick them"). */
+		if (i->type == IT_GAME_FOREST && CargoSpec::Get(p.cargo)->label == CT_MUSHROOMS && !HasGirls(i)) continue;
 
 		uint16_t amount = p.rate;
 		if (scale) amount = ScaleByCargoScale(amount, false);

@@ -3193,5 +3193,888 @@
   "autor": "grrrrf: vlastní model domy/draci_farma.py (stavebnice domů, upečeno domy/dum_objekt.py), složení prumysl/draci_farma.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
+ },
+ {
+  "soubor": "les_zem.glb",
+  "jmeno": "les_zem",
+  "druh": "les",
+  "dil": "zem",
+  "doplnky": [
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     8.41,
+     3.61,
+     0.0
+    ],
+    "otoceni": 100.0,
+    "meritko": 0.81
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.17,
+     12.66,
+     0.0
+    ],
+    "otoceni": 322.7,
+    "meritko": 1.542
+   },
+   {
+    "jmeno": "smrk_les_v1",
+    "poloha": [
+     6.99,
+     9.43,
+     0.0
+    ],
+    "otoceni": 312.6,
+    "meritko": 0.85
+   },
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     3.83,
+     13.24,
+     0.0
+    ],
+    "otoceni": 343.3,
+    "meritko": 0.959
+   },
+   {
+    "jmeno": "smrk_les_v1",
+    "poloha": [
+     2.07,
+     3.6,
+     0.0
+    ],
+    "otoceni": 301.9,
+    "meritko": 0.973
+   },
+   {
+    "jmeno": "smrk_les_v1",
+    "poloha": [
+     1.32,
+     8.2,
+     0.0
+    ],
+    "otoceni": 285.2,
+    "meritko": 1.012
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     11.14,
+     10.45,
+     0.0
+    ],
+    "otoceni": 13.5,
+    "meritko": 1.06
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.42,
+     6.71,
+     0.0
+    ],
+    "otoceni": 57.4,
+    "meritko": 1.332
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.39,
+     2.78,
+     0.0
+    ],
+    "otoceni": 88.6,
+    "meritko": 1.418
+   }
+  ],
+  "houby": [
+   {
+    "poloha": [
+     2.55,
+     13.35,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     8.46,
+     2.33,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     3.65,
+     7.75,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     4.19,
+     13.93,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     8.66,
+     10.51,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     9.35,
+     2.35,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     14.36,
+     12.68,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     11.96,
+     13.07,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     9.05,
+     9.05,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     7.72,
+     8.47,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     3.79,
+     4.12,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     6.13,
+     8.58,
+     0.0
+    ]
+   }
+  ],
+  "holky": [
+   {
+    "postava": "pole_real",
+    "poloha": [
+     11.82,
+     14.16,
+     0.0
+    ],
+    "otoceni": 277.3,
+    "meritko": 2.0,
+    "poznamka": "sbírá houbu před sebou"
+   },
+   {
+    "postava": "pole_sedi",
+    "poloha": [
+     4.138,
+     12.832,
+     0.0
+    ],
+    "otoceni": 87.4,
+    "meritko": 2.0,
+    "poznamka": "sbírá houbu před sebou"
+   },
+   {
+    "postava": "pole_chill",
+    "poloha": [
+     4.488,
+     7.041,
+     0.0
+    ],
+    "otoceni": 139.9,
+    "meritko": 2.0,
+    "poznamka": "sbírá houbu před sebou"
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     5.58,
+     6.01,
+     0.0
+    ],
+    "otoceni": 115.4,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   },
+   {
+    "poloha": [
+     7.19,
+     12.95,
+     0.0
+    ],
+    "otoceni": 278.2,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   }
+  ],
+  "noc_postavy": [
+   {
+    "poloha": [
+     3.93,
+     2.05,
+     0.0
+    ],
+    "otoceni": 209.1,
+    "postavy": [
+     {
+      "postava": "strasidlo",
+      "sada": "carodejnice",
+      "poznamka": "přízrak: průsvitná bílá postava, vznáší se (hra: mirumilovne, straší)"
+     },
+     {
+      "postava": "prizrak",
+      "sada": "carodejnice",
+      "poznamka": "ďábelský fantom, vyprovokovat"
+     },
+     {
+      "postava": "kobold",
+      "sada": "strasidla",
+      "poznamka": "útočí"
+     }
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní půda (listí, jehličí, mech), kapradí, pařezy, padlá větev, kameny; houby rostou u stromů; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 2214 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 916 kB; glb z gltfpacku"
+ },
+ {
+  "soubor": "les_cesta.glb",
+  "jmeno": "les_cesta",
+  "druh": "les",
+  "dil": "cesta",
+  "cesta": {
+   "osa": "x",
+   "y": 7.4,
+   "sirka_m": 2.5
+  },
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     6.28,
+     3.66,
+     0.0
+    ],
+    "otoceni": 276.8,
+    "meritko": 1.485
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     9.59,
+     13.22,
+     0.0
+    ],
+    "otoceni": 187.6,
+    "meritko": 1.677
+   },
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     10.76,
+     1.68,
+     0.0
+    ],
+    "otoceni": 86.6,
+    "meritko": 0.905
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     4.82,
+     11.93,
+     0.0
+    ],
+    "otoceni": 350.4,
+    "meritko": 1.71
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     1.74,
+     5.02,
+     0.0
+    ],
+    "otoceni": 306.1,
+    "meritko": 1.277
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     6.62,
+     5.31,
+     0.0
+    ],
+    "otoceni": 255.6,
+    "meritko": 1.448
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     13.93,
+     5.01,
+     0.0
+    ],
+    "otoceni": 6.7,
+    "meritko": 1.102
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     0.97,
+     9.73,
+     0.0
+    ],
+    "otoceni": 333.5,
+    "meritko": 1.215
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     8.07,
+     9.64,
+     0.0
+    ],
+    "otoceni": 322.3,
+    "meritko": 1.041
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.67,
+     9.78,
+     0.0
+    ],
+    "otoceni": 72.2,
+    "meritko": 1.274
+   }
+  ],
+  "houby": [
+   {
+    "poloha": [
+     5.19,
+     2.5,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     10.52,
+     12.08,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     5.6,
+     5.7,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     8.23,
+     12.42,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     3.47,
+     13.43,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     10.61,
+     3.31,
+     0.0
+    ]
+   }
+  ],
+  "holky": [
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     3.519,
+     6.9,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 2.0,
+    "poznamka": "jde po cestě"
+   },
+   {
+    "postava": "bikini_jde",
+    "poloha": [
+     9.564,
+     7.9,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 2.0,
+    "poznamka": "jde po cestě proti"
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     8.94,
+     4.3,
+     0.0
+    ],
+    "otoceni": 60.1,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní cesta 2,5 m podél x od okraje k okraji (y = 7.4 m, koleje, tráva na krajích), keře podél, stromy mimo; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1034 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 892 kB; glb z gltfpacku"
+ },
+ {
+  "soubor": "les_paseka.glb",
+  "jmeno": "les_paseka",
+  "druh": "les",
+  "dil": "paseka",
+  "okraj_lesa": [
+   "x0",
+   "y0"
+  ],
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.22,
+     5.03,
+     0.0
+    ],
+    "otoceni": 317.4,
+    "meritko": 1.547
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     5.19,
+     1.1,
+     0.0
+    ],
+    "otoceni": 12.9,
+    "meritko": 1.672
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     1.24,
+     9.37,
+     0.0
+    ],
+    "otoceni": 180.6,
+    "meritko": 0.949
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.29,
+     1.55,
+     0.0
+    ],
+    "otoceni": 125.1,
+    "meritko": 1.389
+   }
+  ],
+  "houby": [
+   {
+    "poloha": [
+     0.57,
+     4.1,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     4.31,
+     1.99,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     3.8,
+     0.67,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     1.09,
+     6.15,
+     0.0
+    ]
+   }
+  ],
+  "holky": [
+   {
+    "postava": "pole_punk",
+    "poloha": [
+     9.6,
+     8.2,
+     0.0
+    ],
+    "otoceni": 225.0,
+    "meritko": 2.0,
+    "poznamka": "sedí v trávě"
+   },
+   {
+    "postava": "pole_chill",
+    "poloha": [
+     7.2,
+     10.8,
+     0.0
+    ],
+    "otoceni": 300.0,
+    "meritko": 2.0,
+    "poznamka": "klečí v trávě s telefonem"
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     11.8,
+     11.5,
+     0.0
+    ],
+    "otoceni": 200.0,
+    "meritko": 2.0,
+    "poznamka": "stojí na louce"
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     5.63,
+     6.98,
+     0.0
+    ],
+    "otoceni": 15.9,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   },
+   {
+    "poloha": [
+     11.71,
+     9.38,
+     0.0
+    ],
+    "otoceni": 200.4,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   },
+   {
+    "poloha": [
+     10.86,
+     4.54,
+     0.0
+    ],
+    "otoceni": 46.8,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   },
+   {
+    "poloha": [
+     3.35,
+     9.99,
+     0.0
+    ],
+    "otoceni": 127.3,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   }
+  ],
+  "noc_postavy": [
+   {
+    "poloha": [
+     7.2,
+     11.64,
+     0.0
+    ],
+    "otoceni": 190.4,
+    "postavy": [
+     {
+      "postava": "strasidlo",
+      "sada": "carodejnice",
+      "poznamka": "přízrak: průsvitná bílá postava, vznáší se (hra: mirumilovne, straší)"
+     },
+     {
+      "postava": "prizrak",
+      "sada": "carodejnice",
+      "poznamka": "ďábelský fantom, vyprovokovat"
+     },
+     {
+      "postava": "kobold",
+      "sada": "strasidla",
+      "poznamka": "útočí"
+     }
+    ]
+   },
+   {
+    "poloha": [
+     3.58,
+     3.19,
+     0.0
+    ],
+    "otoceni": 318.0,
+    "postavy": [
+     {
+      "postava": "strasidlo",
+      "sada": "carodejnice",
+      "poznamka": "přízrak: průsvitná bílá postava, vznáší se (hra: mirumilovne, straší)"
+     },
+     {
+      "postava": "prizrak",
+      "sada": "carodejnice",
+      "poznamka": "ďábelský fantom, vyprovokovat"
+     },
+     {
+      "postava": "kobold",
+      "sada": "strasidla",
+      "poznamka": "útočí"
+     }
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "paseka uprostřed lesa: louka s kytkami a trsy trávy; podél okrajů x = 0 a y = 0 (u severního rohu) přechází do lesní půdy, tam dva stromy, keře a kapradí; hra natočí každé ze čtyř prostředních políček severním rohem ven, čtyři dají jednu paseku (jedno z nich je les_paseka_srub); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1244 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 884 kB; glb z gltfpacku"
+ },
+ {
+  "soubor": "les_paseka_srub.glb",
+  "jmeno": "les_paseka_srub",
+  "druh": "les",
+  "dil": "paseka_srub",
+  "okraj_lesa": [
+   "x0",
+   "y0"
+  ],
+  "doplnky": [
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     6.28,
+     1.38,
+     0.0
+    ],
+    "otoceni": 83.8,
+    "meritko": 1.094
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     11.26,
+     1.08,
+     0.0
+    ],
+    "otoceni": 27.1,
+    "meritko": 1.087
+   }
+  ],
+  "houby": [
+   {
+    "poloha": [
+     7.5,
+     1.44,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     1.06,
+     1.52,
+     0.0
+    ]
+   },
+   {
+    "poloha": [
+     5.44,
+     0.83,
+     0.0
+    ]
+   }
+  ],
+  "holky": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     10.43,
+     8.402,
+     0.94
+    ],
+    "otoceni": 231.6,
+    "meritko": 2.0,
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     6.725,
+     6.937,
+     0.94
+    ],
+    "otoceni": 351.6,
+    "meritko": 2.0,
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
+   },
+   {
+    "postava": "anime_girl_sedi",
+    "poloha": [
+     9.845,
+     4.461,
+     0.94
+    ],
+    "otoceni": 111.6,
+    "meritko": 2.0,
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     8.23,
+     11.06,
+     0.0
+    ],
+    "otoceni": 276.0,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   },
+   {
+    "poloha": [
+     4.9,
+     2.9,
+     0.0
+    ],
+    "otoceni": 237.8,
+    "druhy": [
+     "lan",
+     "jelen",
+     "liska",
+     "liska_skace",
+     "vlk_lesni",
+     "vlce",
+     "zajic",
+     "veverka",
+     "jezek"
+    ]
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc: svítící okna srubu, lucerna u dveří a žhavé uhlíky v ohništi; svetlo_NN jsou místa pro záři (dvě okna, lucerna, oheň)"
+  },
+  "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi, lucerna u dveří), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 14408 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 1218 kB; glb z gltfpacku"
  }
 ]

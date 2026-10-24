@@ -251,6 +251,7 @@ struct ThreeDObject {
 	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors ("dvere_NN" of its file, then of its interior's): shut, open one way, the other
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
+	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
 	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
@@ -910,6 +911,27 @@ struct ThreeDIndustryTileParts {
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 bool ThreeDForestTile(TileIndex tile);
+
+/** A place of the forest with a clearing where the game or the ghosts come ("zvirata", "noc_postavy"), with their kinds. */
+struct ThreeDForestPlace {
+	ThreeDObjectFigure at;           ///< where (figure empty), facing
+	std::vector<std::string> kinds;  ///< "druhy" / "postavy": of the animals and ghosts of the indices, by name
+};
+
+/**
+ * A part of the forest with a clearing (the colleague's "druh": "les", hra/3d/LES-PRO-HRU.md) as it lies on a tile,
+ * turned by so many quarter turns about the tile's middle: its ground (the forest floor, the ferns, the path, the
+ * forester's log cabin), its trees and bushes, and where its girls, mushrooms, game and ghosts are -- metres from the
+ * north corner of the tile.
+ */
+struct ThreeDForestPart {
+	const ThreeDObject *ground = nullptr;     ///< the part's model with its trees and bushes ("doplnky") laid in; its night the cabin's windows, lantern, embers
+	std::vector<ThreeDObjectFigure> girls;    ///< "holky": after a delivery of studentky
+	std::vector<ThreeDObjectFigure> mushrooms; ///< "houby": where they grow, all the time (the kind drawn by the place)
+	std::vector<ThreeDForestPlace> animals;   ///< "zvirata"
+	std::vector<ThreeDForestPlace> ghosts;    ///< "noc_postavy", at night
+};
+const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile);
 const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile);
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 

@@ -224,5 +224,36 @@
   "autor": "ufo, ilarioseb (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ufo-1ce1c10eaa5f4288b63c2c635d0c04f7), převod tvorove/ufo.py bez renderu",
   "licence": "CC BY 4.0 (uvést ilarioseb; změny: zjednodušený na 8647 trojúhelníků, kůže přebarvená na zelenou, ruce z A-pózy stažené k tělu, otočený, chůze ze snímků)",
   "poznamka": "v noci chodí kolem měst a kolem přistálého UFO (pilot talíře ufo_talir je týž ufon), neútočí; skutečné metry (1.4 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; chůze z 12 snímků chuze_00 až chuze_11: tělo (3596 trojúhelníků) jako instance jedné sítě, nohy a ruce (5051) v každém snímku vlastní, nohy se kývají kolem kyčlí ±22°, ruce kolem ramen ±18° proti noze na své straně, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); bez kostry; glb z gltfpacku"
+ },
+ {
+  "soubor": "mimozemstan.glb",
+  "jmeno": "mimozemstan",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "zelený mimozemšťan",
+   "en": "green alien"
+  },
+  "kdy": "noc",
+  "kde": "ulice",
+  "povaha": "mirumilovne",
+  "meritko": 2,
+  "rozmer_m": [
+   0.83,
+   0.69,
+   1.54
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 4,
+    "smycka": true,
+    "krok_m": 0.96
+   }
+  },
+  "trojuhelniku": 12478,
+  "autor": "Realistic Alien - Mexico Aliens insiped, Graphetta (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/realistic-alien-mexico-aliens-insiped-16f00ad731654426bf596e088ec35c7a), převod tvorove/par17.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Graphetta; změny: zjednodušený na 12478 trojúhelníků, kůže přebarvená na zelenou, ruce z A-pózy spuštěné, otočený, chůze ze snímků)",
+  "poznamka": "hráč: „ten chodici muže chodit v noci poměstě“; mimozemšťan podle mumií z mexického parlamentu, zelený (hráč: „obarvi na zeleno“), v noci chodí po ulicích, neútočí; skutečné metry (1.5 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; model nemá kostru ani pohyb, chůze je naše z 12 snímků chuze_00 až chuze_11: tělo (5666 trojúhelníků) jako instance jedné sítě, nohy a ruce (6812) v každém snímku vlastní, nohy se kývají kolem kyčlí ±20°, ruce kolem ramen ±16° proti noze na své straně, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); glb z gltfpacku"
  }
 ]

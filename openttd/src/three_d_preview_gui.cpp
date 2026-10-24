@@ -42,6 +42,7 @@
 #include "vehicle_base.h"
 #include "vehicle_func.h"
 #include "industry.h"
+#include "climate_industries.h"
 #include "industry_map.h"
 #include "industrytype.h"
 #include "spritecache.h"
@@ -475,6 +476,15 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		}
 		lay(origin, obj, nullptr, GetThreeDIndustryGirls(ind, obj), 0);
 		laid.back().second.paint = obj->PaintAt(origin);
+	} else if (ind->type == IT_GAME_FOREST) {
+		/* The forest with a clearing, a part on each tile as the map lays it (ThreeDGameForestPartAt()), its girls after
+		 * a delivery of studentky. */
+		const bool girls = HasGirls(ind);
+		for (TileIndex tile : ind->location) {
+			const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+			if (forest == nullptr || forest->ground == nullptr || GetIndustryIndex(tile) != ind->index) continue;
+			lay(tile, forest->ground, nullptr, girls && IsIndustryCompleted(tile) ? std::span<const ThreeDObjectFigure>(forest->girls) : std::span<const ThreeDObjectFigure>(), 0);
+		}
 	} else if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
 		/* An industry of the original game from the parts the industries share, as the map lays it
 		 * (AddOriginalIndustryTile() of viewport.cpp): each tile's ground, first; the parts and the plants of each
@@ -738,7 +748,8 @@ void ShowThreeDIndustryPreview(IndustryID industry)
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
 	const bool field = (ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDFieldPart("zem") != nullptr;
-	if (GetThreeDIndustryObjectOf(ind) == nullptr && !field && !HasOriginalIndustryParts(ind)) return;
+	const bool forest = ind->type == IT_GAME_FOREST && ThreeDGameForestPartAt(ind->location.tile) != nullptr;
+	if (GetThreeDIndustryObjectOf(ind) == nullptr && !field && !forest && !HasOriginalIndustryParts(ind)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }
 

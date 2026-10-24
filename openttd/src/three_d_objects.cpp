@@ -2575,6 +2575,220 @@ static std::map<std::string, IndustryPartMesh> ReadIndustryParts(const nlohmann:
 	return parts;
 }
 
+/** A part of the forest with a clearing as read, by its turn: its object by its place in _three_d_objects. */
+struct ForestPartRead {
+	size_t ground = SIZE_MAX;
+	ThreeDForestPart rest; ///< its girls, mushrooms, game and ghosts (its object put in GetThreeDForestPart())
+};
+/** The parts of the forest with a clearing by their "dil", each turned by 0 to 3 quarter turns (GetThreeDForestPart()). */
+static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest_parts_read;
+
+/**
+ * The whole scene of a part of the forest with a clearing (ThreeDObject::scene_turns): every node but those lit at
+ * night ("noc", read as a house's), turned about the middle of the tile by quarter turns, its night and glows with it.
+ * Only the cabin, the high seat, the logs and the fireplace keep the walker off, not the ferns, the grass and the
+ * stones (passable_tris).
+ */
+static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter_turns)
+{
+	static const std::vector<std::string> solid = {"srub", "posed", "klady", "ohniste"};
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.skip_night = true;
+	o.groups = &solid;
+	if (!ReadGlbMesh(path, mesh, o)) return false;
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
+	const double middle_m = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0;
+	auto turn = [&](auto *p, double middle) {
+		const double dx = p[0] - middle, dy = p[1] - middle;
+		p[0] = static_cast<std::remove_reference_t<decltype(p[0])>>(middle + dx * cs - dy * sn);
+		p[1] = static_cast<std::remove_reference_t<decltype(p[0])>>(middle + dx * sn + dy * cs);
+	};
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) turn(&mesh.pos[i], middle_m);
+	for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) turn(&mesh.nrm[i], 0.0);
+	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
+		if ((mesh.tri_group[t] == 0) != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
+	}
+	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
+	const double middle = TILE_SIZE / 2.0;
+	for (size_t i = 0; i + 2 < obj.night_pos.size(); i += 3) turn(&obj.night_pos[i], middle);
+	for (size_t i = 0; i + 2 < obj.lights.size(); i += 3) turn(&obj.lights[i], middle);
+	return true;
+}
+
+/**
+ * A part of the forest with a clearing ("druh": "les", the colleague's hra/3d/LES-PRO-HRU.md): one tile, its origin
+ * in the north corner, laid by the game turned by quarter turns about the tile's middle (the clearing's four tiles
+ * each with its north corner out of the clearing; the path from the side of the road): an object of its whole scene
+ * (ReadGlbScene()) for each turn, read when first drawn as a house is, its trees and bushes laid in as add-ons; its
+ * girls, mushrooms, game and ghosts by their places -- each turned with it.
+ */
+static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
+{
+	const std::string part = e.value("dil", std::string());
+	if (part.empty() || !e.contains("soubor") || !e.at("soubor").is_string()) return;
+	const std::string file = e.at("soubor").get<std::string>();
+	const std::string name = e.value("jmeno", file);
+	if (ReadWholeFile(folder + file).empty()) return;
+
+	auto figures = [&e](const char *key, std::vector<ThreeDObjectFigure> &into) {
+		if (!e.contains(key) || !e.at(key).is_array()) return;
+		for (const auto &f : e.at(key)) {
+			ThreeDObjectFigure fig;
+			if (f.is_object() && f.contains("postava") && ReadFigure(f, fig)) {
+				into.push_back(std::move(fig));
+			} else if (f.is_object() && f.contains("poloha") && f.at("poloha").is_array() && f.at("poloha").size() == 3) {
+				for (int k = 0; k < 3; k++) fig.at[k] = f.at("poloha").at(k).get<float>();
+				fig.facing = f.value("otoceni", 0.0f);
+				into.push_back(std::move(fig));
+			}
+		}
+	};
+	auto places = [&e](const char *key, const char *kinds, std::vector<ThreeDForestPlace> &into) {
+		if (!e.contains(key) || !e.at(key).is_array()) return;
+		for (const auto &f : e.at(key)) {
+			if (!f.is_object() || !f.contains("poloha") || !f.at("poloha").is_array() || f.at("poloha").size() != 3) continue;
+			ThreeDForestPlace place;
+			for (int k = 0; k < 3; k++) place.at.at[k] = f.at("poloha").at(k).get<float>();
+			place.at.facing = f.value("otoceni", 0.0f);
+			if (f.contains(kinds) && f.at(kinds).is_array()) {
+				for (const auto &kind : f.at(kinds)) {
+					if (kind.is_string()) place.kinds.push_back(kind.get<std::string>());
+					if (kind.is_object() && kind.contains("postava") && kind.at("postava").is_string()) place.kinds.push_back(kind.at("postava").get<std::string>());
+				}
+			}
+			if (!place.kinds.empty()) into.push_back(std::move(place));
+		}
+	};
+	ThreeDForestPart as_read;
+	figures("holky", as_read.girls);
+	figures("houby", as_read.mushrooms);
+	places("zvirata", "druhy", as_read.animals);
+	places("noc_postavy", "postavy", as_read.ghosts);
+	ThreeDObject trees_read;
+	ReadBuildingFigures(e, trees_read);
+
+	/* Turned about the middle of the tile by quarter turns: exactly, no rounding of the sines. */
+	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE) / 2;
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	for (int k = 0; k < 4; k++) {
+		const float cs = static_cast<float>(COS[k]), sn = static_cast<float>(SIN[k]);
+		auto turn = [&](ThreeDObjectFigure &f) {
+			const float dx = f.at[0] - middle, dy = f.at[1] - middle;
+			f.at[0] = middle + dx * cs - dy * sn;
+			f.at[1] = middle + dx * sn + dy * cs;
+			f.facing = std::fmod(f.facing + k * 90.0f, 360.0f);
+		};
+		ThreeDObject obj;
+		obj.file = file;
+		obj.name = fmt::format("{}/{}", name, k * 90);
+		obj.glb_path = folder + file;
+		obj.variants = 0; // no house's
+		obj.scene_turns = static_cast<int8_t>(k);
+		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+		obj.addon_places = trees_read.addon_places;
+		for (ThreeDObjectFigure &f : obj.addon_places) turn(f);
+		ForestPartRead &r = _forest_parts_read[part][k];
+		r.ground = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(obj));
+		r.rest = as_read;
+		for (ThreeDObjectFigure &f : r.rest.girls) turn(f);
+		for (ThreeDObjectFigure &f : r.rest.mushrooms) turn(f);
+		for (ThreeDForestPlace &p : r.rest.animals) turn(p.at);
+		for (ThreeDForestPlace &p : r.rest.ghosts) turn(p.at);
+	}
+}
+
+static void ReadThreeDObjects();
+
+/** A part of the forest with a clearing by its "dil" ("zem", "cesta", "paseka", "paseka_srub"), turned by so many quarter turns; nullptr none. */
+static const ThreeDForestPart *GetThreeDForestPart(std::string_view part, int turn)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static std::map<std::string, std::array<ThreeDForestPart, 4>, std::less<>> resolved;
+	static bool made = false;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		for (const auto &[name, turns] : _forest_parts_read) {
+			Debug(misc, 1, "3D objects: forest part {}: {} trees, {} girls, {} mushrooms, {} places of game, {} of ghosts", name,
+					turns[0].ground != SIZE_MAX ? _three_d_objects[turns[0].ground].addon_places.size() : 0,
+					turns[0].rest.girls.size(), turns[0].rest.mushrooms.size(), turns[0].rest.animals.size(), turns[0].rest.ghosts.size());
+			for (int k = 0; k < 4; k++) {
+				ThreeDForestPart &p = resolved[name][k];
+				p = turns[k].rest;
+				p.ground = turns[k].ground != SIZE_MAX ? &_three_d_objects[turns[k].ground] : nullptr;
+			}
+		}
+	}
+	auto it = resolved.find(part);
+	return it == resolved.end() ? nullptr : &it->second[turn & 3];
+}
+
+/**
+ * The side of the forest with a clearing its path comes from: the side with the most road beside it (the colleague's
+ * hra/3d/LES-PRO-HRU.md, "the path comes from the side of the road"), a side of its own by chance without a road.
+ */
+static DiagDirection GameForestPathSide(const Industry *ind)
+{
+	const TileIndex corner = ind->location.tile;
+	const int w = ind->location.w, h = ind->location.h;
+	int best = 0;
+	DiagDirection side = static_cast<DiagDirection>(GB(ind->random, 3, 2));
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		int roads = 0;
+		const bool along_x = d == DiagDirection::SE || d == DiagDirection::NW;
+		for (int i = 0; i < (along_x ? w : h); i++) {
+			const int x = d == DiagDirection::NE ? -1 : d == DiagDirection::SW ? w : i;
+			const int y = d == DiagDirection::NW ? -1 : d == DiagDirection::SE ? h : i;
+			const TileIndex t = TileAddWrap(corner, x, y);
+			if (t != INVALID_TILE && IsTileType(t, TileType::Road)) roads++;
+		}
+		if (roads > best) {
+			best = roads;
+			side = d;
+		}
+	}
+	return side;
+}
+
+/**
+ * What part of the forest with a clearing lies on a tile of it, turned how (the colleague's hra/3d/LES-PRO-HRU.md):
+ * the clearing on the four middle tiles, each turned with its north corner out of the clearing, the forester's cabin on
+ * one of them; the path on a tile of the edge from the side of the road into the clearing; the forest floor elsewhere,
+ * turned as its place says (its ground runs on over the edges however it is turned). Nullptr for any other tile.
+ */
+const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Industry) || GetIndustryGfx(tile) != GFX_GAME_FOREST) return nullptr;
+	const Industry *ind = Industry::GetByTile(tile);
+	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));
+	const int dy = static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile));
+	if (dx < 0 || dy < 0 || dx > 3 || dy > 3) return nullptr;
+	if (dx >= 1 && dx <= 2 && dy >= 1 && dy <= 2) {
+		/* The north corner out: (1, 1) as it is, (2, 1) a quarter turn, (2, 2) a half, (1, 2) three quarters. */
+		static constexpr int TURNS[2][2] = {{0, 3}, {1, 2}};
+		const bool cabin = (dx - 1) + 2 * (dy - 1) == static_cast<int>(GB(ind->random, 0, 2));
+		return GetThreeDForestPart(cabin ? "paseka_srub" : "paseka", TURNS[dx - 1][dy - 1]);
+	}
+	const int k = 1 + static_cast<int>(GB(ind->random, 2, 1));
+	bool path = false;
+	int turn = 0;
+	switch (GameForestPathSide(ind)) {
+		case DiagDirection::NE: path = dx == 0 && dy == k; break;
+		case DiagDirection::SW: path = dx == 3 && dy == k; break;
+		case DiagDirection::NW: path = dy == 0 && dx == k; turn = 1; break;
+		case DiagDirection::SE: path = dy == 3 && dx == k; turn = 1; break;
+		default: break;
+	}
+	if (path) return GetThreeDForestPart("cesta", turn);
+	return GetThreeDForestPart("zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
+}
+
 /** A tile of the original industries ("druh": "prumysl_dlazdice"): its ground, its parts placed, its plants, for each of its gfx. */
 static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std::string, IndustryPartMesh> &parts)
 {
@@ -2699,6 +2913,10 @@ static void ReadThreeDObjects()
 				}
 				if (kind == "prumysl_dlazdice") {
 					ReadOriginalIndustryTile(e, parts);
+					continue;
+				}
+				if (kind == "les") {
+					ReadForestPart(e, folder);
 					continue;
 				}
 				if (kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
@@ -6496,6 +6714,8 @@ bool ThreeDObject::Read() const
 			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read);
 		} else if (this->is_interior) {
 			ok = ReadGlbInterior(this->glb_path, read);
+		} else if (this->scene_turns >= 0) {
+			ok = ReadGlbScene(this->glb_path, read, this->scene_turns);
 		} else {
 			ok = this->glb_path.empty() ? !this->addon_places.empty() : ReadGlb(this->glb_path, read);
 		}

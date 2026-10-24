@@ -78,6 +78,12 @@ static const IndustryType IT_PUB = NUM_INDUSTRYTYPES - 8;
  * vehicles near (the player, 23. 10.). Makes nothing.
  */
 static const IndustryType IT_DRAGON_FARM = NUM_INDUSTRYTYPES - 9;
+/**
+ * The forest with a clearing, 4x4 out in the country (economy.extra_industries), the colleague's parts (objekty/prumysl/
+ * les_*.glb): its wood always, as the original forest; the mushrooms the girls pick while they are there, after a
+ * delivery of studentky (the player, 23. 10.). Its trees, mushrooms and animals are there always.
+ */
+static const IndustryType IT_GAME_FOREST = NUM_INDUSTRYTYPES - 10;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -127,8 +133,10 @@ static const IndustryGfx  GFX_PUB_YARD = NUM_INDUSTRYTILES - 15;
 /** The tiles of the dragon farm (IT_DRAGON_FARM): its yard, and its keep in the middle. */
 static const IndustryGfx  GFX_DRAGON_FARM_YARD = NUM_INDUSTRYTILES - 16;
 static const IndustryGfx  GFX_DRAGON_FARM = NUM_INDUSTRYTILES - 17;
+/** The tiles of the forest with a clearing (IT_GAME_FOREST), all one: each laid of a part by its place (ThreeDGameForestTile()). */
+static const IndustryGfx  GFX_GAME_FOREST = NUM_INDUSTRYTILES - 18;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_DRAGON_FARM;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_GAME_FOREST;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 
