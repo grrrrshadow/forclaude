@@ -909,6 +909,7 @@ struct ThreeDIndustryTileParts {
 };
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
+bool ThreeDForestTile(TileIndex tile);
 const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile);
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 

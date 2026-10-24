@@ -5744,6 +5744,19 @@ bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTilePa
 }
 
 /**
+ * Whether a tile is of a forest: of an original industry, with trees alone on it (ThreeDIndustryTileParts::at_once).
+ * Its mushrooms grow there, its game lives there, one walks among its trunks as among trees.
+ */
+bool ThreeDForestTile(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Industry)) return false;
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return false;
+	const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTile(gfx);
+	return parts != nullptr && parts->at_once;
+}
+
+/**
  * The plants of a field (wheat on the farm's fields) on a sloped tile: each lifted to the ground under it, the heights
  * of the tile's corners shared between them (an object of its own a slope, made the first time).
  */

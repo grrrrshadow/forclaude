@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "three_d_navigation.h"
+#include "three_d_objects.h"
 #include "map_func.h"
 #include "tile_map.h"
 #include "water_map.h"
@@ -22,9 +23,9 @@
 #include "safeguards.h"
 
 /**
- * Whether a large creature (a dragon) may walk on a tile: the open land, the trees, the roads and the rails; not a
- * house, an industry, a station, an object, water, the end of a tunnel or a bridge, and not a slope steeper than
- * a level across the tile (its corners more than a level apart).
+ * Whether a large creature (a dragon) may walk on a tile: the open land, the trees, the forests, the roads and the
+ * rails; not a house, another industry, a station, an object, water, the end of a tunnel or a bridge, and not a slope
+ * steeper than a level across the tile (its corners more than a level apart).
  */
 bool NavWalkable(TileIndex tile)
 {
@@ -34,6 +35,10 @@ bool NavWalkable(TileIndex tile)
 		case TileType::Trees:
 		case TileType::Road:
 		case TileType::Railway:
+			break;
+		case TileType::Industry:
+			/* The forest's game among its trees (ThreeDForestTile()). */
+			if (!ThreeDForestTile(tile)) return false;
 			break;
 		default:
 			return false;

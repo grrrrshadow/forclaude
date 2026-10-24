@@ -36,6 +36,8 @@
 #include "town.h"
 #include "house.h"
 #include "rail_map.h"
+#include "track_func.h"
+#include "tile_cmd.h"
 #include "settings_type.h"
 #include "company_base.h"
 #include "company_func.h"
@@ -62,9 +64,12 @@ constexpr uint STREET_KEPT = 5;            ///< so many in the streets about the
 constexpr uint DOOR_KEPT = 2;              ///< before the doors
 constexpr uint ROOF_KEPT = 4;              ///< on the roofs
 constexpr uint ROUND_KEPT = 5;             ///< in the land about the towns
+constexpr uint FOREST_KEPT = 3;            ///< in the forests about the middle
 constexpr uint GHOSTS_KEPT = 3;            ///< ghosts ("kdy": at night, by day, or always)
 constexpr uint RAIL_KEPT = 3;              ///< and ghosts along the railway lines about the middle, besides
-constexpr int RAIL_RIDE_TILES = 4;         ///< one along the rails goes on so many tiles at most before it rests
+constexpr double RAIL_RIDE_M = 0.05;       ///< one riding the rails without a pose of walking goes so far a tick, metres
+/** The one who rides the rails as a little engine (the player, 24. 10.: "only Billy rides the rails"): no other ghost. */
+constexpr std::string_view RAIL_RIDER = "billy_tricykl";
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
 constexpr uint64_t SELLER_TICKS = 20000;   ///< a seller stays so long (about nine minutes) ...
 constexpr uint64_t SELLER_AWAY_TICKS = 4000; ///< ... and the next comes after about so long
@@ -91,6 +96,7 @@ enum class Place : uint8_t {
 	Rail,   ///< a ghost along a railway line, going along its rails (the player, 23. 10.: "more ghosts by the tracks; Billy rides along the rails")
 	Seller, ///< a seller of dogs in a street
 	Pet,    ///< the walker's dog, walking with it
+	Forest, ///< in a forest, always (the player, 24. 10.: "trees, mushrooms and the little animals are to be in the forest all the time")
 };
 
 enum class State : uint8_t {
@@ -131,6 +137,8 @@ struct Beast {
 	double way_tx = 0, way_ty = 0;
 	uint64_t way_made = 0;
 	std::string next_pose; ///< the pose it goes into when the one it is in (sitting down, getting up) is done
+	TileIndex rail_tile = INVALID_TILE;       ///< riding the rails (Place::Rail): the tile it rides through ...
+	Trackdir rail_td = Trackdir::Invalid;     ///< ... along this track of it, to its far edge
 };
 
 std::vector<Beast> _beasts;
@@ -166,13 +174,16 @@ struct MushroomAt {
 /** The mushroom of a tile, if it has one now. */
 bool MushroomOnTile(TileIndex t, MushroomAt &at)
 {
-	if (!IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) return false;
+	/* In the forest on every tile, growing all the time, any kind (the player, 24. 10.: "the mushrooms grow there all
+	 * the time, the girls only pick them"); elsewhere about the towns of their theme. */
+	const bool forest = ThreeDForestTile(t);
+	if (!forest && !IsTileType(t, TileType::Clear) && !IsTileType(t, TileType::Trees)) return false;
 	const uint32_t h = (TileX(t) * 2654435761u) ^ (TileY(t) * 40503u) ^ 0x5bd1e995u;
-	if ((h >> 3) % MUSHROOM_ONE_IN != 0) return false;
+	if (!forest && (h >> 3) % MUSHROOM_ONE_IN != 0) return false;
 	const std::vector<ThreeDMushroom> &kinds = GetThreeDMushrooms();
 	if (kinds.empty()) return false;
 	const ThreeDMushroom &m = kinds[(h >> 9) % kinds.size()];
-	if (m.theme != 0 && to_underlying(GetTownThemeAt(t)) != m.theme) return false;
+	if (!forest && m.theme != 0 && to_underlying(GetTownThemeAt(t)) != m.theme) return false;
 	auto picked = _mushrooms_picked.find(t.base());
 	if (picked != _mushrooms_picked.end()) {
 		if (TimerGameTick::counter - picked->second < MUSHROOM_REGROW_TICKS) return false;
@@ -378,40 +389,39 @@ bool RailAxis(TileIndex tile, double &heading)
 	return false;
 }
 
-/**
- * Along the rails it is on: on as far as the straight track goes the way it faces, a few tiles (Billy on his tricycle,
- * the bedsheet floating); at the end of it back the other way. Kept on the middle of the track.
- */
-void PickRailWander(Beast &b)
+/** The middle of a tile's edge on a side, world units: where one riding the rails passes from tile to tile. */
+void EdgeMiddle(TileIndex t, DiagDirection side, double &x, double &y)
 {
-	const TileIndex at = TileVirtXY(static_cast<int>(b.x), static_cast<int>(b.y));
-	double axis;
-	if (!RailAxis(at, axis)) {
+	static constexpr double DX[] = {0, 0.5, 1, 0.5}, DY[] = {0.5, 1, 0.5, 0};
+	x = (TileX(t) + DX[to_underlying(side)]) * TILE_SIZE;
+	y = (TileY(t) + DY[to_underlying(side)]) * TILE_SIZE;
+}
+
+/**
+ * On along the rails as a train goes (the player, 24. 10.: "Billy on his tricycle is to ride the rails like a little
+ * engine, not come after me to attack; he is to ride past along the rails"): from the far edge of the tile it rides
+ * through into the tile beyond, along a track there that goes on from that edge -- straight on where it can, else any,
+ * curves and switches as a train --, to that tile's far edge; at the end of the line back the way it came.
+ */
+void PickRailRide(Beast &b)
+{
+	if (b.rail_tile == INVALID_TILE || b.rail_td == Trackdir::Invalid) {
 		b.tx = b.x;
 		b.ty = b.y;
 		return;
 	}
-	const bool along_x = axis == 0;
-	int step = (along_x ? std::cos(b.heading) : std::sin(b.heading)) >= 0 ? 1 : -1;
-	const int want = 1 + static_cast<int>(InteractiveRandomRange(RAIL_RIDE_TILES));
-	for (int turn = 0; turn < 2; turn++, step = -step) {
-		int n = 0;
-		TileIndex t = at;
-		while (n < want) {
-			const TileIndex next = TileAddWrap(t, along_x ? step : 0, along_x ? 0 : step);
-			double a;
-			if (next == INVALID_TILE || !RailAxis(next, a) || a != axis) break;
-			t = next;
-			n++;
-		}
-		if (n == 0) continue;
-		b.tx = along_x ? TileX(t) * TILE_SIZE + TILE_SIZE / 2.0 : TileX(at) * TILE_SIZE + TILE_SIZE / 2.0;
-		b.ty = along_x ? TileY(at) * TILE_SIZE + TILE_SIZE / 2.0 : TileY(t) * TILE_SIZE + TILE_SIZE / 2.0;
-		b.way.clear();
-		return;
+	const DiagDirection out = TrackdirToExitdir(b.rail_td);
+	const TileIndex next = TileAddWrap(b.rail_tile, TileIndexDiffCByDiagDir(out).x, TileIndexDiffCByDiagDir(out).y);
+	const TrackdirBits on = next == INVALID_TILE ? TrackdirBits{} : GetTileTrackStatus(next, TransportType::Rail, RoadTramType::Invalid).trackdirs & DiagdirReachesTrackdirs(out);
+	if (on.None()) {
+		/* The end of the line (a buffer, a tunnel, a bridge, the edge of the map): back across the tile. */
+		b.rail_td = ReverseTrackdir(b.rail_td);
+	} else {
+		b.rail_tile = next;
+		if (!on.Test(b.rail_td)) b.rail_td = on.GetNthSetBit(InteractiveRandomRange(on.Count())).value_or(FindFirstTrackdir(on));
 	}
-	b.tx = b.x;
-	b.ty = b.y;
+	EdgeMiddle(b.rail_tile, TrackdirToExitdir(b.rail_td), b.tx, b.ty);
+	b.way.clear();
 }
 
 /** A straight railway tile near the middle, at random: the middle of its track, world units, and its way; false none found. */
@@ -439,9 +449,16 @@ std::string_view RestPose(const Beast &b, const ThreeDAnimal &a)
 }
 
 /** Whether it fights the walker now: one that attacks, or one provoked. */
+/** Whether it rides the rails (PickRailRide()): Billy by them; the other ghosts there haunt as anywhere. */
+bool RidesRails(const Beast &b, const ThreeDAnimal &a)
+{
+	return b.place == Place::Rail && a.name == RAIL_RIDER;
+}
+
 bool Fights(const Beast &b, const ThreeDAnimal &a)
 {
-	if (b.place == Place::Pet || b.place == Place::Seller) return false;
+	/* Billy rides past (the player, 24. 10.: "he is not to come after me to attack"). */
+	if (b.place == Place::Pet || b.place == Place::Seller || RidesRails(b, a)) return false;
 	return a.temper == ThreeDAnimal::Temper::Attacks || b.angry;
 }
 
@@ -555,11 +572,11 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			if (b.place == Place::Door && dist_m < 4.0 && a.Has("vrci")) SetPose(b, "vrci", now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
-			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Ghost || (b.place == Place::Street && a.Has("chuze")))) {
+			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Forest || b.place == Place::Ghost || (b.place == Place::Rail && !RidesRails(b, a)) || (b.place == Place::Street && a.Has("chuze")))) {
 				PickWander(b);
 				b.state = State::Wander;
-			} else if (now >= b.until && Moves(a) && b.place == Place::Rail) {
-				PickRailWander(b);
+			} else if (RidesRails(b, a)) {
+				PickRailRide(b);
 				b.state = State::Wander;
 			}
 			break;
@@ -568,10 +585,14 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			SetPose(b, walk, now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
-			} else if (WalkTo(b, b.tx, b.ty, Speed(b, walk, 0.015), now, a.flies || b.place == Place::Rail)) {
-				/* Along the rails it goes on soon, as on a ride. */
-				b.state = State::Idle;
-				b.until = now + (b.place == Place::Rail ? 20 + InteractiveRandomRange(120) : 150 + InteractiveRandomRange(450));
+			} else if (WalkTo(b, b.tx, b.ty, Speed(b, walk, RidesRails(b, a) ? RAIL_RIDE_M : 0.015), now, a.flies || RidesRails(b, a))) {
+				/* Along the rails on into the next tile without a stop, as a train. */
+				if (RidesRails(b, a)) {
+					PickRailRide(b);
+				} else {
+					b.state = State::Idle;
+					b.until = now + 150 + InteractiveRandomRange(450);
+				}
 			}
 			break;
 
@@ -741,6 +762,23 @@ bool PickLand(const Town *t, TileIndex middle, bool town_land, double &x, double
 	return false;
 }
 
+/** A tile of a forest near the middle, at random (ThreeDForestTile()): a place on it to stand, world units; false none found. */
+bool PickForest(TileIndex middle, double &x, double &y)
+{
+	for (int tries = 0; tries < 48; tries++) {
+		const int dx = static_cast<int>(InteractiveRandomRange(2 * REACH + 1)) - static_cast<int>(REACH);
+		const int dy = static_cast<int>(InteractiveRandomRange(2 * REACH + 1)) - static_cast<int>(REACH);
+		const int tx = static_cast<int>(TileX(middle)) + dx, ty = static_cast<int>(TileY(middle)) + dy;
+		if (tx < 1 || ty < 1 || tx >= static_cast<int>(Map::MaxX()) || ty >= static_cast<int>(Map::MaxY())) continue;
+		if (!ThreeDForestTile(TileXY(tx, ty))) continue;
+		x = tx * TILE_SIZE + 2 + InteractiveRandomRange(TILE_SIZE - 4);
+		y = ty * TILE_SIZE + 2 + InteractiveRandomRange(TILE_SIZE - 4);
+		if (!NavNearestWalkable(x, y, 1)) continue;
+		return true;
+	}
+	return false;
+}
+
 /** The houses about the middle with what a place needs: doors before them, or places on their roofs. */
 template <typename F>
 void ForHousesNear(TileIndex middle, F fn)
@@ -840,12 +878,21 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
 			return true;
 		}
+		case Place::Forest: {
+			/* The game of the forests (the deer, the elk, the bear of the climate) among their trees. */
+			if (!PickForest(middle, x, y) || Taken(x, y, 24)) return false;
+			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), ThreeDAnimal::ROUND, {ThreeDAnimal::Kind::Animal}, night);
+			if (a == nullptr) return false;
+			Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
+			return true;
+		}
 		case Place::Ghost: {
-			/* About the town (the mushroom warrior: about the clay towns, on their land), or in its streets (Billy). */
+			/* About the town (the mushroom warrior: about the clay towns, on their land), or in its streets. Billy only by
+			 * the rails (Place::Rail, RAIL_RIDER). */
 			const bool street = InteractiveRandomRange(2) == 0;
 			if (street ? !PickPavement(t, middle, x, y) : !PickLand(t, middle, true, x, y)) return false;
 			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), street ? ThreeDAnimal::STREET : ThreeDAnimal::ROUND, {ThreeDAnimal::Kind::Ghost}, night);
-			if (a == nullptr) return false;
+			if (a == nullptr || a->name == RAIL_RIDER) return false;
 			Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
 			return true;
 		}
@@ -855,7 +902,11 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			if (!PickRail(middle, x, y, heading) || Taken(x, y, 2 * TILE_SIZE)) return false;
 			const ThreeDAnimal *a = PickKind(t, TileVirtXY(static_cast<int>(x), static_cast<int>(y)), ThreeDAnimal::STREET | ThreeDAnimal::ROUND | ThreeDAnimal::RAIL, {ThreeDAnimal::Kind::Ghost}, night);
 			if (a == nullptr) return false;
-			Put(*a, place, x, y, 0, heading, now);
+			Beast &b = Put(*a, place, x, y, 0, heading, now);
+			/* Billy off along the track the way he faces (PickRailRide()); another about the line as anywhere. */
+			b.rail_tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+			const bool along_x = std::abs(std::cos(heading)) > 0.5;
+			b.rail_td = along_x ? (std::cos(heading) > 0 ? Trackdir::X_SW : Trackdir::X_NE) : (std::sin(heading) > 0 ? Trackdir::Y_SE : Trackdir::Y_NW);
 			return true;
 		}
 		case Place::Pet:
@@ -956,10 +1007,11 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 	const Wanted wanted[] = {
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
+		{Place::Forest, FOREST_KEPT},
 	};
-	/* One a time, the place picked in turn. */
+	/* One a time, the place picked in turn. The forests' game is there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
-	if (t == nullptr && w.place != Place::Rail) return;
+	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest) return;
 	if (Count(w.place) < w.kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
 
@@ -1007,6 +1059,8 @@ void Strike(Beast &b, int damage)
 		return;
 	}
 	if (a->temper == ThreeDAnimal::Temper::Provoked) b.angry = true;
+	/* Billy rides on. */
+	if (RidesRails(b, *a)) return;
 	if (Fights(b, *a)) {
 		if (b.state != State::Attack) b.state = State::Chase;
 		return;
@@ -1224,7 +1278,7 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 /** The rig: those about, a line each. */
 std::string DescribeThreeDAnimals()
 {
-	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce"};
+	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les"};
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
 	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
 	for (const Beast &b : _beasts) {

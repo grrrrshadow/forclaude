@@ -31,6 +31,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. večer – houby a zvířata v lese, Billy po kolejích
+
+- Hráč: *„stromy, houby a zvířátka mají být v lese furt, holky přibydou, když je přivezou, a pak les produkuje
+  houby; ty houby tam rostou celou dobu, holky je jen sbírají“*.
+- **Houby v lese:** na každé dlaždici lesa (`ThreeDForestTile()`, dlaždice průmyslu jen se stromy) roste houba
+  pořád, jakýkoli druh (jinde dál jen kolem měst svého tématu); E ji utrhne, za měsíc doroste. Rig: v lese
+  `zvirata utrhni` → hřib utržen.
+- **Zvířata v lese:** nové místo `les` – až 3 zvířata (jelen, laň, wapiti, los, medvěd… podle klimatu) na
+  dlaždicích lesa kolem chodce, i daleko od měst. Navigace bere les jako průchozí (dřív byl průmysl zeď a zvířata
+  se odsunula ven).
+- **Holky a náklad MUSH** zatím ne: vanilla les zůstává vanilla (vozí dřevo); holky s houbami přijdou s novým
+  lesem od kolegy jako náš průmysl (#178).
+- Hráč: *„Billy na tříkolce má jet po kolejích jako mašinka, nemá jet za mnou útočit, má projet okolo“*;
+  *„ostatní strašidla se vyskytují kolem kolejí častěji, abych je potkal, straší normálně, jenom Billy jezdí po
+  kolejích“*. **Teď:** Billy jezdí po trati dlaždici po dlaždici jako vlak (`PickRailRide()`: z hrany na hranu,
+  zatáčky, výhybky – rovně, kde to jde; na konci trati, u tunelu a mostu se otočí), bez zastávek, nikoho nehoní a
+  po zásahu jede dál; v ulicích už není. Ostatní strašidla u kolejí (dál až 3 navíc) se procházejí a útočí jako
+  jinde. Billyho poznám zatím podle jména (`billy_tricykl`) – v indexu nemá nic, co by říkalo „jezdí po kolejích“.
+
 ## 24. 10. večer – dvě božská oka, les bez stromů
 
 - Hráč: *„máme navíc jednu ikonku božího oka, v levém horním rohu; zavřel jsem křížkem first person, ona se
