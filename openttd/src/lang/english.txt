@@ -2277,6 +2277,8 @@ STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the 
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
+STR_FIRST_PERSON_DOOR_OPEN                                      :E: open the door
+STR_FIRST_PERSON_DOOR_SHUT                                      :E: shut the door
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory

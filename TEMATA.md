@@ -27,6 +27,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – interiér kina (první interiér ve hře)
+
+- Hráč: *„dáme interiér, dračí farmu“*. Kolega poslal kino podle `PROSBA-INTERIERY.md` (`KINO-INTERIER-PRO-HRU.md`):
+  `dum_27_kino_interier.glb` (vestibul s pokladnou, sál s 55 sedadly, plátno, opony, vnitřní dveře, lampy) a obal
+  kina s průchody a křídly vchodových dveří `dvere_00–02`.
+- **Jak to hra dělá:** interiér je 3D objekt ve stejném rámci jako dům (`interier`: true / soubor / {soubor, postavy};
+  bere se jen, když soubor existuje – `true` mají v indexu skoro všechny domy). Čte se celý kromě `noc` (lampy
+  v noci jako u domů) a `dvere_NN`. Každé křídlo dveří (z obalu i z interiéru) jsou tři objekty: zavřené, otevřené na
+  jednu a na druhou stranu (otočené kolem počátku uzlu = pantu).
+- **Z očí:** do 3 dlaždic od domu se kreslí i interiér (vidět dveřmi), křídla dveří jak stojí. Uvnitř (v obrysu
+  interiéru) se obal domu nekreslí – okny je vidět ulice. Postavy z indexu interiéru (pokladní, tři holky v sále).
+- **E u dveří:** otevře je směrem od chodce, znovu E zavře (nápověda dole „E: otevřít/zavřít dveře“). Stav dveří se
+  neukládá. Na mapě se křídla kreslí taky (dřív by u kina byly díry).
+- **Chůze:** zavřené křídlo zastaví, otevřeným se projde. Uvnitř zdi a sedadla podle tvaru, podlaha (`podlaha`)
+  nepřekáží a chodec na ní stojí (pódium 0,6 m, schody). Jen přízemí (podlahy do 2,5 m). Na pozemku domu
+  s interiérem je chodec užší (kruh 0,2 m místo 0,4 m) – průchod v obalu je po rámech dveří jen ~0,7 m a uličky
+  mezi řadami sedadel jsou úzké.
+- **Opravená stará chyba:** rozměry (`extent`) objektu se počítaly z vektoru, který už byl přesunutý → byly vždy
+  nula (pouliční lampy se proto řadily podle nulového obdélníku). Teď se počítají ze skutečných rohů.
+- Rig: `test3d chodec dum <x> <y> <m x> <m y> <směr>`, `test3d pudorys <x> <y> interier [jemne]`.
+
 ## 23. 10. noc – společné stromy a keře (kolega), lihovar 10 barev
 
 - Kolega (`STROMY-SPOLECNE`, hráč: *„křoví máš doufám pár variant a rozmísťuješ je, šetříš, u každého domu,

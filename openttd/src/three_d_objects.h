@@ -246,6 +246,15 @@ struct ThreeDObject {
 	float trunk_r = 0;                ///< an add-on's "kmen_r" (a tree), metres at size 1: only its trunk stands in the way, not its crown; 0 all of it
 	std::vector<uint32_t> passable_tris; ///< the triangles of its laid trees that stand in no one's way (trunk_r), first and end of each run
 	std::vector<float> trunks;           ///< the trunks of its laid trees instead: x, y and radius of each, world units (Blocks())
+	/* A house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): the interior an object of its own in the
+	 * house's frame, the wings of the doors objects of their own, each in its three states. */
+	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
+	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors ("dvere_NN" of its file, then of its interior's): shut, open one way, the other
+	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
+	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
+	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
+	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
+	std::optional<double> FloorAt(double x, double y, double up_to) const;
 	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's
 	float extent[4] = {};             ///< x0, x1, y0, y1 of its corners as read, world units
 	/** Night triangle t's texture (night_tex): 0 its own, n its add-on n's. */
@@ -842,6 +851,12 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, 
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
+const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);
+bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y);
+const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origin, size_t door);
+std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach);
+void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, double x, double y);
+bool ThreeDDoorOpen(TileIndex origin, size_t door);
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
 
 /**

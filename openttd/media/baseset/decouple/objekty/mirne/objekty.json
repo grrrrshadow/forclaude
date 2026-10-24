@@ -2975,7 +2975,7 @@
    {
     "cast": "omitka",
     "maska": "dum_27_kino_maska_omitka.png",
-    "zacatek": 233,
+    "zacatek": 232,
     "paleta": [
      "E8E6DE",
      "F0DCB0",
@@ -3027,7 +3027,55 @@
     "sirka": 1.06
    }
   ],
-  "interier": true,
+  "interier": {
+   "soubor": "dum_27_kino_interier.glb",
+   "postavy": [
+    {
+     "postava": "people_girl_stoji",
+     "poloha": [
+      10.257,
+      4.668,
+      0.0
+     ],
+     "otoceni": 90,
+     "meritko": 1.0,
+     "poznamka": "pokladní za pultem, čelem do vestibulu"
+    },
+    {
+     "postava": "college_girl_sedi",
+     "poloha": [
+      5.496,
+      7.4,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále, kouká na plátno"
+    },
+    {
+     "postava": "galaxia_sedi",
+     "poloha": [
+      4.639,
+      6.907,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále"
+    },
+    {
+     "postava": "people_girl_sedi",
+     "poloha": [
+      6.353,
+      10.431,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále"
+    }
+   ]
+  },
   "pruchody": [],
   "okraje_textur": 16,
   "doplnky": [
@@ -3109,12 +3157,12 @@
   "noc": {
    "uzel": "noc",
    "den": "den",
-   "svetla": 16,
-   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (192 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+   "svetla": 15,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (180 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
   },
   "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 1960 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
+  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 2116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
  },
  {
   "soubor": "dum_14_stadion_stary.glb",

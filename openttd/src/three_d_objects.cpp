@@ -813,6 +813,7 @@ struct GlbReadOptions {
 	std::vector<float> *points = nullptr;
 	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
 	std::string_view skip_node;
+	std::string_view skip_prefix; ///< with all_nodes, the nodes whose names start so (and their children) left out (an interior's doors, read on their own)
 	const std::vector<std::string> *groups = nullptr;
 	bool only_groups = false;     ///< with groups, only the meshes under the groups' nodes (an add-on: the nodes no state shows not read at all)
 	bool skip_night = false;      ///< the nodes "noc" and "noc_<...>" and their children left out (lit only at night)
@@ -1151,6 +1152,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				const auto &node = nodes.at(n);
 				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
 				if (!skip_node.empty() && node_name == skip_node) continue;
+				if (!o.skip_prefix.empty() && node_name.starts_with(o.skip_prefix)) continue;
 				if (o.skip_night && IsNightNode(node_name)) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
 				if (groups != nullptr) {
@@ -1758,22 +1760,9 @@ static std::vector<uint16_t> CornerLight(const std::vector<float> &nrm)
 	return light;
 }
 
-static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+/** A building's night from its .glb: the node "noc" (the lit windows) and the places "svetlo_NN" (the glows), when it has them. */
+static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
 {
-	GlbMesh mesh;
-	if (!ReadGlbMesh(path, mesh)) return false;
-	obj.pos.reserve(mesh.pos.size());
-	for (size_t i = 0; i < mesh.pos.size(); i += 3) {
-		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
-		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
-		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
-		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
-	}
-	obj.facing = TriangleFacing(mesh);
-	obj.uv = std::move(mesh.uv);
-	obj.tri = std::move(mesh.tri);
-	obj.png = std::move(mesh.png);
-	/* Its night: the node "noc" (the lit windows) and the places "svetlo_NN" (the glows), when it has them. */
 	GlbMesh night;
 	std::vector<float> lights;
 	ReadGlbMesh(path, night, true, {}, 0, "noc", "svetlo_", &lights);
@@ -1789,7 +1778,124 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		obj.lights.push_back(static_cast<float>(lights[i + 1] * OBJECT_UNITS_PER_METRE));
 		obj.lights.push_back(static_cast<float>(lights[i + 2] * OBJECT_HEIGHT_PER_METRE));
 	}
+}
+
+/** A mesh read (ReadGlbMesh()) into a building: metres into units, the side of each triangle facing out, the light from its normals. */
+static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
+{
+	obj.pos.reserve(mesh.pos.size());
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 1] * OBJECT_UNITS_PER_METRE));
+		obj.pos.push_back(static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+		obj.top = std::max(obj.top, static_cast<float>(mesh.pos[i + 2] * OBJECT_HEIGHT_PER_METRE));
+	}
+	obj.facing = TriangleFacing(mesh);
+	obj.uv = std::move(mesh.uv);
+	obj.tri = std::move(mesh.tri);
+	obj.png = std::move(mesh.png);
 	if (!mesh.nrm.empty()) obj.light = CornerLight(mesh.nrm);
+}
+
+/**
+ * An interior's .glb (the colleague's hra/3d/PROSBA-INTERIERY.md): all its nodes but the lamps lit at night ("noc", read
+ * as a house's) and the wings of its doors ("dvere_NN", objects of their own); its floors ("podlaha", "podlaha_N")
+ * kept apart too, to be walked on (FloorAt()) and in no one's way (passable_tris).
+ */
+static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj)
+{
+	static const std::vector<std::string> floors = {"podlaha", "podlaha_1", "podlaha_2", "podlaha_3", "podlaha_4", "podlaha_5", "podlaha_6", "podlaha_7", "podlaha_8", "podlaha_9"};
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.skip_night = true;
+	o.skip_prefix = "dvere_";
+	o.groups = &floors;
+	if (!ReadGlbMesh(path, mesh, o)) return false;
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (t / 3 >= mesh.tri_group.size() || mesh.tri_group[t / 3] == 0) continue;
+		for (int k = 0; k < 3; k++) {
+			const float *p = &mesh.pos[mesh.tri[t + k] * 3];
+			obj.floor.insert(obj.floor.end(), {static_cast<float>(p[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[2] * OBJECT_HEIGHT_PER_METRE)});
+		}
+		const uint32_t n = static_cast<uint32_t>(t / 3);
+		if (!obj.passable_tris.empty() && obj.passable_tris.back() == n) {
+			obj.passable_tris.back() = n + 1;
+		} else {
+			obj.passable_tris.insert(obj.passable_tris.end(), {n, n + 1});
+		}
+	}
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
+	return true;
+}
+
+/** The wing of a door ("dvere_NN" of a house's or an interior's .glb): its node alone, turned about its origin, the hinge. */
+static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t turn, ThreeDObject &obj)
+{
+	GlbMesh mesh;
+	std::vector<float> hinge;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	o.only_node = node;
+	o.point_prefix = node;
+	o.points = &hinge;
+	if (!ReadGlbMesh(path, mesh, o) || hinge.size() < 3) return false;
+	if (turn != 0) {
+		const double a = turn * M_PI / 2, c = std::cos(a), s = std::sin(a);
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+			const double x = mesh.pos[i] - hinge[0], y = mesh.pos[i + 1] - hinge[1];
+			mesh.pos[i] = static_cast<float>(hinge[0] + x * c - y * s);
+			mesh.pos[i + 1] = static_cast<float>(hinge[1] + x * s + y * c);
+		}
+		for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) {
+			const double x = mesh.nrm[i], y = mesh.nrm[i + 1];
+			mesh.nrm[i] = static_cast<float>(x * c - y * s);
+			mesh.nrm[i + 1] = static_cast<float>(x * s + y * c);
+		}
+	}
+	TakeGlbMesh(mesh, obj);
+	return true;
+}
+
+/** The wings of the doors of a .glb: the nodes "dvere_NN" with a mesh under them (the old houses' doors are empty places), by name. */
+static std::vector<std::string> GlbDoorNodes(const std::string &path)
+{
+	std::vector<std::string> out;
+	const std::vector<uint8_t> b = ReadWholeFile(path);
+	if (b.size() < 20 || b[0] != 'g' || b[1] != 'l' || b[2] != 'T' || b[3] != 'F') return out;
+	const uint32_t len = b[12] | (b[13] << 8) | (b[14] << 16) | (static_cast<uint32_t>(b[15]) << 24);
+	if (20 + static_cast<size_t>(len) > b.size()) return out;
+	try {
+		const nlohmann::json j = nlohmann::json::parse(b.begin() + 20, b.begin() + 20 + len);
+		if (!j.contains("nodes")) return out;
+		const auto &nodes = j.at("nodes");
+		std::function<bool(size_t, int)> has_mesh = [&](size_t i, int depth) {
+			const auto &n = nodes.at(i);
+			if (n.contains("mesh")) return true;
+			if (depth > 8 || !n.contains("children")) return false;
+			for (const auto &c : n.at("children")) {
+				if (has_mesh(c.get<size_t>(), depth + 1)) return true;
+			}
+			return false;
+		};
+		for (size_t i = 0; i < nodes.size(); i++) {
+			const std::string name = nodes.at(i).value("name", std::string());
+			if (name.starts_with("dvere_") && has_mesh(i, 0)) out.push_back(name);
+		}
+	} catch (const std::exception &ex) {
+		Debug(misc, 0, "3D objects {}: {}", path, ex.what());
+	}
+	std::ranges::sort(out);
+	return out;
+}
+
+static bool ReadGlb(const std::string &path, ThreeDObject &obj)
+{
+	GlbMesh mesh;
+	if (!ReadGlbMesh(path, mesh)) return false;
+	TakeGlbMesh(mesh, obj);
+	ReadGlbNight(path, obj);
 	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
 	if (obj.addon) {
 		obj.nrm = std::move(mesh.nrm);
@@ -1995,6 +2101,65 @@ static void ReadPlants(const nlohmann::json &e, ThreeDObject &obj)
 		}
 		obj.plants.push_back(std::move(plant));
 	}
+}
+
+/**
+ * A house's interior ("interier", the colleague's hra/3d/PROSBA-INTERIERY.md): true its file "<house>_interier.glb",
+ * a name another file, {"soubor", "postavy"} the file and the people in it -- when the file is there. Its object and
+ * the wings of the doors of both files ("dvere_NN" with a mesh, GlbDoorNodes()) made now, read when first drawn.
+ * @param obj the house, its file's path set
+ */
+static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig);
+static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+{
+	if (!e.contains("interier")) return;
+	const auto &in = e.at("interier");
+	std::string file;
+	if (in.is_boolean() && in.get<bool>()) {
+		file = obj.file;
+		if (file.ends_with(".glb")) file.resize(file.size() - 4);
+		file += "_interier.glb";
+	} else if (in.is_string()) {
+		file = in.get<std::string>();
+	} else if (in.is_object() && in.contains("soubor") && in.at("soubor").is_string()) {
+		file = in.at("soubor").get<std::string>();
+	}
+	if (file.empty() || ReadWholeFile(folder + file).empty()) return;
+	ThreeDObject interior;
+	interior.file = file;
+	interior.name = obj.name + "/interier";
+	interior.variants = 0; // no house's
+	interior.tiles_x = obj.tiles_x;
+	interior.tiles_y = obj.tiles_y;
+	interior.glb_path = folder + file;
+	interior.is_interior = true;
+	if (in.is_object() && in.contains("postavy") && in.at("postavy").is_array()) {
+		for (const auto &f : in.at("postavy")) {
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) interior.figures.push_back(std::move(fig));
+		}
+	}
+	for (const std::string &path : {obj.glb_path, interior.glb_path}) {
+		for (const std::string &node : GlbDoorNodes(path)) {
+			std::array<size_t, 3> wings;
+			for (int k = 0; k < 3; k++) {
+				ThreeDObject wing;
+				wing.name = fmt::format("{}/{}{}", path == obj.glb_path ? obj.name : interior.name, node, k == 0 ? "" : (k == 1 ? "/+" : "/-"));
+				wing.variants = 0;
+				wing.tiles_x = obj.tiles_x;
+				wing.tiles_y = obj.tiles_y;
+				wing.glb_path = path;
+				wing.door_node = node;
+				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
+				wings[k] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(wing));
+			}
+			obj.door_wings.push_back(wings);
+		}
+	}
+	Debug(misc, 1, "3D object {}: interior {}, {} doors", obj.name, file, obj.door_wings.size());
+	obj.interior = _three_d_objects.size();
+	_three_d_objects.push_back(std::move(interior));
 }
 
 /**
@@ -2540,6 +2705,7 @@ static void ReadThreeDObjects()
 					ReadColourParts(e, folder, obj);
 					ReadBuildingFigures(e, obj);
 					ReadBuildingTitle(e, obj);
+					ReadInterior(e, folder, obj);
 					_three_d_objects.push_back(std::move(obj));
 					continue;
 				}
@@ -2569,6 +2735,7 @@ static void ReadThreeDObjects()
 				ReadColourParts(e, folder, obj);
 				ReadBuildingFigures(e, obj);
 				ReadBuildingTitle(e, obj);
+				ReadInterior(e, folder, obj);
 				const std::string snow = houses.size() > 1 && e.contains("snih") ? folder + e.at("snih").get<std::string>() : std::string();
 				for (size_t k = 1; k < houses.size(); k++) {
 					/* The same shape for the next house of the list; the last ones (above the snow) in the snowy texture. */
@@ -5276,6 +5443,103 @@ const ThreeDObject *GetThreeDObjectByName(std::string_view name)
 	return nullptr;
 }
 
+/** The interior of a house (ReadInterior()), nullptr for a house without one. */
+const ThreeDObject *GetThreeDInterior(const ThreeDObject *house)
+{
+	return house != nullptr && house->interior < _three_d_objects.size() ? &_three_d_objects[house->interior] : nullptr;
+}
+
+/**
+ * Whether a point is inside a house's interior (world units from the house's north corner): within what its walls
+ * enclose, the interior read (in the background the first time, outside till then).
+ */
+bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y)
+{
+	const ThreeDObject *in = GetThreeDInterior(house);
+	if (in == nullptr || !in->TryRead()) return false;
+	return x > in->extent[0] && x < in->extent[1] && y > in->extent[2] && y < in->extent[3];
+}
+
+/** The doors open (E, ToggleThreeDDoor()), by the house's north tile and the door: 1 open one way, 2 the other; never saved. */
+static std::map<std::pair<TileIndex, size_t>, uint8_t> _three_d_doors_open;
+
+/** Whether a door of the house on a tile is open. */
+bool ThreeDDoorOpen(TileIndex origin, size_t door)
+{
+	return _three_d_doors_open.contains({origin, door});
+}
+
+/** The wing of a door of a house as it stands now: shut, or open the way it was opened. */
+const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origin, size_t door)
+{
+	if (house == nullptr || door >= house->door_wings.size()) return nullptr;
+	auto it = _three_d_doors_open.find({origin, door});
+	const size_t state = it == _three_d_doors_open.end() ? 0 : std::min<size_t>(it->second, 2);
+	return &_three_d_objects[house->door_wings[door][state]];
+}
+
+/** The middle of a door's wing as it is made shut, world units from the house's north corner. */
+static std::optional<std::pair<double, double>> DoorMiddle(const ThreeDObject &wing)
+{
+	if (!wing.Read() || wing.pos.empty()) return std::nullopt;
+	return std::make_pair((wing.extent[0] + wing.extent[1]) / 2.0, (wing.extent[2] + wing.extent[3]) / 2.0);
+}
+
+/** The door of a house nearest a point (world units from its north corner) within reach of it (world units), if any. */
+std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex, double x, double y, double reach)
+{
+	if (house == nullptr) return std::nullopt;
+	std::optional<size_t> best;
+	for (size_t k = 0; k < house->door_wings.size(); k++) {
+		const auto mid = DoorMiddle(_three_d_objects[house->door_wings[k][0]]);
+		if (!mid.has_value()) continue;
+		const double d = std::hypot(mid->first - x, mid->second - y);
+		if (d < reach) {
+			reach = d;
+			best = k;
+		}
+	}
+	return best;
+}
+
+/**
+ * E at a door (the colleague's hra/3d/PROSBA-INTERIERY.md: "E opens it, turned by 90 degrees away from the walker"):
+ * a shut one opened the way away from the walker standing at a point (world units from the house's north corner), an
+ * open one shut.
+ */
+void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, double x, double y)
+{
+	if (house == nullptr || door >= house->door_wings.size()) return;
+	if (_three_d_doors_open.erase({origin, door}) != 0) return;
+	const auto a = DoorMiddle(_three_d_objects[house->door_wings[door][1]]), b = DoorMiddle(_three_d_objects[house->door_wings[door][2]]);
+	uint8_t way = 1;
+	if (a.has_value() && b.has_value() && std::hypot(b->first - x, b->second - y) > std::hypot(a->first - x, a->second - y)) way = 2;
+	_three_d_doors_open[{origin, door}] = way;
+}
+
+/**
+ * The floor of an interior under a point (world units from the house's north corner): the highest of its floors
+ * ("podlaha") there no higher than a height (units of height over the house's ground) -- a step up the stairs, not
+ * onto the gallery overhead.
+ */
+std::optional<double> ThreeDObject::FloorAt(double x, double y, double up_to) const
+{
+	std::optional<double> best;
+	for (size_t i = 0; i + 8 < this->floor.size(); i += 9) {
+		const float *a = &this->floor[i], *b = &this->floor[i + 3], *c = &this->floor[i + 6];
+		const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+		if (std::abs(d) < 1e-9) continue;
+		const double l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+		const double l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+		const double l3 = 1 - l1 - l2;
+		if (l1 < -1e-6 || l2 < -1e-6 || l3 < -1e-6) continue;
+		const double z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+		if (z > up_to) continue;
+		if (!best.has_value() || z > *best) best = z;
+	}
+	return best;
+}
+
 /** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
 /** The street lamp standing where the game has a street light on a tile (MakeStreetLamps()): its place there, world units; nullptr none. */
 const ThreeDObject *GetThreeDStreetLamp(int dx, int dy)
@@ -6036,8 +6300,16 @@ bool ThreeDObject::Read() const
 		read.tiles_x = this->tiles_x;
 		read.tiles_y = this->tiles_y;
 		read.addon = this->addon;
-		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()). */
-		bool ok = this->glb_path.empty() ? !this->addon_places.empty() : ReadGlb(this->glb_path, read);
+		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
+		 * (ReadInterior()) read as they are. */
+		bool ok;
+		if (!this->door_node.empty()) {
+			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read);
+		} else if (this->is_interior) {
+			ok = ReadGlbInterior(this->glb_path, read);
+		} else {
+			ok = this->glb_path.empty() ? !this->addon_places.empty() : ReadGlb(this->glb_path, read);
+		}
 		if (ok && !this->snow_path.empty()) {
 			std::vector<uint8_t> snow = ReadWholeFile(this->snow_path);
 			if (!snow.empty()) read.png = std::move(snow);
@@ -6061,14 +6333,15 @@ bool ThreeDObject::Read() const
 			self.tri = std::move(r.tri);
 			self.facing = std::move(r.facing);
 			self.top = r.top;
-			if (!r.pos.empty()) {
+			/* (Of its corners as they are now its own: those read were moved into it.) */
+			if (!self.pos.empty()) {
 				self.extent[0] = self.extent[2] = std::numeric_limits<float>::infinity();
 				self.extent[1] = self.extent[3] = -std::numeric_limits<float>::infinity();
-				for (size_t i = 0; i + 2 < r.pos.size(); i += 3) {
-					self.extent[0] = std::min(self.extent[0], r.pos[i]);
-					self.extent[1] = std::max(self.extent[1], r.pos[i]);
-					self.extent[2] = std::min(self.extent[2], r.pos[i + 1]);
-					self.extent[3] = std::max(self.extent[3], r.pos[i + 1]);
+				for (size_t i = 0; i + 2 < self.pos.size(); i += 3) {
+					self.extent[0] = std::min(self.extent[0], self.pos[i]);
+					self.extent[1] = std::max(self.extent[1], self.pos[i]);
+					self.extent[2] = std::min(self.extent[2], self.pos[i + 1]);
+					self.extent[3] = std::max(self.extent[3], self.pos[i + 1]);
 				}
 			}
 			self.png = std::move(r.png);
@@ -6079,6 +6352,7 @@ bool ThreeDObject::Read() const
 			self.addon_places_of = std::move(r.addon_places_of);
 			self.passable_tris = std::move(r.passable_tris);
 			self.trunks = std::move(r.trunks);
+			self.floor = std::move(r.floor);
 			self.nrm = std::move(r.nrm);
 		}
 		self.glb_state.value.store(made.first ? 1 : 2, std::memory_order_release);
@@ -6264,7 +6538,7 @@ bool ThreeDObject::Blocks(double x, double y) const
 		});
 		for (size_t i = 0; i < cells; i++) {
 			const int o = own(i);
-			if (o >= 0 && reach[i] == INT_MAX) this->footprint[o] = 1;
+			if (o >= 0 && reach[i] == INT_MAX && !this->is_interior && this->interior == SIZE_MAX) this->footprint[o] = 1; // a house with an interior: its walls in the way, its interior's inside
 		}
 	}
 	const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));

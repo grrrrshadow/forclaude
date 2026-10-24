@@ -597,24 +597,6 @@
   "licence": "GPL-2.0 (vlastní geometrie i textura)"
  },
  {
-  "soubor": "pv_strom_jehlic.glb",
-  "jmeno": "pv_strom_jehlic",
-  "druh": "rostlina",
-  "vyska_m": 16.917,
-  "poznamka": "smrk; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 16.917 m), 312 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
-  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)"
- },
- {
-  "soubor": "pv_strom_listnaty.glb",
-  "jmeno": "pv_strom_listnaty",
-  "druh": "rostlina",
-  "vyska_m": 11.009,
-  "poznamka": "listnatý strom (koruna z hrbolatých koulí); pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 11.009 m), 3236 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
-  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
-  "licence": "GPL-2.0 (vlastní geometrie i textura)"
- },
- {
   "soubor": "pv_tezni_vez.glb",
   "jmeno": "pv_tezni_vez",
   "druh": "dil",
@@ -1149,135 +1131,59 @@
   ],
   "podklad": "pole_zem",
   "podklad_sada": "prumysl",
-  "rostliny": [
+  "poznamka": "les: čtyři lesní smrky s holým kmenem dole a jeden listnáč, asi 7 m od sebe, jako společné doplňky (smrk_les_v*, strom_v*); na poli",
+  "doplnky": [
    {
-    "soubor": "pv_strom_jehlic.glb",
+    "jmeno": "smrk_les_v0",
     "poloha": [
-     2.3,
-     2.44,
+     3.42,
+     3.66,
      0.0
     ],
     "otoceni": 160.8,
-    "meritko": [
-     15.6,
-     15.6,
-     15.6
-    ]
+    "meritko": 0.963
    },
    {
-    "soubor": "pv_strom_jehlic.glb",
+    "jmeno": "smrk_les_v1",
     "poloha": [
-     2.36,
-     7.59,
+     3.52,
+     11.42,
      0.0
     ],
     "otoceni": 228.6,
-    "meritko": [
-     14.84,
-     14.84,
-     14.84
-    ]
+    "meritko": 0.92
    },
    {
-    "soubor": "pv_strom_jehlic.glb",
+    "jmeno": "smrk_les_v1",
     "poloha": [
-     1.86,
-     12.09,
+     10.12,
+     3.3,
      0.0
     ],
     "otoceni": 51.1,
-    "meritko": [
-     15.21,
-     15.21,
-     15.21
-    ]
+    "meritko": 0.94
    },
    {
-    "soubor": "pv_strom_jehlic.glb",
+    "jmeno": "smrk_les_v0",
     "poloha": [
-     7.7,
-     2.23,
+     11.59,
+     10.72,
      0.0
     ],
     "otoceni": 344.2,
-    "meritko": [
-     17.39,
-     17.39,
-     17.39
-    ]
+    "meritko": 1.063
    },
    {
-    "soubor": "pv_strom_jehlic.glb",
+    "jmeno": "strom_v1",
     "poloha": [
-     7.1,
-     7.89,
+     8.14,
+     7.8,
      0.0
     ],
-    "otoceni": 240.3,
-    "meritko": [
-     17.48,
-     17.48,
-     17.48
-    ]
-   },
-   {
-    "soubor": "pv_strom_listnaty.glb",
-    "poloha": [
-     3.74,
-     4.27,
-     0.0
-    ],
-    "otoceni": 104.3,
-    "meritko": [
-     13.66,
-     13.66,
-     13.66
-    ]
-   },
-   {
-    "soubor": "pv_strom_listnaty.glb",
-    "poloha": [
-     4.19,
-     11.48,
-     0.0
-    ],
-    "otoceni": 39.7,
-    "meritko": [
-     12.58,
-     12.58,
-     12.58
-    ]
-   },
-   {
-    "soubor": "pv_strom_listnaty.glb",
-    "poloha": [
-     10.22,
-     3.49,
-     0.0
-    ],
-    "otoceni": 90.9,
-    "meritko": [
-     12.89,
-     12.89,
-     12.89
-    ]
-   },
-   {
-    "soubor": "pv_strom_listnaty.glb",
-    "poloha": [
-     11.1,
-     10.76,
-     0.0
-    ],
-    "otoceni": 340.3,
-    "meritko": [
-     13.25,
-     13.25,
-     13.25
-    ]
+    "otoceni": 9.9,
+    "meritko": 1.376
    }
-  ],
-  "poznamka": "les: smrky a listnáče v řadách na poli"
+  ]
  },
  {
   "jmeno": "pv_gfx_018",

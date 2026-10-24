@@ -86,7 +86,7 @@
   },
   "autor": "grrrrf: vlastní model gymnazium/render_gymnazium.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dívčí gymnázium 2 × 2: nízká budova s průčelím, hřiště, park s lavičkami; 27309 trojúhelníků (model 27753), atlas 2048 px jen barva bez světla, s normálami, výška 12.37 m. Průchozí (hra 23. 10.: „Ano, průchody ke všem budovám a mezery v plotech“): mezera v živém plotu na každé straně, kde byl plot (pruchody, 4); atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
+  "poznamka": "dívčí gymnázium 2 × 2: nízká budova s průčelím, hřiště, park s lavičkami; 8345 trojúhelníků (model 8789), atlas 2048 px jen barva bez světla, s normálami, výška 12.37 m. Průchozí (hra 23. 10.: „Ano, průchody ke všem budovám a mezery v plotech“): mezera v živém plotu na každé straně, kde byl plot (pruchody, 4); atlas světlejší (jas 0,85); stromy a keře jako společné doplňky (11); glb z gltfpacku, okraje textur 16.",
   "pruchody": [
    {
     "poloha": [
@@ -137,7 +137,119 @@
     "sirka": 1.596
    }
   ],
-  "okraje_textur": 16
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     4.189,
+     27.33,
+     0.0
+    ],
+    "otoceni": 47.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     10.773,
+     27.53,
+     0.0
+    ],
+    "otoceni": 94.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     27.231,
+     21.745,
+     0.0
+    ],
+    "otoceni": 141.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     25.688,
+     22.057,
+     0.0
+    ],
+    "otoceni": 220.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     24.302,
+     24.232,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     18.788,
+     24.232,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 1.2143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     17.402,
+     22.057,
+     0.0
+    ],
+    "otoceni": 1.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     17.515,
+     19.48,
+     0.0
+    ],
+    "otoceni": 48.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     19.085,
+     17.433,
+     0.0
+    ],
+    "otoceni": 95.0,
+    "meritko": 1.2143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     24.005,
+     17.433,
+     0.0
+    ],
+    "otoceni": 142.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     25.576,
+     19.48,
+     0.0
+    ],
+    "otoceni": 189.0,
+    "meritko": 1.0
+   }
+  ]
  },
  {
   "soubor": "socha.glb",
@@ -356,7 +468,7 @@
   ],
   "autor": "grrrrf: vlastní model socha/render_socha.py (jedna socha, barva číslem)",
   "licence": "GPL-2.0 (vlastní geometrie i textura); rostliny marihuany: Cannabis Plant a Small Cannabis Plant (streetpharmacy), Cannabis Sativa plant (Zbrojmistrz), Sketchfab, CC BY 4.0",
-  "poznamka": "socha Karla Máchy s kapucí, vousy a jointem, lavičky, keře, odpadky, kytky marihuany kolem; jedna socha místo socha_kamen a socha_bronz: barva sochy číslem, varianta vybere položku palety (kamen 0, bronz 1); 35999 trojúhelníků (model 62652), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny). Barvy číslem (hráč 23. 10.: „socha je dvakrat. optimalisovat změnou barvy“): část socha (socha a vousy), paleta kámen, bronz a další; průchody živým plotem ze všech stran (pruchody); atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
+  "poznamka": "socha Karla Máchy s kapucí, vousy a jointem, lavičky, keře, odpadky, kytky marihuany kolem; jedna socha místo socha_kamen a socha_bronz: barva sochy číslem, varianta vybere položku palety (kamen 0, bronz 1); 35999 trojúhelníků (model 62652), atlas 2048 px jen barva bez světla, s normálami, výška 7.97 m, 11 kytek zvlášť (rostliny). Barvy číslem (hráč 23. 10.: „socha je dvakrat. optimalisovat změnou barvy“): část socha (socha a vousy), paleta kámen, bronz a další; průchody živým plotem ze všech stran (pruchody); pás keřů ze společných kusů pas_keru_v* (doplnky, 21); atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
   "varianty": {
    "kamen": 0,
    "bronz": 1
@@ -427,7 +539,219 @@
     "popis": "socha Karla a vousy: kámen, bronz, pískovec, mramor, měděnka, tmavá žula"
    }
   ],
-  "okraje_textur": 16
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     13.893,
+     1.247,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     13.893,
+     2.982,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     13.893,
+     4.717,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     13.893,
+     6.452,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     13.893,
+     10.941,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     13.893,
+     12.247,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     13.893,
+     13.553,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     0.907,
+     1.247,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     0.907,
+     3.246,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     0.907,
+     5.246,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     0.907,
+     7.246,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     0.907,
+     9.245,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     0.907,
+     13.644,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     3.061,
+     13.893,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     5.455,
+     13.893,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     7.849,
+     13.893,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v1",
+    "poloha": [
+     12.038,
+     13.893,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v0",
+    "poloha": [
+     3.061,
+     0.907,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     5.122,
+     0.907,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     7.184,
+     0.907,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "pas_keru_v2",
+    "poloha": [
+     9.245,
+     0.907,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ]
  },
  {
   "soubor": "automat.glb",
@@ -474,9 +798,291 @@
    "svetla": 1,
    "poznamka": "v noci ukaž uzel noc přes automat: přední stěna se svítícím sklem a zeleným pruhem 20 mm před ní (stejný atlas); uzel den je prázdný; prázdný uzel svetlo_00 před automatem je místo pro záři"
   },
-  "autor": "grrrrf: vlastní model automat/render_automat.py, polepy ze zin16 a keře jako instance automat/automat_polep.py",
+  "autor": "grrrrf: vlastní model automat/render_automat.py, polepy ze zin16, plevel jako instance a společné keře automat/automat_polep.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "automat na marihuanu CBD MAT s lavičkou a košem v severním rohu, zbytek políčka zarostlé křovím; automat s obrázky ze zin16 (přední stěna se sklem a placením, oba boky polep s listy a nápisem CBD MAT, 512 px na výšku), křoví tři keře a jeden trs plevele jednou, na políčku jako instance (uzly ker_NN a plevel_NN pod uzlem krovi, každý s vlastní polohou, otočením a velikostí); 12931 trojúhelníků na kreslení (dřív 35 998), v souboru 3691; jeden atlas 2048 px, glb z gltfpacku; holky a všechno ostatní na stejném místě"
+  "poznamka": "automat na marihuanu CBD MAT s lavičkou a košem v severním rohu, zbytek políčka zarostlé křovím; automat s obrázky ze zin16 (přední stěna se sklem a placením, oba boky polep s listy a nápisem CBD MAT, 512 px na výšku), křoví: 28 keřů jako společné doplňky ker_v0 až ker_v2 (doplnky, jako u domů a ostatního průmyslu), trs plevele jednou a na políčku jako instance (uzly plevel_NN pod uzlem krovi, každý s vlastní polohou, otočením a velikostí); 3971 trojúhelníků automatu a plevele na kreslení (dřív 35 998), v souboru 2731; jeden atlas 2048 px, glb z gltfpacku; holky a všechno ostatní na stejném místě",
+  "doplnky": [
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     9.749,
+     9.071,
+     0.0
+    ],
+    "otoceni": 224.2,
+    "meritko": 1.6215
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     10.992,
+     11.179,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 2.0259
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     13.68,
+     10.412,
+     0.0
+    ],
+    "otoceni": 286.3,
+    "meritko": 2.2422
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.9,
+     12.694,
+     0.0
+    ],
+    "otoceni": 339.3,
+    "meritko": 2.2939
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     11.336,
+     2.75,
+     0.0
+    ],
+    "otoceni": 266.4,
+    "meritko": 1.8429
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     4.489,
+     10.477,
+     0.0
+    ],
+    "otoceni": 332.0,
+    "meritko": 2.0489
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     7.105,
+     11.475,
+     0.0
+    ],
+    "otoceni": 10.4,
+    "meritko": 1.8338
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     11.61,
+     6.418,
+     0.0
+    ],
+    "otoceni": 167.6,
+    "meritko": 2.3212
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     6.052,
+     13.242,
+     0.0
+    ],
+    "otoceni": 339.6,
+    "meritko": 2.2816
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.254,
+     10.159,
+     0.0
+    ],
+    "otoceni": 233.6,
+    "meritko": 1.569
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     13.217,
+     12.888,
+     0.0
+    ],
+    "otoceni": 324.3,
+    "meritko": 2.4174
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     9.75,
+     13.159,
+     0.0
+    ],
+    "otoceni": 40.8,
+    "meritko": 1.5821
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     9.057,
+     11.452,
+     0.0
+    ],
+    "otoceni": 168.9,
+    "meritko": 2.1509
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     11.964,
+     9.33,
+     0.0
+    ],
+    "otoceni": 88.8,
+    "meritko": 1.7854
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.013,
+     4.347,
+     0.0
+    ],
+    "otoceni": 195.8,
+    "meritko": 1.639
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     11.358,
+     13.398,
+     0.0
+    ],
+    "otoceni": 206.6,
+    "meritko": 1.9028
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     13.354,
+     2.664,
+     0.0
+    ],
+    "otoceni": 4.7,
+    "meritko": 1.8826
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     7.548,
+     9.638,
+     0.0
+    ],
+    "otoceni": 78.0,
+    "meritko": 1.5093
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     1.158,
+     13.625,
+     0.0
+    ],
+    "otoceni": 100.6,
+    "meritko": 1.8913
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     1.529,
+     11.496,
+     0.0
+    ],
+    "otoceni": 329.9,
+    "meritko": 1.8502
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     7.907,
+     13.18,
+     0.0
+    ],
+    "otoceni": 275.7,
+    "meritko": 1.9593
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.666,
+     4.35,
+     0.0
+    ],
+    "otoceni": 57.5,
+    "meritko": 2.2177
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     9.595,
+     1.867,
+     0.0
+    ],
+    "otoceni": 287.0,
+    "meritko": 1.486
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.755,
+     1.122,
+     0.0
+    ],
+    "otoceni": 50.0,
+    "meritko": 1.9477
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     13.317,
+     8.384,
+     0.0
+    ],
+    "otoceni": 222.3,
+    "meritko": 2.0419
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     9.567,
+     6.205,
+     0.0
+    ],
+    "otoceni": 45.6,
+    "meritko": 1.516
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.842,
+     1.177,
+     0.0
+    ],
+    "otoceni": 0.6,
+    "meritko": 1.714
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     13.571,
+     7.007,
+     0.0
+    ],
+    "otoceni": 313.7,
+    "meritko": 2.0486
+   }
+  ]
  },
  {
   "soubor": "chatka.glb",
@@ -1524,7 +2130,7 @@
   },
   "autor": "grrrrf: vlastní model domy/hospoda.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "hospoda se zahrádkou: velké květináče, úzké slunečníky u budovy, výčep se sudem, gril s rožněm, girlanda (celá scéna dvakrát větší, 2 × 2 políčka, holky 2×); 25176 trojúhelníků (model 30852), atlas 4096 px jen barva bez světla, s normálami, výška 13.37 m. Průchozí (hra 23. 10.: „Ano, průchody ke všem budovám a mezery v plotech“): mezera v živém plotu na každé straně, kde byl plot (pruchody, 3); atlas světlejší (jas 0,85); glb z gltfpacku, okraje textur 16.",
+  "poznamka": "hospoda se zahrádkou: velké květináče, úzké slunečníky u budovy, výčep se sudem, gril s rožněm, girlanda (celá scéna dvakrát větší, 2 × 2 políčka, holky 2×); 15468 trojúhelníků (model 21144), atlas 4096 px jen barva bez světla, s normálami, výška 13.37 m. Průchozí (hra 23. 10.: „Ano, průchody ke všem budovám a mezery v plotech“): mezera v živém plotu na každé straně, kde byl plot (pruchody, 3); atlas světlejší (jas 0,85); stromy a keře jako společné doplňky (3); glb z gltfpacku, okraje textur 16.",
   "pruchody": [
    {
     "poloha": [
@@ -1563,7 +2169,39 @@
     "sirka": 1.99
    }
   ],
-  "okraje_textur": 16
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     26.732,
+     1.995,
+     0.0
+    ],
+    "otoceni": 317.0,
+    "meritko": 1.8286
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     2.793,
+     26.732,
+     0.0
+    ],
+    "otoceni": 4.0,
+    "meritko": 1.8858
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     4.788,
+     21.146,
+     0.0
+    ],
+    "otoceni": 51.0,
+    "meritko": 1.6572
+   }
+  ]
  },
  {
   "soubor": "kytka_mari_mlada.glb",
@@ -2377,6 +3015,88 @@
     "sirka": 4.49
    }
   ],
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     6.982,
+     37.904,
+     0.0
+    ],
+    "otoceni": 97.0,
+    "meritko": 1.2143
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     38.402,
+     5.985,
+     0.0
+    ],
+    "otoceni": 144.0,
+    "meritko": 1.0714
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     5.386,
+     5.586,
+     0.0
+    ],
+    "otoceni": 160.0,
+    "meritko": 1.5714
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     38.901,
+     38.702,
+     0.0
+    ],
+    "otoceni": 207.0,
+    "meritko": 1.7143
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     13.964,
+     38.901,
+     0.0
+    ],
+    "otoceni": 254.0,
+    "meritko": 1.4286
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     39.101,
+     14.962,
+     0.0
+    ],
+    "otoceni": 301.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     15.959,
+     5.386,
+     0.0
+    ],
+    "otoceni": 348.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     5.386,
+     34.911,
+     0.0
+    ],
+    "otoceni": 35.0,
+    "meritko": 1.2857
+   }
+  ],
   "seno": {
    "uzly": [
     "seno_00",
@@ -2472,6 +3192,6 @@
   ],
   "autor": "grrrrf: vlastní model domy/draci_farma.py (stavebnice domů, upečeno domy/dum_objekt.py), složení prumysl/draci_farma.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; strom a keře v rozích, pochodně na zdech. 27396 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
+  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
  }
 ]

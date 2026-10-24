@@ -9136,6 +9136,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			const VehicleID in = RigFirstPersonBoard(beside, argv[2] == "e");
 			IConsolePrint(CC_DEFAULT, "test3d: chodec {}", in == VehicleID::Invalid() ? std::string("pesky") : fmt::format("ve vozidle {}", Vehicle::Get(in)->unitnumber));
+		} else if (argv.size() > 7 && argv[2] == "dum") {
+			/* 'chodec dum <x> <y> <metres x> <metres y> <degrees>': the walker in or by the house on the tile, so many metres
+			 * from its north corner, looking the way given; what it is in and the door at hand. */
+			extern std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double heading_deg);
+			auto x = number(3), y = number(4);
+			auto real = [&](size_t i) { auto v = ParseInteger<int>(argv[i].substr(0, argv[i].find('.')), 10); double f = v.value_or(0); if (auto dot = argv[i].find('.'); dot != std::string_view::npos) { auto d = argv[i].substr(dot + 1); auto frac = ParseInteger<int>(d, 10); if (frac.has_value()) f += (f < 0 || argv[i].starts_with("-") ? -1 : 1) * *frac / std::pow(10.0, d.size()); } return f; };
+			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: {}", RigFirstPersonAtHouse(TileXY(*x, *y), real(5), real(6), real(7)));
 		} else if (argv.size() > 6 && argv[2] == "krok") {
 			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
 			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
@@ -9753,6 +9760,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: pudorys: dum na {},{} neni 3D objekt", *x, *y);
 			return true;
 		}
+		/* 'pudorys <x> <y> interier': its interior's (the colleague's hra/3d/PROSBA-INTERIERY.md). */
+		if (argv.size() > 4 && argv[4] == "interier" && GetThreeDInterior(obj) != nullptr) obj = GetThreeDInterior(obj);
 		obj->Read();
 		const double step = TILE_SIZE / 16.0;
 		float zlo = 1e9f, zhi = -1e9f;
@@ -9761,6 +9770,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			zhi = std::max(zhi, obj->pos[i]);
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: pudorys {} ({}x{} dlazdic, x doprava, y dolu, po {:.2f} m, vyska {:.1f}..{:.1f} m)", obj->name, obj->tiles_x, obj->tiles_y, step / OBJECT_UNITS_PER_METRE, zlo / OBJECT_HEIGHT_PER_METRE, zhi / OBJECT_HEIGHT_PER_METRE);
+		if (obj->is_interior) IConsolePrint(CC_DEFAULT, "test3d: pudorys interieru: {} trojuhelniku, podlahy {} v {} usecich", obj->tri.size() / 3, obj->floor.size() / 9, obj->passable_tris.size() / 2);
+		if (argv.size() > 5 && argv[5] == "jemne") {
+			/* '... jemne': each cell of the footprint (64 a tile, 0.23 m) itself. */
+			const double cell = TILE_SIZE / 64.0;
+			for (int r = 0; r < obj->tiles_y * 64; r++) {
+				std::string line;
+				for (int c = 0; c < obj->tiles_x * 64; c++) line += obj->Blocks((c + 0.5) * cell, (r + 0.5) * cell) ? '#' : '.';
+				IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
+			}
+			return true;
+		}
 		for (int r = 0; r < obj->tiles_y * 16; r++) {
 			std::string line;
 			for (int c = 0; c < obj->tiles_x * 16; c++) {

@@ -4592,8 +4592,9 @@ static void AddNorthHouseObject(size_t first_parent)
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == origin) return;
 	}
-	/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()). */
+	/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()), the wings of its doors. */
 	_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
+	for (size_t k = 0; k < obj->door_wings.size(); k++) _turned_objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, GetTileMaxPixelZ(origin)});
 }
 
 /**
@@ -4975,8 +4976,12 @@ static void ViewportDoDrawTurned()
 					for (const TurnedObject &to : _turned_objects) {
 						if (to.origin == origin) known = true;
 					}
-					/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()). */
-					if (!known) _turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
+					/* With the figures of its event when it is on (the new stadium's, GetThreeDHouseEvent()), and the wings of
+					 * its doors as they stand (a house with an interior, the colleague's hra/3d/PROSBA-INTERIERY.md). */
+					if (!known) {
+						_turned_objects.push_back({obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin)});
+						for (size_t k = 0; k < obj->door_wings.size(); k++) _turned_objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, GetTileMaxPixelZ(origin)});
+					}
 				} else if (north >= NEW_HOUSE_OFFSET && _settings_client.gui.three_d_houses == 0) {
 					/* A set's house without an object (ITL Houses): its boxes below, the set told of once. */
 					NoteThreeDHouseBoxed(north);
@@ -9763,12 +9768,31 @@ static void CabTunnelGround(TileIndex tile, int z)
  * @param[out] out the picture
  * @return whether there is a picture (a 32bpp blitter)
  */
+/** A house's interior is drawn this many tiles about the eye (seen through its doorways), the wings of its doors too. */
+static constexpr double CAB_INTERIOR_TILES = 3.0;
+/** The floors of an interior the walker stands on: those of its ground storey, up to this many metres over its ground. */
+static constexpr double CAB_INTERIOR_STOREY_M = 2.5;
+
 /** The height of the ground under a world point, units of height (the walker of the view from the first person stands on it). */
 double FirstPersonGroundZ(double x, double y)
 {
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
-	return GetSlopePixelZOutsideMap(ix, iy);
+	const double ground = GetSlopePixelZOutsideMap(ix, iy);
+	/* In a house's interior: its floor there (the stage and its steps of the cinema), of the ground storey. */
+	const TileIndex tile = TileVirtXY(ix, iy);
+	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
+		HouseID north = GetHouseType(tile);
+		const TileIndex origin = tile + GetHouseNorthPart(north);
+		const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
+		const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
+		if (ThreeDInsideInterior(house, lx, ly)) {
+			const double base = GetTileMaxPixelZ(origin);
+			const std::optional<double> floor = GetThreeDInterior(house)->FloorAt(lx, ly, CAB_INTERIOR_STOREY_M * OBJECT_HEIGHT_PER_METRE);
+			if (floor.has_value()) return base + *floor;
+		}
+	}
+	return ground;
 }
 
 /**
@@ -11067,7 +11091,22 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					for (const CabObject &co : objects) {
 						if (co.origin == origin) known = true;
 					}
-					if (!known) objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDHouseEvent(obj, origin)});
+					if (!known) {
+						/* A house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): from inside, its interior
+						 * instead of it, the street seen through its windows; near it, its interior too, seen through its
+						 * doorways, and the wings of its doors as they stand. */
+						const int oz = GetTileMaxPixelZ(origin);
+						const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
+						const ThreeDObject *in = GetThreeDInterior(obj);
+						const bool near = in != nullptr && std::hypot(ox + obj->tiles_x * TILE_SIZE / 2.0 - eye.x, oy + obj->tiles_y * TILE_SIZE / 2.0 - eye.y) < CAB_INTERIOR_TILES * TILE_SIZE;
+						if (!near || !ThreeDInsideInterior(obj, eye.x - ox, eye.y - oy)) {
+							objects.push_back({obj, origin, oz, GetThreeDHouseEvent(obj, origin)});
+						}
+						if (near) {
+							objects.push_back({in, origin, oz});
+							for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, oz});
+						}
+					}
 				}
 			}
 		}

@@ -77,6 +77,8 @@ static constexpr double FIRST_PERSON_PITCH_MAX = 1.0;
 static constexpr double FIRST_PERSON_MOUSE = 0.005;
 /** How far from a wall it stops, world units (THREE_D_WALKER_RADIUS_M). */
 static constexpr double FIRST_PERSON_RADIUS = THREE_D_WALKER_RADIUS_M * OBJECT_UNITS_PER_METRE;
+/** The walker inside a house's interior: a body's half-width, between the rows of seats. */
+static constexpr double FIRST_PERSON_INDOOR_RADIUS = 0.2 * OBJECT_UNITS_PER_METRE;
 /** The longest move checked against the walls at once, world units: running a step goes in pieces, so no wall is stepped over. */
 static constexpr double FIRST_PERSON_SUBSTEP = 0.1;
 /** How often it moves and the picture is made, milliseconds. */
@@ -113,6 +115,8 @@ static constexpr double FIRST_PERSON_PUFF_S = 1.6;
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 /** How near a mushroom the walker picks it (E), metres. */
 static constexpr double FIRST_PERSON_PICK_M = 1.5;
+/** How near the middle of a door the walker opens it with E, metres. */
+static constexpr double FIRST_PERSON_DOOR_M = 1.6;
 
 /** How a weapon of the walker is used. */
 enum class WeaponUse : uint8_t {
@@ -250,7 +254,15 @@ static bool FirstPersonWalkable(double x, double y)
 			HouseID north = GetHouseType(tile);
 			const TileIndex origin = tile + GetHouseNorthPart(north);
 			const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
-			return obj != nullptr && !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
+			if (obj == nullptr) return false;
+			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
+			if (obj->Blocks(lx, ly)) return false;
+			/* Its interior's walls and seats, and the wings of its doors as they stand (the colleague's hra/3d/PROSBA-INTERIERY.md). */
+			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+			for (size_t k = 0; k < obj->door_wings.size(); k++) {
+				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly)) return false;
+			}
+			return true;
 		}
 		case TileType::Water:
 			return IsCoast(tile);
@@ -300,12 +312,27 @@ static double FirstPersonWallTop(double x, double y)
  * Whether the walker, a circle, can stand on a world point: its middle and eight points round it, so that the thin
  * walls of a house's shape (ThreeDObject::Blocks()) slip between none of them.
  */
+/**
+ * Whether a world point is on the plot of a house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): there
+ * the walker is as narrow as a body (FIRST_PERSON_INDOOR_RADIUS) -- through its doorways, between the rows of seats of
+ * the cinema.
+ */
+static bool FirstPersonIndoors(double x, double y)
+{
+	if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::SizeX() - 1) * TILE_SIZE || y >= (Map::SizeY() - 1) * TILE_SIZE) return false;
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	if (!IsTileType(tile, TileType::House) || !IsHouseCompleted(tile)) return false;
+	HouseID north = GetHouseType(tile);
+	return GetThreeDInterior(GetThreeDHouseObjectAt(north, tile + GetHouseNorthPart(north))) != nullptr;
+}
+
 static bool FirstPersonFree(double x, double y)
 {
 	if (!FirstPersonWalkable(x, y)) return false;
+	const double radius = FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
 	for (int k = 0; k < 8; k++) {
 		const double a = k * M_PI / 4;
-		if (!FirstPersonWalkable(x + FIRST_PERSON_RADIUS * std::cos(a), y + FIRST_PERSON_RADIUS * std::sin(a))) return false;
+		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a))) return false;
 	}
 	return true;
 }
@@ -437,10 +464,42 @@ struct FirstPersonWindow : Window {
 	}
 
 	/** E: a mushroom at the walker's feet picked (into the inventory, three_d_animals.h); else into the vehicle near, or out of the one the walker is in. */
+	/** A door of a house within reach of the walker: the house, its north tile and the door. */
+	struct DoorAt {
+		const ThreeDObject *house;
+		TileIndex origin;
+		size_t door;
+	};
+
+	/** The door within reach of the walker, E opens or shuts it (the colleague's hra/3d/PROSBA-INTERIERY.md). */
+	std::optional<DoorAt> DoorToUse() const
+	{
+		const int tx = static_cast<int>(this->walker.x / TILE_SIZE), ty = static_cast<int>(this->walker.y / TILE_SIZE);
+		for (int dy = -1; dy <= 1; dy++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				if (tx + dx < 1 || ty + dy < 1 || tx + dx >= static_cast<int>(Map::MaxX()) || ty + dy >= static_cast<int>(Map::MaxY())) continue;
+				const TileIndex tile = TileXY(tx + dx, ty + dy);
+				if (!IsTileType(tile, TileType::House) || !IsHouseCompleted(tile)) continue;
+				HouseID north = GetHouseType(tile);
+				const TileIndex origin = tile + GetHouseNorthPart(north);
+				const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
+				if (house == nullptr || house->door_wings.empty()) continue;
+				const auto door = ThreeDDoorNear(house, origin, this->walker.x - TileX(origin) * TILE_SIZE, this->walker.y - TileY(origin) * TILE_SIZE, FIRST_PERSON_DOOR_M * OBJECT_UNITS_PER_METRE);
+				if (door.has_value()) return DoorAt{house, origin, *door};
+			}
+		}
+		return std::nullopt;
+	}
+
 	void BoardOrLeave()
 	{
 		if (this->Riding() != nullptr) {
 			this->GetOut();
+			return;
+		}
+		/* At a door: opened away from the walker, or shut. */
+		if (const auto door = this->DoorToUse(); door.has_value()) {
+			ToggleThreeDDoor(door->house, door->origin, door->door, this->walker.x - TileX(door->origin) * TILE_SIZE, this->walker.y - TileY(door->origin) * TILE_SIZE);
 			return;
 		}
 		/* The walker's plant ripe, or dried to hay: harvested (WalkerPlant). */
@@ -1282,6 +1341,9 @@ struct FirstPersonWindow : Window {
 						case WalkerPlantStage::Hay: hint = GetString(STR_FIRST_PERSON_PLANT_HAY); break;
 						default: hint = GetString(STR_FIRST_PERSON_PLANT_GROWING, std::max<int32_t>(1, WALKER_PLANT_RIPE_DAYS - WalkerPlantAgeDays(*plant))); break;
 					}
+				} else if (const auto door = this->DoorToUse(); door.has_value()) {
+					/* At a door: E opens it, or shuts it. */
+					hint = GetString(ThreeDDoorOpen(door->origin, door->door) ? STR_FIRST_PERSON_DOOR_SHUT : STR_FIRST_PERSON_DOOR_OPEN);
 				} else if (const ThreeDMushroom *mushroom = ThreeDMushroomNear(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M); mushroom != nullptr) {
 					/* At a mushroom: E picks it. */
 					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
@@ -1630,6 +1692,30 @@ VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e)
  * The rig: the walker so many metres from a vehicle, at an angle from its front (0 before it, 90 on its left, 180
  * behind it), looking at it.
  */
+/** The rig ('test3d chodec dum <x> <y> <metres x> <metres y> <degrees>'): the walker at a place of the house on a tile, looking the way given (0 along +x). */
+std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double heading_deg)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	if (!IsTileType(tile, TileType::House)) return "tam neni dum";
+	HouseID north = GetHouseType(tile);
+	const TileIndex origin = tile + GetHouseNorthPart(north);
+	w->walker.x = TileX(origin) * TILE_SIZE + mx * OBJECT_UNITS_PER_METRE;
+	w->walker.y = TileY(origin) * TILE_SIZE + my * OBJECT_UNITS_PER_METRE;
+	w->walker.heading = heading_deg * M_PI / 180.0;
+	w->walker.pitch = 0;
+	const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
+	const ThreeDObject *in = GetThreeDInterior(house);
+	if (in != nullptr) in->Read(); // the rig: read now, there in the picture
+	const bool inside = ThreeDInsideInterior(house, mx * OBJECT_UNITS_PER_METRE, my * OBJECT_UNITS_PER_METRE);
+	const auto door = w->DoorToUse();
+	w->MakePicture();
+	w->SetDirty();
+	return fmt::format("dum {} interier {} uvnitr {} dvere {} (u dveri {}), vyska {:.2f} m nad zemi domu", house != nullptr ? house->name : std::string("zadny"), in != nullptr ? in->name : std::string("zadny"),
+			inside ? "ano" : "ne", house != nullptr ? house->door_wings.size() : 0, door.has_value() ? fmt::format("{}{}", door->door, ThreeDDoorOpen(door->origin, door->door) ? " otevrene" : " zavrene") : std::string("zadnych"),
+			(FirstPersonGroundZ(w->walker.x, w->walker.y) - GetTileMaxPixelZ(origin)) / OBJECT_HEIGHT_PER_METRE);
+}
+
 void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
