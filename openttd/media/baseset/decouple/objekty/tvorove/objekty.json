@@ -5,8 +5,8 @@
   "druh": "tvor",
   "rozmer_m": [
    7.44,
-   4.37,
-   4.77
+   7.01,
+   4.8
   ],
   "animace": {
    "klid": {
@@ -33,14 +33,20 @@
     "snimku": 8,
     "tiku": 13,
     "smycka": false
+   },
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 3,
+    "smycka": true
    }
   },
   "kostra": "drak_hnedy_kostra.glb",
-  "poza": "chodí (chuze), stojí (klid), útočí (utok), padne a zůstane ležet (smrt)",
+  "poza": "chodí (chuze), stojí (klid), útočí (utok), padne a zůstane ležet (smrt), letí a mává křídly (let, od 24. 10.)",
   "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); snímky z akcí modelu (tvorove/draci.py), bez renderu",
   "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
   "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
-  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; textura modelu (hnědý drak); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+  "poznamka": "počátek na zemi pod tělem, u letu (let) tentýž, hra draka zvedne; let je náš (model žádný nemá, hra/3d/ODPOVED-DRACI-FARMA.md): křídla roztažená do stran a při letu 1,5× delší mávají (vnější kost se zpožďuje), nohy složené dozadu, krk dopředu, ocas se vlní, tělo se houpe; v kostře je jako animace let, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; textura modelu (hnědý drak); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
  },
  {
   "soubor": "drak_hnedy.glb",
@@ -49,8 +55,8 @@
   "textura": "drak_hnedy_cerny.png",
   "rozmer_m": [
    7.44,
-   4.37,
-   4.77
+   7.01,
+   4.8
   ],
   "animace": {
    "klid": {
@@ -77,14 +83,20 @@
     "snimku": 8,
     "tiku": 13,
     "smycka": false
+   },
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 3,
+    "smycka": true
    }
   },
   "kostra": "drak_hnedy_kostra.glb",
-  "poza": "totéž co drak_hnedy, jiná textura",
+  "poza": "totéž co drak_hnedy (i let), jiná textura",
   "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); druhá textura modelu (dragon_black.png), snímky tvorove/draci.py, bez renderu",
   "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
   "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
-  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; druhá textura modelu (černý drak), stejný glb jako drak_hnedy; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+  "poznamka": "počátek na zemi pod tělem, u letu (let) tentýž, hra draka zvedne; let je náš (model žádný nemá, hra/3d/ODPOVED-DRACI-FARMA.md): křídla roztažená do stran a při letu 1,5× delší mávají (vnější kost se zpožďuje), nohy složené dozadu, krk dopředu, ocas se vlní, tělo se houpe; v kostře je jako animace let, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; druhá textura modelu (černý drak), stejný glb jako drak_hnedy; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
  },
  {
   "soubor": "drak_ledovy.glb",

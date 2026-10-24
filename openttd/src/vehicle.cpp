@@ -16,6 +16,7 @@
 #include "viewport_func.h"
 #include "three_d.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_ufo.h"
 #include "blitter/factory.hpp"
 #include "news_func.h"
 #include "command_func.h"
@@ -1344,6 +1345,9 @@ static void DoDrawVehicle(const Vehicle *v)
 		TransparencyOption to = EffectVehicle::From(v)->GetTransparencyOption();
 		if (to != TransparencyOption::Invalid && (IsTransparencySet(to) || IsInvisibilitySet(to))) return;
 	}
+
+	/* A disaster's UFO in the 3D views: the flying saucer (three_d_ufo.h), not its sprite nor its shadow's. */
+	if ((ViewportDrawingTurned() || ViewportDrawingNorthObjects()) && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ThreeDUfoDrawsDisaster(v)) return;
 
 	/* At night a vehicle drawn from its object whose model has its lights is drawn so facing north too: its picture
 	 * keeps the glass of its lights lit through the night (ThreeDModelPicture::lit), a sprite would not. */

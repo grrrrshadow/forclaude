@@ -419,7 +419,9 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 		for (size_t k = 0; k < n; k++) {
 			const ThreeDObjectFigure &p = obj->dragon_places[k];
 			const bool out = !calm && (now / FARM_TURN_TICKS + k * 2 + id.base()) % 3 == 0;
-			const ThreeDCreature *flyer = out ? Flyer(k + id.base()) : nullptr;
+			/* Out: the dragon of the place itself when it flies (the colleague's brown and black, 24. 10.), else one that does. */
+			const ThreeDCreature *own = Creature(p.figure);
+			const ThreeDCreature *flyer = out ? (own != nullptr && own->Has("let") ? own : Flyer(k + id.base())) : nullptr;
 			FarmDragon d;
 			if (flyer == nullptr) {
 				const ThreeDCreature *c = Creature(p.figure);

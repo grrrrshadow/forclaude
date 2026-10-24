@@ -663,7 +663,7 @@ bool TownFits(const Town *t, TileIndex tile, const ThreeDAnimal &a)
 	} else if (land == LandscapeType::Toyland) {
 		look = 0;
 	}
-	return look == a.climate;
+	return (look & a.climate) != 0;
 }
 
 /** The kinds of a place that fit a town now (its kind of towns, its theme, the time of day), and one picked of them. */

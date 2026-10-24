@@ -60,5 +60,6 @@ struct DisasterVehicle final : public SpecializedVehicle<DisasterVehicle, Vehicl
 };
 
 void SpawnRescueHelicopter(TileIndex crash_tile, VehicleID wreck);
+void StartRigUfoDisaster(bool big, TileIndex tile);
 
 #endif /* DISASTER_VEHICLE_H */

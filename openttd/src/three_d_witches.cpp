@@ -9,6 +9,7 @@
 
 #include "stdafx.h"
 #include "three_d_witches.h"
+#include "three_d_ufo.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 #include "three_d.h"
@@ -500,6 +501,8 @@ std::vector<ThreeDWitchLight> GetThreeDWitchLights(bool eye)
 	for (const Witch &w : _witches) {
 		if (const ThreeDWitch *c = Kind(w.kind); c != nullptr) LightsOf(w, *c, eye, out);
 	}
+	/* And the flying saucers' (three_d_ufo.h): its rim, its beam down. */
+	AddThreeDUfoLights(eye, out);
 	return out;
 }
 

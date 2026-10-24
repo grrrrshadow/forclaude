@@ -111,6 +111,7 @@
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
 #include "three_d_witches.h"
+#include "three_d_ufo.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
 #include "cab_drive.h"
@@ -5262,6 +5263,7 @@ static void ViewportDoDrawTurned()
 	AddThreeDDragonsToViewport(zoom);
 	AddThreeDAnimalsToViewport(zoom);
 	AddThreeDWitchesToViewport(zoom);
+	AddThreeDUfosToViewport(zoom);
 	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
 
@@ -5721,6 +5723,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		if (_north_house_objects) AddThreeDDragonsToViewport(_vd.dpi.zoom);
 		if (_north_house_objects) AddThreeDAnimalsToViewport(_vd.dpi.zoom);
 		if (_north_house_objects) AddThreeDWitchesToViewport(_vd.dpi.zoom);
+		if (_north_house_objects) AddThreeDUfosToViewport(_vd.dpi.zoom);
 		ViewportAddVehicles(&_vd.dpi);
 
 		ViewportAddKdtreeSigns(&_vd.dpi);
@@ -8052,6 +8055,7 @@ static void CabClipNear(std::vector<CabPoint> &poly)
 /** How a triangle of the view from an eye takes its texels (CabRasterRows()'s fill_holes): bits. */
 static constexpr uint8_t CAB_FILL_HOLES = 1; ///< the nearest drawn texel where the texture has none (the diamonds of the ground)
 static constexpr uint8_t CAB_REPEAT = 2;     ///< the texture repeated beyond its edges, as glTF's samplers do (a model's texture moved and stretched by "KHR_texture_transform": the ghost's sixteen times)
+static constexpr uint8_t CAB_TEXEL_ALPHA = 8; ///< see-through as much as its alpha times its texel's (a material "BLEND": the saucer's beam; THREE_D_GPU_EYE_TEXEL_ALPHA)
 
 /**
  * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
@@ -8134,8 +8138,10 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			if (p == 0) continue;
 			const uint32_t lit = light == 256 ? p : ShadedPixel(p, light);
 			if (alpha < 256) {
+				const uint a = (fill_holes & CAB_TEXEL_ALPHA) != 0 ? alpha * Colour(p).a / 255 : alpha;
+				if (a == 0) continue;
 				const Colour over(lit), under(row[x]);
-				row[x] = Colour(static_cast<uint8_t>((over.r * alpha + under.r * (256 - alpha)) >> 8), static_cast<uint8_t>((over.g * alpha + under.g * (256 - alpha)) >> 8), static_cast<uint8_t>((over.b * alpha + under.b * (256 - alpha)) >> 8)).data;
+				row[x] = Colour(static_cast<uint8_t>((over.r * a + under.r * (256 - a)) >> 8), static_cast<uint8_t>((over.g * a + under.g * (256 - a)) >> 8), static_cast<uint8_t>((over.b * a + under.b * (256 - a)) >> 8)).data;
 				/* Its depth not kept: what is behind it is lit, hazed and hidden as it is, the night sky seen through it. */
 				continue;
 			}
@@ -8168,6 +8174,8 @@ static bool _cab_batching = false;
 /** The glass of the vehicles (see-through): collected apart while this is set, drawn after all else of their pass (CabFlushGlass()). */
 static std::vector<CabBatchTriangle> _cab_glass_batch;
 static uint _cab_glass_alpha = 256;
+/** With _cab_glass_alpha, CAB_TEXEL_ALPHA for a material "BLEND" (its texels' alpha too), else 0. */
+static uint8_t _cab_glass_texel = 0;
 /** At night the triangles of a material with a light of its own drawn by CabDrawFigureModel(), put here to be drawn again
  * over the dark (DrawEyeNight()) a hair nearer: not darkened. nullptr: not kept. */
 static std::vector<CabBatchTriangle> *_cab_glow_after_night = nullptr;
@@ -8558,6 +8566,7 @@ struct CabBatchScope {
 /** A triangle of the picture: drawn now, or collected to be drawn on every core (CabBatchScope). */
 static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light = 256)
 {
+	if (_cab_glass_alpha < 256) fill_holes |= _cab_glass_texel;
 	if (_eye_frame != nullptr) {
 		/* Into the frame being collected (the glass apart, laid over at CabFlushGlass()). */
 		if (_cab_glass_alpha < 256) {
@@ -9621,6 +9630,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			}
 			/* The glass and a material "BLEND": see-through, laid over the rest after it (CabFlushGlass()). */
 			_cab_glass_alpha = s.IsSeeThrough(t / 3) ? std::max(1u, static_cast<uint>(std::clamp(s.SeeThroughAlpha(t / 3), 0.0f, 1.0f) * 256)) : 256;
+			_cab_glass_texel = s.IsSeeThrough(t / 3) && s.BlendsByTexel(t / 3) ? CAB_TEXEL_ALPHA : 0;
 			/* The texture's place in pixels of the texture of the triangle (its tu, tv as the unit square). */
 			auto in_tex = [&](CabPoint p) {
 				p.tu *= tex->w;
@@ -9649,7 +9659,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 					};
 					const Colour e(glow);
 					const uint own = std::max<uint>({e.r, e.g, e.b, 1});
-					_cab_glow_after_night->push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, nearer(va), nearer(vb), nearer(vc), CAB_REPEAT, own, _cab_glass_alpha});
+					_cab_glow_after_night->push_back({dst, zb, width, height, tex->px.data(), tex->w, tex->h, nearer(va), nearer(vb), nearer(vc), static_cast<uint8_t>(CAB_REPEAT | (_cab_glass_alpha < 256 ? _cab_glass_texel : 0)), own, _cab_glass_alpha});
 				}
 				continue;
 			}
@@ -9679,6 +9689,7 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 		draw(cs, crew_place, crew.texs);
 	}
 	_cab_glass_alpha = 256;
+	_cab_glass_texel = 0;
 }
 
 /**
@@ -11295,6 +11306,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	AddThreeDAnimalsToEye();
 	AddThreeDMushroomsToEye();
 	AddThreeDWitchesToEye();
+	AddThreeDUfosToEye();
 	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
 	AddThreeDDriversToEye();
@@ -11663,6 +11675,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (!same_tunnel) continue;
 		}
 		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
+		/* A disaster's UFO: the saucer among the figures (AddThreeDUfosToEye()), not its sprite. */
+		if (ThreeDEnabled() && ThreeDUfoDrawsDisaster(u)) continue;
 		CabPoint c = CabToEye(eye, u->x_pos, u->y_pos, u->z_pos, 0, 0);
 		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
 		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the

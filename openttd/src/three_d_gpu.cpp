@@ -500,7 +500,7 @@ constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.
 /* The programs, the picture drawn into, the corners of the lights at night. */
 struct GpuProgram {
 	GLuint program = 0;
-	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1, glow = -1;
+	GLint matrix = -1, light = -1, lit = -1, tex = -1, glass = -1, glass_alpha = -1, texel_alpha = -1, glow = -1;
 	/* The paint (ThreeDGpuPaint). */
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
 	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
@@ -590,6 +590,7 @@ const char *const MESH_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform int u_glass;
 uniform float u_glass_alpha;
+uniform int u_texel_alpha;
 uniform vec4 u_glow;
 uniform int u_paint;
 uniform sampler2D u_detail, u_detail_colours, u_paint_mask, u_addon_mask, u_rust_mask;
@@ -693,13 +694,16 @@ void main()
 	ivec2 at = min(ivec2(f * vec2(size)), size - 1);
 	vec4 t = texelFetch(u_tex, at, 0);
 	if (u_glass == 0 && t == vec4(0.0)) discard;
+	/* See-through: the glass's alpha, a material "BLEND"'s times its texel's (the saucer's beam fading down). */
+	float alpha = u_texel_alpha != 0 ? u_glass_alpha * t.a : u_glass_alpha;
+	if (u_glass != 0 && alpha <= 0.0) discard;
 	vec3 own = floor(t.rgb * 255.0 + 0.5);
 	if (u_paint != 0 && t != vec4(0.0)) own = Paint(own, (vec2(at) + 0.5) / vec2(size));
 	/* Its own light (ThreeDVehicleShape::tex_glow): u_glow.a 0 none, 1 the texel times its colour, 2 its colour. */
 	vec3 e = u_glow.a == 0.0 ? vec3(0.0) : (u_glow.a < 1.5 ? floor(u_glow.rgb * own / 255.0) : u_glow.rgb);
 	vec3 c = floor(min(vec3(255.0), own * v_light + e)) / 255.0;
 	o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);
-	o_colour = u_glass == 0 ? vec4(c, 1.0) : vec4(c * u_glass_alpha, u_glass_alpha);
+	o_colour = u_glass == 0 ? vec4(c, 1.0) : vec4(c * alpha, alpha);
 }
 )";
 
@@ -873,7 +877,7 @@ std::string EyeMeshSource(const char *source, bool fragment)
 		s.insert(s.rfind('}'), "\tgl_FragDepth = u_near * gl_FragCoord.w;\n");
 		/* Its own light alone in the second picture, as glow_after_night of viewport.cpp draws it over the dark: the
 		 * texel by its colour's strongest; see-through by the glass's alpha. */
-		replace("o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);", "o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(floor(own * max(u_glow.r, max(u_glow.g, u_glow.b)) / 256.0) / 255.0, 1.0);\n\tif (u_glass != 0) o_lit *= u_glass_alpha;");
+		replace("o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(1.0);", "o_lit = u_glow.a == 0.0 ? vec4(0.0) : vec4(floor(own * max(u_glow.r, max(u_glow.g, u_glow.b)) / 256.0) / 255.0, 1.0);\n\tif (u_glass != 0) o_lit *= alpha;");
 	} else {
 		/* A wheel that turns (its corners' wheel in attribute 3): its corners and normals moved by its matrix first. */
 		s.insert(s.find('\n') + 1, "layout(location = 3) in float a_wheel;\nuniform mat4 u_wheels[32];\nuniform int u_wheel_count;\n");
@@ -972,10 +976,14 @@ void main()
 		}
 	}
 	if (t == vec4(0.0)) discard;
+	/* See-through by so many 256ths; a material "BLEND"'s times its texel's alpha (THREE_D_GPU_EYE_TEXEL_ALPHA). */
+	float alpha = v_how.x >= 256.0 ? 1.0 : v_how.x / 256.0;
+	if ((how & 8) != 0) alpha *= t.a;
+	if (alpha <= 0.0) discard;
 	vec3 c = floor(t.rgb * 255.0 + 0.5);
 	float light = (how & 4) != 0 ? v_corner_light : v_light;
 	if (light != 256.0) c = min(vec3(255.0), floor(c * light / 256.0));
-	o_colour = vec4(c / 255.0, v_how.x >= 256.0 ? 1.0 : v_how.x / 256.0);
+	o_colour = vec4(c / 255.0, alpha);
 	o_glow = vec4(0.0);
 	gl_FragDepth = u_near * gl_FragCoord.w;
 }
@@ -1705,6 +1713,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.tex = gl.glGetUniformLocation(p.program, "u_tex");
 	p.glass = gl.glGetUniformLocation(p.program, "u_glass");
 	p.glass_alpha = gl.glGetUniformLocation(p.program, "u_glass_alpha");
+	p.texel_alpha = gl.glGetUniformLocation(p.program, "u_texel_alpha");
 	p.glow = gl.glGetUniformLocation(p.program, "u_glow");
 	p.paint = gl.glGetUniformLocation(p.program, "u_paint");
 	p.detail = gl.glGetUniformLocation(p.program, "u_detail");
@@ -2224,6 +2233,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 				const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
 				gl.glUniform1f(_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : pic.glass_alpha);
 			}
+			gl.glUniform1i(_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
@@ -3011,6 +3021,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 				const uint8_t alpha = d.mesh->shape->Alpha(r.texture);
 				gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
 			}
+			gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}

@@ -571,6 +571,8 @@ add_files(
     three_d_animals.h
     three_d_dragons.cpp
     three_d_dragons.h
+    three_d_ufo.cpp
+    three_d_ufo.h
     three_d_witches.cpp
     three_d_witches.h
     three_d_navigation.cpp

@@ -80,6 +80,8 @@ static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objec
 static std::vector<ThreeDCreature> _creatures;
 /** The witches of the indices ("druh": "carodejnice"). */
 static std::vector<ThreeDWitch> _witches;
+/** The flying saucers of the indices ("druh": "ufo"). */
+static std::vector<ThreeDUfo> _ufos;
 /** The night flyers an index of ours takes out of the sky ("nahrazuje": the colleague's ghost floats along the streets instead). */
 static std::set<std::string, std::less<>> _witches_replaced;
 /** The trees of each town theme ("druh": "strom" with "tema", the colleague's mushrooms): the names of their figures. */
@@ -178,7 +180,7 @@ static const IntervalTimer<TimerWindow> _read_problem_timer(std::chrono::seconds
 	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_BOXES, problem), {}, WarningLevel::Warning);
 });
 
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr);
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat = 0, bool halved = true, const std::vector<float> *cover = nullptr, bool soft = false);
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
 static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
@@ -612,7 +614,7 @@ struct TextureLevelsMade {
 	std::weak_ptr<const std::vector<uint8_t>> bytes; ///< its picture, while anything has it (its place cannot be another's then)
 	std::weak_ptr<const std::vector<ThreeDObjectTexture>> levels;
 };
-static std::map<std::pair<const std::vector<uint8_t> *, uint32_t>, TextureLevelsMade> _texture_levels;
+static std::map<std::tuple<const std::vector<uint8_t> *, uint32_t, bool>, TextureLevelsMade> _texture_levels;
 /** The textures of files made (TextureLevelsOfFile()), by the file and the colour of what is not in the picture. */
 static std::map<std::pair<std::string, uint32_t>, std::weak_ptr<const std::vector<ThreeDObjectTexture>>> _file_texture_levels;
 /** The masks of details made (DetailMaskOfFile()), by their file. */
@@ -667,11 +669,12 @@ ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes)
  * @param png the picture (InternThreeDTextureBytes()), nullptr none: the material's colour
  * @param flat the material's colour where it has no picture
  * @param finest the finest level wanted: those finer are made without their pixels
+ * @param soft its texels' alpha kept (a material "BLEND", DecodeTextureLevels())
  */
-static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat, int finest = 0)
+static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, uint32_t flat, int finest = 0, bool soft = false)
 {
 	const TextureCoverTriangles cover = TextureCover(png);
-	const auto key = std::make_pair(png.get(), flat);
+	const auto key = std::make_tuple(png.get(), flat, soft);
 	{
 		std::lock_guard lock(_texture_bytes_mutex);
 		auto it = _texture_levels.find(key);
@@ -682,7 +685,7 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 	}
 	static const std::vector<uint8_t> none;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
-	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get());
+	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get(), soft);
 	DropFinerLevels(*made, finest);
 	std::lock_guard lock(_texture_bytes_mutex);
 	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
@@ -768,7 +771,9 @@ struct GlbTexture {
 /**
  * A material's own light and see-through (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md: the fire Tatra's
  * beacon lit, the ghost "BLEND, 0.7, it shines by itself at night"): its "emissiveFactor" -- times the texel with an
- * "emissiveTexture" --, and with "alphaMode" "BLEND" the alpha of its base colour.
+ * "emissiveTexture" --, and with "alphaMode" "BLEND" the alpha of its base colour, below 255 whatever it is: a material
+ * "BLEND" is see-through as much as its alpha times its texels' (the colleague's saucer's beam, fading to the ground
+ * in its texture alone).
  */
 static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
 {
@@ -779,8 +784,9 @@ static void ReadMaterialLight(const nlohmann::json &mat, GlbTexture &t)
 		if (e.r != 0 || e.g != 0 || e.b != 0) t.glow = e.data;
 	}
 	if (mat.value("alphaMode", std::string()) == "BLEND") {
+		t.alpha = 254;
 		if (const nlohmann::json *f = GlbColourFactor(mat); f != nullptr) {
-			t.alpha = static_cast<uint8_t>(std::clamp(f->at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5);
+			t.alpha = static_cast<uint8_t>(std::min(254.0, std::clamp(f->at(3).get<double>(), 0.0, 1.0) * 255.0 + 0.5));
 		}
 	}
 }
@@ -814,6 +820,7 @@ struct GlbReadOptions {
 	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
 	std::string_view skip_node;
 	std::string_view skip_prefix; ///< with all_nodes, the nodes whose names start so (and their children) left out (an interior's doors, read on their own)
+	const std::vector<std::string> *skip_nodes = nullptr; ///< with all_nodes, the nodes so named (and their children) left out
 	const std::vector<std::string> *groups = nullptr;
 	bool only_groups = false;     ///< with groups, only the meshes under the groups' nodes (an add-on: the nodes no state shows not read at all)
 	bool skip_night = false;      ///< the nodes "noc" and "noc_<...>" and their children left out (lit only at night)
@@ -1152,6 +1159,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				const auto &node = nodes.at(n);
 				const std::string node_name = node.contains("name") && node.at("name").is_string() ? node.at("name").get<std::string>() : std::string();
 				if (!skip_node.empty() && node_name == skip_node) continue;
+				if (o.skip_nodes != nullptr && std::ranges::find(*o.skip_nodes, node_name) != o.skip_nodes->end()) continue;
 				if (!o.skip_prefix.empty() && node_name.starts_with(o.skip_prefix)) continue;
 				if (o.skip_night && IsNightNode(node_name)) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
@@ -2979,6 +2987,94 @@ static void ReadThreeDVehicleObjects()
 					if (!_witches_replaced.contains(w.name)) _witches.push_back(std::move(w));
 					continue;
 				}
+				if (figure_kind == "ufo" && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object() && e.at("animace").contains("let")) {
+					/* A flying saucer (the colleague's hra/3d/PROSBA-UFO.md): its flight a figure of frames without its beam
+					 * and its sheep, each of those a figure of its node alone; what it is for and how it shines. */
+					ThreeDUfo u;
+					u.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (int k = 0; k < 3; k++) u.size[k] = e.at("rozmer_m").at(k).get<float>();
+					}
+					auto when = [&](std::string_view w) {
+						if (w == "katastrofa") u.disaster = true;
+						if (w == "noc") u.night = true;
+					};
+					if (e.contains("kdy") && e.at("kdy").is_string()) when(e.at("kdy").get<std::string>());
+					if (e.contains("kdy") && e.at("kdy").is_array()) {
+						for (const auto &w : e.at("kdy")) {
+							if (w.is_string()) when(w.get<std::string>());
+						}
+					}
+					u.night_scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					if (e.contains("katastrofa") && e.at("katastrofa").is_object()) {
+						const auto &d = e.at("katastrofa");
+						if (d.contains("male_ufo") && d.at("male_ufo").is_object()) u.small_scale = std::clamp(d.at("male_ufo").value("meritko", 1.0f), 0.1f, 20.0f);
+						if (d.contains("velke_ufo") && d.at("velke_ufo").is_object()) u.big_scale = std::clamp(d.at("velke_ufo").value("meritko", 2.0f), 0.1f, 20.0f);
+					}
+					if (e.contains("noc") && e.at("noc").is_object()) u.night_lift_m = std::clamp(e.at("noc").value("vyska_m", 13.0f), 1.0f, 200.0f);
+					std::vector<std::string> apart;
+					if (e.contains("paprsek") && e.at("paprsek").is_object()) {
+						const auto &b = e.at("paprsek");
+						u.has_beam = true;
+						u.beam_len_m = std::clamp(b.value("delka_m", 12.0f), 0.5f, 200.0f);
+						u.beam_from_z = std::clamp(b.value("od_z", -1.0f), -50.0f, 50.0f);
+						const std::string node = b.value("uzel", std::string("paprsek"));
+						ThreeDVehicleObject beam;
+						beam.package = package;
+						beam.file = folder + e.at("soubor").get<std::string>();
+						beam.name = u.Figure("paprsek");
+						beam.only_node = node;
+						_figure_objects.push_back(std::move(beam));
+						apart.push_back(node);
+						if (b.contains("konec") && b.at("konec").is_string()) apart.push_back(b.at("konec").get<std::string>());
+					}
+					if (e.contains("ovce") && e.at("ovce").is_object()) {
+						const std::string node = e.at("ovce").value("uzel", std::string("ovce"));
+						u.has_sheep = true;
+						ThreeDVehicleObject sheep;
+						sheep.package = package;
+						sheep.file = folder + e.at("soubor").get<std::string>();
+						sheep.name = u.Figure("ovce");
+						sheep.only_node = node;
+						_figure_objects.push_back(std::move(sheep));
+						apart.push_back(node);
+					}
+					const auto &a = e.at("animace").at("let");
+					ThreeDVehicleObject fly;
+					fly.package = package;
+					fly.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fly.file, MarginsOf::Vehicles);
+					fly.name = u.Figure("let");
+					fly.frame_prefix = a.value("uzly", std::string("let_"));
+					fly.frames = std::clamp(a.value("snimku", 0), 0, 64);
+					fly.frame_ticks = std::clamp(a.value("tiku", 1), 1, 1000);
+					fly.loop = a.value("smycka", true);
+					fly.walk_step = std::clamp(a.value("krok_m", 0.0f), 0.0f, 100.0f);
+					if (fly.frames < 2) fly.frame_prefix.clear();
+					fly.skip_nodes = std::move(apart);
+					_figure_objects.push_back(std::move(fly));
+					auto colour_of = [](const nlohmann::json &l) -> uint32_t {
+						auto n = l.contains("barva") && l.at("barva").is_string() ? ParseInteger<uint32_t>(l.at("barva").get<std::string>(), 16) : std::nullopt;
+						return n.has_value() ? Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data : 0;
+					};
+					if (e.contains("svetla") && e.at("svetla").is_object()) {
+						const auto &lights = e.at("svetla");
+						if (lights.contains("paprsek") && lights.at("paprsek").is_object()) {
+							u.beam_colour = colour_of(lights.at("paprsek"));
+							u.beam_reach_m = std::clamp(lights.at("paprsek").value("dosah_m", 0.0f), 0.0f, 200.0f);
+							u.beam_angle = std::clamp(lights.at("paprsek").value("uhel", 14.0f), 1.0f, 120.0f);
+						}
+						if (lights.contains("lem") && lights.at("lem").is_object()) {
+							u.rim_colour = colour_of(lights.at("lem"));
+							u.rim_reach_m = std::clamp(lights.at("lem").value("dosah_m", 0.0f), 0.0f, 100.0f);
+						}
+					}
+					if (e.contains("posadka") && e.at("posadka").is_array() && !e.at("posadka").empty() && e.at("posadka").at(0).is_object()) {
+						u.crew = e.at("posadka").at(0).value("postava", std::string());
+					}
+					_ufos.push_back(std::move(u));
+					continue;
+				}
 				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac"));
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
@@ -3020,8 +3116,18 @@ static void ReadThreeDVehicleObjects()
 								if (w.is_string()) place(w.get<std::string>());
 							}
 						}
-						const std::string climate = e.value("klima", std::string());
-						a.climate = climate == "mirne" ? ThreeDAnimal::TEMPERATE : climate == "poust" ? ThreeDAnimal::DESERT : climate == "subarkticke" ? ThreeDAnimal::ARCTIC : 0;
+						/* Its kind of towns, one or a list of them (the colleague's Putin: "klima": ["mirne", "subarkticke"]). */
+						auto climate = [&](std::string_view c) {
+							if (c == "mirne") a.climate |= ThreeDAnimal::TEMPERATE;
+							if (c == "poust") a.climate |= ThreeDAnimal::DESERT;
+							if (c == "subarkticke") a.climate |= ThreeDAnimal::ARCTIC;
+						};
+						if (e.contains("klima") && e.at("klima").is_string()) climate(e.at("klima").get<std::string>());
+						if (e.contains("klima") && e.at("klima").is_array()) {
+							for (const auto &c : e.at("klima")) {
+								if (c.is_string()) climate(c.get<std::string>());
+							}
+						}
 						a.theme = ParseIndexTheme(e);
 						a.night = e.value("kdy", std::string()) == "noc";
 						a.day = e.value("kdy", std::string()) == "den";
@@ -3178,7 +3284,7 @@ static void ReadThreeDVehicleObjects()
 					if (fig.thing && e.value("strelba", std::string()) == "raketa") {
 						ThreeDVehicleObject shot = fig;
 						shot.name = fig.name + "/prazdny";
-						shot.skip_node = "raketa_v_hlavni";
+						shot.skip_nodes = {"raketa_v_hlavni"};
 						_figure_objects.push_back(std::move(shot));
 					}
 					/* A light's flame (the colleague's torch and lantern, "plamen"): its frames, the rest of it in each. */
@@ -3737,6 +3843,7 @@ void ResetThreeDVehicleObjects()
 	_creatures.clear();
 	_witches.clear();
 	_witches_replaced.clear();
+	_ufos.clear();
 	_animals.clear();
 	_mushrooms.clear();
 	_thing_sounds.clear();
@@ -4422,7 +4529,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	 * shape, read first, without the glowing underside of its cap): the night kept or left out, a node left out. */
 	if (this->night_glass) key += "|n";
 	if (this->frame_lights) key += "|f";
-	if (!this->skip_node.empty()) key += "|x" + this->skip_node;
+	for (const std::string &n : this->skip_nodes) key += "|x" + n;
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
@@ -4517,14 +4624,14 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			o.skip_night = true;
 			o.groups = &marked;
 			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
-		} else if (!this->skip_node.empty() || this->night_glass) {
+		} else if (!this->skip_nodes.empty() || this->night_glass) {
 			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept. */
 			GlbReadOptions o;
 			o.all_nodes = true;
 			o.frame_prefix = this->frame_prefix;
 			o.frame = frame;
 			o.only_node = this->only_node;
-			o.skip_node = this->skip_node;
+			o.skip_nodes = &this->skip_nodes;
 			o.skip_night = !this->night_glass;
 			o.groups = &marked;
 			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
@@ -4944,7 +5051,9 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 			png = s->pngs[index];
 			flat = s->flats[index];
 		}
-		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat, level);
+		/* A material "BLEND": its texels' alpha as it is (the saucer's beam fading to the ground). */
+		const bool soft = s != nullptr && s->Alpha(static_cast<size_t>(index)) < 255;
+		if (lv == nullptr) lv = ThreeDTextureLevelsOf(png, flat, level, soft);
 		return lv;
 	}, [this, index](ThreeDTextureLevels made) { KeepTexture(this->levels[index], std::move(made)); });
 	std::lock_guard lock(_lazy_mutex);
@@ -5767,6 +5876,13 @@ const std::vector<ThreeDWitch> &GetThreeDWitches()
 	return _witches;
 }
 
+/** The flying saucers of the indices ("druh": "ufo"), read the first time they are asked for. */
+const std::vector<ThreeDUfo> &GetThreeDUfos()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _ufos;
+}
+
 /** The dogs, the animals, the ghosts and the sellers of dogs of the indices, read the first time they are asked for. */
 const std::vector<ThreeDAnimal> &GetThreeDAnimals()
 {
@@ -5953,8 +6069,16 @@ static std::shared_ptr<const std::vector<uint8_t>> TexelsDrawnOf(int w, int h, c
 	return made;
 }
 
-static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover)
+/**
+ * A texture's levels of detail from its picture: each texel opaque where its alpha is at least half, else none (0);
+ * soft, its alpha as it is (a material "BLEND": see-through by it, ThreeDVehicleShape::BlendsByTexel()), none where 0.
+ */
+static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover, bool soft)
 {
+	auto texel = [soft](uint8_t r, uint8_t g, uint8_t b, uint8_t a) -> uint32_t {
+		if (soft) return a == 0 ? 0 : Colour(r, g, b, a).data;
+		return a >= 128 ? Colour(r, g, b).data : 0;
+	};
 	ThreeDObjectTexture t;
 	if (png.size() >= RAW_TEXTURE_MARK.size() + 8 && std::equal(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end(), png.begin())) {
 		/* Pixels as they are (a texture of MSTS, simtrains.h): the mark, the width and the height, then RGBA. */
@@ -5966,7 +6090,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 			t.h = static_cast<int>(h);
 			t.px.resize(static_cast<size_t>(w) * h);
 			const uint8_t *src = png.data() + at + 8;
-			for (size_t i = 0; i < t.px.size(); i++, src += 4) t.px[i] = src[3] >= 128 ? Colour(src[0], src[1], src[2]).data : 0;
+			for (size_t i = 0; i < t.px.size(); i++, src += 4) t.px[i] = texel(src[0], src[1], src[2], src[3]);
 		}
 	}
 #ifdef WITH_PNG
@@ -5982,7 +6106,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 				t.px.resize(static_cast<size_t>(t.w) * t.h);
 				for (size_t i = 0; i < t.px.size(); i++) {
 					const uint8_t *p = &rgba[i * 4];
-					t.px[i] = p[3] >= 128 ? Colour(p[0], p[1], p[2]).data : 0;
+					t.px[i] = texel(p[0], p[1], p[2], p[3]);
 				}
 			} else {
 				png_image_free(&image);
@@ -6019,7 +6143,7 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		if (!drawn.empty()) drawn_b.assign(b.px.size(), 0);
 		for (int y = 0; y < b.h; y++) {
 			for (int x = 0; x < b.w; x++) {
-				uint r = 0, g = 0, bl = 0, n = 0, holes = 0;
+				uint r = 0, g = 0, bl = 0, n = 0, holes = 0, alpha = 0;
 				bool any_drawn = false;
 				for (int k = 0; k < 4; k++) {
 					int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
@@ -6035,10 +6159,15 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 					r += c.r;
 					g += c.g;
 					bl += c.b;
+					alpha += c.a;
 					n++;
 				}
 				const size_t to = static_cast<size_t>(y) * b.w + x;
-				if (drawn.empty()) {
+				if (soft) {
+					/* Its alpha the mean of the four, none counted as nothing. */
+					const uint mean = alpha / 4;
+					b.px[to] = n > 0 && mean > 0 ? Colour(r / n, g / n, bl / n, mean).data : 0;
+				} else if (drawn.empty()) {
 					b.px[to] = n >= 2 ? Colour(r / n, g / n, bl / n).data : 0;
 				} else {
 					drawn_b[to] = any_drawn ? 1 : 0;

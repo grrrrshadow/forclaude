@@ -170,6 +170,8 @@
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
 #include "three_d_witches.h"
+#include "three_d_ufo.h"
+#include "disaster_vehicle.h"
 
 #include "safeguards.h"
 
@@ -9245,6 +9247,23 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: carodejnice {}", sent ? "poslana" : "NEPOSLANA");
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDWitches());
+	} else if (what == "ufo") {
+		/* 'ufo [<x> <y> <stupnu> [visi|ovce|pristan]]': the flying saucers (three_d_ufo.h); with a tile the saucer of the
+		 * night sent from there, flying so many degrees from +x towards +y (it stays only at night), hovering there, a
+		 * sheep up its beam, or landing there at once. 'ufo katastrofa male|velke <x> <y>': the
+		 * small or the big UFO of the disasters there now, the big one coming down at once. */
+		if (argv.size() > 5 && argv[2] == "katastrofa") {
+			auto x = number(4), y = number(5);
+			if (x.has_value() && y.has_value() && *x > 0 && *y > 0 && static_cast<uint>(*x) < Map::MaxX() && static_cast<uint>(*y) < Map::MaxY()) {
+				StartRigUfoDisaster(argv[3] == "velke", TileXY(*x, *y));
+				IConsolePrint(CC_DEFAULT, "test3d: ufo katastrofa {} na {},{}", argv[3], *x, *y);
+			}
+		} else if (auto x = number(2), y = number(3); x.has_value() && y.has_value()) {
+			const bool sent = SendThreeDUfo((*x + 0.5) * TILE_SIZE, (*y + 0.5) * TILE_SIZE, number(4).value_or(0) * M_PI / 180.0);
+			IConsolePrint(CC_DEFAULT, "test3d: ufo {}", sent ? "poslano" : "NEPOSLANO");
+			if (sent && argv.size() > 5) IConsolePrint(CC_DEFAULT, "test3d: ufo {} {}", argv[5], MakeThreeDUfoDo(argv[5]) ? "ano" : "NE");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDUfos());
 	} else if (what == "inventar") {
 		/* The walker's inventory (walker_inventory_gui.cpp): 'inventar' opens it and tells what it holds and what is sold
 		 * near the walker; 'inventar koupit <n>' buys thing n there, 'inventar pouzit <n>' uses it, 'inventar zdravi <n>'

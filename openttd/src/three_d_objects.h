@@ -361,7 +361,7 @@ struct ThreeDVehicleShape {
 	static constexpr uint8_t GLOW_TEXTURED = 1; ///< tex_glow's alpha: its light the texel times the colour ("emissiveTexture")
 	static constexpr uint8_t GLOW_FLAT = 2;     ///< tex_glow's alpha: its light the colour alone
 	std::vector<uint32_t> tex_glow;     ///< for each texture, its own light (Colour::data, the alpha GLOW_*), 0 none: added to it unshaded, and at night it is not darkened
-	std::vector<uint8_t> tex_alpha;     ///< for each texture, how much of what is behind it hides (a material "BLEND"), 255 all
+	std::vector<uint8_t> tex_alpha;     ///< for each texture, how much of what is behind it hides (a material "BLEND", times its texels' alpha), 255 all
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
 	float all[6] = {};          ///< the extent of all its corners, what the states show among them: x0, x1, y0, y1, z0, z1, metres; all 0 not known
 	/* Its lights at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): the glass of the node "noc" of its
@@ -412,6 +412,8 @@ struct ThreeDVehicleShape {
 	{
 		return this->IsGlass(triangle) || this->Alpha(triangle < this->tri_tex.size() ? this->tri_tex[triangle] : 0) < 255;
 	}
+	/** Whether a see-through triangle is of a material "BLEND": its texels' alpha too (SeeThroughAlpha() times it). */
+	bool BlendsByTexel(size_t triangle) const { return this->Alpha(triangle < this->tri_tex.size() ? this->tri_tex[triangle] : 0) < 255; }
 	/** How much of what is behind a see-through triangle hides: its material's, else the glass's. */
 	float SeeThroughAlpha(size_t triangle) const
 	{
@@ -657,7 +659,7 @@ struct ThreeDVehicleObject {
 	std::string tint_material;      ///< an effect's "barvy": the material the game colours ("material")
 	std::vector<uint32_t> tint_palette; ///< and the colours it may be ("paleta", Colour::data)
 	std::string only_node;          ///< a figure of one node of a file of several ("uzel", the colleague's girls of the lorries: a pose a node, the textures once): only that node of it is drawn
-	std::string skip_node;          ///< a node of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni")
+	std::vector<std::string> skip_nodes; ///< nodes of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni"; a saucer's frames: its beam and its sheep)
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
 	uint32_t light_colour = 0;      ///< a light's thing: "svetlo" "barva", 0xRRGGBB; 0 the game's own for it
 	float light_reach_m = 0;        ///< and "dosah_m", how far it lights; 0 the game's own
@@ -771,6 +773,35 @@ struct ThreeDWitch {
 const std::vector<ThreeDWitch> &GetThreeDWitches();
 
 /**
+ * A flying saucer of the indices ("druh": "ufo", the colleague's hra/3d/PROSBA-UFO.md): the small and the big UFO of
+ * the disasters, and flying over the towns at night, breaking nothing. Its figures: "<jmeno>/let" (its frames, without
+ * its beam and its sheep), "<jmeno>/paprsek" (the beam alone, from the hole in its bottom down) and "<jmeno>/ovce".
+ */
+struct ThreeDUfo {
+	std::string name;           ///< "jmeno"
+	float size[3] = {};         ///< "rozmer_m": length, width and height, metres
+	float small_scale = 1.0f;   ///< "katastrofa" "male_ufo" "meritko": the small UFO, so many times its true size
+	float big_scale = 2.0f;     ///< "katastrofa" "velke_ufo" "meritko"
+	bool disaster = false;      ///< "kdy" has "katastrofa": drawn for the disasters' UFOs
+	bool night = false;         ///< "kdy" has "noc": flies over the towns at night
+	float night_scale = 1.0f;   ///< "meritko": its size flying at night
+	float night_lift_m = 13.0f; ///< "noc" "vyska_m": its middle over the ground at night, true metres
+	float beam_len_m = 12.0f;   ///< "paprsek" "delka_m": the beam's length in the model
+	float beam_from_z = -1.0f;  ///< "paprsek" "od_z": where the beam starts under its middle, metres
+	bool has_beam = false;      ///< it has "paprsek"
+	bool has_sheep = false;     ///< it has "ovce"
+	uint32_t beam_colour = 0;   ///< "svetla" "paprsek" "barva" (Colour::data); 0 no light of it at night
+	float beam_reach_m = 0;     ///< its "dosah_m"
+	float beam_angle = 14.0f;   ///< its "uhel", degrees
+	uint32_t rim_colour = 0;    ///< "svetla" "lem" "barva": the light all round it at night
+	float rim_reach_m = 0;      ///< its "dosah_m"
+	std::string crew;           ///< "posadka" "postava": who gets out where it lands at night
+
+	std::string Figure(std::string_view part) const { return this->name + "/" + std::string(part); }
+};
+const std::vector<ThreeDUfo> &GetThreeDUfos();
+
+/**
  * A dog, an animal, a ghost or a seller of dogs of the indices (the colleague's hra/3d/PSI-ZVIRATA-HOUBY-PRO-HRU.md;
  * "druh" "pes", "zvire", "strasidlo", or "postava" with "prodavac"): its poses figures of their own,
  * "<jmeno>/<poza>" ("pozy" with bones, or "animace" of frames), the figure "<jmeno>" as it stands; where it is found,
@@ -794,17 +825,17 @@ struct ThreeDAnimal {
 	static constexpr uint8_t ROUND = 4;  ///< "okoli": in the land about the towns
 	static constexpr uint8_t ROOF = 8;   ///< "strecha": on the flat roofs ("strechy")
 	static constexpr uint8_t RAIL = 16;  ///< "koleje": along the railway lines (where the game puts any ghost too)
-	/* The towns it is found at ("klima"): 0 any. */
+	/* The towns it is found at ("klima", one or a list): bits, 0 any. */
 	static constexpr uint8_t TEMPERATE = 1; ///< "mirne"
 	static constexpr uint8_t DESERT = 2;    ///< "poust": the desert towns
-	static constexpr uint8_t ARCTIC = 3;    ///< "subarkticke"
+	static constexpr uint8_t ARCTIC = 4;    ///< "subarkticke"
 
 	std::string name;            ///< "jmeno"
 	std::string title_cs, title_en; ///< "nazev"
 	Kind kind = Kind::Dog;
 	Temper temper = Temper::Peaceful; ///< "povaha"
 	uint8_t places = 0;          ///< "kde", bits
-	uint8_t climate = 0;         ///< "klima"
+	uint8_t climate = 0;         ///< "klima", bits
 	uint8_t theme = 0;           ///< "tema": only about the towns of the theme (TownTheme), 0 any
 	bool night = false;          ///< "kdy": "noc": out only at night
 	bool day = false;            ///< "kdy": "den": out only by day (the colleague's gnome, PAR14-PRO-HRU.md)

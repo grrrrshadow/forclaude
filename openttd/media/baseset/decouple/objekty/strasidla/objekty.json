@@ -193,5 +193,36 @@
   "autor": "Animated Kobold, greeneyed3DArtist (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/animated-kobold-0da9989223424d4d80137c0bbf4979fa), převod tvorove/par15_tvorove.py bez renderu",
   "licence": "CC BY 4.0 (uvést greeneyed3DArtist; změny: otočený, zmenšený na skutečnou velikost, dýka připnutá na ruku, záběr T-póza pryč)",
   "poznamka": "strašidlo (hráč: „strašidlo vlk“): v noci kolem mírných měst, útočí; až bude les, v noci v lese (PROSBA-LES-PRUMYSL-SVETLA.md); skutečné metry (1.3 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; kostra a pohyb modelu (pozy klid: stojí s dýkou, kývá se; chůzi model nemá); dýka (Dagger.001_Dagger_0) je na kosti levé ruky"
+ },
+ {
+  "soubor": "ufon.glb",
+  "jmeno": "ufon",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "zelený ufon",
+   "en": "green alien"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "povaha": "mirumilovne",
+  "meritko": 2,
+  "rozmer_m": [
+   0.66,
+   0.52,
+   1.42
+  ],
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 12,
+    "tiku": 4,
+    "smycka": true,
+    "krok_m": 0.96
+   }
+  },
+  "trojuhelniku": 8647,
+  "autor": "ufo, ilarioseb (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ufo-1ce1c10eaa5f4288b63c2c635d0c04f7), převod tvorove/ufo.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ilarioseb; změny: zjednodušený na 8647 trojúhelníků, kůže přebarvená na zelenou, ruce z A-pózy stažené k tělu, otočený, chůze ze snímků)",
+  "poznamka": "v noci chodí kolem měst a kolem přistálého UFO (pilot talíře ufo_talir je týž ufon), neútočí; skutečné metry (1.4 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; chůze z 12 snímků chuze_00 až chuze_11: tělo (3596 trojúhelníků) jako instance jedné sítě, nohy a ruce (5051) v každém snímku vlastní, nohy se kývají kolem kyčlí ±22°, ruce kolem ramen ±18° proti noze na své straně, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); bez kostry; glb z gltfpacku"
  }
 ]

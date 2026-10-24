@@ -236,6 +236,7 @@ struct ThreeDGpuEyeCorner {
 static constexpr int THREE_D_GPU_EYE_FILL = 1;         ///< a hole of its texture filled from the nearest texel within three (CAB_FILL_HOLES)
 static constexpr int THREE_D_GPU_EYE_REPEAT = 2;       ///< its texture repeated beyond its edges (CAB_REPEAT)
 static constexpr int THREE_D_GPU_EYE_CORNER_LIGHT = 4; ///< the light of each corner, straight across the picture between them (a thing in the hand)
+static constexpr int THREE_D_GPU_EYE_TEXEL_ALPHA = 8;  ///< see-through times its texel's alpha (a material "BLEND", CAB_TEXEL_ALPHA)
 
 /** Triangles of the eye's frame of one texture, in the order they are drawn: corners first to first + count. */
 struct ThreeDGpuEyeRun {

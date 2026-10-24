@@ -740,13 +740,13 @@ struct ObjectRaster {
 static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2;
 
 /** The texels to a metre of a shape's texture at its full size: how fine a level of it a picture needs. */
-static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape)
+static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int texture = 0)
 {
 	/* Asked on the thread making the pictures of the vehicles too (RasterObject()). */
 	/* (By the shape and its triangles: a shape made again with more parts may be where one let go of was.) */
-	static std::map<std::pair<const ThreeDVehicleShape *, size_t>, float> known;
+	static std::map<std::tuple<const ThreeDVehicleShape *, size_t, int>, float> known;
 	static std::mutex known_mutex;
-	const auto key = std::make_pair(&shape, shape.tri.size());
+	const auto key = std::make_tuple(&shape, shape.tri.size(), texture);
 	{
 		std::lock_guard lock(known_mutex);
 		auto it = known.find(key);
@@ -756,10 +756,13 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 	 * Not known yet: as the most of them are, and not kept -- taken as 1 x 1, every picture of a figure, a few pixels
 	 * big, asked for its textures at their full size (three of 1024 x 1024 for a girl at a stop). */
 	int tw = 1, th = 1;
-	const bool size_known = obj.TextureSize(0, tw, th);
+	const bool size_known = obj.TextureSize(texture, tw, th);
 	if (!size_known) tw = th = 1024;
 	double uv_area = 0, area = 0;
 	for (size_t i = 0; i + 2 < shape.tri.size(); i += 3) {
+		/* Another texture than the body's: by its own triangles (the saucer's beam, 4 x 128 texels down 12 m, was
+		 * made as coarse as the body's 1024 x 1024 over the whole of it: its fading in a few steps). */
+		if (texture != 0 && (i / 3 >= shape.tri_tex.size() || shape.tri_tex[i / 3] != texture)) continue;
 		const uint32_t a = shape.tri[i], b = shape.tri[i + 1], c = shape.tri[i + 2];
 		double ux = shape.uv[b * 2] - shape.uv[a * 2], uy = shape.uv[b * 2 + 1] - shape.uv[a * 2 + 1];
 		double vx = shape.uv[c * 2] - shape.uv[a * 2], vy = shape.uv[c * 2 + 1] - shape.uv[a * 2 + 1];
@@ -1167,9 +1170,15 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	height += (ss - height % ss) % ss;
 	if (width <= 0 || height <= 0 || static_cast<size_t>(width) * height > 64u * 1024 * 1024) return false;
 
-	/* The level of the textures: about a texel to a pixel. */
+	/* The level of the textures: about a texel to a pixel, each its own. */
 	int level = 0;
 	for (float d = TexelsPerMetre(obj, *shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
+	auto level_of = [&](int k) {
+		if (k == 0) return level;
+		int l = 0;
+		for (float d = TexelsPerMetre(obj, *shape, k); d >= 2.0f * p && l < 12; d /= 2.0f) l++;
+		return l;
+	};
 	/* Only the textures of the triangles drawn (and the body's, for a triangle without one): those of the add-ons the
 	 * state does not show are not made at all (an add-on's picture is of sixteen million pixels). */
 	std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, whole->pngs.size()), nullptr);
@@ -1177,7 +1186,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	for (const std::vector<size_t> *list : {&drawn_triangles, &glass_triangles}) {
 		for (size_t t : *list) {
 			const size_t ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
-			if (ti < texs.size() && texs[ti] == nullptr) texs[ti] = obj.GetTexture(level, static_cast<int>(ti));
+			if (ti < texs.size() && texs[ti] == nullptr) texs[ti] = obj.GetTexture(level_of(static_cast<int>(ti)), static_cast<int>(ti));
 		}
 	}
 	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6); the rust after
@@ -1317,7 +1326,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
 		const int ti = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
-		const float glass_alpha = shape->SeeThroughAlpha(t / 3);
+		const float material_alpha = shape->SeeThroughAlpha(t / 3);
+		const bool by_texel = shape->BlendsByTexel(t / 3);
 		const uint32_t glow = shape->Glow(static_cast<size_t>(ti));
 		const float ax = sx[a] - left, ay = sy[a] - top, bx = sx[b] - left, by = sy[b] - top, cx = sx[c] - left, cy = sy[c] - top;
 		const float area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
@@ -1342,6 +1352,9 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				v -= std::floor(v);
 				const int tx = std::min(tex->w - 1, static_cast<int>(u * tex->w)), ty = std::min(tex->h - 1, static_cast<int>(v * tex->h));
 				const Colour g(tex->px[static_cast<size_t>(ty) * tex->w + tx]);
+				/* A material "BLEND": as see-through as its texel too (the saucer's beam fading to the ground). */
+				const float glass_alpha = by_texel ? material_alpha * g.a / 255.0f : material_alpha;
+				if (glass_alpha <= 0.0f) continue;
 				const float k = w0 * light[a] + w1 * light[b] + w2 * light[c];
 				const Colour shone = shine(glow, g.r, g.g, g.b, k);
 				const float gr = shone.r, gg = shone.g, gb = shone.b;
@@ -1634,10 +1647,16 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		box(whole, vehicle_to);
 		int level = 0;
 		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
-		/* Its textures as they are, painted by the card as they are drawn (GpuPaintOf()). */
+		/* Its textures as they are, each at its own level, painted by the card as they are drawn (GpuPaintOf()). */
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
-			if (m.triangles->used[i]) m.textures[i] = obj.GetTexture(level, static_cast<int>(i));
+			if (!m.triangles->used[i]) continue;
+			int l = level;
+			if (i != 0) {
+				l = 0;
+				for (float d = TexelsPerMetre(obj, shape, static_cast<int>(i)); d >= 2.0f * p && l < 12; d /= 2.0f) l++;
+			}
+			m.textures[i] = obj.GetTexture(l, static_cast<int>(i));
 		}
 		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour);
 		const ObjectDetailPaint details(obj, whole, st, std::max<size_t>(1, whole.pngs.size()), m.textures);

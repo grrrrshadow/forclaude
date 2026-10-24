@@ -27,6 +27,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 24. 10. – UFO: katastrofy a noční talíř (kolega PROSBA-UFO)
+
+- Hráč kolegovi: *„ufo talíř pro katastrofy 3D a v noci může létat jako strašidla a neničit koleje, ať svítí paprsek
+  světla dolů, ufona udělej zelenýho“*. Mně: *„1 a 2 ano“* (katastrofy talířem, noční talíř nad městy).
+- **Sada `ufo`** (`ufo_talir.glb`, `druh: ufo`): let ze snímků `let_00–07` bez paprsku a ovce (snímky je vynechávají
+  přes seznam uzlů), paprsek a ovce jako samostatné postavy z jednoho uzlu.
+- **Katastrofy:** malé a velké UFO původní hry se v otočeném pohledu, na 0° s 3D domy i z očí kreslí talířem (malé
+  `meritko` 1, velké 2; na mapě 2× větší, malé ≈ dlaždice jako původní sprite). Sprite i stín se nekreslí. Co katastrofa
+  dělá, je beze změny. Při sestupu (malé na auto, velké na koleje) svítí paprsek.
+- **Noc:** jeden talíř létá od města k městu (přiletí chvíli po setmění, ráno zmizí), nic neničí. Nad městem buď visí
+  s paprskem (někdy zvedá ovci), nebo přistane u města na volné rovině a kolem chodí ufon (`posadka`). Světlo lemu
+  a paprsku se skvrnou na zemi v noci (jako lucerna a svítilna čarodějnic).
+- **Paprsek** je kužel z modelu natažený vždy přesně k zemi (zvětšený celý, kužel má pak stejný úhel).
+- **Opravené chyby po cestě:** materiál `BLEND` bral průhlednost jen z čísla materiálu a textury se při čtení
+  ořezávaly na „pixel je / není“ → paprsek byl nahoře bílý neprůhledný a dole nic. Teď má BLEND průhlednost číslo ×
+  textura (obrázky na mapě procesorem i kartou, z očí procesorem i kartou); ostatní textury (listí s maskou) beze změny.
+  Úroveň zmenšení textury se teď počítá pro každou texturu modelu zvlášť (dřív podle první).
+- **Strašidla:** převzat zelený `ufon` (kolem měst v noci). `klima` může být seznam (bity). **Putin** (par16) vynechán:
+  forclaude je veřejné repo a fotka je cizí (kolega: jen soukromá sada) – rozhodne hráč. **Mexický mimozemšťan**
+  (`mimozemstan.glb`, do ulic v noci): hráč chce zeleného, kolega ho přebarví (jeho model), převezmu pak.
+- **Draci:** převzat let hnědého a černého; na farmě teď létá drak svého místa, když má `let`.
+- Rig: `test3d ufo [x y stupně [visi|ovce|pristan]]`, `test3d ufo katastrofa male|velke x y`.
+
 ## 24. 10. – dračí farma jako průmysl hry
 
 - Hráč: *„dáme interiér, dračí farmu“* (domluveno 23. 10.: FICR + STUD, draci létají a dělají poruchy, se studentkou

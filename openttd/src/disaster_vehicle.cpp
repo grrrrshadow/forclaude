@@ -1078,6 +1078,23 @@ static void Disaster_Big_Ufo_Init()
 
 
 /**
+ * The rig ('test3d ufo katastrofa male|velke <x> <y>'): the small or the big UFO of the disasters at a tile now,
+ * whatever the year; the big one coming down there at once (its state 1 over its tile), the small one flying about.
+ * @param big the big UFO, else the small
+ * @param tile where
+ */
+void StartRigUfoDisaster(bool big, TileIndex tile)
+{
+	if (!Vehicle::CanAllocateItem(2)) return;
+	const int x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2, y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2;
+	DisasterVehicle *v = DisasterVehicle::Create(x, y, Direction::NW, big ? ST_BIG_UFO : ST_SMALL_UFO);
+	v->dest_tile = tile;
+	if (big) v->state = 1;
+	DisasterVehicle *u = DisasterVehicle::Create(x, y, Direction::NW, big ? ST_BIG_UFO_SHADOW : ST_SMALL_UFO_SHADOW);
+	v->SetNext(u);
+}
+
+/**
  * Initialise a submarine.
  * @param subtype The sub type of submarine.
  */
