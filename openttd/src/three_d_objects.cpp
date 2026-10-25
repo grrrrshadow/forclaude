@@ -265,6 +265,36 @@ static std::vector<uint8_t> ReadWholeFile(const std::string &path)
 	return data;
 }
 
+/**
+ * The picture of a glTF image given by its "uri", a file beside its .glb (the colleague's hra/3d/GLTFPACK-CC-PRO-HRU.md:
+ * the same textures of the girls once for all their poses): by its name relative to the .glb's folder, in the same
+ * folder or tar. Its bytes are shared with every file naming it (InternThreeDTextureBytes()).
+ * @return none when there is no such file, or the name reaches out of the folder
+ */
+static ThreeDTextureBytes GlbImageBeside(const std::string &glb_path, const nlohmann::json &img)
+{
+	if (!img.contains("uri") || !img.at("uri").is_string()) return {};
+	const std::string uri = img.at("uri").get<std::string>();
+	/* Its name as glTF writes it: %XX for what is not plain. */
+	std::string name;
+	for (size_t i = 0; i < uri.size(); i++) {
+		if (uri[i] == '%' && i + 2 < uri.size()) {
+			auto hex = ParseInteger<uint8_t>(std::string_view(uri).substr(i + 1, 2), 16);
+			if (hex.has_value()) {
+				name += static_cast<char>(*hex);
+				i += 2;
+				continue;
+			}
+		}
+		name += uri[i];
+	}
+	if (name.empty() || name.starts_with("data:") || name.find(':') != std::string::npos || name.find("..") != std::string::npos || name.front() == '/' || name.front() == '\\') return {};
+	const size_t slash = glb_path.find_last_of("/\\");
+	const std::vector<uint8_t> bytes = ReadWholeFile((slash == std::string::npos ? std::string() : glb_path.substr(0, slash + 1)) + name);
+	if (bytes.empty()) return {};
+	return InternThreeDTextureBytes(bytes);
+}
+
 /*
  * The .glb files are kept only while something is read from them (GlbFilesScope): an add-on of a vehicle is read for
  * its shape, its lamps and its red lights, the records of a package have the same add-ons (a file of the colleague's
@@ -1120,6 +1150,9 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 							size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
 							if (offset <= glb->bin_len && len <= glb->bin_len - offset) t.png = InternThreeDTextureBytes(glb->Piece(offset, len));
 							image_bytes.emplace(image, t.png);
+						} else if (img.contains("uri")) {
+							t.png = GlbImageBeside(path, img);
+							image_bytes.emplace(image, t.png);
 						}
 					}
 				}
@@ -1706,6 +1739,9 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 							const auto &v = j.at("bufferViews").at(img.at("bufferView").get<int>());
 							const size_t offset = v.value("byteOffset", 0), len = v.at("byteLength").get<size_t>();
 							if (offset + len <= bin.size()) t.png = InternThreeDTextureBytes(bin.subspan(offset, len));
+							image_bytes.emplace(image, t.png);
+						} else if (img.contains("uri")) {
+							t.png = GlbImageBeside(path, img);
 							image_bytes.emplace(image, t.png);
 						}
 					}
