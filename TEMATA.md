@@ -31,6 +31,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (7) – hra čte glb zabalené gltfpackem -c (meshopt)
+
+- **Hráč: „jo určitě gltfpack“ (menší 3D GRF a sada).** Hra čte `EXT_meshopt_compression` i
+  `KHR_meshopt_compression` (gltfpack `-c`, `-cc`, `-ce khr`): dekodér meshoptimizer 1.3 (MIT, jen tři soubory
+  dekodéru) v `src/3rdparty/meshoptimizer`. Zabalený bufferView se rozbalí jednou při prvním čtení
+  (`GlbFile::ViewPiece()`), kostry (`ReadGlbAccessor()`) taky. Filtry OCTAHEDRAL/QUATERNION/EXPONENTIAL/COLOR.
+  Rozbalení je rychlé (GB/s), čtení z disku menší. Dál se nečte: Draco, KTX2/Basis (`-tc`), WebP – hra bere jen PNG.
+- Rig: celá sada (425 glb) zabalená `-c -kn -km -ke` i `-cc -ce khr`: farma s draky (kostry), město zhora i z očí
+  stejné jako s původními (rozdíl jen text zprávy dole). Sada 379 → 258 MB; obrázky jsou 223 MB z 379, ty gltfpack
+  bez `-tc` nezmenší (zmenšit textury musí kolega sám). 215 souborů ze 425 nemá ani kvantování.
+- Kolegovi napsáno: přebalit všechno gltfpackem `-cc -kn -km -ke` (jména uzlů, materiály, extras zůstanou).
+
 ## 25. 10. (6) – duch s prostěradlem u kostela
 
 - **Hráč: „kolem kostela zvýšený výskyt ghost prostěradlo, jeden ke každému kostelu; bude mizet, chodit do kostela

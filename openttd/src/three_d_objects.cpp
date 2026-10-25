@@ -37,6 +37,7 @@
 #include "slope_func.h"
 #include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
+#include "3rdparty/meshoptimizer/meshoptimizer.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "timer/timer_game_calendar.h"
@@ -352,9 +353,10 @@ static double ReadGlbNumber(std::span<const uint8_t> d, size_t at, int type, boo
 }
 
 /**
- * Why a .glb is not read as it is: an extension it requires that the game cannot read -- its meshes compressed
- * (gltfpack's -c, -cc: EXT_meshopt_compression; Draco), its pictures not PNG (gltfpack's -tc: KTX2, Basis; WebP).
- * Quantised meshes (KHR_mesh_quantization) and moved textures (KHR_texture_transform) are read.
+ * Why a .glb is not read as it is: an extension it requires that the game cannot read -- its meshes compressed by
+ * Draco, its pictures not PNG (gltfpack's -tc: KTX2, Basis; WebP). Quantised meshes (KHR_mesh_quantization), meshes
+ * compressed by gltfpack's -c, -cc (EXT_ and KHR_meshopt_compression, GlbMeshopt()) and moved textures
+ * (KHR_texture_transform) are read.
  * @return empty when it can be read
  */
 static std::string GlbExtensionNotRead(const nlohmann::json &j)
@@ -363,11 +365,67 @@ static std::string GlbExtensionNotRead(const nlohmann::json &j)
 	for (const auto &e : j.at("extensionsRequired")) {
 		if (!e.is_string()) continue;
 		const std::string name = e.get<std::string>();
-		if (name == "EXT_meshopt_compression" || name == "KHR_meshopt_compression" || name == "KHR_draco_mesh_compression" || name == "KHR_texture_basisu" || name == "EXT_texture_webp") {
-			return "requires " + name + ", which the game does not read (gltfpack: without -c, -cc and -tc)";
+		if (name == "KHR_draco_mesh_compression" || name == "KHR_texture_basisu" || name == "EXT_texture_webp") {
+			return "requires " + name + ", which the game does not read (gltfpack: without -tc)";
 		}
 	}
 	return {};
+}
+
+/**
+ * A buffer view's compression by gltfpack's -c, -cc (EXT_meshopt_compression, KHR_meshopt_compression): where its
+ * compressed bytes are and how they are to be unpacked (UnpackGlbMeshopt()). nullptr: it is not compressed.
+ */
+static const nlohmann::json *GlbMeshopt(const nlohmann::json &view)
+{
+	if (!view.contains("extensions")) return nullptr;
+	const auto &ext = view.at("extensions");
+	for (const char *name : {"KHR_meshopt_compression", "EXT_meshopt_compression"}) {
+		if (ext.contains(name)) return &ext.at(name);
+	}
+	return nullptr;
+}
+
+/**
+ * The bytes of a buffer view compressed by gltfpack (GlbMeshopt()) as they are without it: unpacked
+ * (meshoptimizer's decoder), and the filter undone that made its numbers pack better.
+ * @param compressed its compressed bytes
+ * @throw std::invalid_argument when they cannot be unpacked
+ */
+static std::vector<uint8_t> UnpackGlbMeshopt(const nlohmann::json &ext, std::span<const uint8_t> compressed)
+{
+	const size_t count = ext.at("count").get<size_t>();
+	const size_t stride = ext.at("byteStride").get<size_t>();
+	const std::string mode = ext.at("mode").get<std::string>();
+	const std::string filter = ext.value("filter", "NONE");
+	/* What the decoder asks of them (it asserts it). */
+	const bool sizes = mode == "ATTRIBUTES" ? stride % 4 == 0 && stride <= 256 : (stride == 2 || stride == 4) && (mode != "TRIANGLES" || count % 3 == 0);
+	const bool filter_size = filter == "QUATERNION" ? stride == 8 : filter == "EXPONENTIAL" ? stride % 4 == 0 : filter == "NONE" || stride == 4 || stride == 8;
+	if (stride == 0 || !sizes || !filter_size || count > (size_t{1} << 28)) throw std::invalid_argument("compressed view's size");
+	std::vector<uint8_t> out(count * stride);
+	int rc;
+	if (mode == "ATTRIBUTES") {
+		rc = meshopt_decodeVertexBuffer(out.data(), count, stride, compressed.data(), compressed.size());
+	} else if (mode == "TRIANGLES") {
+		rc = meshopt_decodeIndexBuffer(out.data(), count, stride, compressed.data(), compressed.size());
+	} else if (mode == "INDICES") {
+		rc = meshopt_decodeIndexSequence(out.data(), count, stride, compressed.data(), compressed.size());
+	} else {
+		throw std::invalid_argument("compressed view's mode " + mode);
+	}
+	if (rc != 0) throw std::invalid_argument(fmt::format("compressed view cannot be unpacked ({})", rc));
+	if (filter == "OCTAHEDRAL") {
+		meshopt_decodeFilterOct(out.data(), count, stride);
+	} else if (filter == "QUATERNION") {
+		meshopt_decodeFilterQuat(out.data(), count, stride);
+	} else if (filter == "EXPONENTIAL") {
+		meshopt_decodeFilterExp(out.data(), count, stride);
+	} else if (filter == "COLOR") {
+		meshopt_decodeFilterColor(out.data(), count, stride);
+	} else if (filter != "NONE") {
+		throw std::invalid_argument("compressed view's filter " + filter);
+	}
+	return out;
 }
 
 /**
@@ -531,6 +589,27 @@ struct GlbFile {
 		return this->pieces.emplace_back(offset, std::move(piece)).second;
 	}
 
+	/**
+	 * Bytes of a buffer view, from where in it: as they are in the file, or unpacked when gltfpack compressed it
+	 * (GlbMeshopt()), unpacked the first time they are wanted.
+	 * @throw std::out_of_range when they are past its end
+	 */
+	std::span<const uint8_t> ViewPiece(int index, size_t offset, size_t len)
+	{
+		const auto &view = this->json.at("bufferViews").at(index);
+		const nlohmann::json *ext = GlbMeshopt(view);
+		if (ext == nullptr) return this->Piece(view.value("byteOffset", size_t{0}) + offset, len);
+		auto found = this->unpacked.find(index);
+		if (found == this->unpacked.end()) {
+			std::vector<uint8_t> bytes = UnpackGlbMeshopt(*ext, this->Piece(ext->value("byteOffset", size_t{0}), ext->at("byteLength").get<size_t>()));
+			this->bytes += bytes.size();
+			_glb_files_kept_bytes += bytes.size();
+			found = this->unpacked.emplace(index, std::move(bytes)).first;
+		}
+		if (offset > found->second.size() || len > found->second.size() - offset) throw std::out_of_range("past the view");
+		return std::span<const uint8_t>(found->second).subspan(offset, len);
+	}
+
 	/** Let go of the open file (between the readings): what was read of it stays. */
 	void Close()
 	{
@@ -542,6 +621,7 @@ private:
 	size_t base = 0;   ///< where its first byte is in what was opened (a file in a tar)
 	size_t length = 0;
 	std::vector<std::pair<size_t, std::vector<uint8_t>>> pieces;
+	std::map<int, std::vector<uint8_t>> unpacked; ///< buffer views gltfpack compressed, unpacked (ViewPiece())
 
 	bool Open()
 	{
@@ -900,7 +980,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		const nlohmann::json &j = glb->json;
 		const auto &accessors = j.at("accessors");
 		const auto &views = j.at("bufferViews");
-		/* An accessor's bytes, read from the file when first wanted (GlbFile::Piece()), and how they lie. */
+		/* An accessor's bytes, read from the file when first wanted (GlbFile::ViewPiece()), and how they lie. */
 		struct AccessorBytes {
 			std::span<const uint8_t> bytes;
 			int type = 0;
@@ -909,7 +989,8 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 		};
 		auto accessor_bytes = [&](int index, int comps) {
 			const auto &a = accessors.at(index);
-			const auto &v = views.at(a.at("bufferView").get<int>());
+			const int view = a.at("bufferView").get<int>();
+			const auto &v = views.at(view);
 			AccessorBytes r;
 			r.type = a.at("componentType").get<int>();
 			r.normalized = a.value("normalized", false);
@@ -917,8 +998,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			r.size = GlbComponentSize(r.type);
 			r.stride = v.value("byteStride", 0);
 			if (r.stride == 0) r.stride = r.size * comps;
-			const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
-			r.bytes = glb->Piece(offset, r.count == 0 ? 0 : (r.count - 1) * r.stride + r.size * comps);
+			r.bytes = glb->ViewPiece(view, a.value("byteOffset", 0), r.count == 0 ? 0 : (r.count - 1) * r.stride + r.size * comps);
 			return r;
 		};
 		/* An accessor's elements as floats: copied as they are when they are floats one after the other; whole
@@ -1484,13 +1564,22 @@ struct GlbSkeleton {
 
 /**
  * An accessor's elements of a glTF binary as numbers: the floats, or the whole numbers, normalised ones as fractions
- * (ReadGlbNumber(): gltfpack's turnings of the bones as normalised shorts, the weights as normalised bytes).
+ * (ReadGlbNumber(): gltfpack's turnings of the bones as normalised shorts, the weights as normalised bytes); of a
+ * buffer view gltfpack compressed (GlbMeshopt()) unpacked.
  */
 static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bin, int index, int comps, std::vector<double> &out)
 {
 	const auto &a = j.at("accessors").at(index);
 	const auto &v = j.at("bufferViews").at(a.at("bufferView").get<int>());
-	const size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
+	size_t offset = v.value("byteOffset", 0) + a.value("byteOffset", 0);
+	std::vector<uint8_t> unpacked;
+	if (const nlohmann::json *ext = GlbMeshopt(v); ext != nullptr) {
+		const size_t at = ext->value("byteOffset", size_t{0}), len = ext->at("byteLength").get<size_t>();
+		if (at > bin.size() || len > bin.size() - at) throw std::out_of_range("compressed view past the buffer");
+		unpacked = UnpackGlbMeshopt(*ext, bin.subspan(at, len));
+		bin = unpacked;
+		offset = a.value("byteOffset", 0);
+	}
 	const int type = a.at("componentType").get<int>();
 	const bool normalized = a.value("normalized", false);
 	const size_t count = a.at("count").get<size_t>();
