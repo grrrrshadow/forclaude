@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (9) – od kolegy: přebalené sady, strašidla v lese, světla pozpátku, dračí hrad
+
+- **Hráč: „si to dodělej“** (všechno od kolegy, i sdílené textury přes `uri`).
+- Převzato `35ac7da`: 418 glb přebalených gltfpackem `-cc` (sada hry 368 → 211 MB), nový srub hajného.
+  `b59ea9c`: `strasidlo` a `prizrak` v sadě strasidla (místa v lese je jmenují ze sady strasidla). Výšku jejich počátku
+  bere hra z `vznaseni_m` (dřív jen `vyska_m`).
+- **Světla pozpátku (slíbeno 23. 10., kolega dodal ve Vagony v5):** uzly `svetlo_predni_vzad_NN`/`svetlo_zadni_vpred_NN`
+  a skla materiálů `svetlo_predni_vzad`/`svetlo_zadni_vpred` hra dřív brala jako obyčejná přední/zadní (bílé sklo
+  zadního čela svítilo i při jízdě vpřed). Teď zvlášť (`night_kind` 0–3, `front_back_lights`, `back_front_lights`):
+  vůz otočený (jede zadkem napřed) svítí, vede-li, bíle zadním čelem (s kuželem za sebe), a je-li poslední, červeně
+  předním. Platí pro každý vůz s těmi uzly, i bez motoru (Btax 780). Rig: 810 a Btax ze Vagony v7 – 50/48 skel pro
+  jízdu pozpátku, 3+2 a 2+2 místa.
+- **Dračí hrad** (`4c6e74d`) je vzhled dračí farmy místo zříceniny (hráč: „ten hrad bude hezčí“): v naší kopii
+  `prumysl/objekty.json` zřícenina bez `"prumysl"`. Hra četla u průmyslu z glb jen první kořenový uzel – z hradu
+  jen `zem`, u automatu chyběl plevel pod `krovi`. Teď průmysl čte všechny uzly kromě noci, `den`, sena (zvlášť)
+  a křídel dveří (`all_roots`). Rig: hrad 4970 trojúhelníků, hradby, schody, louče v noci.
+- Zbývá od kolegy: chůze po schodech a hradbách (`podlaha` v obalu průmyslu do 7 m), interiér a dveře průmyslu
+  a lesa (síň, srub), drak na střeše síně (stojí už z `z` místa) a vlétání do síně, žebřík posedu (`zebriky`),
+  sdílené textury přes `uri`.
+
 ## 25. 10. (8) – úvodní menu na telefonu: zem otočené mapy z paměti pohledu, deník s rozpadem
 
 - **Hráč (měřil fps): „stmívání, rozednívání má 0,4 fps, noc 14 fps; stačí dvě auta, jeden přízrak a jsou 4 fps

@@ -257,6 +257,10 @@ struct ThreeDObject {
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors ("dvere_NN" of its file, then of its interior's): shut, open one way, the other
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
+	/* An industry: every node of its file read, not only the first (the colleague's dragon castle: "zem", "hrad",
+	 * "podlaha"; the vending machine's weeds under "krovi"), but the night's, the wings of doors and these. */
+	bool all_roots = false;
+	std::vector<std::string> left_out;        ///< with all_roots, the nodes (and their children) read on their own: the heaps of hay ("seno"), the day's ("den")
 	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
@@ -377,9 +381,13 @@ struct ThreeDVehicleShape {
 	std::vector<float> night_pos;       ///< x, y, z of each corner of the glass, metres
 	std::vector<uint32_t> night_tri;    ///< three corners a triangle
 	std::vector<uint32_t> night_colour; ///< each triangle's colour, its material's (Colour::data)
-	std::vector<uint8_t> night_back;    ///< whether a triangle is of a light at the back (its material "svetlo_zadni")
+	std::vector<uint8_t> night_kind;    ///< which lights a triangle is of (NightLightKind()): 0 the headlights, 1 the red lights at the back, 2 the headlights on the back end, 3 the red lights on the front end
 	std::vector<float> front_lights;    ///< x, y, z of each headlight, metres
 	std::vector<float> back_lights;     ///< x, y, z of each red light at the back, metres
+	/* Going back first (the colleague's hra/3d/VAGONY-3D-V5-PRO-HRU.md: the unit 810, the 753, the Strela): the
+	 * headlights on its back end ("svetlo_predni_vzad_NN"), the red lights on its front end ("svetlo_zadni_vpred_NN"). */
+	std::vector<float> front_back_lights; ///< x, y, z of each headlight on the back end, metres
+	std::vector<float> back_front_lights; ///< x, y, z of each red light on the front end, metres
 	/* A witch's lights in her frame (the player, 18. 10.: "light all round the lantern, and from the hand torch a beam";
 	 * the colleague's hra/3d/PROSBA-CARODEJNICE.md): the places "lucerna_NN", "svitilna_NN" and "paprsek_NN" of the
 	 * frame NN, as her hand and broom have them there. */
@@ -403,7 +411,9 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> front_part;    ///< each headlight: its part (0 always)
 	std::vector<uint8_t> back_part;     ///< each light at the back: its part (0 always)
 	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
-	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty(); }
+	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty() || this->HasLightsGoingBack(); }
+	/** Whether it has lights of its own for going back first (front_back_lights). */
+	bool HasLightsGoingBack() const { return !this->front_back_lights.empty() || !this->back_front_lights.empty() || std::ranges::any_of(this->night_kind, [](uint8_t k) { return k >= 2; }); }
 	/** Whether a triangle is of the glass: the body's ("sklo") or an add-on's node's. */
 	bool IsGlass(size_t triangle) const
 	{
@@ -847,7 +857,7 @@ struct ThreeDAnimal {
 	uint8_t theme = 0;           ///< "tema": only about the towns of the theme (TownTheme), 0 any
 	bool night = false;          ///< "kdy": "noc": out only at night
 	bool day = false;            ///< "kdy": "den": out only by day (the colleague's gnome, PAR14-PRO-HRU.md)
-	float hover_m = 0;           ///< "vyska_m": it floats so high over the ground, metres (the ghost of the streets)
+	float hover_m = 0;           ///< "vznaseni_m" (or "vyska_m"): its origin floats so high over the ground, true metres (the ghosts of the forest)
 
 	/** Whether it is out at this time of day ("kdy"; none: always). */
 	bool OutNow(bool is_night) const { return is_night ? !this->day : !this->night; }

@@ -71,7 +71,7 @@ struct BeamngMesh {
 	std::vector<float> night_pos;
 	std::vector<uint32_t> night_tri;
 	std::vector<uint32_t> night_colour;
-	std::vector<uint8_t> night_back;
+	std::vector<uint8_t> night_kind;
 	/** Where its headlights and its lights at the back shine from (its "props" of lights), x, y, z each. */
 	std::vector<float> front_lights, back_lights;
 };

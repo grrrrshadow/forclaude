@@ -353,6 +353,19 @@ static double ReadGlbNumber(std::span<const uint8_t> d, size_t at, int type, boo
 }
 
 /**
+ * Which lights the glass of a vehicle's "noc" is of, by its material's name (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md
+ * and VAGONY-3D-V5-PRO-HRU.md): 0 the headlights ("svetlo_predni"), 1 the red lights at the back ("svetlo_zadni"), 2 the
+ * headlights on the back end ("svetlo_predni_vzad", lit when it leads going back first), 3 the red lights on the front
+ * end ("svetlo_zadni_vpred", lit when nothing follows it going back first).
+ */
+static uint8_t NightLightKind(std::string_view material)
+{
+	if (material.find("predni_vzad") != std::string_view::npos) return 2;
+	if (material.find("zadni_vpred") != std::string_view::npos) return 3;
+	return material.find("zadni") != std::string_view::npos ? 1 : 0;
+}
+
+/**
  * Why a .glb is not read as it is: an extension it requires that the game cannot read -- its meshes compressed by
  * Draco, its pictures not PNG (gltfpack's -tc: KTX2, Basis; WebP). Quantised meshes (KHR_mesh_quantization), meshes
  * compressed by gltfpack's -c, -cc (EXT_ and KHR_meshopt_compression, GlbMeshopt()) and moved textures
@@ -897,6 +910,7 @@ struct GlbReadOptions {
 	int frame = 0;
 	std::string_view only_node;
 	std::string_view point_prefix;
+	std::string_view point_skip;  ///< with point_prefix, the nodes whose names start so are not of its places
 	std::vector<float> *points = nullptr;
 	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
 	std::string_view skip_node;
@@ -1266,7 +1280,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					}
 				}
 				Matrix m = multiply(parent, local(node));
-				if (points != nullptr && !point_prefix.empty() && node_name.starts_with(point_prefix)) {
+				if (points != nullptr && !point_prefix.empty() && node_name.starts_with(point_prefix) && (o.point_skip.empty() || !node_name.starts_with(o.point_skip))) {
 					/* A place: its origin, turned from glTF's axes as the corners are. */
 					points->push_back(static_cast<float>(m[12]));
 					points->push_back(static_cast<float>(-m[14]));
@@ -2027,7 +2041,16 @@ static std::vector<std::string> GlbDoorNodes(const std::string &path)
 static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 {
 	GlbMesh mesh;
-	if (!ReadGlbMesh(path, mesh)) return false;
+	if (obj.all_roots) {
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.skip_night = true;
+		o.skip_prefix = "dvere_";
+		o.skip_nodes = &obj.left_out;
+		if (!ReadGlbMesh(path, mesh, o)) return false;
+	} else if (!ReadGlbMesh(path, mesh)) {
+		return false;
+	}
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
 	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
@@ -2518,6 +2541,14 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 	obj.variants = 0; // no house's
 	obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
 	obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
+	/* All its nodes but its heaps of hay, read as objects of their own below, and the day's. */
+	obj.all_roots = !field;
+	obj.left_out = {"den", "seno"};
+	if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly")) {
+		for (const auto &n : e.at("seno").at("uzly")) {
+			if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
+		}
+	}
 	if (!obj.file.empty() && !ReadGlb(folder + obj.file, obj)) return;
 	/* Read now for what the index needs of it, and again with its add-ons when it is first drawn (Read()): without its
 	 * file there, that read laid the add-ons alone over it -- since the industries have the shared trees and bushes
@@ -3490,7 +3521,9 @@ static void ReadThreeDVehicleObjects()
 							for (int k = 0; k < 3; k++) a.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
 						}
 						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
-						a.hover_m = std::clamp(e.value("vyska_m", 0.0f), 0.0f, 50.0f);
+						/* How high its origin floats over the ground, true metres: "vznaseni_m" (the colleague's ghost and
+						 * phantom of the forest, hra/3d/STRASIDLA-LES-ROZEN-PRO-HRU.md), before it "vyska_m". */
+						a.hover_m = std::clamp(e.value("vznaseni_m", e.value("vyska_m", 0.0f)), 0.0f, 50.0f);
 						/* In place of a night flyer of the indices (the player, 22. 10.: "the ghost in the bedsheet should not
 						 * attack, it should float along the street like the walkers"): that one out of the sky. */
 						if (e.contains("nahrazuje") && e.at("nahrazuje").is_string()) {
@@ -4459,7 +4492,7 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.night_pos.shrink_to_fit();
 	s.night_tri.shrink_to_fit();
 	s.night_colour.shrink_to_fit();
-	s.night_back.shrink_to_fit();
+	s.night_kind.shrink_to_fit();
 	s.tri_part.shrink_to_fit();
 	s.tex_addon.shrink_to_fit();
 	s.tex_glow.shrink_to_fit();
@@ -4923,7 +4956,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->night_pos = std::move(bm.night_pos);
 		made->night_tri = std::move(bm.night_tri);
 		made->night_colour = std::move(bm.night_colour);
-		made->night_back = std::move(bm.night_back);
+		made->night_kind = std::move(bm.night_kind);
 		made->front_lights = std::move(bm.front_lights);
 		made->back_lights = std::move(bm.back_lights);
 		made->x0 = made->y0 = made->z0 = 1e9f;
@@ -5019,17 +5052,34 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 				made->torch_aims.clear();
 			}
 		} else {
-			ReadGlbMesh(this->file, night, true, {}, 0, "noc", "svetlo_predni_", &made->front_lights);
-			ReadGlbMesh(this->file, none, true, {}, 0, "\x01", "svetlo_zadni_", &made->back_lights);
+			/* The glass of "noc" and the headlights; the red lights and those for going back first, the places only. */
+			GlbReadOptions o;
+			o.all_nodes = true;
+			o.only_node = "noc";
+			o.point_prefix = "svetlo_predni_";
+			o.point_skip = "svetlo_predni_vzad";
+			o.points = &made->front_lights;
+			ReadGlbMesh(this->file, night, o);
+			o.only_node = "\x01";
+			o.points_only = true;
+			for (auto [prefix, skip, list] : {std::tuple{"svetlo_zadni_", "svetlo_zadni_vpred", &made->back_lights}, std::tuple{"svetlo_predni_vzad", "", &made->front_back_lights}, std::tuple{"svetlo_zadni_vpred", "", &made->back_front_lights}}) {
+				o.point_prefix = prefix;
+				o.point_skip = skip;
+				o.points = list;
+				ReadGlbMesh(this->file, none, o);
+			}
 		}
 		made->night_pos = std::move(night.pos);
 		made->night_tri = std::move(night.tri);
 		for (uint8_t t : night.tri_tex) {
 			const GlbTexture *tex = t < night.textures.size() ? &night.textures[t] : nullptr;
 			made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
-			made->night_back.push_back(tex != nullptr && tex->name.find("zadni") != std::string::npos ? 1 : 0);
+			made->night_kind.push_back(tex != nullptr ? NightLightKind(tex->name) : 0);
 		}
-		if (made->HasLights()) Debug(misc, 2, "3D vehicle {}: lights, {} triangles of glass, {} ahead, {} at the back", this->name, made->night_tri.size() / 3, made->front_lights.size() / 3, made->back_lights.size() / 3);
+		if (made->HasLights()) {
+			Debug(misc, 2, "3D vehicle {}: lights, {} triangles of glass ({} of them for going back first), {} ahead, {} at the back; going back first {} ahead, {} at the back", this->name, made->night_tri.size() / 3,
+					std::ranges::count_if(made->night_kind, [](uint8_t k) { return k >= 2; }), made->front_lights.size() / 3, made->back_lights.size() / 3, made->front_back_lights.size() / 3, made->back_front_lights.size() / 3);
+		}
 	}
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
@@ -5212,6 +5262,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			std::vector<float> front, back;
 			std::vector<uint16_t> front_group, back_group;
 			lamps.point_prefix = "svetlo_predni_";
+			lamps.point_skip = "svetlo_predni_vzad";
 			lamps.points = &front;
 			lamps.point_groups = &front_group;
 			GlbMesh night;
@@ -5221,6 +5272,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			rear.only_night = false;
 			rear.only_node = "\x01";
 			rear.point_prefix = "svetlo_zadni_";
+			rear.point_skip = "svetlo_zadni_vpred";
 			rear.points = &back;
 			rear.point_groups = &back_group;
 			GlbMesh none;
@@ -5241,7 +5293,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 				const uint8_t tx = night.tri_tex[t / 3];
 				const GlbTexture *tex = tx < night.textures.size() ? &night.textures[tx] : nullptr;
 				made->night_colour.push_back(tex != nullptr ? tex->flat : Colour(255, 244, 216).data);
-				made->night_back.push_back(tex != nullptr && tex->name.find("zadni") != std::string::npos ? 1 : 0);
+				made->night_kind.push_back(tex != nullptr ? NightLightKind(tex->name) : 0);
 				made->night_part.push_back(part);
 			}
 			auto add_points = [&](const std::vector<float> &points, const std::vector<uint16_t> &groups, std::vector<float> &to, std::vector<uint8_t> &to_part) {
@@ -6850,6 +6902,8 @@ bool ThreeDObject::Read() const
 		read.tiles_x = this->tiles_x;
 		read.tiles_y = this->tiles_y;
 		read.addon = this->addon;
+		read.all_roots = this->all_roots;
+		read.left_out = this->left_out;
 		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
 		 * (ReadInterior()) read as they are. */
 		bool ok;
@@ -7465,7 +7519,7 @@ static size_t VectorBytes(const std::vector<T> &v)
 size_t ThreeDVehicleShape::Bytes() const
 {
 	size_t b = VectorBytes(this->pos) + VectorBytes(this->nrm) + VectorBytes(this->uv) + VectorBytes(this->tri) + VectorBytes(this->tri_tex);
-	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_back);
+	b += VectorBytes(this->night_pos) + VectorBytes(this->night_tri) + VectorBytes(this->night_colour) + VectorBytes(this->night_kind) + VectorBytes(this->front_back_lights) + VectorBytes(this->back_front_lights);
 	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
 	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
 	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);

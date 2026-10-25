@@ -1863,7 +1863,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 					mesh.tri_tex.push_back(tex);
 					if (gl != glow.end()) {
 						mesh.night_colour.push_back(gl->second ? 0xFFFF2814u : 0xFFFFF4D8u);
-						mesh.night_back.push_back(gl->second ? 1 : 0);
+						mesh.night_kind.push_back(gl->second ? 1 : 0);
 					}
 				}
 			}

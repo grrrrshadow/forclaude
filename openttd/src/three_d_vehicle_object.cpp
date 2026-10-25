@@ -743,8 +743,18 @@ struct ObjectRaster {
 	std::vector<ThreeDPictureLight> lights;  ///< at night, the lights that are on, pixels from its origin
 };
 
-/** The lights of a vehicle object on at night (RasterObject()): its headlights, its red lights at the back. */
-static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2;
+/**
+ * The lights of a vehicle object on at night (RasterObject()): its headlights, its red lights at the back; going back
+ * first, the headlights on its back end and the red lights on its front end (ThreeDVehicleShape::front_back_lights).
+ * The bit of the glass of each kind (ThreeDVehicleShape::night_kind) is 1 << kind.
+ */
+static constexpr int LIGHTS_FRONT = 1, LIGHTS_BACK = 2, LIGHTS_FRONT_AT_BACK = 4, LIGHTS_BACK_AT_FRONT = 8;
+
+/** Whether the glass of a triangle of a shape's "noc" is lit with these lights on. */
+static inline bool NightGlassLit(const ThreeDVehicleShape &shape, size_t triangle, int lights)
+{
+	return (lights & (1 << (triangle < shape.night_kind.size() ? shape.night_kind[triangle] & 3 : 0))) != 0;
+}
 
 /** The texels to a metre of a shape's texture at its full size: how fine a level of it a picture needs. */
 static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int texture = 0)
@@ -1055,6 +1065,23 @@ static void ObjectLightsOn(const ThreeDVehicleShape &whole, const ThreeDParts &p
 		for (size_t i = 0; i * 3 + 2 < whole.back_lights.size(); i++) {
 			if (!ThreeDVehicleShape::Shown(i < whole.back_part.size() ? whole.back_part[i] : 0, parts)) continue;
 			add_light(whole.back_lights[i * 3], whole.back_lights[i * 3 + 1], whole.back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
+		}
+	}
+	/* Going back first: the headlights on its back end with their pool behind it, the red lights on its front end. */
+	if ((lights & LIGHTS_FRONT_AT_BACK) != 0 && !whole.front_back_lights.empty()) {
+		float behind = std::numeric_limits<float>::infinity(), mid = 0;
+		const size_t n = whole.front_back_lights.size() / 3;
+		for (size_t i = 0; i < n; i++) {
+			add_light(whole.front_back_lights[i * 3], whole.front_back_lights[i * 3 + 1], whole.front_back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front);
+			behind = std::min(behind, whole.front_back_lights[i * 3]);
+			mid += whole.front_back_lights[i * 3 + 1] / n;
+		}
+		add_light(behind - 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+		add_light(behind - 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+	}
+	if ((lights & LIGHTS_BACK_AT_FRONT) != 0) {
+		for (size_t i = 0; i * 3 + 2 < whole.back_front_lights.size(); i++) {
+			add_light(whole.back_front_lights[i * 3], whole.back_front_lights[i * 3 + 1], whole.back_front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
 		}
 	}
 }
@@ -1389,7 +1416,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const float bias = 0.03f * scale; // a few centimetres: the glass is drawn over the lamp it lies on
 		for (size_t t = 0; t + 2 < whole->night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
-			if ((lights & (tn < whole->night_back.size() && whole->night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
+			if (!NightGlassLit(*whole, tn, lights)) continue;
 			/* The lamps of a part only where the part is (the cab's headlights only on the cab shown). */
 			if (!ThreeDVehicleShape::Shown(tn < whole->night_part.size() ? whole->night_part[tn] : 0, parts)) continue;
 			const Colour glass(tn < whole->night_colour.size() ? whole->night_colour[tn] : Colour(255, 244, 216).data);
@@ -1737,7 +1764,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		const float bias = 0.03f * scale;
 		for (size_t t = 0; t + 2 < whole.night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
-			if ((lights & (tn < whole.night_back.size() && whole.night_back[tn] ? LIGHTS_BACK : LIGHTS_FRONT)) == 0) continue;
+			if (!NightGlassLit(whole, tn, lights)) continue;
 			if (!ThreeDVehicleShape::Shown(tn < whole.night_part.size() ? whole.night_part[tn] : 0, parts)) continue;
 			const uint32_t a = whole.night_tri[t], b = whole.night_tri[t + 1], c = whole.night_tri[t + 2];
 			if (a >= corners || b >= corners || c >= corners) continue;
@@ -2601,7 +2628,7 @@ void MakeThreeDPicturesAtOnce(const std::function<void()> &ask)
 /**
  * Which lights of a vehicle drawn as an object are on at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md):
  * the headlights of its front, +x, when it leads, the red ones of its back when nothing follows it. One turned round
- * has its red lights ahead and its headlights at the back of where it goes: none then.
+ * lights those its model has for going back first (VAGONY-3D-V5-PRO-HRU.md), else none.
  * @param front,last its first and its last piece
  */
 static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
@@ -2609,15 +2636,17 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
 static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed, ZoomLevel zoom)
 {
 	/* At night, or as the player switched them from the cab (VehicleLightsOn()). */
-	if (!VehicleLightsOn(front) || reversed) return 0;
+	if (!VehicleLightsOn(front)) return 0;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
-	int lights = 0;
-	if (front->Previous() == nullptr) lights |= LIGHTS_FRONT;
+	const bool leads = front->Previous() == nullptr;
 	/* Its red lights when nothing follows it, or nothing seen: a lorry of the colleague's without its trailer has the
 	 * trailer's pieces behind it, drawn as nothing. */
-	if (last->Next() == nullptr || NothingSeenAfter(last, zoom)) lights |= LIGHTS_BACK;
-	return lights;
+	const bool last_one = last->Next() == nullptr || NothingSeenAfter(last, zoom);
+	/* Turned round, going back first (the colleague's hra/3d/VAGONY-3D-V5-PRO-HRU.md): the headlights on its back end
+	 * when it leads, the red lights on its front end when nothing follows; without those, none. */
+	if (reversed) return shape->HasLightsGoingBack() ? (leads ? LIGHTS_FRONT_AT_BACK : 0) | (last_one ? LIGHTS_BACK_AT_FRONT : 0) : 0;
+	return (leads ? LIGHTS_FRONT : 0) | (last_one ? LIGHTS_BACK : 0);
 }
 
 /** The first and the last piece of a vehicle an object hung from its anchor piece covers (an article of a train of lorries its own). */
@@ -2997,10 +3026,10 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 	const double ta = StateTurn(ev.obj, ev.state) * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
 	/* Its front in the world, turned as its state has it: where the headlights shine, the red lights the other way. */
 	const double ahead_x = tc * fx + ts * lx, ahead_y = tc * fy + ts * ly;
-	auto add = [&](float ox, float oy, float pz, ThreeDPictureLight::Kind kind) {
+	auto add = [&](float ox, float oy, float pz, ThreeDPictureLight::Kind kind, bool turned_round = false) {
 		const double px = ox * tc - oy * ts, py = ox * ts + oy * tc;
 		const double x = px * ev.scale * ev.along * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE;
-		const double way = kind == ThreeDPictureLight::Kind::Front ? 1.0 : kind == ThreeDPictureLight::Kind::Back ? -1.0 : 0.0;
+		const double way = (kind == ThreeDPictureLight::Kind::Front ? 1.0 : kind == ThreeDPictureLight::Kind::Back ? -1.0 : 0.0) * (turned_round ? -1.0 : 1.0);
 		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind, ahead_x * way, ahead_y * way});
 	};
 	/* The lamps of the parts its state shows only (the cab's on the cab shown). */
@@ -3024,6 +3053,23 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 	if ((ev.lights & LIGHTS_BACK) != 0) {
 		for (size_t i = 0; i * 3 + 2 < shape->back_lights.size(); i++) {
 			if (shown(shape->back_part, i)) add(shape->back_lights[i * 3], shape->back_lights[i * 3 + 1], shape->back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back);
+		}
+	}
+	/* Going back first: the headlights on its back end shine back, the red lights on its front end the other way. */
+	if ((ev.lights & LIGHTS_FRONT_AT_BACK) != 0 && !shape->front_back_lights.empty()) {
+		float behind = std::numeric_limits<float>::infinity(), mid = 0;
+		const size_t n = shape->front_back_lights.size() / 3;
+		for (size_t i = 0; i < n; i++) {
+			add(shape->front_back_lights[i * 3], shape->front_back_lights[i * 3 + 1], shape->front_back_lights[i * 3 + 2], ThreeDPictureLight::Kind::Front, true);
+			behind = std::min(behind, shape->front_back_lights[i * 3]);
+			mid += shape->front_back_lights[i * 3 + 1] / n;
+		}
+		add(behind - 5.0f, mid, 0.0f, ThreeDPictureLight::Kind::PoolNear);
+		add(behind - 11.0f, mid, 0.0f, ThreeDPictureLight::Kind::Pool);
+	}
+	if ((ev.lights & LIGHTS_BACK_AT_FRONT) != 0) {
+		for (size_t i = 0; i * 3 + 2 < shape->back_front_lights.size(); i++) {
+			add(shape->back_front_lights[i * 3], shape->back_front_lights[i * 3 + 1], shape->back_front_lights[i * 3 + 2], ThreeDPictureLight::Kind::Back, true);
 		}
 	}
 }

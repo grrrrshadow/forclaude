@@ -10554,7 +10554,7 @@ static void DrawEyeVehicleGlass(const CabEye &eye, uint32_t *dst, float *zb, int
 		const ThreeDParts parts = fg.obj->PartsOf(fg.state);
 		for (size_t t = 0; t + 2 < shape->night_tri.size(); t += 3) {
 			const size_t tn = t / 3;
-			if ((fg.lights & (tn < shape->night_back.size() && shape->night_back[tn] ? 2 : 1)) == 0) continue;
+			if ((fg.lights & (1 << (tn < shape->night_kind.size() ? shape->night_kind[tn] & 3 : 0))) == 0) continue;
 			if (!ThreeDVehicleShape::Shown(tn < shape->night_part.size() ? shape->night_part[tn] : 0, parts)) continue;
 			uint32_t glass = tn < shape->night_colour.size() ? shape->night_colour[tn] : Colour(255, 244, 216).data;
 			const uint32_t *glass_tex = EyeColour(glass);

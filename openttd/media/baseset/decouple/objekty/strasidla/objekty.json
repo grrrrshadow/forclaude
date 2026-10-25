@@ -255,5 +255,72 @@
   "autor": "Realistic Alien - Mexico Aliens insiped, Graphetta (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/realistic-alien-mexico-aliens-insiped-16f00ad731654426bf596e088ec35c7a), převod tvorove/par17.py bez renderu",
   "licence": "CC BY 4.0 (uvést Graphetta; změny: zjednodušený na 12478 trojúhelníků, kůže přebarvená na zelenou, ruce z A-pózy spuštěné, otočený, chůze ze snímků)",
   "poznamka": "hráč: „ten chodici muže chodit v noci poměstě“; mimozemšťan podle mumií z mexického parlamentu, zelený (hráč: „obarvi na zeleno“), v noci chodí po ulicích, neútočí; skutečné metry (1.5 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; model nemá kostru ani pohyb, chůze je naše z 12 snímků chuze_00 až chuze_11: tělo (5666 trojúhelníků) jako instance jedné sítě, nohy a ruce (6812) v každém snímku vlastní, nohy se kývají kolem kyčlí ±20°, ruce kolem ramen ±16° proti noze na své straně, uzel snímku se houpe; krok_m za jedno kolo (dva kroky); glb z gltfpacku"
+ },
+ {
+  "soubor": "strasidlo.glb",
+  "jmeno": "strasidlo",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "strašidlo",
+   "en": "ghost"
+  },
+  "kdy": "noc",
+  "meritko": 2,
+  "rozmer_m": [
+   0.62,
+   0.67,
+   2.03
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 4.0
+   }
+  },
+  "povaha": "mirumilovne",
+  "trojuhelniku": 40800,
+  "poza": "bílé strašidlo s očima, vznáší se nahoru a dolů a kolébá se",
+  "autor": "ghost, remi136 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ghost-1dd1cdac701b42e6ac41bdc194c03139), převod tvorove/nocni_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést remi136; změny: otočené, zmenšené, poloprůhledné, svítí samo, vznášení ze snímků)",
+  "poznamka": "přízrak: průsvitná bílá postava, vznáší se a straší, neútočí; týž glb a pohyb jako strasidlo v objekty/carodejnice (tam létá po městech jako čarodějnice), tady strašidlo na místech v lese (noc_postavy lesa) a v okolí měst (hra 24. 10., ODPOVED-LES.md); vznáší se: leta true, vznaseni_m = výška počátku (střed těla) nad zemí 1.32 m při skutečné velikosti, animace let (snímky let_NN) je vznášení na místě, krok_m posun za kolo; létá jen v noci (kdy: noc); skutečné metry jako holky, meritko 2 (hra kreslí jako holky na zastávce, hra/3d/PROSBA-CARODEJNICE.md); rozmer_m největší ze všech snímků; čelem k +x, počátek uprostřed těla, s normálami; let ze 8 snímků let_00 až let_07: v každém nehybná část (40800 trojúhelníků) jako instance jedné sítě a vlastní kopie toho, co vlaje (0 trojúhelníků), uzel snímku se houpe (±6 cm, ±1.5° a ±3.0°); krok_m za jedno kolo ve skutečných metrech modelu; glb z gltfpacku; bez lucerny a svítilny (svítí samo); poloprůhledné (alphaMode BLEND 0,7) a svítí samo (emissiveFactor)",
+  "kde": "okoli",
+  "leta": true,
+  "vznaseni_m": 1.32
+ },
+ {
+  "soubor": "prizrak.glb",
+  "jmeno": "prizrak",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "přízrak",
+   "en": "phantom"
+  },
+  "kdy": "noc",
+  "povaha": "vyprovokovat",
+  "meritko": 2,
+  "rozmer_m": [
+   3.12,
+   1.3,
+   2.08
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 5,
+    "smycka": true,
+    "krok_m": 6.0
+   }
+  },
+  "trojuhelniku": 14942,
+  "autor": "Devil Phantom, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/devil-phantom-73c0c5f64d99478ba270348a49b0c6f7), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; nekomerčně; změny: otočený, zmenšený, let upečený do snímků)",
+  "poznamka": "ďábelský fantom: vznáší se, zaútočí, až když ho hráč vyprovokuje; týž glb a pohyb jako prizrak v objekty/carodejnice (tam létá po městech jako čarodějnice), tady strašidlo na místech v lese (noc_postavy lesa) a v okolí měst (hra 24. 10., ODPOVED-LES.md); vznáší se: leta true, vznaseni_m = výška počátku (střed těla) nad zemí 1.54 m při skutečné velikosti, animace let (snímky let_NN) je vznášení na místě, krok_m posun za kolo; létá v noci jako čarodějnice, mírumilovný, dokud ho hráč nezasáhne; skutečné metry (2 m), meritko 2, čelem k +x, počátek uprostřed těla; let z 12 snímků let_00 až let_11 upečených z animace modelu (od pětiny po konec, 1.57 s; model v ní vylétá zespodu a letí dál, každý snímek vystředěný, let dělá hra), bez lucerny a svítilny; glb z gltfpacku",
+  "kde": "okoli",
+  "leta": true,
+  "vznaseni_m": 1.54
  }
 ]
