@@ -2087,6 +2087,34 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 	} else if (!ReadGlbMesh(path, mesh)) {
 		return false;
 	}
+	if (!obj.outside_of.empty()) {
+		/* Without what lies in the interior's box (a few centimetres more every way: its walls are the house's). */
+		GlbMesh in;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		if (ReadGlbMesh(obj.outside_of, in, o) && !in.pos.empty()) {
+			double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+			for (size_t i = 0; i + 2 < in.pos.size(); i += 3) {
+				x0 = std::min<double>(x0, in.pos[i]); x1 = std::max<double>(x1, in.pos[i]);
+				y0 = std::min<double>(y0, in.pos[i + 1]); y1 = std::max<double>(y1, in.pos[i + 1]);
+			}
+			const double margin = 0.05;
+			auto inside = [&](uint32_t c) {
+				const double x = mesh.pos[c * 3], y = mesh.pos[c * 3 + 1];
+				return x > x0 - margin && x < x1 + margin && y > y0 - margin && y < y1 + margin;
+			};
+			std::vector<uint32_t> tri;
+			std::vector<uint8_t> tri_tex;
+			const bool texs = mesh.tri_tex.size() == mesh.tri.size() / 3;
+			for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+				if (inside(mesh.tri[t]) && inside(mesh.tri[t + 1]) && inside(mesh.tri[t + 2])) continue;
+				tri.insert(tri.end(), mesh.tri.begin() + t, mesh.tri.begin() + t + 3);
+				if (texs) tri_tex.push_back(mesh.tri_tex[t / 3]);
+			}
+			mesh.tri = std::move(tri);
+			if (texs) mesh.tri_tex = std::move(tri_tex);
+		}
+	}
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
 	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
@@ -2303,7 +2331,7 @@ static void ReadPlants(const nlohmann::json &e, ThreeDObject &obj)
  * @param obj the house, its file's path set
  */
 static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig);
-static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj, bool outside = false)
 {
 	if (!e.contains("interier")) return;
 	const auto &in = e.at("interier");
@@ -2351,8 +2379,20 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 		}
 	}
 	Debug(misc, 1, "3D object {}: interior {}, {} doors", obj.name, file, obj.door_wings.size());
+	const std::string interior_path = interior.glb_path;
 	obj.interior = _three_d_objects.size();
 	_three_d_objects.push_back(std::move(interior));
+	/* An industry: itself without the interior's box too (ThreeDObject::outside), as it is coloured. */
+	if (outside) {
+		ThreeDObject out = obj;
+		out.name = obj.name + "/venku";
+		out.outside_of = interior_path;
+		out.interior = SIZE_MAX;
+		out.door_wings.clear();
+		out.figures.clear();
+		obj.outside = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(out));
+	}
 }
 
 /**
@@ -2595,6 +2635,8 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 	ReadBuildingFigures(e, obj);
 	ReadBuildingTitle(e, obj);
 	ReadPlants(e, obj);
+	/* Its interior and doors as a house's (the colleague's dragon castle: the hall, its gate without a wing). */
+	if (!field) ReadInterior(e, folder, obj, true);
 	if (field) {
 		obj.field_part = e.value("dil", std::string());
 		if (obj.field_part.empty()) return;
@@ -6032,6 +6074,33 @@ const ThreeDObject *GetThreeDInterior(const ThreeDObject *house)
 	return house != nullptr && house->interior < _three_d_objects.size() ? &_three_d_objects[house->interior] : nullptr;
 }
 
+/** An industry with an interior without what lies in the interior's box (ThreeDObject::outside), drawn near with it; else it as it is. */
+const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj)
+{
+	return obj != nullptr && obj->outside < _three_d_objects.size() ? &_three_d_objects[obj->outside] : obj;
+}
+
+/**
+ * The 3D object with rooms on a tile and its north tile: a house's, or an industry's with an interior or doors (the
+ * colleague's dragon castle). nullptr none.
+ */
+const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin)
+{
+	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
+		HouseID north = GetHouseType(tile);
+		origin = tile + GetHouseNorthPart(north);
+		return GetThreeDHouseObjectAt(north, origin);
+	}
+	if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
+		const Industry *ind = Industry::GetByTile(tile);
+		const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
+		if (obj == nullptr || (obj->interior == SIZE_MAX && obj->door_wings.empty())) return nullptr;
+		origin = GetThreeDIndustryObjectOrigin(ind);
+		return obj;
+	}
+	return nullptr;
+}
+
 /**
  * Whether a point is inside a house's interior (world units from the house's north corner): within what its walls
  * enclose, the interior read (in the background the first time, outside till then).
@@ -6940,6 +7009,7 @@ bool ThreeDObject::Read() const
 		read.addon = this->addon;
 		read.all_roots = this->all_roots;
 		read.left_out = this->left_out;
+		read.outside_of = this->outside_of;
 		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
 		 * (ReadInterior()) read as they are. */
 		bool ok;

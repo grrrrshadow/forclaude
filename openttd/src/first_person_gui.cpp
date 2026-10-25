@@ -296,7 +296,14 @@ static bool FirstPersonWalkable(double x, double y)
 				const std::optional<bool> blocks = ThreeDOriginalIndustryBlocks(tile, x, y);
 				return blocks.has_value() && !*blocks;
 			}
-			return !obj->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE);
+			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
+			if (obj->Blocks(lx, ly)) return false;
+			/* Its interior's straw and troughs, and the wings of its doors, as a house's (the colleague's dragon castle). */
+			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+			for (size_t k = 0; k < obj->door_wings.size(); k++) {
+				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly)) return false;
+			}
+			return true;
 		}
 		case TileType::Station:
 			return HasStationRail(tile) || IsAnyRoadStop(tile);
@@ -329,17 +336,15 @@ static double FirstPersonWallTop(double x, double y)
  * walls of a house's shape (ThreeDObject::Blocks()) slip between none of them.
  */
 /**
- * Whether a world point is on the plot of a house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): there
+ * Whether a world point is on the plot of a house or an industry with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): there
  * the walker is as narrow as a body (FIRST_PERSON_INDOOR_RADIUS) -- through its doorways, between the rows of seats of
  * the cinema.
  */
 static bool FirstPersonIndoors(double x, double y)
 {
 	if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::SizeX() - 1) * TILE_SIZE || y >= (Map::SizeY() - 1) * TILE_SIZE) return false;
-	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
-	if (!IsTileType(tile, TileType::House) || !IsHouseCompleted(tile)) return false;
-	HouseID north = GetHouseType(tile);
-	return GetThreeDInterior(GetThreeDHouseObjectAt(north, tile + GetHouseNorthPart(north))) != nullptr;
+	TileIndex origin;
+	return GetThreeDInterior(GetThreeDObjectWithRoomsAt(TileVirtXY(static_cast<int>(x), static_cast<int>(y)), origin)) != nullptr;
 }
 
 static bool FirstPersonFree(double x, double y)
@@ -499,11 +504,8 @@ struct FirstPersonWindow : Window {
 		for (int dy = -1; dy <= 1; dy++) {
 			for (int dx = -1; dx <= 1; dx++) {
 				if (tx + dx < 1 || ty + dy < 1 || tx + dx >= static_cast<int>(Map::MaxX()) || ty + dy >= static_cast<int>(Map::MaxY())) continue;
-				const TileIndex tile = TileXY(tx + dx, ty + dy);
-				if (!IsTileType(tile, TileType::House) || !IsHouseCompleted(tile)) continue;
-				HouseID north = GetHouseType(tile);
-				const TileIndex origin = tile + GetHouseNorthPart(north);
-				const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
+				TileIndex origin;
+				const ThreeDObject *house = GetThreeDObjectWithRoomsAt(TileXY(tx + dx, ty + dy), origin);
 				if (house == nullptr || house->door_wings.empty()) continue;
 				const auto door = ThreeDDoorNear(house, origin, this->walker.x - TileX(origin) * TILE_SIZE, this->walker.y - TileY(origin) * TILE_SIZE, FIRST_PERSON_DOOR_M * OBJECT_UNITS_PER_METRE);
 				if (door.has_value()) return DoorAt{house, origin, *door};

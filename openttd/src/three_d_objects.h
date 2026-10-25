@@ -261,6 +261,10 @@ struct ThreeDObject {
 	 * "podlaha"; the vending machine's weeds under "krovi"), but the night's, the wings of doors and these. */
 	bool all_roots = false;
 	std::vector<std::string> left_out;        ///< with all_roots, the nodes (and their children) read on their own: the heaps of hay ("seno"), the day's ("den")
+	/* An industry with an interior (the colleague's dragon castle, its hall): itself without what lies in its
+	 * interior's box, drawn near with the interior, which has the whole hall. */
+	size_t outside = SIZE_MAX;                ///< that object, SIZE_MAX none
+	std::string outside_of;                   ///< of that object: the interior's file whose box is left out
 	std::string door_node;                    ///< a door's wing: its node in the file, turned about the node's origin (the hinge)
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
@@ -904,6 +908,8 @@ const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);
+const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin);
+const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj);
 bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y);
 const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origin, size_t door);
 std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach);

@@ -10236,12 +10236,10 @@ double FirstPersonGroundZ(double x, double y)
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	const double ground = GetSlopePixelZOutsideMap(ix, iy);
-	/* In a house's interior: its floor there (the stage and its steps of the cinema), of the ground storey. */
-	const TileIndex tile = TileVirtXY(ix, iy);
-	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
-		HouseID north = GetHouseType(tile);
-		const TileIndex origin = tile + GetHouseNorthPart(north);
-		const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
+	/* In a house's interior (or an industry's, the dragon castle's hall): its floor there (the stage and its steps of the
+	 * cinema), of the ground storey. */
+	TileIndex origin;
+	if (const ThreeDObject *house = GetThreeDObjectWithRoomsAt(TileVirtXY(ix, iy), origin); house != nullptr) {
 		const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
 		if (ThreeDInsideInterior(house, lx, ly)) {
 			const double base = GetTileMaxPixelZ(origin);
@@ -11639,8 +11637,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					if (co.origin == origin) known = true;
 				}
 				if (!known) {
-					objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDIndustryGirls(ind, obj)});
-					for (size_t k = 0; k < std::min<size_t>(obj->hay.size(), DragonFarmHay(ind)); k++) objects.push_back({GetThreeDObjectNumbered(obj->hay[k]), origin, GetTileMaxPixelZ(origin)});
+					/* With an interior (the dragon castle's hall): near, itself without the interior's box, and the
+					 * interior, which has the whole hall, and the wings of its doors as they stand. */
+					const int oz = GetTileMaxPixelZ(origin);
+					const ThreeDObject *in = GetThreeDInterior(obj);
+					const bool near = in != nullptr && std::hypot(TileX(origin) * TILE_SIZE + obj->tiles_x * TILE_SIZE / 2.0 - eye.x, TileY(origin) * TILE_SIZE + obj->tiles_y * TILE_SIZE / 2.0 - eye.y) < (CAB_INTERIOR_TILES + std::max(obj->tiles_x, obj->tiles_y)) * TILE_SIZE;
+					objects.push_back({near ? GetThreeDOutsideOfInterior(obj) : obj, origin, oz, GetThreeDIndustryGirls(ind, obj)});
+					for (size_t k = 0; k < std::min<size_t>(obj->hay.size(), DragonFarmHay(ind)); k++) objects.push_back({GetThreeDObjectNumbered(obj->hay[k]), origin, oz});
+					if (near) {
+						objects.push_back({in, origin, oz});
+						for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, oz});
+					}
 				}
 			} else if (GetThreeDPlantationTile(_cur_ti.tile, pt) && GetThreeDFieldTile(pt, ft)) {
 				/* A tile of a field as in the turned view (AddIndustryObjects()): on the game's ground its plants -- a
