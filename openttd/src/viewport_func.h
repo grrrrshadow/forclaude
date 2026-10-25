@@ -145,4 +145,6 @@ inline void SetViewportCatchmentSpecializedStation(const Waypoint *st, bool sel)
 	SetViewportCatchmentWaypoint(st, sel);
 }
 
+void DrainTurnedObjectBatches();
+
 #endif /* VIEWPORT_FUNC_H */

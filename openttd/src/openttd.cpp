@@ -318,6 +318,7 @@ static void ShutdownGame()
 	/* The threads making the pictures of the 3D vehicles and drawing the view from the eyes, before what they draw from is gone. */
 	StopThreeDPictureThread();
 	StopEyeFrameThread();
+	StopTurnedObjectBatchThread();
 	/* And then the graphics card's, which draws for them (three_d_gpu.h). */
 	ThreeDGpuStop();
 

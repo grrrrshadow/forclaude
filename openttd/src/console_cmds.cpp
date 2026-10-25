@@ -10064,6 +10064,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		AdvanceTitleDayAndNight(std::max(0, number(2).value_or(0)));
 		IConsolePrint(CC_DEFAULT, "test3d: titulnoc {:.2f} uhel {:.1f}", _title_night, GetViewYaw());
 	} else if (what == "snimek" && argv.size() > 2) {
+		/* A picture is of the moment: what the card's batch would bring a frame later is drawn now, waited for
+		 * (MakeTurnedObjectPicturesOnCard()), so the same scene gives the same picture. */
+		AutoRestoreBackup at_once(_three_d_load_at_once, true);
 		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
 		CloseWindowByClass(WindowClass::ModalProgress);
 		CloseWindowByClass(WindowClass::ErrorMessage);

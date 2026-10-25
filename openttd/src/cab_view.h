@@ -59,6 +59,8 @@ struct CabViewCamera {
  * (viewport.cpp, EyeFrame): what a window holds is the last one drawn, taken as it asks for the next.
  */
 bool EyeFrameDrawing();                ///< a frame is being drawn: what it draws from must stay as it is
+bool TurnedObjectBatchBusy();          ///< a batch of the turned map's buildings is on its way to the card: the same holds
+void StopTurnedObjectBatchThread();
 void WaitEyeFrame();                   ///< wait for it (the objects are read anew)
 void StopEyeFrameThread();             ///< at the end of the game
 void DropEyeFrame(const void *client); ///< a window closes: its frame goes

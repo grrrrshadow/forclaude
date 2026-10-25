@@ -31,6 +31,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. – přechod na GPU: dávky domů bez čekání, při otáčení poslední obrázek domu
+
+- Hráč: *„telefon je ok, detekuje mali, jede zink virgl. dodělej ten přechod na gpu, domy a co ještě není
+  hotové.“* Nalezený nedodělek: obrázky budov otočeného pohledu sice kreslila karta v dávce (#134), ale hlavní
+  vlákno na ni **čekalo** – render + čtení zpět (barvy a float hloubky) při každém pootočení, na zinku je čtení
+  zpět to pomalé. **Teď:** dávka jde na vlastní vlákno (`ottd:3d-mapa`), hlavní vlákno nečeká; hotová dávka se
+  vyzvedne každý snímek (UpdateWindows) a překreslí obrazovku. Než dorazí, dům se položí ze svého **posledního
+  obrázku ukotveného za severní roh** (posun + přiblížení hloubky) – při otočení o stupeň skoro k nerozeznání
+  (měřeno: 1,7 % pixelů jinak), přesný obrázek ho o snímek později vystřídá. Bez obrázku (první spatření) se
+  kreslí po trojúhelnících jako dřív; bez karty se nic nemění.
+- Rig: `test3d snimek` kreslí „obrázek okamžiku“ (synchronně) – snímky jsou dál deterministické (2 běhy stejné
+  md5). V rigu s kartou: první kreslení nového úhlu modely ~50 ms (přímé), po dovezení dávky ~5 ms (kopie
+  obrázků), 343 obrázků v paměti. GL rig (llvmpipe): snímky úhlů 30/31 správné, bez pádu. Baterie: zakl,
+  mezera, depoodpoj beze změn. Zahazování textur (DropPaintedTextures, ForgetUnused) počká, dokud je dávka na
+  cestě – stejná pojistka jako u vlákna očí.
+- Pozn. ke GL rigu: konzole se tam neloguje a hra se dnes nahrávala přes 300 s – pády „XIO“ v logu byly jen
+  timeout skriptu, ne chyba hry; `scena_gl2.sh` má limit 560 s a snímky přes `test3d obrazovka`.
+- **Co v přechodu na GPU ještě zbývá:** zem otočené plochy se pořád pokládá s čekáním (karta → čtení zpět na
+  hlavním vlákně, po blocích); vozidla na mapě obrázky po 45° (#127); domy úplně bez obrázků = skládat celý
+  otočený pohled na kartě bez čtení zpět, jako snímek z očí (#123, velký krok – vyžaduje i plakáty vanilla
+  spritů na kartě); u očí sběr scény a příprava trojúhelníků na procesoru (#150).
+
 ## 25. 10. – vypínač stínů, plynulost otáčení z očí, úvodní otáčení nebrzdí myš; co zbývá na GPU
 
 - Hráč: *„světla chci ale stíny nejsou důležité… dej vypínač a nadále zlepšuj“*. **Teď:** nastavení Grafika →
