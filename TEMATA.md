@@ -31,6 +31,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (6) – duch s prostěradlem u kostela
+
+- **Hráč: „kolem kostela zvýšený výskyt ghost prostěradlo, jeden ke každému kostelu; bude mizet, chodit do kostela
+  a okolo kostela“.** Nové místo strašidel `Place::Church` (three_d_animals.cpp): ke každému kostelu v okolí středu
+  (do `CHURCHES_KEPT` = 4) jeden `strasidlo_ulice` (kolegovo prostěradlo, v noci, mírumilovné). Kostel = dům
+  s `BuildingFlag::IsChurch` (všech podnebí). Chodí kolem kostela (0,7 dlaždice od zdí), občas jde ke dveřím
+  (dveře 3D kostela, jinak strana k silnici) a vejde – zmizí na 600–1200 tiků; občas zmizí, kde stojí; vyjde dveřmi
+  nebo se zjeví jinde kolem kostela. Zmizelý se nekreslí a nedá se trefit; udeřený utíká jako ostatní. Ve dne
+  není (jako ostatní noční strašidla), zbouraný kostel – duch zmizí. Rig: kostel 84,40 – chodí, zmizí, vyjde dveřmi.
+
 ## 25. 10. (5) – dračí farma bez hradu, škola a automat neviditelné: jedna chyba
 
 - **Hráč (#300): „kde je dračí farma, já chci starou… byl to hrad zřícenina“, „škola a automat se postavily, byly

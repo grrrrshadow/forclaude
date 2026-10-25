@@ -71,6 +71,12 @@ constexpr uint RAIL_KEPT = 3;              ///< and ghosts along the railway lin
 constexpr double RAIL_RIDE_M = 0.05;       ///< one riding the rails without a pose of walking goes so far a tick, metres
 /** The one who rides the rails as a little engine (the player, 24. 10.: "only Billy rides the rails"): no other ghost. */
 constexpr std::string_view RAIL_RIDER = "billy_tricykl";
+/** The ghost in its sheet of each church about the middle (the player, 25. 10.: "more of the ghost in the sheet about
+ * the church, one to each church; it will vanish, go into the church and about it"). */
+constexpr std::string_view CHURCH_GHOST = "strasidlo_ulice";
+constexpr uint CHURCHES_KEPT = 4;          ///< at most so many churches about the middle have theirs
+constexpr double CHURCH_ROUND_TILES = 0.7; ///< it goes about its church so far out from its walls, tiles
+constexpr uint64_t CHURCH_INSIDE_TICKS = 600; ///< and is in it, or gone, at least so long (and as long again at most)
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
 constexpr uint64_t SELLER_TICKS = 20000;   ///< a seller stays so long (about nine minutes) ...
 constexpr uint64_t SELLER_AWAY_TICKS = 4000; ///< ... and the next comes after about so long
@@ -99,6 +105,7 @@ enum class Place : uint8_t {
 	Pet,    ///< the walker's dog, walking with it
 	Forest, ///< in a forest, always (the player, 24. 10.: "trees, mushrooms and the little animals are to be in the forest all the time")
 	ForestNight, ///< a ghost of the forest with a clearing at night, at its places ("noc_postavy")
+	Church, ///< the ghost in its sheet of a church, about it and in it (CHURCH_GHOST)
 };
 
 enum class State : uint8_t {
@@ -141,6 +148,10 @@ struct Beast {
 	std::string next_pose; ///< the pose it goes into when the one it is in (sitting down, getting up) is done
 	TileIndex rail_tile = INVALID_TILE;       ///< riding the rails (Place::Rail): the tile it rides through ...
 	Trackdir rail_td = Trackdir::Invalid;     ///< ... along this track of it, to its far edge
+	TileIndex church = INVALID_TILE;          ///< its church's north tile (Place::Church)
+	bool going_in = false;                    ///< on its way to the church's door, to go in
+	bool inside = false;                      ///< in the church, or vanished: not seen, not hit, till "until"
+	bool out_at_door = false;                 ///< and it comes out of the door (else it appears about the church)
 };
 
 std::vector<Beast> _beasts;
@@ -405,6 +416,72 @@ void PickWander(Beast &b)
 	b.ty = b.y;
 }
 
+/** Whether a tile is the north tile of a church built (BuildingFlag::IsChurch, of any climate's). */
+bool IsChurchNorthTile(TileIndex t)
+{
+	if (!IsValidTile(t) || !IsTileType(t, TileType::House) || !IsHouseCompleted(t)) return false;
+	HouseID house = GetHouseType(t);
+	return GetHouseNorthPart(house) == 0 && HouseSpec::Get(house)->building_flags.Test(BuildingFlag::IsChurch);
+}
+
+/** A church's middle and how far its walls go from it at most, world units. */
+void ChurchMiddle(TileIndex church, double &x, double &y, double &radius)
+{
+	const BuildingFlags flags = HouseSpec::Get(GetHouseType(church))->building_flags;
+	const int sx = flags.Any({BuildingFlag::Size2x1, BuildingFlag::Size2x2}) ? 2 : 1;
+	const int sy = flags.Any({BuildingFlag::Size1x2, BuildingFlag::Size2x2}) ? 2 : 1;
+	x = (TileX(church) + sx / 2.0) * TILE_SIZE;
+	y = (TileY(church) + sy / 2.0) * TILE_SIZE;
+	radius = std::hypot(sx, sy) / 2.0 * TILE_SIZE;
+}
+
+/**
+ * The church's door, a step out of it: its 3D object's first door ("dvere"); without one the middle of its side to a
+ * road beside it, else of its south-east side.
+ */
+void ChurchDoor(TileIndex church, double &x, double &y)
+{
+	const HouseID house = GetHouseType(church);
+	if (const ThreeDObject *obj = GetThreeDHouseObjectAt(house, church); obj != nullptr && !obj->doors.empty()) {
+		const ThreeDObjectDoor &d = obj->doors.front();
+		const double len = std::max(1e-3, static_cast<double>(std::hypot(d.out[0], d.out[1])));
+		x = TileX(church) * TILE_SIZE + (d.at[0] + d.out[0] / len * 0.8) * OBJECT_UNITS_PER_METRE;
+		y = TileY(church) * TILE_SIZE + (d.at[1] + d.out[1] / len * 0.8) * OBJECT_UNITS_PER_METRE;
+		return;
+	}
+	double mx, my, radius;
+	ChurchMiddle(church, mx, my, radius);
+	static const int8_t DX[4] = {1, 0, -1, 0}, DY[4] = {0, 1, 0, -1};
+	int side = 1;
+	for (int k = 0; k < 4; k++) {
+		const int tx = static_cast<int>(mx / TILE_SIZE + DX[k] * (radius / TILE_SIZE + 0.2)), ty = static_cast<int>(my / TILE_SIZE + DY[k] * (radius / TILE_SIZE + 0.2));
+		if (tx < 0 || ty < 0 || tx >= static_cast<int>(Map::SizeX()) || ty >= static_cast<int>(Map::SizeY())) continue;
+		if (IsTileType(TileXY(tx, ty), TileType::Road)) {
+			side = k;
+			break;
+		}
+	}
+	x = mx + DX[side] * (radius * 0.75 + 0.1 * TILE_SIZE);
+	y = my + DY[side] * (radius * 0.75 + 0.1 * TILE_SIZE);
+	NavNearestWalkable(x, y, 1);
+}
+
+/** A place about the church, a little out from its walls, where it can stand. @return whether there is one */
+bool PickAboutChurch(TileIndex church, double &x, double &y)
+{
+	double mx, my, radius;
+	ChurchMiddle(church, mx, my, radius);
+	for (int tries = 0; tries < 8; tries++) {
+		const double a = InteractiveRandomRange(360) * M_PI / 180.0, r = radius + (0.3 + InteractiveRandomRange(100) / 100.0) * CHURCH_ROUND_TILES * TILE_SIZE;
+		double px = mx + std::cos(a) * r, py = my + std::sin(a) * r;
+		if (!OnMap(px, py) || !NavNearestWalkable(px, py, 1) || !OnMap(px, py)) continue;
+		x = px;
+		y = py;
+		return true;
+	}
+	return false;
+}
+
 /**
  * The way a plain railway tile's straight track runs, radians (along x 0, along y a quarter turn); false none
  * straight (a curve, a crossing of both: it stays where it is).
@@ -594,8 +671,78 @@ void Follow(Beast &b, const ThreeDAnimal &a, uint64_t now, double wx, double wy,
 	SetPose(b, want, now);
 }
 
+/**
+ * The ghost of a church, not fighting: about its church, now and then into it by its door, or gone where it is; a while
+ * after back out of the door, or about the church somewhere else.
+ */
+void ChurchGhost(Beast &b, const ThreeDAnimal &a, uint64_t now)
+{
+	if (b.inside) {
+		if (now < b.until) return;
+		double x = b.x, y = b.y;
+		if (b.out_at_door) {
+			ChurchDoor(b.church, x, y);
+		} else {
+			PickAboutChurch(b.church, x, y);
+		}
+		b.inside = false;
+		b.x = b.tx = x;
+		b.y = b.ty = y;
+		b.way.clear();
+		b.state = State::Idle;
+		b.until = now + 60 + InteractiveRandomRange(120);
+		MarkDirty(b, a);
+		return;
+	}
+	const std::string_view walk = PoseOf(a, {"chuze", "beh"});
+	if (b.state == State::Wander) {
+		SetPose(b, walk, now);
+		if (!WalkTo(b, b.tx, b.ty, Speed(b, walk, 0.015), now, a.flies)) return;
+		b.state = State::Idle;
+		if (b.going_in) {
+			/* In through the door: out of it again after a while, or somewhere about the church. */
+			b.going_in = false;
+			b.inside = true;
+			b.out_at_door = InteractiveRandomRange(2) == 0;
+			b.until = now + CHURCH_INSIDE_TICKS + InteractiveRandomRange(CHURCH_INSIDE_TICKS);
+			MarkDirty(b, a);
+		} else {
+			b.until = now + 100 + InteractiveRandomRange(300);
+		}
+		return;
+	}
+	SetPose(b, RestPose(b, a), now);
+	if (now < b.until) return;
+	const uint32_t pick = InteractiveRandomRange(6);
+	if (pick == 0) {
+		/* Gone where it stands, for a while. */
+		b.inside = true;
+		b.out_at_door = InteractiveRandomRange(2) == 0;
+		b.until = now + CHURCH_INSIDE_TICKS / 2 + InteractiveRandomRange(CHURCH_INSIDE_TICKS);
+		MarkDirty(b, a);
+		return;
+	}
+	double x = b.x, y = b.y;
+	b.going_in = pick <= 2;
+	if (b.going_in) {
+		ChurchDoor(b.church, x, y);
+	} else if (!PickAboutChurch(b.church, x, y)) {
+		b.until = now + 100;
+		return;
+	}
+	b.tx = x;
+	b.ty = y;
+	b.way.clear();
+	b.state = State::Wander;
+}
+
 void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double wx, double wy)
 {
+	/* The ghost of a church about it and in it; struck, it runs as the others (Strike()). */
+	if (b.place == Place::Church && (b.inside || b.state == State::Idle || b.state == State::Wander) && !b.angry) {
+		ChurchGhost(b, a, now);
+		return;
+	}
 	const double dist_m = walker ? std::hypot(wx - b.x, wy - b.y) / OBJECT_UNITS_PER_METRE : 1e9;
 	const double reach_m = std::max(a.size[0], a.size[1]) / 2 + GAP_M;
 	/* The hare and the squirrel hop ("skok", the colleague's hra/3d/LES-PRO-HRU.md: up and down on the spot, moved on
@@ -1003,10 +1150,45 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			b.rail_td = along_x ? (std::cos(heading) > 0 ? Trackdir::X_SW : Trackdir::X_NE) : (std::sin(heading) > 0 ? Trackdir::Y_SE : Trackdir::Y_NW);
 			return true;
 		}
+		case Place::Church: {
+			/* The ghost in its sheet at a church about the middle that has none yet, before its door. */
+			const ThreeDAnimal *a = GetThreeDAnimal(CHURCH_GHOST);
+			if (a == nullptr || !a->OutNow(night)) return false;
+			const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+			for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r); ty++) {
+				for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r); tx++) {
+					const TileIndex church = TileXY(tx, ty);
+					if (!IsChurchNorthTile(church)) continue;
+					if (std::ranges::any_of(_beasts, [church](const Beast &o) { return o.place == Place::Church && o.church == church; })) continue;
+					ChurchDoor(church, x, y);
+					double mx, my, radius;
+					ChurchMiddle(church, mx, my, radius);
+					Beast &b = Put(*a, place, x, y, 0, std::atan2(y - my, x - mx), now);
+					b.church = church;
+					b.home_x = mx;
+					b.home_y = my;
+					return true;
+				}
+			}
+			return false;
+		}
 		case Place::Pet:
 			return false;
 	}
 	return false;
+}
+
+/** How many churches about the middle (ChurchGhost()), so many as have their ghosts at most (CHURCHES_KEPT). */
+uint ChurchesNear(TileIndex middle)
+{
+	uint n = 0;
+	const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+	for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r) && n < CHURCHES_KEPT; ty++) {
+		for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r) && n < CHURCHES_KEPT; tx++) {
+			if (IsChurchNorthTile(TileXY(tx, ty))) n++;
+		}
+	}
+	return n;
 }
 
 /** How many of a place are about the middle. */
@@ -1069,7 +1251,8 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		const ThreeDAnimal *a = KindOf(b);
 		const TileIndex at = TileVirtXY(static_cast<int>(std::clamp(b.x, 0.0, (Map::SizeX() - 1.0) * TILE_SIZE)), static_cast<int>(std::clamp(b.y, 0.0, (Map::SizeY() - 1.0) * TILE_SIZE)));
 		const bool gone = a == nullptr || (b.place != Place::Pet && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
-				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle);
+				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight || b.place == Place::Church) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle) ||
+				(b.place == Place::Church && !IsChurchNorthTile(b.church));
 		if (gone) {
 			if (a != nullptr) MarkDirty(b, *a);
 			if (b.place == Place::Seller) _next_seller = now + SELLER_AWAY_TICKS / 2 + InteractiveRandomRange(SELLER_AWAY_TICKS);
@@ -1101,12 +1284,14 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 	const Wanted wanted[] = {
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
-		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u},
+		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u}, {Place::Church, CHURCHES_KEPT},
 	};
 	/* One a time, the place picked in turn. The forests' game and ghosts are there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
 	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight) return;
-	if (Count(w.place) < w.kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
+	/* A church's ghost to each church about the middle. */
+	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.kept;
+	if (Count(w.place) < kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
 
 /** The figure of its pose and the frame of it: its pose's, or a passage into it from the one before (with bones, as the dragons'). */
@@ -1132,7 +1317,7 @@ float Facing(const Beast &b)
 /** Whether one can be hit: not the walker's dog or a seller, not falling or dead. */
 bool Hittable(const Beast &b)
 {
-	return b.place != Place::Pet && b.place != Place::Seller && b.state != State::Dying && b.state != State::Dead;
+	return b.place != Place::Pet && b.place != Place::Seller && !b.inside && b.state != State::Dying && b.state != State::Dead;
 }
 
 /** One hit: so much less health; it falls after its last; one provoked fights from now on, a peaceful one runs. */
@@ -1190,7 +1375,7 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 {
 	for (const Beast &b : _beasts) {
 		const ThreeDAnimal *a = KindOf(b);
-		if (a == nullptr) continue;
+		if (a == nullptr || b.inside) continue;
 		/* A few poses of each, no passages between them (ThreeDMapPose()). */
 		const std::string figure = FigureIn(b, b.pose);
 		const float scale = a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
@@ -1204,7 +1389,7 @@ void AddThreeDAnimalsToEye()
 {
 	for (const Beast &b : _beasts) {
 		const ThreeDAnimal *a = KindOf(b);
-		if (a == nullptr) continue;
+		if (a == nullptr || b.inside) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
 		const float people = a->kind == ThreeDAnimal::Kind::Seller ? THREE_D_EYE_PEOPLE_SCALE : 1.0f;
@@ -1372,12 +1557,13 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 /** The rig: those about, a line each. */
 std::string DescribeThreeDAnimals()
 {
-	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci"};
+	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci", "kostel"};
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
 	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
 	for (const Beast &b : _beasts) {
-		out += fmt::format("\n  {} ({}) {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, poza {} snimek {}, zdravi {}{}", b.kind, PLACES[static_cast<int>(b.place)], STATES[static_cast<int>(b.state)],
-				b.x / TILE_SIZE, b.y / TILE_SIZE, b.up / OBJECT_HEIGHT_PER_METRE, b.heading * 180.0 / M_PI, b.pose.empty() ? "-" : b.pose, b.frame, b.health, b.angry ? ", vyprovokovany" : "");
+		out += fmt::format("\n  {} ({}) {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, poza {} snimek {}, zdravi {}{}{}", b.kind, PLACES[static_cast<int>(b.place)], STATES[static_cast<int>(b.state)],
+				b.x / TILE_SIZE, b.y / TILE_SIZE, b.up / OBJECT_HEIGHT_PER_METRE, b.heading * 180.0 / M_PI, b.pose.empty() ? "-" : b.pose, b.frame, b.health, b.angry ? ", vyprovokovany" : "",
+				b.place != Place::Church ? std::string() : fmt::format(", kostel {},{}{}{}", TileX(b.church), TileY(b.church), b.inside ? ", uvnitr/zmizel" : "", b.going_in ? ", jde dovnitr" : ""));
 		if (!b.offer.empty()) {
 			out += ", prodava:";
 			for (const std::string &o : b.offer) out += " " + o;
