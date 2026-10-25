@@ -2430,6 +2430,11 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 	obj.tiles_x = std::max(1, e.value("dlazdic_x", 1));
 	obj.tiles_y = std::max(1, e.value("dlazdic_y", 1));
 	if (!obj.file.empty() && !ReadGlb(folder + obj.file, obj)) return;
+	/* Read now for what the index needs of it, and again with its add-ons when it is first drawn (Read()): without its
+	 * file there, that read laid the add-ons alone over it -- since the industries have the shared trees and bushes
+	 * (23. 10.) the dragon farm drew no castle, the gymnasium and the vending machine nothing but their bushes (the
+	 * player, #300: "the school and the vending machine were there, but not seen"). */
+	if (!obj.file.empty()) obj.glb_path = folder + obj.file;
 	ReadColourParts(e, folder, obj);
 	ReadBuildingFigures(e, obj);
 	ReadBuildingTitle(e, obj);

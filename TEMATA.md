@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (5) – dračí farma bez hradu, škola a automat neviditelné: jedna chyba
+
+- **Hráč (#300): „kde je dračí farma, já chci starou… byl to hrad zřícenina“, „škola a automat se postavily, byly
+  tam, ale nebyly vidět“.** Hrad jsem nedal pryč – model od kolegy je pořád ten jediný (zřícenina s nádvořím, 3×3,
+  shodný s grrrrf). Příčina: naše průmysly (`ReadIndustryObject`) se čtou hned při startu, ale bez cesty k souboru;
+  od 23. 10., kdy dostaly společné stromy a keře jako doplňky, je hra při prvním kreslení „dočetla“ znovu
+  (`Read()`) – a bez souboru přečetla jen doplňky a přepsala jimi celý tvar i texturu. Zbyly keře a stromy. Týkalo se
+  všech našich průmyslů s doplňky: **dračí farma, gymnázium (škola), automat, hospoda, socha**; lihovar a chatka
+  doplňky nemají, ty byly vidět. Oprava: průmysl si pamatuje svůj soubor (`glb_path`), při prvním kreslení se přečte
+  celý i s doplňky jako domy. Ověřeno v rigu: hrad s nádvořím a draky, škola s vlajkou a automat stojí (stará verze:
+  tráva a keře), les s pasekou beze změny, kouřová baterie = základna.
+- Hráč s kolegou hrad předělají („ten hrad bude hezčí“) – hra vezme, co kolega pošle.
+
 ## 25. 10. (4) – #300: obraz bez čtení z paměti karty, Ctrl+šipka chůze
 
 - **Z očí ~4 snímky/s, škubání i při pauze (hráč, test 4 #300: „u konce jsem zmáčkl pauzu a pohyboval hlavou, stejně
