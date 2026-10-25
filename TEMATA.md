@@ -31,6 +31,39 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (2) – zem bez čekání, čarodějnice, dračí farma bez „Falca“, logy do save, Esc z očí
+
+- **Zem otočené plochy bez čekání (#190, k buildu #300):** pokládání země bloku kartou (warp drženého obrázku
+  + čtení zpět) drželo hlavní vlákno ~100+ ms na překreslení. Teď `LayTurnedGround` zemi kartě jen **zadá**
+  (`ThreeDGpuDrawGroundStart`), hlavní vlákno mezitím sbírá a třídí objekty bloku (vozidla, chodce, čarodějnice,
+  řazení), a `FinishTurnedGround` si výsledek **vyzvedne** těsně před skládáním objektů do bloku – čekání na kartu
+  se schová za práci procesoru. Pixely jsou bitově stejné (ověřeno: 2 běhy, liší se jen text lišty). Bez karty
+  pokládá procesor hned jako dřív. Rig: `polozila karta 987, procesor 0`, žádný pád.
+- **Deník snímků: rozpad „okna“ (#165, #195):** z hráčova logu #299 bylo v očích ~220 ms/snímek v „okna“, ale oči
+  samotné jen zlomek – zloděj neznámý. Nové sloupce: `hodiny` (hodiny oken, i krok chodce se sběrem), `bloky`
+  (kreslení špinavých kusů), `mapa` (bloky plochy), `okno oci` (vykreslení plátna z očí), `zem` (čekání na kartu
+  u země). Příští snimky.log řekne, kdo těch ~200 ms bere.
+- **Logy na jedno místo:** snimky.log, 3d_karta.log (+minule), 3d_domy.log, texty.log, jizda.log nově do složky
+  **save** vedle uložených her a souborů pádu (`FioDiaryPath`; hráč: „ja nepolezu do windows blazince“).
+  log.txt (záznam anomálií) a crash* tam už byly.
+- **Čarodějnice (hráč):** zatáčka rychle 3°/tik a pak **rovně** k cíli (dřív 0,8°/tik – dlouhý oblouk sypal
+  obrázek za obrázkem natočení; „zatáčet musí, ale ne furt jinam“). Z očí **4× větší** (EYE_OF_MAP 0,5 → 2;
+  „vidím jen světýlko… ať jsou větší v dálce jako draci“ – draci jsou v dálce velcí, protože velcí jsou).
+  První úsek letu vede **nad chodcem**, když je venku u jejího města („ať proletí tak blízko, abych je viděl“).
+  Světla i tělo pro zásahy rostou s ní. Rig: facing 0→-50 za pár tiků, pak drží celé rameno.
+- **Dračí farma bez „Falca“ (hráč: „vubec by neměl byt falco na dračí farmě, to je pes“):** náhradník za
+  nelétajícího draka (drak_kraci) se bral ze **všech** letců indexu – nad farmou tak kroužil obří ledový (modrý)
+  a čínský had (ten „Falco“; pravý Falkor je pes v objekty/psi a na farmu nepatří). Kolega přitom psal „čínský
+  a ledový jsou na farmu velcí“. Teď náhradník jen z letců **té farmy** (mista_draku: hnědý/černý); let nad
+  rozbitým vozidlem taky. Velikosti nechány („draci z first person i zezhora dobrý“).
+- **Z očí:** Esc zavře pohled (kurzor je na telefonu líný, ven to chtělo myš); šipky: první fáze otáčení
+  ~10°/s po 0,35 s, pak rozjezd do plné 115°/s za 1,1 s („šipkama o velký kus, nezatočim kam chci“).
+- Kontroly: build, clang narrowing 0, MinGW 0, determinismus snímku (jen text lišty), kouřová baterie
+  zakl/mezera/depoodpoj = stabilní základna.
+- **Zbývá (hráč):** nastavení poruch – „draci způsobují poruchy“ ano/ne (výchozí ano) a „dosah draků z farmy“
+  (výchozí dnešní DRAGON_REACH_TILES + vyšší volby) do možností hry k poruchám; hráč svolil zadat nižšímu
+  modelu. Spomalení při letu čarodějnice: hráč si zobrazí počet snímků, rozpad „okna“ v deníku ukáže.
+
 ## 25. 10. – přechod na GPU: dávky domů bez čekání, při otáčení poslední obrázek domu
 
 - Hráč: *„telefon je ok, detekuje mali, jede zink virgl. dodělej ten přechod na gpu, domy a co ještě není

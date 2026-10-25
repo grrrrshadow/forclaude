@@ -34,6 +34,7 @@
 #include "game/game.hpp"
 #include "video/video_driver.hpp"
 #include "framerate_type.h"
+#include "frame_diary.h"
 #include "network/network_func.h"
 #include "news_func.h"
 #include "sound_func.h"
@@ -3300,8 +3301,13 @@ void UpdateWindows()
 
 	ProcessPendingPerformanceMeasurements();
 
+	/* The windows' clocks (among them the walker's step with its collecting of the view from the eyes) and the dirty
+	 * pieces drawn below: counted apart in the diary of the frames, so a slow frame says which of the two it was
+	 * (frame_diary.h, the player's #299 log: "okna" long, nothing saying where). */
+	const auto timers_started = std::chrono::steady_clock::now();
 	TimerManager<TimerWindow>::Elapsed(delta_ms);
 	CallWindowRealtimeTickEvent(delta_ms.count());
+	FrameDiaryWindowsTimers(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - timers_started).count());
 
 	/* Process invalidations before anything else. */
 	for (Window *w : Window::Iterate()) {
@@ -3318,7 +3324,9 @@ void UpdateWindows()
 	 * so the screen that stood still is drawn again from them (DrainTurnedObjectBatches()). */
 	DrainTurnedObjectBatches();
 
+	const auto blocks_started = std::chrono::steady_clock::now();
 	DrawDirtyBlocks();
+	FrameDiaryWindowsBlocks(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blocks_started).count());
 
 	for (Window *w : Window::Iterate()) {
 		/* Update viewport only if window is not shaded. */

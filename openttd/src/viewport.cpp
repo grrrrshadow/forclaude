@@ -4970,35 +4970,55 @@ void ForgetTurnedFoundations()
 }
 
 /**
- * Lay the pieces of the ground of a block, in their order, each over those before: by the card where it can (the kept
- * picture of the ground and the tiles' pictures on it, the block read back; GPU point 3), else by the processor on
- * every core, the block in bands of rows.
- * @param frame the block (just cleared)
- * @param pieces the pieces, far first
- * @param foundations the tiles' pictures they come from (TurnedGroundPiece::texture less one)
- * @param kept the kept picture of the ground the other pieces come from, or nullptr when they come from a picture of
- *             the block only (then the processor lays them)
+ * The ground of a block under way: given to the card to lay (LayTurnedGround()) while the processor collects and sorts
+ * what stands on the block, and taken just before that is drawn in (FinishTurnedGround()).
  */
-static void LayTurnedGround(const DrawPixelInfo &frame, std::span<const TurnedGroundPiece> pieces, std::span<const TurnedFoundationTexture *const> foundations, TurnedGround *kept)
+struct TurnedGroundLaying {
+	DrawPixelInfo frame{};                               ///< the block (just cleared)
+	std::vector<TurnedGroundPiece> pieces;               ///< the pieces, far first
+	std::vector<const TurnedFoundationTexture *> foundations; ///< the tiles' pictures they come from (TurnedGroundPiece::texture less one)
+	TurnedGround *kept = nullptr;                        ///< the kept picture of the ground, nullptr when the pieces come from a picture of the block only
+	ThreeDGpuGround g{};                                 ///< what the card holds while it lays
+	std::vector<uint32_t> card_pixels;                   ///< the card's own copy (_turned_ground_check)
+	bool started = false;                                ///< the card has it: FinishTurnedGround() must run before the block is written
+};
+
+/** Lay the pieces by the processor on every core, the block in bands of rows (no card, and _turned_ground_check). */
+static void LayTurnedGroundByProcessor(const TurnedGroundLaying &lay)
 {
-	if (pieces.empty()) return;
+	uint32_t *dst = static_cast<uint32_t *>(lay.frame.dst_ptr);
+	const int fw = UnScaleByZoom(lay.frame.width, lay.frame.zoom), fh = UnScaleByZoom(lay.frame.height, lay.frame.zoom);
+	ParallelBands(fh, [&](int lo, int hi) {
+		for (const TurnedGroundPiece &p : lay.pieces) DrawTexturedTriangle(dst, lay.frame.pitch, fw, fh, p.tex, p.tw, p.th, p.a, p.b, p.c, true, nullptr, nullptr, lo, hi);
+	}, lay.pieces.size() >= 64);
+}
+
+/**
+ * Lay the pieces of the ground of a block, in their order, each over those before: given to the card where it can (the
+ * kept picture of the ground and the tiles' pictures on it, the block read back; GPU point 3) -- without waiting: the
+ * block's objects are collected and sorted meanwhile, and FinishTurnedGround() takes the laid ground before they go
+ * in (the player's #299 log: laying the ground held the main thread a hundred and more ms a redraw of the turned
+ * map). Without the card the processor lays it now, on every core.
+ */
+static void LayTurnedGround(TurnedGroundLaying &lay)
+{
+	if (lay.pieces.empty()) return;
 	double t0 = TurnedNow();
-	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
-	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
-	bool laid = false;
-	std::vector<uint32_t> card_pixels;
+	uint32_t *dst = static_cast<uint32_t *>(lay.frame.dst_ptr);
+	const int fw = UnScaleByZoom(lay.frame.width, lay.frame.zoom), fh = UnScaleByZoom(lay.frame.height, lay.frame.zoom);
+	TurnedGround *kept = lay.kept;
 	if (kept != nullptr && _turned_ground_card && ThreeDGpuReady()) {
-		ThreeDGpuGround g;
+		ThreeDGpuGround &g = lay.g;
 		g.width = fw;
 		g.height = fh;
 		g.clear = dst[0];
 		if (_turned_ground_check) {
-			card_pixels.assign(static_cast<size_t>(fw) * fh, g.clear);
-			g.out = card_pixels.data();
+			lay.card_pixels.assign(static_cast<size_t>(fw) * fh, g.clear);
+			g.out = lay.card_pixels.data();
 			g.out_pitch = fw;
 		} else {
 			g.out = dst;
-			g.out_pitch = frame.pitch;
+			g.out_pitch = lay.frame.pitch;
 		}
 		ThreeDGpuGroundTexture &whole = g.textures.emplace_back();
 		whole.key = 1;
@@ -5013,7 +5033,7 @@ static void LayTurnedGround(const DrawPixelInfo &frame, std::span<const TurnedGr
 			const GroundRect in = r.Within(kept->at);
 			if (!in.Empty()) whole.changed.push_back({in.l - kept->at.l, in.t - kept->at.t, in.r - in.l, in.b - in.t});
 		}
-		for (const TurnedFoundationTexture *f : foundations) {
+		for (const TurnedFoundationTexture *f : lay.foundations) {
 			ThreeDGpuGroundTexture &t = g.textures.emplace_back();
 			t.key = f->key;
 			t.generation = 1;
@@ -5022,28 +5042,46 @@ static void LayTurnedGround(const DrawPixelInfo &frame, std::span<const TurnedGr
 			t.pixels = f->px.data();
 			t.atlas = true;
 		}
-		g.triangles.reserve(pieces.size());
-		for (const TurnedGroundPiece &p : pieces) {
+		g.triangles.reserve(lay.pieces.size());
+		for (const TurnedGroundPiece &p : lay.pieces) {
 			g.triangles.push_back({{static_cast<float>(p.a.x), static_cast<float>(p.b.x), static_cast<float>(p.c.x)}, {static_cast<float>(p.a.y), static_cast<float>(p.b.y), static_cast<float>(p.c.y)},
 					{static_cast<float>(p.a.u), static_cast<float>(p.b.u), static_cast<float>(p.c.u)}, {static_cast<float>(p.a.v), static_cast<float>(p.b.v), static_cast<float>(p.c.v)}, p.texture});
 		}
-		laid = ThreeDGpuDrawGround(g);
-		if (laid) {
-			kept->card_generation = kept->generation;
-			kept->card_x = kept->card_y = 0;
-			kept->card_whole = false;
-			kept->card_changed.clear();
-		}
+		lay.started = ThreeDGpuDrawGroundStart(g);
 	}
-	if (!laid || _turned_ground_check) {
-		ParallelBands(fh, [&](int lo, int hi) {
-			for (const TurnedGroundPiece &p : pieces) DrawTexturedTriangle(dst, frame.pitch, fw, fh, p.tex, p.tw, p.th, p.a, p.b, p.c, true, nullptr, nullptr, lo, hi);
-		}, pieces.size() >= 64);
+	if (!lay.started) {
+		LayTurnedGroundByProcessor(lay);
+		_turned_ground_times.processor_blocks++;
 	}
+	_turned_times.warp += TurnedNow() - t0;
+}
+
+/**
+ * Take the ground the card was laying meanwhile (LayTurnedGround()): in the block now, what stands on it can go over
+ * it. The card could not lay it: the processor does now.
+ */
+static void FinishTurnedGround(TurnedGroundLaying &lay)
+{
+	if (!lay.started) return;
+	lay.started = false;
+	double t0 = TurnedNow();
+	const bool laid = ThreeDGpuDrawGroundTake();
+	/* The wait, for the diary of the frames: the time the card was not done hiding behind the processor's own work. */
+	FrameDiaryGroundWait(TurnedNow() - t0);
+	if (laid) {
+		TurnedGround *kept = lay.kept;
+		kept->card_generation = kept->generation;
+		kept->card_x = kept->card_y = 0;
+		kept->card_whole = false;
+		kept->card_changed.clear();
+	}
+	if (!laid || _turned_ground_check) LayTurnedGroundByProcessor(lay);
 	if (laid && _turned_ground_check) {
 		/* Rig: laid by both, where they differ. */
+		uint32_t *dst = static_cast<uint32_t *>(lay.frame.dst_ptr);
+		const int fw = UnScaleByZoom(lay.frame.width, lay.frame.zoom), fh = UnScaleByZoom(lay.frame.height, lay.frame.zoom);
 		for (int y = 0; y < fh; y++) {
-			const uint32_t *a = dst + static_cast<size_t>(y) * frame.pitch, *b = &card_pixels[static_cast<size_t>(y) * fw];
+			const uint32_t *a = dst + static_cast<size_t>(y) * lay.frame.pitch, *b = &lay.card_pixels[static_cast<size_t>(y) * fw];
 			for (int x = 0; x < fw; x++) _turned_ground_times.differ += a[x] != b[x];
 		}
 		_turned_ground_times.checked += static_cast<size_t>(fw) * fh;
@@ -5442,16 +5480,17 @@ static void ViewportDoDrawTurned()
 	 * pieces laid at once (LayTurnedGround()). */
 	if (_turned_foundation_pixels > TURNED_FOUNDATION_PIXELS) ForgetTurnedFoundations();
 	_turned_ground_block++;
-	std::vector<TurnedGroundPiece> pieces;
-	std::vector<const TurnedFoundationTexture *> foundations;
+	TurnedGroundLaying ground_laying;
+	ground_laying.frame = frame;
 	for (const TurnedTile &t : ground_tiles) {
 		if (t.foundation[0] != -1 || t.foundation[1] != -1) {
-			AddTurnedTileGround(pieces, foundations, frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
+			AddTurnedTileGround(ground_laying.pieces, ground_laying.foundations, frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation);
 		} else if (ground != nullptr && t.first_sprite < t.end_sprite) {
-			AddTurnedTileFromBlock(pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
+			AddTurnedTileFromBlock(ground_laying.pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
 		}
 	}
-	LayTurnedGround(frame, pieces, foundations, ground != nullptr && ground == _turned_ground.px.data() ? &_turned_ground : nullptr);
+	ground_laying.kept = ground != nullptr && ground == _turned_ground.px.data() ? &_turned_ground : nullptr;
+	LayTurnedGround(ground_laying);
 	_turned_times.drawn += static_cast<int>(ground_tiles.size());
 
 	ViewportAddVehicles(&cdpi);
@@ -5508,6 +5547,9 @@ static void ViewportDoDrawTurned()
 		standing.push_back({xr + yr + 2.0 * ps.zmin, &ps});
 	}
 	std::sort(standing.begin(), standing.end(), [](const TurnedSprite &a, const TurnedSprite &b) { return a.near < b.near; });
+	/* The ground the card was laying while all the above was collected and sorted: in the block now, before anything
+	 * is drawn over it. */
+	FinishTurnedGround(ground_laying);
 	double tb0 = TurnedNow();
 	for (const TurnedSprite &s : standing) {
 		const ParentSpriteToDraw *ps = s.ps;
@@ -5998,12 +6040,14 @@ static inline void ViewportDraw(const Viewport &vp, int left, int top, int right
 	if (top < vp.top) top = vp.top;
 	if (bottom > vp.top + vp.height) bottom = vp.top + vp.height;
 
+	const double map_started = TurnedNow();
 	ViewportDoDraw(vp,
 		ScaleByZoom(left - vp.left, vp.zoom) + vp.virtual_left,
 		ScaleByZoom(top - vp.top, vp.zoom) + vp.virtual_top,
 		ScaleByZoom(right - vp.left, vp.zoom) + vp.virtual_left,
 		ScaleByZoom(bottom - vp.top, vp.zoom) + vp.virtual_top
 	);
+	FrameDiaryMapBlock(TurnedNow() - map_started);
 }
 
 /**

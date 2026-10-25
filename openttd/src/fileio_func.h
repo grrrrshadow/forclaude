@@ -18,6 +18,7 @@ bool FioCheckFileExists(std::string_view filename, Subdirectory subdir);
 std::string FioFindFullPath(Subdirectory subdir, std::string_view filename);
 std::string FioGetDirectory(Searchpath sp, Subdirectory subdir);
 std::string FioFindDirectory(Subdirectory subdir);
+std::string FioDiaryPath(std::string_view name);
 void FioCreateDirectory(const std::string &name);
 bool FioRemove(const std::string &filename);
 

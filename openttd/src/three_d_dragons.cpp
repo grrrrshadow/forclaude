@@ -27,6 +27,7 @@
 #include "vehicle_base.h"
 
 #include <cmath>
+#include <algorithm>
 #include <functional>
 
 #include "safeguards.h"
@@ -356,8 +357,11 @@ void Update(Dragon &d, uint64_t now, bool walker, double wx, double wy)
  * The dragons of the dragon farms (the player, 23. 10.: "now and then some of the dragons fly about the farm and break
  * down the trains, the cars and the ships; once they get a studentka they do not fly"): each on its place in the yard
  * (the colleague's "mista_draku"), standing; at a farm without girls one in three of them out flying round it at a time,
- * as a dragon that flies (one with "let"), and one over each vehicle the farm broke down (DragonFarmsDay()) a while.
- * Where they are is reckoned anew for every picture from the farm and the clock: nothing kept, nothing saved.
+ * as a dragon of the farm that flies (one with "let"), and one over each vehicle the farm broke down (DragonFarmsDay())
+ * a while. Only the farm's own: the ice and the Chinese dragon crossing the map are no farm dragons (the colleague:
+ * "the Chinese and the ice one are too big for a farm"; the player, 25. 10.: over the farm "a big blue dragon and the
+ * long flying dog"). Where they are is reckoned anew for every picture from the farm and the clock: nothing kept,
+ * nothing saved.
  */
 constexpr uint64_t FARM_TURN_TICKS = 2400;  ///< a farm dragon's turn out or home, about a minute
 constexpr double FARM_CIRCLE_TILES = 3.0;   ///< the out ones fly round their farm about so far from its middle
@@ -384,12 +388,13 @@ struct FarmDragon {
 	bool flying = false;
 };
 
-/** The k-th of the dragons that fly ("let"), the farm dragons out; nullptr none. */
-const ThreeDCreature *Flyer(size_t k)
+/** The k-th of a farm's own dragons (its places') that fly ("let"): out for one of them that cannot; nullptr none. */
+const ThreeDCreature *FarmFlyer(const ThreeDObject &obj, size_t k)
 {
 	std::vector<const ThreeDCreature *> flyers;
-	for (const ThreeDCreature &c : GetThreeDCreatures()) {
-		if (c.Has("let")) flyers.push_back(&c);
+	for (const ThreeDObjectFigure &p : obj.dragon_places) {
+		const ThreeDCreature *c = Creature(p.figure);
+		if (c != nullptr && c->Has("let") && std::find(flyers.begin(), flyers.end(), c) == flyers.end()) flyers.push_back(c);
 	}
 	return flyers.empty() ? nullptr : flyers[k % flyers.size()];
 }
@@ -421,7 +426,7 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 			const bool out = !calm && (now / FARM_TURN_TICKS + k * 2 + id.base()) % 3 == 0;
 			/* Out: the dragon of the place itself when it flies (the colleague's brown and black, 24. 10.), else one that does. */
 			const ThreeDCreature *own = Creature(p.figure);
-			const ThreeDCreature *flyer = out ? (own != nullptr && own->Has("let") ? own : Flyer(k + id.base())) : nullptr;
+			const ThreeDCreature *flyer = out ? (own != nullptr && own->Has("let") ? own : FarmFlyer(*obj, k + id.base())) : nullptr;
 			FarmDragon d;
 			if (flyer == nullptr) {
 				const ThreeDCreature *c = Creature(p.figure);
@@ -446,11 +451,13 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 			each(d);
 		}
 	}
-	/* Over each vehicle a farm broke down, a while: a flyer circling low over it. */
+	/* Over each vehicle a farm broke down, a while: a flyer of that farm circling low over it. */
 	for (const DragonAttack &a : _attacks) {
 		if (now - a.at > ATTACK_TICKS) continue;
 		const Vehicle *v = Vehicle::GetIfValid(a.vehicle);
-		const ThreeDCreature *flyer = Flyer(a.vehicle);
+		const Industry *i = Industry::GetIfValid(IndustryID{a.farm});
+		const ThreeDObject *obj = i != nullptr ? GetThreeDIndustryObjectOf(i) : nullptr;
+		const ThreeDCreature *flyer = obj != nullptr ? FarmFlyer(*obj, a.vehicle) : nullptr;
 		if (v == nullptr || flyer == nullptr) continue;
 		const double t = static_cast<double>(now - a.at) / 120.0 * M_PI;
 		FarmDragon d;

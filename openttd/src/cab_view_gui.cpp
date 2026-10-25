@@ -268,7 +268,7 @@ static void CabStandingRecord(const Vehicle *v, const CabArrows &arrows, Directi
 	static int lines = 0;
 	if (lines >= CAB_STILL_LINES) return;
 	if (!file.has_value()) {
-		file = FileHandle::Open(_personal_dir + "jizda.log", "w");
+		file = FileHandle::Open(FioDiaryPath("jizda.log"), "w");
 		if (!file.has_value()) {
 			lines = CAB_STILL_LINES;
 			return;

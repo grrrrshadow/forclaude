@@ -62,6 +62,15 @@ struct Times {
 };
 
 Times _game_ticks;    ///< the game's ticks (its own thread)
+/* The parts of "okna" (the player's #299 log: from the eyes, "okna" was ~220 ms a frame while the eyes' own work was
+ * a tenth of that -- where the rest goes was not written anywhere): the windows' clocks (the walker's step in them),
+ * the dirty pieces of the screen drawn, of that the map's blocks, the canvas of the view from the eyes, and in the
+ * map's blocks the wait for the card laying the ground. */
+Times _windows_timers; ///< the windows' clocks (TimerWindow, the realtime ticks)
+Times _windows_blocks; ///< the dirty pieces of the screen drawn (DrawDirtyBlocks())
+Times _map_blocks;     ///< of them, the map's blocks (ViewportDoDraw())
+Times _eye_window;     ///< and the canvas of the view from the eyes (its window's DrawWidget)
+Times _ground_waits;   ///< waits for the card laying the ground of the turned map (FinishTurnedGround())
 Times _eye_collected; ///< the view from the eyes collected (the main thread)
 Times _eye_drawn;     ///< and drawn (its thread)
 Times _eye_prepared;  ///< of that on the card: its steps and triangles made ready by the processor
@@ -90,13 +99,15 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const double secs = std::chrono::duration<double>(now - _since).count();
 	if (_lines >= DIARY_LINES || secs <= 0) return;
 	if (!_diary.has_value()) {
-		_diary = FileHandle::Open(_personal_dir + "snimky.log", "w");
+		_diary = FileHandle::Open(FioDiaryPath("snimky.log"), "w");
 		if (!_diary.has_value()) {
 			_lines = DIARY_LINES;
 			return;
 		}
 		fmt::print(*_diary, "OpenTTD Decouple: denik snimku (kazdych 5 s). snimky/s = jak casto hra kresli a cte klavesy; nejdelsi snimek a z ceho byl:"
 				" buffer = cekani na obrazovku, zamek = cekani na tik hry, klavesy, okna = okna a jejich kresleni (i sber pohledu z oci), obraz = predani obrazu karte;"
+				" rozpad okna: hodiny = hodiny oken (i krok chodce z oci se sberem), bloky = spinave kusy obrazovky kreslene, mapa = bloky herni plochy,"
+				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy;"
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta.\n");
@@ -107,9 +118,10 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
+			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(),
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
 			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB());
 	fflush(*_diary);
@@ -182,6 +194,36 @@ void FrameDiaryDraw(const FrameDiaryParts &parts)
 void FrameDiaryGameTick(double ms)
 {
 	_game_ticks.Add(ms);
+}
+
+/** The windows' clocks run (TimerWindow and the realtime ticks; the main thread), milliseconds. */
+void FrameDiaryWindowsTimers(double ms)
+{
+	_windows_timers.Add(ms);
+}
+
+/** The dirty pieces of the screen drawn (DrawDirtyBlocks(); the main thread), milliseconds. */
+void FrameDiaryWindowsBlocks(double ms)
+{
+	_windows_blocks.Add(ms);
+}
+
+/** A block of the map drawn (ViewportDoDraw(); the main thread), milliseconds. */
+void FrameDiaryMapBlock(double ms)
+{
+	_map_blocks.Add(ms);
+}
+
+/** The canvas of the view from the eyes drawn into its window (the main thread), milliseconds. */
+void FrameDiaryEyeWindow(double ms)
+{
+	_eye_window.Add(ms);
+}
+
+/** A wait for the card laying the ground of a block of the turned map (the main thread), milliseconds. */
+void FrameDiaryGroundWait(double ms)
+{
+	_ground_waits.Add(ms);
 }
 
 /** The view from the eyes collected (the main thread), milliseconds. */

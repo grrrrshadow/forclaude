@@ -67,7 +67,7 @@ static constexpr std::string_view SHARE_OFF = "sdileni s ovladacem videa vypnuto
 
 static std::string DiaryPath(bool last)
 {
-	return _personal_dir + (last ? "3d_karta_minule.log" : "3d_karta.log");
+	return FioDiaryPath(last ? "3d_karta_minule.log" : "3d_karta.log");
 }
 
 /** A line of the diary: kept, or the line of the moment, written over by the next. */
@@ -3961,6 +3961,49 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
 	return job.ok;
+}
+
+/** The one ground job given without waiting (ThreeDGpuDrawGroundStart()), until it is taken; the main thread's only. */
+static std::unique_ptr<GpuJob> _ground_job;
+
+/**
+ * Give the card the ground of a block of the turned map without waiting: the asker collects and sorts the block's
+ * objects meanwhile, and takes the laid ground with ThreeDGpuDrawGroundTake() before anything writes into the block
+ * (GPU point 3 without the stall; the player's #299: the ground held the main thread 100 and more ms a redraw). One
+ * such job at a time; the ground's pieces, its textures and the block's pixels must stand until the take.
+ * @return false: no card (nothing given): the processor lays it now
+ */
+bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground)
+{
+	assert(_ground_job == nullptr);
+	if (!ThreeDGpuAvailable()) return false;
+	auto job = std::make_unique<GpuJob>();
+	job->ground = &ground;
+	{
+		std::lock_guard lock(_gpu_mutex);
+		if (_gpu_state != GpuState::Ready) return false;
+		QueueGpuJob(*job);
+	}
+	_gpu_wake.notify_one();
+	_ground_job = std::move(job);
+	return true;
+}
+
+/**
+ * Wait for the ground given with ThreeDGpuDrawGroundStart() and let go of it.
+ * @return whether the card laid it; false (it could not), the processor lays it
+ */
+bool ThreeDGpuDrawGroundTake()
+{
+	if (_ground_job == nullptr) return false;
+	bool ok;
+	{
+		std::unique_lock lock(_gpu_mutex);
+		_gpu_done.wait(lock, [] { return _ground_job->done; });
+		ok = _ground_job->ok;
+	}
+	_ground_job.reset();
+	return ok;
 }
 
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics)

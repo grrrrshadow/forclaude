@@ -209,6 +209,18 @@ std::string FioGetDirectory(Searchpath sp, Subdirectory subdir)
 	return fmt::format("{}{}", _searchpaths[sp], _subdirs[subdir]);
 }
 
+/**
+ * Where one of the game's own diaries goes (snimky.log, 3d_karta.log, 3d_domy.log, texty.log, jizda.log): the save
+ * folder, beside the saved games and the crash files (CrashLog::CreateFileName(); the player, 25. 10.: "the logs in
+ * one place: saves -- I am not climbing into the Windows madhouse").
+ * @param name the diary's file name
+ * @return the full path to open it at
+ */
+std::string FioDiaryPath(std::string_view name)
+{
+	return FioFindDirectory(Subdirectory::Save) + std::string{name};
+}
+
 std::string FioFindDirectory(Subdirectory subdir)
 {
 	/* Find and return the first valid directory */

@@ -52,6 +52,7 @@
 #include "vehicle_base.h"
 #include "cab_drive.h"
 #include "sound_func.h"
+#include "frame_diary.h"
 #include "video/video_driver.hpp"
 
 #include "table/strings.h"
@@ -72,13 +73,15 @@ static constexpr double FIRST_PERSON_RUN_MS = 8.5;
 /** How fast it turns on the arrows, radians a second. */
 static constexpr double FIRST_PERSON_TURN = 2.0;
 /**
- * The turn on the arrows starts at this share of that and reaches the whole of it as the arrow stays held
- * (FIRST_PERSON_TURN_RAMP_S): a tap turns a degree or two to aim by, held it still turns fast. At the one speed, a
- * tap was the whole 115 degrees a second for however long a frame took -- on a slow machine a frame is long, and the
- * player saw his view leap (25. 10.: "turning by the arrow is still in big jumps").
+ * The turn on the arrows starts at this share of that, stays there a beat (FIRST_PERSON_TURN_SLOW_S) and runs up to
+ * the whole of it as the arrow stays held (FIRST_PERSON_TURN_RAMP_S): a tap turns a degree or two to aim by, held it
+ * still turns fast. At the one speed, a tap was the whole 115 degrees a second for however long a frame took -- on a
+ * slow machine a frame is long, and the player saw his view leap (25. 10. on the run-up from 0.3: "the arrows still
+ * turn me a big piece, I cannot turn where I want" -- so the first beat about a tenth, 10 degrees a second).
  */
-static constexpr double FIRST_PERSON_TURN_FIRST = 0.3;
-static constexpr double FIRST_PERSON_TURN_RAMP_S = 0.8;
+static constexpr double FIRST_PERSON_TURN_FIRST = 0.09;
+static constexpr double FIRST_PERSON_TURN_SLOW_S = 0.35;
+static constexpr double FIRST_PERSON_TURN_RAMP_S = 1.1;
 /** How far it looks up or down at most, radians. */
 static constexpr double FIRST_PERSON_PITCH_MAX = 1.0;
 /** How much a pixel of the mouse turns it, radians. */
@@ -750,8 +753,9 @@ struct FirstPersonWindow : Window {
 			this->turn_held = 0;
 		}
 		if (arrows.None() && wasd.None() && this->walk_on == 0) return;
-		/* The turn runs up from gentle to full as the arrow stays held (FIRST_PERSON_TURN_FIRST). */
-		const double turn = FIRST_PERSON_TURN * (FIRST_PERSON_TURN_FIRST + (1.0 - FIRST_PERSON_TURN_FIRST) * this->turn_held / FIRST_PERSON_TURN_RAMP_S);
+		/* The turn holds gentle for a beat, then runs up to full as the arrow stays held (FIRST_PERSON_TURN_FIRST). */
+		const double run_up = std::clamp((this->turn_held - FIRST_PERSON_TURN_SLOW_S) / (FIRST_PERSON_TURN_RAMP_S - FIRST_PERSON_TURN_SLOW_S), 0.0, 1.0);
+		const double turn = FIRST_PERSON_TURN * (FIRST_PERSON_TURN_FIRST + (1.0 - FIRST_PERSON_TURN_FIRST) * run_up);
 		if (arrows.Test(DirectionKey::Left)) this->walker.heading += turn * dt;
 		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= turn * dt;
 		this->walker.heading = std::remainder(this->walker.heading, 2 * M_PI);
@@ -1229,6 +1233,12 @@ struct FirstPersonWindow : Window {
 
 	EventState OnKeyPress(char32_t key, uint16_t keycode) override
 	{
+		/* Esc leaves the view (the player, 25. 10.: the cursor is slow on his phone -- "when I want out of the first
+		 * person view, it is not easy to hit" -- so a way out without the mouse). */
+		if ((keycode & ~WKC_SPECIAL_KEYS) == WKC_ESC) {
+			this->Close();
+			return EventState::Handled;
+		}
 		/* The walking keys are the walker's, not the toolbar's (they are read as held, Walk()). */
 		switch (keycode & ~WKC_SPECIAL_KEYS) {
 			case 'W': case 'A': case 'S': case 'D':
@@ -1342,6 +1352,11 @@ struct FirstPersonWindow : Window {
 	{
 		switch (widget) {
 			case WID_FP_CANVAS: {
+				/* How long the canvas takes to draw into the window, for the diary of the frames (frame_diary.h). */
+				struct EyeWindowTimer {
+					std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+					~EyeWindowTimer() { FrameDiaryEyeWindow(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - this->start).count()); }
+				} eye_window_timer;
 				int w = r.Width(), h = r.Height();
 				if (w <= 0 || h <= 0) return;
 				/* Made by the step; anew here only when the window changed its size since. */

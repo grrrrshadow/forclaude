@@ -39,14 +39,18 @@ constexpr uint64_t NEXT_TICKS = 450;      ///< one more comes after so long (abo
 constexpr double FLY_M = 16.0;            ///< how high over the ground they fly, metres (her torch reaching the ground: the colleague's shine 23 degrees down)
 constexpr double OVER_ROOF_M = 8.0;       ///< and at least so high over a roof
 constexpr double ROOF_GUESS_M = 30.0;     ///< a house's roof whose height is not known yet (its .glb not read)
-constexpr double TURN = 0.8 * M_PI / 180; ///< how far a witch turns in a tick, radians
+/** How far a witch turns in a tick, radians: a quick turn where she heads next, then straight on (the player, 25. 10.:
+ * "turn she must, but not so often, ever another way" -- a slow turn swept facing after facing, a picture of each). */
+constexpr double TURN = 3.0 * M_PI / 180;
 constexpr double CLIMB_M = 0.4;           ///< how far she rises or sinks in a tick, metres
 constexpr double FALLBACK_STEP_M = 0.12;  ///< metres a tick of her true size, when her animation does not say ("krok_m")
 constexpr double APPROACH_TILES = 14.0;   ///< how far from a town she comes from
 constexpr uint WALKER_TOWN_TILES = 40;    ///< the walker's town, this near it (Manhattan): most come to it
 constexpr float FACING_STEP = 10.0f;      ///< her pictures every so many degrees she turns (each made on the thread)
-/** The girls at a stop are drawn twice their size on the map, as they are from the eyes: a witch "as big as them" so. */
-constexpr float EYE_OF_MAP = 0.5f;
+/** From the eyes she is drawn well over life size, as the dragons read big there by being big (the player, 25. 10.:
+ * "I see only the little light... let them be bigger in the distance as the dragons are"); her lights and her body
+ * for the shots grow with her. */
+constexpr float EYE_OF_MAP = 2.0f;
 
 struct Witch {
 	std::string kind;      ///< the witch of the indices
@@ -275,7 +279,7 @@ void MarkDirty(const Witch &w, const ThreeDWitch &c)
 	MarkAllViewportsDirty(left - 2 * ZOOM_BASE, top - 2 * ZOOM_BASE, right + 2 * ZOOM_BASE, bottom + 2 * ZOOM_BASE);
 }
 
-/** A tick of her flight: turning towards where she flies, on as fast as her animation, over the roofs. */
+/** A tick of her flight: a quick turn where she flies, then straight on as fast as her animation, over the roofs. */
 void Update(Witch &w, const ThreeDWitch &c, uint64_t now)
 {
 	if (w.falling) {
@@ -458,6 +462,14 @@ bool SendThreeDWitch(std::string_view kind, double x, double y, double heading)
 	if (w.town == TownID::Invalid()) {
 		w.tx = x + std::cos(heading) * APPROACH_TILES * TILE_SIZE;
 		w.ty = y + std::sin(heading) * APPROACH_TILES * TILE_SIZE;
+		w.to_town = false;
+	}
+	/* The walker out and near her town: her first leg goes right over it (the player, 25. 10.: "they fly too far,
+	 * I see only the little light; a witch should pass close enough to be seen"). */
+	double wwx = 0, wwy = 0;
+	if (w.town != TownID::Invalid() && FirstPersonWalkerAt(wwx, wwy) && std::hypot(wwx - w.tx, wwy - w.ty) < WALKER_TOWN_TILES * TILE_SIZE) {
+		w.tx = std::clamp(wwx + (static_cast<double>(InteractiveRandomRange(5)) - 2.0) * TILE_SIZE / 2.0, 2.0 * TILE_SIZE, (Map::SizeX() - 2.0) * TILE_SIZE);
+		w.ty = std::clamp(wwy + (static_cast<double>(InteractiveRandomRange(5)) - 2.0) * TILE_SIZE / 2.0, 2.0 * TILE_SIZE, (Map::SizeY() - 2.0) * TILE_SIZE);
 		w.to_town = false;
 	}
 	w.lift = std::max(FLY_M, (RoofAt(x, y) - FirstPersonGroundZ(x, y)) / OBJECT_HEIGHT_PER_METRE + OVER_ROOF_M);

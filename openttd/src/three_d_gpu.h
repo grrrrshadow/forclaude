@@ -348,6 +348,8 @@ void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics);
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
+bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
+bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);

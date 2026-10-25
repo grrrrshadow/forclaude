@@ -389,7 +389,7 @@ static void NoteInvalidString(StringID string)
 	for (StringID s : _strings_formatting) path += fmt::format(" 0x{:X}", s);
 	const TimerGameCalendar::YearMonthDay ymd = TimerGameCalendar::ConvertDateToYMD(TimerGameCalendar::date);
 	const std::string line = fmt::format("neplatny text 0x{:X}, den {}-{:02}-{:02}, v textech{}", string, ymd.year.base(), ymd.month + 1, ymd.day, path);
-	if (!diary.has_value()) diary = FileHandle::Open(_personal_dir + "texty.log", "w");
+	if (!diary.has_value()) diary = FileHandle::Open(FioDiaryPath("texty.log"), "w");
 	if (diary.has_value()) {
 		fmt::print(*diary, "{}\n", line);
 		fflush(*diary);

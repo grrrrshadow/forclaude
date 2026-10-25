@@ -129,7 +129,7 @@ static std::set<uint32_t> _boxed_house_sets; ///< the sets whose houses were tol
 static void ReadDiary(std::string_view line, bool problem)
 {
 	std::lock_guard lock(_read_diary_mutex);
-	if (!_read_diary.has_value()) _read_diary = FileHandle::Open(_personal_dir + "3d_domy.log", "w");
+	if (!_read_diary.has_value()) _read_diary = FileHandle::Open(FioDiaryPath("3d_domy.log"), "w");
 	if (_read_diary.has_value()) {
 		std::string text(line);
 		text += '\n';
