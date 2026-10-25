@@ -1501,6 +1501,11 @@ STR_CONFIG_SETTING_CONSTRUCTION_SPEED_HELPTEXT                  :Omezení výsta
 STR_CONFIG_SETTING_VEHICLE_BREAKDOWNS                           :Poruchy vozidel: {STRING}
 STR_CONFIG_SETTING_VEHICLE_BREAKDOWNS_HELPTEXT                  :Určuje jak často se může špatně udržované vozidlo porouchat. Vlaky se nejčastěji porouchají na nádraží a do 10 políček kolem něj, na volné trati málokdy
 
+STR_CONFIG_SETTING_DRAGON_BREAKDOWNS                            :Draci způsobují poruchy: {STRING}
+STR_CONFIG_SETTING_DRAGON_BREAKDOWNS_HELPTEXT                   :Dračí farmy čas od času rozbijí vlak, auto nebo loď poblíž farmy; se studentkami draci poruchy nedělají.
+STR_CONFIG_SETTING_DRAGON_REACH_TILES                           :Dosah draků z dračí farmy: {STRING}
+STR_CONFIG_SETTING_DRAGON_REACH_TILES_HELPTEXT                  :Jak daleko od dračí farmy (v dlaždicích) draci rozbíjejí vozidla.
+
 STR_CONFIG_SETTING_SUBSIDY_MULTIPLIER                           :Výše dotací: {STRING}
 STR_CONFIG_SETTING_SUBSIDY_MULTIPLIER_HELPTEXT                  :Nastavuje jak moc jsou dotovaná spojení dotována
 

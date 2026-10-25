@@ -1027,6 +1027,8 @@ SettingsContainer &GetSettingsTree()
 			disasters->Add(new SettingEntry("difficulty.economy"));
 			disasters->Add(new SettingEntry("vehicle.plane_crashes"));
 			disasters->Add(new SettingEntry("difficulty.vehicle_breakdowns"));
+			disasters->Add(new SettingEntry("difficulty.dragon_breakdowns"));
+			disasters->Add(new SettingEntry("difficulty.dragon_reach_tiles"));
 			disasters->Add(new SettingEntry("vehicle.rescue_wait_days"));
 			disasters->Add(new SettingEntry("order.no_servicing_if_no_breakdowns"));
 			disasters->Add(new SettingEntry("order.serviceathelipad"));

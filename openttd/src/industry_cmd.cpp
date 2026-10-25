@@ -955,9 +955,8 @@ static const int GIRLS_DAYS = 30;
 /** The heaps of hay a dragon farm shows as the hay comes (the colleague's seno_00 to seno_07), and the days each lasts. */
 static const uint DRAGON_HAY_HEAPS = 8;
 static const int32_t DRAGON_HAY_DAYS = 4;
-/** At a dragon farm without girls, one day in so many its dragons break down a vehicle within so many tiles. */
+/** At a dragon farm without girls, one day in so many its dragons break down a vehicle (within difficulty.dragon_reach_tiles). */
 static const uint DRAGON_BREAKDOWN_ONE_IN = 6;
-static const uint DRAGON_REACH_TILES = 12;
 
 static bool DeliveredLately(const Industry *ind, CargoLabel label);
 
@@ -1153,20 +1152,23 @@ uint DragonFarmHay(const Industry *ind)
  * A day at the dragon farms (the player, 23. 10.: "now and then some of the dragons fly about the farm and break down
  * the trains, the cars and the ships; once they get a studentka they do not fly and break nothing"): at a farm without
  * girls, one day in DRAGON_BREAKDOWN_ONE_IN a vehicle near it breaks down -- a train, a road vehicle or a ship going
- * about within DRAGON_REACH_TILES, one not broken down already. Its hay, fewer heaps by the days, drawn afresh.
+ * about within difficulty.dragon_reach_tiles, one not broken down already. Its hay, fewer heaps by the days, drawn
+ * afresh. With difficulty.dragon_breakdowns off (the player, 25. 10.) the dragons break nothing down at all; the hay
+ * is still drawn, as it has nothing to do with the dragons' mischief.
  */
 static void DragonFarmsDay()
 {
 	for (IndustryID id : Industry::industries[IT_DRAGON_FARM]) {
 		Industry *i = Industry::Get(id);
 		MarkGameOwnIndustryDirty(i);
+		if (!_settings_game.difficulty.dragon_breakdowns) continue;
 		if (HasGirls(i) || !Chance16(1, DRAGON_BREAKDOWN_ONE_IN)) continue;
 		const TileIndex middle = TileAddXY(i->location.tile, 1, 1);
 		std::vector<Vehicle *> near;
 		for (Vehicle *v : Vehicle::Iterate()) {
 			if (!v->IsPrimaryVehicle() || (v->type != VehicleType::Train && v->type != VehicleType::Road && v->type != VehicleType::Ship)) continue;
 			if (v->vehstatus.Any({VehState::Hidden, VehState::Crashed, VehState::Stopped}) || v->breakdown_ctr != 0 || v->IsInDepot()) continue;
-			if (DistanceManhattan(v->tile, middle) > DRAGON_REACH_TILES) continue;
+			if (DistanceManhattan(v->tile, middle) > _settings_game.difficulty.dragon_reach_tiles) continue;
 			near.push_back(v);
 		}
 		if (near.empty()) continue;

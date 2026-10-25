@@ -155,6 +155,8 @@ struct DifficultySettings {
 	uint8_t vehicle_costs; ///< amount of money spent on vehicle running cost
 	uint8_t competitor_speed; ///< the speed at which the AI builds
 	VehicleBreakdowns vehicle_breakdowns; ///< likelihood of vehicles breaking down
+	bool dragon_breakdowns; ///< whether the dragons of a dragon farm break vehicles down at all (DragonFarmsDay())
+	uint8_t dragon_reach_tiles; ///< how far from a dragon farm, in tiles, its dragons break vehicles down
 	uint8_t subsidy_multiplier; ///< payment multiplier for subsidized deliveries
 	uint16_t subsidy_duration; ///< duration of subsidies
 	uint8_t construction_cost; ///< how expensive is building

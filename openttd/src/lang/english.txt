@@ -1393,6 +1393,11 @@ STR_CONFIG_SETTING_CONSTRUCTION_SPEED_HELPTEXT                  :Limit the amoun
 STR_CONFIG_SETTING_VEHICLE_BREAKDOWNS                           :Vehicle breakdowns: {STRING2}
 STR_CONFIG_SETTING_VEHICLE_BREAKDOWNS_HELPTEXT                  :Control how often inadequately serviced vehicles may break down. Trains break down most often at a station and within 10 tiles of it, seldom out on the open line
 
+STR_CONFIG_SETTING_DRAGON_BREAKDOWNS                            :Dragons cause breakdowns: {STRING2}
+STR_CONFIG_SETTING_DRAGON_BREAKDOWNS_HELPTEXT                   :Now and then the dragons of a dragon farm break down a train, a road vehicle or a ship near the farm; with girls (studentky) about, the dragons cause no breakdowns. Off, dragon farms never break vehicles down
+STR_CONFIG_SETTING_DRAGON_REACH_TILES                           :Reach of a dragon farm's dragons: {STRING2}
+STR_CONFIG_SETTING_DRAGON_REACH_TILES_HELPTEXT                  :How far from a dragon farm, in tiles, its dragons break vehicles down
+
 STR_CONFIG_SETTING_SUBSIDY_MULTIPLIER                           :Subsidy multiplier: {STRING2}
 STR_CONFIG_SETTING_SUBSIDY_MULTIPLIER_HELPTEXT                  :Set how much is paid for subsidised connections
 
