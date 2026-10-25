@@ -2247,9 +2247,12 @@ struct TurnedGround {
 };
 static TurnedGround _turned_ground;
 static uint64_t _turned_ground_generations = 0;
+/** Counts the changes of the ground of the turned view: of the kept picture, of the tiles with a foundation (TurnedGroundOfView). */
+static uint64_t _turned_ground_version = 0;
 
 void TurnedGround::ChangedForCard(const GroundRect &r)
 {
+	if (!r.Within(this->at).Empty()) _turned_ground_version++;
 	if (this->card_whole || r.Within(this->at).Empty()) return;
 	if (this->card_changed.size() >= 1024) {
 		this->generation = ++_turned_ground_generations;
@@ -2274,6 +2277,7 @@ static struct {
 	int placed = 0;        ///< times placed anew
 	int card_blocks = 0;   ///< blocks whose ground the card laid
 	int processor_blocks = 0; ///< and the processor
+	int view_blocks = 0;   ///< blocks that took it from what the view kept (TurnedGroundOfView)
 	size_t checked = 0;    ///< pixels laid by both (_turned_ground_check)
 	size_t differ = 0;     ///< of them, those that differ
 } _turned_ground_times;
@@ -2287,6 +2291,7 @@ static inline uint32_t TurnedGroundTileKey(int x, int y)
 void ResetTurnedGround()
 {
 	_turned_ground = TurnedGround();
+	_turned_ground_version++;
 	extern void ForgetTurnedFoundations();
 	ForgetTurnedFoundations();
 }
@@ -2303,10 +2308,29 @@ std::string DescribeTurnedGround()
 /** Rig: what the kept picture of the ground drew again since the last report, and start over (TurnedTimingsPrint()). */
 void TurnedGroundTimingsPrint()
 {
-	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x; polozila karta {}, procesor {}{}", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
+	IConsolePrint(CC_DEFAULT, "test3d: {}; znovu dlazdic {} (z toho jinak {}), obdelniku {}, px {}, polozena {}x; polozila karta {}, procesor {}, z pohledu {}{}", DescribeTurnedGround(), _turned_ground_times.tiles_changed,
 			_turned_ground_times.tiles_replaced, _turned_ground_times.rects, _turned_ground_times.pixels, _turned_ground_times.placed, _turned_ground_times.card_blocks,
-			_turned_ground_times.processor_blocks, _turned_ground_times.checked > 0 ? fmt::format(", kontrola {} px, jinak {}", _turned_ground_times.checked, _turned_ground_times.differ) : std::string());
+			_turned_ground_times.processor_blocks, _turned_ground_times.view_blocks, _turned_ground_times.checked > 0 ? fmt::format(", kontrola {} px, jinak {}", _turned_ground_times.checked, _turned_ground_times.differ) : std::string());
 	_turned_ground_times = {};
+}
+
+/**
+ * For the diary of the frames (snimky.log): where the drawing of the turned map went since the last line (of the map
+ * facing north its 3D objects only), milliseconds a frame, and how many blocks took their ground from what the view
+ * kept; started over. The player's log of 25. 10.
+ * had a whole redraw of the turned map at two seconds on the phone, and no word of what in it.
+ * @param frames the frames drawn since the last line
+ */
+std::string TakeTurnedTimesForDiary(int frames)
+{
+	TurnedTimes &t = _turned_times;
+	const double n = std::max(1, frames);
+	const int blocks = _turned_ground_times.card_blocks + _turned_ground_times.processor_blocks + _turned_ground_times.view_blocks;
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f}, modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku",
+			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.models / n, _turned_ground_times.view_blocks, blocks);
+	t = TurnedTimes();
+	_turned_ground_times = {};
+	return s;
 }
 
 /** Call \a f with the index of each cell of the kept ground the pixels \a r reach into. */
@@ -2346,6 +2370,7 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 	n.zoom = zoom;
 	n.at = at;
 	n.generation = ++_turned_ground_generations;
+	_turned_ground_version++;
 	n.px.assign(at.Pixels(), 0);
 	n.cw = (at.r - at.l + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
 	n.ch = (at.b - at.t + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
@@ -2659,6 +2684,14 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 			key.Sprite(cs.image, cs.pal, cs.x, cs.y, cs.sub);
 			key.Mix(cs.relative);
 		}
+	}
+	/* Another picture of the tile's ground than it had: what the view kept of the ground is old (TurnedGroundOfView). */
+	static std::unordered_map<uint32_t, uint64_t> foundation_of_tile;
+	if (foundation_of_tile.size() > 100000) foundation_of_tile.clear();
+	auto [had, first_time] = foundation_of_tile.try_emplace(static_cast<uint32_t>(x0 / TILE_SIZE) | static_cast<uint32_t>(y0 / TILE_SIZE) << 16, key.key);
+	if (first_time || had->second != key.key) {
+		had->second = key.key;
+		_turned_ground_version++;
 	}
 	auto [kept, made] = _turned_foundations.try_emplace(key.key);
 	TurnedFoundationTexture &ft = kept->second;
@@ -4967,6 +5000,7 @@ void ForgetTurnedFoundations()
 {
 	_turned_foundations.clear();
 	_turned_foundation_pixels = 0;
+	_turned_ground_version++;
 }
 
 /**
@@ -5088,6 +5122,107 @@ static void FinishTurnedGround(TurnedGroundLaying &lay)
 	}
 	(laid ? _turned_ground_times.card_blocks : _turned_ground_times.processor_blocks)++;
 	_turned_times.warp += TurnedNow() - t0;
+}
+
+/**
+ * The ground of the turned view as the card (or the processor) laid it, kept in the view's pixels while the view stands
+ * as it is: a block drawn again where none of the ground changed -- a vehicle went by, a ghost flew over, the title
+ * screen's dusk darkened the map -- takes its ground from here instead of having it laid again (the player's log,
+ * 25. 10.: on the phone each block of the map waited 7 to 16 ms for the card to lay the same ground again, with two
+ * cars and a ghost about ten blocks a frame: 4 frames a second). Turned, zoomed, the ground changed: forgotten.
+ */
+struct TurnedGroundOfView {
+	float yaw = 0;
+	double pivot_x = 0, pivot_y = 0;
+	ZoomLevel zoom = ZoomLevel::Normal;
+	uint64_t version = 0;          ///< _turned_ground_version it was laid at
+	int l = 0, t = 0, w = 0, h = 0; ///< its pixels (unscaled virtual coordinates): the view's
+	std::vector<uint32_t> px;
+	std::vector<uint8_t> have;     ///< each pixel: laid
+};
+static TurnedGroundOfView _turned_view_ground;
+static const Viewport *_turned_vp = nullptr; ///< the viewport whose block is being drawn turned (ViewportDoDraw())
+bool _turned_view_ground_on = true; ///< Rig: the ground of the view kept (test3d zem pohled); else laid again for each block
+
+/** Whether the kept ground of the view is of the view as it is now. */
+static bool TurnedGroundOfViewFits(const TurnedGroundOfView &g, ZoomLevel zoom)
+{
+	double c, s, px, py;
+	GetViewTurn(c, s, px, py);
+	return !g.px.empty() && g.yaw == GetViewYaw() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom && g.version == _turned_ground_version;
+}
+
+/**
+ * The ground of a block from what the view kept of it, when it has all of it.
+ * @param frame the block, its pixels at frame.dst_ptr
+ * @return whether it was there and is in the block now
+ */
+static bool TakeTurnedGroundOfView(const DrawPixelInfo &frame)
+{
+	TurnedGroundOfView &g = _turned_view_ground;
+	if (!_turned_view_ground_on || _turned_ground_check || !TurnedGroundOfViewFits(g, frame.zoom)) return false;
+	const int vs = ScaleByZoom(1, frame.zoom);
+	const int bl = frame.left / vs - g.l, bt = frame.top / vs - g.t;
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	if (bl < 0 || bt < 0 || bl + fw > g.w || bt + fh > g.h) return false;
+	for (int y = 0; y < fh; y++) {
+		const uint8_t *have = &g.have[static_cast<size_t>(bt + y) * g.w + bl];
+		if (std::find(have, have + fw, 0) != have + fw) return false;
+	}
+	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
+	for (int y = 0; y < fh; y++) std::copy_n(&g.px[static_cast<size_t>(bt + y) * g.w + bl], fw, dst + static_cast<size_t>(y) * frame.pitch);
+	return true;
+}
+
+/**
+ * Keep the ground just laid in a block for the next blocks drawn while the view stands (TakeTurnedGroundOfView()):
+ * over the view's pixels; the view moved on, what it had where the two meet stays.
+ */
+static void KeepTurnedGroundOfView(const DrawPixelInfo &frame)
+{
+	if (!_turned_view_ground_on || _turned_ground_check || _turned_vp == nullptr) return;
+	TurnedGroundOfView &g = _turned_view_ground;
+	const Viewport &vp = *_turned_vp;
+	const int vs = ScaleByZoom(1, frame.zoom), mask = ScaleByZoom(-1, frame.zoom);
+	const int vl = (vp.virtual_left & mask) / vs, vt = (vp.virtual_top & mask) / vs;
+	if (!TurnedGroundOfViewFits(g, frame.zoom)) {
+		double c, s;
+		GetViewTurn(c, s, g.pivot_x, g.pivot_y);
+		g.yaw = GetViewYaw();
+		g.zoom = frame.zoom;
+		g.version = _turned_ground_version;
+		g.l = vl;
+		g.t = vt;
+		g.w = vp.width;
+		g.h = vp.height;
+		g.px.assign(static_cast<size_t>(g.w) * g.h, 0);
+		g.have.assign(g.px.size(), 0);
+	} else if (g.l != vl || g.t != vt || g.w != vp.width || g.h != vp.height) {
+		/* The view moved (or changed its size): what both have stays, the rest is not laid. */
+		std::vector<uint32_t> px(static_cast<size_t>(vp.width) * vp.height, 0);
+		std::vector<uint8_t> have(px.size(), 0);
+		const int x0 = std::max(g.l, vl), x1 = std::min(g.l + g.w, vl + vp.width);
+		for (int y = std::max(g.t, vt); y < std::min(g.t + g.h, vt + vp.height) && x0 < x1; y++) {
+			std::copy_n(&g.px[static_cast<size_t>(y - g.t) * g.w + (x0 - g.l)], x1 - x0, &px[static_cast<size_t>(y - vt) * vp.width + (x0 - vl)]);
+			std::copy_n(&g.have[static_cast<size_t>(y - g.t) * g.w + (x0 - g.l)], x1 - x0, &have[static_cast<size_t>(y - vt) * vp.width + (x0 - vl)]);
+		}
+		g.l = vl;
+		g.t = vt;
+		g.w = vp.width;
+		g.h = vp.height;
+		g.px = std::move(px);
+		g.have = std::move(have);
+	}
+	/* The block's pixels within the view. */
+	const int bl = frame.left / vs, bt = frame.top / vs;
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	const int x0 = std::max(bl, g.l), x1 = std::min(bl + fw, g.l + g.w);
+	if (x0 >= x1) return;
+	const uint32_t *src = static_cast<const uint32_t *>(frame.dst_ptr);
+	for (int y = std::max(bt, g.t); y < std::min(bt + fh, g.t + g.h); y++) {
+		std::copy_n(src + static_cast<size_t>(y - bt) * frame.pitch + (x0 - bl), x1 - x0, &g.px[static_cast<size_t>(y - g.t) * g.w + (x0 - g.l)]);
+		std::fill_n(&g.have[static_cast<size_t>(y - g.t) * g.w + (x0 - g.l)], x1 - x0, 1);
+	}
 }
 
 /**
@@ -5490,7 +5625,13 @@ static void ViewportDoDrawTurned()
 		}
 	}
 	ground_laying.kept = ground != nullptr && ground == _turned_ground.px.data() ? &_turned_ground : nullptr;
-	LayTurnedGround(ground_laying);
+	/* The view kept the ground of the block as it is: no laying (TurnedGroundOfView). */
+	const bool ground_of_view = ground_laying.kept != nullptr && TakeTurnedGroundOfView(frame);
+	if (ground_of_view) {
+		_turned_ground_times.view_blocks++;
+	} else {
+		LayTurnedGround(ground_laying);
+	}
 	_turned_times.drawn += static_cast<int>(ground_tiles.size());
 
 	ViewportAddVehicles(&cdpi);
@@ -5550,6 +5691,7 @@ static void ViewportDoDrawTurned()
 	/* The ground the card was laying while all the above was collected and sorted: in the block now, before anything
 	 * is drawn over it. */
 	FinishTurnedGround(ground_laying);
+	if (!ground_of_view && ground_laying.kept != nullptr) KeepTurnedGroundOfView(frame);
 	double tb0 = TurnedNow();
 	for (const TurnedSprite &s : standing) {
 		const ParentSpriteToDraw *ps = s.ps;
@@ -5961,6 +6103,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 
 	if (IsViewportTurned(vp)) {
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
+		AutoRestoreBackup turned_vp(_turned_vp, &vp);
 		ViewportDoDrawTurned();
 	} else {
 		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;

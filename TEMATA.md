@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (8) – úvodní menu na telefonu: zem otočené mapy z paměti pohledu, deník s rozpadem
+
+- **Hráč (měřil fps): „stmívání, rozednívání má 0,4 fps, noc 14 fps; stačí dvě auta, jeden přízrak a jsou 4 fps
+  při pohledu shora“; na prázdných dlaždicích 120 fps (telefon přepnut na 120 Hz, hra strop 64 – nastavení
+  obnovovací frekvence).** Jeho `snimky.log`: celé překreslení otočené mapy ~2 s; s auty ~10 bloků mapy za snímek,
+  každý 11–86 ms, z toho 7–16 ms čekání na kartu, která kladla tutéž zem znovu (karta zem otáčí a hra ji čte zpět).
+- **Oprava:** `TurnedGroundOfView` (viewport.cpp) – zem položená kartou (nebo procesorem) se drží v pixelech pohledu,
+  dokud se pohled neotočí, nezazoomuje a zem se nezmění (`_turned_ground_version`: změny držené země, jiný obrázek
+  dlaždice se základem). Blok kreslený znovu (auto projelo, přízrak, stmívání) si zem zkopíruje, karta nic.
+  Posun pohledu: co oba mají, zůstane. Rig: obraz s pamětí i bez ní stejný pixel po pixelu (den i noc); překreslení
+  celé obrazovky 10,5 → 3 ms; úvodní menu mezi otáčením 598 z 598 bloků ze zemi z paměti, 60 fps.
+- **Deník (`snimky.log`):** nové sloupce `otocena` (sprity, stopy, položení země, sběr, plakáty, modely ms na snímek,
+  kolik bloků vzalo zem z paměti; i modely při 0°) a `obrazky` (kolik obrázků objektů vzniklo, co dělala karta) –
+  druhý log hráče: při 0° bloky s pohybem 30–90 ms a karta drží víc a víc (268 → 882 MB), podezření na pořád nové
+  obrázky; další log to ukáže. Rig: `test3d cas <n> <š> <v>` překreslí jen kousek, `test3d zem pohled 0|1`.
+- Okno z očí: obraz do okna bez tónu (zranění) kopírován po řádcích místo po pixelech přes `Colour` (na telefonu okno
+  3,3× za snímek po 61 ms). Proč 3,3× za snímek (rig 1,2×), ještě nevím.
+- Hráč: auta shora malá, ale kreslená s detaily a holkou za volantem – detaily stojí jen při výrobě obrázku; jestli se
+  obrázky dělají pořád znovu, ukáže nový log, pak zjednodušení malých (posádka pryč pod pár px).
+
 ## 25. 10. (7) – hra čte glb zabalené gltfpackem -c (meshopt)
 
 - **Hráč: „jo určitě gltfpack“ (menší 3D GRF a sada).** Hra čte `EXT_meshopt_compression` i

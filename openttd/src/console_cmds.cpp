@@ -9945,11 +9945,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.
 		 * 'zem karta 0|1': laid on the turned map by the card where it can (1), or by the processor (0); 'zem kontrola
-		 * 0|1': by both, the pixels where they differ counted (test3d cas). */
-		extern bool _turned_ground_kept, _turned_ground_card, _turned_ground_check;
+		 * 0|1': by both, the pixels where they differ counted (test3d cas); 'zem pohled 0|1': the ground the blocks laid
+		 * kept for the next blocks while the view stands (1), or laid again for each block (0). */
+		extern bool _turned_ground_kept, _turned_ground_card, _turned_ground_check, _turned_view_ground_on;
 		extern std::string DescribeTurnedGround();
 		if (argv.size() > 2 && argv[2] == "znovu") {
 			ResetTurnedGround();
+		} else if (argv.size() > 3 && argv[2] == "pohled") {
+			_turned_view_ground_on = number(3).value_or(1) != 0;
 		} else if (argv.size() > 3 && argv[2] == "karta") {
 			_turned_ground_card = number(3).value_or(1) != 0;
 		} else if (argv.size() > 3 && argv[2] == "kontrola") {
@@ -9959,7 +9962,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ResetTurnedGround();
 		}
 		MarkWholeScreenDirty();
-		IConsolePrint(CC_DEFAULT, "test3d: {}, klade {}{}", DescribeTurnedGround(), _turned_ground_card ? "karta" : "procesor", _turned_ground_check ? ", kontrola" : "");
+		IConsolePrint(CC_DEFAULT, "test3d: {}, klade {}{}{}", DescribeTurnedGround(), _turned_ground_card ? "karta" : "procesor", _turned_ground_check ? ", kontrola" : "", _turned_view_ground_on ? ", pohled drzi" : "");
 	} else if (what == "gpu") {
 		/* 'gpu [0|1]': the pictures of the 3D objects drawn by the graphics card (1) or by the processor as before (0),
 		 * and what draws them (three_d_gpu.h). */
@@ -10098,12 +10101,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		bool ok = MakeScreenshot(windows || as_is ? SC_CRASHLOG : SC_VIEWPORT, std::string(argv[2]));
 		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: snimek {} {}", argv[2], ok ? "zapsan" : "ODMITNUTO - nezapsan");
 	} else if (what == "cas") {
-		/* How long the whole screen takes to draw, ten times over, at the angle set. */
+		/* How long the whole screen takes to draw, ten times over, at the angle set; 'cas <n> <w> <h>' a piece of it
+		 * that big in the middle of the screen only (what a vehicle going by makes dirty). */
 		auto n = number(2);
 		int rounds = n.value_or(10);
+		const int pw = number(3).value_or(0), ph = number(4).value_or(0);
 		auto start = std::chrono::steady_clock::now();
 		for (int i = 0; i < rounds; i++) {
-			MarkWholeScreenDirty();
+			if (pw > 0 && ph > 0) {
+				AddDirtyBlock(_screen.width / 2 - pw / 2, _screen.height / 2 - ph / 2, _screen.width / 2 + pw / 2, _screen.height / 2 + ph / 2);
+			} else {
+				MarkWholeScreenDirty();
+			}
 			DrawDirtyBlocks();
 		}
 		auto end = std::chrono::steady_clock::now();

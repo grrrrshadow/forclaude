@@ -411,6 +411,17 @@ void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, 
 	if (pic.pixels.size() != static_cast<size_t>(pic.width) * pic.height) return;
 	const Colour tc(tint);
 	const uint a = tint == 0 ? 0 : tc.a;
+	if (a == 0) {
+		/* Untinted: the rows as they are, made opaque -- a pixel at a time through Colour this cost the phone tens of ms
+		 * a frame (the player's log of 25. 10.: the canvas 61 ms each time it was drawn). */
+		const uint32_t opaque = Colour(0, 0, 0, 255).data;
+		for (int y = y0; y < y1; y++) {
+			const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width + (x0 - px)];
+			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
+			std::transform(src, src + (x1 - x0), dst, [opaque](uint32_t c) { return c | opaque; });
+		}
+		return;
+	}
 	for (int y = y0; y < y1; y++) {
 		const uint32_t *src = &pic.pixels[static_cast<size_t>(y - py) * pic.width];
 		uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));

@@ -31,6 +31,24 @@
 
 #include "safeguards.h"
 
+std::string TakeTurnedTimesForDiary(int frames); // viewport.cpp
+extern double _object_picture_ms, _object_picture_thread_ms, _likeness_picture_ms;
+extern uint64_t _object_pictures_made, _object_pictures_made_thread, _likeness_pictures_made;
+
+/**
+ * The pictures of 3D objects made since the last line (the vehicles' on the main thread and on theirs, the likenesses),
+ * and what the card did: the player's log of 25. 10. had the card hold more and more (268 to 882 MB) while a few things
+ * moved at 4 frames a second -- whether pictures are made again and again shows here.
+ */
+static std::string TakePicturesForDiary()
+{
+	std::string s = fmt::format("objektu {} ({:.0f} ms), na vlakne {} ({:.0f} ms), podoby {} ({:.0f} ms); {}", _object_pictures_made, _object_picture_ms,
+			_object_pictures_made_thread, _object_picture_thread_ms, _likeness_pictures_made, _likeness_picture_ms, ThreeDGpuTimes());
+	_object_picture_ms = _object_picture_thread_ms = _likeness_picture_ms = 0;
+	_object_pictures_made = _object_pictures_made_thread = _likeness_pictures_made = 0;
+	return s;
+}
+
 namespace {
 
 constexpr std::chrono::seconds DIARY_EVERY{5}; ///< a line so often
@@ -110,7 +128,9 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy;"
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
-				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta.\n");
+				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
+				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely, a kolik bloku vzalo zem z drzeneho pohledu;"
+				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta.\n");
 	}
 	const std::time_t t = std::time(nullptr);
 	char clock[16];
@@ -118,12 +138,12 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {}\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
 			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(),
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
-			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB());
+			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary());
 	fflush(*_diary);
 	_lines++;
 }
