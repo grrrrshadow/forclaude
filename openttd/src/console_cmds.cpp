@@ -10019,10 +10019,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_cab_lamp_light = argv.size() < 3 || argv[2] != "0";
 		IConsolePrint(CC_DEFAULT, "test3d: lampy {}", _cab_lamp_light ? "sviti" : "nesviti");
 	} else if (what == "stiny") {
-		/* 'stiny <0|1>': the view from the eyes with the sun's shadows of the buildings (1, as the game draws) or without. */
-		extern bool _cab_shadows;
-		_cab_shadows = argv.size() < 3 || argv[2] != "0";
-		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _cab_shadows ? "zapnute" : "vypnute");
+		/* 'stiny <0|1>': the view from the eyes with the sun's shadows of the buildings or without (the player's
+		 * setting gui.eye_shadows, off unless he turns it on). */
+		_settings_client.gui.eye_shadows = argv.size() < 3 || argv[2] != "0";
+		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _settings_client.gui.eye_shadows ? "zapnute" : "vypnute");
 	} else if (what == "mezipamet") {
 		/* 'mezipamet <0|1>': the buildings of the turned view drawn once and kept (1, as the game draws), or drawn each time. */
 		extern bool _turned_object_pictures_on;

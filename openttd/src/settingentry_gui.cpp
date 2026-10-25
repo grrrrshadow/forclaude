@@ -806,6 +806,7 @@ SettingsContainer &GetSettingsTree()
 			graphics->Add(new SettingEntry("gui.three_d_gpu"));
 			graphics->Add(new SettingEntry("gui.night"));
 			graphics->Add(new SettingEntry("gui.night_light"));
+			graphics->Add(new SettingEntry("gui.eye_shadows"));
 			graphics->Add(new SettingEntry("gui.round_track_curves"));
 			graphics->Add(new SettingEntry("gui.smallmap_land_colour"));
 			graphics->Add(new SettingEntry("gui.linkgraph_colours"));

@@ -71,6 +71,14 @@ static constexpr double FIRST_PERSON_WALK_MS = 3.0;
 static constexpr double FIRST_PERSON_RUN_MS = 8.5;
 /** How fast it turns on the arrows, radians a second. */
 static constexpr double FIRST_PERSON_TURN = 2.0;
+/**
+ * The turn on the arrows starts at this share of that and reaches the whole of it as the arrow stays held
+ * (FIRST_PERSON_TURN_RAMP_S): a tap turns a degree or two to aim by, held it still turns fast. At the one speed, a
+ * tap was the whole 115 degrees a second for however long a frame took -- on a slow machine a frame is long, and the
+ * player saw his view leap (25. 10.: "turning by the arrow is still in big jumps").
+ */
+static constexpr double FIRST_PERSON_TURN_FIRST = 0.3;
+static constexpr double FIRST_PERSON_TURN_RAMP_S = 0.8;
 /** How far it looks up or down at most, radians. */
 static constexpr double FIRST_PERSON_PITCH_MAX = 1.0;
 /** How much a pixel of the mouse turns it, radians. */
@@ -357,6 +365,11 @@ struct FirstPersonWindow : Window {
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
 	int walk_on = 0;                      ///< walks on by itself, 1 ahead, -1 back (Up or Down pressed twice), 0 not
 	bool walk_held[3] = {};               ///< Up, Down, Left or Right held at the last step (their presses, Walk())
+	double turn_held = 0;                 ///< how long Left or Right has been held, seconds, for the turn speed's run-up
+	double seen_heading = 0;              ///< the heading and the pitch at the last picture, for the look ahead (Step())
+	double seen_pitch = 0;
+	double look_ahead_heading = 0;        ///< the look ahead the picture is made with (Step()), radians
+	double look_ahead_pitch = 0;
 	double walk_tapped[2] = {FIRST_PERSON_DOUBLE_TAP_S, FIRST_PERSON_DOUBLE_TAP_S}; ///< seconds since Up, Down was pressed
 	bool weapon_out = false;              ///< the weapon taken out (F, or its key), in the hand
 	int weapon = 0;                       ///< the weapon in the hand or put away (_first_person_weapons)
@@ -573,6 +586,26 @@ struct FirstPersonWindow : Window {
 			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)));
 			this->hurt_steps = 6;
 		}
+		/* The look ahead: on its thread the picture made now is seen a frame late (EyeView()), so a steady turn of
+		 * the head -- the right button dragged, an arrow held -- was always shown where the hand had already been,
+		 * and the view felt tied to the hand by a rubber band (the player, 25. 10.). The picture is therefore made
+		 * looking where the head will be when it is seen: ahead by most of the turn of the last frame, which for a
+		 * steady turn is the lag itself. A sudden stop overshoots by one frame and settles; a leap of the view (the
+		 * double click putting the look back) stays a leap, the clamp keeps the guess small. The rig draws at once
+		 * and guesses nothing, so its pictures stay of the moment. */
+		if (!_eye_synchronous && rv == nullptr) {
+			/* A turn bigger than the guess may be is a leap, not a turn -- the double click putting the look back, the
+			 * walker put somewhere (the god's eye): shown as it is, nothing guessed off it. */
+			constexpr double keep = 0.8, most = 0.17;
+			const double dh = std::remainder(this->walker.heading - this->seen_heading, 2 * M_PI), dp = this->walker.pitch - this->seen_pitch;
+			this->look_ahead_heading = std::abs(dh) > most ? 0 : std::clamp(keep * dh, -most, most);
+			this->look_ahead_pitch = std::abs(dp) > most ? 0 : std::clamp(keep * dp, -most, most);
+		} else {
+			this->look_ahead_heading = 0;
+			this->look_ahead_pitch = 0;
+		}
+		this->seen_heading = this->walker.heading;
+		this->seen_pitch = this->walker.pitch;
 		this->MakePicture();
 		this->hurt_steps = std::max(0, this->hurt_steps - static_cast<int>(steps));
 		this->SetWidgetDirty(WID_FP_CANVAS);
@@ -584,6 +617,7 @@ struct FirstPersonWindow : Window {
 		this->FinishInitNested(number);
 		this->walker.eye_z = FIRST_PERSON_EYES_M * OBJECT_HEIGHT_PER_METRE;
 		this->walker.heading = std::atan2(1.0, 1.0); // looking south-east, down the screen of the map facing north
+		this->seen_heading = this->walker.heading;
 		this->PutWhereTheMainViewLooks();
 		/* Opened over the whole screen (the player, 15. 10.); the button makes it a window again. */
 		this->ToggleFull();
@@ -605,7 +639,10 @@ struct FirstPersonWindow : Window {
 		const int w = canvas->current_x, h = canvas->current_y;
 		if (w <= 0 || h <= 0) return;
 		const Vehicle *rv = this->Riding();
-		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(this->walker, w, h, this->camera, this->picture);
+		FirstPersonEye eye = this->walker;
+		eye.heading = std::remainder(eye.heading + this->look_ahead_heading, 2 * M_PI);
+		eye.pitch = std::clamp(eye.pitch + this->look_ahead_pitch, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
+		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(eye, w, h, this->camera, this->picture);
 	}
 
 	/** Over the whole screen between the toolbar and the status bar, or back where the window was. */
@@ -707,9 +744,16 @@ struct FirstPersonWindow : Window {
 		if (ArrowsWindow() != this && _focused_window != this) this->walk_on = 0;
 		this->WalkOn(arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up), arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down),
 				arrows.Any({DirectionKey::Left, DirectionKey::Right}) || wasd.Any({DirectionKey::Left, DirectionKey::Right}), dt);
+		if (arrows.Any({DirectionKey::Left, DirectionKey::Right})) {
+			this->turn_held = std::min(this->turn_held + dt, FIRST_PERSON_TURN_RAMP_S);
+		} else {
+			this->turn_held = 0;
+		}
 		if (arrows.None() && wasd.None() && this->walk_on == 0) return;
-		if (arrows.Test(DirectionKey::Left)) this->walker.heading += FIRST_PERSON_TURN * dt;
-		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= FIRST_PERSON_TURN * dt;
+		/* The turn runs up from gentle to full as the arrow stays held (FIRST_PERSON_TURN_FIRST). */
+		const double turn = FIRST_PERSON_TURN * (FIRST_PERSON_TURN_FIRST + (1.0 - FIRST_PERSON_TURN_FIRST) * this->turn_held / FIRST_PERSON_TURN_RAMP_S);
+		if (arrows.Test(DirectionKey::Left)) this->walker.heading += turn * dt;
+		if (arrows.Test(DirectionKey::Right)) this->walker.heading -= turn * dt;
 		this->walker.heading = std::remainder(this->walker.heading, 2 * M_PI);
 		double ahead = 0, aside = 0;
 		if (arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up)) ahead += 1;

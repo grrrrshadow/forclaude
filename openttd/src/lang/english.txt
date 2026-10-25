@@ -2254,6 +2254,8 @@ STR_CONFIG_SETTING_NIGHT_LIGHT_MOON                             :moonlight
 STR_CONFIG_SETTING_NIGHT_LIGHT_FULL_MOON                        :full moon
 STR_CONFIG_SETTING_NIGHT_LIGHT_BRIGHT_MOON                      :bright full moon
 STR_CONFIG_SETTING_NIGHT_LIGHT_DAWN                             :nearly the dawn
+STR_CONFIG_SETTING_EYE_SHADOWS                                  :Shadows in the view from the eyes: {STRING2}
+STR_CONFIG_SETTING_EYE_SHADOWS_HELPTEXT                         :By day the buildings cast the sun's shadows in the views from the eyes and from the cab. The map of the shadows is made anew whenever other buildings are about, which can stutter on a slow machine as the walker goes through a town. The lights at night are their own thing and stay either way
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Round curves of rails: {STRING2}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :A curve of rails -- a straight, a piece on the diagonal, a straight -- is drawn in the turned view as one round arc over about two tiles, and a train on it is drawn turned along the arc as its 3D likeness. At a switch the branch is rounded, the straight way stays straight. Only how it looks: the track is built and run on as always. Facing north (angle 0, for building) the curves are as always. Needs the 32bpp blitter. Off, the curves are as they always were, to the pixel
 STR_FIRST_PERSON_CAPTION                                        :{WHITE}View from the first person

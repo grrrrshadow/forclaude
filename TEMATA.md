@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. – vypínač stínů, plynulost otáčení z očí, úvodní otáčení nebrzdí myš; co zbývá na GPU
+
+- Hráč: *„světla chci ale stíny nejsou důležité… dej vypínač a nadále zlepšuj“*. **Teď:** nastavení Grafika →
+  **Stíny v pohledu z očí** (`gui.eye_shadows`), výchozí vypnuto. Vypnuté stíny = žádné přepočítávání mapy stínů
+  při chůzi městem (dřív 105–207 ms každých pár metrů → trhání). Noční světla (lampy, okna, vozidla, pochodeň)
+  jsou samostatná a zůstávají. Rig `test3d stiny <0|1>` přepíná tohle nastavení.
+- Otáčení šipkou z očí *„po velkých skocích“*: otočka má rozjezd – ťuknutí otočí o stupeň a kus (jemné míření),
+  držená šipka se do 0,8 s rozjede na plných 115°/s. Na pomalém stroji tak první viditelný skok není 29°.
+- Pravé tlačítko *„jemné ale gumovější“*: obraz z očí se kreslí na vlákně a je vidět o snímek později, takže při
+  plynulém otáčení hlavy byl vždycky tam, kde ruka už nebyla. Teď se obrázek dělá s pohledem předpovězeným o
+  většinu otočky minulého snímku – plynulý tah zpoždění dožene; prudké zastavení o snímek přestřelí a srovná se;
+  skok pohledu (dvojklik zpět, přemístění chodce) se nepředpovídá. Rig kreslí hned a nepředpovídá nic.
+- Úvodní obrazovka: otáčení plochy stojí, dokud se hýbe myš (po 1,5 s klidu jede dál) – kurzor už není otáčením
+  zpomalený a New Game / Load Game jde trefit (hráč: *„myš kurzor je tak spomalená že se nedá trefit čudlík“*).
+- **Co zbývá v přechodu na GPU** (hráč: „ať se hra hejbe pěkně“; proto je otáčení plochy pořád pomalé):
+  - Otočený pohled (mapa): na kartě je jen terén (GPU bod 3). Domy, průmysly a vozidla jsou obrázky vyrobené
+    procesorem a při každém novém úhlu se vyrábějí znovu – otáčení plochy proto stojí stovky ms na snímek.
+    Zbývá: objekty otočeného pohledu kreslit kartou přímo (úkol #134), vozidla na mapě objektem (#127),
+    domy bez obrázků (#123).
+  - Pohled z očí: snímek už kreslí a ukazuje karta (#151, #152), ale sběr scény a příprava trojúhelníků zůstává
+    na procesoru (#150 rozpracované); mapa stínů taky (teď výchozí vypnutá).
+  - Telefon: podle snimky.log trvá snímek z očí ~260 ms, z toho kreslení z očí jen ~45 ms – zbylých ~200 ms sedí
+    v „okna“ na hlavním vlákně a není vysvětlených (#165). To je teď největší brzda na telefonu; sám přechod
+    na GPU ji nevyřeší, příčinu je potřeba najít.
+
 ## 24. 10. večer – pád při výjezdu z depa (MSTS jednotka, vynucená jízda na červenou, build 298)
 
 - Hráč: *„nutil jsem ho vyjet z depa na červenou, model z MSTS, špatně poskládaný lokomotivy asi jsem dal

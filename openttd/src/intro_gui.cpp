@@ -103,6 +103,9 @@ struct SelectGameWindow : public Window {
 	bool turning = false;
 	float turn_from = 0;
 	float turn_by = 0;
+	/** The player's hand on the mouse: where the pointer was, and for how long it has not moved, milliseconds. */
+	Point mouse_at{-1, -1};
+	uint mouse_still_ms = 0;
 	/** Vector of viewport commands parsed. */
 	std::vector<IntroGameViewportCommand> intro_viewport_commands{};
 
@@ -220,6 +223,20 @@ struct SelectGameWindow : public Window {
 	void AdvanceTurn(uint delta_ms)
 	{
 		if (!ThreeDEnabled()) return;
+		/* The player's hand on the mouse holds the turn still. Each step of a turn redraws the whole screen at a new
+		 * angle, and on a slow machine that is most of a second a frame -- the pointer crawled with it, and the
+		 * buttons of this menu could not be hit while the map turned (the player, 25. 10.: "the mouse is so slowed
+		 * that New Game cannot be hit"). So the map turns only while the mouse has rested a while: the moment it
+		 * moves, the picture stands still and the pointer is the screen's only change, light to draw. */
+		if (_cursor.pos.x != this->mouse_at.x || _cursor.pos.y != this->mouse_at.y || _left_button_down || _right_button_down) {
+			this->mouse_at = _cursor.pos;
+			this->mouse_still_ms = 0;
+			return;
+		}
+		if (this->mouse_still_ms < 1500) {
+			this->mouse_still_ms += delta_ms;
+			return;
+		}
 		this->turn_time += delta_ms;
 		if (!this->turning) {
 			if (this->turn_time < TITLE_STILL_MS) return;

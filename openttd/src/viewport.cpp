@@ -10215,7 +10215,6 @@ static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, floa
 
 /** How far from the eye the buildings cast their shadows, tiles. */
 static constexpr int CAB_SHADOW_TILES = 24;
-bool _cab_shadows = true; ///< The rig: 'test3d stiny 0' draws the view from the eyes without the sun's shadows.
 bool _cab_lamp_light = true; ///< The rig: 'test3d lampy 0' without the light of the houses' lamps on what is about them.
 
 /** A texel of the map of the shadows (DrawEyeShadows()), world units: the casters' shapes as simple as it allows. */
@@ -11950,7 +11949,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* 5b. The sun's shadows of the buildings about the eye, by day (DrawEyeShadows()): their shapes made now, as simple
 	 * as a texel of the map of the shadows allows; the map and the shadows as a job of the frame. */
 	const bool night = IsNightNow();
-	if (!in_tunnel.has_value() && !night && _cab_shadows) {
+	if (!in_tunnel.has_value() && !night && _settings_client.gui.eye_shadows) {
 		std::vector<CabShadowCaster> casters;
 		for (const CabObject &co : objects) {
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;

@@ -260,6 +260,7 @@ struct GUISettings {
 	bool three_d_gpu;             ///< The 3D pictures drawn by the graphics card (three_d_gpu.h); off, by the processor.
 	bool night;                   ///< The night (the player's dark mode, in the help menu by the console): the map darkened, the vehicles' lights on.
 	uint8_t night_light;          ///< How light the night is: 0 a dark night, then the moon, the full moon, a bright full moon, 4 nearly the dawn.
+	bool eye_shadows;             ///< The sun's shadows of the buildings in the views from the eyes and the cab, by day. Off (the default), only the lights of the night remain.
 	bool round_track_curves; ///< In the turned view a curve of rails drawn as a round arc, the trains on it turned along it (round_track.h). Off, the curves are as they always were.
 	uint32_t autosave_interval; ///< how often should we do autosaves?
 	bool threaded_saves; ///< should we do threaded saves?

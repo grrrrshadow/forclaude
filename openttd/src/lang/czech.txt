@@ -2362,6 +2362,8 @@ STR_CONFIG_SETTING_NIGHT_LIGHT_MOON                             :měsíc
 STR_CONFIG_SETTING_NIGHT_LIGHT_FULL_MOON                        :úplněk
 STR_CONFIG_SETTING_NIGHT_LIGHT_BRIGHT_MOON                      :jasný úplněk
 STR_CONFIG_SETTING_NIGHT_LIGHT_DAWN                             :skoro svítání
+STR_CONFIG_SETTING_EYE_SHADOWS                                  :Stíny v pohledu z očí: {STRING}
+STR_CONFIG_SETTING_EYE_SHADOWS_HELPTEXT                         :Ve dne vrhají budovy sluneční stíny v pohledu z očí a z kabiny. Mapa stínů se přepočítává, kdykoli jsou kolem jiné budovy, což na pomalém stroji při chůzi městem trhá. Noční světla jsou samostatná a zůstávají tak i tak
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES                           :Kulaté zatáčky kolejí: {STRING}
 STR_CONFIG_SETTING_ROUND_TRACK_CURVES_HELPTEXT                  :Zatáčka kolejí -- rovně, kus na šikmo, rovně -- se v otočeném pohledu nakreslí jako jeden kulatý oblouk přes asi dvě dlaždice a vlak na ní se nakreslí natočený podél oblouku jako svá 3D podoba. U výhybky se zakulatí odbočka, přímá kolej zůstane rovná. Jen vzhled: kolej se staví a jezdí se po ní jako vždycky. Při pohledu na sever (úhel 0, na stavění) jsou zatáčky jako vždycky. Potřebuje 32bpp blitter. Vypnuto: zatáčky jsou, jaké vždycky byly, do pixelu
 STR_FIRST_PERSON_CAPTION                                        :{WHITE}Pohled z první osoby
