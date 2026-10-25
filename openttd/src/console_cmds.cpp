@@ -68,6 +68,7 @@
 #include "three_d_walkers.h"
 #include "cab_view.h"
 #include "progress.h"
+#include "video/video_driver.hpp"
 #include "genworld.h"
 #include "strings_func.h"
 #include "viewport_func.h"
@@ -5697,7 +5698,14 @@ static const IntervalTimer<TimerGameTick> _testzatik_timer({TimerGameTick::Prior
 			std::string cmd = std::move(it->second);
 			it = _testzatik_queue.erase(it);
 			IConsolePrint(CC_DEFAULT, "testzatik: (tik {}) {}", TimerGameTick::counter, cmd);
-			IConsoleCmdExec(cmd);
+			/* With a real video driver the ticks run on the game's thread, outside the lock of the screen: there the
+			 * command waits for the main thread, as typed into the console (the graphics card's context, the screen's
+			 * buffer). */
+			if (VideoDriver::GetInstance()->HasGUI()) {
+				VideoDriver::GetInstance()->QueueOnMainThread([cmd]() { IConsoleCmdExec(cmd); });
+			} else {
+				IConsoleCmdExec(cmd);
+			}
 		} else {
 			++it;
 		}

@@ -994,9 +994,11 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		_glBufferData(GL_PIXEL_UNPACK_BUFFER, line_pixel_count * bpp / 8, nullptr, GL_DYNAMIC_DRAW);
 	}
 
+	this->vid_pixels.assign(line_pixel_count * bpp / 8, 0);
 	if (bpp == 32) {
 		/* Initialize backing store alpha to opaque for 32bpp modes. */
 		Colour black(0, 0, 0);
+		std::fill_n(reinterpret_cast<uint32_t *>(this->vid_pixels.data()), line_pixel_count, black.data);
 		if (_glClearBufferSubData != nullptr) {
 			_glClearBufferSubData(GL_PIXEL_UNPACK_BUFFER, GL_RGBA8, 0, line_pixel_count * bpp / 8, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, &black.data);
 		} else {
@@ -1034,6 +1036,7 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		}
 
 		/* Initialize buffer as 0 == no remap. */
+		this->anim_pixels.assign(line_pixel_count, 0);
 		if (_glClearBufferSubData != nullptr) {
 			uint8_t b = 0;
 			_glClearBufferSubData(GL_PIXEL_UNPACK_BUFFER, GL_R8, 0, line_pixel_count, GL_RED, GL_UNSIGNED_BYTE, &b);
@@ -1045,6 +1048,7 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		_glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	} else {
+		this->anim_pixels.clear();
 		if (this->anim_buffer != nullptr) {
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
 			_glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -1275,10 +1279,34 @@ void OpenGLBackend::ClearCursorCache()
 }
 
 /**
- * Get a pointer to the memory for the video driver to draw to.
+ * Get a pointer to the memory for the video driver to draw to: the game's own (vid_pixels), what changed in it copied
+ * to the card's buffer when it is released (ReleaseVideoBuffer()). The blitters read what is under what they draw (the
+ * night darkening the map, the colours of the palette's animation realized under a picture), and reading the card's
+ * memory can be very slow: the player's zink on a Mali in Winlator (#300, 25. 10.) took ~200 ms a frame to lay the
+ * picture from the eyes into its window and the night slowed the title's map down, the picture itself drawn by the
+ * card in ~40 ms.
  * @return Pointer to draw on.
  */
 void *OpenGLBackend::GetVideoBuffer()
+{
+	return this->vid_pixels.data();
+}
+
+/**
+ * Get a pointer to the memory for the separate animation buffer: the game's own too (anim_pixels).
+ * @return Pointer to draw on.
+ */
+uint8_t *OpenGLBackend::GetAnimBuffer()
+{
+	if (this->anim_pbo == 0 || this->anim_pixels.empty()) return nullptr;
+	return this->anim_pixels.data();
+}
+
+/**
+ * The card's buffer of the video buffer, mapped for the changes to be copied to it.
+ * @return Its memory.
+ */
+void *OpenGLBackend::MapVideoBuffer()
 {
 #ifndef NO_GL_BUFFER_SYNC
 	if (this->sync_vid_mapping != nullptr) _glClientWaitSync(this->sync_vid_mapping, GL_SYNC_FLUSH_COMMANDS_BIT, 100000000); // 100ms timeout.
@@ -1287,7 +1315,7 @@ void *OpenGLBackend::GetVideoBuffer()
 	if (!this->persistent_mapping_supported) {
 		assert(this->vid_buffer == nullptr);
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->vid_pbo);
-		this->vid_buffer = _glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_READ_WRITE);
+		this->vid_buffer = _glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	} else if (this->vid_buffer == nullptr) {
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->vid_pbo);
 		this->vid_buffer = _glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, static_cast<GLsizeiptr>(_screen.pitch) * _screen.height * BlitterFactory::GetCurrentBlitter()->GetScreenDepth() / 8, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -1297,20 +1325,18 @@ void *OpenGLBackend::GetVideoBuffer()
 }
 
 /**
- * Get a pointer to the memory for the separate animation buffer.
- * @return Pointer to draw on.
+ * The card's buffer of the animation buffer, mapped for the changes to be copied to it.
+ * @return Its memory.
  */
-uint8_t *OpenGLBackend::GetAnimBuffer()
+uint8_t *OpenGLBackend::MapAnimBuffer()
 {
-	if (this->anim_pbo == 0) return nullptr;
-
 #ifndef NO_GL_BUFFER_SYNC
 	if (this->sync_anim_mapping != nullptr) _glClientWaitSync(this->sync_anim_mapping, GL_SYNC_FLUSH_COMMANDS_BIT, 100000000); // 100ms timeout.
 #endif
 
 	if (!this->persistent_mapping_supported) {
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
-		this->anim_buffer = _glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_READ_WRITE);
+		this->anim_buffer = _glMapBuffer(GL_PIXEL_UNPACK_BUFFER, GL_WRITE_ONLY);
 	} else if (this->anim_buffer == nullptr) {
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
 		this->anim_buffer = _glMapBufferRange(GL_PIXEL_UNPACK_BUFFER, 0, static_cast<GLsizeiptr>(_screen.pitch) * _screen.height, GL_MAP_READ_BIT | GL_MAP_WRITE_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT);
@@ -1320,13 +1346,34 @@ uint8_t *OpenGLBackend::GetAnimBuffer()
 }
 
 /**
+ * The rows of a rectangle of the screen copied from the game's memory to the card's: only written there, never read.
+ * @param to the card's buffer, as large as the screen
+ * @param from the game's
+ * @param r the rectangle, right and bottom outside it
+ * @param bytes of a pixel
+ */
+static void CopyScreenRect(void *to, const uint8_t *from, const Rect &r, size_t bytes)
+{
+	if (to == nullptr) return;
+	const int left = std::max(r.left, 0), right = std::min(r.right, _screen.pitch);
+	const int top = std::max(r.top, 0), bottom = std::min(r.bottom, _screen.height);
+	if (left >= right) return;
+	for (int y = top; y < bottom; y++) {
+		const size_t at = (static_cast<size_t>(y) * _screen.pitch + left) * bytes;
+		std::copy_n(from + at, (right - left) * bytes, static_cast<uint8_t *>(to) + at);
+	}
+}
+
+/**
  * Update video buffer texture after the video buffer was filled.
  * @param update_rect Rectangle encompassing the dirty region of the video buffer.
  */
 void OpenGLBackend::ReleaseVideoBuffer(const Rect &update_rect)
 {
 	assert(this->vid_pbo != 0);
+	if (IsEmptyRect(update_rect)) return;
 
+	CopyScreenRect(this->MapVideoBuffer(), this->vid_pixels.data(), update_rect, BlitterFactory::GetCurrentBlitter()->GetScreenDepth() / 8);
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->vid_pbo);
 	if (!this->persistent_mapping_supported) {
 		_glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
@@ -1363,8 +1410,9 @@ void OpenGLBackend::ReleaseVideoBuffer(const Rect &update_rect)
  */
 void OpenGLBackend::ReleaseAnimBuffer(const Rect &update_rect)
 {
-	if (this->anim_pbo == 0) return;
+	if (this->anim_pbo == 0 || this->anim_pixels.empty() || update_rect.left == update_rect.right) return;
 
+	CopyScreenRect(this->MapAnimBuffer(), this->anim_pixels.data(), update_rect, 1);
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
 	if (!this->persistent_mapping_supported) {
 		_glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);

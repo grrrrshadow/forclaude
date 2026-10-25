@@ -17,6 +17,7 @@
 
 #include <map>
 #include <mutex>
+#include <vector>
 
 typedef void (*OGLProc)();
 typedef OGLProc (*GetOGLProcAddressProc)(const char *proc);
@@ -49,6 +50,9 @@ private:
 	void *anim_buffer = nullptr; ///< Pointer to the mapped animation buffer.
 	GLuint anim_pbo = 0; ///< Pixel buffer object storing the memory used for the animation buffer.
 	GLuint anim_texture = 0; ///< Texture handle for the animation buffer texture.
+
+	std::vector<uint8_t> vid_pixels;  ///< What the video driver draws to: the game's own memory, its changes copied to vid_pbo (ReleaseVideoBuffer()).
+	std::vector<uint8_t> anim_pixels; ///< The same of the animation buffer, to anim_pbo; empty when the blitter needs none.
 
 	GLuint remap_program = 0; ///< Shader program for blending and rendering a RGBA + remap texture.
 	GLint  remap_sprite_loc = 0; ///< Uniform location for sprite parameters.
@@ -94,6 +98,9 @@ private:
 	void InternalClearCursorCache();
 
 	void RenderOglSprite(const OpenGLSprite *gl_sprite, PaletteID pal, int x, int y, ZoomLevel zoom);
+
+	void *MapVideoBuffer();
+	uint8_t *MapAnimBuffer();
 
 public:
 	/**

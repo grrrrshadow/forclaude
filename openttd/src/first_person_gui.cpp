@@ -1239,6 +1239,17 @@ struct FirstPersonWindow : Window {
 			this->Close();
 			return EventState::Handled;
 		}
+		/* Ctrl+Up, Ctrl+Down: walks on that way without the key held, as Up or Down pressed twice (WalkOn()) -- told by
+		 * the key's own press, not by how it is held at the next step: on the player's phone the steps were too far
+		 * apart for two quick presses to be seen (#300, 25. 10.: "pressing the arrow twice still does not walk on, let us
+		 * try Ctrl+Up"). The arrow held with it is not a press that stops it again. */
+		if (keycode == (WKC_CTRL | WKC_UP) || keycode == (WKC_CTRL | WKC_DOWN)) {
+			const int k = keycode == (WKC_CTRL | WKC_UP) ? 0 : 1;
+			this->walk_on = k == 0 ? 1 : -1;
+			this->walk_held[k] = true;
+			this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
+			return EventState::Handled;
+		}
 		/* The walking keys are the walker's, not the toolbar's (they are read as held, Walk()). */
 		switch (keycode & ~WKC_SPECIAL_KEYS) {
 			case 'W': case 'A': case 'S': case 'D':

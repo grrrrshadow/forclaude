@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (4) – #300: obraz bez čtení z paměti karty, Ctrl+šipka chůze
+
+- **Z očí ~4 snímky/s, škubání i při pauze (hráč, test 4 #300: „u konce jsem zmáčkl pauzu a pohyboval hlavou, stejně
+  to škubalo“, „ze začátku to běhá líp, pak to škube“):** z snimky.log: kreslení z očí na kartě ~40 ms, ale „okno
+  oci“ (položení obrázku z očí do okna) 3× za snímek po ~67 ms = ~200 ms. Tam se jen nuluje díra pro obraz z karty
+  a před tím čtou barvy animace palety (RealizeAnimation) – na pixel skoro nic. Příčina: obrazovka hry je paměť
+  **namapovaná z karty** (persistent PBO, OpenGL ovladač z OpenTTD) a každé **čtení** z ní je na zinku/Vorteku (Mali)
+  strašně pomalé. Sedí na to i noc na úvodní obrazovce („když začne stmívání, zpomalí se“): noc čte a ztmavuje každý
+  pixel plochy (DarkenRect). Oprava (video/opengl.cpp): hra kreslí do **své vlastní paměti** (vid_pixels,
+  anim_pixels) a kartě jen **zapíše** změněný obdélník (CopyScreenRect) – z paměti karty se nečte nikdy. Ověřeno
+  v GL rigu (sdl-opengl, Xvfb, 40bpp-anim): mapa, noc, otočená plocha a pohled z očí stejné jako stará verze (rozdíl
+  jen pár desítek pixelů animací). Na telefonu to potvrdí sloupec „okno oci“ v příštím snimky.log (má spadnout
+  z ~67 ms na pár ms).
+- **Ctrl+šipka nahoru/dolů = chůze bez držení (hráč: „dvakrát šipku nahoru stále nefunguje… zkusíme Ctrl+šipka“):**
+  dvojí stisk se poznával podle držení klávesy při kroku chodce; při ~4 snímcích/s byly kroky tak daleko od sebe,
+  že dva rychlé stisky hra neviděla. Ctrl+šipka se bere z vlastní události klávesy (OnKeyPress), na rychlosti
+  snímků nezáleží. Šipka držená s Ctrl chůzi hned zase nezastaví; zastaví ji další stisk šipky jako dřív.
+- **Rig:** `testzatik` u opravdového ovladače videa (GL rig) pouští příkaz v hlavním vlákně (QueueOnMainThread), ne
+  ve vlákně tiků – jinak volal OpenGL bez kontextu a kreslil mimo zámek obrazovky (assert dst_ptr). Null rig beze
+  změny. GL rig: `scena_gl3.sh` s příkazy v `AFTER_NEWGAME` (game_start.scr se v GUI nespustí včas).
+- **Černá plocha po návratu z očí** (test 1) se podle hráče už neopakovala.
+- **Zbývá z testu 4 (chyby):** propadání silnicí na nájezdu mostu, chůze po mostech, nohy čarodějnice zblízka
+  neviditelné, 1203 z BeamNG není v nákupu, škola a automat postavené, ale neviditelné, paměť karty roste
+  (110 → 800 MB). **K domluvě (přání):** posed v lese (žebřík), stará dračí farma – zřícenina hradu s jeskyní a
+  rozhlednou (schody, louče), bouda v lese (sud a pivo bez Mata, postel, židle u stolku), auto přes železniční most.
+
 ## 25. 10. (3) – paseka (tráva, kapradí, klády), rožeň, záloha letu draků z #299
 
 - **Paseka v lese (hráč: „dvě desky skrz sebe po celé pasece a jeden kmen je červený“, „dělá to ta tráva“):**
