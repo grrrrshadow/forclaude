@@ -6001,11 +6001,11 @@
     "poloha": [
      24.33,
      27.31,
-     0.95
+     1.01
     ],
     "otoceni": 0,
-    "meritko": 1.0,
-    "poznamka": "rožeň nad grilem v rohu za přední tribunou (gril je doplněk domu), osa podél x ve výšce 0,95 m"
+    "meritko": 1.08,
+    "poznamka": "rožeň nad grilem v rohu za přední tribunou (gril je doplněk domu), osa podél x ve výšce 1,01 m v zářezu vidlic (0,99 m + poloměr tyče); měřítko 1,08, ať tyč (v modelu ±0,95 m) projde vidlicemi grilu (±0,98 až 1,02 m) – hráč 25. 10.: „tyčka končí moc brzo před vidličkou“"
    },
    "tatra": {
     "poloha": [

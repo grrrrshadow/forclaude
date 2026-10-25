@@ -799,7 +799,8 @@ struct GlbMesh {
 	std::vector<uint32_t> tri; ///< three corners a triangle
 	std::vector<uint8_t> tri_tex;      ///< the texture of each triangle, an index into textures
 	std::vector<GlbTexture> textures;  ///< the textures of the materials
-	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's one texture)
+	std::vector<uint8_t> png;  ///< the first material's texture as it is in the file (a building's own texture)
+	int png_texture = -1;      ///< and its index in textures, -1 none
 	std::vector<uint16_t> tri_group;   ///< with groups, each triangle's: n the node groups[n - 1] it is under, 0 none
 	std::vector<uint16_t> tri_mark;    ///< with marks, each triangle's: n the node marks[n - 1] it is under, 0 none
 	std::vector<uint8_t> tri_glass;    ///< with a glass suffix, each triangle: 1 under a node whose name ends so
@@ -1271,10 +1272,13 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			_texture_covers[bytes.get()] = TextureCoverMade{bytes, std::move(cover)};
 		}
 		if (!normals || mesh.nrm.size() != mesh.pos.size()) mesh.nrm.clear();
-		/* A building's one texture: the first material's. */
+		/* A building's own texture: the first material's (the others' its own after its add-ons', TakeGlbMesh()). */
 		if (first_material >= 0) {
 			auto it = material_texture.find(first_material);
-			if (it != material_texture.end() && it->second < mesh.textures.size() && mesh.textures[it->second].png != nullptr) mesh.png = *mesh.textures[it->second].png;
+			if (it != material_texture.end() && it->second < mesh.textures.size() && mesh.textures[it->second].png != nullptr) {
+				mesh.png = *mesh.textures[it->second].png;
+				mesh.png_texture = it->second;
+			}
 		}
 	} catch (const std::exception &e) {
 		Debug(misc, 0, "3D object {}: {}", path, e.what());
@@ -1803,6 +1807,39 @@ static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 	obj.tri = std::move(mesh.tri);
 	obj.png = std::move(mesh.png);
 	if (!mesh.nrm.empty()) obj.light = CornerLight(mesh.nrm);
+	/* The triangles of its other materials each with its material's texture (Textures()), numbered 1, 2, ... here and
+	 * moved past its add-ons' when those are laid in (LayAddons()). All of them drew the first material's: the forest's
+	 * grass and ferns the ground's picture, its stumps a stripe of it (the player, 25. 10.: "two boards through each
+	 * other all over the clearing, and one trunk is red"). */
+	if (mesh.png_texture < 0 || mesh.tri_tex.size() != obj.tri.size() / 3) return;
+	std::vector<int> number(mesh.textures.size(), -1);
+	number[mesh.png_texture] = 0;
+	std::vector<uint8_t> tri_tex(mesh.tri_tex.size(), 0);
+	for (size_t t = 0; t < mesh.tri_tex.size(); t++) {
+		const uint8_t k = mesh.tri_tex[t];
+		if (k >= number.size()) continue;
+		if (number[k] < 0) {
+			/* (Room for its add-ons before them: a byte numbers all.) */
+			if (obj.material_pngs.size() >= UINT8_MAX / 2) {
+				number[k] = 0;
+			} else {
+				obj.material_pngs.push_back(mesh.textures[k].png);
+				obj.material_flats.push_back(mesh.textures[k].flat);
+				number[k] = static_cast<int>(obj.material_pngs.size());
+			}
+		}
+		tri_tex[t] = static_cast<uint8_t>(number[k]);
+	}
+	if (obj.material_pngs.empty()) return;
+	obj.material_levels.assign(obj.material_pngs.size(), nullptr);
+	obj.corner_tex.assign(obj.pos.size() / 3, 0);
+	for (size_t t = 0; t < tri_tex.size(); t++) {
+		for (int k = 0; k < 3; k++) {
+			const uint32_t c = obj.tri[t * 3 + k];
+			if (c < obj.corner_tex.size()) obj.corner_tex[c] = tri_tex[t];
+		}
+	}
+	obj.tri_tex = std::move(tri_tex);
 }
 
 /**
@@ -4240,6 +4277,7 @@ enum LazyThing : int {
 	LAZY_SIMPLER = 5000,     ///< + the level
 	LAZY_HOUSE_SHAPE = 6000, ///< + the level
 	LAZY_HOUSE_MASK = 7000,  ///< + the part painted a colour
+	LAZY_HOUSE_MATERIAL = 8000, ///< + its other material (ThreeDObject::MaterialTexture())
 	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its halves mixed into sixteen bits)
 };
 
@@ -6598,8 +6636,10 @@ static std::shared_ptr<const ThreeDObjectShape> MakeHouseShape(const ThreeDObjec
 static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 {
 	if (house.addon_places.empty()) return;
-	read.tri_tex.assign(read.tri.size() / 3, 0);
-	read.corner_tex.assign(read.pos.size() / 3, 0);
+	/* Its own triangles keep their textures (its other materials', TakeGlbMesh()), moved past the add-ons' below. */
+	const size_t own_tris = read.tri.size() / 3, own_corners = read.pos.size() / 3;
+	read.tri_tex.resize(own_tris, 0);
+	read.corner_tex.resize(own_corners, 0);
 	size_t laid = 0;
 	for (const ThreeDObjectFigure &place : house.addon_places) {
 		auto found = _three_d_addons.find(place.figure);
@@ -6688,6 +6728,15 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		for (size_t i = 0; i + 2 < a.lights.size(); i += 3) lay(&a.lights[i], read.lights);
 		laid++;
 	}
+	/* Its other materials' textures after the add-ons' (Textures()); past a byte, its own. */
+	if (!read.material_pngs.empty() && !read.addon_objects.empty()) {
+		const size_t shift = read.addon_objects.size();
+		auto past = [&](uint8_t &tex) {
+			if (tex != 0) tex = tex + shift <= UINT8_MAX ? static_cast<uint8_t>(tex + shift) : 0;
+		};
+		for (size_t t = 0; t < own_tris; t++) past(read.tri_tex[t]);
+		for (size_t i = 0; i < own_corners; i++) past(read.corner_tex[i]);
+	}
 	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
 }
 
@@ -6757,6 +6806,9 @@ bool ThreeDObject::Read() const
 			self.light = std::move(r.light);
 			self.tri_tex = std::move(r.tri_tex);
 			self.corner_tex = std::move(r.corner_tex);
+			self.material_pngs = std::move(r.material_pngs);
+			self.material_flats = std::move(r.material_flats);
+			self.material_levels.assign(self.material_pngs.size(), nullptr);
 			self.addon_objects = std::move(r.addon_objects);
 			self.addon_places_of = std::move(r.addon_places_of);
 			self.passable_tris = std::move(r.passable_tris);
@@ -7049,6 +7101,7 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
  */
 const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
 	if (texture == 0 || texture > this->addon_objects.size()) return this->GetTexture(level, paint);
 	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level, paint);
 }
@@ -7056,8 +7109,37 @@ const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level
 /** A texture of the building's triangles if it is made already (as TryGetTexture()); else made in the background. */
 const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int level, uint32_t paint) const
 {
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, false);
 	if (texture == 0 || texture > this->addon_objects.size()) return this->TryGetTexture(level, paint);
 	return _three_d_objects[this->addon_objects[texture - 1]].TryGetTexture(level, paint);
+}
+
+/**
+ * The texture of another material of its file (material_pngs) at a level of detail, as it is (the building's colours
+ * paint only its own): made once for all the objects with the same picture (ThreeDTextureLevelsOf()) -- the forest's
+ * four parts share their grass.
+ * @param now made here if it is not yet (on whichever thread); else made in the background and nullptr meanwhile
+ */
+const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int level, bool now) const
+{
+	MarkThreeDUsed(this->used);
+	const int thing = LAZY_HOUSE_MATERIAL + static_cast<int>(material);
+	auto made = [this, material] { return material < this->material_levels.size() && this->material_levels[material] != nullptr; };
+	auto make = [this, material, thing, made] {
+		MakeOnce(this, thing, made, [this, material] { return ThreeDTextureLevelsOf(this->material_pngs[material], this->material_flats[material]); },
+				[this, material](ThreeDTextureLevels levels) {
+					if (material < this->material_levels.size()) this->material_levels[material] = std::move(levels);
+				});
+	};
+	if (now) {
+		make();
+	} else if (!MadeOrAsked(this, thing, made, make)) {
+		return nullptr;
+	}
+	std::lock_guard lock(_lazy_mutex);
+	if (!made() || this->material_levels[material]->empty()) return nullptr;
+	const std::vector<ThreeDObjectTexture> &levels = *this->material_levels[material];
+	return &levels[std::clamp<int>(level, 0, static_cast<int>(levels.size()) - 1)];
 }
 
 /**
@@ -7188,6 +7270,7 @@ void ThreeDObject::Forget() const
 	std::lock_guard lock(_lazy_mutex);
 	this->levels.clear();
 	this->levels.shrink_to_fit();
+	for (ThreeDTextureLevels &material : this->material_levels) material.reset();
 	size_t painted = 0;
 	for (const auto &[key, t] : this->painted) painted += t.px.size() * sizeof(uint32_t);
 	this->painted.clear();

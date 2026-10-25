@@ -9589,9 +9589,9 @@ bool _cab_full_textures = false;
 static constexpr float CAB_FIGURE_SCALE = THREE_D_EYE_PEOPLE_SCALE;
 
 /** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
-void AddCabFigure(std::string_view name, float size, int x, int y, int z, float facing, int frame)
+void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame)
 {
-	_cab_figures.push_back({std::string(name), size, static_cast<double>(x), static_cast<double>(y), static_cast<double>(z), facing, frame});
+	_cab_figures.push_back({std::string(name), size, x, y, z, facing, frame});
 }
 
 /**
@@ -11511,14 +11511,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						AddCabPlant(f.figure, f.scale, f.stretch, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
 					}
 				}
-				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, CAB_FIGURE_SCALE, static_cast<int>(ox + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(oy + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, CAB_FIGURE_SCALE, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
 				if (ft.road != nullptr) {
 					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
 					const int road_z = GetTilePixelZ(road_tile);
 					if (ft.shed != nullptr) objects.push_back({ft.shed, road_tile, road_z});
 					if (ft.hay != nullptr) objects.push_back({ft.hay, road_tile, road_z});
 					for (int edge = 0; edge < 2; edge++) {
-						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, CAB_FIGURE_SCALE, static_cast<int>(TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE), static_cast<int>(TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE), static_cast<int>(road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE), f.facing, -1);
+						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, CAB_FIGURE_SCALE, TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE, TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE, road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
 					}
 				}
 			}
@@ -11560,9 +11560,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				AddCabVehicle(ev, false);
 				return;
 			}
+			/* Where its record says, not rounded to whole units of the world (some 0.93 m, and 0.375 m up): the stadium's
+			 * spit stood a foot beside the grill's forks and above them (the player, 25. 10.: "the rod ends too early
+			 * before the fork it should lie in"). */
 			const ThreeDVehicleObject *fig = GetThreeDFigure(f.figure);
-			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, static_cast<int>(std::lround(ox + f.at[0] * OBJECT_UNITS_PER_METRE)), static_cast<int>(std::lround(oy + f.at[1] * OBJECT_UNITS_PER_METRE)),
-					static_cast<int>(std::lround(oz + f.at[2] * OBJECT_HEIGHT_PER_METRE)), f.facing, -1);
+			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE,
+					oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
 		};
 		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
 		for (const ThreeDObjectFigure &f : co.more) add(f);

@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (3) – paseka (tráva, kapradí, klády), rožeň, záloha letu draků z #299
+
+- **Paseka v lese (hráč: „dvě desky skrz sebe po celé pasece a jeden kmen je červený“, „dělá to ta tráva“):**
+  příčina – budova (ThreeDObject) měla jen **jeden** obrázek: první materiál z glb. Model paseky má materiálů víc
+  (tráva, kapradí, klády, zem) a každý se svým UV; všechny trojúhelníky ale četly obrázek prvního materiálu.
+  Tráva a kapradí (dvě zkřížené desky) tak měly cizí obrázek a místo průhledných stébel byly vidět plné desky;
+  kláda trefila UV pruhem červenou kytku v obrázku země. Oprava: každý materiál budovy má **vlastní obrázek**
+  (číslo 0 vlastní první, 1..A doplňky, A+1.. další materiály; `material_pngs`/`material_flats`, dělají se líně
+  při prvním kreslení přes `MaterialTexture`, sdílí se podle bajtů png jako ostatní). Ověřeno v rigu z očí
+  i na otočené ploše, hráč: „jo to je hezkej les“.
+- **Rožeň u stadionu (hráč: „tyčka končí moc brzo před vidličkou“):** příčina – postavy u domů (prase na rožni,
+  holky, dělníci) se z očí kladly na **celé jednotky** světa (~0,93 m), rožeň tak ujel až o stopu vedle vidlic.
+  `AddCabFigure` teď bere přesné souřadnice (double). Data: rožeň `poloha z` 0,95 → 1,01 a `meritko` 1,0 → 1,08
+  (osa ve výřezu vidlice 0,99 m + poloměr tyče; tyč ±0,95 skrz vidlice ±0,98..1,02). Naše `objekty/mirne` se tu
+  liší od kopie v grrrrf (kolegova má 0,95/1,0). Hráč pak „tak to je jedno ten gril“ – hotové je to stejně.
+- **Záloha letu draků z #299 (hráč: „litali moc hezky… zálohuj to, kdybychom se k tomu chtěli vrátit… litali
+  v kruhu a tím to bylo… tak by lital jenom jeden“):** #299 = commit **1290626**. Tam `Flyer(k)` bral náhradníka
+  z **všech** letců indexu („let“), volal se jako `Flyer(k + id.base())` u farmy a `Flyer(a.vehicle)` u útoku na
+  vozidlo – proto nad farmou kroužil i velký modrý a čínský. Od f224485 je to `FarmFlyer(obj, k)` jen z letců té
+  farmy (mista_draku). Návrat: `git show 1290626:openttd/src/three_d_dragons.cpp` a vrátit ta dvě volání; kroužení
+  samo (dráha) se nezměnilo. Co je hezčí, řekne #300.
+- Vedlejší: šedé koruny stromů v prvním snímku karty po načtení – stejné i bez téhle změny (zástupný obrázek,
+  než se dodělá textura stromu), ne regrese.
+- Kontroly: build, clang narrowing 0, MinGW 0, kouřová baterie zakl spojeno=1, mezera/depoodpoj 0 = základna.
+
 ## 25. 10. (2) – zem bez čekání, čarodějnice, dračí farma bez „Falca“, logy do save, Esc z očí
 
 - **Zem otočené plochy bez čekání (#190, k buildu #300):** pokládání země bloku kartou (warp drženého obrázku
@@ -60,9 +85,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   ~10°/s po 0,35 s, pak rozjezd do plné 115°/s za 1,1 s („šipkama o velký kus, nezatočim kam chci“).
 - Kontroly: build, clang narrowing 0, MinGW 0, determinismus snímku (jen text lišty), kouřová baterie
   zakl/mezera/depoodpoj = stabilní základna.
-- **Zbývá (hráč):** nastavení poruch – „draci způsobují poruchy“ ano/ne (výchozí ano) a „dosah draků z farmy“
-  (výchozí dnešní DRAGON_REACH_TILES + vyšší volby) do možností hry k poruchám; hráč svolil zadat nižšímu
-  modelu. Spomalení při letu čarodějnice: hráč si zobrazí počet snímků, rozpad „okna“ v deníku ukáže.
+- **Hotovo (1c6e9cd, nižší model):** v možnostech hry u poruch „draci způsobují poruchy“ ano/ne (výchozí ano)
+  a „dosah draků z farmy“ (výchozí 12 polí, až 96 po 4). **Zbývá:** spomalení při letu čarodějnice – hráč si
+  zobrazí počet snímků, rozpad „okna“ v deníku ukáže.
 
 ## 25. 10. – přechod na GPU: dávky domů bez čekání, při otáčení poslední obrázek domu
 

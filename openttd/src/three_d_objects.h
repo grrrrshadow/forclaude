@@ -240,8 +240,13 @@ struct ThreeDObject {
 	 * the player, 18. 10.: "the parasols, the bicycles a colour by number") -- a texture of its own at each place, each
 	 * its own colour (AddonPaintAt()); UINT16_MAX a texture shared by all its places. */
 	std::vector<uint16_t> addon_places_of;
-	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s; empty all its own
+	std::vector<uint8_t> tri_tex;     ///< each triangle's texture: 0 its own, n the add-on addon_objects[n - 1]'s, past those its other materials'; empty all its own
 	std::vector<uint8_t> corner_tex;  ///< each corner's texture so
+	/* Its file's other materials (a scene of several: the forest's parts, the grass and the ferns beside the ground and
+	 * the atlas of its stumps), each its own texture after its add-ons': texture 1 + addon_objects.size() + n is n's. */
+	std::vector<ThreeDTextureBytes> material_pngs; ///< their pictures as in the file; nullptr: only the material's colour
+	std::vector<uint32_t> material_flats;          ///< their colours where they have no picture
+	mutable std::vector<ThreeDTextureLevels> material_levels; ///< their textures, made the first time drawn (MaterialTexture())
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
 	float trunk_r = 0;                ///< an add-on's "kmen_r" (a tree), metres at size 1: only its trunk stands in the way, not its crown; 0 all of it
 	std::vector<uint32_t> passable_tris; ///< the triangles of its laid trees that stand in no one's way (trunk_r), first and end of each run
@@ -294,8 +299,9 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	uint32_t AddonPaintAt(TileIndex origin, uint8_t texture) const;
-	/** How many textures its triangles have: its own and its add-ons'. */
-	size_t Textures() const { return 1 + this->addon_objects.size(); }
+	/** How many textures its triangles have: its own, its add-ons' and its other materials'. */
+	size_t Textures() const { return 1 + this->addon_objects.size() + this->material_pngs.size(); }
+	const ThreeDObjectTexture *MaterialTexture(size_t material, int level, bool now) const;
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
 	ThreeDObjectShapeView TryGetShape(int level) const;
