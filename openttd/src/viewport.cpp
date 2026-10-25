@@ -11617,7 +11617,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const int z = GetTileMaxPixelZ(_cur_ti.tile);
 			std::span<const ThreeDObjectFigure> girls;
 			if (IsIndustryCompleted(_cur_ti.tile) && HasGirls(Industry::GetByTile(_cur_ti.tile))) girls = forest->girls;
-			if (forest->ground != nullptr) objects.push_back({forest->ground, _cur_ti.tile, z, girls});
+			if (const ThreeDObject *obj = forest->ground; obj != nullptr) {
+				/* The forester's cabin with its interior: near, as a house's (the colleague's les_paseka_srub). */
+				const ThreeDObject *in = GetThreeDInterior(obj);
+				const bool near = in != nullptr && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < (CAB_INTERIOR_TILES + 1) * TILE_SIZE;
+				objects.push_back({near ? GetThreeDOutsideOfInterior(obj) : obj, _cur_ti.tile, z, girls});
+				if (near) {
+					objects.push_back({in, _cur_ti.tile, z});
+					for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, _cur_ti.tile, k), _cur_ti.tile, z});
+				}
+			}
 		} else if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
 			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
 			const Industry *ind = Industry::GetByTile(_cur_ti.tile);

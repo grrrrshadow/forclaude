@@ -283,7 +283,15 @@ static bool FirstPersonWalkable(double x, double y)
 			/* The forest with a clearing: among the trunks of its trees, round the cabin, the high seat and the logs. */
 			if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
 				const double lx = x - TileX(tile) * TILE_SIZE, ly = y - TileY(tile) * TILE_SIZE;
-				return forest->ground == nullptr || !forest->ground->Blocks(lx, ly);
+				const ThreeDObject *obj = forest->ground;
+				if (obj == nullptr) return true;
+				if (obj->Blocks(lx, ly)) return false;
+				/* The cabin's interior and the wings of its door, as a house's. */
+				if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+				for (size_t k = 0; k < obj->door_wings.size(); k++) {
+					if (GetThreeDDoorWing(obj, tile, k)->Blocks(lx, ly)) return false;
+				}
+				return true;
 			}
 			/* One of the game's own that is a 3D object (the pub, the distillery): by its shape, as a house. Being built a
 			 * wall, but the forest: its trees stand at once (ThreeDOriginalIndustryTileStands()). */
@@ -1783,19 +1791,21 @@ VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e)
  * The rig: the walker so many metres from a vehicle, at an angle from its front (0 before it, 90 on its left, 180
  * behind it), looking at it.
  */
-/** The rig ('test3d chodec dum <x> <y> <metres x> <metres y> <degrees>'): the walker at a place of the house on a tile, looking the way given (0 along +x). */
+/**
+ * The rig ('test3d chodec dum <x> <y> <metres x> <metres y> <degrees>'): the walker at a place of the house on a tile
+ * (or of what else has rooms: the dragon castle, the forester's cabin), looking the way given (0 along +x).
+ */
 std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double heading_deg)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	if (!IsTileType(tile, TileType::House)) return "tam neni dum";
-	HouseID north = GetHouseType(tile);
-	const TileIndex origin = tile + GetHouseNorthPart(north);
+	TileIndex origin = tile;
+	const ThreeDObject *house = GetThreeDObjectWithRoomsAt(tile, origin);
+	if (house == nullptr && !IsTileType(tile, TileType::House)) return "tam neni dum";
 	w->walker.x = TileX(origin) * TILE_SIZE + mx * OBJECT_UNITS_PER_METRE;
 	w->walker.y = TileY(origin) * TILE_SIZE + my * OBJECT_UNITS_PER_METRE;
 	w->walker.heading = heading_deg * M_PI / 180.0;
 	w->walker.pitch = 0;
-	const ThreeDObject *house = GetThreeDHouseObjectAt(north, origin);
 	const ThreeDObject *in = GetThreeDInterior(house);
 	if (in != nullptr) in->Read(); // the rig: read now, there in the picture
 	const bool inside = ThreeDInsideInterior(house, mx * OBJECT_UNITS_PER_METRE, my * OBJECT_UNITS_PER_METRE);

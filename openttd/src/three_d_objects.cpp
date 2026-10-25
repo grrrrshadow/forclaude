@@ -1982,11 +1982,79 @@ static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 }
 
 /**
+ * Leave out of a mesh what lies in an interior's box (a few centimetres more every way: its walls are the house's),
+ * and the wings of the doors, drawn on their own (ThreeDObject::outside).
+ * @param interior_path the interior's file
+ */
+static void CutOutInteriorBox(GlbMesh &mesh, const std::string &interior_path)
+{
+	GlbMesh in;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	if (!ReadGlbMesh(interior_path, in, o) || in.pos.empty()) return;
+	double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+	for (size_t i = 0; i + 2 < in.pos.size(); i += 3) {
+		x0 = std::min<double>(x0, in.pos[i]); x1 = std::max<double>(x1, in.pos[i]);
+		y0 = std::min<double>(y0, in.pos[i + 1]); y1 = std::max<double>(y1, in.pos[i + 1]);
+	}
+	const double margin = 0.05;
+	auto inside = [&](uint32_t c) {
+		const double x = mesh.pos[c * 3], y = mesh.pos[c * 3 + 1];
+		return x > x0 - margin && x < x1 + margin && y > y0 - margin && y < y1 + margin;
+	};
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex;
+	std::vector<uint16_t> tri_group;
+	const bool texs = mesh.tri_tex.size() == mesh.tri.size() / 3, groups = mesh.tri_group.size() == mesh.tri.size() / 3;
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (inside(mesh.tri[t]) && inside(mesh.tri[t + 1]) && inside(mesh.tri[t + 2])) continue;
+		tri.insert(tri.end(), mesh.tri.begin() + t, mesh.tri.begin() + t + 3);
+		if (texs) tri_tex.push_back(mesh.tri_tex[t / 3]);
+		if (groups) tri_group.push_back(mesh.tri_group[t / 3]);
+	}
+	mesh.tri = std::move(tri);
+	if (texs) mesh.tri_tex = std::move(tri_tex);
+	if (groups) mesh.tri_group = std::move(tri_group);
+}
+
+/** A mesh of a part of the forest with a clearing turned about the middle of its tile by quarter turns: exactly, no rounding of the sines. */
+static void TurnGlbMeshQuarters(GlbMesh &mesh, int quarter_turns)
+{
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
+	if (cs == 1) return;
+	const double middle_m = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0;
+	auto turn = [&](float *p, double middle) {
+		const double dx = p[0] - middle, dy = p[1] - middle;
+		p[0] = static_cast<float>(middle + dx * cs - dy * sn);
+		p[1] = static_cast<float>(middle + dx * sn + dy * cs);
+	};
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) turn(&mesh.pos[i], middle_m);
+	for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) turn(&mesh.nrm[i], 0.0);
+}
+
+/** An object's lights at night (ReadGlbNight(), world units) turned as its mesh (TurnGlbMeshQuarters()). */
+static void TurnNightQuarters(ThreeDObject &obj, int quarter_turns)
+{
+	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
+	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
+	if (cs == 1) return;
+	const double middle = TILE_SIZE / 2.0;
+	auto turn = [&](float *p) {
+		const double dx = p[0] - middle, dy = p[1] - middle;
+		p[0] = static_cast<float>(middle + dx * cs - dy * sn);
+		p[1] = static_cast<float>(middle + dx * sn + dy * cs);
+	};
+	for (size_t i = 0; i + 2 < obj.night_pos.size(); i += 3) turn(&obj.night_pos[i]);
+	for (size_t i = 0; i + 2 < obj.lights.size(); i += 3) turn(&obj.lights[i]);
+}
+
+/**
  * An interior's .glb (the colleague's hra/3d/PROSBA-INTERIERY.md): all its nodes but the lamps lit at night ("noc", read
  * as a house's) and the wings of its doors ("dvere_NN", objects of their own); its floors ("podlaha", "podlaha_N")
  * kept apart too, to be walked on (FloorAt()) and in no one's way (passable_tris).
  */
-static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj)
+static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj, int quarter_turns = 0)
 {
 	static const std::vector<std::string> floors = {"podlaha", "podlaha_1", "podlaha_2", "podlaha_3", "podlaha_4", "podlaha_5", "podlaha_6", "podlaha_7", "podlaha_8", "podlaha_9"};
 	GlbMesh mesh;
@@ -1996,6 +2064,8 @@ static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj)
 	o.skip_prefix = "dvere_";
 	o.groups = &floors;
 	if (!ReadGlbMesh(path, mesh, o)) return false;
+	/* Of a part of the forest, turned as it is (the colleague's forest cabin). */
+	TurnGlbMeshQuarters(mesh, quarter_turns);
 	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
 		if (t / 3 >= mesh.tri_group.size() || mesh.tri_group[t / 3] == 0) continue;
 		for (int k = 0; k < 3; k++) {
@@ -2011,11 +2081,15 @@ static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj)
 	}
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
+	TurnNightQuarters(obj, quarter_turns);
 	return true;
 }
 
-/** The wing of a door ("dvere_NN" of a house's or an interior's .glb): its node alone, turned about its origin, the hinge. */
-static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t turn, ThreeDObject &obj)
+/**
+ * The wing of a door ("dvere_NN" of a house's or an interior's .glb): its node alone, turned about its origin, the
+ * hinge; of a part of the forest then as the part is turned.
+ */
+static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t turn, ThreeDObject &obj, int quarter_turns = 0)
 {
 	GlbMesh mesh;
 	std::vector<float> hinge;
@@ -2038,6 +2112,7 @@ static bool ReadGlbDoor(const std::string &path, const std::string &node, int8_t
 			mesh.nrm[i + 1] = static_cast<float>(x * s + y * c);
 		}
 	}
+	TurnGlbMeshQuarters(mesh, quarter_turns);
 	TakeGlbMesh(mesh, obj);
 	return true;
 }
@@ -2081,40 +2156,13 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		GlbReadOptions o;
 		o.all_nodes = true;
 		o.skip_night = true;
-		o.skip_prefix = "dvere_";
+		if (!obj.outside_of.empty()) o.skip_prefix = "dvere_";
 		o.skip_nodes = &obj.left_out;
 		if (!ReadGlbMesh(path, mesh, o)) return false;
 	} else if (!ReadGlbMesh(path, mesh)) {
 		return false;
 	}
-	if (!obj.outside_of.empty()) {
-		/* Without what lies in the interior's box (a few centimetres more every way: its walls are the house's). */
-		GlbMesh in;
-		GlbReadOptions o;
-		o.all_nodes = true;
-		if (ReadGlbMesh(obj.outside_of, in, o) && !in.pos.empty()) {
-			double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-			for (size_t i = 0; i + 2 < in.pos.size(); i += 3) {
-				x0 = std::min<double>(x0, in.pos[i]); x1 = std::max<double>(x1, in.pos[i]);
-				y0 = std::min<double>(y0, in.pos[i + 1]); y1 = std::max<double>(y1, in.pos[i + 1]);
-			}
-			const double margin = 0.05;
-			auto inside = [&](uint32_t c) {
-				const double x = mesh.pos[c * 3], y = mesh.pos[c * 3 + 1];
-				return x > x0 - margin && x < x1 + margin && y > y0 - margin && y < y1 + margin;
-			};
-			std::vector<uint32_t> tri;
-			std::vector<uint8_t> tri_tex;
-			const bool texs = mesh.tri_tex.size() == mesh.tri.size() / 3;
-			for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
-				if (inside(mesh.tri[t]) && inside(mesh.tri[t + 1]) && inside(mesh.tri[t + 2])) continue;
-				tri.insert(tri.end(), mesh.tri.begin() + t, mesh.tri.begin() + t + 3);
-				if (texs) tri_tex.push_back(mesh.tri_tex[t / 3]);
-			}
-			mesh.tri = std::move(tri);
-			if (texs) mesh.tri_tex = std::move(tri_tex);
-		}
-	}
+	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
 	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
@@ -2331,7 +2379,7 @@ static void ReadPlants(const nlohmann::json &e, ThreeDObject &obj)
  * @param obj the house, its file's path set
  */
 static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig);
-static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj, bool outside = false)
+static void ReadInterior(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj, bool outside = false, int8_t quarter_turns = -1)
 {
 	if (!e.contains("interier")) return;
 	const auto &in = e.at("interier");
@@ -2354,6 +2402,7 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 	interior.tiles_y = obj.tiles_y;
 	interior.glb_path = folder + file;
 	interior.is_interior = true;
+	interior.scene_turns = quarter_turns;
 	if (in.is_object() && in.contains("postavy") && in.at("postavy").is_array()) {
 		for (const auto &f : in.at("postavy")) {
 			ThreeDObjectFigure fig;
@@ -2372,6 +2421,7 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 				wing.glb_path = path;
 				wing.door_node = node;
 				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
+				wing.scene_turns = quarter_turns;
 				wings[k] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(wing));
 			}
@@ -2837,26 +2887,18 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 	o.all_nodes = true;
 	o.skip_night = true;
 	o.groups = &solid;
+	/* Without its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
+	if (!obj.outside_of.empty()) o.skip_prefix = "dvere_";
 	if (!ReadGlbMesh(path, mesh, o)) return false;
-	static constexpr int COS[4] = {1, 0, -1, 0}, SIN[4] = {0, 1, 0, -1};
-	const int cs = COS[quarter_turns & 3], sn = SIN[quarter_turns & 3];
-	const double middle_m = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0;
-	auto turn = [&](auto *p, double middle) {
-		const double dx = p[0] - middle, dy = p[1] - middle;
-		p[0] = static_cast<std::remove_reference_t<decltype(p[0])>>(middle + dx * cs - dy * sn);
-		p[1] = static_cast<std::remove_reference_t<decltype(p[0])>>(middle + dx * sn + dy * cs);
-	};
-	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) turn(&mesh.pos[i], middle_m);
-	for (size_t i = 0; i + 2 < mesh.nrm.size(); i += 3) turn(&mesh.nrm[i], 0.0);
+	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
+	TurnGlbMeshQuarters(mesh, quarter_turns);
 	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
 		if ((mesh.tri_group[t] == 0) != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
 	}
 	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
-	const double middle = TILE_SIZE / 2.0;
-	for (size_t i = 0; i + 2 < obj.night_pos.size(); i += 3) turn(&obj.night_pos[i], middle);
-	for (size_t i = 0; i + 2 < obj.lights.size(); i += 3) turn(&obj.lights[i], middle);
+	TurnNightQuarters(obj, quarter_turns);
 	return true;
 }
 
@@ -2932,6 +2974,8 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 		obj.addon_places = trees_read.addon_places;
 		for (ThreeDObjectFigure &f : obj.addon_places) turn(f);
+		/* Its interior and the wings of its doors as a house's, turned as it is (the colleague's forest cabin). */
+		ReadInterior(e, folder, obj, true, static_cast<int8_t>(k));
 		ForestPartRead &r = _forest_parts_read[part][k];
 		r.ground = _three_d_objects.size();
 		_three_d_objects.push_back(std::move(obj));
@@ -6091,6 +6135,12 @@ const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin
 		origin = tile + GetHouseNorthPart(north);
 		return GetThreeDHouseObjectAt(north, origin);
 	}
+	if (const ThreeDForestPart *forest = IsTileType(tile, TileType::Industry) ? ThreeDGameForestPartAt(tile) : nullptr; forest != nullptr) {
+		/* A part of the forest with a clearing with a cabin to go into. */
+		if (forest->ground == nullptr || (forest->ground->interior == SIZE_MAX && forest->ground->door_wings.empty())) return nullptr;
+		origin = tile;
+		return forest->ground;
+	}
 	if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
 		const Industry *ind = Industry::GetByTile(tile);
 		const ThreeDObject *obj = GetThreeDIndustryObjectOf(ind);
@@ -7014,9 +7064,9 @@ bool ThreeDObject::Read() const
 		 * (ReadInterior()) read as they are. */
 		bool ok;
 		if (!this->door_node.empty()) {
-			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read);
+			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read, std::max<int>(0, this->scene_turns));
 		} else if (this->is_interior) {
-			ok = ReadGlbInterior(this->glb_path, read);
+			ok = ReadGlbInterior(this->glb_path, read, std::max<int>(0, this->scene_turns));
 		} else if (this->scene_turns >= 0) {
 			ok = ReadGlbScene(this->glb_path, read, this->scene_turns);
 		} else {

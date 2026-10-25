@@ -8852,7 +8852,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		if (argv[4] == "les") type = forest;
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka>' (test3d objekty lists them; paseka the forest with a clearing).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]>' (test3d objekty lists them; paseka the forest with a clearing).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
@@ -8861,6 +8861,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST)) {
 			Industry *ind = Industry::GetByTile(tile);
 			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
+			/* The forest with a clearing: its random bits as given (the cabin's tile, the path's place), the rig builds with none. */
+			if (type == IT_GAME_FOREST && argv.size() > 5) ind->random = static_cast<uint16_t>(number(5).value_or(0));
 			/* Built at once, for the pictures (the game builds it in stages). */
 			for (TileIndex t : ind->location) {
 				if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index) continue;

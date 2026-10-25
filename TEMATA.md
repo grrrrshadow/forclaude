@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 25. 10. (10) – sdílené textury přes uri, interiér dračího hradu a srubu hajného
+
+- **Textury přes `uri`** (`274dfe9`, kolegova volba 1): obrázek glb může být soubor vedle .glb (cesta relativně ke
+  glb, ve stejné složce nebo taru). Hra ho čte `GlbImageBeside()` na obou místech, kde čte obrázky.
+- **Interiér a dveře průmyslu** (`921fa3d`) jako u domu: `interier` a uzly `dvere_NN` u průmyslu (síň dračího hradu).
+  Zblízka (do `CAB_INTERIOR_TILES` + velikost) se kreslí obal bez krabice interiéru (`ThreeDObject::outside`,
+  `CutOutInteriorBox()` – trojúhelníky celé uvnitř krabice interiéru ±5 cm pryč), interiér a křídla dveří; zdálky
+  celý obal i se zavřenými dveřmi. Chůze, E u dveří a „uvnitř“ přes `GetThreeDObjectWithRoomsAt()`.
+- **Srub hajného** (`les_paseka_srub`, díl lesa otočený po čtvrtotáčkách): interiér, křídlo dveří a obal bez
+  interiéru se čtou pro každé otočení zvlášť a otáčejí se kolem středu dlaždice stejně jako díl
+  (`TurnGlbMeshQuarters()`, `TurnNightQuarters()`). Rig: všechna 4 otočení (`test3d postav x y paseka <bity>` –
+  rig dřív stavěl s náhodou 0, srub byl vždy na (1,1)); E otevře dveře, uvnitř postel, stůl, sud. Rig příkaz
+  `chodec dum` umí i srub a hrad.
+- Viděno v rigu: mezi kládami zadní stěny srubu zevnitř prosvítá světlo (asi mezery v modelu) – zeptat se kolegy.
+
 ## 25. 10. (9) – od kolegy: přebalené sady, strašidla v lese, světla pozpátku, dračí hrad
 
 - **Hráč: „si to dodělej“** (všechno od kolegy, i sdílené textury přes `uri`).
