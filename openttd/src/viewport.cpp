@@ -5054,8 +5054,8 @@ static void HideTurnedCardGround()
 static bool TurnedCardGroundUsable(const DrawPixelInfo &frame)
 {
 	if (!_turned_card_ground_on || _turned_vp == nullptr || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return false;
-	/* Not into a screenshot, and not at night: the night darkens and lights the ground's pixels (DrawNight()). */
-	if (_screen_disable_anim || IsNightNow() || frame.dst_ptr == nullptr) return false;
+	/* Not into a screenshot. */
+	if (_screen_disable_anim || frame.dst_ptr == nullptr) return false;
 	const Window *main = GetMainWindow();
 	if (main == nullptr || main->viewport == nullptr || static_cast<const Viewport *>(main->viewport.get()) != _turned_vp) return false;
 	/* The blitter that draws over a hole as over what shows through it (Blitter_40bppAnim::ComposeOver()). */
@@ -5130,12 +5130,12 @@ static bool TurnedCardGroundHas(const DrawPixelInfo &frame, int &bx, int &by)
 	return true;
 }
 
-/** The ground of a block laid into the picture of the view's ground (TurnedCardGround), at bx, by of it; and the picture shown. */
+/** The ground of a block laid into the picture of the view's ground (TurnedCardGround), at bx, by of it. */
 static void TurnedCardGroundLaid(int bx, int by, int fw, int fh)
 {
 	TurnedCardGround &g = _turned_card_ground;
 	uint64_t made = 0;
-	const uint32_t name = ThreeDGpuViewGround(&made);
+	ThreeDGpuViewGround(&made);
 	if (made != g.made) {
 		/* Made anew for this block: what it held before is gone. */
 		std::fill(g.have.begin(), g.have.end(), 0);
@@ -5143,9 +5143,19 @@ static void TurnedCardGroundLaid(int bx, int by, int fw, int fh)
 	}
 	const int x0 = std::max(0, bx), x1 = std::min(g.w, bx + fw);
 	for (int y = std::max(0, by); y < std::min(g.h, by + fh) && x0 < x1; y++) std::fill_n(&g.have[static_cast<size_t>(y) * g.w + x0], x1 - x0, 1);
+}
+
+static uint32_t NightLightOfCard();
+
+/** The picture of the view's ground shown by the video driver (TurnedCardGround), in the night's light when it is night. */
+static void ShowTurnedCardGround()
+{
+	TurnedCardGround &g = _turned_card_ground;
+	const uint32_t name = ThreeDGpuViewGround();
+	if (g.vp == nullptr) return;
 	const Viewport &vp = *g.vp;
 	const bool was = g.shown;
-	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&_turned_card_ground, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, true);
+	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&_turned_card_ground, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, true, NightLightOfCard());
 	/* Shown first now: the blocks drawn before it are drawn again as holes. */
 	if (g.shown && !was) {
 		Debug(misc, 1, "3D: the turned map's ground shown straight from the graphics card ({}x{})", vp.width, vp.height);
@@ -5300,6 +5310,7 @@ static void FinishTurnedGround(TurnedGroundLaying &lay)
 		const int fw = UnScaleByZoom(lay.frame.width, lay.frame.zoom), fh = UnScaleByZoom(lay.frame.height, lay.frame.zoom);
 		if (laid) {
 			TurnedCardGroundLaid(lay.view_x, lay.view_y, fw, fh);
+			ShowTurnedCardGround();
 		} else {
 			/* The card could not: the processor lays the block's own, whole over the hole. */
 			BlitterFactory::GetCurrentBlitter()->DrawRect(lay.frame.dst_ptr, fw, fh, PixelColour{0});
@@ -5907,6 +5918,7 @@ static void ViewportDoDrawTurned()
 	if (!card_usable && !ground_of_view && ground_laying.kept != nullptr) KeepTurnedGroundOfView(frame);
 	/* Its own ground in the block while the card's picture of the view's is shown: nothing of that through it. */
 	if (!card_has && !ground_laying.into_view) MakeTurnedBlockWhole(frame);
+	if (card_has) ShowTurnedCardGround();
 	double tb0 = TurnedNow();
 	for (const TurnedSprite &s : standing) {
 		const ParentSpriteToDraw *ps = s.ps;
@@ -5992,6 +6004,14 @@ static NightLight GetNightLight()
 	return light;
 }
 
+/** The night's light the picture of the turned view's ground is shown in (TurnedCardGround), 0 by day: as DrawNight() darkens the rest. */
+static uint32_t NightLightOfCard()
+{
+	if (!IsNightNow()) return 0;
+	const NightLight moon = GetNightLight();
+	return Colour(static_cast<uint8_t>(std::min<uint>(255, moon.r)), static_cast<uint8_t>(std::min<uint>(255, moon.g)), static_cast<uint8_t>(std::min<uint>(255, moon.b))).data;
+}
+
 /**
  * How far the night of the title screen is come (SelectGameWindow, the player, 16. 10.: "a long day and then a
  * while of night, round and round"): 0 the day, 1 the night, between them the dusk and the dawn.
@@ -6035,7 +6055,8 @@ static void AddNightLight(uint32_t *dst, int pitch, int w, int h, double cx, dou
 			if (d2 >= 1.0) continue;
 			const double f = strength * (1.0 - d2) * (1.0 - d2);
 			Colour c(row[x]);
-			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+			/* Added to what is there, its alpha kept: over a hole for the card's ground, over what shows through it. */
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f)), c.a).data;
 		}
 	}
 }
@@ -6064,7 +6085,8 @@ static void AddEyeNightLight(uint32_t *dst, const float *zb, int w, int h, doubl
 			if (d2 >= 1.0) continue;
 			const double f = strength * (1.0 - d2) * (1.0 - d2);
 			Colour c(row[x]);
-			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+			/* Added to what is there, its alpha kept: over a hole for the card's ground, over what shows through it. */
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f)), c.a).data;
 		}
 	}
 }
@@ -6096,7 +6118,8 @@ static void AddNightBeam(uint32_t *dst, int pitch, int w, int h, double ax, doub
 			if (d2 >= 1.0) continue;
 			const double f = strength * (1.0 - d2) * (1.0 - along * along);
 			Colour c(row[x]);
-			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f))).data;
+			/* Added to what is there, its alpha kept: over a hole for the card's ground, over what shows through it. */
+			row[x] = Colour(static_cast<uint8_t>(std::min(255.0, c.r + colour.r * f)), static_cast<uint8_t>(std::min(255.0, c.g + colour.g * f)), static_cast<uint8_t>(std::min(255.0, c.b + colour.b * f)), c.a).data;
 		}
 	}
 }

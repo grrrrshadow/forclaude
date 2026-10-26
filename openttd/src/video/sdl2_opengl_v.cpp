@@ -139,11 +139,11 @@ std::optional<std::string_view> VideoDriver_SDL_OpenGL::AllocateContext()
 	return err;
 }
 
-bool VideoDriver_SDL_OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under)
+bool VideoDriver_SDL_OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light)
 {
 	OpenGLBackend *backend = OpenGLBackend::Get();
 	if (backend == nullptr || !backend->CanShowThreeDPictures()) return false;
-	backend->ShowThreeDPicture(owner, r, texture, tint, under);
+	backend->ShowThreeDPicture(owner, r, texture, tint, under, light);
 	return true;
 }
 

@@ -48,12 +48,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     nad zemí z karty správně. Nad neprůhledným pixelem vychází stejně jako dřív.
   - Ovladač videa skládá obrázek karty s obrazovkou jako „přes“ (`s.rgb + (1 − s.a)·karta`) a zem kreslí pod
     obrázkem z očí (`under`).
-  - V noci, u screenshotu, bez sdílení kontextu (vypnutá HW akcelerace) a u jiného blitteru zůstává stará
-    cesta se čtením zpět. Blok, kde zem položil procesor, je celý neprůhledný.
+  - U screenshotu, bez sdílení kontextu (vypnutá HW akcelerace) a u jiného blitteru zůstává stará cesta se čtením
+    zpět. Blok, kde zem položil procesor, je celý neprůhledný.
+  - **Noc kartou taky:** ovladač videa obrázek zemi ztmaví měsíčním světlem (`light`, jako `DarkenRect`
+    zbytku), světla lamp a aut se přičítají a průhlednost nechávají (`AddNightLight`, `AddNightBeam`). Rig: noc
+    karta proti čtení zpět stejně, úvodní obrazovka 90 s celou dobu z karty.
 - **Rig:** `test3d zem ukaz 0|1`. Sdílení kontextu v rigu jen s `SDL_VIDEO_X11_FORCE_EGL=1` (jinak SDL jede přes
   GLX a karta se nesdílí). Otočení 30° a 52°, posun, úvodní obrazovka 90 s se střídáním dne a noci: obrázek
   stejný jako se čtením zpět; liší se jen pole, zvířata a datum, které se mezitím změnily samy.
-- **Zbývá (krok 2):** stojící věci kartou, noc kartou (ztmavení a lampy na zemi), pak domy shora bez čtení zpět.
+- **Zbývá (krok 2):** stojící věci kartou (krabice, mosty, domy z obrázků s hloubkou, auta, sprity), pak domy
+  shora bez čtení zpět. Měřeno na telefonu (test 6, otáčení): zem 155 ms na snímek (krokem 1 pryč), stojící
+  věci dohromady ~50 ms (sprity 18, plakáty 17, modely 10).
 
 ## 26. 10. (7) – deník z telefonu (test 5–8): domy kartou rozbité = Zink 25.1.9, ne jádra
 

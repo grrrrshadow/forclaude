@@ -727,6 +727,7 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 		this->three_d_screen_loc = _glGetUniformLocation(this->three_d_program, "screen");
 		this->three_d_size_loc = _glGetUniformLocation(this->three_d_program, "screen_size");
 		this->three_d_tint_loc = _glGetUniformLocation(this->three_d_program, "tint");
+		this->three_d_light_loc = _glGetUniformLocation(this->three_d_program, "light");
 		_glUseProgram(this->three_d_program);
 		_glUniform1i(tex_location, 0);        // Texture unit 0.
 		_glUniform1i(screen_tex_location, 1); // Texture unit 1.
@@ -1143,6 +1144,8 @@ void OpenGLBackend::Paint()
 				const Colour tint(pic.tint);
 				_glUniform4f(this->three_d_sprite_loc, static_cast<float>(pic.r.left), static_cast<float>(pic.r.top), static_cast<float>(pic.r.right - pic.r.left + 1), static_cast<float>(pic.r.bottom - pic.r.top + 1));
 				_glUniform4f(this->three_d_tint_loc, tint.r / 255.0f, tint.g / 255.0f, tint.b / 255.0f, pic.tint == 0 ? 0.0f : tint.a / 255.0f);
+				const Colour light(pic.light);
+				_glUniform4f(this->three_d_light_loc, pic.light == 0 ? 1.0f : light.r / 256.0f, pic.light == 0 ? 1.0f : light.g / 256.0f, pic.light == 0 ? 1.0f : light.b / 256.0f, 1.0f);
 				_glBindTexture(GL_TEXTURE_2D, pic.texture);
 				_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 			}
@@ -1182,11 +1185,12 @@ void OpenGLBackend::Paint()
  * @param texture the card's, shared with this context
  * @param tint laid over it by its alpha (Colour::data), 0 none
  * @param under shown under the others
+ * @param light its colours multiplied by these, 256ths (Colour::data), 0 as they are
  */
-void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under)
+void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light)
 {
 	std::lock_guard lock(this->three_d_mutex);
-	this->three_d_pictures[owner] = {r, texture, tint, under};
+	this->three_d_pictures[owner] = {r, texture, tint, under, light};
 }
 
 /** A window's picture of the graphics card shown no more. */

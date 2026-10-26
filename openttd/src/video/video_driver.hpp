@@ -116,9 +116,10 @@ public:
 	 * @param texture the card's texture, its top row first
 	 * @param tint laid over it by its alpha (Colour::data), 0 none
 	 * @param under shown under the others (the ground of the turned map under the picture from the eyes)
+	 * @param light its colours multiplied by these, 256ths (Colour::data, the night's moon), 0 as they are
 	 * @return whether it is shown
 	 */
-	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false) { return false; }
+	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false, [[maybe_unused]] uint32_t light = 0) { return false; }
 
 	/**
 	 * A window's picture shown straight from the graphics card no more (the window gone).

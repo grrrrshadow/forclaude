@@ -211,11 +211,12 @@ static const char *_frag_shader_three_d[] = {
 	"uniform sampler2D screen_tex;",
 	"uniform vec2 screen_size;",
 	"uniform vec4 tint;",
+	"uniform vec4 light;",
 	"varying vec2 colour_tex_uv;",
 	"void main() {",
 	"  vec4 s = texture2D(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
 	"  if (s.a > 0.998) discard;",
-	"  gl_FragData[0] = vec4(s.rgb + (1.0 - s.a) * mix(texture2D(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"  gl_FragData[0] = vec4(s.rgb + (1.0 - s.a) * mix(texture2D(colour_tex, colour_tex_uv).rgb * light.rgb, tint.rgb, tint.a), 1.0);",
 	"}",
 };
 
@@ -226,11 +227,12 @@ static const char *_frag_shader_three_d_150[] = {
 	"uniform sampler2D screen_tex;",
 	"uniform vec2 screen_size;",
 	"uniform vec4 tint;",
+	"uniform vec4 light;",
 	"in vec2 colour_tex_uv;",
 	"out vec4 colour;",
 	"void main() {",
 	"  vec4 s = texture(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
 	"  if (s.a > 0.998) discard;",
-	"  colour = vec4(s.rgb + (1.0 - s.a) * mix(texture(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"  colour = vec4(s.rgb + (1.0 - s.a) * mix(texture(colour_tex, colour_tex_uv).rgb * light.rgb, tint.rgb, tint.a), 1.0);",
 	"}",
 };
