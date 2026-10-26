@@ -3239,7 +3239,8 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 			for (int k = 0; k < 3; k++) f.at[k] = v.at("poloha").at(k).get<float>();
 			f.facing = v.value("otoceni", 0.0f);
 			f.scale = std::clamp(v.value("meritko", 1.0f), 0.05f, 20.0f);
-			const float lean = v.value("naklon", 0.0f);
+			/* At most as far as a picture of the map tips an object (ObjectPicture()), the same seen from the eyes. */
+			const float lean = std::clamp(v.value("naklon", 0.0f), -60.0f, 60.0f);
 			if (lean != 0) {
 				const double pitch = -lean * M_PI / 180.0;
 				figure += fmt::format("|^{}", static_cast<int>(std::lround(-lean)));
