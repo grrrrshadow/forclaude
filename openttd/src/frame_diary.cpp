@@ -161,7 +161,10 @@ size_t FrameDiaryMemoryMB()
 	PROCESS_MEMORY_COUNTERS_EX m{};
 	m.cb = sizeof(m);
 	if (!GetProcessMemoryInfo(GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS *>(&m), sizeof(m))) return 0;
-	return m.PrivateUsage >> 20;
+	/* Wine gives no private bytes (the player's phone, 26. 10.: always 0): its committed ones, else its working set. */
+	if (m.PrivateUsage != 0) return m.PrivateUsage >> 20;
+	if (m.PagefileUsage != 0) return m.PagefileUsage >> 20;
+	return m.WorkingSetSize >> 20;
 #elif defined(__linux__)
 	auto f = FileHandle::Open(std::string{"/proc/self/statm"}, "r");
 	if (!f.has_value()) return 0;

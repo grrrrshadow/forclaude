@@ -498,6 +498,13 @@ std::atomic<int> _card_trims = 0;   ///< and how many times it let go of what it
 std::atomic<int64_t> _card_biggest = 0; ///< and the most pixels of a frame of pictures read back at once (its width << 32 | its height)
 uint64_t _card_clock = 0;
 constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.: "today's cards have 8 GB"; 128 MB after #285 was Winlator's old OpenGL)
+/**
+ * As much on a card with no memory of its own, whose memory is the system's (a phone's Mali or Adreno through Zink and
+ * Vortek or VirGL, the processor's llvmpipe): the player's phone, 26. 10., the card holding a gigabyte, the phone's
+ * memory over its limit and Winlator gone.
+ */
+constexpr size_t GPU_BYTES_KEPT_SHARED = 384u * 1024 * 1024;
+size_t _card_budget = GPU_BYTES_KEPT; ///< what the card keeps at most (GPU_BYTES_KEPT, GPU_BYTES_KEPT_SHARED), set at its start
 /* The rows of a frame of pictures drawn and read back at once (DrawPicturesOnCard(), DrawBuildingsOnCard()): more of
  * them in more frames -- one picture taller has a frame of its own. A batch on 2048 x 10378 at once (the rig zoomed in
  * by the town, zink), its frame some 190 MB on the card and its 85 MB read back in one go, the player's phone sharing
@@ -1843,7 +1850,13 @@ bool StartCard(std::string &why, std::string &describe)
 	}
 	Step("preklad programu snimku z oci (shader)");
 	StartEyeFrame();
-	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}{}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target, _frame_programs ? "" : ", the view from the eyes in parts");
+	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
+	const std::string_view name = renderer != nullptr ? renderer : "";
+	_card_budget = GPU_BYTES_KEPT;
+	for (std::string_view shared : {"Mali", "Adreno", "PowerVR", "Vortek", "virgl", "llvmpipe", "softpipe"}) {
+		if (name.find(shared) != std::string_view::npos) _card_budget = GPU_BYTES_KEPT_SHARED;
+	}
+	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}, keeps up to {} MB{}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target, _card_budget >> 20, _frame_programs ? "" : ", the view from the eyes in parts");
 	return true;
 }
 
@@ -1910,10 +1923,10 @@ void EndCard()
 	EndContext();
 }
 
-/** Let go of what the card holds the longest not drawn, till it holds three quarters of GPU_BYTES_KEPT. */
+/** Let go of what the card holds the longest not drawn, till it holds three quarters of what it keeps at most (_card_budget). */
 void TrimCard()
 {
-	if (_card_bytes <= GPU_BYTES_KEPT) return;
+	if (_card_bytes <= _card_budget) return;
 	struct Held {
 		uint64_t used;
 		int kind;
@@ -1928,7 +1941,7 @@ void TrimCard()
 	Step(fmt::format("uvolneni karty ({} MB)", _card_bytes >> 20));
 	_card_trims++;
 	for (const Held &h : held) {
-		if (_card_bytes <= GPU_BYTES_KEPT / 4 * 3) break;
+		if (_card_bytes <= _card_budget / 4 * 3) break;
 		if (h.kind == 0) {
 			GpuShape &s = _card_shapes[h.uid];
 			gl.glDeleteVertexArrays(1, &s.vao);
