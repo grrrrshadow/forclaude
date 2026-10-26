@@ -24,8 +24,7 @@ struct BeamngModel {
 	std::string name;               ///< its name in the purchase list
 	uint16_t id = BEAMNG_ENGINE_ID; ///< its number in the GRF of its folder
 	int make = -1;                  ///< which of the 1203's makes it is, -1 none
-	int year_from = 0;              ///< the year it comes, 0 there in every game
-	int year_to = 0;                ///< the last year it is made, 0 never retiring
+	int year_from = 0;              ///< the year it comes, 0 there in every game; never retired
 	double power_kw = 0;
 	double speed_kmh = 0;
 };
@@ -58,7 +57,6 @@ struct BeamngVehicle {
 	bool has_cab = false;         ///< a camera of the driver given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	int year_from = 0;            ///< "Years" of its info.json: the first year made, 0 none given
-	int year_to = 0;              ///< and the last
 	std::vector<BeamngModel> models; ///< the cars of the purchase list made of it
 	uint32_t grfid = 0;           ///< the GRF's id, of its .zip's and folder's names: one GRF a folder, all its configurations in it
 

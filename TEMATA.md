@@ -35,19 +35,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 
 - Hráč: *„1203 škoda pak 1203 taz a nakonec taz 1500 a 1900D?“*, *„to udělej hezký když to píšeš extra pro 1203“*,
   *„jestli máš z beamng rok tak ho použij“* (u ostatních aut), *„to se má rozbalovat typ auta na dodávku, valník“*.
-- **Éry 1203** (`S1203_MAKES`, jen složka `S1203`): Škoda 1203 1968–1980 (35 kW), TAZ 1203 1981–1992 (35 kW),
-  TAZ 1500 1993–1999 (1433 cm³, 40 kW – odhad, zdroj výkon neuvádí), TAZ 1.9D 1996–1999 (diesel VW 1,9, 47 kW).
-  Každá konfigurace je auto každé éry, do které jí sahají roky z modu; konec z modu platí, jen když je před 1993
-  (De Luxe 1969–1972, mikrobus do 1989, valník do 1990), jinak do konce výroby 1999 (kombi a dodávka mají v modu
-  1995). Rychlost podle třetí odmocniny výkonu. Jména česky: kombi, dodávka, valník, sanitka, pohřební, De Luxe,
-  mikrobus, VB, VB žlutá (police2: nová maska, žlutý nátěr), Spoje.
-- **Roky z BeamNG u všech aut** (`Years` v `info.json` / `info_<konfigurace>.json`): uvedení od `min` (prop 0x00),
-  z nákupu kolem konce `max` (model life 9 + roky − 2, retire early 1: OpenTTD ho stáhne za n let a 7–53 měsíců).
-  Bez `Years` jako dřív (od 1920, navždy).
-- **Hráč hraje s „vozidla nikdy nezastarají“** (`never_expire_vehicles = true` v jeho cfg) – staré éry z nákupu
-  nezmizí, proto jsou **varianty OpenTTD** (prop 0x26): v nákupu se rozbalí typ (Škoda 1203 kombi ▸ dodávka, valník,
-  VB…, stejně TAZ 1203, TAZ 1500, TAZ 1.9D). Rig bez nezastarávání: 1975 jen Škoda, 1985 jen TAZ 1203, 1997 TAZ 1500
-  a 1.9D.
+- **Éry 1203** (`S1203_MAKES`, jen složka `S1203`): Škoda 1203 od 1968 (35 kW), TAZ 1203 od 1981 (35 kW),
+  TAZ 1500 od 1993 (1433 cm³, 40 kW – odhad, zdroj výkon neuvádí), TAZ 1.9D od 1996 (diesel VW 1,9, 47 kW).
+  **Nic nekončí** (hráč: *„nikdy se nezastaví výroba. de luxe by bylo dostupný jen 4 roky. to ne.“*): každá
+  konfigurace je auto každé éry, od roku éry nebo od svého prvního roku z modu (De Luxe od 1969), model life 0xFF.
+  Rychlost podle třetí odmocniny výkonu. Jména česky: kombi, dodávka, valník, sanitka, pohřební, De Luxe, mikrobus,
+  VB, VB žlutá (police2: nová maska, žlutý nátěr), Spoje.
+- **Roky z BeamNG u všech aut**: uvedení od `Years.min` z `info.json` / `info_<konfigurace>.json` (prop 0x00),
+  `max` se nebere; bez `Years` od 1920.
+- **Varianty OpenTTD** (prop 0x26): v nákupu se rozbalí typ (Škoda 1203 kombi ▸ dodávka, valník, VB…, stejně TAZ 1203,
+  TAZ 1500, TAZ 1.9D). Hráč má i tak „vozidla nikdy nezastarají“ (`never_expire_vehicles = true`). Rig 1997: 40 aut.
 - **Jeden GRF na složku auta** (`S1203.grf`, GRF id jako dřív u výchozího auta): všechny konfigurace a éry v něm,
   čísla od 200 (výchozí konfigurace první, takže uložená výchozí 1203 je teď Škoda 1203 kombi). Hráč zapíná jeden
   GRF, ne deset. Výchozí auto čte i `info_<default_pc>.json` (kombi dřív dostalo všechny náklady).

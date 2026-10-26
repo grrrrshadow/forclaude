@@ -558,23 +558,22 @@ static const std::vector<std::string> PEOPLE_CARGOES = {"PASS", "WORK", "PRIS", 
 
 /**
  * Our Škoda 1203 over the years (the player, 26. 10.: "the Škoda 1203, then the TAZ 1203 and at last the TAZ 1500 and
- * the 1.9 D", "make it nice when you write it for the 1203 alone"): made at Vrchlabí to 1981, then at Trnava, the
- * TAZ 1500 with the 1433 cm³ engine from 1993 and the diesel of VW from 1996, the last ones in 1999. Each
- * configuration a car of each make whose years it has; the model the same, the power its make's.
+ * the 1.9 D", "make it nice when you write it for the 1203 alone"): made at Vrchlabí from 1968, then at Trnava from
+ * 1981, the TAZ 1500 with the 1433 cm³ engine from 1993 and the diesel of VW from 1996. Each configuration a car of
+ * each make; the model the same, the power its make's. None of them is ever retired (the player: "the production
+ * never stops").
  */
 struct BeamngMake {
 	std::string_view name;
-	int from, to;   ///< its years, the last one made
+	int from;       ///< the year it comes
 	double kw;      ///< its engine's power
 };
 static constexpr BeamngMake S1203_MAKES[] = {
-	{"Škoda 1203", 1968, 1980, 35}, // 1.2 l, 47 k
-	{"TAZ 1203", 1981, 1992, 35},
-	{"TAZ 1500", 1993, 1999, 40},   // 1433 cm³
-	{"TAZ 1.9D", 1996, 1999, 47},   // the diesel of VW, 1.9 l, 64 k
+	{"Škoda 1203", 1968, 35}, // 1.2 l, 47 k
+	{"TAZ 1203", 1981, 35},
+	{"TAZ 1500", 1993, 40},   // 1433 cm³
+	{"TAZ 1.9D", 1996, 47},   // the diesel of VW, 1.9 l, 64 k
 };
-/** The last make: a configuration the mod makes into it is made to the end, as the 1203 was. */
-static constexpr int S1203_LAST_FROM = 1993;
 /** What each configuration of the 1203 is, in its name. */
 static constexpr std::pair<std::string_view, std::string_view> S1203_KINDS[] = {
 	{"police2", "VB žlutá"}, {"police", "VB"}, {"ambulance", "sanitka"}, {"hearse", "pohřební"}, {"flatbed", "valník"},
@@ -589,7 +588,7 @@ static bool IsS1203(const BeamngVehicle &v)
 
 /**
  * The cars of the purchase list made of a configuration (their numbers in the GRF come later, FindBeamngVehicles()):
- * the car itself in the years of its info.json, or our 1203 as each of its makes.
+ * the car itself from the first year of its info.json, or our 1203 as each of its makes.
  */
 static void MakeModels(BeamngVehicle &v, const std::string &own_config)
 {
@@ -598,7 +597,6 @@ static void MakeModels(BeamngVehicle &v, const std::string &own_config)
 		BeamngModel m;
 		m.name = v.name;
 		m.year_from = v.year_from;
-		m.year_to = v.year_to;
 		m.power_kw = v.power_kw;
 		m.speed_kmh = v.speed_kmh;
 		v.models.push_back(std::move(m));
@@ -615,10 +613,8 @@ static void MakeModels(BeamngVehicle &v, const std::string &own_config)
 		BeamngModel m;
 		m.make = static_cast<int>(&make - S1203_MAKES);
 		m.name = std::string(make.name) + (kind.empty() ? std::string() : " " + kind);
-		/* Its own years within the make's; one the mod ends before the last make ends then, one it makes into it to the end. */
+		/* From its make's year, or its own first one when later (the De Luxe from 1969). */
 		m.year_from = std::max(make.from, v.year_from);
-		m.year_to = v.year_to > 0 && v.year_to < S1203_LAST_FROM ? std::min(make.to, v.year_to) : make.to;
-		if (m.year_from > m.year_to) continue;
 		m.power_kw = make.kw;
 		/* As fast as the mod's car, by the third root of the power against the air. */
 		m.speed_kmh = v.power_kw > 0 ? v.speed_kmh * std::cbrt(make.kw / v.power_kw) : v.speed_kmh;
@@ -679,8 +675,6 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	if (const JValue *a = info.Get("Author"); a != nullptr && a->IsString()) v.author = a->text;
 	if (const JValue *y = info.Get("Years"); y != nullptr && y->IsObject()) {
 		if (const JValue *lo = y->Get("min"); lo != nullptr) v.year_from = static_cast<int>(lo->Num());
-		if (const JValue *hi = y->Get("max"); hi != nullptr) v.year_to = static_cast<int>(hi->Num());
-		if (v.year_to < v.year_from) v.year_to = 0;
 	}
 	const JValue *type = info.Get("Type");
 	if (type != nullptr && type->IsString() && (StrEqualsIgnoreCase(type->text, "Prop") || StrEqualsIgnoreCase(type->text, "Trailer"))) return std::nullopt;
@@ -1108,21 +1102,12 @@ std::vector<uint8_t> MakeGrf(const std::vector<const BeamngVehicle *> &cars)
 			const size_t count_at = 2;
 			uint8_t props = 0;
 			auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
-			/* Its years (the player, 26. 10.: "if you have the year of BeamNG, use it"): it comes in the first, and leaves
-			 * the purchase list about the end of the last. The game retires a model at the end of the first two phases of
-			 * its life less its years "retired early" (CalcEngineReliability()): phase 1 of 7 to 38 months, phase 2 its
-			 * model life less 8 years and 0 to 15 months; a model life of 9 + n years retired 1 early so goes n years and
-			 * 7 to 53 months after it came, about the end of its last year when n is its years less two. */
+			/* It comes in its first year (the player, 26. 10.: "if you have the year of BeamNG, use it") and is never
+			 * retired ("the production never stops"). */
 			prop(0x00); word(a0, m.year_from > 1920 ? std::min<uint32_t>(DaysSince1920(m.year_from), 0xFFFF) : 0);
 			prop(0x02); a0.push_back(20);                  // reliability decay
 			prop(0x03); a0.push_back(15);                  // a vehicle's life, years
-			if (m.year_to > 0) {
-				const int years = std::max(m.year_to + 1 - std::max(m.year_from, 1920), 0);
-				prop(0x04); a0.push_back(static_cast<uint8_t>(Clamp(9 + std::max(years - 2, 0), 9, 254)));
-				prop(0x1B); a0.push_back(1);               // retired a year early: when its years are over
-			} else {
-				prop(0x04); a0.push_back(0xFF);            // the model never retires
-			}
+			prop(0x04); a0.push_back(0xFF);                // the model never retires
 			prop(0x06); a0.push_back(0x0F);                // every climate
 			prop(0x07); a0.push_back(5);                   // loading speed
 			prop(0x0E); a0.push_back(0xFF);                // the set's own sprites: drawn from its model (GetThreeDVehicleObjectSprite())
@@ -1843,7 +1828,7 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 				car->goods ? "goods" : "seats", car->capacity, car->power_kw, car->speed_kmh, car->mass_t, car->effort, car->paints.size(),
 				car->grfid & 0xFF, (car->grfid >> 8) & 0xFF, (car->grfid >> 16) & 0xFF, car->grfid >> 24);
 		for (const BeamngModel &m : car->models) {
-			Debug(grf, 1, "BeamNG:   {} '{}': {}-{}, {:.0f} kW, {:.0f} km/h", m.id, m.name, m.year_from, m.year_to, m.power_kw, m.speed_kmh);
+			Debug(grf, 1, "BeamNG:   {} '{}': from {}, {:.0f} kW, {:.0f} km/h", m.id, m.name, m.year_from, m.power_kw, m.speed_kmh);
 		}
 		_beamng_vehicles.push_back(std::move(*car));
 	};
