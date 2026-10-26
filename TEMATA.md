@@ -31,6 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (7) – deník z telefonu (test 5–8): domy kartou rozbité = Zink 25.1.9, ne jádra
+
+- Hráč: *„asserty odstraníme na konec“*, *„ano další velký krok uděláme“* (skládání mapy kartou, #134),
+  *„potřebuju spravit nastavení“*. Test 5–8: domy a průmysl kartou rozbité, procesorem dobré; myslel, že to
+  začalo zaškrtáváním jader 0–3 ve Winlatoru a nejde vrátit.
+- **Příčina je verze Zinku, ne jádra.** Test 4 (domy dobré): `zink (Vortek)`, **Mesa 22.2.5**, OpenGL 4.6.
+  Test 5–8 (domy rozbité): `zink Vulkan 1.3 (Vortek)`, **Mesa 25.1.9**, override 4.5 a pak 4.3. Jádra jsou
+  zpátky (session.txt: affinity `0xff`, všech 8). Cota vidí tutéž poruchu u 25.1.9 i se starým buildem (PRO-HRU
+  §5.6: Mali nemá `VK_EXT_depth_clip_enable`, podezřelé R8 textury), rozbor u nich běží.
+- **Nastavení:** Winlator → kontejner → grafika → OpenGL Zink, verze **22.2.5**, GL verze jako v testu 4 (4.6).
+  Nový build má obrazovku ve vlastní paměti (`2c5fe7b`), takže OpenGL ≥ 4.4 už nevadí.
+- **Vypnutá HW akcelerace a karta:** dva různé vypínače. HW akcelerace = jak se hotová obrazovka dostane na
+  displej (OpenGL / bez). „Drawn by the graphics card“ = 3D objekty kartou. Proto test 8 kreslil kartou i bez HW
+  akcelerace (kontext karty bez sdílení).
+- **Nový build na mapě:** test 7 mapa většinou 25–50 snímků/s (průměr 20–40 ms), build #300 v testu 4 měl
+  dlouhé úseky po 3–4 snímcích/s. Občas snímek 0,4–0,9 s (`okna`). Start: jeden tik 32 s (zámek 21 s,
+  okna 11 s).
+
 ## 26. 10. (6) – přechod na GPU: deník a zpráva z cota
 
 - Hráč: *„bež dělat gpu, build už něži. naklady odložime. temata denik přechodu na gou a zprava z cota“*, pak
