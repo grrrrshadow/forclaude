@@ -52,7 +52,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     Tělo lucerny je zatím v nábytku a záře oken venku v jednom uzlu s lucernou u dveří → kolegovi: lucerna jako
     uzel `lucerna`, záře oken zvlášť.
   - Rozhledna zříceniny: rig od země na plošinu 11,18 m.
-- **Domluveno, dělá se:** minové kladivo (úder = výbuch jako raketa); Zetor a kolečko u farmy jako dekorace z GRF,
+  - **Minové kladivo** (par16, `kladivo_minove.glb`): zbraň do ruky (iddqd), máchá se jako kladivo, v okamžiku úderu
+    vybuchne 1,8 m před chodcem jako raketa (4 m, draci, čarodějnice, zvířata; chodci nic). Rig: `chodec zbran 10 300 2`.
+- **Domluveno, dělá se:** Zetor a kolečko u farmy jako dekorace z GRF,
   E u nich → tvoje firma dostane opravdové vozidlo zadarmo a nastoupíš, dekorace se objeví znovu; hasičská Tatra
   na hřišti jen dekorace (normální Tatra z GRF, nevyjede); pastviny.
 - **Odloženo:** společné náklady (sada `naklady`) až s velkou úpravou všech GRF.

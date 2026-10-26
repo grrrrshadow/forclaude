@@ -643,5 +643,35 @@
    "uzel": "noc"
   },
   "poznamka": "kovaná lucerna na svíčku (poslal hráč 23. 10.: „koukni jak pěkně sviti“): černý rámeček s křížky přes skla, uvnitř svíčka, která sama svítí jako v modelu; plamen náš (predmety/ohen.py) v šesti snímcích plamen_00 až plamen_05 na knotu, skla ve dne jako v modelu, v noci uzel noc = teplá svítící skla; prázdné uzly svetlo (v plameni) a uchyt (v kruhu nahoře); počátek pod středem dna, z nahoru; glb z gltfpacku"
+ },
+ {
+  "soubor": "kladivo_minove.glb",
+  "jmeno": "kladivo_minove",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "Minové kladivo",
+   "en": "Mortar Hammer"
+  },
+  "kategorie": "zbran",
+  "vaha_kg": 5.0,
+  "rozmer_m": {
+   "x": [
+    -0.596,
+    0.417
+   ],
+   "y": [
+    -0.111,
+    0.11
+   ],
+   "z": [
+    0.0,
+    0.85
+   ]
+  },
+  "trojuhelniku": 5602,
+  "uchyt": "uchyt",
+  "autor": "Mortar Hammer, Lyndschoko (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mortar-hammer-5de1c9926f394d15b1e7f985a7201de2), převod tvorove/par16.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Lyndschoko; změny: otočené, zmenšené na 0.85 m, jen barevná textura)",
+  "poznamka": "další kladivo (hráč: „kladivo dalši“): minometná mina na trubce; počátek na spodním konci násady, násada po +z, mina nahoře leží po ose x, nos s rozbuškou do +x, křidélka do −x (úderné plochy do ±x jako u kladiv); prázdný uzel uchyt na násadě 0,2 m nad koncem; 0.85 m vysoké, mina 1.01 m dlouhá; mávání si dělá hra; glb z gltfpacku"
  }
 ]

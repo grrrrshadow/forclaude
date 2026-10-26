@@ -2350,6 +2350,7 @@ STR_WALKER_ITEM_PITCHFORK                                       :Pitchfork
 STR_WALKER_ITEM_PAPER_LANTERN                                   :Paper lantern
 STR_WALKER_ITEM_IRON_LANTERN                                    :Candle lantern
 STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Mushroom goulash
+STR_WALKER_ITEM_MINE_HAMMER                                     :Mine hammer
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

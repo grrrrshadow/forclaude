@@ -143,6 +143,9 @@ static constexpr double FIRST_PERSON_MOUTH_UP = 0.55;
 /** A flame of a dragon's fire: how long it is seen, seconds; how fast it flies out of the mouth, metres a second. */
 static constexpr double FIRST_PERSON_FLAME_S = 0.6;
 static constexpr double FIRST_PERSON_FLAME_SPEED = 9.0;
+/** The mine hammer's blow: where its bomb blows up, so far before the walker, so high over its feet, metres. */
+static constexpr double FIRST_PERSON_MINE_AHEAD_M = 1.8;
+static constexpr double FIRST_PERSON_MINE_UP_M = 0.8;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 /** How near a mushroom the walker picks it (E), metres. */
@@ -191,6 +194,7 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::RocketLauncher, "raketomet", WeaponUse::Rocket, 0, 6, WalkerItem::Rockets, "raketa", 40},
 	{WalkerItem::WarHammer, "kladivo_valecne", WeaponUse::Swing, 2.7, 2},
 	{WalkerItem::Pitchfork, "vidle", WeaponUse::Swing, 2.6, 2},
+	{WalkerItem::MineHammer, "kladivo_minove", WeaponUse::Swing, 2.0, 6},
 };
 
 /**
@@ -977,7 +981,13 @@ struct FirstPersonWindow : Window {
 			/* The blow lands as the weapon comes down before the eyes: on a dragon there, if one is. */
 			const bool before = this->swing_time < FIRST_PERSON_BLOW_S;
 			this->swing_time += dt;
-			if (before && this->swing_time >= FIRST_PERSON_BLOW_S && !HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage)) {
+			if (before && this->swing_time >= FIRST_PERSON_BLOW_S && w.item == WalkerItem::MineHammer) {
+				/* The mine hammer: its bomb blows up where its nose strikes, as a rocket (the player, 26. 10.: "let the mine
+				 * hammer blow up"), whatever is there. */
+				const double ahead = FIRST_PERSON_MINE_AHEAD_M * OBJECT_UNITS_PER_METRE;
+				this->Explode(this->walker.x + std::cos(this->walker.heading) * ahead, this->walker.y + std::sin(this->walker.heading) * ahead,
+						FirstPersonFeetZ(this->walker) + FIRST_PERSON_MINE_UP_M * OBJECT_HEIGHT_PER_METRE, w.damage);
+			} else if (before && this->swing_time >= FIRST_PERSON_BLOW_S && !HitThreeDDragon(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage)) {
 				HitThreeDAnimal(this->walker.x, this->walker.y, this->walker.heading, w.reach_m, w.damage);
 			}
 			held.swing = SwingAngle(this->swing_time);

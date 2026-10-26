@@ -2458,6 +2458,7 @@ STR_WALKER_ITEM_PITCHFORK                                       :Vidle
 STR_WALKER_ITEM_PAPER_LANTERN                                   :Papírová lucerna
 STR_WALKER_ITEM_IRON_LANTERN                                    :Kovaná lucerna
 STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Houbový guláš
+STR_WALKER_ITEM_MINE_HAMMER                                     :Minové kladivo
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává

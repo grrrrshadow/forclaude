@@ -58,6 +58,7 @@ enum class WalkerItem : uint8_t {
 	PaperLantern, ///< the paper lantern of Morrowind (the colleague's objekty/predmety/lucerna_papirova.glb): a light, hung from the left hand
 	IronLantern,  ///< the wrought candle lantern (the colleague's objekty/predmety/lucerna_kovana.glb): a light
 	MushroomGoulash, ///< mushroom goulash of the pub, while mushrooms come to it (PubCooksGoulash()): heals
+	MineHammer, ///< the mine hammer (the colleague's objekty/predmety/kladivo_minove.glb, par16): a mortar's bomb on a pole, its blow a blast; from iddqd
 	End,        ///< the end of the known things
 };
 
