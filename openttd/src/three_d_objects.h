@@ -403,6 +403,7 @@ struct ThreeDVehicleShape {
 	std::vector<float> torches;         ///< x, y, z of each hand torch's glass, metres
 	std::vector<float> torch_aims;      ///< x, y, z of the point a metre along each one's beam, metres
 	bool paint_whole = false;          ///< the body's texture (the first) painted all over in the state's colour, without a mask (a car of BeamNG)
+	ThreeDTextureBytes paint_mask;     ///< the mask of the paint over the body's texture where the object has no file of it (a car of BeamNG: its painted materials' side by side), nullptr none
 	/* Its parts (the colleague's hra/3d/PROSBA-V3S-3D.md): what is drawn only as the state shows it, the glass, the
 	 * driver, the wheels that turn, the crew drawn bigger than they are. */
 	static constexpr uint8_t PART_DRIVER = 254; ///< tri_part: the driver, not drawn from the own cab's eye
@@ -415,6 +416,7 @@ struct ThreeDVehicleShape {
 	 * the lamps and the wheels are in each part's node, shown with it -- the cab's windows and its headlights only
 	 * where the cab is. */
 	std::vector<uint8_t> tri_glass;     ///< each triangle: 1 of the glass of an add-on's node ("<dil>_sklo"), drawn see-through with its part (tri_part); empty none
+	std::vector<int8_t> facing;         ///< each triangle's outer side, the other left out where it is drawn (FacesAway()): 1 as its corners go round, -1 the other way, 0 seen from both sides; empty all from both (a car of BeamNG has them)
 	std::vector<uint8_t> night_part;    ///< each triangle of the glass of the lights: its part (0 always: the body's "noc")
 	std::vector<uint8_t> front_part;    ///< each headlight: its part (0 always)
 	std::vector<uint8_t> back_part;     ///< each light at the back: its part (0 always)
@@ -426,6 +428,17 @@ struct ThreeDVehicleShape {
 	bool IsGlass(size_t triangle) const
 	{
 		return (triangle < this->tri_part.size() && this->tri_part[triangle] == PART_GLASS) || (triangle < this->tri_glass.size() && this->tri_glass[triangle] != 0);
+	}
+	/** A triangle's outer side (facing), 0 seen from both sides. */
+	int8_t Facing(size_t triangle) const { return triangle < this->facing.size() ? this->facing[triangle] : 0; }
+	/**
+	 * Whether a triangle is seen from behind, so not drawn: its corners on the picture going round (cross, the z of their
+	 * sides' cross product there) the way its outer side does not, where mirror is -1 when what places them mirrors.
+	 */
+	bool FacesAway(size_t triangle, double cross, int mirror) const
+	{
+		const int8_t f = this->Facing(triangle);
+		return f != 0 && cross * f * mirror > 0;
 	}
 	/** A texture's own light (tex_glow), 0 none. */
 	uint32_t Glow(size_t texture) const { return texture < this->tex_glow.size() ? this->tex_glow[texture] : 0; }

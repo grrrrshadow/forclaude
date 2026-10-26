@@ -74,7 +74,9 @@ struct BeamngMesh {
 	std::vector<float> nrm;       ///< its normal
 	std::vector<float> uv;        ///< u, v of each corner
 	std::vector<uint32_t> tri;    ///< three corners a triangle
-	std::vector<uint8_t> tri_tex; ///< each triangle's material: 0 the paint (white, painted in the car's colour)
+	std::vector<uint8_t> tri_tex; ///< each triangle's material: 0 the paint (the painted materials side by side, painted in the car's colour)
+	std::vector<int16_t> tri_cell; ///< each triangle of the paint: its painted material (paint_sources), -1 none; the triangles after it none
+	std::vector<int8_t> tri_facing; ///< each triangle's outer side: 1 as its corners go round, -1 the other way, 0 seen from both sides (a material "doubleSided"); the triangles after it both
 	/** A material: its texture as RGBA, 4 bytes a pixel, or its colour alone. */
 	struct Material {
 		std::string name;
@@ -82,8 +84,29 @@ struct BeamngMesh {
 		std::vector<uint8_t> rgba;
 		std::vector<uint8_t> png; ///< or its texture a PNG, as it is
 		uint32_t flat = 0;        ///< its colour (Colour::data) without a texture
+		uint8_t alpha = 255;      ///< how much of what is behind it hides at most (ThreeDVehicleShape::tex_alpha): below 255 see-through (the glass)
+		/** The glass's "opacityMap": how much of what is behind it hides where (its red), RGBA of ow x oh or a PNG; none empty. */
+		std::vector<uint8_t> opacity_rgba, opacity_png;
+		int ow = 0, oh = 0;
 	};
 	std::vector<Material> materials;
+	/**
+	 * A material in the car's colour (BeamNG's "instanceDiffuse"): the picture of its first layer, its rubber, chrome and
+	 * lamps, and the mask of its paint over it, the colour where it is light (none: all over). The paint's texture is
+	 * them side by side, a square of PaintSide() a side in their order, each triangle of the paint in its own's cell.
+	 */
+	struct PaintSource {
+		std::string name;
+		int w = 0, h = 0, mw = 0, mh = 0;
+		std::vector<uint8_t> rgba, png, mask_rgba, mask_png;
+	};
+	std::vector<PaintSource> paint_sources;
+	static int PaintSide(size_t sources)
+	{
+		int n = 1;
+		while (static_cast<size_t>(n) * n < sources) n++;
+		return n;
+	}
 	/** The glass of its lights ("glowMap" of the mod): its triangles, red for those at the back. */
 	std::vector<float> night_pos;
 	std::vector<uint32_t> night_tri;

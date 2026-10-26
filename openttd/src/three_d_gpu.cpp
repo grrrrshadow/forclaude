@@ -199,11 +199,12 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 			if (shape.tri[t] >= corners || shape.tri[t + 1] >= corners || shape.tri[t + 2] >= corners) continue;
 			uint32_t ti = tn < shape.tri_tex.size() ? shape.tri_tex[tn] : 0;
 			if (ti >= textures) ti = 0;
+			const int8_t facing = shape.Facing(tn);
 			const uint32_t at = static_cast<uint32_t>(made->indices.size());
-			if (!runs.empty() && runs.back().texture == ti && runs.back().first + runs.back().count == at) {
+			if (!runs.empty() && runs.back().texture == ti && runs.back().facing == facing && runs.back().first + runs.back().count == at) {
 				runs.back().count += 3;
 			} else {
-				runs.push_back({at, 3, ti});
+				runs.push_back({at, 3, ti, facing});
 			}
 			made->indices.insert(made->indices.end(), {shape.tri[t], shape.tri[t + 1], shape.tri[t + 2]});
 			made->used[ti] = true;
@@ -2130,6 +2131,41 @@ ThreeDGpuMatrix Multiply(const ThreeDGpuMatrix &a, const ThreeDGpuMatrix &b)
 	return m;
 }
 
+/** The determinant of a matrix: below 0 where it mirrors what it places (its corners' order turned round). */
+static double Determinant(const ThreeDGpuMatrix &m)
+{
+	auto minor = [&m](int skip_row, int skip_col) {
+		double a[9];
+		int k = 0;
+		for (int r = 0; r < 4; r++) {
+			if (r == skip_row) continue;
+			for (int c = 0; c < 4; c++) {
+				if (c != skip_col) a[k++] = m[r * 4 + c];
+			}
+		}
+		return a[0] * (a[4] * a[8] - a[5] * a[7]) - a[1] * (a[3] * a[8] - a[5] * a[6]) + a[2] * (a[3] * a[7] - a[4] * a[6]);
+	};
+	double d = 0;
+	for (int c = 0; c < 4; c++) d += (c % 2 == 0 ? 1 : -1) * m[c] * minor(0, c);
+	return d;
+}
+
+/**
+ * The side of a vehicle's triangles facing away left out as the processor leaves it out (ThreeDVehicleShape::FacesAway()),
+ * for a run of them of one side (facing; 0 both drawn) placed by a matrix of that determinant: a triangle seen from its
+ * outer side goes round counter-clockwise on the card where its side and the determinant differ in sign.
+ */
+static void CullVehicleRun(int8_t facing, double determinant)
+{
+	if (facing == 0 || determinant == 0) {
+		gl.glDisable(GL_CULL_FACE);
+		return;
+	}
+	gl.glEnable(GL_CULL_FACE);
+	gl.glCullFace(GL_BACK);
+	gl.glFrontFace(facing * determinant < 0 ? GL_CCW : GL_CW);
+}
+
 /* A texture's paint on the card: its masks' names (ThreeDGpuPaint). */
 struct PaintOnCard {
 	GLuint detail = 0, detail_colours = 0, paint_mask = 0, addon_mask = 0, rust_mask = 0;
@@ -2258,6 +2294,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 	};
 	auto draw_runs = [&](const MeshOnCard &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
 		const ThreeDGpuMatrix m = Multiply(to_card, d.mesh->matrix);
+		const double determinant = Determinant(m);
 		gl.glUniformMatrix4fv(_mesh_program.matrix, 1, GL_TRUE, m.data());
 		gl.glUniform3f(_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
 		gl.glUniform1f(_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
@@ -2278,8 +2315,11 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 			}
 			gl.glUniform1i(_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
+			CullVehicleRun(r.facing, determinant);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
+		gl.glDisable(GL_CULL_FACE);
+		gl.glFrontFace(GL_CCW);
 	};
 	for (const MeshOnCard &d : draws) draw_runs(d, d.mesh->triangles->opaque, false);
 	/* The glass after all else, over what is behind it, hiding nothing (no depth written); lit only where it has a light
@@ -3145,6 +3185,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? d.mesh->triangles->glass : d.mesh->triangles->opaque;
 		if (runs.empty()) continue;
 		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
+		const double determinant = Determinant(d.mesh->matrix);
 		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
 		gl.glUniform1f(_eye_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
 		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
@@ -3166,9 +3207,12 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			}
 			gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
+			CullVehicleRun(r.facing, -determinant);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
 	}
+	gl.glDisable(GL_CULL_FACE);
+	gl.glFrontFace(GL_CCW);
 	if (glass) gl.glDisable(GL_BLEND);
 	gl.glBindVertexArray(0);
 }

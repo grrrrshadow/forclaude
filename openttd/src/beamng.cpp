@@ -1769,6 +1769,9 @@ std::vector<Triangles> ReadGeometry(const XmlNode &geometry)
 
 /* ---- Materials and textures ---- */
 
+/** How much of what is behind the glass of a car hides where its material has no "opacityMap" (BeamngMesh::Material::alpha). */
+static constexpr uint8_t GLASS_WITHOUT_MAP = 77;
+
 /** What the game takes of a material of BeamNG. */
 struct CarMaterial {
 	uint32_t colour = 0xFFB4B4B4; ///< "diffuseColor" (or "baseColorFactor") of its first layer
@@ -1778,6 +1781,8 @@ struct CarMaterial {
 	bool mask_uv1 = false;
 	std::string paint_mask;       ///< the paint's layer's "opacityMap": the paint where it is light, the first layer's picture where dark
 	bool paint_mask_uv1 = false;
+	bool see_through = false;     ///< "translucent" and not "alphaTest" (the glass): its "opacityMap" how much hides what is behind it, not holes
+	bool both_sides = false;      ///< "doubleSided": seen from behind too; BeamNG leaves out the side of the others facing away
 };
 
 /** A text without the spaces, tabs and ends of lines about it. */
@@ -1840,6 +1845,9 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 				}
 				m.mask = get("opacityMap[0]");
 				m.mask_uv1 = get("opacityMapUV[0]") == "1";
+				auto yes = [&get](const std::string &k) { const std::string val = get(k); return val == "true" || val == "1"; };
+				m.see_through = yes("translucent") && !yes("alphaTest");
+				m.both_sides = yes("doubleSided");
 				std::string map_to = get("mapTo");
 				const std::string key = map_to.empty() ? name : map_to;
 				if (shared) {
@@ -1892,6 +1900,10 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 						}
 					}
 				}
+				const JValue *translucent = mat.Get("translucent"), *alpha_test = mat.Get("alphaTest");
+				m.see_through = translucent != nullptr && translucent->IsTrue() && !(alpha_test != nullptr && alpha_test->IsTrue());
+				const JValue *both = mat.Get("doubleSided");
+				m.both_sides = both != nullptr && both->IsTrue();
 				std::string map_to = mat.Get("mapTo") != nullptr && mat.Get("mapTo")->IsString() ? mat.Get("mapTo")->text : name;
 				if (shared) {
 					out.emplace(map_to, m);
@@ -2067,6 +2079,25 @@ bool ReadTexture(const BeamngVehicle &v, const std::string &name, BeamngMesh::Ma
 }
 
 /**
+ * The outer side of a triangle: 1 as its corners go round (counter-clockwise seen from outside), -1 the other way --
+ * a mirrored node's, or one whose corners joined turned it round --, by its corners' normals; 0 not known. A sheet of
+ * two sides is two triangles on the same corners facing apart (the Škoda 1203's blind over its back side windows:
+ * painted outside, the trim inside): BeamNG leaves out the side facing away, drawn both each came through the other.
+ */
+static int8_t FacingOf(const std::vector<float> &pos, const std::vector<float> &nrm, const uint32_t *corner)
+{
+	const float *a = &pos[corner[0] * 3], *b = &pos[corner[1] * 3], *c = &pos[corner[2] * 3];
+	const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+	const double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+	double s = 0;
+	for (int j = 0; j < 3; j++) {
+		const float *n = &nrm[corner[j] * 3];
+		s += gx * n[0] + gy * n[1] + gz * n[2];
+	}
+	return s > 0 ? 1 : (s < 0 ? -1 : 0);
+}
+
+/**
  * A car's mesh made lighter (the player, 16. 10.: "we fight the slowing of the game"): the corners of a material
  * that fall in the same cell of the size (and face about the same way) made one, the triangles that come to nothing
  * dropped. The models of BeamNG are made to be seen from a metre (a wheel's rim of 15 000 triangles); the closest
@@ -2078,21 +2109,25 @@ void Simplify(BeamngMesh &mesh, float cell)
 		int32_t x, y, z;
 		int8_t nx, ny, nz;
 		uint8_t material;
-		bool operator<(const Key &o) const { return std::tie(x, y, z, nx, ny, nz, material) < std::tie(o.x, o.y, o.z, o.nx, o.ny, o.nz, o.material); }
+		int16_t cell; ///< the paint's: its material's cell (BeamngMesh::tri_cell), its corners not those of another's
+		bool operator<(const Key &o) const { return std::tie(x, y, z, nx, ny, nz, material, cell) < std::tie(o.x, o.y, o.z, o.nx, o.ny, o.nz, o.material, o.cell); }
 	};
 	std::map<Key, uint32_t> corners;
 	std::vector<float> pos, nrm, uv;
 	std::vector<float> sums; // the normals summed, then made one long
 	std::vector<uint32_t> tri;
 	std::vector<uint8_t> tri_tex;
+	std::vector<int16_t> tri_cell;
+	std::vector<int8_t> tri_facing;
 	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
 		const uint8_t material = t / 3 < mesh.tri_tex.size() ? mesh.tri_tex[t / 3] : 0;
+		const int16_t paint_cell = t / 3 < mesh.tri_cell.size() ? mesh.tri_cell[t / 3] : -1;
 		uint32_t made[3];
 		for (int j = 0; j < 3; j++) {
 			const uint32_t c = mesh.tri[t + j];
 			const float *p = &mesh.pos[c * 3], *n = &mesh.nrm[c * 3];
 			Key key{static_cast<int32_t>(std::floor(p[0] / cell)), static_cast<int32_t>(std::floor(p[1] / cell)), static_cast<int32_t>(std::floor(p[2] / cell)),
-					static_cast<int8_t>(std::lround(n[0] * 2)), static_cast<int8_t>(std::lround(n[1] * 2)), static_cast<int8_t>(std::lround(n[2] * 2)), material};
+					static_cast<int8_t>(std::lround(n[0] * 2)), static_cast<int8_t>(std::lround(n[1] * 2)), static_cast<int8_t>(std::lround(n[2] * 2)), material, paint_cell};
 			auto [it, added] = corners.emplace(key, static_cast<uint32_t>(pos.size() / 3));
 			if (added) {
 				/* The cell's middle, its first corner's coordinates. */
@@ -2109,6 +2144,8 @@ void Simplify(BeamngMesh &mesh, float cell)
 		if (made[0] == made[1] || made[1] == made[2] || made[0] == made[2]) continue;
 		tri.insert(tri.end(), {made[0], made[1], made[2]});
 		tri_tex.push_back(material);
+		tri_cell.push_back(paint_cell);
+		tri_facing.push_back(t / 3 < mesh.tri_facing.size() ? mesh.tri_facing[t / 3] : 0);
 	}
 	nrm.resize(sums.size());
 	for (size_t i = 0; i + 2 < sums.size(); i += 3) {
@@ -2120,6 +2157,8 @@ void Simplify(BeamngMesh &mesh, float cell)
 	mesh.uv = std::move(uv);
 	mesh.tri = std::move(tri);
 	mesh.tri_tex = std::move(tri_tex);
+	mesh.tri_cell = std::move(tri_cell);
+	mesh.tri_facing = std::move(tri_facing);
 }
 
 } // namespace
@@ -2434,7 +2473,10 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	}
 
 	/* The materials of the mesh: the paint first (white, painted the car's colour), then each in its order. */
-	mesh.materials.push_back({"paint", 0, 0, {}, {}, 0xFFFFFFFF});
+	BeamngMesh::Material paint;
+	paint.name = "paint";
+	paint.flat = 0xFFFFFFFF;
+	mesh.materials.push_back(std::move(paint));
 	std::map<std::string, uint8_t> index;
 	std::map<std::string, std::pair<int, std::pair<int, std::vector<uint8_t>>>> masks; // mask texture: w, h, grey
 	auto material_of = [&](const std::string &name) -> uint8_t {
@@ -2448,25 +2490,48 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			made.name = name;
 			made.flat = m != materials.end() ? m->second.colour : 0xFFB4B4B4;
 			if (m != materials.end()) ReadTexture(v, m->second.texture, made, &made.png);
+			if (m != materials.end() && m->second.see_through) {
+				/* The glass: as much of what is behind it hides as its "opacityMap" has it where, else a little all over. */
+				BeamngMesh::Material opacity;
+				if (ReadTexture(v, m->second.mask, opacity, &opacity.png)) {
+					made.alpha = 254;
+					made.opacity_rgba = std::move(opacity.rgba);
+					made.opacity_png = std::move(opacity.png);
+					made.ow = opacity.w;
+					made.oh = opacity.h;
+				} else {
+					made.alpha = GLASS_WITHOUT_MAP;
+				}
+			}
 			at = static_cast<uint8_t>(mesh.materials.size());
 			mesh.materials.push_back(std::move(made));
 		}
 		index[name] = at;
 		return at;
 	};
-	/* A painted material's first layer as it is, where its paint's mask is dark (CarMaterial::paint_mask). */
-	std::map<std::string, uint8_t> bare_index;
-	auto bare_of = [&](const std::string &name, const CarMaterial &cm) -> uint8_t {
-		auto it = bare_index.find(name);
-		if (it != bare_index.end()) return it->second;
-		if (mesh.materials.size() >= 255) return 0;
-		BeamngMesh::Material made;
-		made.name = name + " (bare)";
-		made.flat = cm.colour;
-		ReadTexture(v, cm.texture, made, &made.png);
-		const uint8_t at = static_cast<uint8_t>(mesh.materials.size());
-		mesh.materials.push_back(std::move(made));
-		bare_index[name] = at;
+	/* A painted material's cell of the paint's texture: its first layer's picture and its paint's mask (CarMaterial::paint_mask). */
+	std::map<std::string, int16_t> cells;
+	auto cell_of = [&](const std::string &name, const CarMaterial &cm) -> int16_t {
+		auto it = cells.find(name);
+		if (it != cells.end()) return it->second;
+		BeamngMesh::PaintSource src;
+		src.name = name;
+		BeamngMesh::Material base, mask;
+		if (ReadTexture(v, cm.texture, base, &base.png)) {
+			src.w = base.w;
+			src.h = base.h;
+			src.rgba = std::move(base.rgba);
+			src.png = std::move(base.png);
+		}
+		if (!cm.paint_mask.empty() && ReadTexture(v, cm.paint_mask, mask, &mask.png)) {
+			src.mw = mask.w;
+			src.mh = mask.h;
+			src.mask_rgba = std::move(mask.rgba);
+			src.mask_png = std::move(mask.png);
+		}
+		const int16_t at = static_cast<int16_t>(mesh.paint_sources.size());
+		mesh.paint_sources.push_back(std::move(src));
+		cells[name] = at;
 		return at;
 	};
 	auto mask_value = [&](const std::string &name, float u, float vv) -> int {
@@ -2549,10 +2614,10 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				const std::string material = bound != pl->second.materials.end() ? bound->second : t.material;
 				const uint8_t tex = material_of(material);
 				auto cm = materials.find(material);
-				const bool cut = cm != materials.end() && !cm->second.mask.empty();
+				const bool cut = cm != materials.end() && !cm->second.mask.empty() && !cm->second.see_through;
 				auto gl = glow.find(material);
 				const size_t corners = t.pos.size() / 3;
-				const bool layered = cm != materials.end() && cm->second.paint && !cm->second.paint_mask.empty();
+				const int16_t cell = cm != materials.end() && cm->second.paint ? cell_of(material, cm->second) : -1;
 				for (size_t c = 0; c + 2 < corners; c += 3) {
 					if (cut) {
 						/* A hole of the body where its mask is dark at the triangle's middle. */
@@ -2560,13 +2625,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 						const float u = (uvs[c * 2] + uvs[c * 2 + 2] + uvs[c * 2 + 4]) / 3, w = (uvs[c * 2 + 1] + uvs[c * 2 + 3] + uvs[c * 2 + 5]) / 3;
 						if (mask_value(cm->second.mask, u, w) < 128) continue;
 					}
-					uint8_t tri_tex = tex;
-					if (layered) {
-						/* The paint where its mask is light at the triangle's middle, else the first layer as it is. */
-						const std::vector<float> &uvs = cm->second.paint_mask_uv1 && !t.uv1.empty() ? t.uv1 : t.uv0;
-						const float u = (uvs[c * 2] + uvs[c * 2 + 2] + uvs[c * 2 + 4]) / 3, w = (uvs[c * 2 + 1] + uvs[c * 2 + 3] + uvs[c * 2 + 5]) / 3;
-						if (mask_value(cm->second.paint_mask, u, w) < 128) tri_tex = bare_of(material, cm->second);
-					}
+					const uint8_t tri_tex = tex;
 					const uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
 					const uint32_t night_base = static_cast<uint32_t>(mesh.night_pos.size() / 3);
 					for (size_t j = 0; j < 3; j++) {
@@ -2591,6 +2650,9 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 						}
 					}
 					mesh.tri_tex.push_back(tri_tex);
+					mesh.tri_cell.push_back(cell);
+					/* Seen from one side (its outer side counted when the shape is done, FacingOf()), or from both. */
+					mesh.tri_facing.push_back(cm != materials.end() && cm->second.both_sides ? 0 : 1);
 					if (gl != glow.end()) {
 						mesh.night_colour.push_back(gl->second ? 0xFFFF2814u : 0xFFFFF4D8u);
 						mesh.night_kind.push_back(gl->second ? 1 : 0);
@@ -2632,8 +2694,34 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 		}
 	}
 	if (mesh.tri.empty()) return false;
+	/* The paint's triangles into their materials' cells of its texture: each where it is in its own picture (one beyond
+	 * its edge moved back whole into it), then in the cell. */
+	if (!mesh.paint_sources.empty()) {
+		const int side = BeamngMesh::PaintSide(mesh.paint_sources.size());
+		for (size_t t = 0; t < mesh.tri_cell.size(); t++) {
+			const int16_t cell = mesh.tri_cell[t];
+			if (cell < 0) continue;
+			const uint32_t *c = &mesh.tri[t * 3];
+			float su = mesh.uv[c[0] * 2], sv = mesh.uv[c[0] * 2 + 1];
+			for (int j = 1; j < 3; j++) {
+				su = std::min(su, mesh.uv[c[j] * 2]);
+				sv = std::min(sv, mesh.uv[c[j] * 2 + 1]);
+			}
+			su = std::floor(su + 1e-4f);
+			sv = std::floor(sv + 1e-4f);
+			for (int j = 0; j < 3; j++) {
+				float &u = mesh.uv[c[j] * 2], &w = mesh.uv[c[j] * 2 + 1];
+				u = (cell % side + std::clamp(u - su, 0.0f, 1.0f)) / side;
+				w = (cell / side + std::clamp(w - sv, 0.0f, 1.0f)) / side;
+			}
+		}
+	}
 	const size_t full = mesh.tri.size() / 3;
 	Simplify(mesh, 0.02f);
+	/* Its triangles' outer sides where they are now, the corners joined. */
+	for (size_t t = 0; t < mesh.tri_facing.size(); t++) {
+		if (mesh.tri_facing[t] != 0) mesh.tri_facing[t] = FacingOf(mesh.pos, mesh.nrm, &mesh.tri[t * 3]);
+	}
 
 	/* The lights: the nodes their props hang from ("lowbeam" ahead, "brake" at the back), a place once. */
 	for (const JValue *part : parts.used) {

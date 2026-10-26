@@ -1219,6 +1219,18 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 			light[i] = shade(nx, ny, nz);
 		}
 	}
+	/* The side of a triangle facing away left out where its shape knows its outer side (a car of BeamNG); placed with
+	 * its length or height turned the other way, the picture is the model mirrored. */
+	if (!shape->facing.empty()) {
+		const int mirror = along * stretch < 0 ? -1 : 1;
+		auto away = [&](size_t t) {
+			const uint32_t a = shape->tri[t], b = shape->tri[t + 1], c = shape->tri[t + 2];
+			const double cross = static_cast<double>(sx[b] - sx[a]) * (sy[c] - sy[a]) - static_cast<double>(sy[b] - sy[a]) * (sx[c] - sx[a]);
+			return shape->FacesAway(t / 3, cross, mirror);
+		};
+		std::erase_if(drawn_triangles, away);
+		std::erase_if(glass_triangles, away);
+	}
 	/* The crew that walks (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): each figure the state shows at its frame of
 	 * the way gone, turned, sized and stood at its place in the vehicle's frame, then as the vehicle. */
 	struct CrewPiece {

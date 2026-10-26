@@ -10457,6 +10457,15 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			corner(ia);
 			corner(ib);
 			corner(ic);
+			/* The side facing away left out where the shape knows its outer side (a car of BeamNG): the side its corners'
+			 * order makes, seen from the eye -- in the eye's frame (ahead, right, up), its length or height turned the
+			 * other way mirrored. */
+			if (s.Facing(t / 3) != 0) {
+				const CabPoint &qa = pts[ia], &qb = pts[ib], &qc = pts[ic];
+				const double ur = qb.r - qa.r, uu = qb.u - qa.u, uf = qb.f - qa.f, vr = qc.r - qa.r, vu = qc.u - qa.u, vf = qc.f - qa.f;
+				const double away = (uu * vf - uf * vu) * qa.r + (uf * vr - ur * vf) * qa.u + (ur * vu - uu * vr) * qa.f;
+				if (s.FacesAway(t / 3, away, fg.along * fg.stretch < 0 ? 1 : -1)) continue;
+			}
 			/* A material's own light (tex_glow) over it, unshaded: brighter by its colour's strongest. */
 			const uint32_t glow = s.Glow(static_cast<size_t>(ti));
 			uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);

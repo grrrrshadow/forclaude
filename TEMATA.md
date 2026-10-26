@@ -31,6 +31,33 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (16) – Škoda 1203 z BeamNG: barvy, okna, záslepky
+
+- Hráč: *„1203 z beamng neni vidět na silnici, textury nejsou v náhledu v nakupnim menu, jen divny barvy aut“*, pak
+  *„sou vidět u tebe ale stojej za prd taky“*, *„divny barvy, okna,“*, *„ja měl materialy hotovy , moje scripty pro
+  tyhle 1203 jsou v grrrrf“*, *„materialy jsou zakomentovane a script foti něco jineho“*. U záslepek kombi: *„to je
+  okno sklo pod bočnimi panely“*, *„tam ma byt jen plech bez oken vespod pod panelem“*.
+- **Materiály** (beamng.cpp, three_d_objects.cpp):
+  - Lakované materiály (BeamNG `instanceDiffuse`) jsou vedle sebe v jedné textuře těla (atlas), maska laku jako
+    druhá. Lak je tam, kde je maska světlá, v jasu obrázku první vrstvy; guma, chrom a světla zůstanou. Dřív byl
+    každý trojúhelník buď celý lakovaný, nebo celý ne (divné barvy).
+  - Sklo (`translucent` bez `alphaTest`): `opacityMap` říká, kolik toho zakrývá. Dřív z ní byly díry a sklo bylo
+    neprůhledné. Sklo bez mapy zakrývá 77/255.
+  - Alfa obrázku neprůhledného materiálu se nebere (BeamNG ji tam nečte): u `main_d` dělala díry do chromu a gumy.
+- **Jen přední strany trojúhelníků** (nové, jen auta z BeamNG):
+  - Záslepka zadních bočních oken kombi (`S1203_cargo_blind_RL/RR`) je jeden plech: vnější a vnitřní strana leží na
+    stejných bodech, jen otočené. BeamNG kreslí jen stranu k divákovi, my obě, a tmavá vnitřní strana prosvítala
+    přes lakovanou vnější. To byly ty „okna/sklo“ a tmavé tečkované trojúhelníky.
+  - Tvar si teď nese stranu každého trojúhelníku (`ThreeDVehicleShape::facing`). Počítá se z normál až po
+    zjednodušení tvaru, protože spojením rohů se může tenký trojúhelník obrátit. Materiály `doubleSided` zůstávají
+    oboustranné.
+  - Zadní strana se vynechá ve všech čtyřech kresleních vozidel: obrázky pro mapu procesorem (`RasterObject`) i
+    kartou, pohled z očí procesorem (`CabDrawFigureModel`) i kartou.
+  - Ověřeno otočeným znaménkem: auto je pak vidět naruby.
+  - Auta kolegy (glb) nemají `facing`, kreslí se jako dřív.
+- Rig: kombi (motor 265) i Volha z obou stran, mapa i oči, procesor i karta. Smoke beze změny. Nevidění na
+  telefonu se v rigu neukázalo; nejspíš to byly díry z alfy `main_d`.
+
 ## 26. 10. (15) – pěšky přes most nad vodou
 
 - Hráč: *„nemužu jit pěšky přes most, vyjdu nahoru do kopce na most a dál po rovince nemužu . pěšky jsem byl na

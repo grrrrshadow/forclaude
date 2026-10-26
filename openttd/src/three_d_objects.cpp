@@ -189,6 +189,9 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
 static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
+/** The most texels a side a painted material of a car of BeamNG has in the body's texture (BeamngMesh::PaintSource): four of them 2048 x 2048. */
+static constexpr int PAINT_CELL_MOST = 1024;
+
 /** The vehicles as objects (three_d_objects.h), and whether their indices were read yet. */
 static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
@@ -5140,6 +5143,7 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.tex_alpha.shrink_to_fit();
 	s.corner_wheel.shrink_to_fit();
 	s.tri_glass.shrink_to_fit();
+	s.facing.shrink_to_fit();
 	s.night_part.shrink_to_fit();
 	s.lanterns.shrink_to_fit();
 	s.torches.shrink_to_fit();
@@ -5458,6 +5462,20 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 		out->tri_tex.push_back(t / 3 < shape.tri_tex.size() ? shape.tri_tex[t / 3] : 0);
 		if (!shape.tri_part.empty()) out->tri_part.push_back(t / 3 < shape.tri_part.size() ? shape.tri_part[t / 3] : 0);
 		if (!shape.tri_glass.empty()) out->tri_glass.push_back(t / 3 < shape.tri_glass.size() ? shape.tri_glass[t / 3] : 0);
+		if (!shape.facing.empty()) {
+			/* Its outer side where its corners are now: one joined with its neighbours may have turned round (a
+			 * sheet's two sides on the same corners, the other side came through). */
+			int8_t f = shape.Facing(t / 3);
+			if (f != 0 && has_nrm) {
+				const float *pa = &out->pos[a * 3], *pb = &out->pos[b * 3], *pc = &out->pos[c * 3];
+				const double ux = pb[0] - pa[0], uy = pb[1] - pa[1], uz = pb[2] - pa[2], vx = pc[0] - pa[0], vy = pc[1] - pa[1], vz = pc[2] - pa[2];
+				const double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+				double side = 0;
+				for (uint32_t k : {a, b, c}) side += gx * out->nrm[k * 3] + gy * out->nrm[k * 3 + 1] + gz * out->nrm[k * 3 + 2];
+				f = side > 0 ? 1 : (side < 0 ? -1 : 0);
+			}
+			out->facing.push_back(f);
+		}
 	}
 	out->tex_addon = shape.tex_addon;
 	out->tex_glow = shape.tex_glow;
@@ -5629,22 +5647,102 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->uv = std::move(bm.uv);
 		made->tri = std::move(bm.tri);
 		made->tri_tex = std::move(bm.tri_tex);
-		for (BeamngMesh::Material &m : bm.materials) {
-			std::vector<uint8_t> png = std::move(m.png);
-			if (png.empty() && !m.rgba.empty()) {
-				png.assign(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
-				for (uint32_t v : {static_cast<uint32_t>(m.w), static_cast<uint32_t>(m.h)}) {
-					for (int k = 0; k < 4; k++) png.push_back(static_cast<uint8_t>(v >> (8 * k)));
-				}
-				png.insert(png.end(), m.rgba.begin(), m.rgba.end());
+		made->facing = std::move(bm.tri_facing);
+		/* Pixels as they are, marked so (DecodeTextureLevels()). */
+		auto raw_of = [](int w, int h, const std::vector<uint8_t> &rgba) {
+			std::vector<uint8_t> raw(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
+			for (uint32_t v : {static_cast<uint32_t>(w), static_cast<uint32_t>(h)}) {
+				for (int k = 0; k < 4; k++) raw.push_back(static_cast<uint8_t>(v >> (8 * k)));
 			}
+			raw.insert(raw.end(), rgba.begin(), rgba.end());
+			return raw;
+		};
+		/* A picture's RGBA: as it is, or a PNG's (its colour where it is not seen lost). */
+		auto rgba_of = [](std::vector<uint8_t> &rgba, int &w, int &h, const std::vector<uint8_t> &png) {
+			if (!rgba.empty() || png.empty()) return !rgba.empty();
+			std::vector<ThreeDObjectTexture> levels;
+			DecodeTextureLevels(png, levels, 0, false, nullptr, true);
+			if (levels.empty() || levels[0].w <= 1) return false;
+			w = levels[0].w;
+			h = levels[0].h;
+			rgba.resize(levels[0].px.size() * 4);
+			for (size_t i = 0; i < levels[0].px.size(); i++) {
+				const Colour c(levels[0].px[i]);
+				rgba[i * 4] = c.r;
+				rgba[i * 4 + 1] = c.g;
+				rgba[i * 4 + 2] = c.b;
+				rgba[i * 4 + 3] = c.a;
+			}
+			return true;
+		};
+		for (BeamngMesh::Material &m : bm.materials) {
+			/* BeamNG draws a material's picture whole, its alpha only where the material is see-through (the main_d of the
+			 * Škoda 1203 has a quarter under half: holes in its chrome and rubber here); the glass's how much hides where
+			 * of its "opacityMap" (the player: "weird colours, the windows"). */
+			if (m.alpha < 255 && rgba_of(m.rgba, m.w, m.h, m.png) && rgba_of(m.opacity_rgba, m.ow, m.oh, m.opacity_png)) {
+				for (int y = 0; y < m.h; y++) {
+					const int oy = std::min(m.oh - 1, y * m.oh / m.h);
+					for (int x = 0; x < m.w; x++) m.rgba[(static_cast<size_t>(y) * m.w + x) * 4 + 3] = m.opacity_rgba[(static_cast<size_t>(oy) * m.ow + std::min(m.ow - 1, x * m.ow / m.w)) * 4];
+				}
+				m.png.clear();
+			} else if (m.alpha == 255 && !m.rgba.empty()) {
+				for (size_t i = 3; i < m.rgba.size(); i += 4) m.rgba[i] = 255;
+			}
+			std::vector<uint8_t> png = std::move(m.png);
+			if (png.empty() && !m.rgba.empty()) png = raw_of(m.w, m.h, m.rgba);
 			made->pngs.push_back(InternThreeDTextureBytes(png));
 			made->flats.push_back(m.flat);
 			made->tex_names.push_back(std::move(m.name));
 			made->tex_glow.push_back(0);
-			made->tex_alpha.push_back(255);
+			made->tex_alpha.push_back(m.alpha);
 		}
 		made->paint_whole = true;
+		/*
+		 * The painted materials side by side as the body's texture (BeamngMesh::PaintSource), each its first layer's
+		 * picture, and their paints' masks likewise: the car's colour where its mask is light, at the picture's
+		 * lightness -- as BeamNG lays its paint over its rubber, chrome and lamps -- where before a triangle was either.
+		 */
+		if (!bm.paint_sources.empty() && !made->pngs.empty()) {
+			const int side = BeamngMesh::PaintSide(bm.paint_sources.size());
+			int cell = 64;
+			for (BeamngMesh::PaintSource &p : bm.paint_sources) {
+				rgba_of(p.rgba, p.w, p.h, p.png);
+				rgba_of(p.mask_rgba, p.mw, p.mh, p.mask_png);
+				cell = std::max({cell, p.w, p.h});
+			}
+			cell = std::min(cell, PAINT_CELL_MOST);
+			const int mask_cell = std::max(16, cell / 2);
+			const int w = side * cell, mw = side * mask_cell;
+			std::vector<uint8_t> atlas(static_cast<size_t>(w) * w * 4, 255), mask(static_cast<size_t>(mw) * mw * 4, 255);
+			for (size_t k = 0; k < bm.paint_sources.size(); k++) {
+				const BeamngMesh::PaintSource &p = bm.paint_sources[k];
+				const int cx = static_cast<int>(k) % side, cy = static_cast<int>(k) / side;
+				if (!p.rgba.empty() && p.w > 0 && p.h > 0) {
+					for (int y = 0; y < cell; y++) {
+						const int sy = std::min(p.h - 1, y * p.h / cell);
+						for (int x = 0; x < cell; x++) {
+							const uint8_t *src = &p.rgba[(static_cast<size_t>(sy) * p.w + std::min(p.w - 1, x * p.w / cell)) * 4];
+							uint8_t *dst = &atlas[((static_cast<size_t>(cy) * cell + y) * w + cx * cell + x) * 4];
+							dst[0] = src[0];
+							dst[1] = src[1];
+							dst[2] = src[2];
+						}
+					}
+				}
+				if (!p.mask_rgba.empty() && p.mw > 0 && p.mh > 0) {
+					for (int y = 0; y < mask_cell; y++) {
+						const int sy = std::min(p.mh - 1, y * p.mh / mask_cell);
+						for (int x = 0; x < mask_cell; x++) {
+							const uint8_t m = p.mask_rgba[(static_cast<size_t>(sy) * p.mw + std::min(p.mw - 1, x * p.mw / mask_cell)) * 4];
+							uint8_t *dst = &mask[((static_cast<size_t>(cy) * mask_cell + y) * mw + cx * mask_cell + x) * 4];
+							dst[0] = dst[1] = dst[2] = m;
+						}
+					}
+				}
+			}
+			made->pngs[0] = InternThreeDTextureBytes(raw_of(w, w, atlas));
+			made->paint_mask = InternThreeDTextureBytes(raw_of(mw, mw, mask));
+		}
 		made->night_pos = std::move(bm.night_pos);
 		made->night_tri = std::move(bm.night_tri);
 		made->night_colour = std::move(bm.night_colour);
@@ -6182,9 +6280,14 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 /** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 {
-	if (this->paint.mask_file.empty()) return nullptr;
+	/* Without a file of its own, its shape's (a car of BeamNG: its painted materials' masks side by side). */
+	const ThreeDVehicleShape *s = this->paint.mask_file.empty() ? this->GetShape() : nullptr;
+	if (this->paint.mask_file.empty() && (s == nullptr || s->paint_mask == nullptr)) return nullptr;
 	level = std::max(level, 0);
-	MakeOnce(this, LAZY_PAINT_MASK, [this, level] { return this->mask_tried && (this->mask_levels == nullptr || HasLevel(*this->mask_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+	MakeOnce(this, LAZY_PAINT_MASK, [this, level] { return this->mask_tried && (this->mask_levels == nullptr || HasLevel(*this->mask_levels, level)); }, [this, s, level] {
+		if (s != nullptr) return ThreeDTextureLevelsOf(s->paint_mask, Colour(0, 0, 0).data, level);
+		return MaskLevelsOfFile(this->paint.mask_file, PictureUnder(this->GetShape(), -1), level);
+	}, [this](ThreeDTextureLevels made) {
 		KeepTexture(this->mask_levels, std::move(made));
 		this->mask_tried = true;
 	});
