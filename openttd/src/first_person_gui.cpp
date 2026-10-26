@@ -368,7 +368,10 @@ static bool FirstPersonIndoors(double x, double y)
 static bool FirstPersonFree(double x, double y, double stand = -std::numeric_limits<double>::infinity())
 {
 	if (!FirstPersonWalkable(x, y, stand)) return false;
-	const double radius = FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
+	/* Indoors, and up on stairs or a wall walk (standing over the ground), a body's half-width: the ruin's stairs are a
+	 * metre wide between their rails, the high seat's 0.8 m (the colleague's hra/3d/HRAD-ZRICENINA-POSED-PRO-HRU.md). */
+	const bool raised = std::isfinite(stand) && stand > FirstPersonGroundZ(x, y) + 0.1 * OBJECT_HEIGHT_PER_METRE;
+	const double radius = raised || FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
 	for (int k = 0; k < 8; k++) {
 		const double a = k * M_PI / 4;
 		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a), stand)) return false;
@@ -1867,18 +1870,19 @@ void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
  * cannot (a house's wall), 'X' a house that is not a 3D object (all its tile), 'o' where it stands; the walker's circle
  * (FirstPersonFree()), as it walks, at the height it stands at (up on the dragon castle's walls, what stands over it).
  */
-std::string RigFirstPersonFreeMap(int tiles)
+std::string RigFirstPersonFreeMap(int tiles, int step_cm)
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	const double step = 0.5 * OBJECT_UNITS_PER_METRE;
-	const int n = static_cast<int>(tiles * TILE_SIZE / step);
-	std::string out = fmt::format("volno kolem {:.1f},{:.1f} (x doprava, y dolu, po 0,5 m, polomer chodce {:.2f} m)", w->walker.x, w->walker.y, FIRST_PERSON_RADIUS / OBJECT_UNITS_PER_METRE);
+	const double step = std::max(step_cm, 5) / 100.0 * OBJECT_UNITS_PER_METRE;
+	const int n = std::min(static_cast<int>(tiles * TILE_SIZE / step), 60);
+	std::string out = fmt::format("volno kolem {:.1f},{:.1f} (x doprava, y dolu, po {} cm, polomer chodce {:.2f} m; ':' stred volny, kruh ne)", w->walker.x, w->walker.y, std::max(step_cm, 5), FIRST_PERSON_RADIUS / OBJECT_UNITS_PER_METRE);
 	for (int r = -n; r <= n; r++) {
 		std::string line = "\n";
 		for (int c = -n; c <= n; c++) {
 			const double px = w->walker.x + c * step, py = w->walker.y + r * step;
-			char ch = FirstPersonFree(px, py, FirstPersonFeetZ(w->walker)) ? '.' : '#';
+			const double feet = FirstPersonFeetZ(w->walker);
+			char ch = FirstPersonFree(px, py, feet) ? '.' : FirstPersonWalkable(px, py, feet) ? ':' : '#';
 			if (ch == '#' && px >= 0 && py >= 0 && px < Map::SizeX() * TILE_SIZE && py < Map::SizeY() * TILE_SIZE) {
 				const TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
 				if (IsTileType(tile, TileType::House)) {

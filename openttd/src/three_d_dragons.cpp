@@ -371,6 +371,9 @@ constexpr uint64_t ATTACK_TICKS = 600;      ///< over a vehicle it broke down, s
 constexpr uint64_t FARM_LAND_TICKS = 450;   ///< from its round down onto its place, or up from it, so long (about twelve seconds)
 constexpr double FARM_APPROACH_M = 14.0;    ///< over its place before it settles, or so far out of the door it flies in by
 constexpr double FARM_DOOR_M = 3.0;         ///< and so high through that door
+constexpr double FARM_HALL_OUT_M = 6.0;     ///< a hall without doors (the castle's, 26. 10.): in by the way its place faces, from so far before it
+constexpr double FARM_CAVE_OUT_M = 12.0;    ///< a cave's dragon lands so far before its place, out of the mouth it faces, ...
+constexpr uint64_t FARM_WALK_TICKS = 300;   ///< ... and walks in so long (about eight seconds), out the same
 
 /** A vehicle a farm's dragons broke down (NoteThreeDDragonAttack()), when. */
 struct DragonAttack {
@@ -389,6 +392,7 @@ struct FarmDragon {
 	float facing = 0;    ///< degrees
 	float map_scale = 1; ///< so many times its size on the map: the standing ones true to the farm, the flying ones as the other dragons
 	bool flying = false;
+	bool walking = false; ///< on foot into its cave or out of it
 };
 
 /** The k-th of a farm's own dragons (its places') that fly ("let"): out for one of them that cannot; nullptr none. */
@@ -443,19 +447,37 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 			};
 			/* Coming home from its round, or going out to it, the dragon of the place that flies itself (the colleague's
 			 * hra/3d/DRACI-HRAD-PRO-HRU.md, prosba 2): down over its place onto it -- the castle hall's roof at its height --,
-			 * or into the hall low through its door, nearest of the doors ("kde": "sin"); far 0, on its place 1. */
+			 * or into the hall low through its door, nearest of the doors, or by the way it faces out ("kde": "sin"); or
+			 * down before a cave and in on foot (hra/3d/HRAD-ZRICENINA-POSED-PRO-HRU.md, the player: "and the dragon will
+			 * crawl in normally into the cave, won't it"). Far 0, on its place 1. */
+			const uint8_t where = k < obj->dragon_places_in.size() ? obj->dragon_places_in[k] : 0;
+			const bool cave = where == 2 && own != nullptr && own->Has("chuze");
+			const uint64_t home_ticks = FARM_LAND_TICKS + (cave ? FARM_WALK_TICKS : 0);
 			double home = -1;
 			bool landing = true;
 			if (!out && !calm && own != nullptr && own->Has("let")) {
-				if (turn > 0 && out_at(turn - 1) && into < FARM_LAND_TICKS) {
-					home = static_cast<double>(into) / FARM_LAND_TICKS;
-				} else if (out_at(turn + 1) && FARM_TURN_TICKS - into <= FARM_LAND_TICKS) {
-					home = static_cast<double>(FARM_TURN_TICKS - into) / FARM_LAND_TICKS;
+				if (turn > 0 && out_at(turn - 1) && into < home_ticks) {
+					home = static_cast<double>(into) / home_ticks;
+				} else if (out_at(turn + 1) && FARM_TURN_TICKS - into <= home_ticks) {
+					home = static_cast<double>(FARM_TURN_TICKS - into) / home_ticks;
 					landing = false;
 				}
 			}
+			/* Its place faces out: of the hall, of the cave's mouth. */
+			const double out_x = std::cos(p.facing * M_PI / 180.0), out_y = std::sin(p.facing * M_PI / 180.0);
+			const double walk_from = static_cast<double>(FARM_LAND_TICKS) / home_ticks;
 			FarmDragon d;
-			if (home >= 0) {
+			if (cave && home > walk_from) {
+				/* On foot between before the mouth and its place: in facing in, out facing out. */
+				const double f = (home - walk_from) / (1.0 - walk_from), back = (1.0 - f) * FARM_CAVE_OUT_M * OBJECT_UNITS_PER_METRE;
+				d.x = ox + p.at[0] * OBJECT_UNITS_PER_METRE + out_x * back;
+				d.y = oy + p.at[1] * OBJECT_UNITS_PER_METRE + out_y * back;
+				d.z = static_cast<int>(std::lround(FirstPersonGroundZ(d.x, d.y)));
+				d.facing = static_cast<float>(std::fmod(p.facing + (landing ? 180.0 : 0.0) + 360.0, 360.0));
+				d.figure = own->Figure("chuze");
+				d.walking = true;
+			} else if (home >= 0) {
+				if (cave) home /= walk_from;
 				const double base = GetTileMaxPixelZ(origin);
 				const double px = ox + p.at[0] * OBJECT_UNITS_PER_METRE, py = oy + p.at[1] * OBJECT_UNITS_PER_METRE, pz = base + p.at[2] * OBJECT_HEIGHT_PER_METRE;
 				std::array<double, 4> start{};
@@ -472,16 +494,28 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 						}
 					}
 				}
+				const double far = FARM_APPROACH_M * OBJECT_UNITS_PER_METRE;
 				if (door != nullptr) {
 					const double len = std::max(1e-6, static_cast<double>(std::hypot(door->out[0], door->out[1])));
 					const double dx = ox + door->at[0] * OBJECT_UNITS_PER_METRE, dy = oy + door->at[1] * OBJECT_UNITS_PER_METRE;
-					const double ux = door->out[0] / len, uy = door->out[1] / len, far = FARM_APPROACH_M * OBJECT_UNITS_PER_METRE;
+					const double ux = door->out[0] / len, uy = door->out[1] / len;
 					path.push_back({dx + ux * far, dy + uy * far, base + 2 * FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
 					path.push_back({dx, dy, base + FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
+				} else if (where == 1) {
+					/* A hall without doors: low in before its place, by the way it faces out. */
+					const double dx = px + out_x * FARM_HALL_OUT_M * OBJECT_UNITS_PER_METRE, dy = py + out_y * FARM_HALL_OUT_M * OBJECT_UNITS_PER_METRE;
+					path.push_back({dx + out_x * far, dy + out_y * far, base + 2 * FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
+					path.push_back({dx, dy, base + FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
+				} else if (cave) {
+					/* Down before the cave's mouth, where it walks in from. */
+					const double lx = px + out_x * FARM_CAVE_OUT_M * OBJECT_UNITS_PER_METRE, ly = py + out_y * FARM_CAVE_OUT_M * OBJECT_UNITS_PER_METRE;
+					const double lz = FirstPersonGroundZ(lx, ly);
+					path.push_back({lx, ly, lz + FARM_APPROACH_M * OBJECT_HEIGHT_PER_METRE});
+					path.push_back({lx, ly, lz});
 				} else {
 					path.push_back({px, py, pz + FARM_APPROACH_M * OBJECT_HEIGHT_PER_METRE});
 				}
-				path.push_back({px, py, pz});
+				if (!cave) path.push_back({px, py, pz});
 				/* Along it by its length, the heights as far as the ways across. */
 				auto seg_len = [](const std::array<double, 3> &a, const std::array<double, 3> &b) {
 					return std::sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]) + std::pow((b[2] - a[2]) * OBJECT_UNITS_PER_METRE / OBJECT_HEIGHT_PER_METRE, 2));
@@ -498,7 +532,7 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 				d.z = static_cast<int>(std::lround(a[2] + (b[2] - a[2]) * f));
 				/* Facing the way it flies: home along the path, out back along it; settling, turned as its place says. */
 				double facing = std::atan2(b[1] - a[1], b[0] - a[0]) * 180.0 / M_PI + (landing ? 0.0 : 180.0);
-				if (std::hypot(b[0] - a[0], b[1] - a[1]) < 1.0) facing = p.facing;
+				if (std::hypot(b[0] - a[0], b[1] - a[1]) < 1.0) facing = p.facing + (cave && landing ? 180.0 : 0.0);
 				d.facing = static_cast<float>(std::fmod(facing + 360.0, 360.0));
 				d.figure = own->Figure("let");
 				d.map_scale = static_cast<float>(THREE_D_MAP_CREATURE_SCALE + (1.0 - THREE_D_MAP_CREATURE_SCALE) * home);
@@ -555,7 +589,7 @@ void MarkFarmDragons(uint64_t now)
 	for (const Dragon &d : _farm_marked) MarkDirty(d);
 	_farm_marked.clear();
 	ForFarmDragons([&](const FarmDragon &f) {
-		if (!f.flying && now % 16 != 0) return;
+		if (!f.flying && !f.walking && now % 16 != 0) return;
 		Dragon d;
 		d.x = f.x;
 		d.y = f.y;
@@ -563,7 +597,7 @@ void MarkFarmDragons(uint64_t now)
 		d.length_m = f.flying ? 16 : 8 / THREE_D_MAP_CREATURE_SCALE;
 		d.height_m = f.flying ? 10 : 6 / THREE_D_MAP_CREATURE_SCALE;
 		MarkDirty(d);
-		if (f.flying) _farm_marked.push_back(d);
+		if (f.flying || f.walking) _farm_marked.push_back(d);
 	});
 }
 
@@ -833,7 +867,7 @@ std::string DescribeThreeDDragons()
 	/* And the farms' (ForFarmDragons()): where, how high over the land there, flying or standing. */
 	ForFarmDragons([&](const FarmDragon &d) {
 		out += fmt::format("\n  farma {} na {:.2f},{:.2f} vyska {:.1f} m, smer {:.0f}, {}", d.figure, d.x / TILE_SIZE, d.y / TILE_SIZE,
-				(d.z - FirstPersonGroundZ(d.x, d.y)) / OBJECT_HEIGHT_PER_METRE, d.facing, d.flying ? "leti" : "stoji");
+				(d.z - FirstPersonGroundZ(d.x, d.y)) / OBJECT_HEIGHT_PER_METRE, d.facing, d.flying ? "leti" : d.walking ? "jde" : "stoji");
 	});
 	return out;
 }

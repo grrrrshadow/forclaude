@@ -2797,7 +2797,8 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 				for (int k = 0; k < 3; k++) place.at[k] = m.at("poloha").at(k).get<float>();
 				place.facing = m.value("otoceni", 0.0f);
 				obj.dragon_places.push_back(std::move(place));
-				obj.dragon_places_in.push_back(m.value("kde", std::string()) == "sin" ? 1 : 0);
+				const std::string where = m.value("kde", std::string());
+				obj.dragon_places_in.push_back(where == "sin" ? 1 : where == "jeskyne" ? 2 : 0);
 			}
 		}
 		if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly") && !obj.file.empty()) {
@@ -3360,7 +3361,13 @@ static void ReadThreeDObjects()
 			}
 		} else if (o.industry != 0xFF && !_three_d_industry_objects.emplace(std::make_pair(o.industry, o.industry_variant), i).second) {
 			const auto it = _three_d_industry_objects.find(std::make_pair(o.industry, o.industry_variant));
-			if (_three_d_objects[it->second].variant_paint[0] < 0 && _three_d_objects[it->second].variant_paint[1] < 0) {
+			const ThreeDObject &first = _three_d_objects[it->second];
+			if (o.industry_variant < 0 && first.variant_paint[0] < 0 && first.variant_paint[1] < 0 && !_three_d_industry_objects.contains(std::make_pair(o.industry, static_cast<int8_t>(1)))) {
+				/* Two looks of one industry (the dragon farm a castle or a ruin, the player, 26. 10.: "we have two
+				 * dragon farms"): each industry one of them by its random bit 0, as the statue its stone or bronze. */
+				_three_d_industry_objects.emplace(std::make_pair(o.industry, static_cast<int8_t>(0)), it->second);
+				_three_d_industry_objects.emplace(std::make_pair(o.industry, static_cast<int8_t>(1)), i);
+			} else if (first.variant_paint[0] < 0 && first.variant_paint[1] < 0) {
 				Debug(misc, 0, "3D objects: industry {} variant {} has two records, {} is not drawn", o.industry_name, o.industry_variant, o.name);
 			}
 		}

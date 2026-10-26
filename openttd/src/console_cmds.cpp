@@ -8861,7 +8861,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
 		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST)) {
 			Industry *ind = Industry::GetByTile(tile);
-			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 ? 1 : 0);
+			/* The look asked for: the statue's bronze, or the second of two looks (the dragon farm's castle). */
+			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 || GetThreeDIndustryObject(type, true) == obj ? 1 : 0);
 			/* The forest with a clearing: its random bits as given (the cabin's tile, the path's place), the rig builds with none. */
 			if (type == IT_GAME_FOREST && argv.size() > 5) ind->random = static_cast<uint16_t>(number(5).value_or(0));
 			/* Built at once, for the pictures (the game builds it in stages). */
@@ -9112,9 +9113,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: chodec klavesa {} (fokus {}): v ruce {}", argv[3], focus == nullptr ? "zadny" : argv.size() > 4 ? argv[4] : "chodec", to_underlying(FirstPersonWeaponInHand()));
 		} else if (argv.size() > 2 && argv[2] == "volno") {
-			/* 'chodec volno [tiles]': where the walker can stand about it (RigFirstPersonFreeMap()). */
-			extern std::string RigFirstPersonFreeMap(int tiles);
-			const std::string map = RigFirstPersonFreeMap(number(3).value_or(1));
+			/* 'chodec volno [tiles] [cm]': where the walker can stand about it, a character so many centimetres (RigFirstPersonFreeMap()). */
+			extern std::string RigFirstPersonFreeMap(int tiles, int step_cm);
+			const std::string map = RigFirstPersonFreeMap(number(3).value_or(1), argv.size() > 4 ? number(4).value_or(50) : 50);
 			for (size_t at = 0, next; at < map.size(); at = next + 1) {
 				next = map.find('\n', at);
 				if (next == std::string::npos) next = map.size();

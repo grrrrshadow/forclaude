@@ -269,7 +269,7 @@ struct ThreeDObject {
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
 	std::vector<ThreeDObjectFigure> dragon_places; ///< "mista_draku" (the dragon farm): where each of its dragons stands, its creature ("drak") as figure
-	std::vector<uint8_t> dragon_places_in;     ///< and of each whether it is inside ("kde": "sin", the dragon castle's hall): its dragon flies in through the nearest door
+	std::vector<uint8_t> dragon_places_in;     ///< and of each where: 1 in a hall ("kde": "sin"), its dragon flies in through the nearest door; 2 in a cave ("jeskyne"), it walks in; 0 out
 	std::vector<size_t> hay;                  ///< "seno" "uzly" (the dragon farm): its heaps of hay, each an object of its node alone, shown as many as it has (DragonFarmHay())
 	std::optional<double> FloorAt(double x, double y, double up_to) const;
 	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's

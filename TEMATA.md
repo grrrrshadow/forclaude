@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (4) – les a obě dračí farmy od kolegy (1513879): hrad i zřícenina, drak do jeskyně pěšky, schody posedu
+
+- Hráč: *„ušetříme když náklady budou ingame?“* (kolega: 35 MB nákladů v GRF → sada `naklady` 220 kB),
+  *„náklady po buildu, už mi tam dej les, dračí farmu“*, *„dračí farmu máme dvě“*.
+- **Převzato `1513879`:** `draci_farma.glb` (zřícenina se schody na rozhlednu, louče), `les_paseka_srub(_interier).glb`
+  (prkenné schody na posed, srub bez mezer), `objekty.json` kolegy beze změny (zřícenina zase `"prumysl"`),
+  `draci_hrad_interier.glb` pryč (síň bez interiéru).
+- **Dvě podoby jednoho průmyslu:** dva záznamy se stejným `prumysl` bez `varianta` → varianta 0 a 1, průmysl si
+  vybere podle náhodného bitu 0 (jako socha kámen/bronz). Dračí farma je zřícenina nebo hrad. Rig `postav` staví tu
+  podobu, kterou jmenuje.
+- **Drak do síně bez dveří:** síň nemá `dvere`, drak vlétá podle toho, kam jeho místo míří (`otoceni` ven), 6 m před
+  místem ve 3 m. **Drak do jeskyně** (`"kde": "jeskyne"`): přistane 12 m před místem (před ústím), dojde dovnitř
+  animací `chuze` (8 s), ven stejně (`FarmDragon::walking`, „jde“ v `test3d draci`). Rig: obojí ověřeno.
+- **Chůze na schodech a hradbách:** nad zemí (stoupá po podlaze) má chodec poloměr těla 0,2 m jako v interiéru
+  (schody zříceniny 1 m mezi zábradlím, posed 0,8 m). Rig: posed 0 → 2,64 m. Na plošinu posedu nevejde: stříška je
+  1,06–1,66 m nad podlahou plošiny (chodec potřebuje 2 m) – kolegovi. Pata schodů zříceniny je nedosažitelná
+  (u průchodu leží kvádry) – kolegovi. Hrad dál 0 → 7 m.
+- Rig: `chodec volno [dlazdic] [cm]` jemná mapa, `:` = střed volný, kruh ne.
+- Náklady (sada `naklady`, skládání, `loze`) a blednutí 1203 (kolega: 20 let napůl k `B8B8B2`) po buildu.
+
 ## 26. 10. (3) – 1203 po letech: Škoda 1203 → TAZ 1203 → TAZ 1500 a TAZ 1.9D; roky z BeamNG; jeden GRF na auto
 
 - Hráč: *„1203 škoda pak 1203 taz a nakonec taz 1500 a 1900D?“*, *„to udělej hezký když to píšeš extra pro 1203“*,
