@@ -397,8 +397,10 @@ void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, 
 	int x0 = std::max(px, dpi->left), x1 = std::min(px + pic.width, dpi->left + dpi->width);
 	int y0 = std::max(py, dpi->top), y1 = std::min(py + pic.height, dpi->top + dpi->height);
 	if (x0 >= x1 || y0 >= y1) return;
-	/* Written straight into the screen: not the palette's colours of what was under it (Blitter::RealizeAnimation()). */
-	blitter->RealizeAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
+	/* Written straight into the screen: not the palette's colours of what was under it. The picture or the hole for the
+	 * card's overwrites every pixel, so the indexes are only forgotten, the pixels not read (Blitter::ClearAnimation(),
+	 * cota PRO-HRU.md section 7: reading them cost the phone the most of 207 ms a frame). */
+	blitter->ClearAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
 	const Rect on_screen{w.left + px, w.top + py, w.left + px + pic.width - 1, w.top + py + pic.height - 1};
 	if (pic.shown != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&w, on_screen, pic.shown, tint)) {
 		for (int y = y0; y < y1; y++) {

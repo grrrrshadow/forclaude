@@ -20,6 +20,9 @@
 #include <time.h>
 #include <signal.h>
 #include <pthread.h>
+#if defined(__linux__)
+#	include <sched.h>
+#endif
 
 #ifdef WITH_SDL2
 #include <SDL.h>
@@ -264,4 +267,14 @@ void SetCurrentThreadName([[maybe_unused]] const std::string &thread_name)
 #if defined(__APPLE__)
 	MacOSSetThreadName(thread_name);
 #endif /* defined(__APPLE__) */
+}
+
+uint GetUsableCores()
+{
+#if defined(__linux__)
+	cpu_set_t set;
+	CPU_ZERO(&set);
+	if (sched_getaffinity(0, sizeof(set), &set) == 0 && CPU_COUNT(&set) > 0) return static_cast<uint>(CPU_COUNT(&set));
+#endif /* defined(__linux__) */
+	return std::max(1u, std::thread::hardware_concurrency());
 }

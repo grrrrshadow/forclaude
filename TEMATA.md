@@ -31,6 +31,54 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (6) – přechod na GPU: deník a zpráva z cota
+
+- Hráč: *„bež dělat gpu, build už něži. naklady odložime. temata denik přechodu na gou a zprava z cota“*, pak
+  *„cota hlavně identifikoval nějaky nelogicky věci“*: 207 ms procesoru kolem pohledu z očí, domy shora čtené
+  zpět z karty, zem shora po „vše z karty pryč“ kreslená procesorem. Sada `naklady` odložena.
+
+### Zpráva z cota (PRO-HRU.md §5–§8, 25.–26. 10.)
+
+- **2–4 fps = nekešovaná paměť karty (§7, potvrzeno).** Od OpenGL 4.4 hra kreslila obrazovku rovnou do bufferu
+  karty a Vortek ho na telefonu dává nekešovaný: každé čtení pixelu procesorem ~250 ns. Čtou plátno očí
+  (`RealizeAnimation`), otočená mapa, míchání obrázků, noc (`DarkenRect`) a posun. Proto ~207 ms na snímek
+  z očí bez ohledu na scénu (cena roste s plochou). **Řeší `2c5fe7b`** (obrazovka ve vlastní paměti), hráčův build
+  **#300 = `090bc46`** ho nemá. Do nového buildu cota radí OpenGL pod 4.4 (VirGL 4.3).
+- **Start:** obří tik 22–33 s (`OnNewGRFsScanned` bez přerušení), první snímek titulky 11,2 s čekání na 3D vlákno.
+- **Dlouhé snímky brzdí hru:** tiky z 37/s na 4–13/s.
+- **Jádra:** hra běží jen na 4 velkých jádrech (A78), `hardware_concurrency` hlásí 8.
+- **VirGL (§8):** černé domy = chyba jejich hostitele (dva výstupy shaderu bez `layout(location)`), opraveno
+  v buildu 13. „Vše z karty pryč“ = GL_OUT_OF_MEMORY, protože jejich guest ovladač sdílí jeden socket mezi
+  GL vlákny bez zámku (my kreslíme ze dvou: video + 3D). Opravují, hra zatím správně přejde na procesor.
+- **Zink 4.5:** modrá ulice, rozbité textury (Mali nemá `depth_clip_enable`), rozbor u nich běží.
+- **Release build / asserty vypnuté:** návrh cota. Rozhoduje hráč: asserty dávají při pádu přesné místo.
+- **Do deníku chtějí:** plochu překreslenou za snímek a časy fází startu.
+
+### Co z toho bylo nelogické a proč
+
+| co | proč | stav |
+|---|---|---|
+| 207 ms kolem pohledu z očí | čtení pixelů z nekešované paměti karty; plátno očí navíc četlo pixely zbytečně | `2c5fe7b` + dnes `ClearAnimation` |
+| domy shora čtené zpět z karty | mapu skládá procesor ze spritů, obrázek domu se čte **jednou** a drží se | zmizí až se skládáním mapy kartou (#134) |
+| zem shora: karta, pak „vše z karty pryč“ | GL_OUT_OF_MEMORY od chyby VirGL guestu, procesor je záloha | oprava u cota; v #300 se zem kladla a četla každý snímek, od `c903708` se drží, dokud pohled stojí |
+
+### Deník přechodu na GPU (co kreslí karta)
+
+- 18.–21. 10.: pohled z očí celý na kartě (#151), ukázaný bez čtení zpět (#152), obrázky budov po dávkách (#153),
+  zem otočené plochy kartou (#154).
+- 25. 10.: dávky obrázků budov bez čekání hlavního vlákna, domy při otáčení z posledního obrázku (#190).
+- 26. 10.: obrazovka ve vlastní paměti (`2c5fe7b`), položená zem pohledu držená (`c903708`).
+- **26. 10. dnes:**
+  - plátno očí jen smaže bajty animace, pixely nečte (`Blitter::ClearAnimation`);
+  - start na 3D vlákno nečeká, do té doby kreslí procesor (`ThreeDGpuAvailable`, čeká jen rig `test3d gpu`);
+  - po snímku delším než 100 ms dožene herní vlákno zmeškané tiky, nejdéle 100 ms (`VideoDriver::SleepTillNextTick`);
+  - vlákna podle jader, na kterých hra smí běžet (`GetUsableCores`: Windows `GetProcessAffinityMask`, Linux
+    `sched_getaffinity`).
+  - Rig (llvmpipe): z očí při 3–4 snímcích/s hra stihne 19–24 tiků/s.
+- **Zbývá:** 2D mapa (sprity terénu, vozidel, budov) je pořád procesor. To je jediné, co zruší 2–4 fps při pohybu
+  mapy. Skládat otočenou mapu kartou (#134, domluvit), vozidla objektem (#127), domy bez obrázků (#123), sběr
+  scény z očí na kartě (#150).
+
 ## 26. 10. (5) – blednutí aut BeamNG, oprava kolegy (stříška posedu, pata schodů), chůze na úzké schody
 
 - Hráč: *„blednutí dáme hned, a máme to opravené“*.

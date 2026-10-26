@@ -174,6 +174,7 @@
 #include "three_d_witches.h"
 #include "three_d_ufo.h"
 #include "disaster_vehicle.h"
+#include "thread.h"
 
 #include "safeguards.h"
 
@@ -9152,7 +9153,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else if (argv.size() > 2 && argv[2] == "mereni") {
 			/* 'chodec mereni <times> <threads>': how long a picture from the eyes takes, on so many threads (0 all). */
 			const int times = number(3).value_or(10), threads = number(4).value_or(0);
-			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {:.1f} ms na {} vlaknech", RigFirstPersonMeasure(times, threads), threads == 0 ? std::thread::hardware_concurrency() : static_cast<uint>(threads));
+			IConsolePrint(CC_DEFAULT, "test3d: obraz z oci {:.1f} ms na {} vlaknech", RigFirstPersonMeasure(times, threads), threads == 0 ? GetUsableCores() : static_cast<uint>(threads));
 		} else if (argv.size() > 2 && argv[2] == "kladivo") {
 			/* 'chodec kladivo [swing degrees]' the hammer in the hand, swung so far; 'chodec kladivo pryc' put away. */
 			const bool away = argv.size() > 3 && argv[3] == "pryc";
@@ -10002,7 +10003,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			_settings_client.gui.three_d_gpu = *on != 0;
 			_three_d_gpu_off = *on == 0;
 		}
-		ThreeDGpuAvailable();
+		ThreeDGpuAvailable(true);
 		IConsolePrint(CC_DEFAULT, "test3d: gpu {}", ThreeDGpuDescribe());
 	} else if (what == "kresli" && argv.size() <= 3) {
 		/* 'kresli [times]': how long drawing the first vehicle drawn from a 3D object takes, at each zoom, with its

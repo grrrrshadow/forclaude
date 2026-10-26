@@ -32,6 +32,13 @@ inline void CSleep(int milliseconds)
  */
 void SetCurrentThreadName(const std::string &name);
 
+/**
+ * How many cores the game may run on: those the system lets the process have (on the phone Winlator gives it the four
+ * big ones of eight, cota PRO-HRU.md section 7), else all the processor has.
+ * @return at least 1
+ */
+uint GetUsableCores();
+
 
 /**
  * Start a new thread.

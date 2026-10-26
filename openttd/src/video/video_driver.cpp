@@ -43,6 +43,7 @@ void VideoDriver::GameLoop()
 		::GameLoop();
 		FrameDiaryGameTick(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count());
 	}
+	this->game_behind = this->next_game_tick < std::chrono::steady_clock::now();
 }
 
 void VideoDriver::GameThread()
@@ -181,6 +182,9 @@ void VideoDriver::Tick()
 		lap(parts.paint);
 		parts.total = std::chrono::duration<double, std::milli>(mark - started).count();
 		FrameDiaryDraw(parts);
+		/* A long frame held the game's lock, the game's thread could not tick meanwhile: it may catch up before the next
+		 * frame takes the lock again (cota PRO-HRU.md section 7: on the phone the ticks fell from 37 a second to 4-13). */
+		if (this->is_game_threaded && parts.total > CATCH_UP_AFTER_MS) this->catch_up_till = mark + std::chrono::milliseconds(CATCH_UP_AFTER_MS);
 
 		/* Wait till the first successful drawing tick before marking the driver as operational. */
 		static bool first_draw_tick = true;
@@ -198,6 +202,12 @@ void VideoDriver::SleepTillNextTick()
 
 	if (!this->is_game_threaded) {
 		next_tick = min(next_tick, this->next_game_tick);
+	} else {
+		/* The ticks the game's thread missed during a long frame (Tick()), but not longer than the frame's lock could wait. */
+		while (this->game_behind && now < this->catch_up_till) {
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			now = std::chrono::steady_clock::now();
+		}
 	}
 
 	if (next_tick > now) {

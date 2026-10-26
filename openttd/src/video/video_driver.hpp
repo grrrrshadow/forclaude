@@ -255,6 +255,7 @@ public:
 
 protected:
 	const uint ALLOWED_DRIFT = 5; ///< How many times videodriver can miss deadlines without it being overly compensated.
+	static constexpr int CATCH_UP_AFTER_MS = 100; ///< A frame longer lets the game's thread catch up its ticks, at most as long, before the next.
 
 	/**
 	 * Get the resolution of the main screen.
@@ -381,6 +382,8 @@ protected:
 
 	std::chrono::steady_clock::time_point next_game_tick;
 	std::chrono::steady_clock::time_point next_draw_tick;
+	std::atomic<bool> game_behind = false; ///< The game's thread has a tick due already after the one it just ran (GameLoop()).
+	std::chrono::steady_clock::time_point catch_up_till; ///< After a long frame the next waits till then for the game's thread to catch up (SleepTillNextTick()).
 
 	bool fast_forward_key_pressed; ///< The fast-forward key is being pressed.
 	bool fast_forward_via_key; ///< The fast-forward was enabled by key press.

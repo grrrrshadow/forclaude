@@ -134,6 +134,15 @@ public:
 	virtual void RealizeAnimation([[maybe_unused]] void *video, [[maybe_unused]] int width, [[maybe_unused]] int height) {}
 
 	/**
+	 * Forget the palette's indexes of a rectangle of the screen without reading its pixels (RealizeAnimation() reads
+	 * each): for what is about to overwrite every pixel of it, as the picture of the view from the eyes.
+	 * @param video The destination pointer (video-buffer).
+	 * @param width The width of the rectangle.
+	 * @param height The height of the rectangle.
+	 */
+	virtual void ClearAnimation(void *video, int width, int height) { this->RealizeAnimation(video, width, height); }
+
+	/**
 	 * Draw a line with a given colour.
 	 * @param video The destination pointer (video-buffer).
 	 * @param x The x coordinate from where the line starts.

@@ -143,6 +143,18 @@ void Blitter_40bppAnim::RealizeAnimation(void *video, int width, int height)
 	}
 }
 
+void Blitter_40bppAnim::ClearAnimation(void *video, int width, int height)
+{
+	uint8_t *anim_line = _screen_disable_anim ? nullptr : AnimOfScreen(video);
+	if (anim_line == nullptr) return;
+	/* Only written, never read: the screen in the card's memory, uncached on the phone, costs a quarter of a microsecond
+	 * a pixel read (cota PRO-HRU.md section 7). */
+	for (int y = 0; y < height; y++) {
+		std::fill_n(anim_line, width, 0);
+		anim_line += _screen.pitch;
+	}
+}
+
 /**
  * Draws a sprite to a (screen) buffer. It is templated to allow faster operation.
  *

@@ -3904,10 +3904,13 @@ bool ThreeDGpuReady()
 }
 
 /**
- * Whether the card draws the 3D pictures: the first time asked its thread is started and waited for (its context made,
- * its programs compiled). False for good where there is no card to be had, and while the rig has the processor draw.
+ * Whether the card draws the 3D pictures: the first time asked its thread is started, not waited for -- till its
+ * context is made and its programs compiled the processor draws (cota PRO-HRU.md section 7: the first frame of the
+ * title waited 11 s for it on the phone). False for good where there is no card to be had, and while the rig has the
+ * processor draw.
+ * @param wait wait for the start (the rig's 'test3d gpu')
  */
-bool ThreeDGpuAvailable()
+bool ThreeDGpuAvailable(bool wait)
 {
 	if (_three_d_gpu_off) return false;
 	std::unique_lock lock(_gpu_mutex);
@@ -3919,7 +3922,7 @@ bool ThreeDGpuAvailable()
 			return false;
 		}
 	}
-	_gpu_done.wait(lock, [] { return _gpu_state != GpuState::Starting; });
+	if (wait) _gpu_done.wait(lock, [] { return _gpu_state != GpuState::Starting; });
 	return _gpu_state == GpuState::Ready;
 }
 
@@ -4186,7 +4189,7 @@ std::string ThreeDGpuTimes()
 
 #else /* no card */
 
-bool ThreeDGpuAvailable() { return false; }
+bool ThreeDGpuAvailable(bool) { return false; }
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &) { return false; }
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &) { return false; }
 void ThreeDGpuVideoContext(void *, void *, bool) {}

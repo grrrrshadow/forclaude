@@ -8728,13 +8728,14 @@ static CabTexture &EyeScratchTexture(CabTexture &scratch)
 int _cab_threads = 0; ///< The rig: how many threads to draw on (test3d chodec mereni), 0 every core.
 
 /**
- * How many cores the drawing has: the processor's but two -- one computes the game, one loads (the pictures of the
+ * How many cores the drawing has: the game's but two -- one computes the game, one loads (the pictures of the
  * vehicles, three_d_vehicle_object.cpp) --, at most 16 (the player, 17. 10.: "we all have machines with four cores
- * at least": two draw there, six on eight).
+ * at least": two draw there, six on eight). The game's: those it may run on (GetUsableCores(); the phone gives it four
+ * of its eight).
  */
 static int DrawingCores()
 {
-	static const int cores = std::clamp<int>(static_cast<int>(std::thread::hardware_concurrency()) - 2, 1, 16);
+	static const int cores = std::clamp<int>(static_cast<int>(GetUsableCores()) - 2, 1, 16);
 	return cores;
 }
 

@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include "../../language.h"
 #include "../../thread.h"
+#include <bit>
 #include "../../library_loader.h"
 
 #include "table/strings.h"
@@ -607,3 +608,10 @@ void SetCurrentThreadName(const std::string &thread_name)
 #else
 void SetCurrentThreadName(const std::string &) {}
 #endif
+
+uint GetUsableCores()
+{
+	DWORD_PTR process = 0, system = 0;
+	if (GetProcessAffinityMask(GetCurrentProcess(), &process, &system) && process != 0) return static_cast<uint>(std::popcount(static_cast<uint64_t>(process)));
+	return std::max(1u, std::thread::hardware_concurrency());
+}

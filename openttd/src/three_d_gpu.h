@@ -342,7 +342,7 @@ struct ThreeDGpuEyeFrame {
 	uint32_t shown = 0;              ///< the texture of the video driver's OpenGL it is in, top row first (shown)
 };
 
-bool ThreeDGpuAvailable();
+bool ThreeDGpuAvailable(bool wait = false);
 bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);

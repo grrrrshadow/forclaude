@@ -70,6 +70,7 @@
 #endif /* WITH_PNG */
 
 #include "walker_inventory.h"
+#include "thread.h"
 
 #include "safeguards.h"
 
@@ -7484,7 +7485,7 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
 		}
 	}
 	if (jobs.empty()) return;
-	const size_t threads = std::min<size_t>(jobs.size(), std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16));
+	const size_t threads = std::min<size_t>(jobs.size(), std::clamp<size_t>(GetUsableCores(), 1, 16));
 	std::atomic<size_t> next = 0;
 	auto work = [&] {
 		/* Each its own object and level: a slot of shapes no other thread touches. */
@@ -7700,7 +7701,7 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 			for (const auto &[level, paint] : jobs[j].second) jobs[j].first->GetTexture(level, paint, false);
 		}
 	};
-	const size_t cores = std::clamp<size_t>(std::thread::hardware_concurrency(), 1, 16);
+	const size_t cores = std::clamp<size_t>(GetUsableCores(), 1, 16);
 	std::vector<std::thread> threads;
 	for (size_t i = 1; i < std::min(cores, jobs.size()); i++) threads.emplace_back(work);
 	work();
