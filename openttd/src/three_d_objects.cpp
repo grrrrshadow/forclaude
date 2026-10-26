@@ -74,9 +74,11 @@
 
 #include "safeguards.h"
 
-/** Every object read, and whether they were looked for yet. */
+/** Every object read, and whether they were looked for yet (read whole: the lists stay as they are from then on). */
 static std::vector<ThreeDObject> _three_d_objects;
-static bool _three_d_objects_read = false;
+static std::atomic<bool> _three_d_objects_read = false;
+/** This thread reads the indices now: what it looks up on the way is of what it has read so far (ReadThreeDObjectsNow()). */
+static thread_local bool _three_d_objects_reading = false;
 /** The objects by the town theme (TownTheme, 0 every town), the house and the colour slot: the index into _three_d_objects. */
 static std::map<std::tuple<uint8_t, HouseID, uint>, size_t> _three_d_house_objects;
 /** The creatures of the indices ("druh": "tvor", the colleague's dragons). */
@@ -3235,9 +3237,69 @@ static void MakeStreetLamps()
 	}
 }
 
+/**
+ * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
+ * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
+ * go (made after them, so let go of before them).
+ */
+static struct ThreeDObjectsReader {
+	std::thread thread;
+	std::mutex mutex; ///< who reads them, waits for them or starts the thread
+	~ThreeDObjectsReader()
+	{
+		if (this->thread.joinable()) this->thread.join();
+	}
+} _three_d_objects_reader;
+
+static void ReadThreeDObjectsNow();
+
+/** The indices read, now: by the thread reading them (waited for) or else here; nothing while this thread reads them. */
 static void ReadThreeDObjects()
 {
-	_three_d_objects_read = true;
+	if (_three_d_objects_reading) return;
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_reader.thread.joinable()) _three_d_objects_reader.thread.join();
+	if (!_three_d_objects_read) ReadThreeDObjectsNow();
+}
+
+/**
+ * The indices of the objects read on a thread of their own, from the start of the game: on the player's phone the
+ * first block of the map waited for them ten seconds (the player, 26. 10.: "what is that long loading of one block,
+ * 10 s"), the industries' parts read from their .glb with the index -- in the rig 150 of 173 ms. The map draws its
+ * buildings as their sprites till they are read (ThreeDObjectsIndexRead()); what else asks for them waits.
+ */
+void StartReadingThreeDObjects()
+{
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_read || _three_d_objects_reader.thread.joinable()) return;
+	StartNewThread(&_three_d_objects_reader.thread, "ottd:3d-index", &ReadThreeDObjectsNow);
+}
+
+/** The thread reading the indices done (the tars and the folders it reads are scanned anew after it). */
+void WaitForReadingThreeDObjects()
+{
+	std::lock_guard lock(_three_d_objects_reader.mutex);
+	if (_three_d_objects_reader.thread.joinable()) _three_d_objects_reader.thread.join();
+}
+
+/**
+ * Whether the indices are read, never waiting for them: the map asks it, and draws the buildings as their sprites
+ * till they are; asked first here, they are started reading (the rig reads them at once).
+ */
+bool ThreeDObjectsIndexRead()
+{
+	if (_three_d_objects_read) return true;
+	if (_three_d_load_at_once) {
+		ReadThreeDObjects();
+		return true;
+	}
+	StartReadingThreeDObjects();
+	return false;
+}
+
+static void ReadThreeDObjectsNow()
+{
+	_three_d_objects_reading = true;
 	ForgetMarginsFilled(MarginsOf::Buildings);
 	GlbFilesScope files;
 	const auto start = std::chrono::steady_clock::now();
@@ -3409,6 +3471,8 @@ static void ReadThreeDObjects()
 		for (const auto &[key, i] : _three_d_grf_house_objects) grf.emplace(std::get<0>(key), std::get<1>(key));
 		ReadDiary(fmt::format("celkem {} objektů z {} indexů; 3D model má {} domů hry, {} domů tematických měst a {} domů z GRF", _three_d_objects.size(), indices.size(), plain.size(), themed.size(), grf.size()), false);
 	}
+	_three_d_objects_reading = false;
+	_three_d_objects_read = true;
 }
 
 /**
@@ -4622,6 +4686,7 @@ enum LazyThing : int {
 	LAZY_HOUSE_SHAPE = 6000, ///< + the level
 	LAZY_HOUSE_MASK = 7000,  ///< + the part painted a colour
 	LAZY_HOUSE_MATERIAL = 8000, ///< + its other material (ThreeDObject::MaterialTexture())
+	LAZY_HOUSE_READY = 9000,    ///< read and painted to be drawn on the map (ThreeDObjectReadyToDraw())
 	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its halves mixed into sixteen bits)
 };
 
@@ -7519,7 +7584,7 @@ static int LazyHousePaint(int level, uint32_t paint)
  */
 static void DropPaintedTextures()
 {
-	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing() || TurnedObjectBatchBusy()) return;
+	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing() || TurnedObjectBatchBusy() || !_three_d_objects_read) return;
 	std::lock_guard lock(_lazy_mutex);
 	for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
 	_painted_bytes = 0;
@@ -7708,6 +7773,47 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 	for (std::thread &t : threads) t.join();
 }
 
+/** Counts the objects made ready in the background to be drawn on the map (ThreeDObjectReadyToDraw()). */
+static std::atomic<uint64_t> _three_d_objects_readied = 0;
+
+/**
+ * Whether a building's object can be drawn on the map now: its shape read and its texture of the level and paint
+ * painted. If not, they are made in the background (ThreeDLoadInBackground()) and the map draws the building as its
+ * sprites meanwhile, its place drawn again when they are there (ThreeDObjectsReadied()): the first frame of a game read
+ * and painted every building in view at once, on the main thread -- one block of the map 10 s on the player's phone
+ * (26. 10.: "the long loading of one block, 10 s").
+ * @param o the object, nullptr none (ready)
+ * @param level its level of detail (the zoom's)
+ * @param paint its colours (ThreeDObject::PaintAt())
+ */
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint)
+{
+	if (o == nullptr) return true;
+	const ThreeDObject *t = o->texture_of < _three_d_objects.size() ? &_three_d_objects[o->texture_of] : o;
+	/* Read, or tried (a file that cannot be read is drawn as it was, as nothing). */
+	auto tried = [](const ThreeDObject *x) { return x->IsRead() || x->glb_state.value.load(std::memory_order_acquire) != 0; };
+	auto ready = [o, t, level, paint, tried] {
+		if (!tried(o) || !tried(t) || t->levels.empty()) return false;
+		if (paint == 0 || t->colours.empty()) return true;
+		return t->painted.contains({std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint});
+	};
+	return MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, level, paint] {
+		o->Read();
+		o->GetTexture(level, paint, false);
+		{
+			std::lock_guard lock(_lazy_mutex);
+			_lazy_asked.erase({o, LAZY_HOUSE_READY});
+		}
+		_three_d_objects_readied++;
+	});
+}
+
+/** How many objects were made ready in the background so far (ThreeDObjectReadyToDraw()): the places waiting for them drawn again when it grows. */
+uint64_t ThreeDObjectsReadied()
+{
+	return _three_d_objects_readied.load();
+}
+
 /** The rig: the objects read, a line each. */
 std::string DescribeThreeDObjects()
 {
@@ -7781,7 +7887,7 @@ static void ForgetUnusedThreeDObjects()
 	if (ThreeDPicturesBeingMade() || EyeFrameDrawing() || TurnedObjectBatchBusy()) return;
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
-	if (_three_d_clock <= THREE_D_FORGET_AFTER) return;
+	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;
 	for (const ThreeDObject &o : _three_d_objects) {
@@ -7882,7 +7988,7 @@ std::string DescribeThreeDObjectMemory()
 	}
 	const size_t glb_files = _glb_files_kept_bytes;
 	size_t houses = 0, house_count = 0, house_glb = 0, houses_read = 0;
-	{
+	if (_three_d_objects_read) {
 		std::lock_guard lock(_lazy_mutex);
 		for (const ThreeDObject &o : _three_d_objects) {
 			/* What is read of its .glb (ThreeDObject::Read()): its shape and its texture's picture. */
@@ -7923,6 +8029,7 @@ std::string RigReadAllThreeDHouses()
 /** The rig: the clock of the objects on by so many seconds, and what is not drawn since forgotten. */
 std::string RigForgetThreeDObjects(uint seconds)
 {
+	if (!_three_d_objects_read) ReadThreeDObjects();
 	for (uint s = 0; s < seconds; s += 15) ForgetUnusedThreeDObjects();
 	size_t textures = 0, shapes = 0;
 	for (const ThreeDObject &o : _three_d_objects) {

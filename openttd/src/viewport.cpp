@@ -108,6 +108,8 @@
 #include "three_d_objects.h"
 #include "three_d_gpu.h"
 #include "video/video_driver.hpp"
+#include "timer/timer.h"
+#include "timer/timer_window.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
@@ -1300,6 +1302,60 @@ static int GetViewportY(Point tile)
 	/* Each increment in X or Y direction moves down by half a tile, i.e. TILE_PIXELS / 2. */
 	return (tile.y * (int)(TILE_PIXELS / 2) + tile.x * (int)(TILE_PIXELS / 2) - TilePixelHeightOutsideMap(tile.x, tile.y)) << ZOOM_BASE_SHIFT;
 }
+
+/** The tiles of buildings drawn as their sprites while their objects are made ready in the background (ThreeDObjectReadyToDraw()). */
+static std::vector<TileIndex> _tiles_owed_objects;
+
+/**
+ * Whether a building's object can be drawn on the map now (ThreeDObjectReadyToDraw()): if not, it is made ready in the
+ * background, the building drawn as its sprites meanwhile and its tile drawn again when it is (_objects_readied_timer).
+ * @param o the object
+ * @param origin its north tile (its colours)
+ * @param tile the tile being drawn
+ */
+static bool ObjectReadyOrOwed(const ThreeDObject *o, TileIndex origin, TileIndex tile)
+{
+	if (ThreeDObjectReadyToDraw(o, to_underlying(_vd.dpi.zoom), o->PaintAt(origin))) return true;
+	if (_tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(tile);
+	return false;
+}
+
+/** The indices of the objects were not read yet when a block of the map was drawn (ObjectsIndexReadOrOwed()). */
+static bool _objects_index_owed = false;
+
+/**
+ * Whether the indices of the objects are read, so the buildings can be drawn as objects (ThreeDObjectsIndexRead()):
+ * if not, they are being read on their thread, the buildings drawn as their sprites meanwhile and the whole screen
+ * drawn again when they are (_objects_readied_timer).
+ */
+static bool ObjectsIndexReadOrOwed()
+{
+	if (ThreeDObjectsIndexRead()) return true;
+	_objects_index_owed = true;
+	return false;
+}
+
+/** Objects made ready in the background: the tiles drawn as their sprites meanwhile drawn again, with them. */
+static const IntervalTimer<TimerWindow> _objects_readied_timer(std::chrono::milliseconds(100), [](auto) {
+	if (_objects_index_owed && ThreeDObjectsIndexRead()) {
+		_objects_index_owed = false;
+		MarkWholeScreenDirty();
+	}
+	static uint64_t seen = 0;
+	const uint64_t now = ThreeDObjectsReadied();
+	if (now == seen) return;
+	seen = now;
+	std::vector<TileIndex> owed;
+	owed.swap(_tiles_owed_objects);
+	std::sort(owed.begin(), owed.end());
+	owed.erase(std::unique(owed.begin(), owed.end()), owed.end());
+	for (TileIndex t : owed) {
+		if (!IsValidTile(t)) continue;
+		/* Its building's whole height, and over its neighbours: an object reaches past its tile. */
+		const int x = TileX(t) * TILE_SIZE, y = TileY(t) * TILE_SIZE, z = GetTileMaxPixelZ(t);
+		MarkWorldBoxDirty(x - TILE_SIZE, y - TILE_SIZE, x + 2 * TILE_SIZE, y + 2 * TILE_SIZE, z, z + static_cast<int>(MAX_BUILDING_PIXELS));
+	}
+});
 
 /**
  * Add the landscape to the viewport, i.e. all ground tiles and buildings.
@@ -4728,6 +4784,7 @@ uint DragonFarmHay(const Industry *ind);
 
 static void AddIndustryObjects(size_t first_parent, bool north)
 {
+	if (!ObjectsIndexReadOrOwed()) return;
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Industry) || IsTransparencySet(TransparencyOption::Industries)) return;
 	const bool built = IsIndustryCompleted(_cur_ti.tile);
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
@@ -4751,6 +4808,8 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 		return;
 	}
 	if (!built) return;
+	/* Made ready in the background: drawn as its sprites till then. */
+	if (obj != nullptr && !ObjectReadyOrOwed(obj, GetThreeDIndustryObjectOrigin(ind), _cur_ti.tile)) return;
 	if (obj != nullptr) {
 		LeaveOutTileSprites(first_parent, north);
 		/* The refinery as the distillery (GetThreeDIndustryYard()): its tanks and columns beside the distillery. */
@@ -4840,6 +4899,7 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
  */
 static void AddFieldWheat()
 {
+	if (!ObjectsIndexReadOrOwed()) return;
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Clear) || !IsClearGround(_cur_ti.tile, ClearGround::Fields)) return;
 	const uint type = GetFieldType(_cur_ti.tile);
 	if (type == 0 || type >= 8) return;
@@ -4863,6 +4923,7 @@ static bool IsStreetLightSprite(SpriteID image)
  */
 static void AddStreetLamps(size_t first_parent)
 {
+	if (!ObjectsIndexReadOrOwed()) return;
 	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Houses)) return;
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
@@ -4887,7 +4948,7 @@ static void AddNorthHouseObject(size_t first_parent)
 	HouseID north = GetHouseType(_cur_ti.tile);
 	TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
 	const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
-	if (obj == nullptr) return;
+	if (obj == nullptr || !ObjectReadyOrOwed(obj, origin, _cur_ti.tile)) return;
 	LeaveOutTileSprites(first_parent, true);
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == origin) return;
@@ -5611,8 +5672,11 @@ static void ViewportDoDrawTurned()
 			HouseID north = GetHouseType(_cur_ti.tile);
 			{
 				TileIndex origin = _cur_ti.tile + GetHouseNorthPart(north);
-				const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
-				if (obj != nullptr) {
+				const bool index_read = ObjectsIndexReadOrOwed();
+				const ThreeDObject *obj = index_read ? GetThreeDHouseObjectAt(north, origin) : nullptr;
+				if (!index_read || (obj != nullptr && !ObjectReadyOrOwed(obj, origin, _cur_ti.tile))) {
+					/* Read or made ready in the background: drawn as its sprites till then. */
+				} else if (obj != nullptr) {
 					for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) _vd.parent_sprites_to_draw[i].box_kind = 4;
 					bool known = false;
 					for (const TurnedObject &to : _turned_objects) {
@@ -6346,7 +6410,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	} else {
 		/* Facing north again: the turned view's ground from the card shown no more (TurnedCardGround). */
 		if (_turned_card_ground.vp == &vp) HideTurnedCardGround();
-		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
+		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ObjectsIndexReadOrOwed();
 		_turned_objects.clear();
 		_turned_vehicle_pictures.clear();
 		AutoRestoreBackup north_objects_backup(_north_house_objects_now, _north_house_objects);

@@ -98,6 +98,8 @@
 #include "anomaly_log.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_gpu.h"
+#include "three_d_objects.h"
+#include "three_d.h"
 #include "cab_view.h"
 
 #if defined(_WIN32)
@@ -437,6 +439,8 @@ struct AfterNewGRFScan : NewGRFScanCallback {
 		 * down the last time (its diary). */
 		_three_d_gpu_off = !_settings_client.gui.three_d_gpu;
 		ThreeDGpuCheckLastRun();
+		/* The indices of the 3D objects read on their own thread while the game starts (StartReadingThreeDObjects()). */
+		if (ThreeDEnabled()) StartReadingThreeDObjects();
 		/* Since the default for the palette might have changed due to
 		 * reading the configuration file, recalculate that now. */
 		UpdateNewGRFConfigPalette();

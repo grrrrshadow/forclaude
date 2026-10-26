@@ -31,6 +31,39 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (9) – první blok mapy 10 s: rejstřík objektů na vlastním vlákně, domy se chystají na pozadí
+
+- Hráč: *„co to dlouhé načítání jednoho bloku 10s, to si pokračuj, ne že to zahodíš“*. V deníku z telefonu
+  `mapa … nejdel 10710 ms` a `hodiny … nejdel 11323 ms`: první vykreslení mapy po načtení hry.
+- **Příčina (rig, měřeno po částech):** první blok mapy 705 ms. Z toho čtení a malování 3D domů a průmyslu na
+  hlavním vlákně a **čtení rejstříků `objekty.json` (204 ms)**, které se dělalo až při prvním kreslení domu.
+  Z rejstříku 150 ms ze 173 dělají průmysly: `prumysl` a `prumysl_vanilla` čtou při čtení rejstříku glb svých dílů.
+  Sprity z GRF to nejsou (2 ms).
+- Hráč k rejstříkům: *„north house bez sněžný čáry se načítaly a nevědělo se co s nimi naco“*, *„používáme
+  pouštní, ale arktický můžou být jen se sněžnou čárou“*. Změřeno: rejstřík subarktických domů stojí 0,3 ms,
+  jejich glb se čtou až při kreslení. Brzdil průmysl, ne sníh.
+- **Hotovo:**
+  - Rejstříky se čtou na vlastním vlákně hned po skenu GRF při startu hry (`StartReadingThreeDObjects()`).
+  - Mapa na ně nečeká (`ThreeDObjectsIndexRead()`): do přečtení kreslí domy, průmysl, lampy a pšenici jako sprity
+    a pak jednou překreslí celou obrazovku. Co jiného je potřebuje (z očí, kabina, zvířata), počká na vlákno.
+  - Sken tarů GRF počká na vlákno.
+  - Každý dům a průmysl se před prvním kreslením chystá na pozadí (`ThreeDObjectReadyToDraw()`): tvar, textura
+    a nabarvení. Mezitím je vidět jeho sprite a jeho místo se překreslí, až je hotový.
+- **Rig:**
+  - První blok 705 → 113 ms.
+  - S uměle zpomaleným rejstříkem (4 s) se první blok nakreslil za 77 ms jako sprity. Po 10 s se obraz liší
+    od normálního běhu o 4 pixely animace.
+  - Úvodní obrazovka OK. Smoke beze změny.
+- Deník hráče (11:27–11:32, starší build): *„hejbe se to pěkně“*, mapa i oči ~110–120 snímků/s. Při načtení je
+  pořád `mapa nejdel 10221 ms`, to opravuje tenhle krok. V 11:31:07 blok 973 ms: 95 obrázků objektů vozidel
+  na hlavním vlákně (977 ms), zbývá.
+- **Nové od hráče (čeká):**
+  - Dřevěná rozhledna dračí farmy: zasekne se nahoře, poslední kousek na plošinu. Kamenné schody druhé farmy
+    a posed jsou OK.
+  - Srub: dveře jdou zavřít, okna nejdou otevřít.
+  - Krmení draků (domluvit): *„dám mu mari a zakouří se kolem draka, dám mu vodku, pivo a bude oheň kolem draka
+    nebo radši kouř a oheň z tlamy“*.
+
 ## 26. 10. (8) – otočenou mapu skládá karta, krok 1: zem rovnou z karty, nic se nečte zpět
 
 - Hráč: *„už je to dobrý, cota radil ať nedávám 22.2.5 a s ním to funguje“* (nastavení vyřešené: Zink 22.2.5),

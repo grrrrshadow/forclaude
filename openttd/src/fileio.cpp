@@ -31,6 +31,8 @@
 
 #include "safeguards.h"
 
+void WaitForReadingThreeDObjects(); // three_d_objects.cpp
+
 /** Whether the working directory should be scanned. */
 static bool _do_scan_working_directory = true;
 
@@ -430,6 +432,8 @@ static void SimplifyFileName(std::string &name)
  */
 uint TarScanner::DoScan(Subdirectory sd)
 {
+	/* Not under the thread reading the indices of the 3D objects from the tars (three_d_objects.cpp). */
+	if (sd == Subdirectory::Baseset || sd == Subdirectory::NewGrf) WaitForReadingThreeDObjects();
 	_tar_filelist[sd].clear();
 	_tar_list[sd].clear();
 	uint num = this->Scan(".tar", sd, false);

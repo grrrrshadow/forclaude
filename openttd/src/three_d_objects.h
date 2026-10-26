@@ -1001,6 +1001,11 @@ struct ThreeDTextureWanted {
 	uint32_t paint;
 };
 void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
+void StartReadingThreeDObjects();
+void WaitForReadingThreeDObjects();
+bool ThreeDObjectsIndexRead();
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint);
+uint64_t ThreeDObjectsReadied();
 void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted);
 
 /*
