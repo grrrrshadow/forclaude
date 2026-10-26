@@ -31,6 +31,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (8) – otočenou mapu skládá karta, krok 1: zem rovnou z karty, nic se nečte zpět
+
+- Hráč: *„už je to dobrý, cota radil ať nedávám 22.2.5 a s ním to funguje“* (nastavení vyřešené: Zink 22.2.5),
+  *„pokračuj gpu přechod“*, *„nelogický věci“*, *„otočenou mapu ať skládá karta“*.
+- **Plán:** (1) zem otočené mapy kreslí karta do vlastního obrázku pohledu a ovladač videa ji ukáže pod
+  obrazovkou hry (jako snímek z očí); (2) všechno stojící (domy, auta, krabice, mosty, sprity) kartou najednou,
+  jinak by nesedělo pořadí. Pak procesoru zůstanou nápisy a okna.
+- **Krok 1 hotový:**
+  - Karta drží obrázek zemi hlavního pohledu (`ThreeDGpuGround::into_view`, `ThreeDGpuViewGround()`),
+    blok do něj klade na své místo, žádné `glReadPixels`.
+  - Pohled se posune → karta posune obrázek (dvě kopie přes pomocný obrázek). Co je položené, se pamatuje po
+    pixelech jako u „zem z pohledu“ (`TurnedCardGround`): otočení, přiblížení, změna zemi = znovu.
+  - Blok na obrazovce je díra (alfa 0). Co stojí, kreslí procesor do díry jako dřív.
+  - Blitter 40bpp-anim nad dírou počítá i alfu (`ComposeOver`, `DarkenOver`), takže stíny, okraje a písmo jsou
+    nad zemí z karty správně. Nad neprůhledným pixelem vychází stejně jako dřív.
+  - Ovladač videa skládá obrázek karty s obrazovkou jako „přes“ (`s.rgb + (1 − s.a)·karta`) a zem kreslí pod
+    obrázkem z očí (`under`).
+  - V noci, u screenshotu, bez sdílení kontextu (vypnutá HW akcelerace) a u jiného blitteru zůstává stará
+    cesta se čtením zpět. Blok, kde zem položil procesor, je celý neprůhledný.
+- **Rig:** `test3d zem ukaz 0|1`. Sdílení kontextu v rigu jen s `SDL_VIDEO_X11_FORCE_EGL=1` (jinak SDL jede přes
+  GLX a karta se nesdílí). Otočení 30° a 52°, posun, úvodní obrazovka 90 s se střídáním dne a noci: obrázek
+  stejný jako se čtením zpět; liší se jen pole, zvířata a datum, které se mezitím změnily samy.
+- **Zbývá (krok 2):** stojící věci kartou, noc kartou (ztmavení a lampy na zemi), pak domy shora bez čtení zpět.
+
 ## 26. 10. (7) – deník z telefonu (test 5–8): domy kartou rozbité = Zink 25.1.9, ne jádra
 
 - Hráč: *„asserty odstraníme na konec“*, *„ano další velký krok uděláme“* (skládání mapy kartou, #134),

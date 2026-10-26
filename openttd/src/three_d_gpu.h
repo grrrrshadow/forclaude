@@ -186,6 +186,13 @@ struct ThreeDGpuGround {
 	std::vector<ThreeDGpuGroundTriangle> triangles;
 	uint32_t *out = nullptr;     ///< the block's pixels, top row first, read back into
 	int out_pitch = 0;           ///< pixels a row of them
+	/* Or laid into the picture of the view's ground on the card (ThreeDGpuViewGround()), not read back: shown straight
+	 * from the card under the screen, the processor leaving a hole for it (the player, 26. 10.: "the card to compose the
+	 * turned map"). */
+	bool into_view = false;
+	int view_x = 0, view_y = 0;  ///< where the block is in it, pixels from its top left
+	int view_w = 0, view_h = 0;  ///< its size: the view's (made anew, all black, when another)
+	int move_x = 0, move_y = 0;  ///< before the block is laid, what it holds moved by so many pixels (the view moved); a block of no size only moves it
 };
 
 /**
@@ -348,6 +355,7 @@ void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics);
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
+uint32_t ThreeDGpuViewGround(uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);

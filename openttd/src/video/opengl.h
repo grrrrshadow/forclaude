@@ -80,6 +80,7 @@ private:
 		Rect r;           ///< where on the screen
 		GLuint texture;   ///< the card's, shared with this context
 		uint32_t tint;    ///< laid over it by its alpha (Colour::data), 0 none
+		bool under;       ///< shown under the others
 	};
 	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
 	std::mutex three_d_mutex; ///< of three_d_pictures: set by the game, drawn by Paint()
@@ -128,7 +129,7 @@ public:
 	void ClearCursorCache();
 
 	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
-	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint);
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false);
 	void HideThreeDPicture(const void *owner);
 	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
 

@@ -1127,7 +1127,8 @@ void OpenGLBackend::Paint()
 	_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
 	/* The pictures of the graphics card shown straight from it where their windows' are: in the holes the windows left
-	 * for them (the screen's pixels of alpha 0), under what the windows drew over them. */
+	 * for them (the screen's pixels of alpha below 255), under what the windows drew over them; those under the others
+	 * first. */
 	{
 		std::lock_guard lock(this->three_d_mutex);
 		if (!this->three_d_pictures.empty() && this->three_d_program != 0) {
@@ -1137,7 +1138,8 @@ void OpenGLBackend::Paint()
 			_glActiveTexture(GL_TEXTURE1);
 			_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
 			_glActiveTexture(GL_TEXTURE0);
-			for (const auto &[owner, pic] : this->three_d_pictures) {
+			for (const bool under : {true, false}) for (const auto &[owner, pic] : this->three_d_pictures) {
+				if (pic.under != under) continue;
 				const Colour tint(pic.tint);
 				_glUniform4f(this->three_d_sprite_loc, static_cast<float>(pic.r.left), static_cast<float>(pic.r.top), static_cast<float>(pic.r.right - pic.r.left + 1), static_cast<float>(pic.r.bottom - pic.r.top + 1));
 				_glUniform4f(this->three_d_tint_loc, tint.r / 255.0f, tint.g / 255.0f, tint.b / 255.0f, pic.tint == 0 ? 0.0f : tint.a / 255.0f);
@@ -1179,11 +1181,12 @@ void OpenGLBackend::Paint()
  * @param r where on the screen
  * @param texture the card's, shared with this context
  * @param tint laid over it by its alpha (Colour::data), 0 none
+ * @param under shown under the others
  */
-void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint)
+void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under)
 {
 	std::lock_guard lock(this->three_d_mutex);
-	this->three_d_pictures[owner] = {r, texture, tint};
+	this->three_d_pictures[owner] = {r, texture, tint, under};
 }
 
 /** A window's picture of the graphics card shown no more. */

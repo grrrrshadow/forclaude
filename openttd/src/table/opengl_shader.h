@@ -200,7 +200,11 @@ static const char *_frag_shader_sprite_blend_150[] = {
 	"}",
 };
 
-/** Fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha 0 (OpenGLBackend::ShowThreeDPicture()). */
+/**
+ * Fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha below 255
+ * (OpenGLBackend::ShowThreeDPicture()): the screen's pixel laid over it, its colour with its alpha in it (what the
+ * blitter drew over the hole: a shadow, an edge, a letter).
+ */
 static const char *_frag_shader_three_d[] = {
 	"#version 110\n",
 	"uniform sampler2D colour_tex;",
@@ -210,12 +214,12 @@ static const char *_frag_shader_three_d[] = {
 	"varying vec2 colour_tex_uv;",
 	"void main() {",
 	"  vec4 s = texture2D(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
-	"  if (s.a > 0.5) discard;",
-	"  gl_FragData[0] = vec4(mix(texture2D(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"  if (s.a > 0.998) discard;",
+	"  gl_FragData[0] = vec4(s.rgb + (1.0 - s.a) * mix(texture2D(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
 	"}",
 };
 
-/** GLSL 1.50 fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha 0. */
+/** GLSL 1.50 fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha below 255. */
 static const char *_frag_shader_three_d_150[] = {
 	"#version 150\n",
 	"uniform sampler2D colour_tex;",
@@ -226,7 +230,7 @@ static const char *_frag_shader_three_d_150[] = {
 	"out vec4 colour;",
 	"void main() {",
 	"  vec4 s = texture(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
-	"  if (s.a > 0.5) discard;",
-	"  colour = vec4(mix(texture(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
+	"  if (s.a > 0.998) discard;",
+	"  colour = vec4(s.rgb + (1.0 - s.a) * mix(texture(colour_tex, colour_tex_uv).rgb, tint.rgb, tint.a), 1.0);",
 	"}",
 };

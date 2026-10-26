@@ -281,12 +281,12 @@ inline void Blitter_40bppAnim::Draw(const Blitter::BlitterParams *bp, ZoomLevel 
 							Colour b = this->RealizeBlendedColour(*anim, *dst);
 							if (m == 0) {
 								Colour c = mode == BlitterMode::CrashRemap ? this->MakeDark(*src_px) : *src_px;
-								*dst = this->ComposeColourRGBANoCheck(c.r, c.g, c.b, src_px->a, b);
+								*dst = ComposeOver(c.r, c.g, c.b, src_px->a, b);
 								*anim = 0;
 							} else {
 								uint r = remap[m];
 								if (r != 0) {
-									*dst = this->ComposeColourPANoCheck(this->LookupColourInPalette(r), src_px->a, b);
+									*dst = ComposeOver(this->LookupColourInPalette(r), src_px->a, b);
 									*anim = 0; // Animation colours don't work with alpha-blending.
 								}
 							}
@@ -317,14 +317,14 @@ inline void Blitter_40bppAnim::Draw(const Blitter::BlitterParams *bp, ZoomLevel 
 							 * only look at the RGB brightness value. As such, we can simply darken the
 							 * RGB value to darken the anim colour. */
 							Colour b = *anim != 0 ? Colour(GetColourBrightness(*dst), 0, 0) : *dst;
-							*dst = this->MakeTransparent(b, 3, 4);
+							*dst = DarkenOver(b, 3, 4);
 							anim++;
 							dst++;
 						} while (--n != 0);
 					} else {
 						do {
 							Colour b = this->RealizeBlendedColour(*anim, *dst);
-							*dst = this->MakeTransparent(b, (256 * 4 - src_px->a), 256 * 4);
+							*dst = DarkenOver(b, (256 * 4 - src_px->a), 256 * 4);
 							*anim = 0; // Animation colours don't work with alpha-blending.
 							anim++;
 							dst++;
@@ -341,6 +341,9 @@ inline void Blitter_40bppAnim::Draw(const Blitter::BlitterParams *bp, ZoomLevel 
 						do {
 							if (*anim != 0) {
 								*anim = remap[*anim];
+							} else if (dst->a != 255) {
+								/* Over a hole for the card's picture: what shows through darkened, as by PALETTE_TO_TRANSPARENT. */
+								*dst = DarkenOver(*dst, 154);
 							} else {
 								*dst = this->LookupColourInPalette(remap[GetNearestColourIndex(*dst)]);
 								*anim = 0;
@@ -370,10 +373,10 @@ inline void Blitter_40bppAnim::Draw(const Blitter::BlitterParams *bp, ZoomLevel 
 							Colour b = this->RealizeBlendedColour(*anim, *dst);
 
 							if (m == 0) {
-								*dst = this->ComposeColourRGBANoCheck(src_px->r, src_px->g, src_px->b, src_px->a, b);
+								*dst = ComposeOver(src_px->r, src_px->g, src_px->b, src_px->a, b);
 								*anim = 0;
 							} else {
-								*dst = this->ComposeColourPANoCheck(this->LookupColourInPalette(m), src_px->a, b);
+								*dst = ComposeOver(this->LookupColourInPalette(m), src_px->a, b);
 								*anim = m;
 							}
 
@@ -439,7 +442,7 @@ void Blitter_40bppAnim::DrawColourMappingRect(void *dst, int width, int height, 
 		do {
 			for (int i = 0; i != width; i++) {
 				Colour b = *anim != 0 ? Colour(GetColourBrightness(*udst), 0, 0) : *udst;
-				*udst = MakeTransparent(b, 154);
+				*udst = DarkenOver(b, 154);
 				udst++;
 				anim++;
 			}
