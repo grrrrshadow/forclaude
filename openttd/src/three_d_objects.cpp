@@ -4034,6 +4034,11 @@ static void ReadThreeDVehicleObjects()
 						if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
 							for (int k = 0; k < 3; k++) a.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
 						}
+						if (e.contains("rozmer_nakladu") && e.at("rozmer_nakladu").is_array() && e.at("rozmer_nakladu").size() == 3) {
+							for (int k = 0; k < 3; k++) {
+								if (e.at("rozmer_nakladu").at(k).is_number()) a.load_size[k] = std::max(0.05f, e.at("rozmer_nakladu").at(k).get<float>());
+							}
+						}
 						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
 						/* How high its origin floats over the ground, true metres: "vznaseni_m" (the colleague's ghost and
 						 * phantom of the forest, hra/3d/STRASIDLA-LES-ROZEN-PRO-HRU.md), before it "vyska_m". */
@@ -4669,14 +4674,16 @@ static void ReadThreeDVehicleObjects()
 			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
 		}
 	}
-	/* An animal on a bed takes its size and some room about it (the colleague: "with a gap"). */
+	/* An animal on a bed takes the room its record gives it ("rozmer_nakladu"), else its size and some room about it
+	 * (the colleague: "with a gap"). */
 	for (ThreeDLoadPiece &piece : _load_pieces) {
 		if (piece.animal.empty()) continue;
 		for (const ThreeDAnimal &a : _animals) {
 			if (a.name != piece.animal) continue;
-			piece.size[0] = a.size[0] + LOAD_ANIMAL_ROOM_M;
-			piece.size[1] = a.size[1] + LOAD_ANIMAL_ROOM_M;
-			piece.size[2] = a.size[2];
+			const bool given = a.load_size[0] > 0 && a.load_size[1] > 0 && a.load_size[2] > 0;
+			piece.size[0] = given ? a.load_size[0] : a.size[0] + LOAD_ANIMAL_ROOM_M;
+			piece.size[1] = given ? a.load_size[1] : a.size[1] + LOAD_ANIMAL_ROOM_M;
+			piece.size[2] = given ? a.load_size[2] : a.size[2];
 		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());

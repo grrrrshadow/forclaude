@@ -39,8 +39,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   a stav korby má `loze` (dno, x, y, bočnice, max_vyska).
 - **Sada `objekty/naklady`** je v baseset (`media/baseset/decouple/objekty/naklady`). Každý kus (`druh: naklad`) je
   postava `naklady/<jmeno>` s maskou barvy; barvy z jeho tabulky `naklady` jsou stavy postavy (jako lak vozidla).
-  Dobytek je zvíře ze `zvirata` (`pase_00`), velikost zvířete + 0,2 m (`rozmer_nakladu` v záznamech zvířat zatím
-  není).
+  Dobytek je zvíře ze `zvirata` (`pase_00`). Místo na korbě dává `rozmer_nakladu` v záznamu zvířete; dokud ho
+  kolega nedá, je to velikost zvířete + 0,2 m.
 - **Skládání:** kus z vrstev stavu, `loze` z korby; mřížka celých kusů od předku ložné plochy, uprostřed, rovně
   nebo napříč (`otaceni`), podle toho, kolik se vejde víc. Vrstvy do `max_vrstev`. První vrstva vždy, další jen pod
   `max_vyska` (paleta beden 1,124 m je o 4 cm vyšší než laťky valníku, jinak by se nevešla žádná). Kolik kusů:

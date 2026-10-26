@@ -921,6 +921,7 @@ struct ThreeDAnimal {
 	bool flies = false;          ///< "leta": flies beside the walker
 	int price = 0;               ///< "cena", pounds
 	float size[3] = {};          ///< "rozmer_m": length, width and height, metres
+	float load_size[3] = {};     ///< "rozmer_nakladu": the room it takes standing on a lorry's bed with the gap about it, metres; 0 none
 	float scale = 2.0f;          ///< "meritko": so many times its true size on the map (2 as the girls)
 	std::vector<std::string> poses; ///< its poses ("klid", "chuze", "beh", "utok", "smrt", "lezi"...)
 
