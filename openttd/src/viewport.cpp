@@ -1365,8 +1365,6 @@ static void AddNorthHouseObject(size_t first_parent);
 static void AddIndustryObjects(size_t first_parent, bool north);
 static void AddStreetLamps(size_t first_parent);
 static void AddFieldWheat();
-static const ThreeDIndustryTileParts *OriginalIndustryTileParts(TileIndex tile);
-static TileIndex OriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts);
 static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTileParts &parts, bool built);
 
 static void ViewportAddLandscape()
@@ -4800,7 +4798,7 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 	const ThreeDObject *obj = built ? GetThreeDIndustryObjectOf(ind) : nullptr;
 	ThreeDPlantationTile pt;
 	ThreeDFieldTile ft;
-	if (const ThreeDIndustryTileParts *parts = obj == nullptr ? OriginalIndustryTileParts(_cur_ti.tile) : nullptr; parts != nullptr) {
+	if (const ThreeDIndustryTileParts *parts = obj == nullptr ? GetThreeDOriginalIndustryTileAt(_cur_ti.tile) : nullptr; parts != nullptr) {
 		/* An industry of the original game, from the parts the industries share; being built, its ground only (the
 		 * forest's trees at once). */
 		LeaveOutTileSprites(first_parent, north);
@@ -4846,31 +4844,6 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 }
 
 /**
- * The parts of a tile of an industry of the original game drawn from the parts the industries share (the colleague's
- * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, GetThreeDOriginalIndustryTile()); nullptr for a tile of a set (NewGRF) or one
- * the sets have none for (Toyland), drawn by its sprites as ever.
- */
-static const ThreeDIndustryTileParts *OriginalIndustryTileParts(TileIndex tile)
-{
-	const IndustryGfx gfx = GetIndustryGfx(tile);
-	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
-	return GetThreeDOriginalIndustryTile(gfx);
-}
-
-/**
- * The anchor of the block a tile of an original industry is of (a factory of 2 x 2 tiles: its north tile draws it
- * whole) and its parts; the tile itself when it is no member of a block. INVALID_TILE when the anchor is not there.
- */
-static TileIndex OriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts)
-{
-	if (!parts->member) return tile;
-	const TileIndex anchor = TileAddWrap(tile, -parts->anchor_dx, -parts->anchor_dy);
-	if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return INVALID_TILE;
-	parts = OriginalIndustryTileParts(anchor);
-	return parts != nullptr && !parts->member ? anchor : INVALID_TILE;
-}
-
-/**
  * A tile of an original industry among the turned objects: its ground (flat and first, as the field road); when it is
  * built, the parts and plants of its building, from the anchor of its block (once, whichever of its tiles is drawn).
  */
@@ -4879,7 +4852,7 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
 	if (parts.ground != nullptr) _turned_objects.push_back({parts.ground, tile, GetTileMaxPixelZ(tile), nullptr, {}, -4 * static_cast<int>(TILE_HEIGHT)});
 	if (!built) return;
 	const ThreeDIndustryTileParts *of = &parts;
-	const TileIndex anchor = OriginalIndustryAnchor(tile, of);
+	const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, of);
 	if (anchor == INVALID_TILE) return;
 	const int z = GetTileMaxPixelZ(anchor);
 	auto add = [&](const ThreeDObject *obj, std::span<const ThreeDObjectFigure> more = {}) {
@@ -5108,6 +5081,68 @@ static double CabEyeHeight(const ThreeDVehicleObject &m)
 	if (lo < hi && z < lo + 0.1) z = (lo + hi) / 2;
 	lifted[&m] = z;
 	return z;
+}
+
+/** A solid of the model this near in front of the eye of its cab hides the way ahead (CabEyeAhead()), metres. */
+static constexpr double CAB_EYE_SOLID_M = 1.5;
+/** Solids of the model closer behind one another than this are one, the eye goes past them all, metres. */
+static constexpr double CAB_EYE_SOLID_GAP_M = 0.3;
+/** The eye so far past the solid in front of it, metres. */
+static constexpr double CAB_EYE_PAST_SOLID_M = 0.15;
+
+/**
+ * How far ahead of where its index has it the eye of a model's cab is, metres along the way the model goes: none when
+ * it looks out through the glass, else just past the solid of the model in front of it -- the roof's front edge, a
+ * windscreen of the body not of the glass -- so that it sees out before the cab (the player, 26. 10., the Zetor of the
+ * farm: "put the camera before the cab, the colleague will remake the Zetor").
+ * @param parts the parts its state shows
+ * @param turn  how far its state turns the model, radians
+ */
+static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts, double turn)
+{
+	static std::map<std::tuple<const ThreeDVehicleObject *, std::array<uint64_t, 2>, double>, double> ahead;
+	const auto key = std::make_tuple(&m, parts.bits, turn);
+	if (auto it = ahead.find(key); it != ahead.end()) return it->second;
+	const ThreeDVehicleShape *shape = m.TryGetShape(0, parts);
+	if (shape == nullptr) return 0;
+	/* From the eye along the way the model goes, through what is drawn of it from its cab (not the driver's seat). */
+	const double ox = m.cab[0], oy = m.cab[1], oz = CabEyeHeight(m), dx = std::cos(turn), dy = -std::sin(turn);
+	std::vector<std::pair<double, bool>> hits; // how far, whether of the glass
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
+		const uint8_t part = t < shape->tri_part.size() ? shape->tri_part[t] : 0;
+		if (ThreeDVehicleShape::AtDriverSeat(part)) continue;
+		if (part != ThreeDVehicleShape::PART_GLASS && !ThreeDVehicleShape::Shown(part, parts)) continue;
+		if (std::max({shape->tri[t * 3], shape->tri[t * 3 + 1], shape->tri[t * 3 + 2]}) * 3 + 2 >= shape->pos.size()) continue;
+		std::array<double, 3> p[3];
+		for (int k = 0; k < 3; k++) {
+			const size_t c = shape->tri[t * 3 + k];
+			p[k] = {shape->pos[c * 3], shape->pos[c * 3 + 1], shape->pos[c * 3 + 2]};
+		}
+		/* Where the line meets the triangle (Moeller and Trumbore). */
+		const double e1[3] = {p[1][0] - p[0][0], p[1][1] - p[0][1], p[1][2] - p[0][2]};
+		const double e2[3] = {p[2][0] - p[0][0], p[2][1] - p[0][1], p[2][2] - p[0][2]};
+		const double h[3] = {dy * e2[2], -dx * e2[2], dx * e2[1] - dy * e2[0]};
+		const double det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2];
+		if (std::abs(det) < 1e-12) continue;
+		const double sv[3] = {ox - p[0][0], oy - p[0][1], oz - p[0][2]};
+		const double u = (sv[0] * h[0] + sv[1] * h[1] + sv[2] * h[2]) / det;
+		if (u < 0 || u > 1) continue;
+		const double q[3] = {sv[1] * e1[2] - sv[2] * e1[1], sv[2] * e1[0] - sv[0] * e1[2], sv[0] * e1[1] - sv[1] * e1[0]};
+		const double w = (dx * q[0] + dy * q[1]) / det;
+		if (w < 0 || u + w > 1) continue;
+		const double d = (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]) / det;
+		if (d > 0) hits.push_back({d, shape->IsSeeThrough(t)});
+	}
+	std::ranges::sort(hits);
+	/* The solid first, within the cab: past it and what of the solid follows close behind it (its two sides). */
+	double move = 0;
+	if (!hits.empty() && !hits[0].second && hits[0].first < CAB_EYE_SOLID_M) {
+		move = hits[0].first;
+		for (size_t i = 1; i < hits.size() && !hits[i].second && hits[i].first - move < CAB_EYE_SOLID_GAP_M; i++) move = hits[i].first;
+		move += CAB_EYE_PAST_SOLID_M;
+	}
+	ahead[key] = move;
+	return move;
 }
 
 /**
@@ -11614,7 +11649,7 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 							if (const ThreeDIndustryTileParts *yard = GetThreeDIndustryYard(ind, tile); yard != nullptr) {
 								for (const ThreeDObject *p : yard->parts) far_object(p, tile);
 							}
-						} else if (const ThreeDIndustryTileParts *parts = OriginalIndustryTileParts(tile); parts != nullptr && !parts->member && ThreeDOriginalIndustryTileStands(tile, *parts)) {
+						} else if (const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTileAt(tile); parts != nullptr && !parts->member && ThreeDOriginalIndustryTileStands(tile, *parts)) {
 							/* An industry of the original game from the shared parts: its buildings from their anchors. */
 							for (const ThreeDObject *p : parts->parts) far_object(p, tile);
 						} else if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
@@ -11761,7 +11796,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const ThreeDVehicleObject &m = *own_model.obj;
 		const ThreeDVehicleState *st = m.State(own_model.state);
 		const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0;
-		const double cx = m.cab[0] * std::cos(ta) - m.cab[1] * std::sin(ta), cy = m.cab[0] * std::sin(ta) + m.cab[1] * std::cos(ta);
+		/* Looking out through the glass, or else from before the cab (CabEyeAhead()). */
+		const double go = CabEyeAhead(m, m.PartsOf(own_model.state), ta);
+		const double kx = m.cab[0] + go * std::cos(ta), ky = m.cab[1] - go * std::sin(ta);
+		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
 		eye.x = own_model.x + cx * ahead * eye.fx - cy * across * eye.fy;
 		eye.y = own_model.y + cx * ahead * eye.fy + cy * across * eye.fx;
 		eye.z = own_model.z + CabEyeHeight(m) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
@@ -12016,7 +12054,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
-		if (const ThreeDIndustryTileParts *parts = tile_type == TileType::Industry && GetThreeDIndustryObjectOf(Industry::GetByTile(_cur_ti.tile)) == nullptr ? OriginalIndustryTileParts(_cur_ti.tile) : nullptr; parts != nullptr) {
+		if (const ThreeDIndustryTileParts *parts = tile_type == TileType::Industry && GetThreeDIndustryObjectOf(Industry::GetByTile(_cur_ti.tile)) == nullptr ? GetThreeDOriginalIndustryTileAt(_cur_ti.tile) : nullptr; parts != nullptr) {
 			/* An industry of the original game from the parts the industries share (AddOriginalIndustryTile()): its
 			 * ground, and when it is built its building from the anchor of its block, the trees of the forest. */
 			kind = 5;
@@ -12028,7 +12066,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			};
 			if (parts->ground != nullptr) add(parts->ground, _cur_ti.tile);
 			const ThreeDIndustryTileParts *of = parts;
-			const TileIndex anchor = ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts) ? OriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
+			const TileIndex anchor = ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts) ? GetThreeDOriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
 			if (anchor != INVALID_TILE) {
 				/* Its vehicles of the sets (the Zetor, the wheelbarrow of the farm) with its first part. */
 				for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], anchor, k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());

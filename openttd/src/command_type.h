@@ -311,6 +311,7 @@ enum class Commands : uint8_t {
 	MoveSign, ///< move a sign
 
 	TurnRoadVehicle, ///< turn a road vehicle around
+	BuildYardRoadVehicle, ///< a road vehicle like one standing in an industry's yard, for nothing, there (the farm's Zetor, its wheelbarrow)
 
 	Pause, ///< pause the game
 

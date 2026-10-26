@@ -52,6 +52,11 @@
 #include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
+#include "engine_base.h"
+#include "engine_func.h"
+#include "road_func.h"
+#include "roadveh.h"
+#include "roadveh_cmd.h"
 #include "sound_func.h"
 #include "core/random_func.hpp"
 #include "frame_diary.h"
@@ -154,6 +159,8 @@ static constexpr double FIRST_PERSON_PICK_M = 1.5;
 static constexpr double FIRST_PERSON_LAMP_M = 1.2;
 /** How near the middle of a door the walker opens it with E, metres. */
 static constexpr double FIRST_PERSON_DOOR_M = 1.6;
+/** How near a vehicle of the sets standing in an industry's yard the walker takes one like it with E (the farm's Zetor, its wheelbarrow), metres. */
+static constexpr double FIRST_PERSON_YARD_VEHICLE_M = 2.5;
 /** Farther than this from where the walker last stood (put somewhere else, not walked there), it stands on the ground storey again, metres. */
 static constexpr double FIRST_PERSON_SETTLE_M = 2.0;
 
@@ -494,6 +501,28 @@ static bool FirstPersonMove(FirstPersonEye &w, double px, double py)
 	return (std::abs(px) > 0 && std::abs(px) < SLIDE_AT_LEAST * len && go(x + px, y)) || (std::abs(py) > 0 && std::abs(py) < SLIDE_AT_LEAST * len && go(x, y + py));
 }
 
+/**
+ * The engine of the game a vehicle of the sets standing in a yard is of ("vozidlo:<record>|...",
+ * GetThreeDStandingVehicle()): of the climate and the road, its first piece the record's object, one the company
+ * could buy now rather; Invalid when none (its set not loaded).
+ */
+static EngineID YardVehicleEngine(std::string_view figure)
+{
+	if (!figure.starts_with("vozidlo:")) return EngineID::Invalid();
+	std::string_view record = figure.substr(8);
+	record = record.substr(0, record.find('|'));
+	EngineID found = EngineID::Invalid();
+	for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+		if (!e->IsEnabled() || RoadTypeIsTram(e->VehInfo<RoadVehicleInfo>().roadtype) || !IsValidCargoType(e->GetDefaultCargoType())) continue;
+		int piece = 0;
+		const ThreeDVehicleObject *obj = GetThreeDVehicleObject(e->index, &piece);
+		if (obj == nullptr || piece != 0 || obj->name != record) continue;
+		if (IsEngineBuildable(e->index, VehicleType::Road, _local_company)) return e->index;
+		if (found == EngineID::Invalid()) found = e->index;
+	}
+	return found;
+}
+
 void ShowWalkerInventoryWindow();
 static void ShowDragonFeedWindow(uint32_t place);
 TileIndex FirstPersonShopNearby();
@@ -667,6 +696,48 @@ struct FirstPersonWindow : Window {
 		return std::nullopt;
 	}
 
+	/** A vehicle of the sets standing in an industry's yard within reach of the walker: E gives the company one like it there (CmdBuildYardRoadVehicle()). */
+	struct YardVehicle {
+		TileIndex tile;  ///< the anchor of the industry's block it stands on
+		EngineID engine; ///< the engine of the one given
+		int32_t px, py;  ///< where it stands, CAB_SUBUNIT of a unit
+		uint8_t yaw;     ///< the way it faces, 128ths of a turn
+	};
+
+	/** The vehicle of a yard nearest the walker within reach (ThreeDIndustryTileParts::vehicles), shown and of an engine of the game. */
+	std::optional<YardVehicle> YardVehicleToTake() const
+	{
+		if (!Company::IsValidID(_local_company)) return std::nullopt;
+		const int tx = static_cast<int>(this->walker.x / TILE_SIZE), ty = static_cast<int>(this->walker.y / TILE_SIZE);
+		std::optional<YardVehicle> best;
+		double best_d = FIRST_PERSON_YARD_VEHICLE_M * OBJECT_UNITS_PER_METRE;
+		std::vector<TileIndex> seen;
+		for (int dy = -1; dy <= 1; dy++) {
+			for (int dx = -1; dx <= 1; dx++) {
+				if (tx + dx < 1 || ty + dy < 1 || tx + dx >= static_cast<int>(Map::MaxX()) || ty + dy >= static_cast<int>(Map::MaxY())) continue;
+				const TileIndex tile = TileXY(tx + dx, ty + dy);
+				if (!IsTileType(tile, TileType::Industry)) continue;
+				const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTileAt(tile);
+				if (parts == nullptr || !ThreeDOriginalIndustryTileStands(tile, *parts)) continue;
+				/* The block's vehicles stand with its anchor, once whichever of its tiles is near. */
+				const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, parts);
+				if (anchor == INVALID_TILE || std::ranges::find(seen, anchor) != seen.end()) continue;
+				seen.push_back(anchor);
+				for (const ThreeDObjectFigure &f : parts->vehicles) {
+					const double x = TileX(anchor) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE, y = TileY(anchor) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE;
+					const double d = std::hypot(x - this->walker.x, y - this->walker.y);
+					if (d >= best_d) continue;
+					const EngineID engine = YardVehicleEngine(f.figure);
+					if (engine == EngineID::Invalid()) continue;
+					best_d = d;
+					const int yaw = static_cast<int>(std::lround(f.facing * CAB_YAW_TURN / 360.0));
+					best = YardVehicle{anchor, engine, static_cast<int32_t>(std::lround(x * CAB_SUBUNIT)), static_cast<int32_t>(std::lround(y * CAB_SUBUNIT)), static_cast<uint8_t>(yaw & (CAB_YAW_TURN - 1))};
+				}
+			}
+		}
+		return best;
+	}
+
 	void BoardOrLeave()
 	{
 		if (this->Riding() != nullptr) {
@@ -702,7 +773,14 @@ struct FirstPersonWindow : Window {
 		}
 		this->riding = VehicleID::Invalid();
 		const Vehicle *v = this->VehicleToBoard();
-		if (v != nullptr) this->GetIn(v);
+		if (v != nullptr) {
+			this->GetIn(v);
+			return;
+		}
+		/* By the Zetor or the wheelbarrow of a farm: one like it the company's, there, and into it (CcBuildYardRoadVehicle()). */
+		if (const auto yard = this->YardVehicleToTake(); yard.has_value()) {
+			Command<Commands::BuildYardRoadVehicle>::Post(STR_ERROR_CAN_T_BUY_ROAD_VEHICLE, CcBuildYardRoadVehicle, yard->tile, yard->engine, yard->px, yard->py, yard->yaw);
+		}
 	}
 
 	/*
@@ -1725,6 +1803,9 @@ struct FirstPersonWindow : Window {
 				} else if (const Vehicle *near = this->VehicleToBoard(); near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
 					hint = GetString(STR_FIRST_PERSON_BOARD_HERE, near->index);
+				} else if (const auto yard = this->YardVehicleToTake(); yard.has_value()) {
+					/* By the Zetor or the wheelbarrow of a farm: E takes one like it. */
+					hint = GetString(STR_FIRST_PERSON_TAKE_VEHICLE, PackEngineNameDParam(yard->engine, EngineNameContext::Generic));
 				}
 				if (!hint.empty()) {
 					if (text.empty()) {
@@ -1789,6 +1870,16 @@ void ShowFirstPersonWindow()
 	const Company *c = Company::GetIfValid(_local_company);
 	if (c != nullptr && c->walker_health == 0) Command<Commands::ReviveWalker>::Post(TileIndex{}, WALKER_HEALTH_MAX);
 	AllocateWindowDescFront<FirstPersonWindow>(_first_person_desc, 0);
+}
+
+/** The vehicle of a yard given (CmdBuildYardRoadVehicle()): the walker who asked for it gets into it, and drives it. */
+void CcBuildYardRoadVehicle(Commands, const CommandCost &result, VehicleID veh_id)
+{
+	if (result.Failed()) return;
+	FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	const Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (fp == nullptr || v == nullptr || fp->Riding() != nullptr) return;
+	fp->GetIn(v);
 }
 
 /** The things a farm's dragon is fed, in the order of the lines of its window. */

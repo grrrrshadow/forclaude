@@ -44,12 +44,17 @@
 
 #include "cab_drive.h"
 #include "object_map.h"
+#include "industry_map.h"
 
 #include "table/strings.h"
 
 #include "green_load.h"
 
 #include "three_d_vehicle_object.h"
+#include "autoreplace_gui.h"
+#include "group.h"
+#include "vehicle_gui.h"
+#include "window_func.h"
 
 #include "safeguards.h"
 
@@ -301,6 +306,93 @@ void RoadVehUpdateCache(RoadVehicle *v, bool same_length)
 }
 
 /**
+ * A new road vehicle of the current company with its articulated parts, stopped: in the depot of its tile (hidden), or
+ * standing at a place of the map as it is (CmdBuildYardRoadVehicle()).
+ * @param e         the engine to build.
+ * @param tile      the tile it is on.
+ * @param x         where it is, x.
+ * @param y         and y.
+ * @param direction the way it faces.
+ * @param in_depot  whether it is in the depot of the tile.
+ * @return the vehicle.
+ */
+static RoadVehicle *MakeRoadVehicle(const Engine *e, TileIndex tile, int x, int y, Direction direction, bool in_depot)
+{
+	RoadType rt = e->VehInfo<RoadVehicleInfo>().roadtype;
+	const RoadTypeInfo *rti = GetRoadTypeInfo(rt);
+	const RoadVehicleInfo *rvi = &e->VehInfo<RoadVehicleInfo>();
+
+	RoadVehicle *v = RoadVehicle::Create();
+	v->direction = direction;
+	v->owner = _current_company;
+
+	v->tile = tile;
+	v->x_pos = x;
+	v->y_pos = y;
+	v->z_pos = GetSlopePixelZ(x, y, true);
+
+	v->state = in_depot ? RVSB_IN_DEPOT : to_underlying(DiagDirToDiagTrackdir(DirToDiagDir(direction)));
+	v->vehstatus = in_depot ? VehStates{VehState::Hidden, VehState::Stopped, VehState::DefaultPalette} : VehStates{VehState::Stopped, VehState::DefaultPalette};
+
+	v->spritenum = rvi->image_index;
+	v->cargo_type = e->GetDefaultCargoType();
+	assert(IsValidCargoType(v->cargo_type));
+	v->cargo_cap = rvi->capacity;
+	v->refit_cap = 0;
+
+	v->last_station_visited = StationID::Invalid();
+	v->last_loading_station = StationID::Invalid();
+	v->engine_type = e->index;
+	v->gcache.first_engine = EngineID::Invalid(); // needs to be set before first callback
+
+	v->reliability = e->reliability;
+	v->reliability_spd_dec = e->reliability_spd_dec;
+	v->max_age = e->GetLifeLengthInDays();
+
+	v->SetServiceInterval(Company::Get(v->owner)->settings.vehicle.servint_roadveh);
+
+	v->date_of_last_service = TimerGameEconomy::date;
+	v->date_of_last_service_newgrf = TimerGameCalendar::date;
+	v->build_year = TimerGameCalendar::year;
+
+	v->sprite_cache.sprite_seq.Set(SPR_IMG_QUERY);
+	v->random_bits = Random();
+	v->SetFrontEngine();
+
+	v->roadtype = rt;
+	v->compatible_roadtypes = rti->powered_roadtypes;
+	v->gcache.cached_veh_length = VEHICLE_LENGTH;
+
+	if (e->flags.Test(EngineFlag::ExclusivePreview)) v->vehicle_flags.Set(VehicleFlag::BuiltAsPrototype);
+	v->SetServiceIntervalIsPercent(Company::Get(_current_company)->settings.vehicle.servint_ispercent);
+
+	AddArticulatedParts(v);
+	/* Out of a depot: off the road, driven from its cab (cab_drive.h), its parts with it; no road under it is asked
+	 * of (RoadVehicle::GetMaxTrackSpeed()). */
+	if (!in_depot) {
+		for (RoadVehicle *u = v; u != nullptr; u = u->Next()) {
+			u->state = v->state;
+			u->cab_free = true;
+		}
+	}
+	v->InvalidateNewGRFCacheOfChain();
+
+	/* Call various callbacks after the whole consist has been constructed */
+	for (RoadVehicle *u = v; u != nullptr; u = u->Next()) {
+		u->cargo_cap = u->GetEngine()->DetermineCapacity(u);
+		u->refit_cap = 0;
+		v->InvalidateNewGRFCache();
+		u->InvalidateNewGRFCache();
+	}
+	RoadVehUpdateCache(v);
+	/* Initialize cached values for realistic acceleration. */
+	if (_settings_game.vehicle.roadveh_acceleration_model != AccelerationModel::Original) v->CargoChanged();
+
+	v->UpdatePosition();
+	return v;
+}
+
+/**
  * Build a road vehicle.
  * @param flags    type of operation.
  * @param tile     tile of the depot where road vehicle is built.
@@ -316,71 +408,8 @@ CommandCost CmdBuildRoadVehicle(DoCommandFlags flags, TileIndex tile, const Engi
 	if (!HasTileAnyRoadType(tile, rti->powered_roadtypes)) return CommandCost(STR_ERROR_DEPOT_WRONG_DEPOT_TYPE);
 
 	if (flags.Test(DoCommandFlag::Execute)) {
-		const RoadVehicleInfo *rvi = &e->VehInfo<RoadVehicleInfo>();
-
-		RoadVehicle *v = RoadVehicle::Create();
+		RoadVehicle *v = MakeRoadVehicle(e, tile, TileX(tile) * TILE_SIZE + TILE_SIZE / 2, TileY(tile) * TILE_SIZE + TILE_SIZE / 2, DiagDirToDir(GetRoadDepotDirection(tile)), true);
 		*ret = v;
-		v->direction = DiagDirToDir(GetRoadDepotDirection(tile));
-		v->owner = _current_company;
-
-		v->tile = tile;
-		int x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2;
-		int y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2;
-		v->x_pos = x;
-		v->y_pos = y;
-		v->z_pos = GetSlopePixelZ(x, y, true);
-
-		v->state = RVSB_IN_DEPOT;
-		v->vehstatus = {VehState::Hidden, VehState::Stopped, VehState::DefaultPalette};
-
-		v->spritenum = rvi->image_index;
-		v->cargo_type = e->GetDefaultCargoType();
-		assert(IsValidCargoType(v->cargo_type));
-		v->cargo_cap = rvi->capacity;
-		v->refit_cap = 0;
-
-		v->last_station_visited = StationID::Invalid();
-		v->last_loading_station = StationID::Invalid();
-		v->engine_type = e->index;
-		v->gcache.first_engine = EngineID::Invalid(); // needs to be set before first callback
-
-		v->reliability = e->reliability;
-		v->reliability_spd_dec = e->reliability_spd_dec;
-		v->max_age = e->GetLifeLengthInDays();
-
-		v->SetServiceInterval(Company::Get(v->owner)->settings.vehicle.servint_roadveh);
-
-		v->date_of_last_service = TimerGameEconomy::date;
-		v->date_of_last_service_newgrf = TimerGameCalendar::date;
-		v->build_year = TimerGameCalendar::year;
-
-		v->sprite_cache.sprite_seq.Set(SPR_IMG_QUERY);
-		v->random_bits = Random();
-		v->SetFrontEngine();
-
-		v->roadtype = rt;
-		v->compatible_roadtypes = rti->powered_roadtypes;
-		v->gcache.cached_veh_length = VEHICLE_LENGTH;
-
-		if (e->flags.Test(EngineFlag::ExclusivePreview)) v->vehicle_flags.Set(VehicleFlag::BuiltAsPrototype);
-		v->SetServiceIntervalIsPercent(Company::Get(_current_company)->settings.vehicle.servint_ispercent);
-
-		AddArticulatedParts(v);
-		v->InvalidateNewGRFCacheOfChain();
-
-		/* Call various callbacks after the whole consist has been constructed */
-		for (RoadVehicle *u = v; u != nullptr; u = u->Next()) {
-			u->cargo_cap = u->GetEngine()->DetermineCapacity(u);
-			u->refit_cap = 0;
-			v->InvalidateNewGRFCache();
-			u->InvalidateNewGRFCache();
-		}
-		RoadVehUpdateCache(v);
-		/* Initialize cached values for realistic acceleration. */
-		if (_settings_game.vehicle.roadveh_acceleration_model != AccelerationModel::Original) v->CargoChanged();
-
-		v->UpdatePosition();
-
 		CheckConsistencyOfArticulatedVehicle(v);
 	}
 
@@ -1863,6 +1892,15 @@ static bool RoadVehFreeCanEnter(TileIndex tile, DiagDirection enterdir)
 }
 
 /**
+ * Whether a road vehicle driven freely from its cab may go from a tile of an industry onto another tile of it: about
+ * its yard and out of it (one given there, CmdBuildYardRoadVehicle()), not into an industry from outside.
+ */
+static bool RoadVehFreeInYard(TileIndex from, TileIndex to)
+{
+	return IsTileType(from, TileType::Industry) && IsTileType(to, TileType::Industry) && GetIndustryIndex(from) == GetIndustryIndex(to);
+}
+
+/**
  * For the record of a vehicle that stands while driven from its cab (cab_view_gui.cpp, jizda.log): the tile a unit
  * along its heading, and whether it may go onto it.
  */
@@ -1878,7 +1916,7 @@ std::string DescribeRoadVehFreeAhead(const Vehicle *v)
 	const TileIndex tile = TileVirtXY(x, y);
 	if (tile == v->tile) return fmt::format("stejna dlazdice {},{}", TileX(tile), TileY(tile));
 	return fmt::format("dlazdice {},{} typu {}{} {}", TileX(tile), TileY(tile), to_underlying(GetTileType(tile)),
-			IsRoadDepotTile(tile) ? " (depo)" : "", RoadVehFreeCanEnter(tile, DiagdirBetweenTiles(v->tile, tile)) ? "lze vjet" : "NELZE VJET");
+			IsRoadDepotTile(tile) ? " (depo)" : "", RoadVehFreeCanEnter(tile, DiagdirBetweenTiles(v->tile, tile)) || RoadVehFreeInYard(v->tile, tile) ? "lze vjet" : "NELZE VJET");
 }
 
 /**
@@ -2019,7 +2057,7 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 		const bool along_deck = RoadVehFreeBridgeDeck(v, tile) >= 0 && enterdir != DiagDirection::Invalid && DiagDirToAxis(enterdir) == GetBridgeAxis(tile);
 		if (on_deck && !along_deck && !(IsBridgeTile(tile) && RoadVehFreeCanEnter(tile, enterdir))) return false;
 		if (!along_deck && v->cab_rejoin && enterdir != DiagDirection::Invalid && RoadVehRejoinRoad(v, tile, enterdir)) return true;
-		if (!along_deck && !RoadVehFreeCanEnter(tile, enterdir)) return false;
+		if (!along_deck && !RoadVehFreeCanEnter(tile, enterdir) && !RoadVehFreeInYard(v->tile, tile)) return false;
 		v->tile = tile;
 	}
 	v->cab_px = px;
@@ -2065,6 +2103,80 @@ static void RoadVehFreeController(RoadVehicle *v)
 	v->SetLastSpeed();
 	v->UpdateViewport(false, false);
 	if (v->progress == 0) v->progress = blocked ? adv_spd - 1 : j;
+}
+
+/**
+ * A road vehicle like one of the sets standing in an industry's yard (the farm's Zetor and its wheelbarrow,
+ * ThreeDIndustryTileParts::vehicles), the company's for nothing (the player, 26. 10.: "with E I take the wheelbarrow
+ * and drive; the Zetor a vehicle by E too"): it stands where that one stands, the way it faces, off the road and
+ * driven from its cab already (cab_drive.h), stopped till it is driven off; its trailers behind it. The one of the
+ * yard stays there (the player: "the wheelbarrow may spawn again").
+ * @param flags operation to perform
+ * @param tile a tile of the industry it stands at
+ * @param eid the engine of the vehicle
+ * @param px where it stands, x, CAB_SUBUNIT of a unit
+ * @param py and y
+ * @param yaw the way it faces, 128ths of a turn (cab_drive.h)
+ * @return the cost (none) and the new vehicle, or an error
+ */
+std::tuple<CommandCost, VehicleID> CmdBuildYardRoadVehicle(DoCommandFlags flags, TileIndex tile, EngineID eid, int32_t px, int32_t py, uint8_t yaw)
+{
+	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Industry) || yaw >= CAB_YAW_TURN || !Company::IsValidID(_current_company)) return { CMD_ERROR, VehicleID::Invalid() };
+	/* On the industry's tile or by it, not on the outer tiles of the map. */
+	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
+	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
+			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {
+		return { CMD_ERROR, VehicleID::Invalid() };
+	}
+	const TileIndex at = TileVirtXY(x, y);
+	if (DistanceMax(at, tile) > 1) return { CMD_ERROR, VehicleID::Invalid() };
+	/* An engine of the climate, of the road (no tram), whatever the year: the one of the yard stands there anyway. */
+	const Engine *e = Engine::GetIfValid(eid);
+	if (e == nullptr || e->type != VehicleType::Road || !e->IsEnabled() || RoadTypeIsTram(e->VehInfo<RoadVehicleInfo>().roadtype) || !IsValidCargoType(e->GetDefaultCargoType())) {
+		return { CommandCost(STR_ERROR_ROAD_VEHICLE_NOT_AVAILABLE), VehicleID::Invalid() };
+	}
+	if (!Vehicle::CanAllocateItem(1 + CountArticulatedParts(eid))) return { CommandCost(STR_ERROR_TOO_MANY_VEHICLES_IN_GAME), VehicleID::Invalid() };
+	const UnitID unit = GetFreeUnitNumber(VehicleType::Road);
+	if (unit == UINT16_MAX) return { CommandCost(STR_ERROR_TOO_MANY_VEHICLES_IN_GAME), VehicleID::Invalid() };
+	if (!flags.Test(DoCommandFlag::Execute)) return { CommandCost(), VehicleID::Invalid() };
+
+	RoadVehicle *v = MakeRoadVehicle(e, at, x, y, CabYawToDirection(yaw), false);
+	v->unitnumber = unit;
+	v->value = 0;
+	/* Driven from its cab, each piece the length of the one before it behind it (RoadVehPullChain()). */
+	int32_t ux = px, uy = py;
+	for (RoadVehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u != v) {
+			const int len = u->Previous()->gcache.cached_veh_length;
+			ux -= CabCos(yaw) * len;
+			uy -= CabSin(yaw) * len;
+		}
+		u->cab_free = true;
+		u->cab_rejoin = false;
+		u->cab_turn = Vehicle::CAB_TURN_NONE;
+		u->cab_heading = Direction::Invalid;
+		u->cab_yaw = yaw;
+		u->cab_px = ux;
+		u->cab_py = uy;
+		u->direction = CabYawToDirection(yaw);
+		u->x_pos = Clamp(ux / CAB_SUBUNIT, 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
+		u->y_pos = Clamp(uy / CAB_SUBUNIT, 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
+		u->tile = TileVirtXY(u->x_pos, u->y_pos);
+		u->UpdatePosition();
+		RoadVehFreeHeight(u);
+		u->cab_altitude = static_cast<uint16_t>(std::clamp(u->z_pos, 0, static_cast<int>(UINT16_MAX)));
+	}
+	CheckConsistencyOfArticulatedVehicle(v);
+
+	/* Counted as one bought (CmdBuildVehicle()). */
+	InvalidateWindowClassesData(GetWindowClassForVehicleType(VehicleType::Road), 0);
+	SetWindowDirty(WindowClass::Company, _current_company);
+	if (IsLocalCompany()) InvalidateAutoreplaceWindow(v->engine_type, v->group_id);
+	GroupStatistics::CountEngine(v, 1);
+	GroupStatistics::UpdateAutoreplace(_current_company);
+	GroupStatistics::CountVehicle(v, 1);
+	Company::Get(_current_company)->freeunits[VehicleType::Road].UseID(unit);
+	return { CommandCost(), v->index };
 }
 
 static bool RoadVehController(RoadVehicle *v)

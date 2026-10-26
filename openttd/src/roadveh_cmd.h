@@ -21,7 +21,11 @@ bool RoadVehiclesAreBuilt();
 CommandCost CmdBuildRoadVehicle(DoCommandFlags flags, TileIndex tile, const Engine *e, Vehicle **v);
 
 CommandCost CmdTurnRoadVeh(DoCommandFlags flags, VehicleID veh_id);
+std::tuple<CommandCost, VehicleID> CmdBuildYardRoadVehicle(DoCommandFlags flags, TileIndex tile, EngineID eid, int32_t px, int32_t py, uint8_t yaw);
 
 DEF_CMD_TRAIT(Commands::TurnRoadVehicle, CmdTurnRoadVeh, CommandFlag::Location, CommandType::VehicleManagement)
+DEF_CMD_TRAIT(Commands::BuildYardRoadVehicle, CmdBuildYardRoadVehicle, {}, CommandType::VehicleConstruction)
+
+void CcBuildYardRoadVehicle(Commands cmd, const CommandCost &result, VehicleID veh_id);
 
 #endif /* ROADVEH_CMD_H */

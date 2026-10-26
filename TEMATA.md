@@ -31,7 +31,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
-## 26. 10. (13) – srub: okenice na E, lucerna ze stolu E sebrat; rozhledna zříceniny s podestou; co dál z grrrrf
+## 26. 10. (13) – srub: okenice a lucerna na E; rozhledna s podestou; pastviny; minové kladivo; Zetor a kolečko na E
 
 - Hráč: *„co nemá hotové v grrrf?“* → seznam (pastviny, okenice, rozhledna s podestou, společné náklady, Zetor
   a kolečko, minové kladivo). Pak: *„společné náklady znamená předělat všechny grf, takže se to odkládá na větší akci
@@ -61,9 +61,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     s plotem hry (plot i proti poli vedle). Ve 3D na mapě: kolegova zem, plot na okraji pastviny s otvorem uprostřed
     strany, přístřešek na první dlaždici, koryto na poslední, zvířata (na mapě stojí, z očí se pasou a občas koukají,
     každé jinak). Rig: `test3d pastvina [pokusů]`.
-- **Domluveno, dělá se:** Zetor a kolečko u farmy jako dekorace z GRF,
-  E u nich → tvoje firma dostane opravdové vozidlo zadarmo a nastoupíš, dekorace se objeví znovu; hasičská Tatra
-  na hřišti jen dekorace (normální Tatra z GRF, nevyjede); pastviny.
+  - **Zetor a kolečko u farmy** (klíč `vozidla` u dlaždic farmy v `prumysl_vanilla/objekty.json`): stojí jako
+    dekorace z GRF (Zetor z `Zvlastni_vozy_3D` u dílen, stavební kolečko ze `SPECIAL_3D` opřené o kravín, `naklon`
+    se `stred_naklonu`). Bez balíčku na farmě nic nestojí.
+  - **E u nich** (do 2,5 m): lišta *„E: vzít si Stavební kolečko“*. E → tvoje firma dostane opravdové vozidlo
+    toho GRF zadarmo (příkaz `BuildYardRoadVehicle`), stojí na místě dekorace, mimo silnici, a hned v něm sedíš
+    a řídíš jako v každém autě. Dekorace zůstává, jde si vzít další. Z dvora farmy se dá vyjet (volná jízda smí
+    po dlaždicích téže farmy, dovnitř zvenku ne). Ověřeno v rigu: kolečko jede krokem (2 km/h), Zetor (traktor
+    s vlečkami) vyjel na pole 40 km/h.
+  - Hráč: *„zetor má černý neprůhledný skla kabiny asi“*. Oko řidiče z balíčku (`kabina`, 2,25 m) sedí v přední
+    hraně střechy, před ním neprůhledná plocha modelu, ne sklo. Hráč: *„joj tak dej kameru před kabinu, kolega zetor
+    předělá“*. Hotovo obecně: když oko z kabiny vidí před sebou do 1,5 m neprůhlednou část modelu dřív než sklo,
+    posune se těsně za ni (`CabEyeAhead()`); u dobrých modelů se nic nemění. Až kolega Zetor předělá, převezme se.
+  - Hasičská Tatra na hřišti zůstává dekorace (stojící Tatra z GRF, nevyjede).
 - **Odloženo:** společné náklady (sada `naklady`) až s velkou úpravou všech GRF.
 
 ## 26. 10. (12) – Krmení draků na farmě (E → nabídka, mari kouř, pivo oheň z tlamy, seno nic)

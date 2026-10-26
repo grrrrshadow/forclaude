@@ -2295,6 +2295,7 @@ STR_FIRST_PERSON_DOOR_SHUT                                      :E: shut the doo
 STR_FIRST_PERSON_WINDOW_OPEN                                    :E: open the window
 STR_FIRST_PERSON_WINDOW_SHUT                                    :E: shut the window
 STR_FIRST_PERSON_TAKE_LAMP                                      :E: take the lantern
+STR_FIRST_PERSON_TAKE_VEHICLE                                   :E: take {ENGINE}
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory

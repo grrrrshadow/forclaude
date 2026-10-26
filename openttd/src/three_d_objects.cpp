@@ -6706,6 +6706,31 @@ bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTilePa
 }
 
 /**
+ * The parts of a tile of an industry of the original game drawn from the parts the industries share (the colleague's
+ * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, GetThreeDOriginalIndustryTile()); nullptr for a tile of a set (NewGRF) or one
+ * the sets have none for (Toyland), drawn by its sprites as ever.
+ */
+const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile)
+{
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	return GetThreeDOriginalIndustryTile(gfx);
+}
+
+/**
+ * The anchor of the block a tile of an original industry is of (a factory of 2 x 2 tiles: its north tile draws it
+ * whole) and its parts; the tile itself when it is no member of a block. INVALID_TILE when the anchor is not there.
+ */
+TileIndex GetThreeDOriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts)
+{
+	if (!parts->member) return tile;
+	const TileIndex anchor = TileAddWrap(tile, -parts->anchor_dx, -parts->anchor_dy);
+	if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return INVALID_TILE;
+	parts = GetThreeDOriginalIndustryTileAt(anchor);
+	return parts != nullptr && !parts->member ? anchor : INVALID_TILE;
+}
+
+/**
  * Whether a tile is of a forest: of an original industry, with trees alone on it (ThreeDIndustryTileParts::at_once).
  * Its mushrooms grow there, its game lives there, one walks among its trunks as among trees.
  */
