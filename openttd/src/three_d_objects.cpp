@@ -7356,6 +7356,13 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 
 /** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */
 static constexpr int FOOTPRINT_CELLS = 64;
+/**
+ * And up on a building, about an eighth of a metre: the railings and posts up there stand close to where one walks, the
+ * cells round them to a quarter of a metre shut the way -- the ruin's lookout, between a post of its railing and the
+ * handrail of its stairs 0.58 m, a quarter of a metre left of it, the walker (0.4 m) stopped in the last stair (the
+ * player, 26. 10.).
+ */
+static constexpr int FOOTPRINT_UP_CELLS = 128;
 /** The steps of height of the footprints of what stands over a walker up on a building (ThreeDObject::Blocks()), metres. */
 static constexpr double FOOTPRINT_STOREY_M = 0.25;
 
@@ -7370,11 +7377,11 @@ static constexpr double FOOTPRINT_STOREY_M = 0.25;
 bool ThreeDObject::Blocks(double x, double y, double feet) const
 {
 	this->Read();
-	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
-	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
 	/* What of it is as high as a body standing at a height: its triangles cut to that height, their outlines and their
-	 * insides on the cells; its trees' trunks with trunks. */
-	auto band = [&](double lo, double hi, std::vector<uint8_t> &fp, bool trunks) {
+	 * insides on the cells, so many to a tile; its trees' trunks with trunks. */
+	auto band = [&](double lo, double hi, std::vector<uint8_t> &fp, bool trunks, int cells) {
+		const int w = this->tiles_x * cells, h = this->tiles_y * cells;
+		const double cell = static_cast<double>(TILE_SIZE) / cells;
 		auto mark = [&](double px, double py) {
 			const int cx = static_cast<int>(std::floor(px / cell)), cy = static_cast<int>(std::floor(py / cell));
 			if (cx >= 0 && cy >= 0 && cx < w && cy < h) fp[static_cast<size_t>(cy) * w + cx] = 1;
@@ -7445,20 +7452,24 @@ bool ThreeDObject::Blocks(double x, double y, double feet) const
 	 * one's way, the battlements are. Only the walker stands up there (on the game's thread). */
 	const int storey = static_cast<int>(std::lround(feet / (FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE)));
 	if (storey > 0) {
+		const int w = this->tiles_x * FOOTPRINT_UP_CELLS, h = this->tiles_y * FOOTPRINT_UP_CELLS;
+		const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_UP_CELLS;
 		std::vector<uint8_t> &fp = this->footprints_up[storey];
 		if (fp.empty()) {
 			fp.assign(static_cast<size_t>(w) * h, 0);
 			const double at = storey * FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE;
-			band(at + 0.3 * OBJECT_HEIGHT_PER_METRE, at + 2.0 * OBJECT_HEIGHT_PER_METRE, fp, false);
+			band(at + 0.3 * OBJECT_HEIGHT_PER_METRE, at + 2.0 * OBJECT_HEIGHT_PER_METRE, fp, false, FOOTPRINT_UP_CELLS);
 		}
 		const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
 		if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
 		return fp[static_cast<size_t>(cy) * w + cx] != 0;
 	}
+	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
+	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
 	if (this->footprint_w == 0) {
 		this->footprint.assign(static_cast<size_t>(w) * h, 0);
 		this->footprint_w = w;
-		band(0.3 * OBJECT_HEIGHT_PER_METRE, 2.0 * OBJECT_HEIGHT_PER_METRE, this->footprint, true);
+		band(0.3 * OBJECT_HEIGHT_PER_METRE, 2.0 * OBJECT_HEIGHT_PER_METRE, this->footprint, true, FOOTPRINT_CELLS);
 		/*
 		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
 		 * a body's half-width (WALKER_CELLS) from every wall, a gap narrower than a body shut -- is solid too. A body,

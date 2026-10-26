@@ -93,6 +93,10 @@ static constexpr double FIRST_PERSON_RADIUS = THREE_D_WALKER_RADIUS_M * OBJECT_U
 static constexpr double FIRST_PERSON_INDOOR_RADIUS = THREE_D_WALKER_BODY_M * OBJECT_UNITS_PER_METRE;
 /** The longest move checked against the walls at once, world units: running a step goes in pieces, so no wall is stepped over. */
 static constexpr double FIRST_PERSON_SUBSTEP = 0.1;
+/** How far aside the walker steps round what stands a little to one side of its way (FirstPersonMove()), world units. */
+static constexpr double FIRST_PERSON_SIDESTEP = 0.3 * OBJECT_UNITS_PER_METRE;
+/** In so many tries each way, the nearest first. */
+static constexpr int FIRST_PERSON_SIDESTEPS = 6;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
 /** An arrow pressed twice within this many seconds: the walker walks on by itself (the player, 21. 10.). */
@@ -402,6 +406,54 @@ static void FirstPersonSettle(FirstPersonEye &w)
 static bool FirstPersonFreeFrom(const FirstPersonEye &w, double x, double y)
 {
 	return FirstPersonFree(x, y, FirstPersonStandZ(x, y, FirstPersonFeetZ(w)));
+}
+
+/**
+ * The walker moved by a piece of its step where it can go: straight; else along a wall, each way on its own; else round
+ * what stands a little to one side of its way, aslant by up to FIRST_PERSON_SIDESTEP aside, the nearest that is free --
+ * as one walks round a post. The ruin's lookout: its stairs end at a corner of its platform, the last post of
+ * its railing a tenth of a metre into their width, half of them by the platform's slanting edge; the walker up the
+ * middle of the stairs stopped at the post (the player, 26. 10.: "I get stuck at the top, the last bit onto the
+ * platform of the lookout").
+ * @return whether it moved
+ */
+static bool FirstPersonMove(FirstPersonEye &w, double px, double py)
+{
+	const double x = w.x, y = w.y;
+	auto go = [&w](double nx, double ny) {
+		if (!FirstPersonFreeFrom(w, nx, ny)) return false;
+		w.x = nx;
+		w.y = ny;
+		return true;
+	};
+	if (go(x + px, y + py)) return true;
+	const double len = std::hypot(px, py);
+	if (len <= 0) return false;
+	/* Along a wall, where the way goes along it at least a little (straight at it, the slide is nowhere). */
+	static constexpr double SLIDE_AT_LEAST = 0.3;
+	if (std::abs(px) >= SLIDE_AT_LEAST * len && go(x + px, y)) return true;
+	if (std::abs(py) >= SLIDE_AT_LEAST * len && go(x, y + py)) return true;
+	/*
+	 * Round it, to the left of the way or to the right, the nearest first: aslant, nothing standing halfway there (the
+	 * body is wider than half the step, nothing thin is stepped through) at the height of the feet or of the stair
+	 * stepped onto, a floor under it or not -- off the top of the ruin's stairs one steps aslant onto the platform of
+	 * its lookout, the stairs end at a corner of it, half of them by its edge; or aside first, where it goes on from
+	 * there -- between the post and the handrail of the stairs there is a hand's breadth to spare.
+	 */
+	const double sx = -py / len, sy = px / len;
+	const double feet = FirstPersonFeetZ(w);
+	for (int k = 1; k <= FIRST_PERSON_SIDESTEPS; k++) {
+		for (const int side : {1, -1}) {
+			const double ox = sx * side * FIRST_PERSON_SIDESTEP * k / FIRST_PERSON_SIDESTEPS;
+			const double oy = sy * side * FIRST_PERSON_SIDESTEP * k / FIRST_PERSON_SIDESTEPS;
+			const double on = FirstPersonStandZ(x + ox + px, y + oy + py, feet);
+			if (FirstPersonFree(x + (ox + px) / 2, y + (oy + py) / 2, std::max(feet, on)) && go(x + ox + px, y + oy + py)) return true;
+			const double aside = FirstPersonStandZ(x + ox, y + oy, feet);
+			if (FirstPersonFree(x + ox + px, y + oy + py, FirstPersonStandZ(x + ox + px, y + oy + py, aside)) && go(x + ox, y + oy)) return true;
+		}
+	}
+	/* Straight at a wall, at least the little along it there is. */
+	return (std::abs(px) > 0 && std::abs(px) < SLIDE_AT_LEAST * len && go(x + px, y)) || (std::abs(py) > 0 && std::abs(py) < SLIDE_AT_LEAST * len && go(x, y + py));
 }
 
 void ShowWalkerInventoryWindow();
@@ -821,23 +873,12 @@ struct FirstPersonWindow : Window {
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
 		const double rx = fy, ry = -fx;
 		const double dx = (fx * ahead + rx * aside) * speed, dy = (fy * ahead + ry * aside) * speed;
-		/* Along a wall, sliding: each way on its own where both together would go into it (FirstPersonFree()); in
-		 * pieces, so that a run does not step over a thin wall. */
+		/* Along a wall, sliding, and round a post (FirstPersonMove()); in pieces, so that a run does not step over a
+		 * thin wall. */
 		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
 		FirstPersonSettle(this->walker);
 		for (int i = 0; i < pieces; i++) {
-			const double px = dx / pieces, py = dy / pieces;
-			const double x = this->walker.x, y = this->walker.y;
-			if (FirstPersonFreeFrom(this->walker, x + px, y + py)) {
-				this->walker.x = x + px;
-				this->walker.y = y + py;
-			} else if (FirstPersonFreeFrom(this->walker, x + px, y)) {
-				this->walker.x = x + px;
-			} else if (FirstPersonFreeFrom(this->walker, x, y + py)) {
-				this->walker.y = y + py;
-			} else {
-				break;
-			}
+			if (!FirstPersonMove(this->walker, dx / pieces, dy / pieces)) break;
 			/* Up a stair, or down off it. */
 			FirstPersonSettle(this->walker);
 		}
@@ -1943,13 +1984,9 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 		const double speed = FIRST_PERSON_WALK_MS * OBJECT_UNITS_PER_METRE * FIRST_PERSON_TICK_MS / 1000.0;
 		const double fx = std::cos(w->walker.heading), fy = std::sin(w->walker.heading);
 		const double nx = w->walker.x + (fx * ahead + fy * aside) * speed, ny = w->walker.y + (fy * ahead - fx * aside) * speed;
-		/* As the walker walks: its circle against the walls (FirstPersonFree()), up the stairs. */
+		/* As the walker walks: its circle against the walls, round a post (FirstPersonMove()), up the stairs. */
 		FirstPersonSettle(w->walker);
-		if (FirstPersonFreeFrom(w->walker, nx, ny)) {
-			w->walker.x = nx;
-			w->walker.y = ny;
-			FirstPersonSettle(w->walker);
-		}
+		if (FirstPersonMove(w->walker, nx - w->walker.x, ny - w->walker.y)) FirstPersonSettle(w->walker);
 	}
 	w->MakePicture();
 	w->SetDirty();

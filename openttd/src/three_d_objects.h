@@ -324,7 +324,7 @@ struct ThreeDObject {
 
 	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 64th of a tile (Blocks()), made the first time
 	mutable int footprint_w = 0;            ///< the cells across x, 0 not made yet
-	mutable std::map<int, std::vector<uint8_t>> footprints_up; ///< up on it: what stands as high as a body over feet so many steps up (Blocks())
+	mutable std::map<int, std::vector<uint8_t>> footprints_up; ///< up on it: what stands as high as a body over feet so many steps up, cells of a 128th of a tile (Blocks())
 	uint32_t PaintAt(TileIndex origin) const;
 };
 

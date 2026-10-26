@@ -31,6 +31,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (10) – rozhledna zříceniny: chodec vyjde až na plošinu
+
+- Hráč: *„dračí farma s dřevěnou rozhlednou, zaseknu se nahoře poslední kousek na plošinu rozhledny, na druhé farmě
+  kamenné schody jsou v pořádku a posed v lese má schody taky v pořádku“*. Pak: *„jo tak ať si tu rozhlednu schody
+  dřevěné předělá, když tam nestačí něco jednoduše spravit, co tam vymýšlíš“* a *„ať to převezme od tebe, když si to
+  spravil“*: oprava zůstává ve hře, kolegovi jen zpráva.
+- **Příčina (rig, trojúhelníky modelu):**
+  - Schody (y 4,69–5,69 m) končí v rohu osmiúhelníkové plošiny 11,18 m.
+  - Koncový sloupek zábradlí (y 5,02–5,12) stojí v šířce schodů a pravá půlka schodů vede kolem šikmé hrany
+    do vzduchu.
+  - Volně je 0,58 m mezi sloupkem a madlem. Mřížka kolizí (0,23 m) z toho nechala 0,23 m, chodec má 0,4 m.
+- **Hotovo:**
+  - Kolize nahoře na budovách po 0,12 m (`FOOTPRINT_UP_CELLS`).
+  - Chodec obejde, co mu stojí trochu stranou (`FirstPersonMove()`): šikmý krok, nebo nejdřív úkrok bokem
+    do 0,3 m, když odtamtud jde dál. Klouzání podél zdi jen tam, kde se po ní opravdu postoupí (dřív se nulové
+    klouzání počítalo jako pohyb). Rig chodí stejně.
+- **Rig:** zřícenina od země na plošinu a přes ni k protějšímu zábradlí. Hrad 7 m a posed 2,84 m beze změny.
+  Smoke beze změny.
+- Kolegovi `hra/3d/ODPOVED-ROZHLEDNA-ZRICENINY.md` (grrrrf `7ca4ace`): co v modelu je, co hra dělá a jak schody
+  stavět příště.
+- Čeká: okna srubu (dveře jdou, okna ne), domluva krmení draků.
+
 ## 26. 10. (9) – první blok mapy 10 s: rejstřík objektů na vlastním vlákně, domy se chystají na pozadí
 
 - Hráč: *„co to dlouhé načítání jednoho bloku 10s, to si pokračuj, ne že to zahodíš“*. V deníku z telefonu
