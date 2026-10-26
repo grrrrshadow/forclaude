@@ -3648,7 +3648,9 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 /**
  * A vehicle standing as a figure of a building ("vozidlo:<record>|<set>", the new stadium's event: the fire Tatra on
  * the pitch): the vehicle of its package by its record's name, in the state of the set so named, standing empty -- none
- * of its crew (the player, 18. 10.: "on the pitch stands an empty Tatra, without a driver").
+ * of its crew (the player, 18. 10.: "on the pitch stands an empty Tatra, without a driver"). "+<file>=<node>" its state
+ * by its add-ons instead: the first of its states that shows that node of each add-on so named and nothing of the others
+ * (the wheelbarrow of the Special by the cowshed: its frame, empty); "^<degrees>" its front raised so much, leaning.
  * @param[out] ev its object and state; its place, size and facing are the caller's
  * @return false: not such a name, or its package is not there
  */
@@ -3661,14 +3663,45 @@ bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 	if (obj == nullptr) return false;
 	/* Its sets, one of each layer it shows (the cab, the grille, the body), made one state as the GRF's layers are. */
 	std::vector<int> steps;
+	ThreeDParts wanted, addon_parts;
+	bool by_addons = false;
+	ev.pitch = 0;
 	while (bar != std::string_view::npos) {
 		const size_t next = name.find('|', bar + 1);
-		const int step = obj->StateNamed(name.substr(bar + 1, next == std::string_view::npos ? std::string_view::npos : next - bar - 1));
-		if (step > 0) steps.push_back(step);
+		const std::string_view token = name.substr(bar + 1, next == std::string_view::npos ? std::string_view::npos : next - bar - 1);
+		if (token.starts_with('+')) {
+			/* An add-on's node: its part, "<file>/<node>" (ThreeDVehicleObject::part_names). */
+			const size_t eq = token.find('=');
+			if (eq != std::string_view::npos) {
+				const std::string part = fmt::format("{}/{}", token.substr(1, eq - 1), token.substr(eq + 1));
+				auto it = std::ranges::find(obj->part_names, part);
+				if (it != obj->part_names.end()) wanted.Set(static_cast<int>(it - obj->part_names.begin()));
+				by_addons = true;
+			}
+		} else if (token.starts_with('^')) {
+			ev.pitch = static_cast<float>(std::atof(std::string(token.substr(1)).c_str()));
+		} else {
+			const int step = obj->StateNamed(token);
+			if (step > 0) steps.push_back(step);
+		}
 		bar = next;
 	}
+	int state = obj->ComposeState(steps);
+	if (by_addons) {
+		/* The add-ons' parts: all but the crew's. */
+		for (size_t k = 0; k < obj->part_names.size(); k++) {
+			if (!obj->part_names[k].empty() && !obj->part_names[k].starts_with("posadk")) addon_parts.Set(static_cast<int>(k));
+		}
+		for (size_t k = 0; k < obj->states.size(); k++) {
+			const ThreeDParts &p = obj->states[k].parts;
+			if ((p.bits[0] & addon_parts.bits[0]) == wanted.bits[0] && (p.bits[1] & addon_parts.bits[1]) == wanted.bits[1]) {
+				state = static_cast<int>(k + 1);
+				break;
+			}
+		}
+	}
 	ev.obj = obj;
-	ev.state = obj->EmptyStateOf(obj->ComposeState(steps));
+	ev.state = obj->EmptyStateOf(state);
 	if (_debug_misc_level >= 2) {
 		const ThreeDParts parts = obj->PartsOf(ev.state);
 		Debug(misc, 2, "3D standing vehicle {}: {} sets found, state {}, parts {:x}.{:x}", obj->name, steps.size(), ev.state, parts.bits[1], parts.bits[0]);
@@ -3691,7 +3724,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up);
 		const float world_az = facing - 135.0f;
 		_object_picture_may_wait = for_eye;
-		const ThreeDModelPicture *pic = ObjectPicture(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state);
+		const ThreeDModelPicture *pic = ObjectPicture(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state, 0, -1, 1.0f, 0, static_cast<int>(std::lround(ev.pitch)));
 		_object_picture_may_wait = false;
 		if (pic != nullptr && height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 		return pic;

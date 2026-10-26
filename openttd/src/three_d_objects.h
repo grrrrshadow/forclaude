@@ -956,6 +956,7 @@ struct ThreeDIndustryTileParts {
 	bool member = false;                           ///< a tile of a block its anchor draws ("soucast_bloku"): its ground only
 	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
 	bool at_once = false;                          ///< trees and plants alone, no building: they stand from the first, the industry being built or not (the forest)
+	std::vector<ThreeDObjectFigure> vehicles;      ///< "vozidla": vehicles of the sets standing on it, as figures "vozidlo:..." (GetThreeDStandingVehicle()); none without their package
 };
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);

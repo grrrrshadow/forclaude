@@ -3137,9 +3137,15 @@ static bool ProducesLivestock(const Industry *i)
 std::string RigPlantFarmPastures(int tries)
 {
 	int farms = 0;
+	std::string where;
 	for (const Industry *i : Industry::Iterate()) {
 		if (!ProducesLivestock(i)) continue;
 		farms++;
+		for (TileIndex t : i->location) {
+			if (!i->TileBelongsToIndustry(t)) continue;
+			const IndustryGfx gfx = GetIndustryGfx(t);
+			if (gfx == 36 || gfx == 38) where += fmt::format(" gfx{} {},{}", gfx, TileX(t), TileY(t));
+		}
 		for (int k = 0; k < tries; k++) {
 			const TileIndex tile = TileAddWrap(i->location.tile, i->location.w / 2 + Random() % 31 - 16, i->location.h / 2 + Random() % 31 - 16);
 			if (tile != INVALID_TILE) PlantFarmPasture(tile, i->index);
@@ -3154,10 +3160,10 @@ std::string RigPlantFarmPastures(int tries)
 		GetPastureSpot(t, x, y, w, h);
 		if (first == INVALID_TILE && x == 0 && y == 0) first = t;
 	}
-	if (first == INVALID_TILE) return fmt::format("farem s dobytkem {}, pastvin zadna", farms);
+	if (first == INVALID_TILE) return fmt::format("farem s dobytkem {} ({}), pastvin zadna", farms, where);
 	uint x, y, w, h;
 	GetPastureSpot(first, x, y, w, h);
-	return fmt::format("farem s dobytkem {}, dlazdic pastvin {}, prvni na {},{} ({}x{}, druh {})", farms, tiles, TileX(first), TileY(first), w, h, to_underlying(GetPastureKind(first)));
+	return fmt::format("farem s dobytkem {} ({}), dlazdic pastvin {}, prvni na {},{} ({}x{}, druh {})", farms, where, tiles, TileX(first), TileY(first), w, h, to_underlying(GetPastureKind(first)));
 }
 
 void PlantRandomFarmField(const Industry *i)

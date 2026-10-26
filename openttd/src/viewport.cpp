@@ -4882,13 +4882,15 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
 	const TileIndex anchor = OriginalIndustryAnchor(tile, of);
 	if (anchor == INVALID_TILE) return;
 	const int z = GetTileMaxPixelZ(anchor);
-	auto add = [&](const ThreeDObject *obj) {
+	auto add = [&](const ThreeDObject *obj, std::span<const ThreeDObjectFigure> more = {}) {
 		for (const TurnedObject &to : _turned_objects) {
 			if (to.origin == anchor && to.obj == obj) return;
 		}
-		_turned_objects.push_back({obj, anchor, z});
+		_turned_objects.push_back({obj, anchor, z, nullptr, more});
 	};
-	for (const ThreeDObject *p : of->parts) add(p);
+	/* Its vehicles of the sets (the Zetor, the wheelbarrow of the farm) with its first part, or alone. */
+	if (of->parts.empty() && !of->vehicles.empty()) add(nullptr, of->vehicles);
+	for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());
 	if (of->plants != nullptr) add(of->plants);
 }
 
@@ -12018,17 +12020,18 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			/* An industry of the original game from the parts the industries share (AddOriginalIndustryTile()): its
 			 * ground, and when it is built its building from the anchor of its block, the trees of the forest. */
 			kind = 5;
-			auto add = [&](const ThreeDObject *obj, TileIndex origin) {
+			auto add = [&](const ThreeDObject *obj, TileIndex origin, std::span<const ThreeDObjectFigure> more = {}) {
 				for (const CabObject &co : objects) {
 					if (co.origin == origin && co.obj == obj) return;
 				}
-				objects.push_back({obj, origin, GetTileMaxPixelZ(origin)});
+				objects.push_back({obj, origin, GetTileMaxPixelZ(origin), more});
 			};
 			if (parts->ground != nullptr) add(parts->ground, _cur_ti.tile);
 			const ThreeDIndustryTileParts *of = parts;
 			const TileIndex anchor = ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts) ? OriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
 			if (anchor != INVALID_TILE) {
-				for (const ThreeDObject *p : of->parts) add(p, anchor);
+				/* Its vehicles of the sets (the Zetor, the wheelbarrow of the farm) with its first part. */
+				for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], anchor, k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());
 				if (of->plants != nullptr && anchor == _cur_ti.tile) {
 					const double oz = GetTileMaxPixelZ(anchor);
 					for (const ThreeDObjectFigure &f : of->plants->plants) {

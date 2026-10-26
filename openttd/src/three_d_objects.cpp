@@ -2862,6 +2862,7 @@ struct OriginalIndustryTile {
 	bool member = false;         ///< "soucast_bloku"
 	int anchor_dx = 0, anchor_dy = 0;
 	bool buildings = false;      ///< a part of "dily" on it: built in the industry's stages; without, its trees stand at once
+	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla" (ThreeDIndustryTileParts::vehicles)
 };
 /** The tiles of the original industries by their gfx (GetThreeDOriginalIndustryTile()). */
 static std::map<IndustryGfx, OriginalIndustryTile> _original_industry_tiles;
@@ -3210,6 +3211,50 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 		if (!addons.addon_places.empty()) {
 			tile.parts.push_back(_three_d_objects.size());
 			_three_d_objects.push_back(std::move(addons));
+		}
+	}
+	/* Its vehicles of the sets (the colleague's hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md, point 4: the Zetor by the workshop
+	 * of the farm, the wheelbarrow of the Special leaning on the cowshed): each its record ("zaznam") in the state of its
+	 * sets ("sada") and add-ons ("doplnky", file: node), empty, as the fire Tatra on the pitch -- a figure
+	 * "vozidlo:<record>|<set>|+<file>=<node>|^<pitch>" (GetThreeDStandingVehicle()). Leaning ("naklon", degrees about the
+	 * axle "stred_naklonu" of its frame, its handles up): its front down so much, the axle where "poloha" says. */
+	if (e.contains("vozidla") && e.at("vozidla").is_array()) {
+		for (const auto &v : e.at("vozidla")) {
+			if (!v.is_object() || !v.contains("poloha") || !v.at("poloha").is_array() || v.at("poloha").size() != 3) continue;
+			const std::string record = v.value("zaznam", v.value("objekt", std::string()));
+			if (record.empty()) continue;
+			std::string figure = "vozidlo:" + record;
+			if (v.contains("sada") && v.at("sada").is_string()) figure += "|" + v.at("sada").get<std::string>();
+			if (v.contains("sada") && v.at("sada").is_array()) {
+				for (const auto &set : v.at("sada")) {
+					if (set.is_string()) figure += "|" + set.get<std::string>();
+				}
+			}
+			if (v.contains("doplnky") && v.at("doplnky").is_object()) {
+				for (const auto &[file, node] : v.at("doplnky").items()) {
+					if (node.is_string()) figure += "|+" + file + "=" + node.get<std::string>();
+				}
+			}
+			ThreeDObjectFigure f;
+			for (int k = 0; k < 3; k++) f.at[k] = v.at("poloha").at(k).get<float>();
+			f.facing = v.value("otoceni", 0.0f);
+			f.scale = std::clamp(v.value("meritko", 1.0f), 0.05f, 20.0f);
+			const float lean = v.value("naklon", 0.0f);
+			if (lean != 0) {
+				const double pitch = -lean * M_PI / 180.0;
+				figure += fmt::format("|^{}", static_cast<int>(std::lround(-lean)));
+				if (v.contains("stred_naklonu") && v.at("stred_naklonu").is_array() && v.at("stred_naklonu").size() == 3) {
+					/* The origin such that the axle, turned with it, comes where "poloha" says. */
+					const double sx = v.at("stred_naklonu").at(0).get<double>(), sy = v.at("stred_naklonu").at(1).get<double>(), sz = v.at("stred_naklonu").at(2).get<double>();
+					const double px = sx * std::cos(pitch) - sz * std::sin(pitch), pz = sx * std::sin(pitch) + sz * std::cos(pitch);
+					const double a = f.facing * M_PI / 180.0;
+					f.at[0] -= static_cast<float>(px * std::cos(a) - sy * std::sin(a));
+					f.at[1] -= static_cast<float>(px * std::sin(a) + sy * std::cos(a));
+					f.at[2] -= static_cast<float>(pz);
+				}
+			}
+			f.figure = std::move(figure);
+			tile.vehicles.push_back(std::move(f));
 		}
 	}
 	ThreeDObject plants;
@@ -6643,6 +6688,7 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
 			r.anchor_dx = t.anchor_dx;
 			r.anchor_dy = t.anchor_dy;
 			r.at_once = !t.buildings;
+			r.vehicles = t.vehicles;
 		}
 	}
 	auto it = resolved.find(gfx);
