@@ -75,6 +75,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     posune se těsně za ni (`CabEyeAhead()`); u dobrých modelů se nic nemění. Až kolega Zetor předělá, převezme se.
   - Hasičská Tatra na hřišti zůstává dekorace (stojící Tatra z GRF, nevyjede).
   - Náklon dekorací nejvýš ±60° už při čtení (obrázky mapy víc neumějí; kolečko má v balíčku 65°).
+  - Hráč: *„lucernu dej pryč s celou tou září. mám v inventáři svoji lucernu“*. Lucerna i záře jsou v kolegově
+    modelu (tělo slité v `nabytek`, svit `noc` + `svetlo_00` v interiéru; venku záře oken `les_noc_okno`
+    a `svetlo_00`–`02`). Prosba kolegovi `hra/3d/PROSBA-SRUB-BEZ-LUCERNY.md`: vyhodit je, uhlí ohniště nechat.
+    Ruší prosby o uzel `lucerna` a `noc_okna`. Až pošle, převzít; „E: vzít lucernu“ pak zmizí samo (není světlo).
   - Kolegovi do grrrrf `hra/3d/ODPOVED-PASTVINY-OKNA-ZETOR.md` (`b273059`): co je hotové, prosby lucerna jako uzel
     `lucerna`, záře oken srubu zvlášť (`noc_okna`), Zetor: čelní okno celé do `zts_sklo` a oko `kabina` níž.
 - **Odloženo:** společné náklady (sada `naklady`) až s velkou úpravou všech GRF.
