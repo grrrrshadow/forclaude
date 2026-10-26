@@ -75,6 +75,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     posune se těsně za ni (`CabEyeAhead()`); u dobrých modelů se nic nemění. Až kolega Zetor předělá, převezme se.
   - Hasičská Tatra na hřišti zůstává dekorace (stojící Tatra z GRF, nevyjede).
   - Náklon dekorací nejvýš ±60° už při čtení (obrázky mapy víc neumějí; kolečko má v balíčku 65°).
+  - **Převzato z grrrrf (`eb9e9b3`, `8cba34a`):** srub bez lucerny – uvnitř ani stůl, ani svit, ani světlo; venku
+    bez záře oken a dveří, zůstalo jen uhlí ohniště (`svetlo_00`). Kolečko u kravína `naklon` 60, osa blíž ke zdi.
+    Zetor: čelní sklo celé v `zts_sklo` (nový tar `Zvlastni_vozy_3D-v1`, md5 `a009f41f…`, GRF stejný) – z kabiny je
+    vidět ven sklem, stěrače, kapota; kamera se už neposouvá (`CabEyeAhead()` zůstává pro jiné modely).
+  - **„E: vzít lucernu“ z hry pryč** i se zhasnutým interiérem (`GetThreeDInteriorAt`, `TakeThreeDLamp`): hráč
+    *„lucernu pryč a hotovo“*. Navíc by se nabízelo u každého světla interiéru (lampy v kině). Ověřeno v rigu
+    v noci: srub uvnitř tmavý, okna a dveře venku nesvítí, okenice dál na E.
   - Hráč: *„lucernu dej pryč s celou tou září. mám v inventáři svoji lucernu“*. Lucerna i záře jsou v kolegově
     modelu (tělo slité v `nabytek`, svit `noc` + `svetlo_00` v interiéru; venku záře oken `les_noc_okno`
     a `svetlo_00`–`02`). Prosba kolegovi `hra/3d/PROSBA-SRUB-BEZ-LUCERNY.md`: vyhodit je, uhlí ohniště nechat.

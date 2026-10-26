@@ -2402,7 +2402,6 @@ STR_FIRST_PERSON_DOOR_OPEN                                      :E: otevřít dv
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: zavřít dveře
 STR_FIRST_PERSON_WINDOW_OPEN                                    :E: otevřít okno
 STR_FIRST_PERSON_WINDOW_SHUT                                    :E: zavřít okno
-STR_FIRST_PERSON_TAKE_LAMP                                      :E: vzít lucernu
 STR_FIRST_PERSON_TAKE_VEHICLE                                   :E: vzít si {ENGINE}
 STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš
 STR_FIRST_PERSON_RIDING_ROUTE                                   :Ve vozidle {VEHICLE} · {VELOCITY} · jede svou trasu

@@ -1709,7 +1709,7 @@
     "bez_posadky": true,
     "meritko": 0.5,
     "otoceni": 270,
-    "naklon": 65,
+    "naklon": 60,
     "stred_naklonu": [
      0.792,
      -0.295,
@@ -1717,10 +1717,10 @@
     ],
     "poloha": [
      3.0,
-     3.66,
+     3.73,
      0.183
     ],
-    "poznamka": "stavební kolečko ze special (hráč: „kolečko tam opři ze special“), bez holky, opřené o jižní zeď kravína: meritko 0,5 (kolečko specialu je dvojnásobné jako holky), otoceni 270 (kolo k −y, rukojeti ke zdi), naklon 65° kolem osy kola (stred_naklonu v rámci kolečka po meritku): rukojeti nahoru ke zdi, kolo na zemi; poloha = kam přijde osa kola; barvy korby a rámu původní (bez stavu)"
+    "poznamka": "stavební kolečko ze special (hráč: „kolečko tam opři ze special“), bez holky, opřené o jižní zeď kravína: meritko 0,5 (kolečko specialu je dvojnásobné jako holky), otoceni 270 (kolo k −y, rukojeti ke zdi), naklon 60° kolem osy kola (stred_naklonu v rámci kolečka po meritku): rukojeti nahoru ke zdi, kolo na zemi; poloha = kam přijde osa kola; barvy korby a rámu původní (bez stavu)"
    }
   ]
  },

@@ -959,7 +959,6 @@ struct GlbReadOptions {
 	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
 	std::string_view skip_node;
 	bool skip_wings = false;      ///< with all_nodes, the wings of doors and windows (IsWingNode(), read on their own) and their children left out
-	bool skip_lamps = false;      ///< with all_nodes, the lamps to take ("lucerna...", an interior's whose lamp the walker took) and their children left out
 	const std::vector<std::string> *skip_nodes = nullptr; ///< with all_nodes, the nodes so named (and their children) left out
 	const std::vector<std::string> *groups = nullptr;
 	bool only_groups = false;     ///< with groups, only the meshes under the groups' nodes (an add-on: the nodes no state shows not read at all)
@@ -1304,7 +1303,6 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 				if (!skip_node.empty() && node_name == skip_node) continue;
 				if (o.skip_nodes != nullptr && std::ranges::find(*o.skip_nodes, node_name) != o.skip_nodes->end()) continue;
 				if (o.skip_wings && IsWingNode(node_name)) continue;
-				if (o.skip_lamps && node_name.starts_with("lucerna")) continue;
 				if (o.skip_night && IsNightNode(node_name)) continue;
 				if (!only_node.empty() && node_name == only_node) inside = true;
 				if (groups != nullptr) {
@@ -2128,22 +2126,20 @@ static void TurnNightQuarters(ThreeDObject &obj, int quarter_turns)
  * as a house's) and the wings of its doors ("dvere_NN", objects of their own); its floors ("podlaha", "podlaha_N")
  * kept apart too, to be walked on (FloorAt()) and in no one's way (passable_tris).
  */
-static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj, int quarter_turns = 0, bool unlit = false)
+static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj, int quarter_turns = 0)
 {
 	GlbMesh mesh;
 	GlbReadOptions o;
 	o.all_nodes = true;
 	o.skip_night = true;
 	o.skip_wings = true;
-	o.skip_lamps = unlit;
 	o.groups = &GLB_FLOORS;
 	if (!ReadGlbMesh(path, mesh, o)) return false;
 	/* Of a part of the forest, turned as it is (the colleague's forest cabin). */
 	TurnGlbMeshQuarters(mesh, quarter_turns);
 	TakeGlbFloors(mesh, obj);
 	TakeGlbMesh(mesh, obj);
-	/* Its lamp taken by the walker: nothing of the night lit in it (TakeThreeDLamp()). */
-	if (!unlit) ReadGlbNight(path, obj);
+	ReadGlbNight(path, obj);
 	TurnNightQuarters(obj, quarter_turns);
 	return true;
 }
@@ -2496,21 +2492,14 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 	}
 	Debug(misc, 1, "3D object {}: interior {}, {} doors", obj.name, file, obj.door_wings.size());
 	const std::string interior_path = interior.glb_path;
-	/* And as it is with its lamp taken by the walker (TakeThreeDLamp()), read when first drawn so. */
-	ThreeDObject unlit = interior;
-	unlit.name += "/zhasnuto";
-	unlit.unlit = true;
 	obj.interior = _three_d_objects.size();
 	_three_d_objects.push_back(std::move(interior));
-	obj.interior_unlit = _three_d_objects.size();
-	_three_d_objects.push_back(std::move(unlit));
 	/* An industry: itself without the interior's box too (ThreeDObject::outside), as it is coloured. */
 	if (outside) {
 		ThreeDObject out = obj;
 		out.name = obj.name + "/venku";
 		out.outside_of = interior_path;
 		out.interior = SIZE_MAX;
-		out.interior_unlit = SIZE_MAX;
 		out.door_wings.clear();
 		out.figures.clear();
 		obj.outside = _three_d_objects.size();
@@ -6533,37 +6522,6 @@ bool ThreeDDoorIsWindow(const ThreeDObject *house, size_t door)
 	return house != nullptr && door < house->door_wings.size() && _three_d_objects[house->door_wings[door][0]].door_node.starts_with("okno_");
 }
 
-/** The lamps of interiors the walker took (the player, 26. 10.: "I pick up the lantern with E and that is it"), by the house's north tile; never saved. */
-static std::set<TileIndex> _three_d_lamps_taken;
-
-/** The interior of a house on a tile as it is now: lit, or with its lamp taken (TakeThreeDLamp()). */
-const ThreeDObject *GetThreeDInteriorAt(const ThreeDObject *house, TileIndex origin)
-{
-	if (house != nullptr && house->interior_unlit < _three_d_objects.size() && _three_d_lamps_taken.contains(origin)) return &_three_d_objects[house->interior_unlit];
-	return GetThreeDInterior(house);
-}
-
-/**
- * The lamp of a house's interior within reach of a point (world units from the house's north corner): a light of its
- * night ("svetlo_NN"), the lantern on the table of the forest cabin; none when taken or the interior not read yet.
- * @return whether there is one
- */
-bool ThreeDLampNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach)
-{
-	const ThreeDObject *in = GetThreeDInterior(house);
-	if (in == nullptr || _three_d_lamps_taken.contains(origin) || !in->IsRead()) return false;
-	for (size_t i = 0; i + 2 < in->lights.size(); i += 3) {
-		if (std::hypot(in->lights[i] - x, in->lights[i + 1] - y) < reach) return true;
-	}
-	return false;
-}
-
-/** The walker took the lamp of the interior of the house on a tile: it lights nothing more, nor stands there (GetThreeDInteriorAt()). */
-void TakeThreeDLamp(TileIndex origin)
-{
-	_three_d_lamps_taken.insert(origin);
-}
-
 /** Whether a door of the house on a tile is open. */
 bool ThreeDDoorOpen(TileIndex origin, size_t door)
 {
@@ -7498,7 +7456,7 @@ bool ThreeDObject::Read() const
 		if (!this->door_node.empty()) {
 			ok = ReadGlbDoor(this->glb_path, this->door_node, this->door_turn, read, std::max<int>(0, this->scene_turns));
 		} else if (this->is_interior) {
-			ok = ReadGlbInterior(this->glb_path, read, std::max<int>(0, this->scene_turns), this->unlit);
+			ok = ReadGlbInterior(this->glb_path, read, std::max<int>(0, this->scene_turns));
 		} else if (this->scene_turns >= 0) {
 			ok = ReadGlbScene(this->glb_path, read, this->scene_turns);
 		} else {

@@ -155,8 +155,6 @@ static constexpr double FIRST_PERSON_MINE_UP_M = 0.8;
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 /** How near a mushroom the walker picks it (E), metres. */
 static constexpr double FIRST_PERSON_PICK_M = 1.5;
-/** How near the lamp of an interior the walker takes it with E (the forest cabin's lantern on its table), metres. */
-static constexpr double FIRST_PERSON_LAMP_M = 1.2;
 /** How near the middle of a door the walker opens it with E, metres. */
 static constexpr double FIRST_PERSON_DOOR_M = 1.6;
 /** How near a vehicle of the sets standing in an industry's yard the walker takes one like it with E (the farm's Zetor, its wheelbarrow), metres. */
@@ -681,21 +679,6 @@ struct FirstPersonWindow : Window {
 		return std::nullopt;
 	}
 
-	/** A house whose interior's lamp is within reach of the walker, E takes it: the house and its north tile. */
-	std::optional<std::pair<const ThreeDObject *, TileIndex>> LampToTake() const
-	{
-		const int tx = static_cast<int>(this->walker.x / TILE_SIZE), ty = static_cast<int>(this->walker.y / TILE_SIZE);
-		for (int dy = -1; dy <= 1; dy++) {
-			for (int dx = -1; dx <= 1; dx++) {
-				if (tx + dx < 1 || ty + dy < 1 || tx + dx >= static_cast<int>(Map::MaxX()) || ty + dy >= static_cast<int>(Map::MaxY())) continue;
-				TileIndex origin;
-				const ThreeDObject *house = GetThreeDObjectWithRoomsAt(TileXY(tx + dx, ty + dy), origin);
-				if (house != nullptr && ThreeDLampNear(house, origin, this->walker.x - TileX(origin) * TILE_SIZE, this->walker.y - TileY(origin) * TILE_SIZE, FIRST_PERSON_LAMP_M * OBJECT_UNITS_PER_METRE)) return std::make_pair(house, origin);
-			}
-		}
-		return std::nullopt;
-	}
-
 	/** A vehicle of the sets standing in an industry's yard within reach of the walker: E gives the company one like it there (CmdBuildYardRoadVehicle()). */
 	struct YardVehicle {
 		TileIndex tile;  ///< the anchor of the industry's block it stands on
@@ -742,11 +725,6 @@ struct FirstPersonWindow : Window {
 	{
 		if (this->Riding() != nullptr) {
 			this->GetOut();
-			return;
-		}
-		/* By the lamp of an interior (the forest cabin's lantern on its table): taken into the inventory, the room dark. */
-		if (const auto lamp = this->LampToTake(); lamp.has_value()) {
-			if (Command<Commands::PickWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WalkerItem::Lantern)) TakeThreeDLamp(lamp->second);
 			return;
 		}
 		/* At a door: opened away from the walker, or shut. */
@@ -1773,9 +1751,6 @@ struct FirstPersonWindow : Window {
 						case WalkerPlantStage::Hay: hint = GetString(STR_FIRST_PERSON_PLANT_HAY); break;
 						default: hint = GetString(STR_FIRST_PERSON_PLANT_GROWING, std::max<int32_t>(1, WALKER_PLANT_RIPE_DAYS - WalkerPlantAgeDays(*plant))); break;
 					}
-				} else if (this->LampToTake().has_value()) {
-					/* By the lamp of an interior: E takes it. */
-					hint = GetString(STR_FIRST_PERSON_TAKE_LAMP);
 				} else if (const auto door = this->DoorToUse(); door.has_value()) {
 					/* At a door or a window: E opens it, or shuts it. */
 					const bool open = ThreeDDoorOpen(door->origin, door->door);
@@ -2372,10 +2347,9 @@ std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double h
 	const auto door = w->DoorToUse();
 	w->MakePicture();
 	w->SetDirty();
-	return fmt::format("dum {} interier {} uvnitr {} dvere {} (u dveri {}{}), vyska {:.2f} m nad zemi domu{}", house != nullptr ? house->name : std::string("zadny"), in != nullptr ? in->name : std::string("zadny"),
+	return fmt::format("dum {} interier {} uvnitr {} dvere {} (u dveri {}{}), vyska {:.2f} m nad zemi domu", house != nullptr ? house->name : std::string("zadny"), in != nullptr ? in->name : std::string("zadny"),
 			inside ? "ano" : "ne", house != nullptr ? house->door_wings.size() : 0, door.has_value() ? fmt::format("{}{}", door->door, ThreeDDoorOpen(door->origin, door->door) ? " otevrene" : " zavrene") : std::string("zadnych"),
-			door.has_value() && ThreeDDoorIsWindow(door->house, door->door) ? " okno" : "", (FirstPersonFeetZ(w->walker) - GetTileMaxPixelZ(origin)) / OBJECT_HEIGHT_PER_METRE,
-			w->LampToTake().has_value() ? ", u lucerny" : "");
+			door.has_value() && ThreeDDoorIsWindow(door->house, door->door) ? " okno" : "", (FirstPersonFeetZ(w->walker) - GetTileMaxPixelZ(origin)) / OBJECT_HEIGHT_PER_METRE);
 }
 
 void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)

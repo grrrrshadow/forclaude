@@ -4357,7 +4357,7 @@
   ],
   "interier": {
    "soubor": "les_paseka_srub_interier.glb",
-   "poznamka": "srub uvnitř (hra 25. 10.: „bouda v lese (sud a pivo bez Mata, postel, židle u stolku)“): rámec dílu, celý srub i zvenku (hra uvnitř obrysu interiéru díl nekreslí), podlaha z prken (podlaha), postel u zdi −y, stůl se dvěma židlemi a dvěma korbely piva, sud s pípou na koze v rohu u dveří (bez Mata), kamna pod komínem, lucerna na stole (noc, svetlo_00); okna jsou otvory (dřevěné okenice okno_NN jsou v dílu, otevírají se jako dveře), uličky aspoň 0,8 m, ode dveří 1,6 m; 3444 trojúhelníků, 26 kB"
+   "poznamka": "srub uvnitř (hra 25. 10.: „bouda v lese (sud a pivo bez Mata, postel, židle u stolku)“): rámec dílu, celý srub i zvenku (hra uvnitř obrysu interiéru díl nekreslí), podlaha z prken (podlaha), postel u zdi −y, stůl se dvěma židlemi a dvěma korbely piva, sud s pípou na koze v rohu u dveří (bez Mata), kamna pod komínem; bez lucerny, bez noc a bez svetlo_NN: v noci tma, dokud hráč nepřinese svoje světlo; okna jsou otvory (dřevěné okenice okno_NN jsou v dílu, otevírají se jako dveře), uličky aspoň 0,8 m, ode dveří 1,6 m; 3396 trojúhelníků, 25 kB"
   },
   "podlaha": {
    "uzel": "podlaha",
@@ -4379,11 +4379,11 @@
   "noc": {
    "uzel": "noc",
    "den": "den",
-   "svetla": 4,
-   "poznamka": "v noci ukaž uzel noc: svítící okna srubu, lucerna u dveří a žhavé uhlíky v ohništi; svetlo_NN jsou místa pro záři (dvě okna, lucerna, oheň)"
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc: žhavé uhlíky v ohništi, svetlo_00 je místo pro jejich záři; srub je v noci tmavý, okna nesvítí, lucerna nikde (hráč nosí svoji z inventáře)"
   },
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi, lucerna u dveří), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10196 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 930 kB; glb z gltfpacku"
+  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi; v noci tma), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10148 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 929 kB; glb z gltfpacku"
  }
 ]

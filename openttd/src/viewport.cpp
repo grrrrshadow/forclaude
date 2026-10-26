@@ -12047,7 +12047,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 							objects.push_back({obj, origin, oz, GetThreeDHouseEvent(obj, origin)});
 						}
 						if (near) {
-							objects.push_back({GetThreeDInteriorAt(obj, origin), origin, oz});
+							objects.push_back({in, origin, oz});
 							for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, oz});
 						}
 					}
@@ -12109,7 +12109,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const bool near = in != nullptr && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < (CAB_INTERIOR_TILES + 1) * TILE_SIZE;
 				objects.push_back({near ? GetThreeDOutsideOfInterior(obj) : obj, _cur_ti.tile, z, girls});
 				if (near) {
-					objects.push_back({GetThreeDInteriorAt(obj, _cur_ti.tile), _cur_ti.tile, z});
+					objects.push_back({in, _cur_ti.tile, z});
 					for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, _cur_ti.tile, k), _cur_ti.tile, z});
 				}
 			}
@@ -12140,7 +12140,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					objects.push_back({near ? GetThreeDOutsideOfInterior(obj) : obj, origin, oz, GetThreeDIndustryGirls(ind, obj)});
 					for (size_t k = 0; k < std::min<size_t>(obj->hay.size(), DragonFarmHay(ind)); k++) objects.push_back({GetThreeDObjectNumbered(obj->hay[k]), origin, oz});
 					if (near) {
-						objects.push_back({GetThreeDInteriorAt(obj, origin), origin, oz});
+						objects.push_back({in, origin, oz});
 						for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, origin, k), origin, oz});
 					}
 				}
