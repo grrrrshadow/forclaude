@@ -9179,6 +9179,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			 * so many steps. */
 			extern std::string RigFirstPersonWeapon(int key, int draw_ms, int steps);
 			IConsolePrint(CC_DEFAULT, "test3d: zbran {}", RigFirstPersonWeapon(number(3).value_or(1), number(4).value_or(0), argv.size() > 5 && argv[5] == "drzet" ? -1 : number(5).value_or(0)));
+		} else if (argv.size() > 2 && argv[2] == "drak") {
+			/* 'chodec drak [n] [metres] [degrees]': the walker before the n-th dragon of the farms resting, so far from its
+			 * mouth, at the angle from its front, looking at it; two of the beer, the marijuana and the hay given it, of
+			 * those it has none of (to feed it). */
+			extern std::string RigFirstPersonAtDragon(int n, double metres, double angle_deg);
+			if (Company *c = Company::GetIfValid(_local_company); c != nullptr) {
+				for (WalkerItem item : {WalkerItem::Beer, WalkerItem::Marijuana, WalkerItem::Hay}) {
+					if (c->walker_items[to_underlying(item)] == 0) c->walker_items[to_underlying(item)] = 2;
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: chodec u draka: {}", RigFirstPersonAtDragon(number(3).value_or(0), number(4).value_or(4), number(5).value_or(0)));
+		} else if (argv.size() > 3 && argv[2] == "krmit") {
+			/* 'chodec krmit <pivo|mari|seno> [steps]': in the menu to feed a dragon (opened with 'chodec klavesa e'), the
+			 * button of the thing clicked, so many steps after it. */
+			extern std::string RigFirstPersonFeed(std::string_view what, int steps);
+			IConsolePrint(CC_DEFAULT, "test3d: krmeni: {}", RigFirstPersonFeed(argv[3], number(4).value_or(0)));
 		} else if (argv.size() > 2 && argv[2] == "svetlo") {
 			/* 'chodec svetlo': L pressed (the torch, the lantern, the light put out), held up at once; the inventory
 			 * window closed, so that the picture shows the hand. */

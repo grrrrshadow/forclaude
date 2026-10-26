@@ -2289,11 +2289,15 @@ STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the 
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
+STR_FIRST_PERSON_FEED_DRAGON                                    :E: feed the dragon
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: open the door
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: shut the door
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory
+STR_DRAGON_FEED_CAPTION                                         :{WHITE}Feed the dragon
+STR_DRAGON_FEED_ITEM                                            :{STRING} ({COMMA})
+STR_DRAGON_FEED_NOTHING                                         :You have nothing to give it
 STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
 STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :You carry:
@@ -2352,6 +2356,7 @@ STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}It can't
 STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}You have none
 STR_ERROR_WALKER_CAN_T_PLANT                                    :{WHITE}Can't plant...
 STR_ERROR_WALKER_CAN_T_HARVEST                                  :{WHITE}Can't harvest...
+STR_ERROR_WALKER_CAN_T_FEED                                     :{WHITE}Can't feed it...
 STR_ERROR_WALKER_CANNOT_PLANT_HERE                              :{WHITE}It won't grow here
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}You can't have more plants
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}It isn't ripe yet

@@ -199,6 +199,28 @@ CommandCost CmdShootWalkerItem(DoCommandFlags flags, WalkerItem item)
 }
 
 /**
+ * The walker feeds a dragon of a dragon farm (first_person_gui.cpp; the player, 26. 10.: "beer and marijuana ... and we
+ * will feed hay too"): one less of it. Only to watch, the dragon smokes or breathes fire; nothing else comes of it.
+ * @param flags operation to perform
+ * @param item the beer, the marijuana or the hay
+ * @return nothing, or an error
+ */
+CommandCost CmdFeedWalkerItem(DoCommandFlags flags, WalkerItem item)
+{
+	if (item != WalkerItem::Beer && item != WalkerItem::Marijuana && item != WalkerItem::Hay) return CMD_ERROR;
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	if (c->walker_items[to_underlying(item)] == 0) return CommandCost(STR_ERROR_WALKER_HAS_NONE);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(item)]--;
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+		InvalidateWindowData(WindowClass::DragonFeed, 0);
+	}
+	return CommandCost();
+}
+
+/**
  * Hurt the walker of the view from the first person: a dragon's blow (the player, 15. 10.: "they attack the player").
  * At no health left the view closes and the player is back on the map (first_person_gui.cpp).
  * @param flags operation to perform

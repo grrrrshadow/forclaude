@@ -12898,7 +12898,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* A rocket's blast lighting what is about it, as it swells and fades. */
 		if (walker != nullptr) {
 			for (const ThreeDBlast &b : walker->blasts) {
-				if (!b.light || b.alpha <= 0) continue;
+				if (!b.light || !b.lights_about || b.alpha <= 0) continue;
 				ThreeDWitchLight &l = witch_lights.emplace_back();
 				l.x = b.x;
 				l.y = b.y;

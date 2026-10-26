@@ -2397,11 +2397,15 @@ STR_FIRST_PERSON_PLANT_RIPE                                     :E: sklidit mari
 STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit marihuanové seno
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
+STR_FIRST_PERSON_FEED_DRAGON                                    :E: nakrmit draka
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: otevřít dveře
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: zavřít dveře
 STR_FIRST_PERSON_RIDING                                         :Ve vozidle {VEHICLE} · {VELOCITY} · řídíš
 STR_FIRST_PERSON_RIDING_ROUTE                                   :Ve vozidle {VEHICLE} · {VELOCITY} · jede svou trasu
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventář
+STR_DRAGON_FEED_CAPTION                                         :{WHITE}Krmit draka
+STR_DRAGON_FEED_ITEM                                            :{STRING} ({COMMA})
+STR_DRAGON_FEED_NOTHING                                         :Nemáš nic, co mu dát
 STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
 STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :Neseš:
@@ -2460,6 +2464,7 @@ STR_ERROR_WALKER_CANNOT_USE                                     :{WHITE}To se (z
 STR_ERROR_WALKER_HAS_NONE                                       :{WHITE}Nic takového nemáš
 STR_ERROR_WALKER_CAN_T_PLANT                                    :{WHITE}Nelze zasadit...
 STR_ERROR_WALKER_CAN_T_HARVEST                                  :{WHITE}Nelze sklidit...
+STR_ERROR_WALKER_CAN_T_FEED                                     :{WHITE}Nelze nakrmit...
 STR_ERROR_WALKER_CANNOT_PLANT_HERE                              :{WHITE}Tady to neporoste
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}Víc kytek už mít nemůžeš
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}Ještě neuzrála

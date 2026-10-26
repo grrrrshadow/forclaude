@@ -138,6 +138,7 @@ struct ThreeDBlast {
 	float alpha = 0;            ///< how much of what is behind it hides, at its middle
 	uint32_t colour = 0;        ///< 0xRRGGBB
 	bool light = false;         ///< a blast: it lights what is about it at night
+	bool lights_about = true;   ///< a blast (light): it does light what is about it -- of a dragon's fire's many flames only a few do
 };
 
 struct FirstPersonEye {

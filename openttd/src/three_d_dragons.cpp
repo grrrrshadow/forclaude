@@ -393,6 +393,8 @@ struct FarmDragon {
 	float map_scale = 1; ///< so many times its size on the map: the standing ones true to the farm, the flying ones as the other dragons
 	bool flying = false;
 	bool walking = false; ///< on foot into its cave or out of it
+	const ThreeDCreature *creature = nullptr; ///< resting on its place: the dragon it is (its size, ThreeDRestingDragonNear()); else nullptr
+	uint32_t place = 0;   ///< resting: its farm and its place there, to find it again (ThreeDRestingDragonAt())
 };
 
 /** The k-th of a farm's own dragons (its places') that fly ("let"): out for one of them that cannot; nullptr none. */
@@ -545,6 +547,8 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 				d.y = oy + p.at[1] * OBJECT_UNITS_PER_METRE;
 				d.z = static_cast<int>(GetTileMaxPixelZ(origin) + p.at[2] * OBJECT_HEIGHT_PER_METRE);
 				d.facing = p.facing;
+				d.creature = c;
+				d.place = static_cast<uint32_t>(id.base()) << 8 | static_cast<uint32_t>(k & 0xFF);
 			} else {
 				double z = 0, facing = 0;
 				circle(now, d.x, d.y, z, facing);
@@ -793,6 +797,70 @@ int BlastThreeDDragons(double x, double y, double z, double radius_m, int damage
 		struck++;
 	}
 	return struck;
+}
+
+/** A farm's dragon resting on its place, as the walker sees it fed. */
+static ThreeDRestingDragon RestingDragon(const FarmDragon &d)
+{
+	ThreeDRestingDragon r;
+	r.place = d.place;
+	r.x = d.x;
+	r.y = d.y;
+	r.z = d.z;
+	r.facing = d.facing;
+	r.length_m = d.creature->size[0];
+	r.width_m = d.creature->size[1];
+	r.height_m = d.creature->size[2];
+	return r;
+}
+
+/** The dragons of the dragon farms resting on their places now (not out flying, not walking into a cave or out of it). */
+std::vector<ThreeDRestingDragon> ThreeDRestingDragons()
+{
+	std::vector<ThreeDRestingDragon> resting;
+	ForFarmDragons([&](const FarmDragon &d) {
+		if (!d.flying && !d.walking && d.creature != nullptr) resting.push_back(RestingDragon(d));
+	});
+	return resting;
+}
+
+/**
+ * The dragon of a dragon farm resting on its place nearest to the walker, within reach of it (the player, 26. 10.: "E
+ * near a dragon pops up a menu to feed it"): from the edge of its body, about as long and as wide as the dragon, on
+ * about the walker's level -- not one on the castle's roof over it.
+ * @param x,y,z where the walker's feet are, world units and units of height
+ * @param reach_m how far from its body, metres
+ * @return the dragon, or nothing near
+ */
+std::optional<ThreeDRestingDragon> ThreeDRestingDragonNear(double x, double y, double z, double reach_m)
+{
+	std::optional<ThreeDRestingDragon> best;
+	double best_gap = reach_m;
+	for (const ThreeDRestingDragon &d : ThreeDRestingDragons()) {
+		if (z < d.z - 1.5 * OBJECT_HEIGHT_PER_METRE || z > d.z + (d.height_m + 1.0) * OBJECT_HEIGHT_PER_METRE) continue;
+		/* Along it and across, from its middle: how far out of its body. */
+		const double a = d.facing * M_PI / 180.0, dx = (x - d.x) / OBJECT_UNITS_PER_METRE, dy = (y - d.y) / OBJECT_UNITS_PER_METRE;
+		const double along = std::abs(dx * std::cos(a) + dy * std::sin(a)) - d.length_m / 2;
+		const double across = std::abs(-dx * std::sin(a) + dy * std::cos(a)) - d.width_m / 2;
+		const double gap = std::hypot(std::max(0.0, along), std::max(0.0, across));
+		if (gap > best_gap) continue;
+		best_gap = gap;
+		best = d;
+	}
+	return best;
+}
+
+/**
+ * A farm's dragon of ThreeDRestingDragonNear() now: as long as it rests on its place, not out flying.
+ * @param place its farm and its place there (ThreeDRestingDragon::place)
+ * @return the dragon, or nothing when it is not on its place now
+ */
+std::optional<ThreeDRestingDragon> ThreeDRestingDragonAt(uint32_t place)
+{
+	for (const ThreeDRestingDragon &d : ThreeDRestingDragons()) {
+		if (d.place == place) return d;
+	}
+	return std::nullopt;
 }
 
 /** The health the dragons took from the walker since the last asking; asked by the view from the first person, which takes it through a command. */

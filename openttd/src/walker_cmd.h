@@ -16,6 +16,7 @@
 CommandCost CmdBuyWalkerItem(DoCommandFlags flags, TileIndex tile, WalkerItem item);
 CommandCost CmdUseWalkerItem(DoCommandFlags flags, WalkerItem item);
 CommandCost CmdShootWalkerItem(DoCommandFlags flags, WalkerItem item);
+CommandCost CmdFeedWalkerItem(DoCommandFlags flags, WalkerItem item);
 CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage);
 CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health);
 CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver);
@@ -29,6 +30,7 @@ Money WalkerPetPrice(std::string_view name);
 DEF_CMD_TRAIT(Commands::BuyWalkerItem, CmdBuyWalkerItem, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::UseWalkerItem, CmdUseWalkerItem, CommandFlag::Location, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::ShootWalkerItem, CmdShootWalkerItem, {}, CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::FeedWalkerItem, CmdFeedWalkerItem, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::HurtWalker, CmdHurtWalker, CommandFlag::Location, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::ReviveWalker, CmdReviveWalker, CommandFlag::Location, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::WalkerCheat, CmdWalkerCheat, CommandFlag::Offline, CommandType::Cheat)

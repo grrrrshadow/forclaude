@@ -250,6 +250,7 @@ enum class Commands : uint8_t {
 	BuyWalkerItem, ///< buy a thing for the walker's inventory where it is sold (walker_inventory.h)
 	UseWalkerItem, ///< use a thing of the walker's inventory: drink the beer (walker_inventory.h)
 	ShootWalkerItem, ///< an arrow or a bolt of the walker's inventory shot (walker_inventory.h)
+	FeedWalkerItem, ///< the walker feeds a farm's dragon a thing of its inventory: the beer, the marijuana, the hay (walker_inventory.h)
 	HurtWalker, ///< a dragon hurts the walker of the view from the first person
 	ReviveWalker, ///< the walker of the view from the first person comes back with full health
 	WalkerCheat, ///< the cheat iddqd: every weapon to the walker, the arrows filled up (walker_inventory.h)

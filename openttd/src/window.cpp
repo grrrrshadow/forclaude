@@ -2755,10 +2755,10 @@ void HandleKeypress(uint keycode, char32_t key)
 		}
 	}
 
-	/* The view from the first person or its inventory focused: the view takes the keys first -- 1 to 5 its weapons, as
+	/* The view from the first person, its inventory or the feeding of a dragon focused: the view takes the keys first -- 1 to 5 its weapons, as
 	 * Morrowind's quick keys (the player, 17. 10.) --, before a construction toolbar in front of it, whose hotkeys are
 	 * 1, 2, ... too. */
-	if (_focused_window != nullptr && (_focused_window->window_class == WindowClass::FirstPerson || _focused_window->window_class == WindowClass::WalkerInventory)) {
+	if (_focused_window != nullptr && (_focused_window->window_class == WindowClass::FirstPerson || _focused_window->window_class == WindowClass::WalkerInventory || _focused_window->window_class == WindowClass::DragonFeed)) {
 		Window *fp = FindWindowById(WindowClass::FirstPerson, 0);
 		if (fp != nullptr && fp->OnKeyPress(key, keycode) == EventState::Handled) return;
 	}

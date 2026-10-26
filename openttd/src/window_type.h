@@ -374,6 +374,12 @@ enum class WindowClass : uint16_t {
 	WalkerInventory,
 
 	/**
+	 * Feeding a dragon of a dragon farm the walker of the view from the first person stands by (first_person_gui.cpp); %Window numbers:
+	 *   - 0 = #DragonFeedWidgets
+	 */
+	DragonFeed,
+
+	/**
 	 * Station view; %Window numbers:
 	 *   - #StationID = #StationViewWidgets
 	 */

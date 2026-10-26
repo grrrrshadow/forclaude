@@ -21,4 +21,10 @@ enum FirstPersonWidgets : WidgetID {
 	WID_FP_INVENTORY, ///< The walker's inventory.
 };
 
+/** Widgets of the #DragonFeedWindow class. */
+enum DragonFeedWidgets : WidgetID {
+	WID_DF_CAPTION, ///< Caption of the window.
+	WID_DF_LIST,    ///< What the walker carries that the dragon is fed.
+};
+
 #endif /* WIDGETS_FIRST_PERSON_WIDGET_H */

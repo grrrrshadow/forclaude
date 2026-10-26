@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (12) – Krmení draků na farmě (E → nabídka, mari kouř, pivo oheň z tlamy, seno nic)
+
+- Hráč: *„chci krmit na farmě draky, když k němu přijdu dám mu mari a zakouří se kolem draka a dám mu vodku, pivo
+  a bude oheň kolem draka nebo radši kouř a oheň z tlamy“*. Domluva: *„1 E vyskočí nabídka krmit draka a tam bude co
+  mám co mu můžu dát pivo a mari a když vyberu tak okno výběru zmizí a drak zakouří nebo vypustí oheň. 2 bez vodky,
+  3 podívaná jenom 4 seno taky budem krmit senem a po senu neudělá nic ani kouř ani oheň“*; *„jo dej krmení draků“*.
+- **Hotovo:** u draka farmy, který odpočívá na svém místě (ne ten, co krouží nebo leze do jeskyně), ukazuje lišta
+  *„E: nakrmit draka“* (do 4 m od jeho těla, na stejné úrovni – ne drak na střeše hradu). E otevře okno *„Krmit
+  draka“* s tlačítkem pro každou věc, kterou chodec nese (pivo, mari, marihuanové seno, s počtem); nic nenese →
+  *„Nemáš nic, co mu dát“*. Klik: jedna věc ubude (příkaz `FeedWalkerItem`, nic neléčí), okno zmizí.
+  - **Mari:** 8 s kouří – z tlamy dýchne obláček kouře každé 2 s, kolem celého těla oblak, stoupá.
+  - **Pivo:** chvilku pije, pak 2,5 s chrlí oheň z tlamy nahoru do vzduchu (sloup, ať je vidět odevšad a nešlehá
+    chodci do očí), nad ním tmavý kouř, pak trochu kouře z tlamy. V noci oheň svítí kolem (jen každý šestý plamen,
+    ať to není drahé).
+  - **Seno:** sní, nic dalšího.
+  - Jen podívaná, žádný vliv na hru. Okno se zavře, když chodec odejde, nastoupí, drak odletí nebo Esc (Esc zavře
+    jen nabídku, ne pohled z očí).
+- Rig: `test3d chodec drak <n> <m> <úhel>` (chodec před n-tým odpočívajícím drakem, dá mu po 2 kusech, když nemá),
+  `test3d chodec klavesa e`, `test3d chodec krmit pivo|mari|seno <kroků>`. Ověřeno na dračím hradu: zepředu
+  i z boku, nabídka mizí po výběru i po odchodu na 12 m.
+
 ## 26. 10. (11) – Škoda 1203 z BeamNG (par15): kola, textury, lak podle masky
 
 - Hráč (screenshot z #300, nákup v depu): *„dvanáctsettrojky se nepodařily kolečka a textury“*, odkaz na release

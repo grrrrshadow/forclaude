@@ -53,6 +53,7 @@
 #include "vehicle_base.h"
 #include "cab_drive.h"
 #include "sound_func.h"
+#include "core/random_func.hpp"
 #include "frame_diary.h"
 #include "video/video_driver.hpp"
 
@@ -127,6 +128,21 @@ static constexpr double FIRST_PERSON_BLAST_M = 4.0;
 static constexpr double FIRST_PERSON_BLAST_S = 0.8;
 static constexpr double FIRST_PERSON_PUFF_EVERY_S = 0.04;
 static constexpr double FIRST_PERSON_PUFF_S = 1.6;
+/** Feeding a farm's dragon (the player, 26. 10.): how near its body the walker feeds it with E, metres; how long it
+ * smokes the marijuana, its breaths of smoke, seconds; how long the beer takes it to breathe fire, how long it breathes
+ * it, how long it smokes after, seconds. */
+static constexpr double FIRST_PERSON_FEED_M = 4.0;
+static constexpr double FIRST_PERSON_SMOKE_S = 8.0;
+static constexpr double FIRST_PERSON_BREATH_S = 2.0;
+static constexpr double FIRST_PERSON_GULP_S = 0.8;
+static constexpr double FIRST_PERSON_FIRE_S = 2.5;
+static constexpr double FIRST_PERSON_AFTER_FIRE_S = 1.5;
+/** A farm's dragon's mouth, resting: so much of its length in front of its middle, of its height over its feet. */
+static constexpr double FIRST_PERSON_MOUTH_AHEAD = 0.4;
+static constexpr double FIRST_PERSON_MOUTH_UP = 0.55;
+/** A flame of a dragon's fire: how long it is seen, seconds; how fast it flies out of the mouth, metres a second. */
+static constexpr double FIRST_PERSON_FLAME_S = 0.6;
+static constexpr double FIRST_PERSON_FLAME_SPEED = 9.0;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 /** How near a mushroom the walker picks it (E), metres. */
@@ -216,9 +232,25 @@ struct FirstPersonBlast {
 	double age = 0;             ///< seconds
 	bool smoke = true;          ///< a puff of smoke; else the blast
 	double size = 1;            ///< a puff: how many metres it grows; the cloud a blast leaves, more and darker, a while longer
+	double vx = 0, vy = 0, vz = 0; ///< how it drifts, metres a second: a dragon's smoke and fire out of its mouth, rising
+	bool flame = false;         ///< not a puff: a flame of a dragon's fire, flying out and growing by size, not a blast
+	bool lights = true;         ///< a flame: it lights what is about it too (one of a few, many fly together)
+	uint32_t colour = 0;        ///< a puff's colour, 0xRRGGBB; 0 as its size says
 
 	/** Seconds it is seen. */
-	double Life() const { return this->smoke ? FIRST_PERSON_PUFF_S * std::sqrt(this->size) : FIRST_PERSON_BLAST_S; }
+	double Life() const { return this->smoke ? FIRST_PERSON_PUFF_S * std::sqrt(this->size) : this->flame ? FIRST_PERSON_FLAME_S : FIRST_PERSON_BLAST_S; }
+};
+
+/** A dragon of a dragon farm fed (the player, 26. 10.: "the dragon smokes or breathes out fire"), as it goes on. */
+struct FirstPersonFeeding {
+	uint32_t place = 0;  ///< the dragon (ThreeDRestingDragonAt())
+	WalkerItem item = WalkerItem::End; ///< what it was fed: the marijuana or the beer
+	double age = 0;      ///< seconds since
+	double mouth = 0;    ///< seconds till the next puff or flame out of its mouth
+	double round = 0;    ///< seconds till the next puff about it
+
+	/** Seconds it goes on. */
+	double Life() const { return this->item == WalkerItem::Beer ? FIRST_PERSON_GULP_S + FIRST_PERSON_FIRE_S + FIRST_PERSON_AFTER_FIRE_S : FIRST_PERSON_SMOKE_S; }
 };
 
 /**
@@ -457,6 +489,7 @@ static bool FirstPersonMove(FirstPersonEye &w, double px, double py)
 }
 
 void ShowWalkerInventoryWindow();
+static void ShowDragonFeedWindow(uint32_t place);
 TileIndex FirstPersonShopNearby();
 void RedrawFirstPersonPicture();
 
@@ -491,6 +524,7 @@ struct FirstPersonWindow : Window {
 	double burst_time = 0;                ///< seconds till its next shot
 	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
 	std::vector<FirstPersonBlast> blasts;  ///< the rockets' smoke and blasts
+	std::vector<FirstPersonFeeding> feedings; ///< the farms' dragons fed, smoking or breathing fire
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
 	int light = -1;                       ///< the light asked for in the left hand (_first_person_lights), -1 none: the one held put out first
 	int light_held = -1;                  ///< the light in the left hand or being put out, -1 none
@@ -633,6 +667,11 @@ struct FirstPersonWindow : Window {
 		}
 		if (PickThreeDMushroom(this->walker.x, this->walker.y, FIRST_PERSON_PICK_M)) {
 			Command<Commands::PickWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WalkerItem::Mushrooms);
+			return;
+		}
+		/* By a farm's dragon resting: what it is fed chosen (ShowDragonFeedWindow()). */
+		if (const auto dragon = ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M); dragon.has_value()) {
+			ShowDragonFeedWindow(dragon->place);
 			return;
 		}
 		this->riding = VehicleID::Invalid();
@@ -1147,9 +1186,21 @@ struct FirstPersonWindow : Window {
 	 */
 	void Fly(double dt)
 	{
-		/* The rockets' smoke and blasts, as they fade. */
-		for (FirstPersonBlast &b : this->blasts) b.age += dt;
+		/* The rockets' smoke and blasts, as they fade; the dragons' smoke and fire drifting, the flames slowing in the air. */
+		for (FirstPersonBlast &b : this->blasts) {
+			b.age += dt;
+			b.x += b.vx * dt * OBJECT_UNITS_PER_METRE;
+			b.y += b.vy * dt * OBJECT_UNITS_PER_METRE;
+			b.z += b.vz * dt * OBJECT_HEIGHT_PER_METRE;
+			if (b.flame) {
+				const double slow = std::max(0.0, 1.0 - 2.0 * dt);
+				b.vx *= slow;
+				b.vy *= slow;
+				b.vz = b.vz * slow + 1.5 * dt;
+			}
+		}
 		std::erase_if(this->blasts, [](const FirstPersonBlast &b) { return b.age > b.Life(); });
+		this->Smoke(dt);
 		for (FirstPersonMissile &m : this->missiles) {
 			m.age += dt;
 			if (m.stuck || m.gone) continue;
@@ -1242,6 +1293,97 @@ struct FirstPersonWindow : Window {
 	}
 
 	/**
+	 * A dragon of a farm fed (FeedDragon()): one less of it, through the command; the dragon then smokes the marijuana or
+	 * breathes the beer out as fire (Smoke()), the hay it only eats.
+	 * @return whether it was fed
+	 */
+	bool FeedDragon(uint32_t place, WalkerItem item)
+	{
+		if (!ThreeDRestingDragonAt(place).has_value()) return false;
+		if (!Command<Commands::FeedWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_FEED, item)) return false;
+		if (item == WalkerItem::Hay) return true;
+		std::erase_if(this->feedings, [place](const FirstPersonFeeding &f) { return f.place == place; });
+		FirstPersonFeeding &f = this->feedings.emplace_back();
+		f.place = place;
+		f.item = item;
+		f.mouth = item == WalkerItem::Beer ? FIRST_PERSON_GULP_S : 0.3;
+		return true;
+	}
+
+	/**
+	 * The dragons fed (the player, 26. 10.: "I give it marijuana and it smokes round the dragon", "rather smoke and fire
+	 * out of its mouth"): the marijuana smoked, in breaths of smoke out of its mouth and a cloud about it, rising; the
+	 * beer, after a gulp, fire out of its mouth with dark smoke over it, and a little smoke after. Each where the dragon
+	 * is now; one gone off its place (flying out) is done with it.
+	 */
+	void Smoke(double dt)
+	{
+		const double m = OBJECT_UNITS_PER_METRE, up = OBJECT_HEIGHT_PER_METRE;
+		auto rnd = [](double from, double to) { return from + (to - from) * InteractiveRandomRange(1000) / 1000.0; };
+		for (FirstPersonFeeding &f : this->feedings) {
+			f.age += dt;
+			const std::optional<ThreeDRestingDragon> d = ThreeDRestingDragonAt(f.place);
+			if (!d.has_value()) {
+				f.age = f.Life() + 1;
+				continue;
+			}
+			const double a = d->facing * M_PI / 180.0, ca = std::cos(a), sa = std::sin(a);
+			/* Its mouth: in front of it, a little over half its height. */
+			const double mx = d->x + ca * d->length_m * FIRST_PERSON_MOUTH_AHEAD * m, my = d->y + sa * d->length_m * FIRST_PERSON_MOUTH_AHEAD * m, mz = d->z + d->height_m * FIRST_PERSON_MOUTH_UP * up;
+			auto puff = [&](double x, double y, double z, double size, uint32_t colour, double vx, double vy, double vz) {
+				FirstPersonBlast &b = this->blasts.emplace_back();
+				b = {x, y, z, 0, true, size};
+				b.vx = vx;
+				b.vy = vy;
+				b.vz = vz;
+				b.colour = colour;
+			};
+			if (f.item == WalkerItem::Marijuana) {
+				/* Out of its mouth: a breath of smoke, then a breath taken. */
+				for (f.mouth -= dt; f.mouth <= 0; f.mouth += 0.07) {
+					if (std::fmod(f.age, FIRST_PERSON_BREATH_S) > 0.8) continue;
+					const double turn = rnd(-0.3, 0.3), speed = rnd(1.0, 1.8);
+					puff(mx, my, mz, rnd(0.6, 1.0), 0xDCDED2, std::cos(a + turn) * speed, std::sin(a + turn) * speed, rnd(0.6, 1.0));
+				}
+				/* About it: a cloud round its body, as long and as wide as it is, rising slowly. */
+				for (f.round -= dt; f.round <= 0; f.round += 0.15) {
+					if (f.age > FIRST_PERSON_SMOKE_S - 1.5) continue;
+					const double t = rnd(0, 2 * M_PI), along = std::cos(t) * (d->length_m / 2 + 0.5), across = std::sin(t) * (d->width_m / 2 + 0.5);
+					const double x = d->x + (ca * along - sa * across) * m, y = d->y + (sa * along + ca * across) * m;
+					puff(x, y, d->z + rnd(0.2, 0.9) * d->height_m * up, rnd(2.0, 3.0), 0xC8CCC2, std::cos(t) * 0.2, std::sin(t) * 0.2, rnd(0.25, 0.45));
+				}
+			} else {
+				const double fire_end = FIRST_PERSON_GULP_S + FIRST_PERSON_FIRE_S;
+				for (f.mouth -= dt; f.mouth <= 0; f.mouth += f.age < fire_end ? 0.025 : 0.1) {
+					if (f.age < FIRST_PERSON_GULP_S) continue;
+					if (f.age >= fire_end) {
+						/* After the fire: a little smoke out of its mouth. */
+						puff(mx, my, mz, 1.0, 0x6A6660, ca * 0.5, sa * 0.5, 0.5);
+						continue;
+					}
+					/* The fire: flames out of its mouth up into the air, as a column seen from wherever the walker
+					 * stands -- not at the walker before it, whose eyes it would fill --, spread a little, slowing as
+					 * they grow. */
+					const double turn = rnd(-0.12, 0.12), lift = rnd(0.7, 0.95);
+					FirstPersonBlast &b = this->blasts.emplace_back();
+					b = {mx, my, mz, 0, false, rnd(0.5, 0.9)};
+					b.flame = true;
+					b.lights = InteractiveRandomRange(6) == 0;
+					b.vx = std::cos(a + turn) * std::cos(lift) * FIRST_PERSON_FLAME_SPEED;
+					b.vy = std::sin(a + turn) * std::cos(lift) * FIRST_PERSON_FLAME_SPEED;
+					b.vz = std::sin(lift) * FIRST_PERSON_FLAME_SPEED;
+					/* Dark smoke over its end now and then. */
+					if (InteractiveRandomRange(5) == 0) {
+						const double far = rnd(2.5, 3.5);
+						puff(mx + ca * far * m, my + sa * far * m, mz + far * 1.3 * up, rnd(1.2, 1.8), 0x4A4642, ca * 0.5, sa * 0.5, rnd(0.8, 1.2));
+					}
+				}
+			}
+		}
+		std::erase_if(this->feedings, [](const FirstPersonFeeding &f) { return f.age > f.Life(); });
+	}
+
+	/**
 	 * The rockets' smoke and blasts as the eyes see them (ThreeDBlast): a puff grows and fades, a blast swells and fades
 	 * fast; and the flame behind each rocket flying, flickering.
 	 */
@@ -1269,7 +1411,15 @@ struct FirstPersonWindow : Window {
 				const double t = b.age / b.Life();
 				s.radius_m = 0.25 + b.size * t;
 				s.alpha = static_cast<float>((b.size > 1 ? 0.7 : 0.55) * (1.0 - t));
-				s.colour = b.size > 1 ? 0x5C5852 : 0xB8B4AC;
+				s.colour = b.colour != 0 ? b.colour : b.size > 1 ? 0x5C5852 : 0xB8B4AC;
+			} else if (b.flame) {
+				/* A flame of a dragon's fire: white-yellow out of the mouth, orange, red as it goes out. */
+				const double t = b.age / FIRST_PERSON_FLAME_S;
+				s.radius_m = 0.2 + b.size * std::sqrt(t);
+				s.alpha = static_cast<float>(0.9 * (1.0 - t * t));
+				s.colour = t < 0.2 ? 0xFFF0A0 : t < 0.55 ? 0xFFA040 : 0xE05020;
+				s.light = true;
+				s.lights_about = b.lights;
 			} else {
 				const double t = b.age / FIRST_PERSON_BLAST_S;
 				s.radius_m = FIRST_PERSON_BLAST_M * std::min(1.0, 0.35 + 1.3 * t);
@@ -1328,6 +1478,11 @@ struct FirstPersonWindow : Window {
 		/* Esc leaves the view (the player, 25. 10.: the cursor is slow on his phone -- "when I want out of the first
 		 * person view, it is not easy to hit" -- so a way out without the mouse). */
 		if ((keycode & ~WKC_SPECIAL_KEYS) == WKC_ESC) {
+			/* The menu to feed a dragon open: only it goes. */
+			if (Window *feed = FindWindowById(WindowClass::DragonFeed, 0); feed != nullptr) {
+				feed->Close();
+				return EventState::Handled;
+			}
 			this->Close();
 			return EventState::Handled;
 		}
@@ -1515,6 +1670,9 @@ struct FirstPersonWindow : Window {
 					/* At a mushroom: E picks it. */
 					const bool cs = std::string_view(_current_language->isocode).starts_with("cs");
 					hint = GetString(STR_FIRST_PERSON_PICK_HERE, cs ? mushroom->title_cs : mushroom->title_en);
+				} else if (ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M).has_value()) {
+					/* By a farm's dragon resting: E feeds it. */
+					hint = GetString(STR_FIRST_PERSON_FEED_DRAGON);
 				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
 					/* At a shop: I opens the inventory, where it is bought. */
 					hint = GetString(STR_FIRST_PERSON_SHOP_HERE, shop);
@@ -1591,6 +1749,145 @@ void ShowFirstPersonWindow()
 	const Company *c = Company::GetIfValid(_local_company);
 	if (c != nullptr && c->walker_health == 0) Command<Commands::ReviveWalker>::Post(TileIndex{}, WALKER_HEALTH_MAX);
 	AllocateWindowDescFront<FirstPersonWindow>(_first_person_desc, 0);
+}
+
+/** The things a farm's dragon is fed, in the order of the lines of its window. */
+static constexpr WalkerItem DRAGON_FOODS[] = {WalkerItem::Beer, WalkerItem::Marijuana, WalkerItem::Hay};
+
+static constexpr NWidgetPart _nested_dragon_feed_widgets[] = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, Colours::Brown),
+		NWidget(WWT_CAPTION, Colours::Brown, WID_DF_CAPTION), SetStringTip(STR_DRAGON_FEED_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+	EndContainer(),
+	NWidget(WWT_PANEL, Colours::Brown, WID_DF_LIST), SetFill(1, 0), EndContainer(),
+};
+
+/**
+ * Feeding a farm's dragon the walker stands by (the player, 26. 10.: "E pops up a menu 'feed the dragon' and in it what
+ * I have that I can give it, beer and marijuana, and when I choose, the window goes and the dragon smokes or breathes
+ * out fire"; "we will feed hay too, and after the hay it does nothing"): a button for each of them the walker carries,
+ * a click feeds it (FirstPersonWindow::FeedDragon()). It goes as the walker walks away or the dragon flies out.
+ */
+struct DragonFeedWindow : Window {
+	uint32_t place; ///< the dragon (ThreeDRestingDragonAt())
+
+	DragonFeedWindow(WindowDesc &desc, uint32_t place) : Window(desc), place(place)
+	{
+		this->InitNested(0);
+	}
+
+	/** The things it can be fed that the walker carries, as the buttons show them. */
+	static std::vector<WalkerItem> Foods()
+	{
+		std::vector<WalkerItem> foods;
+		for (WalkerItem item : DRAGON_FOODS) {
+			if (FirstPersonWindow::Carried(item) > 0) foods.push_back(item);
+		}
+		return foods;
+	}
+
+	/** A button's height: tall enough for a finger on the phone. */
+	static int ButtonHeight()
+	{
+		return GetCharacterHeight(FontSize::Normal) * 2 + WidgetDimensions::scaled.framerect.Vertical();
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_DF_LIST) return;
+		size.height = static_cast<uint>(std::max<size_t>(1, Foods().size()) * ButtonHeight()) + padding.height;
+		size.width = std::max(size.width, GetStringBoundingBox(STR_DRAGON_FEED_NOTHING).width);
+		for (WalkerItem item : DRAGON_FOODS) {
+			size.width = std::max(size.width, GetStringBoundingBox(GetString(STR_DRAGON_FEED_ITEM, GetWalkerItemSpec(item).name, 999)).width);
+		}
+		size.width += padding.width + 4 * WidgetDimensions::scaled.framerect.Horizontal();
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		if (widget != WID_DF_LIST) return;
+		const Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
+		const int bh = ButtonHeight(), text = GetCharacterHeight(FontSize::Normal);
+		const std::vector<WalkerItem> foods = Foods();
+		if (foods.empty()) {
+			DrawString(ir.left, ir.right, ir.top + (bh - text) / 2, STR_DRAGON_FEED_NOTHING, TextColour::Grey, AlignmentH::Centre);
+			return;
+		}
+		int y = ir.top;
+		for (WalkerItem item : foods) {
+			const Rect b{ir.left, y + 1, ir.right, y + bh - 2};
+			DrawFrameRect(b, Colours::Brown, {});
+			DrawString(b.left, b.right, b.top + (b.Height() - text) / 2, GetString(STR_DRAGON_FEED_ITEM, GetWalkerItemSpec(item).name, FirstPersonWindow::Carried(item)), TextColour::White, AlignmentH::Centre);
+			y += bh;
+		}
+	}
+
+	void OnClick(Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		if (widget != WID_DF_LIST) return;
+		const Rect ir = this->GetWidget<NWidgetBase>(WID_DF_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		const std::vector<WalkerItem> foods = Foods();
+		if (pt.y < ir.top) return;
+		const size_t k = static_cast<size_t>((pt.y - ir.top) / ButtonHeight());
+		if (k < foods.size()) this->Feed(foods[k]);
+	}
+
+	/** The dragon fed one of it; the window goes. */
+	void Feed(WalkerItem item)
+	{
+		FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+		if (fp != nullptr) fp->FeedDragon(this->place, item);
+		this->Close();
+	}
+
+	void OnInvalidateData([[maybe_unused]] int data = 0, [[maybe_unused]] bool gui_scope = true) override
+	{
+		if (gui_scope) this->ReInit();
+	}
+
+	/** The walker walked away from the dragon, got into a vehicle, left the view, or the dragon flew out: no feeding then. */
+	IntervalTimer<TimerWindow> check{std::chrono::milliseconds(250), [this](uint) {
+		const FirstPersonWindow *fp = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+		const auto near = fp != nullptr && fp->Riding() == nullptr ? ThreeDRestingDragonNear(fp->walker.x, fp->walker.y, FirstPersonFeetZ(fp->walker), FIRST_PERSON_FEED_M + 2.0) : std::nullopt;
+		if (!near.has_value() || near->place != this->place) this->Close();
+	}};
+};
+
+static WindowDesc _dragon_feed_desc(
+	WindowPosition::Center, {}, 0, 0,
+	WindowClass::DragonFeed, WindowClass::None,
+	{},
+	_nested_dragon_feed_widgets
+);
+
+/** Open the window to feed a farm's dragon, instead of one open for another. */
+static void ShowDragonFeedWindow(uint32_t place)
+{
+	CloseWindowById(WindowClass::DragonFeed, 0);
+	new DragonFeedWindow(_dragon_feed_desc, place);
+}
+
+/**
+ * The rig: the menu to feed a farm's dragon open, a click on the button of a thing (as the player would); "" nothing
+ * done.
+ * @return "otevreno" with what it offers, then what was fed: the effect seen ("kour", "ohen", "nic")
+ */
+std::string RigDragonFeed(std::string_view what)
+{
+	DragonFeedWindow *w = static_cast<DragonFeedWindow *>(FindWindowById(WindowClass::DragonFeed, 0));
+	if (w == nullptr) return "zavreno";
+	std::string out = "nabidka:";
+	const std::vector<WalkerItem> foods = DragonFeedWindow::Foods();
+	for (WalkerItem item : foods) out += " " + GetString(GetWalkerItemSpec(item).name);
+	WalkerItem item = WalkerItem::End;
+	if (what == "pivo") item = WalkerItem::Beer;
+	if (what == "mari") item = WalkerItem::Marijuana;
+	if (what == "seno") item = WalkerItem::Hay;
+	const auto it = std::ranges::find(foods, item);
+	if (it == foods.end()) return out;
+	const Rect ir = w->GetWidget<NWidgetBase>(WID_DF_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+	w->OnClick({w->width / 2, ir.top + static_cast<int>(it - foods.begin()) * DragonFeedWindow::ButtonHeight() + DragonFeedWindow::ButtonHeight() / 2}, WID_DF_LIST, 1);
+	return out + fmt::format(", krmeno {}, okno {}", what, FindWindowById(WindowClass::DragonFeed, 0) != nullptr ? "zustalo" : "zmizelo");
 }
 
 /**
@@ -1752,6 +2049,56 @@ std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
 	w->MakePicture();
 	w->SetDirty();
 	return held;
+}
+
+/**
+ * The rig: the walker before the n-th dragon of the farms resting on its place, so many metres from its mouth at an angle
+ * from its front, looking at its mouth.
+ * @return where, or why not
+ */
+std::string RigFirstPersonAtDragon(int n, double metres, double angle_deg)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	const std::vector<ThreeDRestingDragon> resting = ThreeDRestingDragons();
+	if (w == nullptr || n < 0 || static_cast<size_t>(n) >= resting.size()) return fmt::format("zadny (odpociva {})", resting.size());
+	const ThreeDRestingDragon &d = resting[n];
+	const double a = d.facing * M_PI / 180.0, m = OBJECT_UNITS_PER_METRE;
+	const double mx = d.x + std::cos(a) * d.length_m * FIRST_PERSON_MOUTH_AHEAD * m, my = d.y + std::sin(a) * d.length_m * FIRST_PERSON_MOUTH_AHEAD * m;
+	const double b = a + angle_deg * M_PI / 180.0;
+	w->walker.x = mx + std::cos(b) * metres * m;
+	w->walker.y = my + std::sin(b) * metres * m;
+	FirstPersonSettle(w->walker);
+	w->walker.heading = std::atan2(my - w->walker.y, mx - w->walker.x);
+	w->walker.pitch = 0;
+	w->MakePicture();
+	w->SetDirty();
+	return fmt::format("drak {} ({}x{}x{} m) na {:.2f},{:.2f} smer {:.0f}; chodec na {:.2f},{:.2f}, k tlame {:.1f} m", d.place, d.length_m, d.width_m, d.height_m, d.x / TILE_SIZE, d.y / TILE_SIZE, d.facing,
+			w->walker.x / TILE_SIZE, w->walker.y / TILE_SIZE, std::hypot(mx - w->walker.x, my - w->walker.y) / m);
+}
+
+/**
+ * The rig: in the menu to feed a dragon (E pressed before), the button of a thing clicked (RigDragonFeed()), then so
+ * many steps of the dragon smoking or breathing fire; the smoke and the flames then, the picture made.
+ */
+std::string RigFirstPersonFeed(std::string_view what, int steps)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "bez chodce";
+	std::string out = RigDragonFeed(what);
+	const double dt = FIRST_PERSON_TICK_MS / 1000.0;
+	for (int i = 0; i < steps; i++) w->Fly(dt);
+	int puffs = 0, flames = 0;
+	double far = 0;
+	for (const FirstPersonBlast &b : w->blasts) {
+		(b.flame ? flames : puffs)++;
+		if (b.flame) far = std::max(far, std::hypot(b.x - w->walker.x, b.y - w->walker.y) / OBJECT_UNITS_PER_METRE);
+	}
+	out += fmt::format("; krmeni {}, kour {}x, plamenu {}x", w->feedings.size(), puffs, flames);
+	if (flames > 0) out += fmt::format(" (nejdal {:.1f} m od chodce)", far);
+	w->SeeBlasts();
+	w->MakePicture();
+	w->SetDirty();
+	return out;
 }
 
 /** The arrows and the bolts of the walker in the view from the eyes (AddCabMissile()). */
