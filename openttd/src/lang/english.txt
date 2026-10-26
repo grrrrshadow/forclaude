@@ -2292,6 +2292,9 @@ STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mus
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: feed the dragon
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: open the door
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: shut the door
+STR_FIRST_PERSON_WINDOW_OPEN                                    :E: open the window
+STR_FIRST_PERSON_WINDOW_SHUT                                    :E: shut the window
+STR_FIRST_PERSON_TAKE_LAMP                                      :E: take the lantern
 STR_FIRST_PERSON_RIDING                                         :In {VEHICLE} · {VELOCITY} · you drive
 STR_FIRST_PERSON_RIDING_ROUTE                                   :In {VEHICLE} · {VELOCITY} · goes its route
 STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventory

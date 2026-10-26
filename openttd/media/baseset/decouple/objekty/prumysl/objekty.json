@@ -3223,7 +3223,7 @@
   ],
   "autor": "grrrrf: vlastní model domy/draci_farma.py (stavebnice domů, upečeno domy/dum_objekt.py), složení prumysl/draci_farma.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). Od 25. 10. (hráč: „na zřicenině udělej taky rozhlednu a jeskyni zřicenou mistnost s drakem“): dřevěná rozhledna na 11 m věži se schody a loučemi a jeskyně, dutá díra v kopci u východní hradby (žádný interiér), kde leží třetí drak (prumysl/draci_zricenina.py, 1580 trojúhelníků, vlastní atlas 256 px). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
+  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). Od 25. 10. (hráč: „na zřicenině udělej taky rozhlednu a jeskyni zřicenou mistnost s drakem“): dřevěná rozhledna na 11 m věži se schody a loučemi a jeskyně, dutá díra v kopci u východní hradby (žádný interiér), kde leží třetí drak (prumysl/draci_zricenina.py, 1664 trojúhelníků, vlastní atlas 256 px). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
  },
  {
   "soubor": "draci_hrad.glb",
@@ -4315,9 +4315,49 @@
     "sirka": 1.1
    }
   ],
+  "okna": [
+   {
+    "uzel": "okno_00",
+    "poloha": [
+     5.86,
+     11.2,
+     1.4
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.92,
+    "vyska": 0.96,
+    "pant": [
+     5.86,
+     10.74
+    ],
+    "otevira_se": "ven"
+   },
+   {
+    "uzel": "okno_01",
+    "poloha": [
+     3.7,
+     12.56,
+     1.55
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 0.92,
+    "vyska": 0.96,
+    "pant": [
+     4.16,
+     12.56
+    ],
+    "otevira_se": "ven"
+   }
+  ],
   "interier": {
    "soubor": "les_paseka_srub_interier.glb",
-   "poznamka": "srub uvnitř (hra 25. 10.: „bouda v lese (sud a pivo bez Mata, postel, židle u stolku)“): rámec dílu, celý srub i zvenku (hra uvnitř obrysu interiéru díl nekreslí), podlaha z prken (podlaha), postel u zdi −y, stůl se dvěma židlemi a dvěma korbely piva, sud s pípou na koze v rohu u dveří (bez Mata), kamna pod komínem, lucerna na stole (noc, svetlo_00); okna jsou otvory se sklem (BLEND), uličky aspoň 0,8 m, ode dveří 1,6 m; 3468 trojúhelníků, 27 kB"
+   "poznamka": "srub uvnitř (hra 25. 10.: „bouda v lese (sud a pivo bez Mata, postel, židle u stolku)“): rámec dílu, celý srub i zvenku (hra uvnitř obrysu interiéru díl nekreslí), podlaha z prken (podlaha), postel u zdi −y, stůl se dvěma židlemi a dvěma korbely piva, sud s pípou na koze v rohu u dveří (bez Mata), kamna pod komínem, lucerna na stole (noc, svetlo_00); okna jsou otvory (dřevěné okenice okno_NN jsou v dílu, otevírají se jako dveře), uličky aspoň 0,8 m, ode dveří 1,6 m; 3444 trojúhelníků, 26 kB"
   },
   "podlaha": {
    "uzel": "podlaha",
@@ -4344,6 +4384,6 @@
   },
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi, lucerna u dveří), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10052 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 928 kB; glb z gltfpacku"
+  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi, lucerna u dveří), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10196 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 930 kB; glb z gltfpacku"
  }
 ]

@@ -255,7 +255,7 @@ enum class Commands : uint8_t {
 	ReviveWalker, ///< the walker of the view from the first person comes back with full health
 	WalkerCheat, ///< the cheat iddqd: every weapon to the walker, the arrows filled up (walker_inventory.h)
 	BuyWalkerPet, ///< buy a dog of a seller of dogs for the walker, or let its dog go (three_d_animals.h)
-	PickWalkerItem, ///< the walker picks up a thing where it is: a mushroom (walker_inventory.h)
+	PickWalkerItem, ///< the walker picks up a thing where it is: a mushroom, a lantern (walker_inventory.h)
 	SetWalkerQuickKey, ///< a thing put under a quick key of the walker (walker_inventory.h)
 	PlantWalkerSeedling, ///< the walker plants a seedling of marijuana in front of it (WalkerPlant, walker_inventory.h)
 	HarvestWalkerPlant, ///< the walker harvests its plant: marijuana, or hay (WalkerPlant)

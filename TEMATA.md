@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (13) – srub: okenice na E, lucerna ze stolu E sebrat; rozhledna zříceniny s podestou; co dál z grrrrf
+
+- Hráč: *„co nemá hotové v grrrf?“* → seznam (pastviny, okenice, rozhledna s podestou, společné náklady, Zetor
+  a kolečko, minové kladivo). Pak: *„společné náklady znamená předělat všechny grf, takže se to odkládá na větší akci
+  úpravy grf. minové kladivo ať bouchne. 5 postavíš tam kolečko ze special a já ho budu řídit. klávesou E si vezmu
+  kolečko normální a budu řídit. normální kolečko a zetor z grf rozmístíme“*, *„to dělá hra E nastoupit do vozidla.
+  jen ho tam zaparkuj“*, *„jo kolečko se může spawnout znova, traktor, tatra hasičská na hřišti, to jsou dekorace“*,
+  *„traktor je normální traktor E budu řídit ale tatra z hřiště nevyjede. úspornější bude normální tatra než dělat
+  zjednodušenou další“*, *„zetor taky vozidlo E. dekorace můžou fungovat“*.
+- K srubu: *„co tam svítí ve srubu. já si tam donesu lucernu svoji“*, *„je tam lucerna? jak ji zhasnu. to mám lepší
+  svoji lucernu“*, *„tak tu lucernu E seberu a je to“*.
+- **Hotovo:**
+  - Převzato z grrrrf (`98beda0`): `les_paseka_srub.glb` (okenice `okno_00`, `okno_01`), `_interier.glb`,
+    `draci_farma.glb` (podesta rozhledny), `prumysl/objekty.json` (klíč `okna`).
+  - **Okenice** jsou křídla jako dveře (uzly `okno_NN` vedle `dvere_NN`). E otevře a zavře, vždy ven (od středu
+    interiéru), zevnitř i zvenku. Lišta: *„E: otevřít okno“* / *„E: zavřít okno“*.
+  - **Lucerna na stole:** u ní (1,2 m) lišta *„E: vzít lucernu“*. E dá do inventáře lucernu a interiér je pak tmavý
+    (bez nočního uzlu a světel, `GetThreeDInteriorAt()`). Neukládá se, po načtení hry je lucerna zase na stole.
+    Tělo lucerny je zatím v nábytku a záře oken venku v jednom uzlu s lucernou u dveří → kolegovi: lucerna jako
+    uzel `lucerna`, záře oken zvlášť.
+  - Rozhledna zříceniny: rig od země na plošinu 11,18 m.
+- **Domluveno, dělá se:** minové kladivo (úder = výbuch jako raketa); Zetor a kolečko u farmy jako dekorace z GRF,
+  E u nich → tvoje firma dostane opravdové vozidlo zadarmo a nastoupíš, dekorace se objeví znovu; hasičská Tatra
+  na hřišti jen dekorace (normální Tatra z GRF, nevyjede); pastviny.
+- **Odloženo:** společné náklady (sada `naklady`) až s velkou úpravou všech GRF.
+
 ## 26. 10. (12) – Krmení draků na farmě (E → nabídka, mari kouř, pivo oheň z tlamy, seno nic)
 
 - Hráč: *„chci krmit na farmě draky, když k němu přijdu dám mu mari a zakouří se kolem draka a dám mu vodku, pivo

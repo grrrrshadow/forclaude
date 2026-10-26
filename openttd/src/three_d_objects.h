@@ -256,7 +256,9 @@ struct ThreeDObject {
 	/* A house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): the interior an object of its own in the
 	 * house's frame, the wings of the doors objects of their own, each in its three states. */
 	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
-	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors ("dvere_NN" of its file, then of its interior's): shut, open one way, the other
+	size_t interior_unlit = SIZE_MAX;         ///< and that interior with its lamp taken (TakeThreeDLamp())
+	bool unlit = false;                       ///< an interior with its lamp taken: nothing of its night, nor its nodes "lucerna..."
+	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors and windows ("dvere_NN", "okno_NN" of its file, then of its interior's): shut, open one way, the other
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
 	/* An industry: every node of its file read, not only the first (the colleague's dragon castle: "zem", "hrad",
@@ -922,6 +924,10 @@ const ThreeDObject *GetThreeDDoorWing(const ThreeDObject *house, TileIndex origi
 std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach);
 void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, double x, double y);
 bool ThreeDDoorOpen(TileIndex origin, size_t door);
+bool ThreeDDoorIsWindow(const ThreeDObject *house, size_t door);
+const ThreeDObject *GetThreeDInteriorAt(const ThreeDObject *house, TileIndex origin);
+bool ThreeDLampNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach);
+void TakeThreeDLamp(TileIndex origin);
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
 
 /**

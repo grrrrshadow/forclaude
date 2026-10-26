@@ -336,14 +336,15 @@ CommandCost CmdBuyWalkerPet(DoCommandFlags flags, const std::string &name)
 
 /**
  * A thing the walker picks up where it is (the player, 18. 10.: "the mushrooms will be picked about the clay towns"):
- * one more of it in the inventory. Only the mushrooms are picked so.
+ * one more of it in the inventory. Only the mushrooms are picked so, and the lantern of the forest cabin's table (the
+ * player, 26. 10.: "I pick up the lantern with E and that is it").
  * @param flags operation to perform
  * @param item the thing
  * @return nothing, or an error
  */
 CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item)
 {
-	if (item != WalkerItem::Mushrooms) return CMD_ERROR;
+	if (item != WalkerItem::Mushrooms && item != WalkerItem::Lantern) return CMD_ERROR;
 	Company *c = Company::GetIfValid(_current_company);
 	if (c == nullptr) return CMD_ERROR;
 	if (c->walker_items[to_underlying(item)] >= WALKER_ITEM_MAX) return CommandCost(STR_ERROR_WALKER_CARRIES_TOO_MANY);
