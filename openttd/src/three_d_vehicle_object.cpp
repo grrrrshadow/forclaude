@@ -291,7 +291,7 @@ bool GetThreeDLoadPieces(const ThreeDVehicleState *st, ThreeDLoadPieces &out)
 	out.fig = GetThreeDFigure(piece->figure);
 	if (out.fig == nullptr) return false;
 	out.frame = piece->frame;
-	out.state = ThreeDLoadColourState(*piece, st->load_label);
+	out.state = ThreeDLoadColourState(*piece, st->load_label, st->load_colour);
 	ThreeDLoadPlaces(*piece, st->bed, st->load_count, out.places);
 	return !out.places.empty();
 }
@@ -648,6 +648,40 @@ static bool CoupledBehind(const ThreeDVehicleObject *obj, const Vehicle *anchor,
 	if (before == nullptr || before == obj || !before->has_couple_back) return false;
 	before_anchor = PieceAway(prev, before->anchor - piece);
 	return before_anchor != nullptr && PieceReversed(before_anchor) == PieceReversed(anchor);
+}
+
+/** How far ahead of its front coupling an article's shape may reach and still not be drawn over the one before (DrawnOverBefore()), metres. */
+static constexpr float OVERHANG_DRAWN_OVER_M = 0.1f;
+
+/**
+ * Whether an article is drawn over the one it is coupled behind (CoupledBehind()): its shape reaches ahead of its front
+ * coupling, over the other's back (a semi-trailer over its tractor's fifth wheel by 1.3 to 2 m; a trailer on its
+ * drawbar does not). Drawn as the boxes of their pieces sort them, the tractor of a lorry going towards the viewer was
+ * drawn last, over the front of its semi-trailer (the colleague's hra/3d/TAHAC-NAVES-PORADI-PRO-HRU.md: the player,
+ * "the Tatras have the tractor drawn over the semi-trailer going south-east and south-west").
+ * @param anchor the article's anchor piece
+ * @param[out] before the article before it, and its anchor piece
+ */
+static bool DrawnOverBefore(const ThreeDVehicleObject *obj, const Vehicle *anchor, const ThreeDVehicleObject *&before, const Vehicle *&before_anchor)
+{
+	if (!CoupledBehind(obj, anchor, before, before_anchor)) return false;
+	/* Its front as far as any of its states reaches (the semi-trailer's body is a part its state shows, its frame ends
+	 * at the kingpin). */
+	const ThreeDVehicleShape *shape = obj->TryGetShape();
+	if (shape == nullptr) return false;
+	const float front = shape->all[1] > shape->all[0] ? shape->all[1] : shape->x1;
+	return front > obj->couple_front[0] + OVERHANG_DRAWN_OVER_M;
+}
+
+/** The anchor piece of the article a vehicle's piece is drawn over (DrawnOverBefore()) when it is its article's anchor piece; nullptr else. */
+const Vehicle *ThreeDVehicleDrawnOver(const Vehicle *v)
+{
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
+	if (obj == nullptr || piece != obj->anchor) return nullptr;
+	const ThreeDVehicleObject *before = nullptr;
+	const Vehicle *before_anchor = nullptr;
+	return DrawnOverBefore(obj, v, before, before_anchor) ? before_anchor : nullptr;
 }
 
 /**
@@ -2930,7 +2964,57 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom)
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose)
 {
 	VehicleObjectPlace place;
-	if (PlaceVehicleObject(v, zoom, pose, place) == nullptr) return false;
+	const ThreeDVehicleObject *obj = PlaceVehicleObject(v, zoom, pose, place);
+	if (obj == nullptr) return false;
+	/* Articles drawn over the ones they are coupled behind (DrawnOverBefore()): one entry with them, the first article's
+	 * picture first, sorted by the box of all their pieces; once in the block, from whichever piece of them comes. */
+	if (pose == nullptr) {
+		int piece = 0;
+		ThreeDVehicleObjectOf(v, &piece);
+		/* Each article as its anchor piece takes it, the object it is drawn as (PlaceVehicleObject()). */
+		const Vehicle *head = PieceAway(v, obj->anchor - piece);
+		const ThreeDVehicleObject *head_obj = ThreeDVehicleObjectOf(head);
+		for (int depth = 0; head_obj != nullptr && depth < 4; depth++) {
+			const ThreeDVehicleObject *before = nullptr;
+			const Vehicle *before_anchor = nullptr;
+			if (!DrawnOverBefore(head_obj, head, before, before_anchor)) break;
+			head = before_anchor;
+			head_obj = ThreeDVehicleObjectOf(head);
+		}
+		/* The articles from it on, each drawn over the one before. */
+		std::vector<std::pair<const ThreeDVehicleObject *, const Vehicle *>> group;
+		if (head_obj != nullptr) group.emplace_back(head_obj, head);
+		while (!group.empty() && group.size() < 5) {
+			const auto [a_obj, a] = group.back();
+			const Vehicle *last = PieceAway(a, static_cast<int>(a_obj->pieces.size()) - 1 - a_obj->anchor);
+			const Vehicle *next_first = last != nullptr ? last->Next() : nullptr;
+			if (next_first == nullptr) break;
+			int next_piece = 0;
+			const ThreeDVehicleObject *first_obj = ThreeDVehicleObjectOf(next_first, &next_piece);
+			const Vehicle *next = first_obj != nullptr ? PieceAway(next_first, first_obj->anchor - next_piece) : nullptr;
+			const ThreeDVehicleObject *next_obj = ThreeDVehicleObjectOf(next);
+			const ThreeDVehicleObject *before = nullptr;
+			const Vehicle *before_anchor = nullptr;
+			if (next_obj == nullptr || !DrawnOverBefore(next_obj, next, before, before_anchor) || before_anchor != a) break;
+			group.emplace_back(next_obj, next);
+		}
+		if (group.size() > 1) {
+			extern bool VehicleDrawnFirstInBlock(VehicleID id);
+			if (!VehicleDrawnFirstInBlock(head->index)) return true;
+			std::vector<TurnedVehiclePart> parts;
+			int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
+			for (const auto &[a_obj, a] : group) {
+				VehicleObjectPlace at;
+				PlaceVehicleObject(a, zoom, nullptr, at);
+				if (at.pic == nullptr) continue;
+				parts.push_back({at.pic, at.ax, at.ay, at.az});
+				xmin = std::min(xmin, at.xmin); ymin = std::min(ymin, at.ymin); zmin = std::min(zmin, at.zmin);
+				xmax = std::max(xmax, at.xmax); ymax = std::max(ymax, at.ymax); zmax = std::max(zmax, at.zmax);
+			}
+			if (!parts.empty()) AddTurnedVehiclePictures(parts, xmin, ymin, zmin, xmax, ymax, zmax);
+			return true;
+		}
+	}
 	if (place.pic != nullptr) AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
 	return true;
 }
@@ -4237,7 +4321,12 @@ bool WriteThreeDVehicleObjectPPM(EngineID engine, float az, float pxm, int state
 	int piece = 0;
 	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, &piece);
 	if (obj == nullptr) return false;
-	if (state < 0) state = StateStep(obj, engine, nullptr, EngineImageType::Purchase);
+	if (state < 0) {
+		state = StateStep(obj, engine, nullptr, EngineImageType::Purchase);
+	} else if (const uint64_t load = LoadCode(obj, {state}, nullptr, engine); load != 0) {
+		/* A state of a load piece with its bed full, as the purchase list has it. */
+		state = obj->ComposeState({state}, 0, load);
+	}
 	const uint64_t walk = WalkCode(obj, state, walked_m * UNITS_PER_METRE, 1.0f);
 	ObjectRaster r;
 	if (!RasterObject(*obj, 1.0f, az, az, 1.0f, pxm, FadeAmount(obj, state), r, 0, RustTime(obj, state), 0, PaletteColour(obj, state), 1.0f, 0, 0, 0, lights, state, walk)) return false;

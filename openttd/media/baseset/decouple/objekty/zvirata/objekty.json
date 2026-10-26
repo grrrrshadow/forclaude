@@ -625,11 +625,16 @@
    }
   },
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   1.35,
+   0.58,
+   0.71
+  ],
   "naklad": {
    "sada": "naklady",
    "rozmer_m": [
-    1.2,
-    0.6
+    1.35,
+    0.58
    ],
    "uzel": "pase_00",
    "meritko": 1
@@ -673,11 +678,16 @@
    }
   },
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   2.29,
+   0.95,
+   1.68
+  ],
   "naklad": {
    "sada": "naklady",
    "rozmer_m": [
-    2.4,
-    0.9
+    2.29,
+    0.95
    ],
    "uzel": "pase_00",
    "meritko": 1
@@ -721,11 +731,16 @@
    }
   },
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   1.13,
+   0.56,
+   0.74
+  ],
   "naklad": {
    "sada": "naklady",
    "rozmer_m": [
-    1.0,
-    0.55
+    1.13,
+    0.56
    ],
    "uzel": "pase_00",
    "meritko": 1

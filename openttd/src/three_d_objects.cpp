@@ -4526,7 +4526,17 @@ static void ReadThreeDVehicleObjects()
 						}
 						if (st.contains("sada") && st.at("sada").is_string()) state.set_name = st.at("sada").get<std::string>();
 						/* The pieces of the shared loads its set carries, and the bed of the body it shows. */
-						if (st.contains("naklad") && st.at("naklad").is_object()) state.load_piece = st.at("naklad").value("kus", std::string());
+						if (st.contains("naklad") && st.at("naklad").is_object()) {
+							const auto &load = st.at("naklad");
+							state.load_piece = load.value("kus", std::string());
+							/* Its own colour, before its cargo's (the V3S's red and grey bricks, either of BRCK and BDMT). */
+							if (load.contains("barva") && load.at("barva").is_string()) {
+								std::string c = load.at("barva").get<std::string>();
+								if (c.starts_with("#")) c = c.substr(1);
+								auto n = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+								if (n.has_value()) state.load_colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+							}
+						}
 						if (st.contains("loze")) ReadLoadBed(st.at("loze"), state.bed);
 						if (st.contains("posadka") && st.at("posadka").is_string()) {
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
@@ -4677,6 +4687,14 @@ static void ReadThreeDVehicleObjects()
 			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
 		}
 	}
+	/* The objects sharing a piece only of the package the piece is taken of: of an older package of the set read first
+	 * (Nakladaky_Tatra_3D-v2 beside -v4), the first piece of a semi-trailer was taken to the old one's semi-trailer of
+	 * the same pieces, the one listed first, its other pieces to the new one's. */
+	for (auto it = _vehicle_object_shared_pieces.begin(); it != _vehicle_object_shared_pieces.end();) {
+		const std::string &package = _vehicle_objects[_vehicle_object_pieces[it->first].first].package;
+		std::erase_if(it->second, [&package](const std::pair<uint32_t, int> &s) { return _vehicle_objects[s.first].package != package; });
+		it = it->second.size() > 1 ? std::next(it) : _vehicle_object_shared_pieces.erase(it);
+	}
 	/* An animal on a bed takes the room its record gives it ("rozmer_nakladu"), else its size and some room about it
 	 * (the colleague: "with a gap"). */
 	for (ThreeDLoadPiece &piece : _load_pieces) {
@@ -4687,6 +4705,28 @@ static void ReadThreeDVehicleObjects()
 			piece.size[0] = given ? a.load_size[0] : a.size[0] + LOAD_ANIMAL_ROOM_M;
 			piece.size[1] = given ? a.load_size[1] : a.size[1] + LOAD_ANIMAL_ROOM_M;
 			piece.size[2] = given ? a.load_size[2] : a.size[2];
+		}
+	}
+	/* The colours the vehicles' states give their pieces ("naklad" "barva"): each a state of the piece's figure. */
+	for (const ThreeDVehicleObject &o : _vehicle_objects) {
+		for (const ThreeDVehicleState &s : o.states) {
+			if (s.load_colour == 0 || s.load_piece.empty()) continue;
+			auto piece = std::ranges::find(_load_pieces, s.load_piece, &ThreeDLoadPiece::name);
+			if (piece == _load_pieces.end() || std::ranges::any_of(piece->own_colours, [&s](const auto &c) { return c.first == s.load_colour; })) continue;
+			auto fig = std::ranges::find(_figure_objects, piece->figure, &ThreeDVehicleObject::name);
+			if (fig == _figure_objects.end() || fig->paint.mask_file.empty()) continue;
+			int step = 0;
+			for (size_t k = 0; k < fig->states.size(); k++) {
+				if (fig->states[k].colour == s.load_colour) step = static_cast<int>(k) + 1;
+			}
+			if (step == 0) {
+				ThreeDVehicleState st;
+				st.colour = s.load_colour;
+				st.given = ThreeDVehicleState::GIVEN_COLOUR;
+				fig->states.push_back(st);
+				step = static_cast<int>(fig->states.size());
+			}
+			piece->own_colours.emplace_back(s.load_colour, step);
 		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
@@ -4759,9 +4799,12 @@ void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, in
 	}
 }
 
-/** The state of a piece's figure in the colour of a cargo (its table "naklady"); 0 its own colours. */
-int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label)
+/** The state of a piece's figure in a colour a vehicle's state gives it, else in the colour of a cargo (its table "naklady"); 0 its own colours. */
+int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label, uint32_t colour)
 {
+	for (const auto &[c, step] : piece.own_colours) {
+		if (colour != 0 && c == colour) return step;
+	}
 	for (const auto &[l, step] : piece.colours) {
 		if (l == label) return step;
 	}
@@ -6520,7 +6563,10 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
 		}
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
-		if (!s.load_piece.empty()) made.load_piece = s.load_piece;
+		if (!s.load_piece.empty()) {
+			made.load_piece = s.load_piece;
+			made.load_colour = s.load_colour;
+		}
 		if (s.bed.Given()) made.bed = s.bed;
 	}
 	/* How many pieces lie on its bed, of which cargo (ThreeDLoadCode()). */

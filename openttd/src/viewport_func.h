@@ -55,6 +55,12 @@ void DrawGroundSpriteAt(SpriteID image, PaletteID pal, int32_t x, int32_t y, int
 void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z, const SpriteBounds &bounds, bool transparent = false, const SubSprite *sub = nullptr, Point pixel_offset = {});
 struct ThreeDModelPicture;
 void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up = 0);
+/** A picture of a vehicle drawn in one entry with others (AddTurnedVehiclePictures()), and the world point it hangs from. */
+struct TurnedVehiclePart {
+	const ThreeDModelPicture *pic;
+	int ax, ay, az;
+};
+void AddTurnedVehiclePictures(std::span<const TurnedVehiclePart> parts, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax);
 bool ViewportDrawingTurned();
 bool ViewportDrawingNorthObjects();
 bool ViewportDrawingEye();

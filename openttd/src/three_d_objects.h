@@ -574,6 +574,7 @@ struct ThreeDVehicleState {
 	/* The pieces of the shared loads it carries (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): the GRF's set
 	 * names the piece, the game stacks it on the bed of the body, as many as are loaded, coloured by the cargo. */
 	std::string load_piece;     ///< "naklad" "kus": the piece (ThreeDLoadPiece), empty none
+	uint32_t load_colour = 0;   ///< "naklad" "barva": the pieces' colour (Colour::data) instead of their cargo's in their table, 0 that
 	ThreeDLoadBed bed;          ///< "loze": the bed of the body it shows
 	uint8_t load_count = 0;     ///< of the layers made one (ComposeState()): how many pieces lie on the bed
 	uint32_t load_label = 0;    ///< and the label of their cargo (their colour)
@@ -807,6 +808,7 @@ struct ThreeDLoadPiece {
 	int layers = 1;                  ///< "skladani" "max_vrstev"
 	bool quarter_turn = false;       ///< "otaceni" with 90: it may lie across the bed
 	std::vector<std::pair<uint32_t, int>> colours; ///< the labels of its table ("naklady") with a colour, each with the state of its figure in that colour
+	std::vector<std::pair<uint32_t, int>> own_colours; ///< the colours the vehicles' states give it ("naklad" "barva", Colour::data), each with the state of its figure in that colour
 };
 
 /** Where a piece of a load lies on the bed: its foot, metres in the vehicle's frame, and how it is turned, degrees. */
@@ -818,7 +820,7 @@ struct ThreeDLoadPlace {
 const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name);
 int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed);
 void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out);
-int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label);
+int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label, uint32_t colour = 0);
 const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name);
 std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node);
 std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound);

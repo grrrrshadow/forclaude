@@ -3582,8 +3582,15 @@ static void TurnedBridgeHead(TileIndex head, size_t first_parent)
 	}
 }
 
-/** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index, box_dy how many times its pixels are doubled. */
-static std::vector<const ThreeDModelPicture *> _turned_vehicle_pictures;
+/** A picture of a vehicle of the block being drawn (box_kind 5), where it hangs, and those drawn with it after it. */
+struct TurnedVehiclePicture {
+	const ThreeDModelPicture *pic;
+	int ax, ay, az;  ///< the world point it hangs from
+	int up;          ///< its pixels drawn doubled so many times
+	int more;        ///< how many of the pictures after it are drawn with it, in their order (AddTurnedVehiclePictures())
+};
+/** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index of the first. */
+static std::vector<TurnedVehiclePicture> _turned_vehicle_pictures;
 /** Whether the turned renderer is collecting what to draw (ViewportDoDrawTurned()): the vehicles then come as their likeness. */
 static bool _drawing_turned = false;
 /** The sprites of the bridges over the tiles collected (MarkCabBridgeSprites()): the tile, and the first and the end of their parent sprites. */
@@ -3658,7 +3665,74 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 	ps.box_dx = static_cast<int16_t>(_turned_vehicle_pictures.size());
 	ps.box_dy = static_cast<int16_t>(up);
 	ps.box_kind = 5;
-	_turned_vehicle_pictures.push_back(pic);
+	_turned_vehicle_pictures.push_back({pic, ax, ay, az, up, 0});
+	_vd.last_child = LAST_CHILD_NONE;
+}
+
+/**
+ * Vehicles of the turned view drawn as one entry to sort, their pictures in the order given: an article whose picture
+ * reaches over the one it is coupled behind (a semi-trailer over its tractor's fifth wheel) after that one, which
+ * sorting them by their own boxes could not keep -- the tractor of a lorry going towards the viewer was drawn over the
+ * front of its semi-trailer (the colleague's hra/3d/TAHAC-NAVES-PORADI-PRO-HRU.md).
+ * @param parts the pictures, the first drawn first
+ * @param xmin,ymin,zmin,xmax,ymax,zmax the box of all their pieces, world units
+ */
+void AddTurnedVehiclePictures(std::span<const TurnedVehiclePart> parts, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax)
+{
+	/* Not in the block at all? Each picture about its point, in the units of the collecting dpi (16x). */
+	const int scale = 1 << to_underlying(_vd.dpi.zoom);
+	int left = INT32_MAX, top = INT32_MAX, right = INT32_MIN, bottom = INT32_MIN;
+	for (const TurnedVehiclePart &p : parts) {
+		if (p.pic == nullptr || p.pic->width <= 0) continue;
+		const Point pt = RemapCoords(p.ax, p.ay, p.az);
+		left = std::min(left, pt.x + p.pic->left * scale);
+		top = std::min(top, pt.y + p.pic->top * scale);
+		right = std::max(right, pt.x + (p.pic->left + p.pic->width) * scale);
+		bottom = std::max(bottom, pt.y + (p.pic->top + p.pic->height) * scale);
+		if (ThreeDPictureStandsIn(p.pic)) {
+			const int reach = std::max(p.pic->width, p.pic->height) * scale / ZOOM_BASE + 2;
+			OweThreeDPictureBox(std::min(xmin, p.ax) - reach, std::min(ymin, p.ay) - reach, std::max(xmax, p.ax) + reach, std::max(ymax, p.ay) + reach, std::min(zmin, p.az) - reach, std::max(zmax, p.az) + 2 * reach);
+		}
+	}
+	if (left >= right || left >= _vd.dpi.left + _vd.dpi.width || right <= _vd.dpi.left || top >= _vd.dpi.top + _vd.dpi.height || bottom <= _vd.dpi.top) return;
+	if (_turned_vehicle_pictures.size() + parts.size() >= 32000) return;
+
+	const size_t at = _turned_vehicle_pictures.size();
+	const TurnedVehiclePart *first = nullptr;
+	for (const TurnedVehiclePart &p : parts) {
+		if (p.pic == nullptr || p.pic->width <= 0) continue;
+		if (first == nullptr) first = &p;
+		_turned_vehicle_pictures.push_back({p.pic, p.ax, p.ay, p.az, 0, 0});
+	}
+	_turned_vehicle_pictures[at].more = static_cast<int>(_turned_vehicle_pictures.size() - at - 1);
+
+	const Point pt = RemapCoords(first->ax, first->ay, first->az);
+	ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw.emplace_back();
+	ps.x = pt.x;
+	ps.y = pt.y;
+	ps.left = left;
+	ps.top = top;
+	ps.image = SPR_EMPTY_BOUNDING_BOX;
+	ps.pal = PAL_NONE;
+	ps.sub = nullptr;
+	ps.xmin = xmin;
+	ps.xmax = xmax;
+	ps.ymin = ymin;
+	ps.ymax = ymax;
+	ps.zmin = zmin;
+	ps.zmax = zmax;
+	ps.first_child = LAST_CHILD_NONE;
+	ps.order = 0;
+	ps.ax = first->ax;
+	ps.ay = first->ay;
+	ps.az = first->az;
+	ps.box = nullptr;
+	ps.box_ox = first->ax;
+	ps.box_oy = first->ay;
+	ps.box_oz = first->az;
+	ps.box_dx = static_cast<int16_t>(at);
+	ps.box_dy = 0;
+	ps.box_kind = 5;
 	_vd.last_child = LAST_CHILD_NONE;
 }
 
@@ -3795,7 +3869,12 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, bool north)
 {
 	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
-	BlitTurnedPicture(frame, *_turned_vehicle_pictures[ps.box_dx], ps.box_ox, ps.box_oy, ps.box_oz, north, ps.box_dy);
+	/* It, and those drawn with it after it (AddTurnedVehiclePictures()). */
+	const size_t end = std::min(_turned_vehicle_pictures.size(), static_cast<size_t>(ps.box_dx) + 1 + _turned_vehicle_pictures[ps.box_dx].more);
+	for (size_t k = ps.box_dx; k < end; k++) {
+		const TurnedVehiclePicture &p = _turned_vehicle_pictures[k];
+		BlitTurnedPicture(frame, *p.pic, p.ax, p.ay, p.az, north, p.up);
+	}
 }
 
 /**

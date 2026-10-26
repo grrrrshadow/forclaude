@@ -31,6 +31,33 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (18) – Návěs přes tahač, V3S s kusovými náklady, barva nákladu ze stavu
+
+- Hráč přes kolegu (grrrrf `hra/3d/TAHAC-NAVES-PORADI-PRO-HRU.md`): *„tatry maj tahač nakreslený přes navěs v jv a jz
+  směru. když jedou sv nebo sz tak je to v pořádku. test nákladů dopadl dobře.“* Kolega: článek spojený za jiným,
+  jehož tvar sahá před spojku víc než asi o 0,1 m, *„kresli vždy přes článek, za kterým je spojený“*, v obou pohledech.
+- **Pořadí** (three_d_vehicle_object.cpp `DrawnOverBefore()`, vehicle.cpp, viewport.cpp):
+  - Přesah se bere z `all[1]` tvaru (kam sahají díly všech stavů). Korba návěsu je díl stavu, rám končí u čepu, takže
+    `x1` samotného tvaru přesah neukázal.
+  - Pohled na sever: v `DrawRoadVehicleWhole()` se díl návěsu přesune hned za díl tahače.
+  - Otočený pohled: tahač a návěs jsou jeden záznam k řazení (`AddTurnedVehiclePictures()`), krabice obou, obrázek
+    tahače první. Kreslí se jednou v bloku, ať přijde od kteréhokoli dílu.
+  - Rig: Tatra 138 tahač s návěsem v zatáčce, 0° i 30°: čelo návěsu leží přes točnici, kabina zůstává celá.
+- **Chyba při dvou balíčcích jedné sady** (three_d_objects.cpp): seznam dílů sdílených více objekty míchal objekty
+  starého balíčku (složka `Nakladaky_Tatra_3D-v2`) a nového (`-v4.tar`). První díl návěsu se pak přiřadil ke staré
+  verzi a ostatní k nové. Teď sdílené díly jen z balíčku, ke kterému díl opravdu patří. Rig vozil se starou verzí
+  klády místo beden zboží.
+- **V3S bez kusových nákladů** (kolega `V3S-NAKLADY-PRO-HRU.md`, hráč: *„udělej v3s bez nákladů. pajda studentky a
+  kupy nech v grf u v3s“*): nový tar `V3S_3D-v1` (md5 c70b69cf…) má stavy `naklad` + `loze`. Kolegova prosba:
+  *„Když je `naklad.barva`, ber prosím ji místo barvy z tabulky.“*
+  - `naklad.barva` ve stavu → kus dostane vlastní barevný stav (jen kusy s maskou), přednost před tabulkou nákladů.
+  - Rig (`test3d kresli` teď kreslí stav s kusy s plnou korbou jako nákupní seznam): cihly červené i šedé, 6 prasat,
+    9 ovcí, 2 kravičky.
+  - **Klády (3,99 m) a prkna (4,0 m) se na korbu V3S (3,92 m) nevejdou**, auto se dřevem jede prázdné. Napsáno
+    kolegovi (kratší kus nebo delší `loze`).
+- Zvířata: `zvirata/objekty.json` od kolegy s `rozmer_nakladu` (prase 1,35 × 0,58, kravička 2,29 × 0,95, ovce
+  1,13 × 0,56).
+
 ## 26. 10. (17) – Trabant na návěsu a bordel kolem čarodějnice: nastavení OpenGL ve Winlatoru
 
 - Hráč (build #303, test 14): *„tady ve směru jihovychod byl vždycky návěs dump i valnik daleko od tahače. a taky

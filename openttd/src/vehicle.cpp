@@ -1230,6 +1230,19 @@ static std::vector<VehicleID> _road_consists_drawn;
 bool _draw_road_consists_whole = true;
 
 /**
+ * Whether a vehicle drawn in one entry with others (an articulated road vehicle whole, a semi-trailer with its tractor,
+ * AddThreeDVehicleObjectToViewport()) comes the first time in the block being drawn: it is drawn once, from whichever
+ * of its pieces the block holds.
+ * @param id the piece the entry is known by
+ */
+bool VehicleDrawnFirstInBlock(VehicleID id)
+{
+	if (std::find(_road_consists_drawn.begin(), _road_consists_drawn.end(), id) != _road_consists_drawn.end()) return false;
+	_road_consists_drawn.push_back(id);
+	return true;
+}
+
+/**
  * Draw an articulated road vehicle whole: one entry to sort, the hull of the boxes of all its parts, with the parts'
  * pictures as its children from the farthest to the nearest. The colleague's request (grrrrf
  * hra/razeni-dlouhych-aut, 12. 10.): the sets' lorries are long -- a Tatra with its trailer, a tractor with its
@@ -1304,6 +1317,20 @@ static void DrawRoadVehicleWhole(const Vehicle *first)
 		zmax = zmin + u->bounds.extent.z - 1;
 	}
 	std::stable_sort(parts.begin(), parts.end(), [](const Part &a, const Part &b) { return a.near < b.near; });
+	/* An article drawn over the one it is coupled behind (a semi-trailer reaching over its tractor's fifth wheel) comes
+	 * after that one, however near the viewer its tractor is (the colleague's hra/3d/TAHAC-NAVES-PORADI-PRO-HRU.md). */
+	extern const Vehicle *ThreeDVehicleDrawnOver(const Vehicle *v);
+	for (size_t i = 0; i < parts.size(); i++) {
+		const Vehicle *over = ThreeDVehicleDrawnOver(parts[i].v);
+		if (over == nullptr) continue;
+		auto later = std::find_if(parts.begin() + i + 1, parts.end(), [over](const Part &p) { return p.v == over; });
+		if (later == parts.end()) continue;
+		const Part moved = parts[i];
+		const size_t to = static_cast<size_t>(later - parts.begin());
+		parts.erase(parts.begin() + i);
+		parts.insert(parts.begin() + to, moved);
+		i--;
+	}
 	const Part &anchor = parts.front();
 	int ax = anchor.v->x_pos + anchor.v->bounds.origin.x + anchor.v->bounds.offset.x;
 	int ay = anchor.v->y_pos + anchor.v->bounds.origin.y + anchor.v->bounds.offset.y;
