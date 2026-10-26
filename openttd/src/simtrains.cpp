@@ -809,8 +809,8 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		prop(0x12); a0.push_back(0xFD);                // drawn from its model
 		prop(0x14); a0.push_back(static_cast<uint8_t>(e.capacity));
 		prop(0x15); a0.push_back(e.passengers ? 0x00 : 0xFF); // passengers, or the first goods it takes
-		prop(0x28); word(a0, e.passengers ? 0x0001 : 0xFFFE); // the classes of cargo it may be refitted to
-		prop(0x29); word(a0, e.passengers ? 0x0000 : 0x0001);
+		prop(0x28); word(a0, e.passengers ? 0x0001 : 0xFFFE); // the classes of cargo it may be refitted to: a goods wagon every one but passengers
+		prop(0x29); word(a0, e.passengers ? 0x0000 : 0x8001); // and not the road vehicles (CT_ROLA, special): the player's car carriers only
 		prop(0x16); a0.push_back(weight & 0xFF);
 		prop(0x24); a0.push_back(static_cast<uint8_t>(weight >> 8));
 		prop(0x17); a0.push_back(e.passengers ? 247 : 200);
@@ -862,7 +862,7 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		if (e.wagon) {
 			prop(0x15); a0.push_back(e.passengers ? 0x00 : 0xFF);
 			prop(0x28); word(a0, e.passengers ? 0x0001 : 0xFFFE);
-			prop(0x29); word(a0, e.passengers ? 0x0000 : 0x0001);
+			prop(0x29); word(a0, e.passengers ? 0x0000 : 0x8001);
 		}
 		prop(0x16); a0.push_back(0);
 		a0[2] = props;

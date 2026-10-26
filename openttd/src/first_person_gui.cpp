@@ -20,6 +20,7 @@
 
 #include "stdafx.h"
 #include "cab_view.h"
+#include "landscape.h"
 #include "window_gui.h"
 #include "window_func.h"
 #include "gfx_func.h"
@@ -128,6 +129,8 @@ static constexpr double FIRST_PERSON_BOARD_M = 5.0;
 static constexpr double FIRST_PERSON_PICK_M = 1.5;
 /** How near the middle of a door the walker opens it with E, metres. */
 static constexpr double FIRST_PERSON_DOOR_M = 1.6;
+/** Farther than this from where the walker last stood (put somewhere else, not walked there), it stands on the ground storey again, metres. */
+static constexpr double FIRST_PERSON_SETTLE_M = 2.0;
 
 /** How a weapon of the walker is used. */
 enum class WeaponUse : uint8_t {
@@ -250,11 +253,15 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 /**
  * Whether the walker can stand on a world point: not in a house, an industry's building (a field is walked), a
  * station's building (a platform or a stop is walked), an object, the water or off the map.
+ * @param stand the height it stands at there, units of height (FirstPersonStandZ()): up on a building (the dragon
+ *              castle's wall walks) only what stands over its feet is in its way; lower than the building's ground, on it
  */
-static bool FirstPersonWalkable(double x, double y)
+static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric_limits<double>::infinity())
 {
 	if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::SizeX() - 1) * TILE_SIZE || y >= (Map::SizeY() - 1) * TILE_SIZE) return false;
 	TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	/* The feet over the ground of a building whose north tile is origin. */
+	auto feet = [stand](TileIndex origin) { return std::max(0.0, stand - GetTileMaxPixelZ(origin)); };
 	switch (GetTileType(tile)) {
 		case TileType::Void:
 		case TileType::Object:
@@ -267,11 +274,12 @@ static bool FirstPersonWalkable(double x, double y)
 			const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
 			if (obj == nullptr) return false;
 			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
-			if (obj->Blocks(lx, ly)) return false;
+			const double up = feet(origin);
+			if (obj->Blocks(lx, ly, up)) return false;
 			/* Its interior's walls and seats, and the wings of its doors as they stand (the colleague's hra/3d/PROSBA-INTERIERY.md). */
-			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly, up)) return false;
 			for (size_t k = 0; k < obj->door_wings.size(); k++) {
-				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly)) return false;
+				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly, up)) return false;
 			}
 			return true;
 		}
@@ -285,11 +293,12 @@ static bool FirstPersonWalkable(double x, double y)
 				const double lx = x - TileX(tile) * TILE_SIZE, ly = y - TileY(tile) * TILE_SIZE;
 				const ThreeDObject *obj = forest->ground;
 				if (obj == nullptr) return true;
-				if (obj->Blocks(lx, ly)) return false;
+				const double up = feet(tile);
+				if (obj->Blocks(lx, ly, up)) return false;
 				/* The cabin's interior and the wings of its door, as a house's. */
-				if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+				if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly, up)) return false;
 				for (size_t k = 0; k < obj->door_wings.size(); k++) {
-					if (GetThreeDDoorWing(obj, tile, k)->Blocks(lx, ly)) return false;
+					if (GetThreeDDoorWing(obj, tile, k)->Blocks(lx, ly, up)) return false;
 				}
 				return true;
 			}
@@ -305,11 +314,12 @@ static bool FirstPersonWalkable(double x, double y)
 				return blocks.has_value() && !*blocks;
 			}
 			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
-			if (obj->Blocks(lx, ly)) return false;
+			const double up = feet(origin);
+			if (obj->Blocks(lx, ly, up)) return false;
 			/* Its interior's straw and troughs, and the wings of its doors, as a house's (the colleague's dragon castle). */
-			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly)) return false;
+			if (const ThreeDObject *in = GetThreeDInterior(obj); in != nullptr && in->IsRead() && in->Blocks(lx, ly, up)) return false;
 			for (size_t k = 0; k < obj->door_wings.size(); k++) {
-				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly)) return false;
+				if (GetThreeDDoorWing(obj, origin, k)->Blocks(lx, ly, up)) return false;
 			}
 			return true;
 		}
@@ -355,15 +365,33 @@ static bool FirstPersonIndoors(double x, double y)
 	return GetThreeDInterior(GetThreeDObjectWithRoomsAt(TileVirtXY(static_cast<int>(x), static_cast<int>(y)), origin)) != nullptr;
 }
 
-static bool FirstPersonFree(double x, double y)
+static bool FirstPersonFree(double x, double y, double stand = -std::numeric_limits<double>::infinity())
 {
-	if (!FirstPersonWalkable(x, y)) return false;
+	if (!FirstPersonWalkable(x, y, stand)) return false;
 	const double radius = FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
 	for (int k = 0; k < 8; k++) {
 		const double a = k * M_PI / 4;
-		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a))) return false;
+		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a), stand)) return false;
 	}
 	return true;
+}
+
+/**
+ * The walker where it stands now: up the stairs or down from where it stood a step before (FirstPersonStandZ()), on
+ * the ground storey where it was put somewhere else (FirstPersonGroundZ()).
+ */
+static void FirstPersonSettle(FirstPersonEye &w)
+{
+	const bool moved = std::hypot(w.x - w.stand_x, w.y - w.stand_y) > FIRST_PERSON_SETTLE_M * OBJECT_UNITS_PER_METRE;
+	w.stand_z = moved ? FirstPersonGroundZ(w.x, w.y) : FirstPersonStandZ(w.x, w.y, w.stand_z);
+	w.stand_x = w.x;
+	w.stand_y = w.y;
+}
+
+/** Whether the walker can go to a world point from where it stands, at the height it would stand at there. */
+static bool FirstPersonFreeFrom(const FirstPersonEye &w, double x, double y)
+{
+	return FirstPersonFree(x, y, FirstPersonStandZ(x, y, FirstPersonFeetZ(w)));
 }
 
 void ShowWalkerInventoryWindow();
@@ -431,7 +459,7 @@ struct FirstPersonWindow : Window {
 	{
 		const Vehicle *best = nullptr;
 		double best_d = FIRST_PERSON_BOARD_M * OBJECT_UNITS_PER_METRE;
-		const double ground = FirstPersonGroundZ(this->walker.x, this->walker.y);
+		const double ground = FirstPersonFeetZ(this->walker);
 		for (const Vehicle *u : Vehicle::Iterate()) {
 			if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship) continue;
 			if (u->vehstatus.Any({VehState::Hidden, VehState::Crashed})) continue;
@@ -786,19 +814,22 @@ struct FirstPersonWindow : Window {
 		/* Along a wall, sliding: each way on its own where both together would go into it (FirstPersonFree()); in
 		 * pieces, so that a run does not step over a thin wall. */
 		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
+		FirstPersonSettle(this->walker);
 		for (int i = 0; i < pieces; i++) {
 			const double px = dx / pieces, py = dy / pieces;
 			const double x = this->walker.x, y = this->walker.y;
-			if (FirstPersonFree(x + px, y + py)) {
+			if (FirstPersonFreeFrom(this->walker, x + px, y + py)) {
 				this->walker.x = x + px;
 				this->walker.y = y + py;
-			} else if (FirstPersonFree(x + px, y)) {
+			} else if (FirstPersonFreeFrom(this->walker, x + px, y)) {
 				this->walker.x = x + px;
-			} else if (FirstPersonFree(x, y + py)) {
+			} else if (FirstPersonFreeFrom(this->walker, x, y + py)) {
 				this->walker.y = y + py;
 			} else {
 				break;
 			}
+			/* Up a stair, or down off it. */
+			FirstPersonSettle(this->walker);
 		}
 	}
 
@@ -1045,7 +1076,7 @@ struct FirstPersonWindow : Window {
 		if (shape != nullptr) m.length_m = shape->x1;
 		m.x = this->walker.x + fx * 0.3 * OBJECT_UNITS_PER_METRE;
 		m.y = this->walker.y + fy * 0.3 * OBJECT_UNITS_PER_METRE;
-		m.z = FirstPersonGroundZ(this->walker.x, this->walker.y) + this->walker.eye_z + (fz * 0.3 - 0.12) * OBJECT_HEIGHT_PER_METRE;
+		m.z = FirstPersonFeetZ(this->walker) + this->walker.eye_z + (fz * 0.3 - 0.12) * OBJECT_HEIGHT_PER_METRE;
 		m.vx = fx * speed;
 		m.vy = fy * speed;
 		m.vz = fz * speed;
@@ -1477,7 +1508,7 @@ struct FirstPersonWindow : Window {
 			case WID_FP_CENTRE:
 				/* The map shows again: the view a window. */
 				if (this->full) this->ToggleFull();
-				ScrollMainWindowTo(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y), static_cast<int>(FirstPersonGroundZ(this->walker.x, this->walker.y)));
+				ScrollMainWindowTo(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y), static_cast<int>(FirstPersonFeetZ(this->walker)));
 				break;
 			case WID_FP_RUN:
 				this->running = !this->running;
@@ -1598,9 +1629,9 @@ std::string DescribeFirstPerson()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
+	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), nohy {:.2f} m nad zemi, smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
 			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE,
-			w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards);
+			(FirstPersonFeetZ(w->walker) - GetSlopePixelZOutsideMap(static_cast<int>(w->walker.x), static_cast<int>(w->walker.y))) / OBJECT_HEIGHT_PER_METRE, w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards);
 }
 
 /**
@@ -1793,7 +1824,7 @@ VehicleID RigFirstPersonBoard(const Vehicle *beside, bool press_e)
  */
 /**
  * The rig ('test3d chodec dum <x> <y> <metres x> <metres y> <degrees>'): the walker at a place of the house on a tile
- * (or of what else has rooms: the dragon castle, the forester's cabin), looking the way given (0 along +x).
+ * (or of what else has rooms: the dragon castle, the forester's cabin; elsewhere of the tile), looking the way given (0 along +x).
  */
 std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double heading_deg)
 {
@@ -1801,7 +1832,7 @@ std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double h
 	if (w == nullptr) return "zadny chodec";
 	TileIndex origin = tile;
 	const ThreeDObject *house = GetThreeDObjectWithRoomsAt(tile, origin);
-	if (house == nullptr && !IsTileType(tile, TileType::House)) return "tam neni dum";
+	if (house == nullptr && !IsTileType(tile, TileType::House)) origin = tile; // anywhere: from the tile's north corner (a bridge's ramp)
 	w->walker.x = TileX(origin) * TILE_SIZE + mx * OBJECT_UNITS_PER_METRE;
 	w->walker.y = TileY(origin) * TILE_SIZE + my * OBJECT_UNITS_PER_METRE;
 	w->walker.heading = heading_deg * M_PI / 180.0;
@@ -1814,7 +1845,7 @@ std::string RigFirstPersonAtHouse(TileIndex tile, double mx, double my, double h
 	w->SetDirty();
 	return fmt::format("dum {} interier {} uvnitr {} dvere {} (u dveri {}), vyska {:.2f} m nad zemi domu", house != nullptr ? house->name : std::string("zadny"), in != nullptr ? in->name : std::string("zadny"),
 			inside ? "ano" : "ne", house != nullptr ? house->door_wings.size() : 0, door.has_value() ? fmt::format("{}{}", door->door, ThreeDDoorOpen(door->origin, door->door) ? " otevrene" : " zavrene") : std::string("zadnych"),
-			(FirstPersonGroundZ(w->walker.x, w->walker.y) - GetTileMaxPixelZ(origin)) / OBJECT_HEIGHT_PER_METRE);
+			(FirstPersonFeetZ(w->walker) - GetTileMaxPixelZ(origin)) / OBJECT_HEIGHT_PER_METRE);
 }
 
 void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
@@ -1834,7 +1865,7 @@ void RigFirstPersonLookAt(const Vehicle *v, double metres, double angle_deg)
 /**
  * The rig: where the walker can stand about it, so many tiles each way, a character a half metre: '.' it can, '#' it
  * cannot (a house's wall), 'X' a house that is not a 3D object (all its tile), 'o' where it stands; the walker's circle
- * (FirstPersonFree()), as it walks.
+ * (FirstPersonFree()), as it walks, at the height it stands at (up on the dragon castle's walls, what stands over it).
  */
 std::string RigFirstPersonFreeMap(int tiles)
 {
@@ -1847,7 +1878,7 @@ std::string RigFirstPersonFreeMap(int tiles)
 		std::string line = "\n";
 		for (int c = -n; c <= n; c++) {
 			const double px = w->walker.x + c * step, py = w->walker.y + r * step;
-			char ch = FirstPersonFree(px, py) ? '.' : '#';
+			char ch = FirstPersonFree(px, py, FirstPersonFeetZ(w->walker)) ? '.' : '#';
 			if (ch == '#' && px >= 0 && py >= 0 && px < Map::SizeX() * TILE_SIZE && py < Map::SizeY() * TILE_SIZE) {
 				const TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
 				if (IsTileType(tile, TileType::House)) {
@@ -1901,10 +1932,12 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 		const double speed = FIRST_PERSON_WALK_MS * OBJECT_UNITS_PER_METRE * FIRST_PERSON_TICK_MS / 1000.0;
 		const double fx = std::cos(w->walker.heading), fy = std::sin(w->walker.heading);
 		const double nx = w->walker.x + (fx * ahead + fy * aside) * speed, ny = w->walker.y + (fy * ahead - fx * aside) * speed;
-		/* As the walker walks: its circle against the walls (FirstPersonFree()). */
-		if (FirstPersonFree(nx, ny)) {
+		/* As the walker walks: its circle against the walls (FirstPersonFree()), up the stairs. */
+		FirstPersonSettle(w->walker);
+		if (FirstPersonFreeFrom(w->walker, nx, ny)) {
 			w->walker.x = nx;
 			w->walker.y = ny;
+			FirstPersonSettle(w->walker);
 		}
 	}
 	w->MakePicture();

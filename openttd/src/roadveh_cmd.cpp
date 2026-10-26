@@ -19,6 +19,7 @@
 #include "pathfinder/yapf/yapf.h"
 #include "strings_func.h"
 #include "tunnelbridge_map.h"
+#include "bridge_map.h"
 #include "timer/timer_game_calendar.h"
 #include "timer/timer_game_economy.h"
 #include "vehicle_func.h"
@@ -1834,12 +1835,17 @@ again:
 
 /**
  * Whether a road vehicle driven freely from its cab (cab_drive.h) may go onto a tile: land, fields, trees (it drives
- * through them), roads and rails (over them anywhere, not only at a level crossing: the player, 21. 10.); not a house
- * or any building (it stops there, the player), water, a steep slope, a bridge's end, a tunnel or a depot.
+ * through them), roads and rails (over them anywhere, not only at a level crossing: the player, 21. 10.), the end of
+ * a bridge of rails or of a road along it (up its ramp, the player 26. 10.: "by car over the railway one, off-road");
+ * not a house or any building (it stops there, the player), water, a steep slope, a tunnel or a depot.
+ * @param enterdir the way it comes onto it, DiagDirection::Invalid not across an edge
  */
-static bool RoadVehFreeCanEnter(TileIndex tile)
+static bool RoadVehFreeCanEnter(TileIndex tile, DiagDirection enterdir)
 {
 	switch (GetTileType(tile)) {
+		case TileType::TunnelBridge:
+			return IsBridge(tile) && GetTunnelBridgeTransportType(tile) != TransportType::Water && enterdir != DiagDirection::Invalid &&
+					DiagDirToAxis(enterdir) == DiagDirToAxis(GetTunnelBridgeDirection(tile));
 		case TileType::Clear:
 		case TileType::Trees:
 			return !IsSteepSlope(GetTileSlope(tile));
@@ -1872,7 +1878,7 @@ std::string DescribeRoadVehFreeAhead(const Vehicle *v)
 	const TileIndex tile = TileVirtXY(x, y);
 	if (tile == v->tile) return fmt::format("stejna dlazdice {},{}", TileX(tile), TileY(tile));
 	return fmt::format("dlazdice {},{} typu {}{} {}", TileX(tile), TileY(tile), to_underlying(GetTileType(tile)),
-			IsRoadDepotTile(tile) ? " (depo)" : "", RoadVehFreeCanEnter(tile) ? "lze vjet" : "NELZE VJET");
+			IsRoadDepotTile(tile) ? " (depo)" : "", RoadVehFreeCanEnter(tile, DiagdirBetweenTiles(v->tile, tile)) ? "lze vjet" : "NELZE VJET");
 }
 
 /**
@@ -1914,6 +1920,29 @@ static bool RoadVehRejoinRoad(RoadVehicle *v, TileIndex tile, DiagDirection ente
 	RoadVehLayChainBehind(v, tile, ReverseDiagDir(enterdir));
 	Debug(misc, 5, "road vehicle {} back on the road at {},{} trackdir {}", v->unitnumber, TileX(tile), TileY(tile), to_underlying(td));
 	return true;
+}
+
+/**
+ * The deck of the bridge over a tile, for a road vehicle driven freely from its cab that is up there: as high as the
+ * deck already, or up the bridge's ramp to it (not on the road under the bridge). -1 none.
+ */
+static int RoadVehFreeBridgeDeck(const RoadVehicle *v, TileIndex tile)
+{
+	if (!IsBridgeAbove(tile)) return -1;
+	const int deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	return v->z_pos >= deck - TILE_HEIGHT / 2 ? deck : -1;
+}
+
+/** The height of a piece of a road vehicle driven freely from its cab, where it now is: on a bridge's deck, or on the ground (its ramp). */
+static int RoadVehFreeHeight(RoadVehicle *u)
+{
+	const int deck = RoadVehFreeBridgeDeck(u, u->tile);
+	if (deck < 0) return u->UpdateInclination(true, true);
+	const int old_z = u->z_pos;
+	u->z_pos = deck;
+	u->gv_flags.Reset({GroundVehicleFlag::GoingUp, GroundVehicleFlag::GoingDown});
+	u->UpdateViewport(true, true);
+	return old_z;
 }
 
 /**
@@ -1962,7 +1991,7 @@ static void RoadVehPullChain(RoadVehicle *v)
 		u->x_pos = x;
 		u->y_pos = y;
 		u->UpdatePosition();
-		u->UpdateInclination(true, true);
+		RoadVehFreeHeight(u);
 		u->UpdateViewport(true, true);
 	}
 }
@@ -1984,8 +2013,13 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 	bool new_tile = tile != v->tile;
 	if (new_tile) {
 		DiagDirection enterdir = DiagdirBetweenTiles(v->tile, tile);
-		if (v->cab_rejoin && enterdir != DiagDirection::Invalid && RoadVehRejoinRoad(v, tile, enterdir)) return true;
-		if (!RoadVehFreeCanEnter(tile)) return false;
+		/* Along a bridge's deck, whatever is under it; off its side or its ends only where the ground is (its ramp):
+		 * the railings. */
+		const bool on_deck = RoadVehFreeBridgeDeck(v, v->tile) >= 0;
+		const bool along_deck = RoadVehFreeBridgeDeck(v, tile) >= 0 && enterdir != DiagDirection::Invalid && DiagDirToAxis(enterdir) == GetBridgeAxis(tile);
+		if (on_deck && !along_deck && !(IsBridgeTile(tile) && RoadVehFreeCanEnter(tile, enterdir))) return false;
+		if (!along_deck && v->cab_rejoin && enterdir != DiagDirection::Invalid && RoadVehRejoinRoad(v, tile, enterdir)) return true;
+		if (!along_deck && !RoadVehFreeCanEnter(tile, enterdir)) return false;
 		v->tile = tile;
 	}
 	v->cab_px = px;
@@ -1994,7 +2028,7 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 	v->x_pos = x;
 	v->y_pos = y;
 	v->UpdatePosition();
-	RoadZPosAffectSpeed(v, v->UpdateInclination(true, true));
+	RoadZPosAffectSpeed(v, RoadVehFreeHeight(v));
 	RoadVehPullChain(v);
 	return true;
 }

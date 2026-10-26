@@ -877,8 +877,9 @@ std::vector<uint8_t> MakeGrf(const BeamngVehicle &v)
 	prop(0x0E); a0.push_back(0xFF);                // the set's own sprites: drawn from its model (GetThreeDVehicleObjectSprite())
 	prop(0x0F); a0.push_back(static_cast<uint8_t>(v.capacity));
 	prop(0x10); a0.push_back(v.goods ? 0xFF : 0x00); // passengers, or the first goods it takes
-	prop(0x1D); word(a0, v.goods ? 0xFFFE : 0x0001); // the classes of cargo it may be refitted to
-	prop(0x1E); word(a0, v.goods ? 0x0001 : 0x0000);
+	/* Refitted to every cargo the game has (the player, 26. 10.: "give the BeamNG cars all the cargoes in the game"). */
+	prop(0x1D); word(a0, 0xFFFF);                  // the classes of cargo it may be refitted to: all
+	prop(0x1E); word(a0, 0x0000);                  // and none left out
 	prop(0x11); a0.push_back(cost);
 	prop(0x09); a0.push_back(running);
 	prop(0x13); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(hp / 10)), 1, 255)));       // power, 10 hp
@@ -1660,6 +1661,71 @@ void PrepareBeamngGrfs()
 }
 
 /**
+ * A wheel of the game's own on a car whose mod has none (ReadBeamngShape()): a tyre, its tread and its two sides, and a
+ * grey rim filling it, about the line between two hub nodes (metres in the axes of BeamNG) at their middle.
+ * @param r its radius, metres
+ * @param width the tyre's width, metres
+ * @param rim the rim's radius, metres
+ */
+static void AddBeamngWheel(BeamngMesh &mesh, const CarFrame &frame, const std::array<double, 3> &a, const std::array<double, 3> &b, double r, double width, double rim)
+{
+	auto material = [&](const char *name, uint32_t colour) {
+		for (size_t i = 0; i < mesh.materials.size(); i++) {
+			if (mesh.materials[i].name == name) return static_cast<uint8_t>(i);
+		}
+		if (mesh.materials.size() >= 255) return static_cast<uint8_t>(0);
+		BeamngMesh::Material m;
+		m.name = name;
+		m.flat = colour;
+		mesh.materials.push_back(std::move(m));
+		return static_cast<uint8_t>(mesh.materials.size() - 1);
+	};
+	const uint8_t tyre = material("wheel of the game: tyre", 0xFF1E1E1E), metal = material("wheel of the game: rim", 0xFF9C9C9C);
+	/* Its axis, and two ways across it. */
+	double ax[3] = {b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+	const double len = std::sqrt(ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]);
+	if (len < 1e-6) return;
+	for (double &c : ax) c /= len;
+	const double mid[3] = {(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2};
+	double u[3] = {0, 0, 1};
+	if (std::abs(ax[2]) > 0.9) u[0] = 1, u[2] = 0;
+	double w[3] = {ax[1] * u[2] - ax[2] * u[1], ax[2] * u[0] - ax[0] * u[2], ax[0] * u[1] - ax[1] * u[0]};
+	const double wl = std::sqrt(w[0] * w[0] + w[1] * w[1] + w[2] * w[2]);
+	for (double &c : w) c /= wl;
+	const double v2[3] = {w[1] * ax[2] - w[2] * ax[1], w[2] * ax[0] - w[0] * ax[2], w[0] * ax[1] - w[1] * ax[0]};
+	auto corner = [&](double radius, double angle, double side, const double *n) {
+		double p[3];
+		for (int k = 0; k < 3; k++) p[k] = mid[k] + ax[k] * side * width / 2 + (w[k] * std::cos(angle) + v2[k] * std::sin(angle)) * radius;
+		auto o = ToObject(frame, p[0], p[1], p[2]);
+		mesh.pos.insert(mesh.pos.end(), o.begin(), o.end());
+		/* (The normal into the object's axes as the meshes' are.) */
+		mesh.nrm.push_back(static_cast<float>(-n[1]));
+		mesh.nrm.push_back(static_cast<float>(n[0]));
+		mesh.nrm.push_back(static_cast<float>(n[2]));
+		mesh.uv.insert(mesh.uv.end(), {0.5f, 0.5f});
+	};
+	auto quad = [&](uint8_t tex, std::array<double, 4> radii, std::array<double, 4> angles, std::array<double, 4> sides, const std::array<double, 3> &n0, const std::array<double, 3> &n1) {
+		const uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
+		for (int k = 0; k < 4; k++) corner(radii[k], angles[k], sides[k], (k == 1 || k == 2) ? n1.data() : n0.data());
+		mesh.tri.insert(mesh.tri.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+		mesh.tri_tex.insert(mesh.tri_tex.end(), {tex, tex});
+	};
+	constexpr int SEGMENTS = 16;
+	for (int i = 0; i < SEGMENTS; i++) {
+		const double t0 = i * 2 * M_PI / SEGMENTS, t1 = (i + 1) * 2 * M_PI / SEGMENTS;
+		auto out = [&](double t) { return std::array<double, 3>{w[0] * std::cos(t) + v2[0] * std::sin(t), w[1] * std::cos(t) + v2[1] * std::sin(t), w[2] * std::cos(t) + v2[2] * std::sin(t)}; };
+		const std::array<double, 3> o0 = out(t0), o1 = out(t1);
+		/* The tread, and each side: the tyre's ring, and the rim inside it a little sunk. */
+		quad(tyre, {r, r, r, r}, {t0, t1, t1, t0}, {-1, -1, 1, 1}, o0, o1);
+		for (double side : {-1.0, 1.0}) {
+			const std::array<double, 3> n = {ax[0] * side, ax[1] * side, ax[2] * side};
+			quad(tyre, {rim, r, r, rim}, {t0, t0, t1, t1}, {side, side, side, side}, n, n);
+			quad(metal, {0, rim, rim, 0}, {t0, t0, t1, t1}, {side * 0.8, side * 0.8, side * 0.8, side * 0.8}, n, n);
+		}
+	}
+}
+
+/**
  * Read a car's model for drawing: the meshes its flexbodies name, each where its flexbody puts it ("pos", "rot" in
  * degrees about x, y and z, "scale"; else where its node in the .dae is), in the frame of the vehicle objects; the
  * materials' colours, textures and paint; the body's holes cut by its mask; the glass of its lights and where they are.
@@ -1779,6 +1845,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 
 	/* The flexbodies of the parts: a mesh, its groups, and where it is put. */
 	int meshes = 0, missing = 0;
+	std::set<std::string> drawn_groups; // the groups of nodes the meshes drawn hang on (a wheel's "wheel_FR", "tire_FR")
 	for (const JValue *part : parts.used) {
 		const JValue *flex = part->Get("flexbodies");
 		if (flex == nullptr || !flex->IsArray()) continue;
@@ -1792,6 +1859,11 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				continue;
 			}
 			meshes++;
+			if (row.items.size() > 1 && row.items[1].IsArray()) {
+				for (const JValue &g : row.items[1].items) {
+					if (g.IsString()) drawn_groups.insert(g.text);
+				}
+			}
 			/* Its placing: "pos", "rot" (degrees, about x, then y, then z), "scale"; the node's matrix of the .dae before it. */
 			double pos[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
 			for (size_t i = 1; i < row.items.size(); i++) {
@@ -1869,6 +1941,38 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			}
 		}
 	}
+	/*
+	 * Its wheels the mod leaves to BeamNG's own parts (the player, 26. 10.: the Škoda 1203 "has no wheels": its
+	 * "S1203_wheel_F", tyres and hubcaps are in none of its files): for each wheel no mesh hangs on, a wheel of its own on
+	 * its hub -- a tyre of the wheel's radius and a grey rim, between its two hub nodes.
+	 */
+	int made_wheels = 0;
+	for (const JValue *part : parts.used) {
+		for (const char *kind : {"pressureWheels", "hubWheels", "hubWheelsTSV", "pressureWheelsTSV"}) {
+			const JValue *wheels = part->Get(kind);
+			if (wheels == nullptr || !wheels->IsArray()) continue;
+			double r = 0.3, width = 0.17, hub = 0;
+			for (const JValue &row : wheels->items) {
+				if (row.IsObject()) {
+					for (const auto &[k, val] : row.members) {
+						if (k == "radius" && val.type == JValue::Type::Number) r = val.number;
+						if (k == "tireWidth" && val.type == JValue::Type::Number) width = val.number;
+						if (k == "hubRadius" && val.type == JValue::Type::Number) hub = val.number;
+					}
+					continue;
+				}
+				if (!row.IsArray() || row.items.size() < 5 || !row.items[0].IsString() || row.items[0].text == "name") continue;
+				if (!row.items[3].IsString() || !row.items[4].IsString()) continue;
+				const std::string hub_group = row.items[1].IsString() ? row.items[1].text : std::string();
+				const std::string tire_group = row.items[2].IsString() ? row.items[2].text : std::string();
+				if ((!hub_group.empty() && drawn_groups.contains(hub_group)) || (!tire_group.empty() && drawn_groups.contains(tire_group))) continue;
+				auto n1 = parts.nodes.find(row.items[3].text), n2 = parts.nodes.find(row.items[4].text);
+				if (n1 == parts.nodes.end() || n2 == parts.nodes.end()) continue;
+				AddBeamngWheel(mesh, frame, n1->second, n2->second, r, width, hub > 0 ? hub : r * 0.62);
+				made_wheels++;
+			}
+		}
+	}
 	if (mesh.tri.empty()) return false;
 	const size_t full = mesh.tri.size() / 3;
 	Simplify(mesh, 0.02f);
@@ -1893,7 +1997,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			if (!known) list.insert(list.end(), o.begin(), o.end());
 		}
 	}
-	Debug(misc, 1, "BeamNG {}: {} meshes ({} not in the model), {} triangles ({} in the model), {} materials, {} of glass, lights {} ahead and {} at the back",
-			v.name, meshes, missing, mesh.tri.size() / 3, full, mesh.materials.size(), mesh.night_tri.size() / 3, mesh.front_lights.size() / 3, mesh.back_lights.size() / 3);
+	Debug(misc, 1, "BeamNG {}: {} meshes ({} not in the model), {} wheels of the game's own, {} triangles ({} in the model), {} materials, {} of glass, lights {} ahead and {} at the back",
+			v.name, meshes, missing, made_wheels, mesh.tri.size() / 3, full, mesh.materials.size(), mesh.night_tri.size() / 3, mesh.front_lights.size() / 3, mesh.back_lights.size() / 3);
 	return true;
 }

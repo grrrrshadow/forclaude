@@ -269,6 +269,7 @@ struct ThreeDObject {
 	int8_t door_turn = 0;                     ///< by 0, +90 or -90 degrees
 	std::vector<float> floor;                 ///< an interior's floors: x, y, z of each corner of each triangle, world units (FloorAt())
 	std::vector<ThreeDObjectFigure> dragon_places; ///< "mista_draku" (the dragon farm): where each of its dragons stands, its creature ("drak") as figure
+	std::vector<uint8_t> dragon_places_in;     ///< and of each whether it is inside ("kde": "sin", the dragon castle's hall): its dragon flies in through the nearest door
 	std::vector<size_t> hay;                  ///< "seno" "uzly" (the dragon farm): its heaps of hay, each an object of its node alone, shown as many as it has (DragonFarmHay())
 	std::optional<double> FloorAt(double x, double y, double up_to) const;
 	bool street = false;              ///< a street lamp (GetThreeDStreetLamp()): sorted among the vehicles by its own extent, not its tile's
@@ -313,7 +314,7 @@ struct ThreeDObject {
 	ThreeDObjectShapeView GetShape(int level) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, uint32_t paint = 0) const;
 	ThreeDObjectShapeView TryGetShape(int level) const;
-	bool Blocks(double x, double y) const;
+	bool Blocks(double x, double y, double feet = 0) const;
 	void Forget() const;
 	ThreeDObjectTexture Painted(const ThreeDObjectTexture &plain, uint32_t paint) const;
 
@@ -321,6 +322,7 @@ struct ThreeDObject {
 
 	mutable std::vector<uint8_t> footprint; ///< what of it stands as high as a body, cells of a 64th of a tile (Blocks()), made the first time
 	mutable int footprint_w = 0;            ///< the cells across x, 0 not made yet
+	mutable std::map<int, std::vector<uint8_t>> footprints_up; ///< up on it: what stands as high as a body over feet so many steps up (Blocks())
 	uint32_t PaintAt(TileIndex origin) const;
 };
 
@@ -908,6 +910,7 @@ const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);
+const ThreeDObject *GetThreeDObjectToStandOnAt(TileIndex tile, TileIndex &origin);
 const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin);
 const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj);
 bool ThreeDInsideInterior(const ThreeDObject *house, double x, double y);

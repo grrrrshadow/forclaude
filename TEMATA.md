@@ -31,6 +31,33 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (1) – chůze nahoru: hradby, střecha síně, most; auto přes most; draci do síně; kolegův hrad z modulů
+
+- **Hráč: „1–5, pak build a po buildu GPU“** (1 let draka do síně, 2 kolegův hrad z modulů a zřícenina s rozhlednou
+  a jeskyní, 3 chůze po schodech a hradbách, 4 noční světla, 5 odpověď kolegovi). Během toho: posed „bude chodit do
+  schodů“ (žádný žebřík), „a na most“, „autem po železničním offroad“; autům BeamNG všechny náklady.
+- **Převzato `78fd302` a `60ba2ab`:** hrad z modulů (věž a zeď 4×, otočené uzly – čtení glb bere u uzlů celé TRS),
+  zřícenina s rozhlednou a jeskyní. Zřícenina v naší kopii dál bez `"prumysl"` (farma = hrad).
+- **Chodec stojí ve výšce** (`FirstPersonEye::stand_z`, `FirstPersonStandZ()`): nejvyšší z toho, na čem se dá stát,
+  nejvýš krok 0,45 m nad tím, kde stál – `podlaha` obalu průmyslu i interiéru (schody, ochozy, střecha síně),
+  mostovka nad dlaždicí, jinak zem; na rampě mostu rampa jako pro auto (propad na rampě z testu 4 pryč). Jinam
+  postavený (dál než 2 m od posledního místa) stojí na přízemí jako dřív (`FirstPersonGroundZ()`).
+- **Překážky podle výšky** (`Blocks(x, y, nohy)`): nahoře půdorys toho, co stojí od kolen po hlavu nad nohama,
+  po krocích 0,25 m (`footprints_up`) – zdi pod nohama nepřekážejí, cimbuří ano. Rig: chodec vyjde po schodech
+  0 → 3,4 → 7 m, jde po zadním ochozu, zastaví ho rozhledna; mapa volna v 7 m ukazuje cimbuří síně a rozhlednu.
+- `podlaha` se kreslí (schody jsou jen v ní) a čte se i u dílů lesa (schody posedu, až je kolega udělá).
+- **Most:** chodec po rampě 0,4 → 2,3 m, po mostovce 3 m nad tratí, dolů. **Auto mimo silnici** najede na hlavu
+  mostu po jeho ose, jede po mostovce (i přes železnici pod ní), bokem z ní nesjede, přívěsy nahoře s ním
+  (`RoadVehFreeBridgeDeck()`); rig: autobus 8 → 16 → 16 → 8.
+- **Draci farmy přilétají a odlétají** (12 s, `FARM_LAND_TICKS`): na nádvoří shora, na střechu síně do 7 m, do síně
+  („kde": "sin") před vjezd, jím ve 3 m dovnitř a na slámu; zase ven stejnou cestou.
+- **Noc v materiálech:** noční trojúhelníky každý ve své textuře (lucerna rozhledny a louč jeskyně zříceniny mají
+  vlastní atlas, kreslily se z velkého).
+- **BeamNG:** auta přestavitelná na všechny náklady hry; kola, která mod nechává na dílech BeamNG (1203:
+  `S1203_wheel_F/R`, pneumatiky, poklice v žádném souboru), hra kreslí vlastní (pneu a disk) na náboj.
+  Varianty 1203 (VB, valník, dodávky – `cotamje.md` z testu 4) jako samostatná auta: další krok.
+- Simtrains: nákladní vagony bez vození aut (Rola jen vozy hráče).
+
 ## 25. 10. (10) – sdílené textury přes uri, interiér dračího hradu a srubu hajného
 
 - **Textury přes `uri`** (`274dfe9`, kolegova volba 1): obrázek glb může být soubor vedle .glb (cesta relativně ke

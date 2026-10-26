@@ -145,6 +145,8 @@ struct FirstPersonEye {
 	double heading = 0;   ///< radians, the world direction it looks along (atan2 of y, x)
 	double pitch = 0;     ///< radians, looking up (positive) or down
 	double eye_z = 0;     ///< its eyes over the ground, units of height
+	double stand_z = 0;   ///< the height it stands at, units of height (FirstPersonStandZ()): up the stairs of the dragon castle, on a bridge
+	double stand_x = -1, stand_y = -1; ///< where it stood at that height; anywhere else, on the ground storey (FirstPersonFeetZ())
 	ThreeDHeldThing held; ///< the thing in its hands
 	ThreeDHeldThing left; ///< the light in its left hand (the torch, the lantern), lighting about it at night
 	uint32_t light_colour = 0; ///< that light's colour (Colour::data), 0 none
@@ -153,6 +155,8 @@ struct FirstPersonEye {
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);
+double FirstPersonStandZ(double x, double y, double from);
+double FirstPersonFeetZ(const FirstPersonEye &walker);
 void ShowFirstPersonWindow();
 void ShowFirstPersonWindowAt(TileIndex tile);
 

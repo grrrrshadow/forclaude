@@ -2961,8 +2961,8 @@
   "noc": {
    "uzel": "noc",
    "den": "den",
-   "svetla": 11,
-   "poznamka": "v noci ukaž uzel noc: plameny pochodní na zdech a oheň v ohništi (stejný atlas); den je prázdný; svetlo_NN jsou místa záře"
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc: plameny pochodní na zdech a oheň v ohništi (stejný atlas), od 25. 10. i jeho dítě noc_pridavky (lucerna na rozhledně a louč u jeskyně, atlas přídavků); den je prázdný; svetlo_NN jsou místa záře"
   },
   "pruchody": [
    {
@@ -3117,7 +3117,8 @@
      0.0
     ],
     "otoceni": 36.3,
-    "drak": "drak_hnedy"
+    "drak": "drak_hnedy",
+    "kde": "nadvori"
    },
    {
     "poloha": [
@@ -3126,7 +3127,8 @@
      0.0
     ],
     "otoceni": 128.7,
-    "drak": "drak_cerny"
+    "drak": "drak_cerny",
+    "kde": "nadvori"
    },
    {
     "poloha": [
@@ -3135,7 +3137,9 @@
      0.0
     ],
     "otoceni": 221.6,
-    "drak": "drak_hnedy"
+    "drak": "drak_hnedy",
+    "kde": "jeskyne",
+    "poznamka": "v jeskyni (zřícená klenutá místnost zarostlá v kopci u východní hradby, ústí 8 m ke kupě sena)"
    },
    {
     "poloha": [
@@ -3144,9 +3148,18 @@
      0.0
     ],
     "otoceni": 354.0,
-    "drak": "drak_kraci"
+    "drak": "drak_kraci",
+    "kde": "nadvori"
    }
   ],
+  "rozhledna": {
+   "uzel": "rozhledna",
+   "poznamka": "dřevěná vyhlídka na 11 m věži ve východním rohu: plošina z prken na koruně, zábradlí, čtyři sloupky se šindelovou stříškou, prapor, lucerna v noci"
+  },
+  "jeskyne": {
+   "uzel": "jeskyne",
+   "poznamka": "zřícená klenutá místnost zarostlá v kamenném kopci 7 m u východní hradby, ústí 8 × 5,7 m ke kupě sena, uvnitř klenba z kamene a kosti, u ústí pahýly zdí, zlomený překlad, kvádry a louč; leží v ní třetí drak (mista_draku 3, kde jeskyne)"
+  },
   "postavy_s_holkami": [
    {
     "postava": "college_girl_stoji",
@@ -3191,7 +3204,7 @@
   ],
   "autor": "grrrrf: vlastní model domy/draci_farma.py (stavebnice domů, upečeno domy/dum_objekt.py), složení prumysl/draci_farma.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy",
+  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). Od 25. 10. (hráč: „na zřicenině udělej taky rozhlednu a jeskyni zřicenou mistnost s drakem“): dřevěná rozhledna na 11 m věži a jeskyně, zřícená klenutá místnost v kopci u východní hradby, kde leží třetí drak (prumysl/draci_zricenina.py, 780 trojúhelníků, vlastní atlas 256 px). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy",
   "poznamka_hry": "hra 25. 10.: dračí farma má vzhled draci_hrad (hráč: „ten hrad bude hezčí“), tahle zřícenina už průmysl není"
  },
  {
@@ -4111,7 +4124,7 @@
    {
     "cast": "kamen",
     "maska": "draci_hrad_maska_kamen.png",
-    "zacatek": 168,
+    "zacatek": 160,
     "paleta": [
      "A8A296",
      "B8A888",
@@ -4128,7 +4141,7 @@
   "noc": {
    "uzel": "noc",
    "den": "den",
-   "svetla": 20,
+   "svetla": 22,
    "poznamka": "v noci ukaž uzel noc: plameny loučí na ochozech hradeb, u brány, u vjezdu do síně, na střeše síně a uvnitř; den je prázdný; svetlo_NN jsou místa záře (u každého plamene)"
   },
   "pruchody": [
@@ -4154,7 +4167,7 @@
      -1,
      0
     ],
-    "sirka": 1.6
+    "sirka": 5.0
    },
    {
     "poloha": [
@@ -4166,11 +4179,11 @@
      1,
      0
     ],
-    "sirka": 1.6
+    "sirka": 5.0
    },
    {
     "poloha": [
-     35.2,
+     22.2,
      44.4,
      0.0
     ],
@@ -4178,7 +4191,8 @@
      0,
      1
     ],
-    "sirka": 1.6
+    "sirka": 5.0,
+    "poznamka": "zadní brána vede rovnou do dračí síně"
    }
   ],
   "seno": {
@@ -4230,14 +4244,14 @@
    },
    {
     "poloha": [
-     22.2,
-     34.0,
+     16.4,
+     32.6,
      7.0
     ],
     "otoceni": 270.0,
     "drak": "drak_hnedy",
     "kde": "strecha",
-    "poznamka": "na střeše síně (terasa ve výšce ochozu, z 7 m)"
+    "poznamka": "na střeše síně vedle rozhledny (terasa ve výšce ochozu, z 7 m)"
    }
   ],
   "postavy_s_holkami": [
@@ -4299,18 +4313,34 @@
     ],
     "sirka": 9.0,
     "poznamka": "vjezd do dračí síně 9 × 6 m bez křídla (drak musí ven i dovnitř)"
+   },
+   {
+    "poloha": [
+     22.2,
+     42.4,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 5.0,
+    "poznamka": "zadní brána hradby (stejná jako ostatní tři) vede rovnou do síně, bez křídla"
    }
   ],
   "interier": {
    "soubor": "draci_hrad_interier.glb",
-   "poznamka": "dračí síň uvnitř (hráč: „dole byla mistnost s drakem“): rámec hradu, celá síň i se střechou, cimbuřím a loučemi na ní (uvnitř obrysu síně hrad nekreslíš), podlaha z kamenných desek (podlaha; střecha síně jako horní patro podlaha_1 ve výšce 7 m), sláma pro draka, žlab se senem, kosti, dvě louče na zadní zdi (noc, svetlo_NN); vnitřek 17 × 10.7 m, strop 6.4 m; 770 trojúhelníků, 298 kB"
+   "poznamka": "dračí síň uvnitř (hráč: „dole byla mistnost s drakem“): rámec hradu, celá síň i se střechou, cimbuřím a loučemi na ní (uvnitř obrysu síně hrad nekreslíš), podlaha z kamenných desek (podlaha; střecha síně jako horní patro podlaha_1 ve výšce 7 m), sláma pro draka, dva žlaby se senem, kosti, rozhledna na střeše, louče (noc, svetlo_NN); vnitřek 17 × 10.7 m, strop 6.4 m; 1126 trojúhelníků, 303 kB"
   },
   "podlaha": {
    "uzel": "podlaha",
-   "poznamka": "po čem se chodí venku (hráč: „zvenku schody nahoru na střechu te mistnosti, na hradby“): dvoje schody (stupně 0.2 × 0.3 m, 34°, šířka 1.8 m: podél síně na její střechu a k zadnímu ochozu, u brány na přední ochoz), ochozy na hradbách ve výšce 7 m (za cimbuřím, kolem dokola: věže mají v patře průchod z obou hradeb), střecha síně jako terasa ve stejné výšce, podlahy věží; stejně jako podlaha interiéru (chodec na nejvyšší podlaze pod ním), jen výš než 2,5 m"
+   "poznamka": "po čem se chodí venku (hráč: „zvenku schody nahoru na střechu te mistnosti, na hradby“): prázdný uzel, jeho děti jsou kopie sítí s vlastní polohou a otočením: schody_00 a schody_01 (tytéž schody z obou stran síně, stupně 0.2 × 0.3 m, 34°, šířka 1.8 m, na střechu síně a k zadnímu ochozu), zed_vrch_00–03 (ochozy na hradbách ve výšce 7 m, za cimbuřím, kolem dokola), vez_vrch_00–03 (podlahy věží v patře, ochoz jimi prochází), sin_vrch (střecha síně jako terasa ve stejné výšce); stejně jako podlaha interiéru (chodec na nejvyšší podlaze pod ním), jen výš než 2,5 m"
   },
   "autor": "grrrrf: vlastní model prumysl/draci_hrad.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“): hradby 7 m s ochozem a cimbuřím kolem dokola, čtyři nárožní věže (ochoz jimi prochází), brána s vytaženou mříží a branky v ostatních zdech (průchody ze všech stran), dračí síň u zadní zdi s vjezdem 9 × 6 m, její střecha jako terasa na úrovni ochozu, venkovní schody na ni a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení, prapory na předních věžích. 5194 trojúhelníků (dnešní zřícenina 14 864), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)"
+  "moduly": {
+   "poznamka": "hrad je složený z kopií: zed (hradba s bránou, cimbuřím a loučemi) 4× (zed_00–03), vez (nárožní věž) 4× (vez_00–03), obojí otočené po 90° kolem středu pozemku; schod 2×; síň jednou (souměrná); v souboru je každá síť jednou, uzly ji kreslí s vlastní polohou a otočením (jako seno_NN)"
+  },
+  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“; potom: „modularni čtyři stejny věžičky, čtyři zdi mezi věžičkama a pak mistnost s rozhlednou a schodama tak zrcadlově leva stejna jako prava“): hradby 7 m s ochozem a cimbuřím kolem dokola, v každé brána s vytaženou mříží (průchody ze všech stran, zadní vede do síně), čtyři stejné nárožní věže s praporem (ochoz jimi prochází), souměrná dračí síň u zadní zdi s vjezdem 9 × 6 m uprostřed, rozhlednou na střeše a schody z obou stran na střechu (terasa na úrovni ochozu) a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení. Hra kreslí 5096 trojúhelníků (dnešní zřícenina 14 864), v souboru je každý modul jednou (2372), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)"
  }
 ]

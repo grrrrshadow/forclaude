@@ -18,6 +18,7 @@
 #include "water_cmd.h"
 #include "road_cmd.h"
 #include "roadveh.h"
+#include "cab_drive.h"
 #include "industry.h"
 #include "town.h"
 #include "town_cmd.h"
@@ -10325,6 +10326,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
+	} else if (what == "jizda_na" && argv.size() > 5) {
+		/* 'jizda_na <unit> <x> <y> <yaw>': a road vehicle driven freely put on the middle of a tile at a heading
+		 * (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it. */
+		auto unit = number(2), x = number(3), y = number(4), yaw = number(5);
+		for (Vehicle *u : Vehicle::Iterate()) {
+			if (u->type != VehicleType::Road || !u->IsPrimaryVehicle() || !unit.has_value() || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			AutoRestoreBackup cur_company(_current_company, u->owner);
+			if (!u->cab_free) Command<Commands::CabDrive>::Do(DoCommandFlag::Execute, u->index, 0);
+			RoadVehicle *v = RoadVehicle::From(u);
+			v->x_pos = static_cast<int>(*x) * TILE_SIZE + TILE_SIZE / 2;
+			v->y_pos = static_cast<int>(*y) * TILE_SIZE + TILE_SIZE / 2;
+			v->tile = TileVirtXY(v->x_pos, v->y_pos);
+			v->cab_px = v->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			v->cab_py = v->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+			v->cab_yaw = static_cast<uint8_t>(yaw.value_or(0) & (CAB_YAW_TURN - 1));
+			v->direction = CabYawToDirection(v->cab_yaw);
+			v->UpdatePosition();
+			v->UpdateInclination(true, true);
+			IConsolePrint(CC_DEFAULT, "test3d: jizda_na {}: volne {} na {},{},{} yaw {}", *unit, v->cab_free, v->x_pos, v->y_pos, v->z_pos, v->cab_yaw);
+			return true;
+		}
+		IConsolePrint(CC_ERROR, "test3d: jizda_na: takove auto neni.");
 	} else if (what == "autojizda" && argv.size() > 3) {
 		/* 'autojizda <type> <unit>': Up pressed twice from the cab, as the player presses it (CabArrows::Drive(), 40 ms a
 		 * look): its speed limit before, after one press and after the second (0 is full speed). */

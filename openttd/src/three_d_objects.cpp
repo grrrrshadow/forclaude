@@ -1924,6 +1924,38 @@ static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
 	}
 	obj.night_uv = std::move(night.uv);
 	obj.night_tri = std::move(night.tri);
+	/* Each night triangle in its material's texture, as by day (TakeGlbMesh()): the colleague's ruin has the lantern
+	 * of its lookout and the torch at its cave in an atlas of their own, which drew in the ruin's. Its own texture
+	 * where the picture is its own (the castle's flames, another material of the same atlas). */
+	if (night.tri_tex.size() == obj.night_tri.size() / 3) {
+		std::vector<int> number(night.textures.size(), -1);
+		std::vector<uint8_t> tex(night.tri_tex.size(), 0);
+		bool other = false;
+		for (size_t t = 0; t < night.tri_tex.size(); t++) {
+			const uint8_t k = night.tri_tex[t];
+			if (k >= number.size()) continue;
+			if (number[k] < 0) {
+				const GlbTexture &g = night.textures[k];
+				number[k] = 0;
+				if (g.png != nullptr && *g.png != obj.png) {
+					auto same = std::ranges::find_if(obj.material_pngs, [&](const ThreeDTextureBytes &m) { return m == g.png || (m != nullptr && *m == *g.png); });
+					if (same != obj.material_pngs.end()) {
+						number[k] = static_cast<int>(same - obj.material_pngs.begin()) + 1;
+					} else if (obj.material_pngs.size() < UINT8_MAX / 2) {
+						obj.material_pngs.push_back(g.png);
+						obj.material_flats.push_back(g.flat);
+						number[k] = static_cast<int>(obj.material_pngs.size());
+					}
+				}
+			}
+			tex[t] = static_cast<uint8_t>(number[k]);
+			if (tex[t] != 0) other = true;
+		}
+		if (other) {
+			obj.night_tex = std::move(tex);
+			obj.material_levels.assign(obj.material_pngs.size(), nullptr);
+		}
+	}
 	for (size_t i = 0; i + 2 < lights.size(); i += 3) {
 		obj.lights.push_back(static_cast<float>(lights[i] * OBJECT_UNITS_PER_METRE));
 		obj.lights.push_back(static_cast<float>(lights[i + 1] * OBJECT_UNITS_PER_METRE));
@@ -1979,6 +2011,32 @@ static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 		}
 	}
 	obj.tri_tex = std::move(tri_tex);
+}
+
+/** The floors one walks on ("podlaha", "podlaha_N"): the names of their nodes (GlbReadOptions::groups). */
+static const std::vector<std::string> GLB_FLOORS = {"podlaha", "podlaha_1", "podlaha_2", "podlaha_3", "podlaha_4", "podlaha_5", "podlaha_6", "podlaha_7", "podlaha_8", "podlaha_9"};
+
+/**
+ * The triangles of a mesh under the floors (read with GLB_FLOORS as its groups) kept apart to be walked on (FloorAt()),
+ * and in no one's way (passable_tris, unless the caller marks those); drawn as they are.
+ * @param first_group the group of the first floor, those before it others' (a part of the forest's solid nodes)
+ */
+static void TakeGlbFloors(const GlbMesh &mesh, ThreeDObject &obj, uint16_t first_group = 1, bool passable = true)
+{
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (t / 3 >= mesh.tri_group.size() || mesh.tri_group[t / 3] < first_group) continue;
+		for (int k = 0; k < 3; k++) {
+			const float *p = &mesh.pos[mesh.tri[t + k] * 3];
+			obj.floor.insert(obj.floor.end(), {static_cast<float>(p[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[2] * OBJECT_HEIGHT_PER_METRE)});
+		}
+		if (!passable) continue;
+		const uint32_t n = static_cast<uint32_t>(t / 3);
+		if (!obj.passable_tris.empty() && obj.passable_tris.back() == n) {
+			obj.passable_tris.back() = n + 1;
+		} else {
+			obj.passable_tris.insert(obj.passable_tris.end(), {n, n + 1});
+		}
+	}
 }
 
 /**
@@ -2056,29 +2114,16 @@ static void TurnNightQuarters(ThreeDObject &obj, int quarter_turns)
  */
 static bool ReadGlbInterior(const std::string &path, ThreeDObject &obj, int quarter_turns = 0)
 {
-	static const std::vector<std::string> floors = {"podlaha", "podlaha_1", "podlaha_2", "podlaha_3", "podlaha_4", "podlaha_5", "podlaha_6", "podlaha_7", "podlaha_8", "podlaha_9"};
 	GlbMesh mesh;
 	GlbReadOptions o;
 	o.all_nodes = true;
 	o.skip_night = true;
 	o.skip_prefix = "dvere_";
-	o.groups = &floors;
+	o.groups = &GLB_FLOORS;
 	if (!ReadGlbMesh(path, mesh, o)) return false;
 	/* Of a part of the forest, turned as it is (the colleague's forest cabin). */
 	TurnGlbMeshQuarters(mesh, quarter_turns);
-	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
-		if (t / 3 >= mesh.tri_group.size() || mesh.tri_group[t / 3] == 0) continue;
-		for (int k = 0; k < 3; k++) {
-			const float *p = &mesh.pos[mesh.tri[t + k] * 3];
-			obj.floor.insert(obj.floor.end(), {static_cast<float>(p[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(p[2] * OBJECT_HEIGHT_PER_METRE)});
-		}
-		const uint32_t n = static_cast<uint32_t>(t / 3);
-		if (!obj.passable_tris.empty() && obj.passable_tris.back() == n) {
-			obj.passable_tris.back() = n + 1;
-		} else {
-			obj.passable_tris.insert(obj.passable_tris.end(), {n, n + 1});
-		}
-	}
+	TakeGlbFloors(mesh, obj);
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
 	TurnNightQuarters(obj, quarter_turns);
@@ -2158,11 +2203,14 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		o.skip_night = true;
 		if (!obj.outside_of.empty()) o.skip_prefix = "dvere_";
 		o.skip_nodes = &obj.left_out;
+		/* Its floors walked on as an interior's (the dragon castle's stairs, wall walks and the hall's roof, "podlaha"). */
+		o.groups = &GLB_FLOORS;
 		if (!ReadGlbMesh(path, mesh, o)) return false;
 	} else if (!ReadGlbMesh(path, mesh)) {
 		return false;
 	}
 	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
+	TakeGlbFloors(mesh, obj);
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
 	/* An add-on is lit again as it is turned at each of its places (LayAddons()): its normals kept. */
@@ -2748,6 +2796,7 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 				for (int k = 0; k < 3; k++) place.at[k] = m.at("poloha").at(k).get<float>();
 				place.facing = m.value("otoceni", 0.0f);
 				obj.dragon_places.push_back(std::move(place));
+				obj.dragon_places_in.push_back(m.value("kde", std::string()) == "sin" ? 1 : 0);
 			}
 		}
 		if (e.contains("seno") && e.at("seno").is_object() && e.at("seno").contains("uzly") && !obj.file.empty()) {
@@ -2881,19 +2930,27 @@ static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest
  */
 static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter_turns)
 {
+	/* What one bumps into, and then its floors to walk on (the high seat's steps, the player 26. 10.: "up the stairs"). */
 	static const std::vector<std::string> solid = {"srub", "posed", "klady", "ohniste"};
+	static const std::vector<std::string> groups = [] {
+		std::vector<std::string> all = solid;
+		all.insert(all.end(), GLB_FLOORS.begin(), GLB_FLOORS.end());
+		return all;
+	}();
 	GlbMesh mesh;
 	GlbReadOptions o;
 	o.all_nodes = true;
 	o.skip_night = true;
-	o.groups = &solid;
+	o.groups = &groups;
 	/* Without its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
 	if (!obj.outside_of.empty()) o.skip_prefix = "dvere_";
 	if (!ReadGlbMesh(path, mesh, o)) return false;
 	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
 	TurnGlbMeshQuarters(mesh, quarter_turns);
+	TakeGlbFloors(mesh, obj, static_cast<uint16_t>(solid.size() + 1), false);
 	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
-		if ((mesh.tri_group[t] == 0) != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
+		const bool passable = mesh.tri_group[t] == 0 || mesh.tri_group[t] > solid.size();
+		if (passable != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
 	}
 	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
 	TakeGlbMesh(mesh, obj);
@@ -6125,6 +6182,29 @@ const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj)
 }
 
 /**
+ * The 3D object standing on a tile, to be walked on (its floors, "podlaha": the dragon castle's stairs and wall walks,
+ * a high seat's steps), and its north tile: a house's, a part of the forest's, an industry's. nullptr none.
+ */
+const ThreeDObject *GetThreeDObjectToStandOnAt(TileIndex tile, TileIndex &origin)
+{
+	if (IsTileType(tile, TileType::House)) {
+		if (!IsHouseCompleted(tile)) return nullptr;
+		HouseID north = GetHouseType(tile);
+		origin = tile + GetHouseNorthPart(north);
+		return GetThreeDHouseObjectAt(north, origin);
+	}
+	if (!IsTileType(tile, TileType::Industry)) return nullptr;
+	if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
+		origin = tile;
+		return forest->ground;
+	}
+	if (!IsIndustryCompleted(tile)) return nullptr;
+	const Industry *ind = Industry::GetByTile(tile);
+	origin = GetThreeDIndustryObjectOrigin(ind);
+	return GetThreeDIndustryObjectOf(ind);
+}
+
+/**
  * The 3D object with rooms on a tile and its north tile: a house's, or an industry's with an interior or doors (the
  * colleague's dragon castle). nullptr none.
  */
@@ -6938,7 +7018,7 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 {
 	if (house.addon_places.empty()) return;
 	/* Its own triangles keep their textures (its other materials', TakeGlbMesh()), moved past the add-ons' below. */
-	const size_t own_tris = read.tri.size() / 3, own_corners = read.pos.size() / 3;
+	const size_t own_tris = read.tri.size() / 3, own_corners = read.pos.size() / 3, own_night_tris = read.night_tex.size();
 	read.tri_tex.resize(own_tris, 0);
 	read.corner_tex.resize(own_corners, 0);
 	size_t laid = 0;
@@ -7037,6 +7117,7 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		};
 		for (size_t t = 0; t < own_tris; t++) past(read.tri_tex[t]);
 		for (size_t i = 0; i < own_corners; i++) past(read.corner_tex[i]);
+		for (size_t t = 0; t < own_night_tris; t++) past(read.night_tex[t]);
 	}
 	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
 }
@@ -7159,6 +7240,8 @@ ThreeDObjectShapeView ThreeDObject::TryGetShape(int level) const
 
 /** The cells of a tile across for the footprints of the buildings (ThreeDObject::Blocks()): about a quarter of a metre, finer than the walker's half-width. */
 static constexpr int FOOTPRINT_CELLS = 64;
+/** The steps of height of the footprints of what stands over a walker up on a building (ThreeDObject::Blocks()), metres. */
+static constexpr double FOOTPRINT_STOREY_M = 0.25;
 
 /**
  * Whether a building stands at a place as high as a walker's body, from its knees to over its head (the
@@ -7166,19 +7249,19 @@ static constexpr int FOOTPRINT_CELLS = 64;
  * square round a fountain, the space under a roof on pillars can be walked into, a wall cannot. Its triangles cut to
  * that height, their outlines and their insides on a grid of cells, made the first time.
  * @param x,y the place, world units from the building's north corner
+ * @param feet the height the walker stands at, units of height over the building's ground (its wall walks)
  */
-bool ThreeDObject::Blocks(double x, double y) const
+bool ThreeDObject::Blocks(double x, double y, double feet) const
 {
 	this->Read();
 	const int w = this->tiles_x * FOOTPRINT_CELLS, h = this->tiles_y * FOOTPRINT_CELLS;
 	const double cell = static_cast<double>(TILE_SIZE) / FOOTPRINT_CELLS;
-	if (this->footprint_w == 0) {
-		this->footprint.assign(static_cast<size_t>(w) * h, 0);
-		this->footprint_w = w;
-		const double lo = 0.3 * OBJECT_HEIGHT_PER_METRE, hi = 2.0 * OBJECT_HEIGHT_PER_METRE;
+	/* What of it is as high as a body standing at a height: its triangles cut to that height, their outlines and their
+	 * insides on the cells; its trees' trunks with trunks. */
+	auto band = [&](double lo, double hi, std::vector<uint8_t> &fp, bool trunks) {
 		auto mark = [&](double px, double py) {
 			const int cx = static_cast<int>(std::floor(px / cell)), cy = static_cast<int>(std::floor(py / cell));
-			if (cx >= 0 && cy >= 0 && cx < w && cy < h) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+			if (cx >= 0 && cy >= 0 && cx < w && cy < h) fp[static_cast<size_t>(cy) * w + cx] = 1;
 		};
 		size_t run = 0; // the run of passable triangles (a tree's crown) at or after this one
 		for (size_t t = 0; t + 2 < this->tri.size(); t += 3) {
@@ -7225,20 +7308,41 @@ bool ThreeDObject::Blocks(double x, double y) const
 						const auto &a = poly[k], &b = poly[l];
 						if ((a[1] > py) != (b[1] > py) && px < (b[0] - a[0]) * (py - a[1]) / (b[1] - a[1]) + a[0]) in = !in;
 					}
-					if (in) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+					if (in) fp[static_cast<size_t>(cy) * w + cx] = 1;
 				}
 			}
 		}
+		if (!trunks) return;
 		/* The trunks of its trees: the cells within each, and the one its middle is in. */
 		for (size_t i = 0; i + 2 < this->trunks.size(); i += 3) {
 			const double tx = this->trunks[i], ty = this->trunks[i + 1], tr = this->trunks[i + 2];
 			mark(tx, ty);
 			for (int cy = std::max(0, static_cast<int>((ty - tr) / cell)); cy <= std::min(h - 1, static_cast<int>((ty + tr) / cell)); cy++) {
 				for (int cx = std::max(0, static_cast<int>((tx - tr) / cell)); cx <= std::min(w - 1, static_cast<int>((tx + tr) / cell)); cx++) {
-					if (std::hypot((cx + 0.5) * cell - tx, (cy + 0.5) * cell - ty) <= tr) this->footprint[static_cast<size_t>(cy) * w + cx] = 1;
+					if (std::hypot((cx + 0.5) * cell - tx, (cy + 0.5) * cell - ty) <= tr) fp[static_cast<size_t>(cy) * w + cx] = 1;
 				}
 			}
 		}
+	};
+	/* Up on it (the dragon castle's wall walks and the roof of its hall): what stands over the feet there, from the
+	 * knees to over the head, made the first time at each step of FOOTPRINT_STOREY_M -- the walls under the feet are no
+	 * one's way, the battlements are. Only the walker stands up there (on the game's thread). */
+	const int storey = static_cast<int>(std::lround(feet / (FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE)));
+	if (storey > 0) {
+		std::vector<uint8_t> &fp = this->footprints_up[storey];
+		if (fp.empty()) {
+			fp.assign(static_cast<size_t>(w) * h, 0);
+			const double at = storey * FOOTPRINT_STOREY_M * OBJECT_HEIGHT_PER_METRE;
+			band(at + 0.3 * OBJECT_HEIGHT_PER_METRE, at + 2.0 * OBJECT_HEIGHT_PER_METRE, fp, false);
+		}
+		const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
+		if (cx < 0 || cy < 0 || cx >= w || cy >= h) return false;
+		return fp[static_cast<size_t>(cy) * w + cx] != 0;
+	}
+	if (this->footprint_w == 0) {
+		this->footprint.assign(static_cast<size_t>(w) * h, 0);
+		this->footprint_w = w;
+		band(0.3 * OBJECT_HEIGHT_PER_METRE, 2.0 * OBJECT_HEIGHT_PER_METRE, this->footprint, true);
 		/*
 		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
 		 * a walker's half-width (WALKER_CELLS) from every wall, a door narrower than a walker shut -- is solid too.

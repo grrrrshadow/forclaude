@@ -368,6 +368,9 @@ constexpr double FARM_CIRCLE_TILES = 3.0;   ///< the out ones fly round their fa
 constexpr double FARM_FLY_M = 28.0;         ///< and so high
 constexpr double FARM_ROUND_TICKS = 900.0;  ///< a round of it in so many ticks
 constexpr uint64_t ATTACK_TICKS = 600;      ///< over a vehicle it broke down, so long (about sixteen seconds)
+constexpr uint64_t FARM_LAND_TICKS = 450;   ///< from its round down onto its place, or up from it, so long (about twelve seconds)
+constexpr double FARM_APPROACH_M = 14.0;    ///< over its place before it settles, or so far out of the door it flies in by
+constexpr double FARM_DOOR_M = 3.0;         ///< and so high through that door
 
 /** A vehicle a farm's dragons broke down (NoteThreeDDragonAttack()), when. */
 struct DragonAttack {
@@ -423,12 +426,84 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 		const size_t n = obj->dragon_places.size();
 		for (size_t k = 0; k < n; k++) {
 			const ThreeDObjectFigure &p = obj->dragon_places[k];
-			const bool out = !calm && (now / FARM_TURN_TICKS + k * 2 + id.base()) % 3 == 0;
+			const uint64_t turn = now / FARM_TURN_TICKS, into = now % FARM_TURN_TICKS;
+			auto out_at = [&](uint64_t t) { return !calm && (t + k * 2 + id.base()) % 3 == 0; };
+			const bool out = out_at(turn);
 			/* Out: the dragon of the place itself when it flies (the colleague's brown and black, 24. 10.), else one that does. */
 			const ThreeDCreature *own = Creature(p.figure);
 			const ThreeDCreature *flyer = out ? (own != nullptr && own->Has("let") ? own : FarmFlyer(*obj, k + id.base())) : nullptr;
+			/* Its round, where it is at a tick. */
+			auto circle = [&](uint64_t at, double &x, double &y, double &z, double &facing) {
+				const double a = (at % static_cast<uint64_t>(FARM_ROUND_TICKS)) / FARM_ROUND_TICKS * 2 * M_PI + k * 2 * M_PI / n;
+				const double r = (FARM_CIRCLE_TILES + 0.7 * k) * TILE_SIZE;
+				x = mx + std::cos(a) * r;
+				y = my + std::sin(a) * r;
+				z = FirstPersonGroundZ(x, y) + FARM_FLY_M * OBJECT_HEIGHT_PER_METRE;
+				facing = std::fmod((a + M_PI / 2) * 180.0 / M_PI, 360.0);
+			};
+			/* Coming home from its round, or going out to it, the dragon of the place that flies itself (the colleague's
+			 * hra/3d/DRACI-HRAD-PRO-HRU.md, prosba 2): down over its place onto it -- the castle hall's roof at its height --,
+			 * or into the hall low through its door, nearest of the doors ("kde": "sin"); far 0, on its place 1. */
+			double home = -1;
+			bool landing = true;
+			if (!out && !calm && own != nullptr && own->Has("let")) {
+				if (turn > 0 && out_at(turn - 1) && into < FARM_LAND_TICKS) {
+					home = static_cast<double>(into) / FARM_LAND_TICKS;
+				} else if (out_at(turn + 1) && FARM_TURN_TICKS - into <= FARM_LAND_TICKS) {
+					home = static_cast<double>(FARM_TURN_TICKS - into) / FARM_LAND_TICKS;
+					landing = false;
+				}
+			}
 			FarmDragon d;
-			if (flyer == nullptr) {
+			if (home >= 0) {
+				const double base = GetTileMaxPixelZ(origin);
+				const double px = ox + p.at[0] * OBJECT_UNITS_PER_METRE, py = oy + p.at[1] * OBJECT_UNITS_PER_METRE, pz = base + p.at[2] * OBJECT_HEIGHT_PER_METRE;
+				std::array<double, 4> start{};
+				circle(landing ? turn * FARM_TURN_TICKS : (turn + 1) * FARM_TURN_TICKS, start[0], start[1], start[2], start[3]);
+				std::vector<std::array<double, 3>> path = {{start[0], start[1], start[2]}};
+				const ThreeDObjectDoor *door = nullptr;
+				if (k < obj->dragon_places_in.size() && obj->dragon_places_in[k] != 0) {
+					double best = 0;
+					for (const ThreeDObjectDoor &dr : obj->doors) {
+						const double dd = std::hypot(dr.at[0] - p.at[0], dr.at[1] - p.at[1]);
+						if (door == nullptr || dd < best) {
+							door = &dr;
+							best = dd;
+						}
+					}
+				}
+				if (door != nullptr) {
+					const double len = std::max(1e-6, static_cast<double>(std::hypot(door->out[0], door->out[1])));
+					const double dx = ox + door->at[0] * OBJECT_UNITS_PER_METRE, dy = oy + door->at[1] * OBJECT_UNITS_PER_METRE;
+					const double ux = door->out[0] / len, uy = door->out[1] / len, far = FARM_APPROACH_M * OBJECT_UNITS_PER_METRE;
+					path.push_back({dx + ux * far, dy + uy * far, base + 2 * FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
+					path.push_back({dx, dy, base + FARM_DOOR_M * OBJECT_HEIGHT_PER_METRE});
+				} else {
+					path.push_back({px, py, pz + FARM_APPROACH_M * OBJECT_HEIGHT_PER_METRE});
+				}
+				path.push_back({px, py, pz});
+				/* Along it by its length, the heights as far as the ways across. */
+				auto seg_len = [](const std::array<double, 3> &a, const std::array<double, 3> &b) {
+					return std::sqrt((b[0] - a[0]) * (b[0] - a[0]) + (b[1] - a[1]) * (b[1] - a[1]) + std::pow((b[2] - a[2]) * OBJECT_UNITS_PER_METRE / OBJECT_HEIGHT_PER_METRE, 2));
+				};
+				double total = 0;
+				for (size_t i = 1; i < path.size(); i++) total += seg_len(path[i - 1], path[i]);
+				double s = home * total;
+				size_t i = 1;
+				for (; i + 1 < path.size() && s > seg_len(path[i - 1], path[i]); i++) s -= seg_len(path[i - 1], path[i]);
+				const double l = std::max(1e-6, seg_len(path[i - 1], path[i])), f = std::clamp(s / l, 0.0, 1.0);
+				const auto &a = path[i - 1], &b = path[i];
+				d.x = a[0] + (b[0] - a[0]) * f;
+				d.y = a[1] + (b[1] - a[1]) * f;
+				d.z = static_cast<int>(std::lround(a[2] + (b[2] - a[2]) * f));
+				/* Facing the way it flies: home along the path, out back along it; settling, turned as its place says. */
+				double facing = std::atan2(b[1] - a[1], b[0] - a[0]) * 180.0 / M_PI + (landing ? 0.0 : 180.0);
+				if (std::hypot(b[0] - a[0], b[1] - a[1]) < 1.0) facing = p.facing;
+				d.facing = static_cast<float>(std::fmod(facing + 360.0, 360.0));
+				d.figure = own->Figure("let");
+				d.map_scale = static_cast<float>(THREE_D_MAP_CREATURE_SCALE + (1.0 - THREE_D_MAP_CREATURE_SCALE) * home);
+				d.flying = true;
+			} else if (flyer == nullptr) {
 				const ThreeDCreature *c = Creature(p.figure);
 				if (c == nullptr || c->animations.empty()) continue;
 				d.figure = c->Figure(RestAnim(*c));
@@ -437,12 +512,10 @@ void ForFarmDragons(const std::function<void(const FarmDragon &)> &each)
 				d.z = static_cast<int>(GetTileMaxPixelZ(origin) + p.at[2] * OBJECT_HEIGHT_PER_METRE);
 				d.facing = p.facing;
 			} else {
-				const double a = (now % static_cast<uint64_t>(FARM_ROUND_TICKS)) / FARM_ROUND_TICKS * 2 * M_PI + k * 2 * M_PI / n;
-				const double r = (FARM_CIRCLE_TILES + 0.7 * k) * TILE_SIZE;
-				d.x = mx + std::cos(a) * r;
-				d.y = my + std::sin(a) * r;
-				d.z = static_cast<int>(std::lround(FirstPersonGroundZ(d.x, d.y) + FARM_FLY_M * OBJECT_HEIGHT_PER_METRE));
-				d.facing = static_cast<float>(std::fmod((a + M_PI / 2) * 180.0 / M_PI, 360.0));
+				double z = 0, facing = 0;
+				circle(now, d.x, d.y, z, facing);
+				d.z = static_cast<int>(std::lround(z));
+				d.facing = static_cast<float>(facing);
 				d.figure = flyer->Figure("let");
 				d.map_scale = THREE_D_MAP_CREATURE_SCALE;
 				d.flying = true;
@@ -757,5 +830,10 @@ std::string DescribeThreeDDragons()
 		if (f != nullptr && f->blend_from != nullptr) out += fmt::format(", prechod {} snimek {}", figure, frame);
 		if (f != nullptr && !f->skeleton_file.empty() && f->GetShape(frame) != nullptr) out += fmt::format(", kostra ({} snimku)", f->frames);
 	}
+	/* And the farms' (ForFarmDragons()): where, how high over the land there, flying or standing. */
+	ForFarmDragons([&](const FarmDragon &d) {
+		out += fmt::format("\n  farma {} na {:.2f},{:.2f} vyska {:.1f} m, smer {:.0f}, {}", d.figure, d.x / TILE_SIZE, d.y / TILE_SIZE,
+				(d.z - FirstPersonGroundZ(d.x, d.y)) / OBJECT_HEIGHT_PER_METRE, d.facing, d.flying ? "leti" : "stoji");
+	});
 	return out;
 }

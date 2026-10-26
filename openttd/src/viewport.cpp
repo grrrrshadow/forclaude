@@ -10230,12 +10230,26 @@ static constexpr double CAB_INTERIOR_TILES = 3.0;
 /** The floors of an interior the walker stands on: those of its ground storey, up to this many metres over its ground. */
 static constexpr double CAB_INTERIOR_STOREY_M = 2.5;
 
+/** How far up the walker steps at once, metres: up a stair, not onto the wall walk overhead. */
+static constexpr double CAB_STEP_UP_M = 0.45;
+
+/**
+ * The ground at a world point (in the map) as one walks on it: the land, and on the end of a bridge its ramp as a car
+ * drives up it (the player, test 4: the walker sank through the road of a bridge's ramp).
+ */
+static double CabWalkedGround(int ix, int iy)
+{
+	const TileIndex tile = TileVirtXY(ix, iy);
+	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsBridge(tile)) return GetSlopePixelZ(ix, iy, true);
+	return GetSlopePixelZOutsideMap(ix, iy);
+}
+
 /** The height of the ground under a world point, units of height (the walker of the view from the first person stands on it). */
 double FirstPersonGroundZ(double x, double y)
 {
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
-	const double ground = GetSlopePixelZOutsideMap(ix, iy);
+	const double ground = CabWalkedGround(ix, iy);
 	/* In a house's interior (or an industry's, the dragon castle's hall): its floor there (the stage and its steps of the
 	 * cinema), of the ground storey. */
 	TileIndex origin;
@@ -10248,6 +10262,47 @@ double FirstPersonGroundZ(double x, double y)
 		}
 	}
 	return ground;
+}
+
+/**
+ * The height the walker stands at on a world point coming from a height (units of height): the highest of what is to
+ * stand on there no more than a step over where it was (CAB_STEP_UP_M) -- the floors of a building and of its interior
+ * (the dragon castle's stairs, its wall walks and the roof of its hall, the colleague's "podlaha"), the deck of a
+ * bridge over the tile (the player: "and onto the bridge") --, or the ground. In an interior, its floor even under the
+ * land of a slope.
+ */
+double FirstPersonStandZ(double x, double y, double from)
+{
+	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
+	const double up_to = from + CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
+	double best = CabWalkedGround(ix, iy);
+	const TileIndex tile = TileVirtXY(ix, iy);
+	TileIndex origin;
+	if (const ThreeDObject *obj = GetThreeDObjectToStandOnAt(tile, origin); obj != nullptr) {
+		const double base = GetTileMaxPixelZ(origin);
+		const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
+		const ThreeDObject *in = GetThreeDInterior(obj);
+		std::optional<double> floor;
+		for (const ThreeDObject *o : {obj, in}) {
+			if (o == nullptr || !o->IsRead()) continue;
+			const std::optional<double> f = o->FloorAt(lx, ly, up_to - base);
+			if (f.has_value() && (!floor.has_value() || *f > *floor)) floor = f;
+		}
+		if (floor.has_value()) best = in != nullptr && ThreeDInsideInterior(obj, lx, ly) ? base + *floor : std::max(best, base + *floor);
+	}
+	if (IsValidTile(tile) && IsBridgeAbove(tile)) {
+		const double deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+		if (deck <= up_to && deck > best) best = deck;
+	}
+	return best;
+}
+
+/** The height the walker's feet are at (FirstPersonEye::stand_z), where it stood at it; put somewhere else, the ground storey's. */
+double FirstPersonFeetZ(const FirstPersonEye &walker)
+{
+	if (std::abs(walker.x - walker.stand_x) < 1e-6 && std::abs(walker.y - walker.stand_y) < 1e-6) return walker.stand_z;
+	return FirstPersonGroundZ(walker.x, walker.y);
 }
 
 /**
@@ -11315,7 +11370,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* The walker's eyes over the ground where it stands. */
 		eye.x = walker->x;
 		eye.y = walker->y;
-		eye.z = FirstPersonGroundZ(walker->x, walker->y) + walker->eye_z;
+		eye.z = FirstPersonFeetZ(*walker) + walker->eye_z;
 	} else if (in_model_cab) {
 		/* In the driver's head of the model, as big as the model is drawn, turned as its state turns it. */
 		const double across = own_model.scale * OBJECT_UNITS_PER_METRE, ahead = across * own_model.along;
@@ -12531,7 +12586,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ThreeDWitchLight &l = witch_lights.emplace_back();
 			l.x = walker->x + std::cos(walker->heading) * 0.4 * OBJECT_UNITS_PER_METRE;
 			l.y = walker->y + std::sin(walker->heading) * 0.4 * OBJECT_UNITS_PER_METRE;
-			l.z = FirstPersonGroundZ(walker->x, walker->y) + walker->eye_z - 0.5 * OBJECT_HEIGHT_PER_METRE;
+			l.z = FirstPersonFeetZ(*walker) + walker->eye_z - 0.5 * OBJECT_HEIGHT_PER_METRE;
 			l.reach = walker->light_reach_m * OBJECT_UNITS_PER_METRE;
 			l.colour = Colour(static_cast<uint8_t>(walker->light_colour >> 16), static_cast<uint8_t>(walker->light_colour >> 8), static_cast<uint8_t>(walker->light_colour));
 		}
