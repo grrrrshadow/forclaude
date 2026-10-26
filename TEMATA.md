@@ -74,6 +74,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     předělá“*. Hotovo obecně: když oko z kabiny vidí před sebou do 1,5 m neprůhlednou část modelu dřív než sklo,
     posune se těsně za ni (`CabEyeAhead()`); u dobrých modelů se nic nemění. Až kolega Zetor předělá, převezme se.
   - Hasičská Tatra na hřišti zůstává dekorace (stojící Tatra z GRF, nevyjede).
+  - Náklon dekorací nejvýš ±60° už při čtení (obrázky mapy víc neumějí; kolečko má v balíčku 65°).
+  - Kolegovi do grrrrf `hra/3d/ODPOVED-PASTVINY-OKNA-ZETOR.md` (`b273059`): co je hotové, prosby lucerna jako uzel
+    `lucerna`, záře oken srubu zvlášť (`noc_okna`), Zetor: čelní okno celé do `zts_sklo` a oko `kabina` níž.
 - **Odloženo:** společné náklady (sada `naklady`) až s velkou úpravou všech GRF.
 
 ## 26. 10. (12) – Krmení draků na farmě (E → nabídka, mari kouř, pivo oheň z tlamy, seno nic)
