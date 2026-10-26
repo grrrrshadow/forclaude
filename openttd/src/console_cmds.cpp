@@ -9262,6 +9262,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				bar->width, bar->height, bar->left, bar->top, help->current_x, help->current_y, bar->left + help->pos_x, bar->top + help->pos_y,
 				_thd.window_class == WindowClass::MainToolbar && _thd.window_number == 1 && _thd.place_mode != HT_NONE ? "venku" : "ne",
 				eye->IsWidgetLowered(WID_GE_FIRST_PERSON) ? "stisknute" : "nahore", eyes);
+	} else if (what == "pastvina") {
+		/* 'pastvina [tries]': each farm with livestock tries so many times to lay a pasture (industry_cmd.cpp). */
+		extern std::string RigPlantFarmPastures(int tries);
+		IConsolePrint(CC_DEFAULT, "test3d: pastviny: {}", RigPlantFarmPastures(number(2).value_or(20)));
 	} else if (what == "draci") {
 		/* The dragons (three_d_dragons.h): 'draci' tells where they are; 'draci posli [jmeno]' sends one near the walker
 		 * of the view from the first person (or the middle of the main view); 'draci uder' a blow of the hammer. */

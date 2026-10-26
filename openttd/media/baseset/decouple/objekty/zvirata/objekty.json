@@ -589,5 +589,149 @@
   "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: ježek s bodlinami na hřbetě (hnědošedé se světlými špičkami), špičatý čumák s černým nosem; cupitá; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků chuze_00 až chuze_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 55 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "prase.glb",
+  "jmeno": "prase",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "prasátko",
+   "en": "pig"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.27,
+   0.51,
+   0.71
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1012,
+  "animace": {
+   "pase": {
+    "uzly": "pase_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.0
+   },
+   "kouka": {
+    "uzly": "pase_00",
+    "snimku": 1,
+    "tiku": 240,
+    "smycka": false,
+    "krok_m": 0.0
+   }
+  },
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    1.2,
+    0.6
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): růžové prasátko: kulaté tělo, plochý rypák, uši sklopené dopředu, zatočený ocásek, tmavá kopýtka; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 10 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "krava.glb",
+  "jmeno": "krava",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kravička",
+   "en": "cow"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   2.21,
+   0.88,
+   1.68
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 2616,
+  "animace": {
+   "pase": {
+    "uzly": "pase_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.0
+   },
+   "kouka": {
+    "uzly": "pase_00",
+    "snimku": 1,
+    "tiku": 240,
+    "smycka": false,
+    "krok_m": 0.0
+   }
+  },
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    2.4,
+    0.9
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "model cow (Star, 3D Warehouse, cow_3D_Star.zip), převod tvorove/farma_zvirata.py jako u nákladu Tater",
+  "licence": "3D Warehouse General Model License (společná licence balíčků)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): kravička z nákladu Tater (model cow, Star, 3D Warehouse, poslal hráč 7. 10.; hráč: „bude jedna krava naklad i na pastvu“): hlava zvednutá v pase_00 jako na korbě, při pasení skloněná; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: krk se ohýbá plynule: tělo je jedna síť pro všechny snímky, přední část s krkem a hlavou má tři sítě (nahoře, jako v modelu, skloněná, u trávy) na osm snímků (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 180 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "ovce.glb",
+  "jmeno": "ovce",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ovečka",
+   "en": "sheep"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.05,
+   0.49,
+   0.74
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 768,
+  "animace": {
+   "pase": {
+    "uzly": "pase_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.0
+   },
+   "kouka": {
+    "uzly": "pase_00",
+    "snimku": 1,
+    "tiku": 240,
+    "smycka": false,
+    "krok_m": 0.0
+   }
+  },
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    1.0,
+    0.55
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): ovečka jako na korbě V3S: jedno hladké krémové rouno, tmavá hlava, uši a nohy; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 9 kB, glb z gltfpacku"
  }
 ]

@@ -3067,7 +3067,8 @@ static void PlantFarmField(TileIndex tile, IndustryID industry)
 	/* make field */
 	for (TileIndex cur_tile : ta) {
 		assert(cur_tile < Map::Size());
-		if (IsSuitableForFarmField(cur_tile, true, true)) {
+		/* (Not over a pasture: it stays whole, PlantFarmPasture().) */
+		if (IsSuitableForFarmField(cur_tile, true, true) && !IsPasture(cur_tile)) {
 			MakeField(cur_tile, field_type, industry);
 			SetClearCounter(cur_tile, counter);
 			MarkTileDirtyByTile(cur_tile);
@@ -3085,14 +3086,94 @@ static void PlantFarmField(TileIndex tile, IndustryID industry)
 	SetupFarmFieldFence(ta.tile + TileDiffXY(0, ta.h - 1), ta.w, type, DiagDirection::SE);
 }
 
+/**
+ * A pasture of a farm with livestock (the colleague's pv_pole_pastvina, hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md; the
+ * player, 26. 10.: "the paddock with the animals can be like a field of wheat, several times about the farm, bigger"):
+ * a field of 2 to 3 tiles a side with one kind of animal, fenced. Only on flat land all of one height, its fences and
+ * animals standing true there; over no other pasture, and no field is laid over it after.
+ * @param tile about where
+ * @param industry the farm
+ */
+static void PlantFarmPasture(TileIndex tile, IndustryID industry)
+{
+	const uint32_t r = Random();
+	const uint w = 2 + GB(r, 0, 1), h = 2 + GB(r, 1, 1);
+	const PastureKind kind = static_cast<PastureKind>(1 + GB(r, 2, 8) * 3 / 256);
+	TileArea ta(tile - TileDiffXY(std::min(TileX(tile), w / 2), std::min(TileY(tile), h / 2)), w, h);
+	ta.ClampToMap();
+	if (ta.w != w || ta.h != h) return;
+	const int height = TileHeight(ta.tile);
+	for (TileIndex cur_tile : ta) {
+		if (!IsSuitableForFarmField(cur_tile, true, true) || IsPasture(cur_tile)) return;
+		if (GetTileSlope(cur_tile) != SLOPE_FLAT || TileHeight(cur_tile) != height) return;
+		if (_settings_game.game_creation.landscape == LandscapeType::Arctic && height + 2 >= GetSnowLine()) return;
+	}
+	const uint counter = GB(r, 10, 3);
+	for (TileIndex cur_tile : ta) {
+		MakeField(cur_tile, 0, industry);
+		SetClearCounter(cur_tile, counter);
+		MakePasture(cur_tile, kind, TileX(cur_tile) - TileX(ta.tile), TileY(cur_tile) - TileY(ta.tile), w, h);
+		MarkTileDirtyByTile(cur_tile);
+	}
+	SetupFarmFieldFence(ta.tile, ta.h, 1, DiagDirection::NE);
+	SetupFarmFieldFence(ta.tile, ta.w, 1, DiagDirection::NW);
+	SetupFarmFieldFence(ta.tile + TileDiffXY(ta.w - 1, 0), ta.h, 1, DiagDirection::SW);
+	SetupFarmFieldFence(ta.tile + TileDiffXY(0, ta.h - 1), ta.w, 1, DiagDirection::SE);
+}
+
+/** Whether an industry produces livestock (its fields may be pastures, PlantFarmPasture()). */
+static bool ProducesLivestock(const Industry *i)
+{
+	for (const auto &p : i->produced) {
+		if (IsValidCargoType(p.cargo) && CargoSpec::Get(p.cargo)->label == CT_LIVESTOCK) return true;
+	}
+	return false;
+}
+
+/**
+ * The rig: so many tries of each farm with livestock to lay a pasture about it (PlantFarmPasture()).
+ * @return the farms, the pastures' tiles on the map then, and the north tile of the first pasture
+ */
+std::string RigPlantFarmPastures(int tries)
+{
+	int farms = 0;
+	for (const Industry *i : Industry::Iterate()) {
+		if (!ProducesLivestock(i)) continue;
+		farms++;
+		for (int k = 0; k < tries; k++) {
+			const TileIndex tile = TileAddWrap(i->location.tile, i->location.w / 2 + Random() % 31 - 16, i->location.h / 2 + Random() % 31 - 16);
+			if (tile != INVALID_TILE) PlantFarmPasture(tile, i->index);
+		}
+	}
+	int tiles = 0;
+	TileIndex first = INVALID_TILE;
+	for (TileIndex t : Map::Iterate()) {
+		if (!IsPasture(t)) continue;
+		tiles++;
+		uint x, y, w, h;
+		GetPastureSpot(t, x, y, w, h);
+		if (first == INVALID_TILE && x == 0 && y == 0) first = t;
+	}
+	if (first == INVALID_TILE) return fmt::format("farem s dobytkem {}, pastvin zadna", farms);
+	uint x, y, w, h;
+	GetPastureSpot(first, x, y, w, h);
+	return fmt::format("farem s dobytkem {}, dlazdic pastvin {}, prvni na {},{} ({}x{}, druh {})", farms, tiles, TileX(first), TileY(first), w, h, to_underlying(GetPastureKind(first)));
+}
+
 void PlantRandomFarmField(const Industry *i)
 {
 	int x = i->location.w / 2 + Random() % 31 - 16;
 	int y = i->location.h / 2 + Random() % 31 - 16;
 
 	TileIndex tile = TileAddWrap(i->location.tile, x, y);
+	if (tile == INVALID_TILE) return;
 
-	if (tile != INVALID_TILE) PlantFarmField(tile, i->index);
+	/* A farm with livestock: every third of its fields a pasture. */
+	if (ProducesLivestock(i) && Chance16(1, 3)) {
+		PlantFarmPasture(tile, i->index);
+		return;
+	}
+	PlantFarmField(tile, i->index);
 }
 
 /**

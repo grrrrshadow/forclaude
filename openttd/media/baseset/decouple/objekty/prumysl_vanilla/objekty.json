@@ -700,6 +700,71 @@
   "licence": "GPL-2.0 (vlastní geometrie i textura)"
  },
  {
+  "soubor": "pv_pastvina_zem.glb",
+  "jmeno": "pv_pastvina_zem",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.01
+  ],
+  "poznamka": "podklad pastviny: krátce spasená tráva, tmavší trsy, ušlapaná místa; textura navazuje přes okraje políček dokola; počátek v severním rohu políčka (jako pole_zem); metry, 2 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_plot.glb",
+  "jmeno": "pv_pastvina_plot",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   0.12,
+   1.2
+  ],
+  "poznamka": "plot jedné hrany políčka pastviny: 7 sloupků 1,2 m po 2,47 m a tři latě, od (0, 0) do (14,8, 0) podél x na čáře hrany; krajní sloupek je společný se sousedním kusem; metry, 120 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_plot_otvor.glb",
+  "jmeno": "pv_pastvina_plot_otvor",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   0.12,
+   1.2
+  ],
+  "poznamka": "týž plot s otvorem 2 m uprostřed bez vrátek (hráč: „bez vratek jen otvory ať se tam da chodit“); metry, 168 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_koryto.glb",
+  "jmeno": "pv_pastvina_koryto",
+  "druh": "dil",
+  "rozmer_m": [
+   2.4,
+   0.6,
+   0.5
+  ],
+  "poznamka": "dřevěné koryto s vodou 2,4 m; počátek uprostřed na zemi; metry, 62 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_pristresek.glb",
+  "jmeno": "pv_pastvina_pristresek",
+  "druh": "dil",
+  "rozmer_m": [
+   3.7,
+   4.8,
+   2.4
+  ],
+  "poznamka": "přístřešek 3,1 × 2,9 m se střechou spadající dozadu (+y), prkna vzadu a vpravo, před ním jesle se senem pod stříškou (−y); počátek uprostřed přístřešku na zemi; metry, 168 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
   "jmeno": "pv_gfx_000",
   "druh": "prumysl_dlazdice",
   "gfx": [
@@ -1632,7 +1697,32 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "kravín"
+  "poznamka": "kravín",
+  "vozidla": [
+   {
+    "zaznam": "special_kolecko",
+    "objekt": "special_kolecko",
+    "sada_objektu": "special",
+    "doplnky": {
+     "kolecko_ram.glb": "ram"
+    },
+    "bez_posadky": true,
+    "meritko": 0.5,
+    "otoceni": 270,
+    "naklon": 65,
+    "stred_naklonu": [
+     0.792,
+     -0.295,
+     0.183
+    ],
+    "poloha": [
+     3.0,
+     3.66,
+     0.183
+    ],
+    "poznamka": "stavební kolečko ze special (hráč: „kolečko tam opři ze special“), bez holky, opřené o jižní zeď kravína: meritko 0,5 (kolečko specialu je dvojnásobné jako holky), otoceni 270 (kolo k −y, rukojeti ke zdi), naklon 65° kolem osy kola (stred_naklonu v rámci kolečka po meritku): rukojeti nahoru ke zdi, kolo na zemi; poloha = kam přijde osa kola; barvy korby a rámu původní (bez stavu)"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_037",
@@ -1694,7 +1784,31 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "kůlna (díl pole) a dílna"
+  "poznamka": "kůlna (díl pole) a dílna",
+  "vozidla": [
+   {
+    "zaznam": "zv_traktor_zts",
+    "objekt": "zv_traktor_zts",
+    "sada_objektu": "zvlastni_vozy",
+    "sada": [
+     "traktor"
+    ],
+    "poloha": [
+     3.4,
+     9.6,
+     0.0
+    ],
+    "otoceni": 90,
+    "jizda": {
+     "k": "pole",
+     "z": "farma",
+     "rychlost_kmh": 20,
+     "stoji_tiku": 600,
+     "poznamka": "z farmy na její pole a zpátky (hráč: „zetor postav na farmě na zrni ať jezdi na pole“): po cestě nebo po zemi na políčko pole farmy, tam pomalu přejede pole a vrátí se na své místo"
+    },
+    "poznamka": "traktor ZTS 16245 (Zetor) z balíčku Zvlastni_vozy_3D jako stojící hasičská Tatra na hřišti (hráč: „zetor veme z grf jako hasičskou tatru na hřiště“): záznam zv_traktor_zts, sada traktor (červený, bez přívěsu, s řidičkou záznamu); stojí u dílny v rohu políčka a jezdí na pole. Model se nekopíruje (hráč: „nic nemusí být dvakrát ve hře a v grf“), bez balíčku Zetor na farmě není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_039",
@@ -4767,5 +4881,93 @@
    }
   ],
   "poznamka": "zralá pšenice s klasy na polích farmy (hráč: „pole už máš tak jen dáš pšenici jako že tam roste a holky nebudou v poli“): 16 čtverců na políčko na místech kytek pole marihuany (hustý porost 4 m se překrývá, natočení jen po 90°), podklad pole_zem ze sady prumysl; holky v poli nejsou, jen na cestě polem (díl pole_cesta ze sady prumysl, u_cesty)"
+ },
+ {
+  "jmeno": "pv_pole_pastvina",
+  "druh": "pole",
+  "pole": "pastvina",
+  "dil": "pastvina",
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_pastvina_zem",
+  "plot": {
+   "hrana": "pv_pastvina_plot",
+   "otvor": "pv_pastvina_plot_otvor",
+   "poznamka": "plot na každé hraně políčka, za kterou už pastvina není; na každé straně pastviny jeden kus s otvorem (políčko uprostřed strany), ostatní bez; díl leží podél x od severního rohu, na ostatní hrany otočit po 90°"
+  },
+  "doplnky_pole": [
+   {
+    "dil": "pv_pastvina_pristresek",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "kolik": 1
+   },
+   {
+    "dil": "pv_pastvina_koryto",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "kolik": 1
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     4.2,
+     4.6,
+     0.0
+    ],
+    "otoceni": 35
+   },
+   {
+    "poloha": [
+     10.4,
+     10.0,
+     0.0
+    ],
+    "otoceni": 215
+   },
+   {
+    "poloha": [
+     10.0,
+     3.8,
+     0.0
+    ],
+    "otoceni": 130
+   },
+   {
+    "poloha": [
+     4.4,
+     10.6,
+     0.0
+    ],
+    "otoceni": 300
+   }
+  ],
+  "druhy_zvirat": [
+   "krava",
+   "ovce",
+   "prase"
+  ],
+  "zvirat_na_policko": {
+   "krava": 2,
+   "ovce": 3,
+   "prase": 3
+  },
+  "meritko_zvirat": 1,
+  "animace_zvirat": [
+   "pase",
+   "kouka"
+  ],
+  "poznamka": "pastvina s dobytkem jako pole farmy (hráč 26. 10.: „ohradka se zviřatky muže byt jako pole zrní pšenice vickrat v okoli farmy. větši jako jsou pole“): hra ji položí kolem farmy jako pole s pšenicí, víckrát a přes víc políček; jedna pastvina = jeden druh zvířat (kravičky, ovečky nebo prasátka z objekty/zvirata, meritko 1; pasou se a občas zvednou hlavu a koukají: pase a kouka); na každém políčku podklad pv_pastvina_zem a prvních zvirat_na_policko[druh] míst ze zvirata (natočení po svém); kolem plot (plot.hrana) s otvorem uprostřed každé strany (plot.otvor); přístřešek s jeslemi a koryto jednou na pastvinu, každé na jiném políčku (doplnky_pole, poloha v políčku)"
  }
 ]

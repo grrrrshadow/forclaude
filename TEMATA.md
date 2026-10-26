@@ -54,6 +54,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   - Rozhledna zříceniny: rig od země na plošinu 11,18 m.
   - **Minové kladivo** (par16, `kladivo_minove.glb`): zbraň do ruky (iddqd), máchá se jako kladivo, v okamžiku úderu
     vybuchne 1,8 m před chodcem jako raketa (4 m, draci, čarodějnice, zvířata; chodci nic). Rig: `chodec zbran 10 300 2`.
+  - **Pastviny** (`pv_pole_pastvina`, zvířata `krava`, `ovce`, `prase` z grrrrf `98beda0`): pole farmy s dobytkem
+    (LVST). Při zakládání pole je každé třetí pastvina 2×2 až 3×3 dlaždice, jen na rovině v jedné výšce, jeden druh
+    zvířat. Pole se přes pastvinu nezakládá. Stará farma pastviny dostane, jak zakládá pole dál. Ve hře je to pole
+    se značkou v `m8` (druh, místo v pastvině, rozměr; `IsPasture()`), nic se neukládá navíc. Bez 3D je to tráva
+    s plotem hry (plot i proti poli vedle). Ve 3D na mapě: kolegova zem, plot na okraji pastviny s otvorem uprostřed
+    strany, přístřešek na první dlaždici, koryto na poslední, zvířata (na mapě stojí, z očí se pasou a občas koukají,
+    každé jinak). Rig: `test3d pastvina [pokusů]`.
 - **Domluveno, dělá se:** Zetor a kolečko u farmy jako dekorace z GRF,
   E u nich → tvoje firma dostane opravdové vozidlo zadarmo a nastoupíš, dekorace se objeví znovu; hasičská Tatra
   na hřišti jen dekorace (normální Tatra z GRF, nevyjede); pastviny.

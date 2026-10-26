@@ -196,7 +196,12 @@ static void DrawTile_Clear(TileInfo *ti)
 			break;
 
 		case ClearGround::Fields:
-			DrawGroundSprite(_clear_land_sprites_farmland[GetFieldType(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			/* A pasture: grass grazed within its fences (IsPasture()). */
+			if (IsPasture(ti->tile)) {
+				DrawClearLandTile(ti, 3);
+			} else {
+				DrawGroundSprite(_clear_land_sprites_farmland[GetFieldType(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			}
 			DrawClearLandFence(ti);
 			break;
 
@@ -227,7 +232,8 @@ static void UpdateFences(TileIndex tile)
 	for (DiagDirection dir : EnumRange(DiagDirection::End)) {
 		if (GetFence(tile, dir) != 0) continue;
 		TileIndex neighbour = tile + TileOffsByDiagDir(dir);
-		if (IsTileType(neighbour, TileType::Clear) && IsClearGround(neighbour, ClearGround::Fields)) continue;
+		/* A pasture fenced from the fields about it too. */
+		if (IsTileType(neighbour, TileType::Clear) && IsClearGround(neighbour, ClearGround::Fields) && IsPasture(neighbour) == IsPasture(tile)) continue;
 		SetFence(tile, dir, 3);
 		dirty = true;
 	}

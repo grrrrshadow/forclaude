@@ -204,6 +204,74 @@ inline void SetIndustryIndexOfField(Tile t, IndustryID i)
 	t.m2() = i.base();
 }
 
+/**
+ * The animals of a pasture, a field of a farm with livestock (the colleague's pv_pole_pastvina,
+ * hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md; the player, 26. 10.: "the paddock with the animals can be like a field of
+ * wheat, several times about the farm, bigger"): one kind on the whole pasture, m8 bits 0..1.
+ */
+enum class PastureKind : uint8_t {
+	None = 0,  ///< no pasture: a field
+	Cows = 1,
+	Sheep = 2,
+	Pigs = 3,
+};
+
+/**
+ * Whether a tile is a pasture of a farm (PastureKind).
+ * @param t the tile
+ * @return true when it is a field with animals
+ */
+inline bool IsPasture(Tile t)
+{
+	return IsTileType(t, TileType::Clear) && IsClearGround(t, ClearGround::Fields) && GB(t.m8(), 0, 2) != 0;
+}
+
+/**
+ * The animals of a pasture.
+ * @param t the tile
+ * @pre IsPasture(t)
+ * @return its kind
+ */
+inline PastureKind GetPastureKind(Tile t)
+{
+	assert(IsPasture(t));
+	return static_cast<PastureKind>(GB(t.m8(), 0, 2));
+}
+
+/**
+ * Where a tile lies in its pasture (a rectangle of 2 to 3 tiles a side): m8 bits 2..9.
+ * @param t the tile
+ * @param[out] x,y its column and row from the pasture's north corner
+ * @param[out] w,h the pasture's size, tiles
+ * @pre IsPasture(t)
+ */
+inline void GetPastureSpot(Tile t, uint &x, uint &y, uint &w, uint &h)
+{
+	assert(IsPasture(t));
+	x = GB(t.m8(), 2, 2);
+	y = GB(t.m8(), 4, 2);
+	w = GB(t.m8(), 6, 2) + 1;
+	h = GB(t.m8(), 8, 2) + 1;
+}
+
+/**
+ * Make a field a tile of a pasture.
+ * @param t the field
+ * @param kind its animals
+ * @param x,y its column and row from the pasture's north corner, 0 to 3
+ * @param w,h the pasture's size, tiles, 1 to 4
+ * @pre IsClearGround(t, ClearGround::Fields)
+ */
+inline void MakePasture(Tile t, PastureKind kind, uint x, uint y, uint w, uint h)
+{
+	assert(IsClearGround(t, ClearGround::Fields));
+	SB(t.m8(), 0, 2, to_underlying(kind));
+	SB(t.m8(), 2, 2, x);
+	SB(t.m8(), 4, 2, y);
+	SB(t.m8(), 6, 2, w - 1);
+	SB(t.m8(), 8, 2, h - 1);
+}
+
 
 /**
  * Is there a fence at the given border?

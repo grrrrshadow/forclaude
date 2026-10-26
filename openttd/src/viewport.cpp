@@ -4897,14 +4897,91 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
  * ploughed field nor on the haystacks of the harvest, young while it grows (the field's type 1 to 3), ripe before the
  * harvest (4 to 7), each plant on the field's slope. No girls in the field, nothing is hoed there.
  */
+static void AddPastureTile();
 static void AddFieldWheat()
 {
 	if (!ObjectsIndexReadOrOwed()) return;
 	if (_cur_ti.tile == INVALID_TILE || !IsTileType(_cur_ti.tile, TileType::Clear) || !IsClearGround(_cur_ti.tile, ClearGround::Fields)) return;
+	if (IsPasture(_cur_ti.tile)) {
+		AddPastureTile();
+		return;
+	}
 	const uint type = GetFieldType(_cur_ti.tile);
 	if (type == 0 || type >= 8) return;
 	const ThreeDObject *wheat = GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala");
 	if (wheat != nullptr) _turned_objects.push_back({GetThreeDSlopedPlants(wheat, _cur_ti.tileh), _cur_ti.tile, _cur_ti.z});
+}
+
+/** A round of a pasture's animal (ForPastureAnimals()): so many ticks, the first of them looking up. */
+static constexpr uint PASTURE_ROUND_TICKS = 1100;
+static constexpr uint PASTURE_LOOK_TICKS = 240;
+
+/**
+ * What stands on a tile of a pasture (ThreeDPasture): the fence along each side of the pasture it lies on, with the gap
+ * of the way in on the middle tile of the side; the shelter on its first tile, the trough on its last.
+ */
+static std::vector<const ThreeDObject *> PastureTilePieces(TileIndex tile, const ThreeDPasture &p)
+{
+	std::vector<const ThreeDObject *> pieces;
+	uint x, y, w, h;
+	GetPastureSpot(tile, x, y, w, h);
+	for (DiagDirection d : EnumRange(DiagDirection::End)) {
+		const bool along_y = d == DiagDirection::NE || d == DiagDirection::SW;
+		const bool edge = d == DiagDirection::NE ? x == 0 : d == DiagDirection::SW ? x == w - 1 : d == DiagDirection::NW ? y == 0 : y == h - 1;
+		if (!edge) continue;
+		const bool gap = along_y ? y == h / 2 : x == w / 2;
+		const ThreeDObject *o = gap ? p.gate[to_underlying(d)] : p.fence[to_underlying(d)];
+		if (o != nullptr) pieces.push_back(o);
+	}
+	const uint at = y * w + x;
+	if (!p.extras.empty() && p.extras[0] != nullptr && at == 0) pieces.push_back(p.extras[0]);
+	if (p.extras.size() > 1 && p.extras[1] != nullptr && at == w * h - 1) pieces.push_back(p.extras[1]);
+	return pieces;
+}
+
+/**
+ * The animals of a tile of a pasture (ThreeDPasture, the colleague's "pase" and "kouka"): its kind's first places, each
+ * grazing round its frames and now and then looking up a while (the player, 26. 10.: "it may look up now and then, as
+ * when it rides with its head up"), each at another point of its round. On the map, which is not drawn again for them,
+ * each stands as it is.
+ * @param moving the frames of the game's tick; else each a pose of its own
+ * @param each the figure, its frame and its place on the tile
+ */
+static void ForPastureAnimals(TileIndex tile, const ThreeDPasture &p, bool moving, const std::function<void(const std::string &, int, const ThreeDObjectFigure &)> &each)
+{
+	const size_t k = to_underlying(GetPastureKind(tile)) - 1;
+	if (k >= p.kinds.size() || p.kinds[k].empty()) return;
+	const size_t n = std::min<size_t>(p.count[k], p.places.size());
+	for (size_t i = 0; i < n; i++) {
+		const uint32_t phase = (TileX(tile) * 7919 + TileY(tile) * 104729 + static_cast<uint32_t>(i) * 2654435761u) % PASTURE_ROUND_TICKS;
+		const uint64_t t = ((moving ? TimerGameTick::counter : 0) + phase) % PASTURE_ROUND_TICKS;
+		if (t < PASTURE_LOOK_TICKS) {
+			each(p.kinds[k] + "/kouka", 0, p.places[i]);
+			continue;
+		}
+		const std::string figure = p.kinds[k] + "/pase";
+		const ThreeDVehicleObject *f = GetThreeDFigure(figure);
+		const int frame = f == nullptr || f->frames < 2 ? 0 : static_cast<int>((t / std::max(1, f->frame_ticks)) % f->frames);
+		each(figure, frame, p.places[i]);
+	}
+}
+
+/** A tile of a pasture of a farm in the turned view (AddFieldWheat()): its grass, its fences, its shelter or trough, its animals. */
+static void AddPastureTile()
+{
+	const ThreeDPasture *p = GetThreeDPasture();
+	if (p == nullptr) return;
+	const std::vector<const ThreeDObject *> pieces = PastureTilePieces(_cur_ti.tile, *p);
+	if (pieces.empty()) {
+		if (p->ground != nullptr) _turned_objects.push_back({p->ground, _cur_ti.tile, _cur_ti.z});
+	} else {
+		TurnedObject &to = _turned_objects.emplace_back(pieces[0], _cur_ti.tile, _cur_ti.z, p->ground);
+		to.with.assign(pieces.begin() + 1, pieces.end());
+	}
+	ForPastureAnimals(_cur_ti.tile, *p, false, [](const std::string &figure, int frame, const ThreeDObjectFigure &f) {
+		AddThreeDFigureToViewport(figure, f.scale, static_cast<int>(std::lround(_cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE)), static_cast<int>(std::lround(_cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE)),
+				_cur_ti.z, f.facing, _vd.dpi.zoom, INVALID_TILE, 0, ThreeDMapPose(figure, frame));
+	});
 }
 
 /** Whether a sprite is one of the game's own street lights (Roadside::StreetLights: the table _roadside_lamps of road_cmd.cpp). */
@@ -11960,7 +12037,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
-		if (tile_type == TileType::Clear && IsClearGround(_cur_ti.tile, ClearGround::Fields) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
+		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
+			/* A pasture (AddPastureTile()): its fences, its shelter or trough, its animals grazing, on the game's grass. */
+			if (const ThreeDPasture *p = GetThreeDPasture(); p != nullptr) {
+				for (const ThreeDObject *o : PastureTilePieces(_cur_ti.tile, *p)) objects.push_back({o, _cur_ti.tile, _cur_ti.z});
+				ForPastureAnimals(_cur_ti.tile, *p, true, [](const std::string &figure, int frame, const ThreeDObjectFigure &f) {
+					AddCabFigure(figure, f.scale, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z, f.facing, frame);
+				});
+			}
+		} else if (tile_type == TileType::Clear && IsClearGround(_cur_ti.tile, ClearGround::Fields) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* Wheat on the farm's fields (AddFieldWheat()), near the eye: farther the field's ground says enough. */
 			const uint type = GetFieldType(_cur_ti.tile);
 			const ThreeDObject *wheat = type == 0 || type >= 8 ? nullptr : GetThreeDSlopedPlants(GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala"), _cur_ti.tileh);

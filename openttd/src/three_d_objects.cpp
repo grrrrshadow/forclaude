@@ -3227,6 +3227,101 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 	}
 }
 
+/** A pasture's parts as read (ReadPasture()), by their places in _three_d_objects; resolved by GetThreeDPasture(). */
+static struct {
+	size_t ground = SIZE_MAX;
+	std::array<size_t, 4> fence{SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
+	std::array<size_t, 4> gate{SIZE_MAX, SIZE_MAX, SIZE_MAX, SIZE_MAX};
+	std::vector<size_t> extras;
+	std::vector<ThreeDObjectFigure> places;
+	std::array<std::string, 3> kinds;
+	std::array<int, 3> count{};
+	bool read = false;
+} _pasture_read;
+
+/**
+ * The pasture of the farms ("druh": "pole", "pole": "pastvina", the colleague's pv_pole_pastvina,
+ * hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md): the ground of a tile of it ("podklad"), its fence along each side of a
+ * tile ("plot" "hrana", a part lying along x from the tile's north corner, turned onto the other sides) and with the
+ * gap of the way in ("otvor"), the shelter and the trough ("doplnky_pole"), each its own object placed on a tile; the
+ * places of the animals on a tile ("zvirata") and of which kinds ("druhy_zvirat", "zvirat_na_policko").
+ */
+static void ReadPasture(const nlohmann::json &e, const std::map<std::string, IndustryPartMesh> &parts)
+{
+	const std::string name = e.value("jmeno", std::string("pastvina"));
+	const float side = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE);
+	auto place = [&](const std::string &part, float x, float y, float turn) -> size_t {
+		auto it = parts.find(part);
+		if (it == parts.end()) {
+			Debug(misc, 0, "3D objects {}: no part {}", name, part);
+			return SIZE_MAX;
+		}
+		const float at[3] = {x, y, 0};
+		_three_d_objects.push_back(PlaceIndustryPart(it->second, fmt::format("{}/{} {:.0f},{:.0f} {:.0f}", name, part, x, y, turn), at, turn, 1.0f, 1, 1));
+		return _three_d_objects.size() - 1;
+	};
+	_pasture_read = {};
+	_pasture_read.read = true;
+	if (e.contains("podklad") && e.at("podklad").is_string()) _pasture_read.ground = place(e.at("podklad").get<std::string>(), 0, 0, 0);
+	if (e.contains("plot") && e.at("plot").is_object()) {
+		const auto &f = e.at("plot");
+		/* Along each side of a tile, by DiagDirection: NE (x 0), SE (y the tile's side), SW (x so), NW (y 0). */
+		static constexpr float AT[4][3] = {{0, 0, 90}, {0, 1, 0}, {1, 0, 90}, {0, 0, 0}};
+		for (int d = 0; d < 4; d++) {
+			if (f.contains("hrana") && f.at("hrana").is_string()) _pasture_read.fence[d] = place(f.at("hrana").get<std::string>(), AT[d][0] * side, AT[d][1] * side, AT[d][2]);
+			if (f.contains("otvor") && f.at("otvor").is_string()) _pasture_read.gate[d] = place(f.at("otvor").get<std::string>(), AT[d][0] * side, AT[d][1] * side, AT[d][2]);
+		}
+	}
+	if (e.contains("doplnky_pole") && e.at("doplnky_pole").is_array()) {
+		for (const auto &d : e.at("doplnky_pole")) {
+			if (!d.is_object() || !d.contains("dil") || !d.contains("poloha") || !d.at("poloha").is_array() || d.at("poloha").size() < 2) continue;
+			const size_t k = place(d.at("dil").get<std::string>(), d.at("poloha").at(0).get<float>(), d.at("poloha").at(1).get<float>(), d.value("otoceni", 0.0f));
+			if (k != SIZE_MAX) _pasture_read.extras.push_back(k);
+		}
+	}
+	if (e.contains("zvirata") && e.at("zvirata").is_array()) {
+		for (const auto &z : e.at("zvirata")) {
+			if (!z.is_object() || !z.contains("poloha") || !z.at("poloha").is_array() || z.at("poloha").size() < 2) continue;
+			ThreeDObjectFigure &f = _pasture_read.places.emplace_back();
+			f.at[0] = z.at("poloha").at(0).get<float>();
+			f.at[1] = z.at("poloha").at(1).get<float>();
+			f.facing = z.value("otoceni", 0.0f);
+			f.scale = e.value("meritko_zvirat", 1.0f);
+		}
+	}
+	if (e.contains("druhy_zvirat") && e.at("druhy_zvirat").is_array()) {
+		for (size_t k = 0; k < std::min<size_t>(3, e.at("druhy_zvirat").size()); k++) {
+			_pasture_read.kinds[k] = e.at("druhy_zvirat").at(k).get<std::string>();
+			_pasture_read.count[k] = 2;
+			if (e.contains("zvirat_na_policko") && e.at("zvirat_na_policko").is_object()) _pasture_read.count[k] = std::clamp(e.at("zvirat_na_policko").value(_pasture_read.kinds[k], 2), 0, 8);
+		}
+	}
+}
+
+/** The pasture of the farms (ReadPasture()), nullptr none in the sets. */
+const ThreeDPasture *GetThreeDPasture()
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static ThreeDPasture resolved;
+	static bool made = false;
+	if (!_pasture_read.read) return nullptr;
+	if (!made) {
+		/* The objects by their places, now that all the indices are read and the list stays as it is. */
+		made = true;
+		auto at = [](size_t k) -> const ThreeDObject * { return k < _three_d_objects.size() ? &_three_d_objects[k] : nullptr; };
+		resolved.ground = at(_pasture_read.ground);
+		for (int d = 0; d < 4; d++) {
+			resolved.fence[d] = at(_pasture_read.fence[d]);
+			resolved.gate[d] = at(_pasture_read.gate[d]);
+		}
+		for (size_t k : _pasture_read.extras) resolved.extras.push_back(at(k));
+		resolved.places = _pasture_read.places;
+		resolved.kinds = _pasture_read.kinds;
+		resolved.count = _pasture_read.count;
+	}
+	return &resolved;
+}
+
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 /** The lamp of the colleague's set "lampy" standing where the game has its street lights. */
 static constexpr std::string_view STREET_LAMP = "lampa_na_sloupu";
@@ -3334,6 +3429,10 @@ static void ReadThreeDObjectsNow()
 			const std::map<std::string, IndustryPartMesh> parts = ReadIndustryParts(list, folder);
 			for (const auto &e : list) {
 				const std::string kind = e.value("druh", std::string("dum"));
+				if (kind == "pole" && e.value("pole", std::string()) == "pastvina") {
+					ReadPasture(e, parts);
+					continue;
+				}
 				if (kind == "prumysl" || kind == "pole") {
 					ReadIndustryObject(e, folder, kind == "pole");
 					continue;

@@ -928,6 +928,20 @@ bool ThreeDDoorIsWindow(const ThreeDObject *house, size_t door);
 const ThreeDObject *GetThreeDInteriorAt(const ThreeDObject *house, TileIndex origin);
 bool ThreeDLampNear(const ThreeDObject *house, TileIndex origin, double x, double y, double reach);
 void TakeThreeDLamp(TileIndex origin);
+/**
+ * The pasture of the farms (the colleague's pv_pole_pastvina, hra/3d/PASTVINY-OKNA-ROZHLEDNA-PRO-HRU.md; the game's
+ * pastures, IsPasture()): what stands on a tile of it, each an object placed in the tile's frame from its north corner.
+ */
+struct ThreeDPasture {
+	const ThreeDObject *ground = nullptr;              ///< "podklad": the grass grazed
+	std::array<const ThreeDObject *, 4> fence{};       ///< "plot" "hrana": the fence along a side of the tile, by DiagDirection
+	std::array<const ThreeDObject *, 4> gate{};        ///< "plot" "otvor": so, with the gap of the way in
+	std::vector<const ThreeDObject *> extras;          ///< "doplnky_pole": the shelter, the trough; each on a tile of its own
+	std::vector<ThreeDObjectFigure> places;            ///< "zvirata": where the animals of a tile stand (the figure the caller's)
+	std::array<std::string, 3> kinds;                  ///< "druhy_zvirat": the animals by PastureKind (cows, sheep, pigs)
+	std::array<int, 3> count{};                        ///< "zvirat_na_policko": so many of each on a tile
+};
+const ThreeDPasture *GetThreeDPasture();
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
 
 /**
