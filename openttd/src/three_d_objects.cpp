@@ -4263,8 +4263,8 @@ static void ReadThreeDVehicleObjects()
 		}
 		_vehicle_objects.push_back(std::move(obj));
 	}
-	/* The cars of the mods of BeamNG (beamng.h): each the one road vehicle of the GRF made of it, drawn from its model,
-	 * one of its mod's paints each car (the player, 16. 10.: "the colour of the mod"). */
+	/* The cars of the mods of BeamNG (beamng.h): each configuration the road vehicles of the GRF of its folder made of
+	 * it, drawn from its model, one of its mod's paints each car (the player, 16. 10.: "the colour of the mod"). */
 	for (const BeamngVehicle &b : FindBeamngVehicles()) {
 		ThreeDVehicleObject obj;
 		obj.name = b.name;
@@ -4272,7 +4272,8 @@ static void ReadThreeDVehicleObjects()
 		obj.file = "beamng:" + b.Package() + "|" + b.folder + "|" + b.config;
 		obj.type = VehicleType::Road;
 		obj.grfid = b.grfid;
-		obj.pieces.push_back(BEAMNG_ENGINE_ID);
+		/* Each car of the purchase list made of the configuration (the 1203's makes over the years) drawn from it. */
+		for (const BeamngModel &m : b.models) obj.pieces.push_back(m.id);
 		for (uint32_t colour : b.paints) {
 			ThreeDVehicleState st;
 			st.colour = colour;

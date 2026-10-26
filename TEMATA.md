@@ -31,6 +31,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (3) – 1203 po letech: Škoda 1203 → TAZ 1203 → TAZ 1500 a TAZ 1.9D; roky z BeamNG; jeden GRF na auto
+
+- Hráč: *„1203 škoda pak 1203 taz a nakonec taz 1500 a 1900D?“*, *„to udělej hezký když to píšeš extra pro 1203“*,
+  *„jestli máš z beamng rok tak ho použij“* (u ostatních aut), *„to se má rozbalovat typ auta na dodávku, valník“*.
+- **Éry 1203** (`S1203_MAKES`, jen složka `S1203`): Škoda 1203 1968–1980 (35 kW), TAZ 1203 1981–1992 (35 kW),
+  TAZ 1500 1993–1999 (1433 cm³, 40 kW – odhad, zdroj výkon neuvádí), TAZ 1.9D 1996–1999 (diesel VW 1,9, 47 kW).
+  Každá konfigurace je auto každé éry, do které jí sahají roky z modu; konec z modu platí, jen když je před 1993
+  (De Luxe 1969–1972, mikrobus do 1989, valník do 1990), jinak do konce výroby 1999 (kombi a dodávka mají v modu
+  1995). Rychlost podle třetí odmocniny výkonu. Jména česky: kombi, dodávka, valník, sanitka, pohřební, De Luxe,
+  mikrobus, VB, VB žlutá (police2: nová maska, žlutý nátěr), Spoje.
+- **Roky z BeamNG u všech aut** (`Years` v `info.json` / `info_<konfigurace>.json`): uvedení od `min` (prop 0x00),
+  z nákupu kolem konce `max` (model life 9 + roky − 2, retire early 1: OpenTTD ho stáhne za n let a 7–53 měsíců).
+  Bez `Years` jako dřív (od 1920, navždy).
+- **Hráč hraje s „vozidla nikdy nezastarají“** (`never_expire_vehicles = true` v jeho cfg) – staré éry z nákupu
+  nezmizí, proto jsou **varianty OpenTTD** (prop 0x26): v nákupu se rozbalí typ (Škoda 1203 kombi ▸ dodávka, valník,
+  VB…, stejně TAZ 1203, TAZ 1500, TAZ 1.9D). Rig bez nezastarávání: 1975 jen Škoda, 1985 jen TAZ 1203, 1997 TAZ 1500
+  a 1.9D.
+- **Jeden GRF na složku auta** (`S1203.grf`, GRF id jako dřív u výchozího auta): všechny konfigurace a éry v něm,
+  čísla od 200 (výchozí konfigurace první, takže uložená výchozí 1203 je teď Škoda 1203 kombi). Hráč zapíná jeden
+  GRF, ne deset. Výchozí auto čte i `info_<default_pc>.json` (kombi dřív dostalo všechny náklady).
+- V releasech grrrrf (16), forclaude a cota 1203 z BeamNG není; v indexu jen tisknutelné modely (stl) a VWT1.
+  Hráčovy 1203 v grrrrf: VWT1 všech 18 od 1. 1. 1951, osobáčky/pokusy TAZ 1203 plachta od 1. 4. 1972.
+
 ## 26. 10. (2) – BeamNG: varianty jako samostatná auta, náklady podle 1203, College Girl řídí 1203
 
 - **Varianty:** každý `.pc` složky auta (kromě `default_pc` z `info.json`, bez něj kromě prvního `.pc`) je samostatné

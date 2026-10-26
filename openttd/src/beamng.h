@@ -13,11 +13,28 @@
 #include <string>
 #include <vector>
 
+/** The first number of the cars in the GRF made of a car's folder: past the original road vehicles, so new ones and not copies. */
+static constexpr uint16_t BEAMNG_ENGINE_ID = 200;
+
+/**
+ * A car of the purchase list made of a configuration: one for most, but for our Škoda 1203 one for each of its makes
+ * over the years (the player, 26. 10.: "the Škoda 1203, then the TAZ 1203 and at last the TAZ 1500 and the 1.9 D").
+ */
+struct BeamngModel {
+	std::string name;               ///< its name in the purchase list
+	uint16_t id = BEAMNG_ENGINE_ID; ///< its number in the GRF of its folder
+	int make = -1;                  ///< which of the 1203's makes it is, -1 none
+	int year_from = 0;              ///< the year it comes, 0 there in every game
+	int year_to = 0;                ///< the last year it is made, 0 never retiring
+	double power_kw = 0;
+	double speed_kmh = 0;
+};
+
 /**
  * A car of a mod of BeamNG.drive as the player has it: a .zip in the mods folder of BeamNG (or one unpacked there),
  * in a folder the player names ("beamng_path"), or in newgrf/beamng/ of the game's folders (the player, 16. 10.:
- * "shall we drive mods of BeamNG?"). Its folder vehicles/<name>/ read, the game makes of it a NewGRF of one road
- * vehicle (PrepareBeamngGrfs()) in newgrf/beamng/, drawn from its model.
+ * "shall we drive mods of BeamNG?"). Its folder vehicles/<name>/ read, the game makes of it a NewGRF of road vehicles,
+ * one for each of its configurations (PrepareBeamngGrfs()), in newgrf/beamng/, drawn from its model.
  *
  * Nothing of it is ever the game's: the mods are the player's own downloads and their authors', each under its own
  * licence (the official cars of BeamNG may not go to another game at all). So the game only reads them where they
@@ -40,14 +57,14 @@ struct BeamngVehicle {
 	std::vector<std::string> cargoes; ///< the labels of the cargoes it may be refitted to, the first its own; empty every cargo of the game
 	bool has_cab = false;         ///< a camera of the driver given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
-	uint32_t grfid = 0;           ///< the GRF's id, of its .zip's and folder's names
+	int year_from = 0;            ///< "Years" of its info.json: the first year made, 0 none given
+	int year_to = 0;              ///< and the last
+	std::vector<BeamngModel> models; ///< the cars of the purchase list made of it
+	uint32_t grfid = 0;           ///< the GRF's id, of its .zip's and folder's names: one GRF a folder, all its configurations in it
 
-	std::string grf_path;         ///< where the GRF made of it is: newgrf/beamng/ of the player's own folder
+	std::string grf_path;         ///< where the GRF made of its folder is: newgrf/beamng/ of the player's own folder
 	std::string Package() const { return this->zip.empty() ? this->folder : this->zip; }
 };
-
-/** The car's number in the GRF made of it: past the original road vehicles, so a new one and not a copy of one. */
-static constexpr uint16_t BEAMNG_ENGINE_ID = 200;
 
 extern std::string _beamng_path;
 const std::vector<BeamngVehicle> &FindBeamngVehicles();

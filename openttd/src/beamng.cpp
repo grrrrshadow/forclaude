@@ -557,6 +557,76 @@ static const std::vector<std::string> TARP_1203_CARGOES = {
 static const std::vector<std::string> PEOPLE_CARGOES = {"PASS", "WORK", "PRIS", "YETI", "YETY"};
 
 /**
+ * Our Škoda 1203 over the years (the player, 26. 10.: "the Škoda 1203, then the TAZ 1203 and at last the TAZ 1500 and
+ * the 1.9 D", "make it nice when you write it for the 1203 alone"): made at Vrchlabí to 1981, then at Trnava, the
+ * TAZ 1500 with the 1433 cm³ engine from 1993 and the diesel of VW from 1996, the last ones in 1999. Each
+ * configuration a car of each make whose years it has; the model the same, the power its make's.
+ */
+struct BeamngMake {
+	std::string_view name;
+	int from, to;   ///< its years, the last one made
+	double kw;      ///< its engine's power
+};
+static constexpr BeamngMake S1203_MAKES[] = {
+	{"Škoda 1203", 1968, 1980, 35}, // 1.2 l, 47 k
+	{"TAZ 1203", 1981, 1992, 35},
+	{"TAZ 1500", 1993, 1999, 40},   // 1433 cm³
+	{"TAZ 1.9D", 1996, 1999, 47},   // the diesel of VW, 1.9 l, 64 k
+};
+/** The last make: a configuration the mod makes into it is made to the end, as the 1203 was. */
+static constexpr int S1203_LAST_FROM = 1993;
+/** What each configuration of the 1203 is, in its name. */
+static constexpr std::pair<std::string_view, std::string_view> S1203_KINDS[] = {
+	{"police2", "VB žlutá"}, {"police", "VB"}, {"ambulance", "sanitka"}, {"hearse", "pohřební"}, {"flatbed", "valník"},
+	{"van", "dodávka"}, {"com", "kombi"}, {"passenger", "mikrobus"}, {"lux", "De Luxe"}, {"spoje", "Spoje"}, {"fire", "hasiči"},
+};
+
+/** Is it our Škoda 1203: the folder "S1203" of its mod. */
+static bool IsS1203(const BeamngVehicle &v)
+{
+	return StrEqualsIgnoreCase(v.id, "S1203");
+}
+
+/**
+ * The cars of the purchase list made of a configuration (their numbers in the GRF come later, FindBeamngVehicles()):
+ * the car itself in the years of its info.json, or our 1203 as each of its makes.
+ */
+static void MakeModels(BeamngVehicle &v, const std::string &own_config)
+{
+	v.models.clear();
+	if (!IsS1203(v)) {
+		BeamngModel m;
+		m.name = v.name;
+		m.year_from = v.year_from;
+		m.year_to = v.year_to;
+		m.power_kw = v.power_kw;
+		m.speed_kmh = v.speed_kmh;
+		v.models.push_back(std::move(m));
+		return;
+	}
+	std::string kind = own_config;
+	for (const auto &[config, name] : S1203_KINDS) {
+		if (StrEqualsIgnoreCase(own_config, config)) {
+			kind = name;
+			break;
+		}
+	}
+	for (const BeamngMake &make : S1203_MAKES) {
+		BeamngModel m;
+		m.make = static_cast<int>(&make - S1203_MAKES);
+		m.name = std::string(make.name) + (kind.empty() ? std::string() : " " + kind);
+		/* Its own years within the make's; one the mod ends before the last make ends then, one it makes into it to the end. */
+		m.year_from = std::max(make.from, v.year_from);
+		m.year_to = v.year_to > 0 && v.year_to < S1203_LAST_FROM ? std::min(make.to, v.year_to) : make.to;
+		if (m.year_from > m.year_to) continue;
+		m.power_kw = make.kw;
+		/* As fast as the mod's car, by the third root of the power against the air. */
+		m.speed_kmh = v.power_kw > 0 ? v.speed_kmh * std::cbrt(make.kw / v.power_kw) : v.speed_kmh;
+		v.models.push_back(std::move(m));
+	}
+}
+
+/**
  * A car of its folder in the mod, if it is one with a model and an engine.
  * @param config its configuration, a .pc of the folder without ".pc"; empty the default one
  */
@@ -568,9 +638,12 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	v.id = id;
 	v.config = config;
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
-	/* A configuration's own info_<name>.json over the car's: its name ("Configuration"), its paint, its body. */
-	if (!config.empty() && info.IsObject()) {
-		JValue own = ParseJson(ReadModFile(v, "info_" + config + ".json"));
+	/* Its configuration's name: its own, or for the car itself info.json's "default_pc". */
+	std::string own_config = config;
+	if (const JValue *d = info.Get("default_pc"); own_config.empty() && d != nullptr && d->IsString()) own_config = d->text;
+	/* The configuration's own info_<name>.json over the car's: its name ("Configuration"), its years, its paint, its body. */
+	if (!own_config.empty() && info.IsObject()) {
+		JValue own = ParseJson(ReadModFile(v, "info_" + own_config + ".json"));
 		if (own.IsObject()) {
 			for (auto &[k, val] : own.members) {
 				auto it = std::ranges::find_if(info.members, [&k](const auto &m) { return m.first == k; });
@@ -604,6 +677,11 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 		v.name += " " + (c != nullptr && c->IsString() && !c->text.empty() ? c->text : config);
 	}
 	if (const JValue *a = info.Get("Author"); a != nullptr && a->IsString()) v.author = a->text;
+	if (const JValue *y = info.Get("Years"); y != nullptr && y->IsObject()) {
+		if (const JValue *lo = y->Get("min"); lo != nullptr) v.year_from = static_cast<int>(lo->Num());
+		if (const JValue *hi = y->Get("max"); hi != nullptr) v.year_to = static_cast<int>(hi->Num());
+		if (v.year_to < v.year_from) v.year_to = 0;
+	}
 	const JValue *type = info.Get("Type");
 	if (type != nullptr && type->IsString() && (StrEqualsIgnoreCase(type->text, "Prop") || StrEqualsIgnoreCase(type->text, "Trailer"))) return std::nullopt;
 
@@ -769,7 +847,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	 * tarp, the flatbed without people. Any other car every cargo of the game (the player: "give the BeamNG cars all
 	 * the cargoes in the game").
 	 */
-	std::string what = config + " ";
+	std::string what = own_config + " ";
 	if (const JValue *c = info.Get("Configuration"); c != nullptr && c->IsString()) what += c->text;
 	strtolower(what);
 	auto has = [&what](std::initializer_list<std::string_view> words) { return std::ranges::any_of(words, [&what](std::string_view w) { return what.find(w) != std::string::npos; }); };
@@ -816,8 +894,9 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 		}
 	}
 	const std::string zip_name = zip.empty() ? folder : zip.substr(zip.find_last_of(PATHSEPCHAR) + 1);
-	/* (The default configuration's as it always was: the games saved with it keep it.) */
-	v.grfid = GrfIdOf(zip_name + "/" + id + (config.empty() ? std::string() : "/" + config));
+	/* One GRF a folder, of the id it always had: the games saved with the car keep it. */
+	v.grfid = GrfIdOf(zip_name + "/" + id);
+	MakeModels(v, own_config);
 	return v;
 }
 
@@ -938,9 +1017,22 @@ std::string GrfFolder()
 
 /* ---- The GRF ---- */
 
-/** The bytes of a NewGRF of one road vehicle (container version 1, GRF version 8: Actions 8, 0 and 4, no sprites). */
-std::vector<uint8_t> MakeGrf(const BeamngVehicle &v)
+/** The days from 1920 to the first of January of a year, as a GRF gives the introduction of a vehicle. */
+static uint32_t DaysSince1920(int year)
 {
+	uint32_t days = 0;
+	for (int y = 1920; y < year; y++) days += (y % 4 == 0 && (y % 100 != 0 || y % 400 == 0)) ? 366 : 365;
+	return days;
+}
+
+/**
+ * The bytes of a NewGRF of a car's folder (container version 1, GRF version 8: Actions 8, 0 and 4, no sprites): a
+ * road vehicle for each car of the purchase list of each of its configurations (BeamngVehicle::models).
+ * @param cars the folder's configurations, the car itself first
+ */
+std::vector<uint8_t> MakeGrf(const std::vector<const BeamngVehicle *> &cars)
+{
+	const BeamngVehicle &first = *cars.front();
 	std::vector<std::vector<uint8_t>> sprites;
 	auto text = [](std::vector<uint8_t> &b, const std::string &s) {
 		/* "Þ" first: the text is UTF-8. */
@@ -951,64 +1043,119 @@ std::vector<uint8_t> MakeGrf(const BeamngVehicle &v)
 	};
 	auto word = [](std::vector<uint8_t> &b, uint32_t x) { b.push_back(x & 0xFF); b.push_back((x >> 8) & 0xFF); };
 	auto dword = [&word](std::vector<uint8_t> &b, uint32_t x) { word(b, x & 0xFFFF); word(b, x >> 16); };
+	/* A number as an extended byte: itself, or 0xFF and a word. */
+	auto ext = [&word](std::vector<uint8_t> &b, uint16_t x) {
+		if (x < 0xFF) {
+			b.push_back(static_cast<uint8_t>(x));
+		} else {
+			b.push_back(0xFF);
+			word(b, x);
+		}
+	};
 
 	{
 		std::vector<uint8_t> a8 = {0x08, 0x08};
-		dword(a8, v.grfid);
-		text(a8, "BeamNG: " + v.name);
-		std::string author = v.author.empty() ? std::string() : ", autor " + v.author;
-		text(a8, "Auto z modu BeamNG.drive (" + v.id + author + "). Model a textury patří autorům modu a zůstávají ve své složce: jen pro tvou hru, nešířit.");
+		dword(a8, first.grfid);
+		text(a8, "BeamNG: " + first.name);
+		std::string author = first.author.empty() ? std::string() : ", autor " + first.author;
+		text(a8, "Auto z modu BeamNG.drive (" + first.id + author + "). Model a textury patří autorům modu a zůstávají ve své složce: jen pro tvou hru, nešířit.");
 		sprites.push_back(std::move(a8));
 	}
 
-	const double hp = v.power_kw / 0.7457;
-	/* Prices by the original game's bus (MPS Regal: 90 hp, cost 120, running 91), a car of the same power less. */
-	const double rel = std::max(hp, 20.0) / 90.0;
-	const uint8_t cost = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 100 : 50) * std::pow(rel, 0.45))), 8, 255));
-	const uint8_t running = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 80 : 40) * std::pow(rel, 0.4))), 8, 255));
-	/* Its cargoes by their labels: a translation table of them (global property 9), the refit list by its numbers. */
-	if (!v.cargoes.empty()) {
-		std::vector<uint8_t> ctt = {0x00, 0x08, 0x01, static_cast<uint8_t>(std::min<size_t>(v.cargoes.size(), 255)), 0x00, 0x09};
-		for (size_t i = 0; i < v.cargoes.size() && i < 255; i++) {
-			for (int k = 0; k < 4; k++) ctt.push_back(k < static_cast<int>(v.cargoes[i].size()) ? static_cast<uint8_t>(v.cargoes[i][k]) : ' ');
+	/* The cargoes of all of them by their labels: one translation table (global property 9), each refit list by its numbers. */
+	std::vector<std::string> labels;
+	for (const BeamngVehicle *v : cars) {
+		for (const std::string &c : v->cargoes) {
+			if (std::ranges::find(labels, c) == labels.end()) labels.push_back(c);
+		}
+	}
+	if (labels.size() > 255) labels.resize(255);
+	if (!labels.empty()) {
+		std::vector<uint8_t> ctt = {0x00, 0x08, 0x01, static_cast<uint8_t>(labels.size()), 0x00, 0x09};
+		for (const std::string &l : labels) {
+			for (int k = 0; k < 4; k++) ctt.push_back(k < static_cast<int>(l.size()) ? static_cast<uint8_t>(l[k]) : ' ');
 		}
 		sprites.push_back(std::move(ctt));
 	}
-	std::vector<uint8_t> a0 = {0x00, 0x01, 0, 0x01, static_cast<uint8_t>(BEAMNG_ENGINE_ID)};
-	uint8_t props = 0;
-	auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
-	prop(0x00); word(a0, 0);                       // introduced 1920: there in every game
-	prop(0x02); a0.push_back(20);                  // reliability decay
-	prop(0x03); a0.push_back(15);                  // a vehicle's life, years
-	prop(0x04); a0.push_back(0xFF);                // the model never retires
-	prop(0x06); a0.push_back(0x0F);                // every climate
-	prop(0x07); a0.push_back(5);                   // loading speed
-	prop(0x0E); a0.push_back(0xFF);                // the set's own sprites: drawn from its model (GetThreeDVehicleObjectSprite())
-	prop(0x0F); a0.push_back(static_cast<uint8_t>(v.capacity));
-	if (!v.cargoes.empty()) {
-		prop(0x10); a0.push_back(0x00);            // the first of its table, its own
-		prop(0x1D); word(a0, 0x0000);              // no classes: its list alone
-		prop(0x1E); word(a0, 0x0000);
-		prop(0x24); a0.push_back(static_cast<uint8_t>(std::min<size_t>(v.cargoes.size(), 255)));
-		for (size_t i = 0; i < v.cargoes.size() && i < 255; i++) a0.push_back(static_cast<uint8_t>(i));
-	} else {
-		prop(0x10); a0.push_back(v.goods ? 0xFF : 0x00); // passengers, or the first goods it takes
-		/* Refitted to every cargo the game has (the player, 26. 10.: "give the BeamNG cars all the cargoes in the game"). */
-		prop(0x1D); word(a0, 0xFFFF);              // the classes of cargo it may be refitted to: all
-		prop(0x1E); word(a0, 0x8000);              // but the road vehicles (CT_ROLA, special): the player's car carriers only
+
+	/*
+	 * The purchase list folds the cars of a make under its first one, the car itself's where it has the make (the
+	 * player, 26. 10.: "the make is to unfold into the van, the flatbed"): the player keeps the vehicles that never
+	 * expire, so the old makes stay there beside the new.
+	 */
+	std::map<int, uint16_t> make_first;
+	for (const BeamngVehicle *v : cars) {
+		for (const BeamngModel &m : v->models) {
+			if (m.make >= 0) make_first.try_emplace(m.make, m.id);
+		}
 	}
-	prop(0x11); a0.push_back(cost);
-	prop(0x09); a0.push_back(running);
-	prop(0x13); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(hp / 10)), 1, 255)));       // power, 10 hp
-	prop(0x14); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(v.mass_t * 4)), 1, 255)));  // weight, 1/4 t
-	prop(0x15); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(v.speed_kmh / 2.0117)), 1, 255))); // speed, 1.25 mph
-	prop(0x18); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(v.effort * 255)), 1, 255)));  // tractive effort
-	a0[2] = props;
-	sprites.push_back(std::move(a0));
-	{
-		std::vector<uint8_t> a4 = {0x04, 0x01, 0x7F, 0x01, static_cast<uint8_t>(BEAMNG_ENGINE_ID)};
-		text(a4, v.name);
-		sprites.push_back(std::move(a4));
+
+	for (const BeamngVehicle *car : cars) {
+		const BeamngVehicle &v = *car;
+		std::vector<uint8_t> refits;
+		for (const std::string &c : v.cargoes) {
+			auto at = std::ranges::find(labels, c);
+			if (at != labels.end()) refits.push_back(static_cast<uint8_t>(at - labels.begin()));
+		}
+		for (const BeamngModel &m : v.models) {
+			const double hp = m.power_kw / 0.7457;
+			/* Prices by the original game's bus (MPS Regal: 90 hp, cost 120, running 91), a car of the same power less. */
+			const double rel = std::max(hp, 20.0) / 90.0;
+			const uint8_t cost = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 100 : 50) * std::pow(rel, 0.45))), 8, 255));
+			const uint8_t running = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 80 : 40) * std::pow(rel, 0.4))), 8, 255));
+			std::vector<uint8_t> a0 = {0x00, 0x01, 0, 0x01};
+			ext(a0, m.id);
+			const size_t count_at = 2;
+			uint8_t props = 0;
+			auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
+			/* Its years (the player, 26. 10.: "if you have the year of BeamNG, use it"): it comes in the first, and leaves
+			 * the purchase list about the end of the last. The game retires a model at the end of the first two phases of
+			 * its life less its years "retired early" (CalcEngineReliability()): phase 1 of 7 to 38 months, phase 2 its
+			 * model life less 8 years and 0 to 15 months; a model life of 9 + n years retired 1 early so goes n years and
+			 * 7 to 53 months after it came, about the end of its last year when n is its years less two. */
+			prop(0x00); word(a0, m.year_from > 1920 ? std::min<uint32_t>(DaysSince1920(m.year_from), 0xFFFF) : 0);
+			prop(0x02); a0.push_back(20);                  // reliability decay
+			prop(0x03); a0.push_back(15);                  // a vehicle's life, years
+			if (m.year_to > 0) {
+				const int years = std::max(m.year_to + 1 - std::max(m.year_from, 1920), 0);
+				prop(0x04); a0.push_back(static_cast<uint8_t>(Clamp(9 + std::max(years - 2, 0), 9, 254)));
+				prop(0x1B); a0.push_back(1);               // retired a year early: when its years are over
+			} else {
+				prop(0x04); a0.push_back(0xFF);            // the model never retires
+			}
+			prop(0x06); a0.push_back(0x0F);                // every climate
+			prop(0x07); a0.push_back(5);                   // loading speed
+			prop(0x0E); a0.push_back(0xFF);                // the set's own sprites: drawn from its model (GetThreeDVehicleObjectSprite())
+			prop(0x0F); a0.push_back(static_cast<uint8_t>(v.capacity));
+			if (!refits.empty()) {
+				prop(0x10); a0.push_back(refits.front());  // the first of its list, its own
+				prop(0x1D); word(a0, 0x0000);              // no classes: its list alone
+				prop(0x1E); word(a0, 0x0000);
+				prop(0x24); a0.push_back(static_cast<uint8_t>(refits.size()));
+				a0.insert(a0.end(), refits.begin(), refits.end());
+			} else {
+				prop(0x10); a0.push_back(v.goods ? 0xFF : 0x00); // passengers, or the first goods it takes
+				/* Refitted to every cargo the game has (the player, 26. 10.: "give the BeamNG cars all the cargoes in the game"). */
+				prop(0x1D); word(a0, 0xFFFF);              // the classes of cargo it may be refitted to: all
+				prop(0x1E); word(a0, 0x8000);              // but the road vehicles (CT_ROLA, special): the player's car carriers only
+			}
+			prop(0x11); a0.push_back(cost);
+			prop(0x09); a0.push_back(running);
+			prop(0x13); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(hp / 10)), 1, 255)));       // power, 10 hp
+			prop(0x14); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(v.mass_t * 4)), 1, 255)));  // weight, 1/4 t
+			prop(0x15); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(m.speed_kmh / 2.0117)), 1, 255))); // speed, 1.25 mph
+			prop(0x18); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(v.effort * 255)), 1, 255)));  // tractive effort
+			if (auto first_of_make = make_first.find(m.make); first_of_make != make_first.end() && first_of_make->second != m.id) {
+				prop(0x26); word(a0, first_of_make->second); // under the first of its make
+			}
+			a0[count_at] = props;
+			sprites.push_back(std::move(a0));
+
+			std::vector<uint8_t> a4 = {0x04, 0x01, 0x7F, 0x01};
+			ext(a4, m.id);
+			text(a4, m.name);
+			sprites.push_back(std::move(a4));
+		}
 	}
 
 	std::vector<uint8_t> grf;
@@ -1675,27 +1822,38 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 	_zips.clear();
 	const std::string grf_folder = GrfFolder();
 	if (grf_folder.empty()) return _beamng_vehicles;
-	auto take = [&](std::optional<BeamngVehicle> car) {
+	/* A configuration of a folder: its cars numbered on from the folder's last, its GRF the folder's. */
+	auto take = [&](std::optional<BeamngVehicle> car, uint16_t &next_id) {
 		if (!car.has_value()) return;
-		if (std::ranges::any_of(_beamng_vehicles, [&car](const BeamngVehicle &o) { return o.grfid == car->grfid; })) {
+		if (std::ranges::any_of(_beamng_vehicles, [&car](const BeamngVehicle &o) { return o.grfid == car->grfid && (o.Package() != car->Package() || o.folder != car->folder); })) {
 			Debug(grf, 0, "BeamNG: {} {} has the same GRF id as another, left out", car->Package(), car->id);
 			return;
 		}
-		car->grf_path = grf_folder + car->id + (car->config.empty() ? std::string() : "_" + car->config) + ".grf";
-		if (std::ranges::any_of(_beamng_vehicles, [&car](const BeamngVehicle &o) { return StrEqualsIgnoreCase(o.grf_path, car->grf_path); })) {
-				car->grf_path = grf_folder + car->id + (car->config.empty() ? std::string() : "_" + car->config) + fmt::format("_{:08X}", car->grfid) + ".grf";
+		auto same_folder = std::ranges::find_if(_beamng_vehicles, [&car](const BeamngVehicle &o) { return o.grfid == car->grfid; });
+		if (same_folder != _beamng_vehicles.end()) {
+			car->grf_path = same_folder->grf_path;
+		} else {
+			car->grf_path = grf_folder + car->id + ".grf";
+			if (std::ranges::any_of(_beamng_vehicles, [&car](const BeamngVehicle &o) { return StrEqualsIgnoreCase(o.grf_path, car->grf_path); })) {
+				car->grf_path = grf_folder + car->id + fmt::format("_{:08X}", car->grfid) + ".grf";
+			}
 		}
+		for (BeamngModel &m : car->models) m.id = next_id++;
 		Debug(grf, 1, "BeamNG: {} ({} {}): {} {}, {:.0f} kW, {:.0f} km/h, {:.2f} t, effort {:.2f}, {} paints, GRF {:02X}{:02X}{:02X}{:02X}", car->name, car->Package(), car->id,
 				car->goods ? "goods" : "seats", car->capacity, car->power_kw, car->speed_kmh, car->mass_t, car->effort, car->paints.size(),
 				car->grfid & 0xFF, (car->grfid >> 8) & 0xFF, (car->grfid >> 16) & 0xFF, car->grfid >> 24);
+		for (const BeamngModel &m : car->models) {
+			Debug(grf, 1, "BeamNG:   {} '{}': {}-{}, {:.0f} kW, {:.0f} km/h", m.id, m.name, m.year_from, m.year_to, m.power_kw, m.speed_kmh);
+		}
 		_beamng_vehicles.push_back(std::move(*car));
 	};
-	/* A car, and each of its other configurations as a car of its own when it is one. */
+	/* A car, and each of its other configurations as cars of their own when it is one; all of them in one GRF. */
 	auto take_all = [&](const std::string &zip, const std::string &car_folder, const std::string &id) {
 		std::optional<BeamngVehicle> car = ReadCar(zip, car_folder, id);
 		if (!car.has_value()) return;
-		take(std::move(car));
-		for (const std::string &config : OtherConfigs(zip, car_folder, id)) take(ReadCar(zip, car_folder, id, config));
+		uint16_t next_id = BEAMNG_ENGINE_ID;
+		take(std::move(car), next_id);
+		for (const std::string &config : OtherConfigs(zip, car_folder, id)) take(ReadCar(zip, car_folder, id, config), next_id);
 	};
 	for (const std::string &folder : ModFolders()) {
 		Debug(grf, 1, "BeamNG: mods looked for in {}", folder);
@@ -1764,15 +1922,23 @@ void PrepareBeamngGrfs()
 		std::string file = FS2OTTD(entry.path().filename().native());
 		if (!EndsWithIgnoreCase(file, ".grf")) continue;
 		if (std::ranges::any_of(found, [&](const BeamngVehicle &v) { return StrEqualsIgnoreCase(v.grf_path, folder + file); })) continue;
-		/* Only one the game made: small, with its words. */
+		/* Only one the game made: small (a few kB, more with many configurations), with its words. */
 		std::vector<uint8_t> old = ReadBytes(folder + file);
-		if (old.empty() || old.size() > 4096 || std::search(old.begin(), old.end(), MARK.begin(), MARK.end()) == old.end()) continue;
+		if (old.empty() || old.size() > 65536 || std::search(old.begin(), old.end(), MARK.begin(), MARK.end()) == old.end()) continue;
 		std::filesystem::remove(entry.path(), ec);
 		Debug(grf, 1, "BeamNG: {} removed, its car is no longer there", folder + file);
 	}
 	if (!found.empty()) FioCreateDirectory(folder);
+	/* A GRF a folder: its configurations in the order found, the car itself first. */
+	std::vector<std::string> written;
 	for (const BeamngVehicle &v : found) {
-		std::vector<uint8_t> grf = MakeGrf(v);
+		if (std::ranges::find(written, v.grf_path) != written.end()) continue;
+		written.push_back(v.grf_path);
+		std::vector<const BeamngVehicle *> cars;
+		for (const BeamngVehicle &o : found) {
+			if (o.grf_path == v.grf_path) cars.push_back(&o);
+		}
+		std::vector<uint8_t> grf = MakeGrf(cars);
 		if (ReadBytes(v.grf_path) == grf) continue;
 		auto f = FileHandle::Open(v.grf_path, "wb");
 		if (!f.has_value()) {

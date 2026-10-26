@@ -10482,6 +10482,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				const CargoType own = e->GetDefaultCargoType();
 				const uint32_t ov = IsValidCargoType(own) ? CargoSpec::Get(own)->label.base() : 0x3F3F3F3F;
 				IConsolePrint(CC_DEFAULT, "test3d:   naklad {:c}{:c}{:c}{:c} {} kusu, prestavby {}:{}", static_cast<char>(ov >> 24), static_cast<char>(ov >> 16), static_cast<char>(ov >> 8), static_cast<char>(ov), e->GetDisplayDefaultCapacity(), e->info.refit_mask.Count(), refits);
+				/* When it came and whether any company may buy it now (not yet come, or retired). */
+				IConsolePrint(CC_DEFAULT, "test3d:   uveden {} nabizi se {} pod {}", TimerGameCalendar::ConvertDateToYMD(e->intro_date).year, e->company_avail.Any() ? "ano" : "ne",
+						e->info.variant_id != EngineID::Invalid() ? GetString(STR_ENGINE_NAME, e->info.variant_id) : std::string("-"));
 			}
 			return true;
 		}
