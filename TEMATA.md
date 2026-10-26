@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (17) – Trabant na návěsu a bordel kolem čarodějnice: nastavení OpenGL ve Winlatoru
+
+- Hráč (build #303, test 14): *„tady ve směru jihovychod byl vždycky návěs dump i valnik daleko od tahače. a taky
+  vezl trabanta s nákladem“*, *„ten navěs je chyba v grf“*, *„už se mi zobrazovali blbosti kolem čarodějnice, když
+  hejbu s nastavenim opengl dějou se divny věci“*, pak *„vratil jsem opengl na 4,6 a už se neobjevil problem podobny
+  trabantu na návěsu nebo bordel kolem čarodějnice“*.
+- V testu 14 měl Winlator `MESA_GL_VERSION_OVERRIDE=3.3` (karta hlásila „OpenGL 3.3 Core, zink Mesa 22.2.5“). Se
+  zinkem na 4.6 („OpenGL 4.6 Core“) se cizí tvar v obrázcích ani bordel neukázal. Hra potřebuje 3.3 core a jinou cestu
+  podle verze nemá. Je to tedy chování zinku/Vorteku s vynucenou verzí, ne chyba hry. Hra kreslí na kartě jedním
+  vlastním kontextem a čísla tvarů jsou jednoznačná.
+- Hláška Mesy o `VK_EXT_depth_clip_enable` hry netýká (depth clamp nepoužívá).
+- Paměť: v testu 14 (3.3) z očí 2,3 → 4,8 GB za 3 min, karta 750 MB a 56× uvolňování. V běhu na 4.6 z očí
+  2,0 → 2,6 GB za 5 min, na mapě nejvýš 3,4 GB. Hlídat dál.
+- Mezera návěs–tahač na jihovýchod: chyba v GRF (kolega).
+
 ## 26. 10. (16) – Škoda 1203 z BeamNG: barvy, okna, záslepky
 
 - Hráč: *„1203 z beamng neni vidět na silnici, textury nejsou v náhledu v nakupnim menu, jen divny barvy aut“*, pak
