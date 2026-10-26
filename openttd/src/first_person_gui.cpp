@@ -34,6 +34,7 @@
 #include "industry_map.h"
 #include "station_map.h"
 #include "water_map.h"
+#include "bridge_map.h"
 #include "three_d.h"
 #include "three_d_objects.h"
 #include "language.h"
@@ -307,6 +308,9 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 {
 	if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::SizeX() - 1) * TILE_SIZE || y >= (Map::SizeY() - 1) * TILE_SIZE) return false;
 	TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	/* On the deck of a bridge over the tile (FirstPersonStandZ()), whatever is under it is not in the way: the river, the
+	 * sea, a railway (the player, 26. 10.: up the ramp onto the road bridge, and no further along it). */
+	if (IsBridgeAbove(tile) && stand >= GetBridgePixelHeight(GetSouthernBridgeEnd(tile)) - 0.1 * OBJECT_HEIGHT_PER_METRE) return true;
 	/* The feet over the ground of a building whose north tile is origin. */
 	auto feet = [stand](TileIndex origin) { return std::max(0.0, stand - GetTileMaxPixelZ(origin)); };
 	switch (GetTileType(tile)) {

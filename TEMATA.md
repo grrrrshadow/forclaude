@@ -31,6 +31,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (15) – pěšky přes most nad vodou
+
+- Hráč: *„nemužu jit pěšky přes most, vyjdu nahoru do kopce na most a dál po rovince nemužu . pěšky jsem byl na
+  silničnim mostě.“* (A dál: *„byl jsem krmit draky vlastní vypěstovanou marihuanou ze sazenic od matyldy a byl jsem
+  se psem v lese. pustim build, skusime náklady a převedem zbytek grrrf na ingame náklady“*.)
+- Příčina: chůze pouští na vodu jen pobřeží a nehleděla na to, že chodec stojí na mostovce nad ní. Přes most nad
+  dolíkem se přejít dalo, přes most nad vodou ne. Teď platí: kdo stojí na mostovce nad dlaždicí, toho to, co je
+  pod mostem (řeka, moře, kanál), nezastaví. Pod mostem u vody se dál chodit nedá.
+- Rig: `test3d kanal x1 y1 x2 y2` (kanál pod mostem z `test3d trat`), chodec přejde most z 70,23 na 77,23.
+- Další krok: hráč zkusí náklady Tater, pak převedeme zbytek GRF kolegy (V3S, vagony, Autosan) na náklady hry.
+
 ## 26. 10. (14) – kusové náklady Tater dává hra (sada `naklady`, stav `naklad` + `loze`), kabina 138
 
 - Hráč: *„mame hasičskou tatru na hřiště a přechazime na ingame náklady, tatry už maj náklady zvlášť“*. Kolega

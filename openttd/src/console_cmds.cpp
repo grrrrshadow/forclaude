@@ -9967,6 +9967,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _eye_frame_on_card;
 		_eye_frame_on_card = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu snimek {}", _eye_frame_on_card ? "cely na karte" : "procesor, objekty na karte");
+	} else if (what == "kanal" && argv.size() > 5) {
+		/* 'kanal <x1> <y1> <x2> <y2>': a canal over the tiles (under a bridge of 'trat': the walker over water). */
+		auto x1 = number(2), y1 = number(3), x2 = number(4), y2 = number(5);
+		if (!x1.has_value() || !y1.has_value() || !x2.has_value() || !y2.has_value()) return true;
+		CommandCost r = Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(*x2, *y2), TileXY(*x1, *y1), WaterClass::Canal, false);
+		IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: kanal {}", r.Succeeded() ? std::string("postaven") : RefusalReason(r));
 	} else if (what == "kytky") {
 		/* The marijuana the walker planted (walker_inventory.h): 'kytky' lists them; 'kytky zasad' plants a seedling of
 		 * the inventory in front of the walker (one given when it has none); 'kytky stari <days>' makes them all so many
