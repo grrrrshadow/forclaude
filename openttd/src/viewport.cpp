@@ -10251,6 +10251,10 @@ struct CabFigureModel {
 		std::vector<const ThreeDObjectTexture *> texs;
 	};
 	std::vector<Crew> crew;
+	/** The pieces of its load on its bed (GetThreeDLoadPieces()), each where it lies in its frame. */
+	const ThreeDVehicleShape *load_shape = nullptr;
+	std::vector<const ThreeDObjectTexture *> load_texs;
+	std::vector<ThreeDLoadPlace> load_places;
 };
 
 /**
@@ -10306,6 +10310,25 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureMode
 			ready = crew.texs[i] != nullptr;
 		}
 		if (ready) model.crew.push_back(std::move(crew));
+	}
+	/* The pieces of its load (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md) in the cargo's colour; not read yet,
+	 * left out this frame. */
+	model.load_shape = nullptr;
+	model.load_places.clear();
+	if (ThreeDLoadPieces load; GetThreeDLoadPieces(st, load)) {
+		const ThreeDVehicleShape *ls = load.fig->TryGetShape(load.frame);
+		if (ls != nullptr && !ls->tri.empty()) {
+			model.load_texs.assign(std::max<size_t>(1, ls->pngs.size()), nullptr);
+			bool ready = true;
+			for (size_t i = 0; i < model.load_texs.size() && ready; i++) {
+				model.load_texs[i] = TryGetThreeDEyeVehicleTexture(load.fig, load.state, _cab_full_textures ? 1e9 : pixels_per_metre, static_cast<int>(i));
+				ready = model.load_texs[i] != nullptr;
+			}
+			if (ready) {
+				model.load_shape = fg.own_cab ? ls : ls->TrySimpler(_cab_detail_pixels / pixels_per_metre);
+				model.load_places = std::move(load.places);
+			}
+		}
 	}
 	return true;
 }
@@ -10501,6 +10524,27 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 		};
 		draw(cs, crew_place, crew.texs);
 	}
+	/* The pieces of its load, each where it lies on the bed, turned as it lies. */
+	if (model.load_shape != nullptr) {
+		const ThreeDVehicleShape &ls = *model.load_shape;
+		const bool load_lit = ls.nrm.size() == ls.pos.size();
+		for (const ThreeDLoadPlace &at : model.load_places) {
+			const double wa = at.turn * M_PI / 180.0, wc = std::cos(wa), ws = std::sin(wa);
+			auto load_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
+				const double fx0 = ls.pos[i * 3], fy0 = ls.pos[i * 3 + 1];
+				px = at.at[0] + fx0 * wc - fy0 * ws;
+				py = at.at[1] + fx0 * ws + fy0 * wc;
+				pz = at.at[2] + ls.pos[i * 3 + 2];
+				if (load_lit) {
+					const double n0 = ls.nrm[i * 3], n1 = ls.nrm[i * 3 + 1];
+					nx = n0 * wc - n1 * ws;
+					ny = n0 * ws + n1 * wc;
+					nz = ls.nrm[i * 3 + 2];
+				}
+			};
+			draw(ls, load_place, model.load_texs);
+		}
+	}
 	_cab_glass_alpha = 256;
 	_cab_glass_texel = 0;
 }
@@ -10595,6 +10639,12 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		const M3 wt = about_z(w.turn);
 		const M3 local = mul(wt, M3{w.scale, 0, 0, 0, w.scale, 0, 0, 0, w.scale});
 		mesh(*crew.shape, crew.texs, local, {w.at[0], w.at[1], w.at[2]}, wt);
+	}
+	if (model.load_shape != nullptr) {
+		for (const ThreeDLoadPlace &at : model.load_places) {
+			const M3 lt = about_z(at.turn);
+			mesh(*model.load_shape, model.load_texs, lt, {at.at[0], at.at[1], at.at[2]}, lt);
+		}
 	}
 	return true;
 }

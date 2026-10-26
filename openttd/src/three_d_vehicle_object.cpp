@@ -13,6 +13,7 @@
 #include "three_d_gpu.h"
 #include "three_d.h"
 #include "engine_base.h"
+#include "cargotype.h"
 #include "vehicle_base.h"
 #include "vehicle_func.h"
 #include "train.h"
@@ -173,6 +174,42 @@ std::vector<int> _three_d_rig_states;
  */
 static const Vehicle *PieceAway(const Vehicle *v, int steps);
 
+/**
+ * What the layers of a vehicle's state carry of the shared loads (ThreeDVehicleState::load_piece, on the bed of its
+ * body): how many pieces -- of those its bed takes, as many as it is loaded (the colleague: "half the load, half the
+ * pallets"), at least one with any cargo; its bed full in the purchase list -- and of which cargo, made one with the
+ * state (ThreeDVehicleObject::ComposeState()).
+ * @param v the piece of the vehicle the cargo is in, nullptr in the purchase list
+ * @return the count above the cargo's label, 0 none
+ */
+static uint64_t LoadCode(const ThreeDVehicleObject *obj, const std::vector<int> &layers, const Vehicle *v, EngineID engine)
+{
+	std::string_view name;
+	ThreeDLoadBed bed;
+	for (int step : layers) {
+		if (step <= 0 || static_cast<size_t>(step) > obj->states.size()) continue;
+		const ThreeDVehicleState &s = obj->states[step - 1];
+		if (!s.load_piece.empty()) name = s.load_piece;
+		if (s.bed.Given()) bed = s.bed;
+	}
+	if (name.empty() || !bed.Given()) return 0;
+	const ThreeDLoadPiece *piece = GetThreeDLoadPiece(name);
+	if (piece == nullptr) return 0;
+	const int capacity = ThreeDLoadCapacity(*piece, bed);
+	if (capacity <= 0) return 0;
+	int count = capacity;
+	CargoType cargo = INVALID_CARGO;
+	if (v != nullptr) {
+		const uint stored = v->cargo.StoredCount(), cap = v->cargo_cap;
+		count = cap == 0 ? 0 : std::clamp<int>(static_cast<int>((static_cast<uint64_t>(stored) * capacity + cap / 2) / cap), stored > 0 ? 1 : 0, capacity);
+		cargo = v->cargo_type;
+	} else if (const Engine *e = Engine::GetIfValid(engine); e != nullptr) {
+		cargo = e->GetDefaultCargoType();
+	}
+	const uint32_t label = IsValidCargoType(cargo) ? CargoSpec::Get(cargo)->label.base() : 0;
+	return static_cast<uint64_t>(count) << 32 | label;
+}
+
 static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
 	/* The vehicle's colours of its set for its masks of details (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
@@ -182,7 +219,7 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 	if (!_three_d_rig_states.empty()) {
 		std::vector<int> layers;
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
-		return obj->ComposeState(layers, colours);
+		return obj->ComposeState(layers, colours, LoadCode(obj, layers, nullptr, engine));
 	}
 	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years. */
 	if (obj->paint_random) {
@@ -220,6 +257,7 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 	 * paints its own picture: the semi-trailer of the Terrno hangs from a piece of its own cargo, the marijuana on its
 	 * first one. */
 	const Source *painted_by = nullptr;
+	const Source *loaded_by = nullptr; ///< the piece whose set names the pieces of a load: its cargo is theirs
 	for (const Source &src : sources) {
 		ids.clear();
 		GetVehicleSetSpriteLocalIDs(src.engine, src.v, image_type, ids);
@@ -234,13 +272,28 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 				}
 			}
 			if (found != 0 && painted_by == nullptr) painted_by = &src;
+			if (found != 0 && !obj->states[found - 1].load_piece.empty()) loaded_by = &src;
 			/* (A state its pieces all pick, Sergej's paint, once.) */
 			if (found != 0 && std::ranges::find(layers, found) != layers.end()) found = 0;
 			layers.push_back(found);
 		}
 	}
 	const uint16_t painted = painted_by != nullptr && painted_by->v != nullptr && obj->HasDetails() ? GetVehicleTrueColours(painted_by->v) : colours;
-	return obj->ComposeState(layers, painted);
+	return obj->ComposeState(layers, painted, LoadCode(obj, layers, loaded_by != nullptr ? loaded_by->v : v, engine));
+}
+
+/** The pieces of the shared loads a state carries (ThreeDVehicleState::load_piece): of its cargo's colour, where each lies on the bed; false none. */
+bool GetThreeDLoadPieces(const ThreeDVehicleState *st, ThreeDLoadPieces &out)
+{
+	if (st == nullptr || st->load_piece.empty() || st->load_count == 0 || !st->bed.Given()) return false;
+	const ThreeDLoadPiece *piece = GetThreeDLoadPiece(st->load_piece);
+	if (piece == nullptr) return false;
+	out.fig = GetThreeDFigure(piece->figure);
+	if (out.fig == nullptr) return false;
+	out.frame = piece->frame;
+	out.state = ThreeDLoadColourState(*piece, st->load_label);
+	ThreeDLoadPlaces(*piece, st->bed, st->load_count, out.places);
+	return !out.places.empty();
 }
 
 /** The state of a step (StateStep()), nullptr for none. */
@@ -1172,32 +1225,42 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const ThreeDVehicleObject *fig;
 		const ThreeDVehicleShape *shape;
 		float scale;
+		int state; ///< a piece of a load: its figure's state in the cargo's colour; 0 as it is
 		std::vector<float> sx, sy, depth, light;
 	};
 	std::vector<CrewPiece> crew;
-	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
-	for (size_t k = 0; k < walking.size(); k++) {
-		const ThreeDWalkingCrew &w = walking[k];
-		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
-		if (fs == nullptr) continue;
-		CrewPiece &c = crew.emplace_back(CrewPiece{w.figure, fs, w.scale, {}, {}, {}, {}});
+	auto add_piece = [&](const ThreeDVehicleObject *fig, const ThreeDVehicleShape *fs, const float at[3], float turn, float size, int piece_state) {
+		CrewPiece &c = crew.emplace_back(CrewPiece{fig, fs, size, piece_state, {}, {}, {}, {}});
 		const size_t m = fs->pos.size() / 3;
 		const bool flit = lit && fs->nrm.size() == fs->pos.size();
 		c.sx.resize(m);
 		c.sy.resize(m);
 		c.depth.resize(m);
 		c.light.assign(m, 1.0f);
-		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
+		const float wa = turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
 		for (size_t i = 0; i < m; i++) {
 			const float fx0 = fs->pos[i * 3], fy0 = fs->pos[i * 3 + 1];
-			place(w.at[0] + (fx0 * wc - fy0 * ws) * w.scale, w.at[1] + (fx0 * ws + fy0 * wc) * w.scale, w.at[2] + fs->pos[i * 3 + 2] * w.scale, c.sx[i], c.sy[i], c.depth[i]);
+			place(at[0] + (fx0 * wc - fy0 * ws) * size, at[1] + (fx0 * ws + fy0 * wc) * size, at[2] + fs->pos[i * 3 + 2] * size, c.sx[i], c.sy[i], c.depth[i]);
 			minx = std::min(minx, c.sx[i]); maxx = std::max(maxx, c.sx[i]);
 			miny = std::min(miny, c.sy[i]); maxy = std::max(maxy, c.sy[i]);
 			if (flit) {
 				const float nx = fs->nrm[i * 3], ny = fs->nrm[i * 3 + 1];
 				c.light[i] = shade(nx * wc - ny * ws, nx * ws + ny * wc, fs->nrm[i * 3 + 2]);
 			}
+		}
+	};
+	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
+	for (size_t k = 0; k < walking.size(); k++) {
+		const ThreeDWalkingCrew &w = walking[k];
+		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
+		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
+		if (fs != nullptr) add_piece(w.figure, fs, w.at, w.turn, w.scale, 0);
+	}
+	/* The pieces of the shared loads on its bed (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): each where it
+	 * lies in the vehicle's frame, then as the vehicle; in the colour of the cargo. */
+	if (ThreeDLoadPieces load; GetThreeDLoadPieces(st, load)) {
+		if (const ThreeDVehicleShape *ls = load.fig->GetShape(load.frame); ls != nullptr) {
+			for (const ThreeDLoadPlace &at : load.places) add_piece(load.fig, ls, at.at, at.turn, 1.0f, load.state);
 		}
 	}
 	if (minx > maxx) return false;
@@ -1282,7 +1345,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	};
 	/* A triangle of a shape through the depth: of the vehicle's (its body painted, its add-ons coloured, an effect
 	 * tinted) or of its crew that walks (as it is). */
-	auto fill = [&](const ThreeDVehicleShape &s, const std::vector<float> &sx, const std::vector<float> &sy, const std::vector<float> &depth, const std::vector<float> &light, const std::vector<const ThreeDObjectTexture *> &texs, size_t t, bool body) {
+	auto fill = [&](const ThreeDVehicleShape &s, const std::vector<float> &sx, const std::vector<float> &sy, const std::vector<float> &depth, const std::vector<float> &light, const std::vector<const ThreeDObjectTexture *> &texs, size_t t, bool body, const ObjectPaintOfState *own = nullptr) {
 		const uint32_t a = s.tri[t], b = s.tri[t + 1], c = s.tri[t + 2];
 		const int ti = t / 3 < s.tri_tex.size() ? s.tri_tex[t / 3] : 0;
 		const ThreeDObjectTexture *tex = texs[static_cast<size_t>(ti) < texs.size() ? ti : 0];
@@ -1316,6 +1379,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 				Colour col(texel);
 				float cr = col.r, cg = col.g, cb = col.b;
 				if (!body) {
+					if (own != nullptr && ti == 0) own->Paint(u, v, cr, cg, cb);
 					zb[at] = dz;
 					buf[at] = shine(glow, cr, cg, cb, k);
 					if (!litbuf.empty()) litbuf[at] = glow != 0 ? 1 : 0;
@@ -1355,7 +1419,10 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		for (float d = TexelsPerMetre(*c.fig, *c.shape); d >= 2.0f * p * c.scale && crew_level < 12; d /= 2.0f) crew_level++;
 		std::vector<const ThreeDObjectTexture *> crew_texs(std::max<size_t>(1, c.shape->pngs.size()));
 		for (size_t i = 0; i < crew_texs.size(); i++) crew_texs[i] = c.fig->GetTexture(crew_level, static_cast<int>(i));
-		for (size_t t = 0; t + 2 < c.shape->tri.size(); t += 3) fill(*c.shape, c.sx, c.sy, c.depth, c.light, crew_texs, t, false);
+		/* A piece of a load in its cargo's colour over its mask, as a vehicle's paint. */
+		std::optional<ObjectPaintOfState> own;
+		if (c.state != 0) own.emplace(*c.fig, *c.shape, crew_level, 0.0f, 0.0f, PaletteColour(c.fig, c.state));
+		for (size_t t = 0; t + 2 < c.shape->tri.size(); t += 3) fill(*c.shape, c.sx, c.sy, c.depth, c.light, crew_texs, t, false, own.has_value() ? &*own : nullptr);
 	}
 
 	/* The glass of its windows ("sklo") and what is of a material "BLEND" (the ghost), after all else: see-through,
@@ -1757,6 +1824,43 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			if (m.triangles->used[i]) m.textures[i] = w.figure->GetTexture(crew_level, static_cast<int>(i));
+		}
+	}
+	/* The pieces of the shared loads on its bed, each where it lies, as the vehicle; in the cargo's colour over the
+	 * piece's mask, painted by the card as a vehicle's paint. */
+	if (ThreeDLoadPieces load; GetThreeDLoadPieces(st, load)) {
+		if (const ThreeDVehicleShape *ls = load.fig->GetShape(load.frame); ls != nullptr) {
+			int load_level = 0;
+			for (float d = TexelsPerMetre(*load.fig, *ls); d >= 2.0f * p && load_level < 12; d /= 2.0f) load_level++;
+			std::shared_ptr<const ThreeDGpuTriangles> triangles = ThreeDGpuTrianglesOf(*ls, 0, false, ls->pngs.size());
+			std::vector<const ThreeDObjectTexture *> textures(triangles->used.size(), nullptr);
+			for (size_t i = 0; i < textures.size(); i++) {
+				if (triangles->used[i]) textures[i] = load.fig->GetTexture(load_level, static_cast<int>(i));
+			}
+			std::vector<ThreeDGpuPaint> paints;
+			if (load.state != 0) {
+				const ObjectPaintOfState painted(*load.fig, *ls, load_level, 0.0f, 0.0f, PaletteColour(load.fig, load.state));
+				const ObjectDetailPaint details(*load.fig, *ls, nullptr, std::max<size_t>(1, ls->pngs.size()), textures);
+				paints.resize(textures.size());
+				for (size_t i = 0; i < textures.size(); i++) {
+					if (textures[i] != nullptr) paints[i] = GpuPaintOf(*load.fig, *ls, load.fig->State(load.state), static_cast<int>(i), painted, details, 0, held);
+				}
+			}
+			for (const ThreeDLoadPlace &at : load.places) {
+				const float wa = at.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
+				auto piece_to = [&cam, &at, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
+					cam.Place(at.at[0] + fx0 * wc - fy0 * ws, at.at[1] + fx0 * ws + fy0 * wc, at.at[2] + fz0, ox, oy, od);
+				};
+				ThreeDGpuMesh &m = pic.meshes.emplace_back();
+				m.shape = ls;
+				m.triangles = triangles;
+				matrix_of(piece_to, m.matrix);
+				m.lit = lit && ls->nrm.size() == ls->pos.size();
+				light_of([&cam, wc, ws](float nx, float ny, float nz) { return cam.LightAt(nx * wc - ny * ws, nx * ws + ny * wc, nz); }, m.light);
+				box(*ls, piece_to);
+				m.textures = textures;
+				m.paints = paints;
+			}
 		}
 	}
 	/* At night the glass of its lights that are on, over the body as it is turned and leant, a few centimetres before

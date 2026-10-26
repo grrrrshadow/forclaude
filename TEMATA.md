@@ -31,6 +31,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (14) – kusové náklady Tater dává hra (sada `naklady`, stav `naklad` + `loze`), kabina 138
+
+- Hráč: *„mame hasičskou tatru na hřiště a přechazime na ingame náklady, tatry už maj náklady zvlášť“*. Kolega
+  (grrrrf `1bccac0`, `hra/3d/TATRY-138-NAKLADY-PRO-HRU.md`): nový tar `Nakladaky_Tatra_3D-v4` (GRF stejný),
+  kabina 138 vlastní (`kabina_138`), kusy nákladu už nejsou uzly, ale stav `naklad: {sada: "naklady", kus: …}`,
+  a stav korby má `loze` (dno, x, y, bočnice, max_vyska).
+- **Sada `objekty/naklady`** je v baseset (`media/baseset/decouple/objekty/naklady`). Každý kus (`druh: naklad`) je
+  postava `naklady/<jmeno>` s maskou barvy; barvy z jeho tabulky `naklady` jsou stavy postavy (jako lak vozidla).
+  Dobytek je zvíře ze `zvirata` (`pase_00`), velikost zvířete + 0,2 m (`rozmer_nakladu` v záznamech zvířat zatím
+  není).
+- **Skládání:** kus z vrstev stavu, `loze` z korby; mřížka celých kusů od předku ložné plochy, uprostřed, rovně
+  nebo napříč (`otaceni`), podle toho, kolik se vejde víc. Vrstvy do `max_vrstev`. První vrstva vždy, další jen pod
+  `max_vyska` (paleta beden 1,124 m je o 4 cm vyšší než laťky valníku, jinak by se nevešla žádná). Kolik kusů:
+  podle naloženého (`naloženo / kapacita`, aspoň 1, když něco veze); v nákupu plno. Barva podle nákladu vozidla
+  (`BRAM` hnědé pytle), jinak výchozí barva kusu. Zvířata jen na korbě s bočnicemi.
+- Kusy jsou součást stavu vozidla (složený stav nese kus, počet a náklad), takže obrázek se mění sám, když se
+  naloží nebo vyloží. Kreslí se na mapě (procesor i karta) i z očí (procesor i karta).
+- Rig: bedny (GOOD), prasata (LVST), klády (WOOD), bedny na přívěsu fox, brambory v pytlích, pivo v sudech, korba
+  s rukou; cisterna bez kusů. Obrázky aut v rigu chvíli trvají (hráč: *„chvilku trva než se auta začnou kreslit“*),
+  rig čeká `test3d dokresli`. `test3d auta` kupuje první auto toho jména, které firma smí koupit, a říká, proč nákup
+  nevyšel.
+- **Hráč si musí vzít nový tar** `nakladaky3d/Nakladaky_Tatra_3D-v4.tar` z grrrrf (md5 `d0f36b98…`), kabina 138
+  přijde s ním.
+
 ## 26. 10. (13) – srub: okenice a lucerna na E; rozhledna s podestou; pastviny; minové kladivo; Zetor a kolečko na E
 
 - Hráč: *„co nemá hotové v grrrf?“* → seznam (pastviny, okenice, rozhledna s podestou, společné náklady, Zetor

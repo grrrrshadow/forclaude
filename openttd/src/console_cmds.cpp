@@ -9536,9 +9536,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: auta: silnice {} depa {} {}", RefusalReason(road), RefusalReason(da), RefusalReason(db));
 			return true;
 		}
+		/* The first of that name the company may buy, else the first of that name. */
 		const Engine *engine = nullptr;
 		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
-			if (GetString(STR_ENGINE_NAME, e->index).find(wanted) != std::string::npos) {
+			if (GetString(STR_ENGINE_NAME, e->index).find(wanted) == std::string::npos) continue;
+			if (engine == nullptr) engine = e;
+			if (IsEngineBuildable(e->index, VehicleType::Road, CompanyID::Begin())) {
 				engine = e;
 				break;
 			}
@@ -9550,7 +9553,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		int bought = 0;
 		for (int k = 0; k < count; k++) {
 			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, k % 2 == 0 ? depot_a : depot_b, engine->index, true, INVALID_CARGO, ClientID::Invalid);
-			if (cost.Failed()) continue;
+			if (cost.Failed()) {
+				IConsolePrint(CC_DEFAULT, "test3d: auta: nakup {}", RefusalReason(cost));
+				continue;
+			}
 			if (IsValidCargoType(refit_to)) {
 				CommandCost refit = std::get<0>(Command<Commands::RefitVehicle>::Do(DoCommandFlag::Execute, veh, refit_to, subtype, false, false, 0));
 				if (refit.Failed()) IConsolePrint(CC_DEFAULT, "test3d: auta: prestavba {}", RefusalReason(refit));

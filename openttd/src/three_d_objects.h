@@ -521,6 +521,20 @@ struct ThreeDVehicleSize {
 };
 
 /**
+ * Where a vehicle's body carries the pieces of the shared loads ("loze", the colleague's
+ * hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): metres in the vehicle's frame, as its state shows the body.
+ */
+struct ThreeDLoadBed {
+	float floor = 0;            ///< "dno": the height of its floor
+	float x[2] = {};            ///< "x": from its back to its front, inside its sides
+	float y[2] = {};            ///< "y": from side to side
+	float sides = 0;            ///< "bocnice": how high its solid sides are over the floor, 0 a platform
+	float top = 0;              ///< "max_vyska": no piece higher; 0 as many layers as the piece has
+	/** Whether a state gives one. */
+	bool Given() const { return this->x[1] > this->x[0] && this->y[1] > this->y[0]; }
+};
+
+/**
  * A state of a vehicle object chosen by its GRF ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): the GRF picks a set of
  * its sprites for the vehicle by its own rules (random bits, age, breakdown, load …) and a set whose first sprite is
  * numbered within [first, last] in the GRF draws the object so. The game decides nothing of it by itself (the player,
@@ -544,6 +558,12 @@ struct ThreeDVehicleState {
 	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
 	std::string set_name;       ///< "sada": the GRF's set it is drawn for, by its name ("nastavba hasici"): a vehicle standing as a building's event (StateNamed())
 	bool empty = false;         ///< standing empty: none of its crew drawn, the record's nor its groups' (EmptyStateOf(): the fire Tatra on the pitch)
+	/* The pieces of the shared loads it carries (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): the GRF's set
+	 * names the piece, the game stacks it on the bed of the body, as many as are loaded, coloured by the cargo. */
+	std::string load_piece;     ///< "naklad" "kus": the piece (ThreeDLoadPiece), empty none
+	ThreeDLoadBed bed;          ///< "loze": the bed of the body it shows
+	uint8_t load_count = 0;     ///< of the layers made one (ComposeState()): how many pieces lie on the bed
+	uint32_t load_label = 0;    ///< and the label of their cargo (their colour)
 	/**
 	 * The colours of the vehicle's set, detail by detail (true_colour.h, callback 1C1: the configurator, the colour by
 	 * the load, by chance, faded with age), its masks of details ("maska_podrobnosti") painted in them; 0 none. Not of
@@ -721,7 +741,7 @@ struct ThreeDVehicleObject {
 	float Length() const;
 	ThreeDParts PartsOf(int state) const;
 	const ThreeDVehicleState *State(int step) const;
-	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0) const;
+	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
@@ -739,7 +759,7 @@ struct ThreeDVehicleObject {
 	mutable uint32_t extent_version = 0; ///< each time the extent grew (a part added to the shape)
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
-	mutable std::map<std::pair<std::vector<int>, uint16_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers and the vehicle's colours
+	mutable std::map<std::tuple<std::vector<int>, uint16_t, uint64_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers, the vehicle's colours and its load (ThreeDLoadCode())
 	mutable std::vector<ThreeDWalkingCrew> walking; ///< its crew that walks (WalkingCrew()), found the first time asked for
 	mutable bool walking_found = false;
 
@@ -760,6 +780,32 @@ private:
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+
+/**
+ * A piece of the shared loads (the colleague's objekty/naklady, hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md): a pallet of
+ * bricks, logs, a cow; stacked whole on a vehicle's bed, as many as it carries, coloured by the cargo.
+ */
+struct ThreeDLoadPiece {
+	std::string name;                ///< "jmeno"
+	std::string figure;              ///< the figure it is drawn as (GetThreeDFigure()): its own file, or an animal's pose
+	int frame = 0;                   ///< that figure's frame (an animal standing, "uzel" "pase_00")
+	std::string animal;              ///< "objekt" of "zvirata": its size is the animal's
+	float size[3] = {};              ///< "rozmer_m": along, across, up, metres; an animal's with room about it
+	int layers = 1;                  ///< "skladani" "max_vrstev"
+	bool quarter_turn = false;       ///< "otaceni" with 90: it may lie across the bed
+	std::vector<std::pair<uint32_t, int>> colours; ///< the labels of its table ("naklady") with a colour, each with the state of its figure in that colour
+};
+
+/** Where a piece of a load lies on the bed: its foot, metres in the vehicle's frame, and how it is turned, degrees. */
+struct ThreeDLoadPlace {
+	float at[3];
+	float turn;
+};
+
+const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name);
+int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed);
+void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out);
+int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label);
 const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name);
 std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node);
 std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound);

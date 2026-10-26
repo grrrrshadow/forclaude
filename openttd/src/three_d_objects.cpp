@@ -194,6 +194,8 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+/** The pieces of the shared loads (ThreeDLoadPiece), by the indices' order. */
+static std::vector<ThreeDLoadPiece> _load_pieces;
 /** The sounds of the things of the indices ("zvuky"): "<jmeno>/<zvuk>" to its file (a path, or in a tar: IN_TAR, IN_BASESET_TAR). */
 static std::map<std::string, std::string> _thing_sounds;
 /** The places of the things asked for (GetThreeDThingPlace()): "<jmeno>/<uzel>" to where it is, nothing when it has none. */
@@ -3667,6 +3669,107 @@ static VehicleType ParseIndexVehicleType(const std::string &text)
 	return VehicleType::Invalid;
 }
 
+/** The room about an animal standing on a bed with others (ThreeDLoadPiece::size), metres each way. */
+static constexpr float LOAD_ANIMAL_ROOM_M = 0.2f;
+
+/** A cargo's label as the game has it ('BRCK'), from its four letters in an index; 0 none. */
+static uint32_t ParseLoadLabel(const nlohmann::json &value)
+{
+	if (!value.is_string()) return 0;
+	const std::string text = value.get<std::string>();
+	if (text.size() != 4) return 0;
+	return static_cast<uint32_t>(static_cast<uint8_t>(text[0])) << 24 | static_cast<uint32_t>(static_cast<uint8_t>(text[1])) << 16 |
+			static_cast<uint32_t>(static_cast<uint8_t>(text[2])) << 8 | static_cast<uint32_t>(static_cast<uint8_t>(text[3]));
+}
+
+/** The bed of the loads of a state's body ("loze", ThreeDLoadBed). */
+static void ReadLoadBed(const nlohmann::json &e, ThreeDLoadBed &bed)
+{
+	if (!e.is_object()) return;
+	bed.floor = e.value("dno", 0.0f);
+	for (const char *axis : {"x", "y"}) {
+		if (!e.contains(axis) || !e.at(axis).is_array() || e.at(axis).size() != 2 || !e.at(axis).at(0).is_number() || !e.at(axis).at(1).is_number()) continue;
+		float *to = axis[0] == 'x' ? bed.x : bed.y;
+		to[0] = std::min(e.at(axis).at(0).get<float>(), e.at(axis).at(1).get<float>());
+		to[1] = std::max(e.at(axis).at(0).get<float>(), e.at(axis).at(1).get<float>());
+	}
+	bed.sides = std::max(0.0f, e.value("bocnice", 0.0f));
+	bed.top = e.value("max_vyska", 0.0f);
+}
+
+/**
+ * A piece of the shared loads ("druh": "naklad", the colleague's objekty/naklady): a file of its own, coloured over
+ * its mask ("barvy") by the cargo -- each colour of its table ("naklady") a state of its figure, as a vehicle's paint
+ * --, or an animal of "zvirata" standing ("uzel" its frame).
+ */
+static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, const std::string &package)
+{
+	ThreeDLoadPiece piece;
+	piece.name = e.value("jmeno", std::string());
+	if (piece.name.empty()) return;
+	if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+		for (int k = 0; k < 3; k++) piece.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
+	}
+	if (e.contains("skladani") && e.at("skladani").is_object()) {
+		const auto &how = e.at("skladani");
+		piece.layers = std::clamp(how.value("max_vrstev", 1), 1, 8);
+		if (how.contains("otaceni") && how.at("otaceni").is_array()) {
+			for (const auto &turn : how.at("otaceni")) {
+				if (turn.is_number() && std::abs(std::remainder(turn.get<double>(), 180.0)) > 45.0) piece.quarter_turn = true;
+			}
+		}
+	}
+	ThreeDVehicleObject fig;
+	if (e.contains("soubor") && e.at("soubor").is_string()) {
+		fig.package = package;
+		fig.file = folder + e.at("soubor").get<std::string>();
+		NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+		fig.name = "naklady/" + piece.name;
+		fig.thing = true;
+		if (e.contains("barvy") && e.at("barvy").is_array() && !e.at("barvy").empty() && e.at("barvy").at(0).is_object()) {
+			const auto &b = e.at("barvy").at(0);
+			if (b.contains("maska") && b.at("maska").is_string()) fig.paint.mask_file = folder + b.at("maska").get<std::string>();
+			fig.paint.start = std::clamp(b.value("zacatek", 0), 0, 255);
+		}
+		piece.figure = fig.name;
+	} else if (e.value("sada", std::string()) == "zvirata" && e.contains("objekt") && e.at("objekt").is_string()) {
+		/* An animal's frame by its node ("pase_00": the pose "pase", its first frame); its size the animal's. */
+		piece.animal = e.at("objekt").get<std::string>();
+		const std::string node = e.value("uzel", std::string("pase_00"));
+		const size_t last = node.find_last_not_of("0123456789");
+		const std::string prefix = last == std::string::npos ? std::string() : node.substr(0, last + 1);
+		piece.frame = last + 1 < node.size() ? ParseInteger<int>(node.substr(last + 1), 10).value_or(0) : 0;
+		piece.figure = piece.animal + "/" + (prefix.ends_with("_") ? prefix.substr(0, prefix.size() - 1) : prefix);
+	} else {
+		return;
+	}
+	/* Its colours by the cargo: each a state of the figure, the paint's colour over its mask. */
+	if (e.contains("naklady") && e.at("naklady").is_array()) {
+		for (const auto &n : e.at("naklady")) {
+			if (!n.is_object() || !n.contains("barva") || !n.at("barva").is_string() || fig.file.empty()) continue;
+			const uint32_t label = ParseLoadLabel(n.value("naklad", nlohmann::json()));
+			std::string c = n.at("barva").get<std::string>();
+			if (c.starts_with("#")) c = c.substr(1);
+			auto rgb = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
+			if (label == 0 || !rgb.has_value()) continue;
+			ThreeDVehicleState st;
+			st.colour = Colour(static_cast<uint8_t>(*rgb >> 16), static_cast<uint8_t>(*rgb >> 8), static_cast<uint8_t>(*rgb)).data;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			int step = 0;
+			for (size_t k = 0; k < fig.states.size(); k++) {
+				if (fig.states[k].colour == st.colour) step = static_cast<int>(k) + 1;
+			}
+			if (step == 0) {
+				fig.states.push_back(st);
+				step = static_cast<int>(fig.states.size());
+			}
+			piece.colours.emplace_back(label, step);
+		}
+	}
+	if (!fig.file.empty()) _figure_objects.push_back(std::move(fig));
+	_load_pieces.push_back(std::move(piece));
+}
+
 /** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
 static void ReadThreeDVehicleObjects()
 {
@@ -3680,6 +3783,10 @@ static void ReadThreeDVehicleObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
+				if (e.value("druh", std::string()) == "naklad") {
+					ReadLoadPiece(e, folder, package);
+					continue;
+				}
 				if (e.value("druh", std::string("dum")) == "efekt" && e.contains("soubor")) {
 					/* An effect (the colleague's hra/3d/PROSBA-POSTAVY-ANIMACE.md, the fireworks): frames as a figure's,
 					 * metres, unlit when it has no normals; a material of it coloured from a palette by the game. */
@@ -4410,6 +4517,9 @@ static void ReadThreeDVehicleObjects()
 							}
 						}
 						if (st.contains("sada") && st.at("sada").is_string()) state.set_name = st.at("sada").get<std::string>();
+						/* The pieces of the shared loads its set carries, and the bed of the body it shows. */
+						if (st.contains("naklad") && st.at("naklad").is_object()) state.load_piece = st.at("naklad").value("kus", std::string());
+						if (st.contains("loze")) ReadLoadBed(st.at("loze"), state.bed);
 						if (st.contains("posadka") && st.at("posadka").is_string()) {
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
 							if (part > 0) state.parts.Set(part);
@@ -4559,7 +4669,93 @@ static void ReadThreeDVehicleObjects()
 			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
 		}
 	}
-	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures", _vehicle_objects.size(), _figure_objects.size());
+	/* An animal on a bed takes its size and some room about it (the colleague: "with a gap"). */
+	for (ThreeDLoadPiece &piece : _load_pieces) {
+		if (piece.animal.empty()) continue;
+		for (const ThreeDAnimal &a : _animals) {
+			if (a.name != piece.animal) continue;
+			piece.size[0] = a.size[0] + LOAD_ANIMAL_ROOM_M;
+			piece.size[1] = a.size[1] + LOAD_ANIMAL_ROOM_M;
+			piece.size[2] = a.size[2];
+		}
+	}
+	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
+}
+
+/** A piece of the shared loads by its name ("kus" of a state's "naklad"), nullptr none. */
+const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDLoadPiece &p : _load_pieces) {
+		if (p.name == name) return &p;
+	}
+	return nullptr;
+}
+
+/** How the pieces of a kind lie on a bed (ThreeDLoadCapacity()): along it or across, how many each way, how many layers. */
+struct LoadGrid {
+	bool across = false;
+	int along = 0, side = 0, layers = 0;
+	float la = 0, lb = 0; ///< a piece's length along the bed and across it
+};
+
+static LoadGrid LoadGridOf(const ThreeDLoadPiece &p, const ThreeDLoadBed &bed)
+{
+	LoadGrid g;
+	if (!bed.Given() || p.size[0] <= 0 || p.size[1] <= 0 || p.size[2] <= 0) return g;
+	/* The animals only between sides (the colleague: "only on beds with sides"). */
+	if (!p.animal.empty() && bed.sides <= 0) return g;
+	const float length = bed.x[1] - bed.x[0], width = bed.y[1] - bed.y[0];
+	auto fit = [](float room, float piece) { return static_cast<int>(std::floor(room / piece + 1e-4f)); };
+	/* Whichever way more lie side by side: along the bed, or across it where the piece may be turned. */
+	const int straight = fit(length, p.size[0]) * fit(width, p.size[1]);
+	const int turned = p.quarter_turn ? fit(length, p.size[1]) * fit(width, p.size[0]) : 0;
+	g.across = turned > straight;
+	g.la = g.across ? p.size[1] : p.size[0];
+	g.lb = g.across ? p.size[0] : p.size[1];
+	g.along = fit(length, g.la);
+	g.side = fit(width, g.lb);
+	/* The first layer always (a pallet of crates is a hair higher than the slats of the flatbed), the others only as
+	 * far as they go under its top. */
+	g.layers = p.layers;
+	if (bed.top > bed.floor) g.layers = std::min(g.layers, std::max(1, fit(bed.top - bed.floor, p.size[2])));
+	g.layers = std::max(1, g.layers);
+	return g;
+}
+
+/** How many pieces of a kind a bed takes: whole ones side by side, as many layers as they go up to its top. */
+int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed)
+{
+	const LoadGrid g = LoadGridOf(piece, bed);
+	return g.along * g.side * g.layers;
+}
+
+/**
+ * Where so many pieces lie on a bed (the colleague: "whole pieces, never stretched, as many as are loaded"): in rows
+ * across it from its front, the grid in the middle of the bed, the first layer full before the next.
+ */
+void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out)
+{
+	out.clear();
+	const LoadGrid g = LoadGridOf(piece, bed);
+	const int per_layer = g.along * g.side;
+	count = std::min(count, per_layer * g.layers);
+	if (count <= 0) return;
+	const float front = bed.x[1] - (bed.x[1] - bed.x[0] - g.along * g.la) / 2 - g.la / 2;
+	const float right = bed.y[0] + (bed.y[1] - bed.y[0] - g.side * g.lb) / 2 + g.lb / 2;
+	for (int k = 0; k < count; k++) {
+		const int layer = k / per_layer, in = k % per_layer;
+		out.push_back({{front - (in / g.side) * g.la, right + (in % g.side) * g.lb, bed.floor + layer * piece.size[2]}, g.across ? 90.0f : 0.0f});
+	}
+}
+
+/** The state of a piece's figure in the colour of a cargo (its table "naklady"); 0 its own colours. */
+int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label)
+{
+	for (const auto &[l, step] : piece.colours) {
+		if (l == label) return step;
+	}
+	return 0;
 }
 
 /**
@@ -4655,6 +4851,7 @@ void ResetThreeDVehicleObjects()
 {
 	_vehicle_objects.clear();
 	_figure_objects.clear();
+	_load_pieces.clear();
 	_effect_objects.clear();
 	_driving_objects.clear();
 	_vehicle_object_pieces.clear();
@@ -6181,7 +6378,7 @@ const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
  * @param true_colours the vehicle's colours (GetVehicleTrueColours()), 0 none
  * @return its step: the one state itself when only one layer has a state and there are no colours, 0 when there is nothing
  */
-int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t true_colours) const
+int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t true_colours, uint64_t load) const
 {
 	int only = 0, count = 0;
 	for (int step : layers) {
@@ -6190,9 +6387,9 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			count++;
 		}
 	}
-	if (count <= 1 && true_colours == 0) return only;
+	if (count <= 1 && true_colours == 0 && load == 0) return only;
 	std::lock_guard lock(_lazy_mutex);
-	auto it = this->composed_steps.find({layers, true_colours});
+	auto it = this->composed_steps.find({layers, true_colours, load});
 	if (it != this->composed_steps.end()) return it->second;
 	ThreeDVehicleState made;
 	made.true_colours = true_colours;
@@ -6213,14 +6410,19 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
 		}
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+		if (!s.load_piece.empty()) made.load_piece = s.load_piece;
+		if (s.bed.Given()) made.bed = s.bed;
 	}
+	/* How many pieces lie on its bed, of which cargo (ThreeDLoadCode()). */
+	made.load_count = static_cast<uint8_t>(std::min<uint64_t>(load >> 32, 255));
+	made.load_label = static_cast<uint32_t>(load);
 	for (int16_t part : made.addon_parts) {
 		if (part > 0) made.parts.Set(part);
 	}
 	if (made.crew_part > 0) made.parts.Set(made.crew_part);
 	this->composed.push_back(std::move(made));
 	const int step = static_cast<int>(this->states.size() + this->composed.size());
-	this->composed_steps.emplace(std::make_pair(layers, true_colours), step);
+	this->composed_steps.emplace(std::make_tuple(layers, true_colours, load), step);
 	return step;
 }
 
