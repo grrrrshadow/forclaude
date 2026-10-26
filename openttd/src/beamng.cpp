@@ -237,6 +237,43 @@ std::vector<std::string> ListCarFiles(const BeamngVehicle &v)
 	return files;
 }
 
+/**
+ * The files of the mod's shared folder, vehicles/common/ (its own wheels, the Škoda 1203's S1203_wheels: their parts,
+ * their model, their materials and textures), by their paths from the mod's root ("vehicles/common/..."), in order.
+ */
+std::vector<std::string> ListModCommonFiles(const BeamngVehicle &v)
+{
+	static constexpr std::string_view COMMON = "vehicles/common/";
+	std::vector<std::string> files;
+	if (!v.zip.empty()) {
+		const Zip *zip = OpenZip(v.zip);
+		if (zip == nullptr) return files;
+		for (const ZipEntry &e : zip->entries) {
+			if (e.name.size() > COMMON.size() && e.name.back() != '/' && StrEqualsIgnoreCase(std::string_view(e.name).substr(0, COMMON.size()), COMMON)) files.push_back(e.name);
+		}
+	} else {
+		/* The mod's root: the folder above vehicles/<name>/. */
+		std::string root = v.folder;
+		for (int up = 0; up < 2 && root.size() > 1; up++) {
+			root.pop_back();
+			root.erase(root.find_last_of(PATHSEPCHAR) + 1);
+		}
+		std::string vehicles = FindInFolder(root, "vehicles");
+		std::string common = vehicles.empty() ? std::string() : FindInFolder(vehicles + PATHSEP, "common");
+		std::error_code ec;
+		if (!common.empty()) {
+			for (const auto &entry : std::filesystem::recursive_directory_iterator(OTTD2FS(common), ec)) {
+				if (!entry.is_regular_file(ec)) continue;
+				std::string rest = FS2OTTD(entry.path().lexically_relative(OTTD2FS(common)).native());
+				std::replace(rest.begin(), rest.end(), '\\', '/');
+				files.push_back(std::string(COMMON) + rest);
+			}
+		}
+	}
+	std::sort(files.begin(), files.end());
+	return files;
+}
+
 bool EndsWithIgnoreCase(std::string_view s, std::string_view end)
 {
 	return s.size() >= end.size() && StrEqualsIgnoreCase(s.substr(s.size() - end.size()), end);
@@ -403,6 +440,178 @@ void FindAll(const JValue &v, std::string_view key, std::vector<const JValue *> 
 	}
 }
 
+/**
+ * An expression of a .jbeam ("$=..."), as BeamNG reckons it in Lua: numbers, the variables ("$name"), + - * / and
+ * brackets, comparisons (== ~= != < <= > >=), nil, and case(when, then, ..., else), min, max, abs. A variable not
+ * known, or anything else, is nil.
+ */
+class JbeamExpression {
+	using Value = std::optional<double>;
+	std::string_view s;
+	size_t p = 0;
+	const std::map<std::string, double> &vars;
+
+	void Skip()
+	{
+		while (this->p < this->s.size() && (this->s[this->p] == ' ' || this->s[this->p] == '\t')) this->p++;
+	}
+
+	bool Eat(std::string_view t)
+	{
+		this->Skip();
+		if (this->s.substr(this->p, t.size()) != t) return false;
+		this->p += t.size();
+		return true;
+	}
+
+	std::string Name()
+	{
+		this->Skip();
+		const size_t from = this->p;
+		while (this->p < this->s.size() && (std::isalnum(static_cast<unsigned char>(this->s[this->p])) || this->s[this->p] == '_')) this->p++;
+		return std::string(this->s.substr(from, this->p - from));
+	}
+
+	Value Primary()
+	{
+		this->Skip();
+		if (this->Eat("(")) {
+			Value v = this->Compare();
+			this->Eat(")");
+			return v;
+		}
+		if (this->p < this->s.size() && this->s[this->p] == '$') {
+			this->p++;
+			auto it = this->vars.find("$" + this->Name());
+			return it != this->vars.end() ? Value(it->second) : Value();
+		}
+		if (this->p < this->s.size() && (std::isdigit(static_cast<unsigned char>(this->s[this->p])) || this->s[this->p] == '.')) {
+			double d = 0;
+			auto [end, ec] = std::from_chars(this->s.data() + this->p, this->s.data() + this->s.size(), d);
+			if (ec != std::errc()) return {};
+			this->p = end - this->s.data();
+			return d;
+		}
+		const std::string name = this->Name();
+		if (name == "true") return 1;
+		if (name == "false") return 0;
+		if (name.empty() || !this->Eat("(")) return {};
+		std::vector<Value> args;
+		if (!this->Eat(")")) {
+			do {
+				args.push_back(this->Compare());
+			} while (this->Eat(","));
+			this->Eat(")");
+		}
+		if (name == "case") {
+			size_t i = 0;
+			for (; i + 1 < args.size(); i += 2) {
+				if (args[i].has_value() && *args[i] != 0) return args[i + 1];
+			}
+			return i < args.size() ? args[i] : Value();
+		}
+		if ((name == "min" || name == "max") && !args.empty()) {
+			Value v = args[0];
+			for (const Value &a : args) {
+				if (!v.has_value() || !a.has_value()) return {};
+				v = name == "min" ? std::min(*v, *a) : std::max(*v, *a);
+			}
+			return v;
+		}
+		if (name == "abs" && args.size() == 1 && args[0].has_value()) return std::abs(*args[0]);
+		return {};
+	}
+
+	Value Unary()
+	{
+		if (this->Eat("-")) {
+			Value v = this->Unary();
+			return v.has_value() ? Value(-*v) : v;
+		}
+		return this->Primary();
+	}
+
+	Value Term()
+	{
+		Value v = this->Unary();
+		for (;;) {
+			if (this->Eat("*")) {
+				Value r = this->Unary();
+				v = v.has_value() && r.has_value() ? Value(*v * *r) : Value();
+			} else if (this->Eat("/")) {
+				Value r = this->Unary();
+				v = v.has_value() && r.has_value() && *r != 0 ? Value(*v / *r) : Value();
+			} else {
+				return v;
+			}
+		}
+	}
+
+	Value Sum()
+	{
+		Value v = this->Term();
+		for (;;) {
+			if (this->Eat("+")) {
+				Value r = this->Term();
+				v = v.has_value() && r.has_value() ? Value(*v + *r) : Value();
+			} else if (this->Eat("-")) {
+				Value r = this->Term();
+				v = v.has_value() && r.has_value() ? Value(*v - *r) : Value();
+			} else {
+				return v;
+			}
+		}
+	}
+
+	Value Compare()
+	{
+		Value a = this->Sum();
+		for (std::string_view op : {"==", "~=", "!=", "<=", ">=", "<", ">"}) {
+			if (!this->Eat(op)) continue;
+			this->Skip();
+			Value b = this->s.substr(this->p, 3) == "nil" ? (this->p += 3, Value()) : this->Sum();
+			const bool both = a.has_value() && b.has_value();
+			bool r = false;
+			if (op == "==") r = both ? *a == *b : a.has_value() == b.has_value();
+			if (op == "~=" || op == "!=") r = both ? *a != *b : a.has_value() != b.has_value();
+			if (op == "<=") r = both && *a <= *b;
+			if (op == ">=") r = both && *a >= *b;
+			if (op == "<") r = both && *a < *b;
+			if (op == ">") r = both && *a > *b;
+			return r ? 1 : 0;
+		}
+		return a;
+	}
+
+public:
+	JbeamExpression(std::string_view text, const std::map<std::string, double> &variables) : s(text), vars(variables) {}
+
+	/** Its value, nothing for nil. */
+	Value Evaluate()
+	{
+		return this->Compare();
+	}
+};
+
+/** A number of a .jbeam: a number, a variable ("$name") or an expression of them ("$=..."); def when none, or nil. */
+double JbeamNumber(const JValue &v, const std::map<std::string, double> &vars, double def = 0)
+{
+	if (v.type == JValue::Type::Number) return v.number;
+	if (!v.IsString() || v.text.empty() || v.text[0] != '$') return def;
+	if (v.text.starts_with("$=")) {
+		const std::optional<double> r = JbeamExpression(std::string_view(v.text).substr(2), vars).Evaluate();
+		return r.has_value() ? *r : def;
+	}
+	auto it = vars.find(v.text);
+	return it != vars.end() ? it->second : def;
+}
+
+/** Whether a value of a .jbeam is a number, or a variable or an expression that can make one (a node's place). */
+bool IsJbeamNumber(const JValue &v)
+{
+	return v.type == JValue::Type::Number || (v.IsString() && !v.text.empty() && v.text[0] == '$');
+}
+
 /* ---- The car: its parts and figures ---- */
 
 /** The parts of a car's .jbeam files, the main one and those its slots name, in that order. */
@@ -410,12 +619,40 @@ struct CarParts {
 	std::vector<JValue> files;
 	std::vector<const JValue *> used;
 	std::map<std::string, std::array<double, 3>> nodes; ///< the places of the nodes of the parts used, metres in the axes of BeamNG
+	std::map<std::string, double> vars;                 ///< the variables ("$name"): the configuration's, else the parts' own
+	std::map<const JValue *, std::array<double, 3>> offsets; ///< how far its slots move a part used ("nodeOffset")
+
+	/** A number of the parts' (JbeamNumber()). */
+	double Number(const JValue &v, double def = 0) const
+	{
+		return JbeamNumber(v, this->vars, def);
+	}
+
+	/**
+	 * A place of a part (a node's, a flexbody's) moved as its slots move it ("nodeOffset" of the slot and those above
+	 * it): along and up as it is, across away from the middle, so one offset puts both wheels of an axle out (the
+	 * Škoda 1203's wheels, BeamNG's x of the slot's "trackoffset").
+	 */
+	std::array<double, 3> Moved(const JValue *part, double x, double y, double z) const
+	{
+		auto it = this->offsets.find(part);
+		if (it == this->offsets.end()) return {x, y, z};
+		const std::array<double, 3> &o = it->second;
+		return {x + (x > 0 ? o[0] : (x < 0 ? -o[0] : 0)), y + o[1], z + o[2]};
+	}
+};
+
+/** A slot of a part: its type, the part it takes by default, its options ("nodeOffset"), nullptr none. */
+struct PartSlot {
+	std::string type;
+	std::string part;
+	const JValue *options = nullptr;
 };
 
 /** The slots of a part and the part each takes by default: "slots" (type, default) or "slots2" (name, ..., default). */
-std::vector<std::pair<std::string, std::string>> SlotsOf(const JValue &part)
+std::vector<PartSlot> SlotsOf(const JValue &part)
 {
-	std::vector<std::pair<std::string, std::string>> out;
+	std::vector<PartSlot> out;
 	for (const char *key : {"slots", "slots2"}) {
 		const JValue *slots = part.Get(key);
 		if (slots == nullptr || !slots->IsArray()) continue;
@@ -423,7 +660,8 @@ std::vector<std::pair<std::string, std::string>> SlotsOf(const JValue &part)
 		for (const JValue &row : slots->items) {
 			if (!row.IsArray() || row.items.size() <= at_default || !row.items[0].IsString()) continue;
 			if (row.items[0].text == "type" || row.items[0].text == "name") continue; // the heading
-			out.emplace_back(row.items[0].text, row.items[at_default].IsString() ? row.items[at_default].text : std::string());
+			const JValue *options = row.items.back().IsObject() ? &row.items.back() : nullptr;
+			out.push_back({row.items[0].text, row.items[at_default].IsString() ? row.items[at_default].text : std::string(), options});
 		}
 	}
 	return out;
@@ -453,8 +691,18 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 				if (part.IsString()) chosen[slot] = part.text;
 			}
 		}
+		/* Its own values of the variables (the trackoffset of the wheels). */
+		if (const JValue *vars = cfg.Get("vars"); vars != nullptr && vars->IsObject()) {
+			for (const auto &[name, value] : vars->members) {
+				if (value.type == JValue::Type::Number) parts.vars[name] = value.number;
+			}
+		}
 	}
 	for (const std::string &f : files) {
+		if (EndsWithIgnoreCase(f, ".jbeam")) parts.files.push_back(ParseJson(ReadModFile(v, f)));
+	}
+	/* And the parts the mod shares in vehicles/common/ (the Škoda 1203's wheels), after the car's own. */
+	for (const std::string &f : ListModCommonFiles(v)) {
 		if (EndsWithIgnoreCase(f, ".jbeam")) parts.files.push_back(ParseJson(ReadModFile(v, f)));
 	}
 	std::map<std::string, const JValue *> by_name;
@@ -470,26 +718,53 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 	if (main == nullptr) return false;
 	std::set<const JValue *> seen;
 	std::vector<const JValue *> todo = {main};
+	std::map<const JValue *, std::pair<const JValue *, const JValue *>> slotted; // a part: the part and the slot's options it is in
 	while (!todo.empty() && parts.used.size() < 400) {
 		const JValue *part = todo.front();
 		todo.erase(todo.begin());
 		if (!seen.insert(part).second) continue;
 		parts.used.push_back(part);
-		for (const auto &[slot, def] : SlotsOf(*part)) {
-			auto c = chosen.find(slot);
-			const std::string &name = c != chosen.end() ? c->second : def;
+		for (const PartSlot &slot : SlotsOf(*part)) {
+			auto c = chosen.find(slot.type);
+			const std::string &name = c != chosen.end() ? c->second : slot.part;
 			if (name.empty()) continue;
 			auto it = by_name.find(name);
-			if (it != by_name.end()) todo.push_back(it->second);
+			if (it == by_name.end()) continue;
+			todo.push_back(it->second);
+			slotted.emplace(it->second, std::make_pair(part, slot.options));
 		}
 	}
-	/* The nodes: a row [id, x, y, z, {...}], weighed by the "nodeWeight" set before it or in it. */
+	/* The variables: the configuration's, else the default of the part that has them ([name, type, unit, category, default, ...]). */
+	for (const JValue *part : parts.used) {
+		const JValue *vars = part->Get("variables");
+		if (vars == nullptr || !vars->IsArray()) continue;
+		for (const JValue &row : vars->items) {
+			if (!row.IsArray() || row.items.size() < 5 || !row.items[0].IsString() || !row.items[0].text.starts_with("$")) continue;
+			if (row.items[4].type == JValue::Type::Number) parts.vars.emplace(row.items[0].text, row.items[4].number);
+		}
+	}
+	/* How far the slots move the parts: each by its slot's "nodeOffset", and by those above it (a part before its own in parts.used). */
+	for (const JValue *part : parts.used) {
+		auto from = slotted.find(part);
+		if (from == slotted.end()) continue;
+		std::array<double, 3> off = {0, 0, 0};
+		if (auto above = parts.offsets.find(from->second.first); above != parts.offsets.end()) off = above->second;
+		const JValue *node_offset = from->second.second != nullptr ? from->second.second->Get("nodeOffset") : nullptr;
+		if (node_offset != nullptr && node_offset->IsObject()) {
+			static const char *const AXES[3] = {"x", "y", "z"};
+			for (int a = 0; a < 3; a++) {
+				if (const JValue *by = node_offset->Get(AXES[a]); by != nullptr) off[a] += parts.Number(*by);
+			}
+		}
+		if (off[0] != 0 || off[1] != 0 || off[2] != 0) parts.offsets[part] = off;
+	}
+	/* The nodes: a row [id, x, y, z, {...}], weighed by the "nodeWeight" set before it or in it; moved by their part's slots. */
 	for (const JValue *part : parts.used) {
 		const JValue *nodes = part->Get("nodes");
 		if (nodes == nullptr || !nodes->IsArray()) continue;
 		for (const JValue &row : nodes->items) {
-			if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || row.items[1].type != JValue::Type::Number) continue;
-			parts.nodes[row.items[0].text] = {row.items[1].Num(), row.items[2].Num(), row.items[3].Num()};
+			if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || !IsJbeamNumber(row.items[1])) continue;
+			parts.nodes[row.items[0].text] = parts.Moved(part, parts.Number(row.items[1]), parts.Number(row.items[2]), parts.Number(row.items[3]));
 		}
 	}
 	return true;
@@ -712,13 +987,13 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 					if (const JValue *w = row.Get("nodeWeight"); w != nullptr && w->type == JValue::Type::Number) weight = w->number;
 					continue;
 				}
-				if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || row.items[1].type != JValue::Type::Number) continue;
+				if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || !IsJbeamNumber(row.items[1])) continue;
 				double w = weight;
 				for (size_t i = 4; i < row.items.size(); i++) {
 					if (const JValue *own = row.items[i].Get("nodeWeight"); own != nullptr && own->type == JValue::Type::Number) w = own->number;
 				}
 				mass += w;
-				const double x = row.items[1].Num(), y = row.items[2].Num(), z = row.items[3].Num();
+				const auto [x, y, z] = parts.Moved(part, parts.Number(row.items[1]), parts.Number(row.items[2]), parts.Number(row.items[3]));
 				min_x = std::min(min_x, x); max_x = std::max(max_x, x);
 				min_y = std::min(min_y, y); max_y = std::max(max_y, y);
 				min_z = std::min(min_z, z); max_z = std::max(max_z, z);
@@ -1341,6 +1616,8 @@ struct Placed {
 	const XmlNode *geometry = nullptr;
 	Matrix world = IDENTITY;
 	std::map<std::string, std::string> materials;
+	double unit = 1;    ///< its .dae's metres to a unit
+	bool y_up = false;  ///< its .dae's up is y
 };
 
 void CollectNodes(const XmlNode &n, const Matrix &parent, const std::map<std::string, const XmlNode *> &geometries, std::map<std::string, Placed> &out, int depth = 0)
@@ -1499,6 +1776,8 @@ struct CarMaterial {
 	bool paint = false;           ///< "instanceDiffuse": the car's paint
 	std::string mask;             ///< "opacityMap" on the second texture coordinates: holes where it is dark
 	bool mask_uv1 = false;
+	std::string paint_mask;       ///< the paint's layer's "opacityMap": the paint where it is light, the first layer's picture where dark
+	bool paint_mask_uv1 = false;
 };
 
 /** A text without the spaces, tabs and ends of lines about it. */
@@ -1513,7 +1792,15 @@ std::string Trimmed(std::string_view s)
 std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 {
 	std::map<std::string, CarMaterial> out;
-	for (const std::string &f : ListCarFiles(v)) {
+	/* The car's own, then those the mod shares in vehicles/common/ (its wheels'); a name the car's own if both have it. */
+	std::vector<std::string> files = ListCarFiles(v);
+	const size_t own = files.size();
+	for (const std::string &f : ListModCommonFiles(v)) {
+		if (EndsWithIgnoreCase(f, ".cs") || EndsWithIgnoreCase(f, "materials.json")) files.push_back(f);
+	}
+	for (size_t at = 0; at < files.size(); at++) {
+		const std::string &f = files[at];
+		const bool shared = at >= own;
 		if (EndsWithIgnoreCase(f, ".cs")) {
 			std::vector<uint8_t> bytes = ReadModFile(v, f);
 			std::string_view s(reinterpret_cast<const char *>(bytes.data()), bytes.size());
@@ -1554,7 +1841,12 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 				m.mask = get("opacityMap[0]");
 				m.mask_uv1 = get("opacityMapUV[0]") == "1";
 				std::string map_to = get("mapTo");
-				out[map_to.empty() ? name : map_to] = m;
+				const std::string key = map_to.empty() ? name : map_to;
+				if (shared) {
+					out.emplace(key, m);
+				} else {
+					out[key] = m;
+				}
 				p = close + 2;
 			}
 		} else if (EndsWithIgnoreCase(f, ".materials.json") || StrEqualsIgnoreCase(f, "materials.json")) {
@@ -1571,18 +1863,41 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 					for (const char *k : {"diffuseMap", "colorMap", "baseColorMap"}) {
 						if (const JValue *t = first->Get(k); t != nullptr && t->IsString() && m.texture.empty()) m.texture = t->text;
 					}
+					/* The first's BeamNG's empty picture ("common/null.dds"), the picture of a layer after it (the
+					 * Škoda 1203's tyre: its rubber in the second). */
+					if (m.texture.empty() || m.texture.find("common/null") != std::string::npos) {
+						for (const JValue &st : stages->items) {
+							for (const char *k : {"diffuseMap", "colorMap", "baseColorMap"}) {
+								const JValue *t = st.Get(k);
+								if (t != nullptr && t->IsString() && t->text.find("common/null") == std::string::npos && (m.texture.empty() || m.texture.find("common/null") != std::string::npos)) m.texture = t->text;
+							}
+						}
+					}
 					if (const JValue *t = first->Get("opacityMap"); t != nullptr && t->IsString()) m.mask = t->text;
 					if (const JValue *t = first->Get("opacityMapUseUV"); t != nullptr) m.mask_uv1 = t->Num() == 1;
 				}
 				if (stages != nullptr && stages->IsArray()) {
 					for (const JValue &st : stages->items) {
+						bool painted = false;
 						for (const char *k : {"instanceDiffuse", "useColorPalette"}) {
-							if (const JValue *b = st.Get(k); b != nullptr && b->IsTrue()) m.paint = true;
+							if (const JValue *b = st.Get(k); b != nullptr && b->IsTrue()) painted = true;
+						}
+						if (!painted) continue;
+						m.paint = true;
+						/* The paint a layer over the first, where its mask is light (the Škoda 1203's body: its rubber, chrome
+						 * and lamps in the first layer's picture, dark in the mask). */
+						if (&st != first) {
+							if (const JValue *t = st.Get("opacityMap"); t != nullptr && t->IsString() && m.paint_mask.empty()) m.paint_mask = t->text;
+							if (const JValue *t = st.Get("opacityMapUseUV"); t != nullptr) m.paint_mask_uv1 = t->Num() == 1;
 						}
 					}
 				}
 				std::string map_to = mat.Get("mapTo") != nullptr && mat.Get("mapTo")->IsString() ? mat.Get("mapTo")->text : name;
-				out[map_to] = m;
+				if (shared) {
+					out.emplace(map_to, m);
+				} else {
+					out[map_to] = m;
+				}
 			}
 		}
 	}
@@ -1722,11 +2037,25 @@ bool DecodeDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_
 bool ReadTexture(const BeamngVehicle &v, const std::string &name, BeamngMesh::Material &m, std::vector<uint8_t> *png)
 {
 	if (name.empty() || name.find("common/null") != std::string::npos) return false;
-	std::vector<uint8_t> bytes = ReadModFile(v, name);
+	/* As BeamNG finds it: by its name, else as .dds or .png whichever the material named (the Škoda 1203's materials
+	 * name main_d.color.png, its picture is main_d.color.dds; its wheels' the other way round); with its folder, else
+	 * the car's own. */
+	auto read = [&v](const std::string &file) {
+		std::vector<uint8_t> bytes = ReadModFile(v, file);
+		const size_t dot = file.find_last_of('.');
+		if (bytes.empty() && dot != std::string::npos) {
+			for (const char *ext : {".dds", ".png"}) {
+				if (!StrEqualsIgnoreCase(std::string_view(file).substr(dot), ext)) bytes = ReadModFile(v, file.substr(0, dot) + ext);
+				if (!bytes.empty()) break;
+			}
+		}
+		return bytes;
+	};
+	std::vector<uint8_t> bytes = read(name);
 	if (bytes.empty()) {
 		/* A texture named without its folder: the car's own. */
 		std::string base = name.substr(name.find_last_of("/\\") + 1);
-		if (base != name) bytes = ReadModFile(v, base);
+		if (base != name) bytes = read(base);
 	}
 	if (bytes.empty()) return false;
 	if (bytes.size() > 8 && bytes[0] == 0x89 && bytes[1] == 'P') {
@@ -2013,35 +2342,58 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	auto fr = _frames.find(v.Package() + "|" + v.folder + "|" + v.config);
 	const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
 
-	/* The model: the first .dae of the folder, and those the flexbodies may name. */
+	/* The model: the .dae files of the folder; and those the mod shares in vehicles/common/ when a flexbody names a mesh
+	 * they have (the Škoda 1203's wheels, S1203_wheels/wheel.dae). The first that has a mesh places it. */
 	std::vector<std::string> daes;
 	for (const std::string &f : ListCarFiles(v)) {
 		if (EndsWithIgnoreCase(f, ".dae")) daes.push_back(f);
 	}
 	if (daes.empty()) return false;
-	std::vector<XmlNode> docs(daes.size());
+	const size_t own_daes = daes.size();
+	std::vector<std::string> common_daes;
+	for (const std::string &f : ListModCommonFiles(v)) {
+		if (EndsWithIgnoreCase(f, ".dae")) common_daes.push_back(f);
+	}
+	std::set<std::string> wanted; // the meshes the flexbodies name
+	for (const JValue *part : parts.used) {
+		const JValue *flex = part->Get("flexbodies");
+		if (flex == nullptr || !flex->IsArray()) continue;
+		for (const JValue &row : flex->items) {
+			if (!row.IsArray() || row.items.empty() || !row.items[0].IsString() || row.items[0].text == "mesh") continue;
+			std::string name = row.items[0].text;
+			strtolower(name);
+			wanted.insert(name);
+		}
+	}
+	std::vector<XmlNode> docs(daes.size() + common_daes.size());
 	std::map<std::string, Placed> placed;
-	double unit = 1;
-	bool y_up = false;
 	for (size_t i = 0; i < daes.size(); i++) {
+		/* The shared ones when the car's own leave a mesh out. */
+		if (i + 1 == own_daes && std::ranges::any_of(wanted, [&placed](const std::string &n) { return !placed.contains(n); })) {
+			daes.insert(daes.end(), common_daes.begin(), common_daes.end());
+		}
 		std::vector<uint8_t> bytes = ReadModFile(v, daes[i]);
 		if (!ParseXml(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()), docs[i])) continue;
 		const XmlNode *collada = docs[i].Kid("COLLADA");
 		if (collada == nullptr) continue;
+		double unit = 1;
+		bool y_up = false;
 		if (const XmlNode *asset = collada->Kid("asset"); asset != nullptr) {
 			if (const XmlNode *u = asset->Kid("unit"); u != nullptr && u->Attr("meter") != nullptr) unit = NumberOf(*u->Attr("meter"));
 			if (const XmlNode *up = asset->Kid("up_axis"); up != nullptr) y_up = up->text.find("Y_UP") != std::string::npos;
 		}
+		if (unit <= 0) unit = 1;
 		std::map<std::string, const XmlNode *> geometries;
 		if (const XmlNode *lib = collada->Kid("library_geometries"); lib != nullptr) {
 			for (const XmlNode &g : lib->kids) {
 				if (g.name == "geometry") geometries[g.AttrOr("id")] = &g;
 			}
 		}
+		std::map<std::string, Placed> here;
 		if (const XmlNode *lib = collada->Kid("library_visual_scenes"); lib != nullptr) {
 			for (const XmlNode &scene : lib->kids) {
 				for (const XmlNode &n : scene.kids) {
-					if (n.name == "node") CollectNodes(n, IDENTITY, geometries, placed);
+					if (n.name == "node") CollectNodes(n, IDENTITY, geometries, here);
 				}
 			}
 		}
@@ -2049,15 +2401,19 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 		if (const XmlNode *lib = collada->Kid("library_materials"); lib != nullptr) {
 			std::map<std::string, std::string> names;
 			for (const XmlNode &m : lib->kids) names[m.AttrOr("id")] = m.AttrOr("name").empty() ? m.AttrOr("id") : m.AttrOr("name");
-			for (auto &[key, p] : placed) {
+			for (auto &[key, p] : here) {
 				for (auto &[symbol, target] : p.materials) {
 					auto it = names.find(target);
 					if (it != names.end()) target = it->second;
 				}
 			}
 		}
+		for (auto &[key, p] : here) {
+			p.unit = unit;
+			p.y_up = y_up;
+			placed.emplace(key, std::move(p));
+		}
 	}
-	if (unit <= 0) unit = 1;
 
 	std::map<std::string, CarMaterial> materials = ReadMaterials(v);
 	/* The glowing glass: a material of "glowMap" with its lights ("lowbeam", "highbeam": ahead; "brake": at the back). */
@@ -2096,6 +2452,21 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			mesh.materials.push_back(std::move(made));
 		}
 		index[name] = at;
+		return at;
+	};
+	/* A painted material's first layer as it is, where its paint's mask is dark (CarMaterial::paint_mask). */
+	std::map<std::string, uint8_t> bare_index;
+	auto bare_of = [&](const std::string &name, const CarMaterial &cm) -> uint8_t {
+		auto it = bare_index.find(name);
+		if (it != bare_index.end()) return it->second;
+		if (mesh.materials.size() >= 255) return 0;
+		BeamngMesh::Material made;
+		made.name = name + " (bare)";
+		made.flat = cm.colour;
+		ReadTexture(v, cm.texture, made, &made.png);
+		const uint8_t at = static_cast<uint8_t>(mesh.materials.size());
+		mesh.materials.push_back(std::move(made));
+		bare_index[name] = at;
 		return at;
 	};
 	auto mask_value = [&](const std::string &name, float u, float vv) -> int {
@@ -2146,15 +2517,18 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				if (!o.IsObject()) continue;
 				auto xyz = [&](const char *key, double *out) {
 					if (const JValue *p = o.Get(key); p != nullptr && p->IsObject()) {
-						out[0] = p->Get("x") != nullptr ? p->Get("x")->Num(out[0]) : out[0];
-						out[1] = p->Get("y") != nullptr ? p->Get("y")->Num(out[1]) : out[1];
-						out[2] = p->Get("z") != nullptr ? p->Get("z")->Num(out[2]) : out[2];
+						out[0] = p->Get("x") != nullptr ? parts.Number(*p->Get("x"), out[0]) : out[0];
+						out[1] = p->Get("y") != nullptr ? parts.Number(*p->Get("y"), out[1]) : out[1];
+						out[2] = p->Get("z") != nullptr ? parts.Number(*p->Get("z"), out[2]) : out[2];
 					}
 				};
 				xyz("pos", pos);
 				xyz("rot", rot);
 				xyz("scale", scale);
 			}
+			/* Where its part's slots move it (the wheels out to their track). */
+			const auto moved = parts.Moved(part, pos[0], pos[1], pos[2]);
+			std::copy(moved.begin(), moved.end(), pos);
 			const double rx = rot[0] * M_PI / 180, ry = rot[1] * M_PI / 180, rz = rot[2] * M_PI / 180;
 			const Matrix mx = {1, 0, 0, 0, 0, std::cos(rx), -std::sin(rx), 0, 0, std::sin(rx), std::cos(rx), 0, 0, 0, 0, 1};
 			const Matrix my = {std::cos(ry), 0, std::sin(ry), 0, 0, 1, 0, 0, -std::sin(ry), 0, std::cos(ry), 0, 0, 0, 0, 1};
@@ -2164,10 +2538,11 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				for (int c = 0; c < 3; c++) place[r * 4 + c] *= scale[c];
 				place[r * 4 + 3] = pos[r];
 			}
-			/* The units of the .dae and its up: metres, z up. */
+			/* The units of its .dae and its up: metres, z up. */
+			const double unit = pl->second.unit;
 			Matrix units = IDENTITY;
 			units[0] = units[5] = units[10] = unit;
-			if (y_up) units = {unit, 0, 0, 0, 0, 0, -unit, 0, 0, unit, 0, 0, 0, 0, 0, 1};
+			if (pl->second.y_up) units = {unit, 0, 0, 0, 0, 0, -unit, 0, 0, unit, 0, 0, 0, 0, 0, 1};
 			const Matrix m = Multiply(place, Multiply(units, pl->second.world));
 			for (Triangles &t : ReadGeometry(*pl->second.geometry)) {
 				auto bound = pl->second.materials.find(t.material);
@@ -2177,12 +2552,20 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				const bool cut = cm != materials.end() && !cm->second.mask.empty();
 				auto gl = glow.find(material);
 				const size_t corners = t.pos.size() / 3;
+				const bool layered = cm != materials.end() && cm->second.paint && !cm->second.paint_mask.empty();
 				for (size_t c = 0; c + 2 < corners; c += 3) {
 					if (cut) {
 						/* A hole of the body where its mask is dark at the triangle's middle. */
 						const std::vector<float> &uvs = cm->second.mask_uv1 ? t.uv1 : t.uv0;
 						const float u = (uvs[c * 2] + uvs[c * 2 + 2] + uvs[c * 2 + 4]) / 3, w = (uvs[c * 2 + 1] + uvs[c * 2 + 3] + uvs[c * 2 + 5]) / 3;
 						if (mask_value(cm->second.mask, u, w) < 128) continue;
+					}
+					uint8_t tri_tex = tex;
+					if (layered) {
+						/* The paint where its mask is light at the triangle's middle, else the first layer as it is. */
+						const std::vector<float> &uvs = cm->second.paint_mask_uv1 && !t.uv1.empty() ? t.uv1 : t.uv0;
+						const float u = (uvs[c * 2] + uvs[c * 2 + 2] + uvs[c * 2 + 4]) / 3, w = (uvs[c * 2 + 1] + uvs[c * 2 + 3] + uvs[c * 2 + 5]) / 3;
+						if (mask_value(cm->second.paint_mask, u, w) < 128) tri_tex = bare_of(material, cm->second);
 					}
 					const uint32_t base = static_cast<uint32_t>(mesh.pos.size() / 3);
 					const uint32_t night_base = static_cast<uint32_t>(mesh.night_pos.size() / 3);
@@ -2207,7 +2590,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 							mesh.night_tri.push_back(night_base + static_cast<uint32_t>(j));
 						}
 					}
-					mesh.tri_tex.push_back(tex);
+					mesh.tri_tex.push_back(tri_tex);
 					if (gl != glow.end()) {
 						mesh.night_colour.push_back(gl->second ? 0xFFFF2814u : 0xFFFFF4D8u);
 						mesh.night_kind.push_back(gl->second ? 1 : 0);

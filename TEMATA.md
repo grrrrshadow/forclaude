@@ -31,6 +31,36 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (11) – Škoda 1203 z BeamNG (par15): kola, textury, lak podle masky
+
+- Hráč (screenshot z #300, nákup v depu): *„dvanáctsettrojky se nepodařily kolečka a textury“*, odkaz na release
+  grrrrf `par15` (zip `vehicles-…`: `vehicles/S1203/` a `vehicles/common/S1203_wheels/`). Pak: *„v #301 ten
+  screenshot auta vypadá stejně, nejsou kola a textury“* a *„to máš vzadu plechy místo oken, to je několik aut
+  v jednom. barvu nedáš, tam je 6 karoserií na sobě a šest oken“*.
+- **Příčiny (rig s jeho zipem, stejný obraz jako u něj):**
+  - Kola leží v `vehicles/common/S1203_wheels/` (díly, `wheel.dae`, materiály, textury). Hra četla jen složku
+    auta, takže kola neexistovala a nevznikla ani náhradní.
+  - Na místo kola posouvá slot podvozku (`nodeOffset`) výrazem s proměnnou:
+    `$=case($trackwidth_F == nil, $trackoffset_F+0.18, $trackwidth_F)`.
+  - Materiály jmenují `…color.png`, ale soubory jsou `.dds`, u kol obráceně. BeamNG si příponu přehodí sám.
+  - Karoserie má lak až ve druhé vrstvě s maskou (`opacityMap`): lak je tam, kde je maska bílá. Pryž, chrom
+    a světla jsou v textuře první vrstvy. Hra natírala celý materiál jednou barvou.
+- **Hotovo (`beamng.cpp`):**
+  - díly, modely a materiály se čtou i z `vehicles/common/` modu (zip i složka);
+  - modely odtud jen tehdy, když síť chybí v modelech auta; každý model má vlastní jednotky a osu nahoru;
+  - proměnné dílů (`variables`, výchozí hodnota) a `vars` z `.pc`;
+  - výrazy `$=` (+ − * /, závorky, porovnání, `nil`, `case`, `min`, `max`, `abs`);
+  - `nodeOffset` slotu posune uzly i flexbody dílu a jeho poddílů, x od středu na obě strany;
+  - textura s druhou příponou (`.dds` ↔ `.png`); pneumatika bere texturu druhé vrstvy, když je v první prázdná
+    `common/null.dds`;
+  - lakovaný materiál s maskou laku: trojúhelník se středem na tmavé části masky má texturu první vrstvy,
+    ostatní lak (stejně jako díry podle masky).
+- **Rig:** 1203 kombi (COM) i mikrobus mají kola (pneumatiky, poklice) na svých místech, sklo a detaily.
+  Kreslí se jen díly zvolené konfigurace, jedna karoserie (`S1203_body_74`). Plechy vzadu jsou u COM díly
+  `S1203_blind_side_RL/RR`, které `COM.pc` dává místo zadních bočních oken; mikrobus (`passenger.pc`) má okna.
+  Smoke beze změny.
+- Čeká: jestli se COM má jmenovat jinak než „kombi“ (zeptat se hráče); krmení draků (domluveno, kódovat).
+
 ## 26. 10. (10) – rozhledna zříceniny: chodec vyjde až na plošinu
 
 - Hráč: *„dračí farma s dřevěnou rozhlednou, zaseknu se nahoře poslední kousek na plošinu rozhledny, na druhé farmě
