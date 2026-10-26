@@ -435,9 +435,9 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 	std::vector<std::string> files = ListCarFiles(v);
 	std::sort(files.begin(), files.end());
 	std::map<std::string, std::string> chosen;
-	/* The configuration: info.json's "default_pc", else the only .pc. */
-	std::string pc;
-	if (const JValue *d = info != nullptr ? info->Get("default_pc") : nullptr; d != nullptr && d->IsString()) pc = d->text + ".pc";
+	/* The configuration: its own, else info.json's "default_pc", else the only .pc. */
+	std::string pc = v.config.empty() ? std::string() : v.config + ".pc";
+	if (const JValue *d = info != nullptr ? info->Get("default_pc") : nullptr; pc.empty() && d != nullptr && d->IsString()) pc = d->text + ".pc";
 	if (pc.empty()) {
 		for (const std::string &f : files) {
 			if (EndsWithIgnoreCase(f, ".pc")) {
@@ -537,14 +537,51 @@ std::array<float, 3> ToObject(const CarFrame &f, double x, double y, double z)
 	return {static_cast<float>(-(y - f.mid_y)), static_cast<float>(x), static_cast<float>(z - f.ground_z)};
 }
 
-/** A car of its folder in the mod, if it is one with a model and an engine. */
-std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &folder, const std::string &id)
+/**
+ * The cargoes of our Škoda 1203 with a tarp (the colleague's osobacky/plachta_naklady.json, TAZ 1203 plachta 0x91 of
+ * the vans): the vans and the flatbeds of BeamNG carry them (the player, 26. 10.: "give them their cargoes as the
+ * flatbed and the van, you have our 1203s for a pattern"), mail first, as theirs.
+ */
+static const std::vector<std::string> TARP_1203_CARGOES = {
+	"PASS", "BEER", "MAIL", "BDMT", "FOOD", "FARM", "FRUT", "LVPT", "DYES", "HOPS", "TEXT", "GLAS", "WDPR", "WOOL",
+	"FISH", "PAPR", "SUGR", "NUTS", "JAVA", "COAT", "STEL", "TYRE", "STST", "PIPE", "STSE", "STSH", "STWR", "STAL",
+	"ALUM", "STCB", "CMNT", "CSTI", "VENG", "POWR", "CIGR", "TBCO", "COLA", "BEAN", "FURN", "TATO", "ELEC", "NODC",
+	"FZDR", "SWET", "CTCD", "SOAP", "MEAT", "SEED", "OLSD", "CHSE", "CERA", "BUBL", "TOFF", "CCPR", "BRCK", "STBL",
+	"FOCA", "PPWK", "RBAR", "SEAL", "STPP", "STTB", "TYCO", "WELD", "SESP", "LVST", "PUMP", "CBLK", "COPR", "FECR",
+	"FERT", "KAOL", "MILK", "PLAS", "RUBR", "ZINC", "BAKE", "COBL", "EOIL", "FRVG", "IRON", "METL", "NICK", "OYST",
+	"PCL_", "QLME", "SALT", "SASH", "PLST", "YETI", "YETY", "RSGR", "MARI", "STIG", "STSL", "STBR", "STPL", "STSW",
+	"FEAL", "PLNT", "CHEM", "WORK", "PRIS", "ENUM", "MPAR", "PPAR", "RAMT", "TINP", "LEAT", "PRNT", "WINE", "FLOU",
+	"LETH", "CRAN", "LFEQ", "SCPR", "STTP", "SWRP", "TIN_", "WDCH", "BRAM"
+};
+/** The people among them: none on a flatbed (they sit in the cab). */
+static const std::vector<std::string> PEOPLE_CARGOES = {"PASS", "WORK", "PRIS", "YETI", "YETY"};
+
+/**
+ * A car of its folder in the mod, if it is one with a model and an engine.
+ * @param config its configuration, a .pc of the folder without ".pc"; empty the default one
+ */
+std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &folder, const std::string &id, const std::string &config = {})
 {
 	BeamngVehicle v;
 	v.zip = zip;
 	v.folder = folder;
 	v.id = id;
+	v.config = config;
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
+	/* A configuration's own info_<name>.json over the car's: its name ("Configuration"), its paint, its body. */
+	if (!config.empty() && info.IsObject()) {
+		JValue own = ParseJson(ReadModFile(v, "info_" + config + ".json"));
+		if (own.IsObject()) {
+			for (auto &[k, val] : own.members) {
+				auto it = std::ranges::find_if(info.members, [&k](const auto &m) { return m.first == k; });
+				if (it != info.members.end()) {
+					it->second = val;
+				} else {
+					info.members.emplace_back(k, val);
+				}
+			}
+		}
+	}
 	CarParts parts;
 	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts)) return std::nullopt;
 	bool model = false;
@@ -562,6 +599,10 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	if (const JValue *n = info.Get("Name"); n != nullptr && n->IsString()) name = n->text;
 	if (name.empty()) name = id;
 	v.name = !brand.empty() && name.find(brand) == std::string::npos ? brand + " " + name : name;
+	if (!config.empty()) {
+		const JValue *c = info.Get("Configuration");
+		v.name += " " + (c != nullptr && c->IsString() && !c->text.empty() ? c->text : config);
+	}
 	if (const JValue *a = info.Get("Author"); a != nullptr && a->IsString()) v.author = a->text;
 	const JValue *type = info.Get("Type");
 	if (type != nullptr && type->IsString() && (StrEqualsIgnoreCase(type->text, "Prop") || StrEqualsIgnoreCase(type->text, "Trailer"))) return std::nullopt;
@@ -648,7 +689,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 		}
 	}
 	frame.ground_z = hub_z < 1e8 ? hub_z - radius : (min_z < 1e8 ? min_z : 0);
-	_frames[v.Package() + "|" + v.folder] = frame;
+	_frames[v.Package() + "|" + v.folder + "|" + v.config] = frame;
 
 	/* The engine: the most power of its torque curve ([rpm, Nm] rows), its revolutions at most. */
 	double power = 0, max_torque = 0, max_rpm = 0;
@@ -722,6 +763,35 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 		v.goods = true;
 		v.capacity = Clamp(static_cast<int>(std::lround(v.mass_t * 2)), 5, 40);
 	}
+	/*
+	 * Its cargoes by what it is (the player, 26. 10., of the 1203's configurations): a police car ("VB") or an ambulance
+	 * one passenger or one studentka; a passenger van its people; a flatbed and a van the cargoes of our 1203 with a
+	 * tarp, the flatbed without people. Any other car every cargo of the game (the player: "give the BeamNG cars all
+	 * the cargoes in the game").
+	 */
+	std::string what = config + " ";
+	if (const JValue *c = info.Get("Configuration"); c != nullptr && c->IsString()) what += c->text;
+	strtolower(what);
+	auto has = [&what](std::initializer_list<std::string_view> words) { return std::ranges::any_of(words, [&what](std::string_view w) { return what.find(w) != std::string::npos; }); };
+	if (has({"police", "vb", "ambulance", "sanit"})) {
+		v.cargoes = {"PASS", "STUD"};
+		v.capacity = 1;
+		v.goods = false;
+	} else if (has({"passenger", "lux", "bus", "osob"})) {
+		v.cargoes = {"PASS", "STUD"};
+		v.capacity = std::max(v.capacity, 8);
+		v.goods = false;
+	} else if (has({"flatbed", "pickup", "valnik", "valník"}) || style.find("pickup") != std::string::npos || style.find("flatbed") != std::string::npos) {
+		for (const std::string &c : TARP_1203_CARGOES) {
+			if (std::ranges::find(PEOPLE_CARGOES, c) == PEOPLE_CARGOES.end()) v.cargoes.push_back(c);
+		}
+		v.goods = true;
+	} else if (style.find("van") != std::string::npos || has({"van", "com", "spoje", "hearse", "fire", "dodav"})) {
+		v.cargoes = TARP_1203_CARGOES;
+		v.goods = true;
+	}
+	/* Mail first, as our 1203's. */
+	if (auto mail = std::ranges::find(v.cargoes, std::string("MAIL")); mail != v.cargoes.end()) std::rotate(v.cargoes.begin(), mail, mail + 1);
 
 	/* The driver's eye: the camera inside of the driver ("driver", "dash"), else the first. */
 	if (const JValue *main = parts.used.front(); main != nullptr) {
@@ -746,8 +816,39 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 		}
 	}
 	const std::string zip_name = zip.empty() ? folder : zip.substr(zip.find_last_of(PATHSEPCHAR) + 1);
-	v.grfid = GrfIdOf(zip_name + "/" + id);
+	/* (The default configuration's as it always was: the games saved with it keep it.) */
+	v.grfid = GrfIdOf(zip_name + "/" + id + (config.empty() ? std::string() : "/" + config));
 	return v;
+}
+
+/**
+ * The configurations of a car's folder other than its default one, each a car of its own (the player, test 4: the
+ * 1203 "has many variants... we need the VB, and the flatbed and the vans"): its .pc files but info.json's
+ * "default_pc" (the car itself), by their names.
+ */
+std::vector<std::string> OtherConfigs(const std::string &zip, const std::string &folder, const std::string &id)
+{
+	BeamngVehicle v;
+	v.zip = zip;
+	v.folder = folder;
+	v.id = id;
+	JValue info = ParseJson(ReadModFile(v, "info.json"));
+	std::string def;
+	if (const JValue *d = info.IsObject() ? info.Get("default_pc") : nullptr; d != nullptr && d->IsString()) def = d->text;
+	std::vector<std::string> files = ListCarFiles(v);
+	std::sort(files.begin(), files.end());
+	std::vector<std::string> out;
+	for (const std::string &f : files) {
+		if (!EndsWithIgnoreCase(f, ".pc")) continue;
+		const std::string name = f.substr(0, f.size() - 3);
+		/* Without "default_pc" the car itself is its first .pc, as ReadCarParts takes it. */
+		if (def.empty()) {
+			def = name;
+			continue;
+		}
+		if (!StrEqualsIgnoreCase(name, def)) out.push_back(name);
+	}
+	return out;
 }
 
 /* ---- Where the mods are ---- */
@@ -865,6 +966,14 @@ std::vector<uint8_t> MakeGrf(const BeamngVehicle &v)
 	const double rel = std::max(hp, 20.0) / 90.0;
 	const uint8_t cost = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 100 : 50) * std::pow(rel, 0.45))), 8, 255));
 	const uint8_t running = static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround((v.goods || v.capacity > 4 ? 80 : 40) * std::pow(rel, 0.4))), 8, 255));
+	/* Its cargoes by their labels: a translation table of them (global property 9), the refit list by its numbers. */
+	if (!v.cargoes.empty()) {
+		std::vector<uint8_t> ctt = {0x00, 0x08, 0x01, static_cast<uint8_t>(std::min<size_t>(v.cargoes.size(), 255)), 0x00, 0x09};
+		for (size_t i = 0; i < v.cargoes.size() && i < 255; i++) {
+			for (int k = 0; k < 4; k++) ctt.push_back(k < static_cast<int>(v.cargoes[i].size()) ? static_cast<uint8_t>(v.cargoes[i][k]) : ' ');
+		}
+		sprites.push_back(std::move(ctt));
+	}
 	std::vector<uint8_t> a0 = {0x00, 0x01, 0, 0x01, static_cast<uint8_t>(BEAMNG_ENGINE_ID)};
 	uint8_t props = 0;
 	auto prop = [&](uint8_t p) { a0.push_back(p); props++; };
@@ -876,10 +985,18 @@ std::vector<uint8_t> MakeGrf(const BeamngVehicle &v)
 	prop(0x07); a0.push_back(5);                   // loading speed
 	prop(0x0E); a0.push_back(0xFF);                // the set's own sprites: drawn from its model (GetThreeDVehicleObjectSprite())
 	prop(0x0F); a0.push_back(static_cast<uint8_t>(v.capacity));
-	prop(0x10); a0.push_back(v.goods ? 0xFF : 0x00); // passengers, or the first goods it takes
-	/* Refitted to every cargo the game has (the player, 26. 10.: "give the BeamNG cars all the cargoes in the game"). */
-	prop(0x1D); word(a0, 0xFFFF);                  // the classes of cargo it may be refitted to: all
-	prop(0x1E); word(a0, 0x0000);                  // and none left out
+	if (!v.cargoes.empty()) {
+		prop(0x10); a0.push_back(0x00);            // the first of its table, its own
+		prop(0x1D); word(a0, 0x0000);              // no classes: its list alone
+		prop(0x1E); word(a0, 0x0000);
+		prop(0x24); a0.push_back(static_cast<uint8_t>(std::min<size_t>(v.cargoes.size(), 255)));
+		for (size_t i = 0; i < v.cargoes.size() && i < 255; i++) a0.push_back(static_cast<uint8_t>(i));
+	} else {
+		prop(0x10); a0.push_back(v.goods ? 0xFF : 0x00); // passengers, or the first goods it takes
+		/* Refitted to every cargo the game has (the player, 26. 10.: "give the BeamNG cars all the cargoes in the game"). */
+		prop(0x1D); word(a0, 0xFFFF);              // the classes of cargo it may be refitted to: all
+		prop(0x1E); word(a0, 0x8000);              // but the road vehicles (CT_ROLA, special): the player's car carriers only
+	}
 	prop(0x11); a0.push_back(cost);
 	prop(0x09); a0.push_back(running);
 	prop(0x13); a0.push_back(static_cast<uint8_t>(Clamp<int>(static_cast<int>(std::lround(hp / 10)), 1, 255)));       // power, 10 hp
@@ -1564,14 +1681,21 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 			Debug(grf, 0, "BeamNG: {} {} has the same GRF id as another, left out", car->Package(), car->id);
 			return;
 		}
-		car->grf_path = grf_folder + car->id + ".grf";
+		car->grf_path = grf_folder + car->id + (car->config.empty() ? std::string() : "_" + car->config) + ".grf";
 		if (std::ranges::any_of(_beamng_vehicles, [&car](const BeamngVehicle &o) { return StrEqualsIgnoreCase(o.grf_path, car->grf_path); })) {
-			car->grf_path = grf_folder + car->id + fmt::format("_{:08X}", car->grfid) + ".grf";
+				car->grf_path = grf_folder + car->id + (car->config.empty() ? std::string() : "_" + car->config) + fmt::format("_{:08X}", car->grfid) + ".grf";
 		}
 		Debug(grf, 1, "BeamNG: {} ({} {}): {} {}, {:.0f} kW, {:.0f} km/h, {:.2f} t, effort {:.2f}, {} paints, GRF {:02X}{:02X}{:02X}{:02X}", car->name, car->Package(), car->id,
 				car->goods ? "goods" : "seats", car->capacity, car->power_kw, car->speed_kmh, car->mass_t, car->effort, car->paints.size(),
 				car->grfid & 0xFF, (car->grfid >> 8) & 0xFF, (car->grfid >> 16) & 0xFF, car->grfid >> 24);
 		_beamng_vehicles.push_back(std::move(*car));
+	};
+	/* A car, and each of its other configurations as a car of its own when it is one. */
+	auto take_all = [&](const std::string &zip, const std::string &car_folder, const std::string &id) {
+		std::optional<BeamngVehicle> car = ReadCar(zip, car_folder, id);
+		if (!car.has_value()) return;
+		take(std::move(car));
+		for (const std::string &config : OtherConfigs(zip, car_folder, id)) take(ReadCar(zip, car_folder, id, config));
 	};
 	for (const std::string &folder : ModFolders()) {
 		Debug(grf, 1, "BeamNG: mods looked for in {}", folder);
@@ -1591,7 +1715,7 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 					if (slash == std::string::npos || e.name.find('/', slash + 1) != std::string::npos) continue;
 					cars.insert(e.name.substr(0, slash + 1));
 				}
-				for (const std::string &car : cars) take(ReadCar(folder + file, car, car.substr(9, car.size() - 10)));
+				for (const std::string &car : cars) take_all(folder + file, car, car.substr(9, car.size() - 10));
 			} else if (entry.is_directory(ec)) {
 				/* An unpacked mod: its vehicles/ folder, also under "unpacked". */
 				std::vector<std::string> roots = {folder + file + PATHSEP};
@@ -1607,7 +1731,7 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 					for (const auto &car : std::filesystem::directory_iterator(OTTD2FS(vehicles), ec)) {
 						if (!car.is_directory(ec)) continue;
 						const std::string id = FS2OTTD(car.path().filename().native());
-						take(ReadCar({}, vehicles + id + PATHSEP, id));
+						take_all({}, vehicles + id + PATHSEP, id);
 					}
 				}
 			}
@@ -1735,7 +1859,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
 	CarParts parts;
 	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts)) return false;
-	auto fr = _frames.find(v.Package() + "|" + v.folder);
+	auto fr = _frames.find(v.Package() + "|" + v.folder + "|" + v.config);
 	const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
 
 	/* The model: the first .dae of the folder, and those the flexbodies may name. */

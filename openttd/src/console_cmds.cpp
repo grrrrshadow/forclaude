@@ -10473,6 +10473,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return std::tolower(c); });
 				if (!text.empty() && lower.find(text) == std::string::npos) continue;
 				IConsolePrint(CC_DEFAULT, "test3d: auto {} '{}' dilu {} roadtype {} dostupne {}", e->index.base(), name, CountArticulatedParts(e->index) + 1, RoadVehInfo(e->index)->roadtype, Company::IsValidID(_local_company) && e->company_avail.Test(_local_company) ? "ano" : "ne");
+				/* What it carries: its own cargo, how much, and all it refits to. */
+				std::string refits;
+				for (CargoType c : e->info.refit_mask) {
+					const uint32_t v = CargoSpec::Get(c)->label.base();
+					refits += fmt::format(" {:c}{:c}{:c}{:c}", static_cast<char>(v >> 24), static_cast<char>(v >> 16), static_cast<char>(v >> 8), static_cast<char>(v));
+				}
+				const CargoType own = e->GetDefaultCargoType();
+				const uint32_t ov = IsValidCargoType(own) ? CargoSpec::Get(own)->label.base() : 0x3F3F3F3F;
+				IConsolePrint(CC_DEFAULT, "test3d:   naklad {:c}{:c}{:c}{:c} {} kusu, prestavby {}:{}", static_cast<char>(ov >> 24), static_cast<char>(ov >> 16), static_cast<char>(ov >> 8), static_cast<char>(ov), e->GetDisplayDefaultCapacity(), e->info.refit_mask.Count(), refits);
 			}
 			return true;
 		}

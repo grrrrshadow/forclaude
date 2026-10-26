@@ -44,6 +44,7 @@
 #include "settings_type.h"
 #include "error.h"
 #include "strings_func.h"
+#include "string_func.h"
 #include "window_func.h"
 #include "table/strings.h"
 
@@ -4268,7 +4269,7 @@ static void ReadThreeDVehicleObjects()
 		ThreeDVehicleObject obj;
 		obj.name = b.name;
 		obj.package = b.Package();
-		obj.file = "beamng:" + b.Package() + "|" + b.folder;
+		obj.file = "beamng:" + b.Package() + "|" + b.folder + "|" + b.config;
 		obj.type = VehicleType::Road;
 		obj.grfid = b.grfid;
 		obj.pieces.push_back(BEAMNG_ENGINE_ID);
@@ -4281,6 +4282,17 @@ static void ReadThreeDVehicleObjects()
 		if (b.has_cab) {
 			std::copy(std::begin(b.cab), std::end(b.cab), obj.cab);
 			obj.has_cab = true;
+		}
+		/* College Girl at the wheel of our Škoda 1203 only (the player, 26. 10.: "let College Girl drive", "in every car
+		 * one sits differently, put her only into the 1203"): the colleague's girl sitting at a wheel, her origin where she
+		 * sits, her eyes about 0.72 m over it and a little ahead of her hips. */
+		if (b.has_cab && StrEqualsIgnoreCase(b.id, "S1203")) {
+			ThreeDVehicleCrew driver;
+			driver.figure = "college_girl_za_volantem";
+			driver.at[0] = b.cab[0] - 0.1f;
+			driver.at[1] = b.cab[1];
+			driver.at[2] = b.cab[2] - 0.72f;
+			obj.crew.push_back(std::move(driver));
 		}
 		_vehicle_objects.push_back(std::move(obj));
 	}
@@ -4729,6 +4741,57 @@ int ThreeDVehicleObject::FrameAt(uint64_t tick, uint32_t phase) const
  */
 static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
 
+/**
+ * A figure of the crew into a vehicle's shape: its shape sized, turned about z and stood at its place, its textures after
+ * the others, its triangles of a part. The driver -- the one sitting at the eye of the cab -- is not drawn from that eye.
+ * A figure bigger than it is ("meritko") stays that big everywhere, the view from the eyes too. A figure that walks is
+ * not of the shape: it is drawn on its own, its frame by the way gone (WalkingCrew()).
+ */
+void ThreeDVehicleObject::AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const
+{
+	const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
+	if (fig != nullptr && fig->Walks()) return; // drawn on its own, a frame by the way gone (WalkingCrew())
+	const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
+	if (fs == nullptr) {
+		Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
+		return;
+	}
+	if ((part == 0 || part == this->crew_record_part) && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
+	const size_t first_triangle = made.tri.size() / 3;
+	const bool lit = !made.nrm.empty() && !fs->nrm.empty();
+	if (!lit) made.nrm.clear();
+	uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made.pngs.size(), 255));
+	for (size_t t = 0; t < fs->pngs.size() && made.pngs.size() < 255; t++) {
+		made.pngs.push_back(fs->pngs[t]);
+		made.flats.push_back(fs->flats[t]);
+		made.tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
+		made.tex_glow.push_back(fs->Glow(t));
+		made.tex_alpha.push_back(fs->Alpha(t));
+	}
+	const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
+	uint32_t base = static_cast<uint32_t>(made.pos.size() / 3);
+	for (size_t i = 0; i < fs->pos.size(); i += 3) {
+		made.pos.push_back(c.at[0] + (fs->pos[i] * ca - fs->pos[i + 1] * sa) * s);
+		made.pos.push_back(c.at[1] + (fs->pos[i] * sa + fs->pos[i + 1] * ca) * s);
+		made.pos.push_back(c.at[2] + fs->pos[i + 2] * s);
+		if (lit) {
+			made.nrm.push_back(fs->nrm[i] * ca - fs->nrm[i + 1] * sa);
+			made.nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
+			made.nrm.push_back(fs->nrm[i + 2]);
+		}
+	}
+	made.uv.insert(made.uv.end(), fs->uv.begin(), fs->uv.end());
+	for (size_t t = 0; t < fs->tri.size(); t += 3) {
+		made.tri.push_back(base + fs->tri[t]);
+		made.tri.push_back(base + fs->tri[t + 1]);
+		made.tri.push_back(base + fs->tri[t + 2]);
+		made.tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + (t / 3 < fs->tri_tex.size() ? fs->tri_tex[t / 3] : 0))));
+	}
+	if (part == 0 && made.tri_part.empty()) return;
+	made.tri_part.resize(first_triangle, 0);
+	made.tri_part.resize(made.tri.size() / 3, part);
+}
+
 /** The object's shape as it is now, read from its .glb the first time (only what is always drawn); nullptr when it cannot be. A figure that moves: its first frame. */
 const ThreeDVehicleShape *ThreeDVehicleObject::GetShape() const
 {
@@ -5106,7 +5169,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		std::lock_guard beamng_lock(beamng_mutex);
 		const BeamngVehicle *car = nullptr;
 		for (const BeamngVehicle &b : FindBeamngVehicles()) {
-			if (this->file == "beamng:" + b.Package() + "|" + b.folder) car = &b;
+			if (this->file == "beamng:" + b.Package() + "|" + b.folder + "|" + b.config) car = &b;
 		}
 		BeamngMesh bm;
 		if (car == nullptr || !ReadBeamngShape(*car, bm)) return nullptr;
@@ -5138,6 +5201,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->night_kind = std::move(bm.night_kind);
 		made->front_lights = std::move(bm.front_lights);
 		made->back_lights = std::move(bm.back_lights);
+		/* Its crew: College Girl at the wheel (ReadThreeDVehicleObjects()), not drawn from the cab's eye. */
+		for (const ThreeDVehicleCrew &c : this->crew) this->AddCrewFigure(*made, c, 0);
 		made->x0 = made->y0 = made->z0 = 1e9f;
 		made->x1 = made->y1 = made->z1 = -1e9f;
 		for (size_t i = 0; i + 2 < made->pos.size(); i += 3) {
@@ -5340,47 +5405,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	 * driver -- the one sitting at the eye of the cab -- is not drawn from that eye. A figure bigger than it is ("meritko")
 	 * stays that big everywhere, the view from the eyes too. A figure that walks is not of the shape: it is drawn on its
 	 * own, its frame by the way gone (WalkingCrew()). */
-	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) {
-		const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-		if (fig != nullptr && fig->Walks()) return; // drawn on its own, a frame by the way gone (WalkingCrew())
-		const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
-		if (fs == nullptr) {
-			Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
-			return;
-		}
-		if ((part == 0 || part == this->crew_record_part) && this->has_cab && std::hypot(c.at[0] - this->cab[0], c.at[1] - this->cab[1]) < 0.4f) part = ThreeDVehicleShape::PART_DRIVER;
-		const size_t first_triangle = made->tri.size() / 3;
-		const bool lit = !made->nrm.empty() && !fs->nrm.empty();
-		if (!lit) made->nrm.clear();
-		uint8_t first_tex = static_cast<uint8_t>(std::min<size_t>(made->pngs.size(), 255));
-		for (size_t t = 0; t < fs->pngs.size() && made->pngs.size() < 255; t++) {
-			made->pngs.push_back(fs->pngs[t]);
-			made->flats.push_back(fs->flats[t]);
-			made->tex_names.push_back(t < fs->tex_names.size() ? fs->tex_names[t] : std::string());
-			made->tex_glow.push_back(fs->Glow(t));
-			made->tex_alpha.push_back(fs->Alpha(t));
-		}
-		const float a = c.turn * static_cast<float>(M_PI) / 180.0f, ca = std::cos(a), sa = std::sin(a), s = c.scale;
-		uint32_t base = static_cast<uint32_t>(made->pos.size() / 3);
-		for (size_t i = 0; i < fs->pos.size(); i += 3) {
-			made->pos.push_back(c.at[0] + (fs->pos[i] * ca - fs->pos[i + 1] * sa) * s);
-			made->pos.push_back(c.at[1] + (fs->pos[i] * sa + fs->pos[i + 1] * ca) * s);
-			made->pos.push_back(c.at[2] + fs->pos[i + 2] * s);
-			if (lit) {
-				made->nrm.push_back(fs->nrm[i] * ca - fs->nrm[i + 1] * sa);
-				made->nrm.push_back(fs->nrm[i] * sa + fs->nrm[i + 1] * ca);
-				made->nrm.push_back(fs->nrm[i + 2]);
-			}
-		}
-		made->uv.insert(made->uv.end(), fs->uv.begin(), fs->uv.end());
-		for (size_t t = 0; t < fs->tri.size(); t += 3) {
-			made->tri.push_back(base + fs->tri[t]);
-			made->tri.push_back(base + fs->tri[t + 1]);
-			made->tri.push_back(base + fs->tri[t + 2]);
-			made->tri_tex.push_back(static_cast<uint8_t>(std::min<int>(255, first_tex + (t / 3 < fs->tri_tex.size() ? fs->tri_tex[t / 3] : 0))));
-		}
-		mark_part(part, first_triangle);
-	};
+	auto add_crew = [&](const ThreeDVehicleCrew &c, uint8_t part) { this->AddCrewFigure(*made, c, part); };
 	for (const ThreeDVehicleCrew &c : this->crew) add_crew(c, static_cast<uint8_t>(this->crew_record_part));
 	/* What a state shows -- a group of the crew, the load -- is not of the vehicle's size (its length on the map). */
 	const size_t extent_floats = made->pos.size();

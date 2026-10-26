@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (2) – BeamNG: varianty jako samostatná auta, náklady podle 1203, College Girl řídí 1203
+
+- **Varianty:** každý `.pc` složky auta (kromě `default_pc` z `info.json`, bez něj kromě prvního `.pc`) je samostatné
+  auto v nákupu, jméno + „Configuration“ z `info_<název>.json`, díly podle svého `.pc`, vlastní GRF
+  (`<id>_<název>.grf`). Výchozí auto má GRF id jako dřív (savy drží).
+- **Náklady** (hráč: *„dej jim normálně náklady valník, dodávka, předlohu máš dvanáctsetrojky. VB bude vozit
+  1 pasažéra nebo 1 studentku“*): VB/policie/sanitka PASS a STUD po 1; osobní/lux/bus lidi; valník a pickup seznam
+  naší 1203 s plachtou bez lidí; dodávky, COM, spoje, pohřební seznam 1203 s plachtou (pošta první). Ostatní auta
+  BeamNG dál všechny náklady, ale **bez ROLA** (Rola jen vozy hráče).
+- **College Girl za volantem jen v 1203** (hráč: *„colege girl ať řídí“*, pak *„v každým autě se sedí jinak, dej ji
+  jen do 1203“*): sedí podle kamery řidiče z jbeam (`camerasInternal` „driver“). Ověřeno na kopii Volhy přejmenované
+  na S1203 (Volha sama holku nemá); skutečnou 1203 v rigu nemám, sezení zkontrolovat ve hře.
+- Rig: `test3d motory auta [text]` píše i náklad, kapacitu a přestavby.
+
 ## 26. 10. (1) – chůze nahoru: hradby, střecha síně, most; auto přes most; draci do síně; kolegův hrad z modulů
 
 - **Hráč: „1–5, pak build a po buildu GPU“** (1 let draka do síně, 2 kolegův hrad z modulů a zřícenina s rozhlednou
@@ -55,7 +69,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   vlastní atlas, kreslily se z velkého).
 - **BeamNG:** auta přestavitelná na všechny náklady hry; kola, která mod nechává na dílech BeamNG (1203:
   `S1203_wheel_F/R`, pneumatiky, poklice v žádném souboru), hra kreslí vlastní (pneu a disk) na náboj.
-  Varianty 1203 (VB, valník, dodávky – `cotamje.md` z testu 4) jako samostatná auta: další krok.
+  Varianty 1203 (VB, valník, dodávky – `cotamje.md` z testu 4) jako samostatná auta: viz 26. 10. (2).
 - Simtrains: nákladní vagony bez vození aut (Rola jen vozy hráče).
 
 ## 25. 10. (10) – sdílené textury přes uri, interiér dračího hradu a srubu hajného

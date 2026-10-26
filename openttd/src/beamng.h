@@ -27,6 +27,7 @@ struct BeamngVehicle {
 	std::string zip;              ///< the .zip it is in, or empty for an unpacked mod
 	std::string folder;           ///< its folder: in the .zip "vehicles/<name>/", else the path of that folder with the separator
 	std::string id;               ///< the name of its folder
+	std::string config;           ///< its configuration, a .pc of the folder without ".pc" (the 1203's police, flatbed, van...); empty its default one
 	std::string name;             ///< "Name" of its info.json, with "Brand" before it
 	std::string author;           ///< "Author"
 	std::vector<uint32_t> paints; ///< the colours of its info.json ("colors", "paints"), Colour::data; the default first
@@ -36,6 +37,7 @@ struct BeamngVehicle {
 	double effort = 0;            ///< the most force at its wheels against its weight
 	bool goods = false;           ///< a lorry: goods of any kind, not passengers
 	int capacity = 4;             ///< the passengers it takes, or the goods
+	std::vector<std::string> cargoes; ///< the labels of the cargoes it may be refitted to, the first its own; empty every cargo of the game
 	bool has_cab = false;         ///< a camera of the driver given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	uint32_t grfid = 0;           ///< the GRF's id, of its .zip's and folder's names

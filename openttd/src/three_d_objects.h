@@ -722,6 +722,7 @@ struct ThreeDVehicleObject {
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
+	void AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const;
 	void Forget() const;
 	size_t TrimTextures(std::set<const void *> &seen) const;
 
