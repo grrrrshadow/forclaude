@@ -44,6 +44,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   jen do 1203“*): sedí podle kamery řidiče z jbeam (`camerasInternal` „driver“). Ověřeno na kopii Volhy přejmenované
   na S1203 (Volha sama holku nemá); skutečnou 1203 v rigu nemám, sezení zkontrolovat ve hře.
 - Rig: `test3d motory auta [text]` píše i náklad, kapacitu a přestavby.
+- Hráč: *„rola nikdy nemohla být na žádném autě, to je vagon na přepravu aut. bude odtahovka jo? auto který bude
+  vozit auta, potom někdy“* – odtahovka později. Kontrola: žádné z 91 aut hry Rolu nebere.
+- **Odpověď kolegovi** `hra/3d/ODPOVED-DRACI-HRAD.md` (grrrrf `3b915b0`): prosby 0–4 hradu ano, jeskyně zříceniny
+  podle hráče (výklenek, ne nová místnost; rozhledna se schody, louče, drak zvenku), posed schody jako `podlaha`,
+  otázka na mezery mezi kládami srubu.
 
 ## 26. 10. (1) – chůze nahoru: hradby, střecha síně, most; auto přes most; draci do síně; kolegův hrad z modulů
 
