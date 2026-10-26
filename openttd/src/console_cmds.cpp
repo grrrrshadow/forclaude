@@ -8838,6 +8838,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		cur_company.Restore();
 		IConsolePrint(cost.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: dum {:#04x} na {},{}: {}", *house, *x, *y,
 				cost.Succeeded() ? std::string("postaven") : (cost.GetErrorMessage() == INVALID_STRING_ID ? std::string("NEJDE") : GetString(cost.GetErrorMessage())));
+	} else if (what == "trojuhelniky" && argv.size() > 9) {
+		/* 'trojuhelniky <x> <y> <x0> <y0> <x1> <y1> <z0> <z1>': the triangles of the industry's 3D object on the tile
+		 * touching the box (centimetres in its frame), each its box and whether it is walked on (a floor). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value() || !IsTileType(TileXY(*x, *y), TileType::Industry)) return true;
+		const ThreeDObject *obj = GetThreeDIndustryObjectOf(Industry::GetByTile(TileXY(*x, *y)));
+		if (obj == nullptr || !obj->Read()) return true;
+		const double bx0 = number(4).value_or(0) / 100.0, by0 = number(5).value_or(0) / 100.0, bx1 = number(6).value_or(0) / 100.0, by1 = number(7).value_or(0) / 100.0;
+		const double bz0 = number(8).value_or(0) / 100.0, bz1 = number(9).value_or(0) / 100.0;
+		int shown = 0, found = 0;
+		size_t run = 0;
+		for (size_t t = 0; t + 2 < obj->tri.size(); t += 3) {
+			while (run + 1 < obj->passable_tris.size() && t / 3 >= obj->passable_tris[run + 1]) run += 2;
+			const bool floor = run + 1 < obj->passable_tris.size() && t / 3 >= obj->passable_tris[run];
+			double lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = obj->tri[t + k];
+				const double p[3] = {obj->pos[i * 3] / OBJECT_UNITS_PER_METRE, obj->pos[i * 3 + 1] / OBJECT_UNITS_PER_METRE, obj->pos[i * 3 + 2] / OBJECT_HEIGHT_PER_METRE};
+				for (int a = 0; a < 3; a++) {
+					lo[a] = std::min(lo[a], p[a]);
+					hi[a] = std::max(hi[a], p[a]);
+				}
+			}
+			if (hi[0] < bx0 || lo[0] > bx1 || hi[1] < by0 || lo[1] > by1 || hi[2] < bz0 || lo[2] > bz1) continue;
+			found++;
+			if (shown++ < 40) IConsolePrint(CC_DEFAULT, "test3d: troj {} x {:.2f}-{:.2f} y {:.2f}-{:.2f} z {:.2f}-{:.2f}{}", t / 3, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2], floor ? " podlaha" : "");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {} trojuhelniku v krabici", found);
 	} else if (what == "postav" && argv.size() > 4) {
 		/* Put one of the game's own industries drawn as a 3D object on the map, by its object's name (test3d objekty
 		 * lists them): the statue's object of bronze builds it of bronze. */

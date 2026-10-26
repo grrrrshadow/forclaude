@@ -4281,12 +4281,29 @@ static void ReadThreeDVehicleObjects()
 		obj.grfid = b.grfid;
 		/* Each car of the purchase list made of the configuration (the 1203's makes over the years) drawn from it. */
 		for (const BeamngModel &m : b.models) obj.pieces.push_back(m.id);
+		/*
+		 * The paint fading with age as our cars' do (the colleague's hra/3d/BLEDNUTI-1203-PRO-HRU.md, the player: "all
+		 * must fade"): in whole years from its purchase, each a twentieth of the way to halfway to a faded off-white,
+		 * then no more. The paint alone, as the mod paints it; its glass, chrome, lights and the girl at the wheel not.
+		 */
+		static constexpr int BEAMNG_FADE_YEARS = 20;
+		static constexpr uint8_t FADED[3] = {0xB8, 0xB8, 0xB2};
 		for (uint32_t colour : b.paints) {
-			ThreeDVehicleState st;
-			st.colour = colour;
-			obj.states.push_back(st);
+			const Colour c(colour);
+			const uint8_t from[3] = {c.r, c.g, c.b};
+			for (int year = 0; year <= BEAMNG_FADE_YEARS; year++) {
+				uint8_t now[3];
+				for (int k = 0; k < 3; k++) {
+					const int to = (from[k] + FADED[k] + 1) / 2;
+					now[k] = static_cast<uint8_t>(from[k] + static_cast<int>(std::lround((to - from[k]) * static_cast<double>(year) / BEAMNG_FADE_YEARS)));
+				}
+				ThreeDVehicleState st;
+				st.colour = Colour(now[0], now[1], now[2], c.a).data;
+				obj.states.push_back(st);
+			}
 		}
 		obj.paint_random = true;
+		obj.paint_years = BEAMNG_FADE_YEARS + 1;
 		if (b.has_cab) {
 			std::copy(std::begin(b.cab), std::end(b.cab), obj.cab);
 			obj.has_cab = true;
@@ -7378,9 +7395,11 @@ bool ThreeDObject::Blocks(double x, double y, double feet) const
 		band(0.3 * OBJECT_HEIGHT_PER_METRE, 2.0 * OBJECT_HEIGHT_PER_METRE, this->footprint, true);
 		/*
 		 * Inside: the building is hollow, its walls only. What a walker cannot get to from outside -- its middle kept
-		 * a walker's half-width (WALKER_CELLS) from every wall, a door narrower than a walker shut -- is solid too.
+		 * a body's half-width (WALKER_CELLS) from every wall, a gap narrower than a body shut -- is solid too. A body,
+		 * not the walker's circle on the ground: the corridor of the ruin's stairs is a metre wide (26. 10.); the circle
+		 * keeps the walker out of the narrow gaps by itself (FirstPersonFree()).
 		 */
-		static constexpr double WALKER_CELLS_EXACT = THREE_D_WALKER_RADIUS_M * OBJECT_UNITS_PER_METRE * FOOTPRINT_CELLS / TILE_SIZE;
+		static constexpr double WALKER_CELLS_EXACT = THREE_D_WALKER_BODY_M * OBJECT_UNITS_PER_METRE * FOOTPRINT_CELLS / TILE_SIZE;
 		static constexpr int WALKER_CELLS = static_cast<int>(WALKER_CELLS_EXACT) + (WALKER_CELLS_EXACT > static_cast<int>(WALKER_CELLS_EXACT) ? 1 : 0);
 		/* On a grid with a margin round the tiles, free: the walker comes from there. */
 		static constexpr int MARGIN = WALKER_CELLS + 1;

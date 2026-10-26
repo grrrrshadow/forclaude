@@ -184,8 +184,13 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
 		return obj->ComposeState(layers, colours);
 	}
-	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list. */
-	if (obj->paint_random) return v == nullptr ? 1 : 1 + static_cast<int>(v->random_bits % obj->states.size());
+	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years. */
+	if (obj->paint_random) {
+		const size_t years = std::max<size_t>(obj->paint_years, 1), paints = std::max<size_t>(obj->states.size() / years, 1);
+		if (v == nullptr) return 1;
+		const size_t age = std::min<size_t>(static_cast<size_t>(std::max(v->age.base(), 0)) / CalendarTime::DAYS_IN_YEAR, years - 1);
+		return 1 + static_cast<int>((v->random_bits % paints) * years + age);
+	}
 	/* The sets of the layers of its pieces, each piece's after the one before: of every piece of it (the colleague's
 	 * semi-trailer has its sets in its first piece and hangs from its middle one, the lesovoz has them in its second,
 	 * PROSBA-NAKLADAKY-TATRA-3D.md point 3), or of its anchor alone when its states name their piece ("clanek": "the

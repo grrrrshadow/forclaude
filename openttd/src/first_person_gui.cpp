@@ -90,7 +90,7 @@ static constexpr double FIRST_PERSON_MOUSE = 0.005;
 /** How far from a wall it stops, world units (THREE_D_WALKER_RADIUS_M). */
 static constexpr double FIRST_PERSON_RADIUS = THREE_D_WALKER_RADIUS_M * OBJECT_UNITS_PER_METRE;
 /** The walker inside a house's interior: a body's half-width, between the rows of seats. */
-static constexpr double FIRST_PERSON_INDOOR_RADIUS = 0.2 * OBJECT_UNITS_PER_METRE;
+static constexpr double FIRST_PERSON_INDOOR_RADIUS = THREE_D_WALKER_BODY_M * OBJECT_UNITS_PER_METRE;
 /** The longest move checked against the walls at once, world units: running a step goes in pieces, so no wall is stepped over. */
 static constexpr double FIRST_PERSON_SUBSTEP = 0.1;
 /** How often it moves and the picture is made, milliseconds. */
@@ -368,10 +368,17 @@ static bool FirstPersonIndoors(double x, double y)
 static bool FirstPersonFree(double x, double y, double stand = -std::numeric_limits<double>::infinity())
 {
 	if (!FirstPersonWalkable(x, y, stand)) return false;
-	/* Indoors, and up on stairs or a wall walk (standing over the ground), a body's half-width: the ruin's stairs are a
-	 * metre wide between their rails, the high seat's 0.8 m (the colleague's hra/3d/HRAD-ZRICENINA-POSED-PRO-HRU.md). */
-	const bool raised = std::isfinite(stand) && stand > FirstPersonGroundZ(x, y) + 0.1 * OBJECT_HEIGHT_PER_METRE;
-	const double radius = raised || FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
+	/* Indoors, and up on stairs or a wall walk (standing over the ground) or at their foot (a step under its circle), a
+	 * body's half-width: the ruin's stairs are a metre wide between their stringers, the high seat's 0.8 m (the
+	 * colleague's hra/3d/HRAD-ZRICENINA-POSED-PRO-HRU.md). */
+	auto over_ground = [stand](double px, double py) {
+		return FirstPersonStandZ(px, py, stand) > FirstPersonGroundZ(px, py) + 0.1 * OBJECT_HEIGHT_PER_METRE;
+	};
+	bool narrow = std::isfinite(stand) && (stand > FirstPersonGroundZ(x, y) + 0.1 * OBJECT_HEIGHT_PER_METRE);
+	for (int k = 0; k < 8 && !narrow && std::isfinite(stand); k++) {
+		narrow = over_ground(x + FIRST_PERSON_RADIUS * std::cos(k * M_PI / 4), y + FIRST_PERSON_RADIUS * std::sin(k * M_PI / 4));
+	}
+	const double radius = narrow || FirstPersonIndoors(x, y) ? FIRST_PERSON_INDOOR_RADIUS : FIRST_PERSON_RADIUS;
 	for (int k = 0; k < 8; k++) {
 		const double a = k * M_PI / 4;
 		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a), stand)) return false;

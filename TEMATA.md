@@ -31,6 +31,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 26. 10. (5) – blednutí aut BeamNG, oprava kolegy (stříška posedu, pata schodů), chůze na úzké schody
+
+- Hráč: *„blednutí dáme hned, a máme to opravené“*.
+- **Blednutí** (kolega `BLEDNUTI-1203-PRO-HRU.md`): každá barva laku z modu má 21 stavů, jeden na celý rok stáří
+  (`paint_years`). Rok po roce 1/20 cesty k `(barva + B8B8B2) / 2`, po 20 letech konec. Bledne jen lak (materiál
+  barvy auta), sklo, chrom, světla a holka ne; v nákupu nová. Všechna auta BeamNG. Rig: Volha nová / 10 / 20 let.
+- **Převzato `15fdb06`:** stříška posedu v 5 m (2,16 m nad plošinou), u paty schodů zříceniny odsunuté kvádry.
+- **Chůze:** výplň „kam chodec dojde zvenku“ počítá s tělem 0,2 m (`THREE_D_WALKER_BODY_M`), ne s kruhem 0,4 m –
+  metrová chodba schodů zříceniny byla jinak plná. Chodec je úzký (0,2 m) i u paty schodů (schod pod kruhem). Rig:
+  zřícenina 0 → 10,9 m, posed 0 → 2,84 m a po plošině, hrad dál 0 → 7 m.
+- Rig: `test3d trojuhelniky <x> <y> <x0> <y0> <x1> <y1> <z0> <z1>` (cm) – trojúhelníky objektu průmyslu v krabici.
+
 ## 26. 10. (4) – les a obě dračí farmy od kolegy (1513879): hrad i zřícenina, drak do jeskyně pěšky, schody posedu
 
 - Hráč: *„ušetříme když náklady budou ingame?“* (kolega: 35 MB nákladů v GRF → sada `naklady` 220 kB),
@@ -49,7 +61,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   1,06–1,66 m nad podlahou plošiny (chodec potřebuje 2 m) – kolegovi. Pata schodů zříceniny je nedosažitelná
   (u průchodu leží kvádry) – kolegovi. Hrad dál 0 → 7 m.
 - Rig: `chodec volno [dlazdic] [cm]` jemná mapa, `:` = střed volný, kruh ne.
-- Náklady (sada `naklady`, skládání, `loze`) a blednutí 1203 (kolega: 20 let napůl k `B8B8B2`) po buildu.
+- Náklady (sada `naklady`, skládání, `loze`) po buildu; blednutí viz 26. 10. (5).
 
 ## 26. 10. (3) – 1203 po letech: Škoda 1203 → TAZ 1203 → TAZ 1500 a TAZ 1.9D; roky z BeamNG; jeden GRF na auto
 

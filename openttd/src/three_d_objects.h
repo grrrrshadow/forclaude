@@ -68,6 +68,8 @@ float ThreeDGlowShare(const std::vector<float> &lights, size_t i);
  * wide: it did not get through an alley between two houses (the player, 17. 10.).
  */
 static constexpr double THREE_D_WALKER_RADIUS_M = 0.4;
+/** A body's half-width: the walker indoors and up on stairs, and how near a wall it can be reached from outside. */
+static constexpr double THREE_D_WALKER_BODY_M = 0.2;
 
 /**
  * A number of its own for each shape and texture made: what the graphics card keeps of it is found by it
@@ -649,6 +651,7 @@ struct ThreeDVehicleObject {
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
 	bool paint_random = false;      ///< a car of a mod of BeamNG (beamng.h): its states the paints of the mod, one of them each car by its random bits
+	uint8_t paint_years = 1;        ///< and of each paint so many states, one a year of its age, the paint fading (BEAMNG_FADE_YEARS + 1)
 	HouseID drive_house = UINT16_MAX; ///< a car of the game's own ("auto" with "jizda"): drives between the houses of this original house, from stop ("stani") to stop
 	float drive_kmh = 60;           ///< "rychlost_kmh"
 	int drive_stand = 400;          ///< "stoji_tiku": ticks it stands at a stop
