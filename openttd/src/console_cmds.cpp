@@ -9306,7 +9306,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* The dogs, the animals, the ghosts and the sellers (three_d_animals.h): 'zvirata' tells where they are and what
 		 * the indices have; 'zvirata posli <jmeno> [metru]' puts one so many metres ahead of the walker (3 without);
 		 * 'zvirata uder' a blow of the hammer; 'zvirata pes [jmeno]' the walker's dog (none without), as the company's,
-		 * 'zvirata koupit [jmeno]' through the command (bought, or let go without a name). */
+		 * 'zvirata koupit [jmeno]' through the command (bought, or let go without a name); 'zvirata ukaz <misto>' the view to
+		 * the first of a place. */
 		extern bool FirstPersonWalkerAt(double &x, double &y);
 		extern double FirstPersonWalkerHeading();
 		double wx = 0, wy = 0;
@@ -9324,6 +9325,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			/* 'zvirata houba': the walker to the mushroom nearest it; 'zvirata utrhni': and E there. */
 			extern std::string RigFirstPersonToMushroom(bool pick);
 			IConsolePrint(CC_DEFAULT, "test3d: houba {}", RigFirstPersonToMushroom(argv[2] == "utrhni"));
+		} else if (argv.size() > 3 && argv[2] == "ukaz") {
+			/* 'zvirata ukaz <misto>': the main view to the first of a place ("farma", "pastvina", ...). */
+			double ax = 0, ay = 0;
+			if (ThreeDAnimalOfPlace(argv[3], ax, ay)) {
+				ScrollMainWindowToTile(TileVirtXY(static_cast<int>(ax), static_cast<int>(ay)), true);
+				UpdateViewportPosition(GetMainWindow(), 0);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: ukaz {} na {:.1f},{:.1f}", argv[3], ax / TILE_SIZE, ay / TILE_SIZE);
 		} else if (argv.size() > 2 && argv[2] == "koupit") {
 			const Company *c = Company::GetIfValid(_local_company);
 			const Money before = c != nullptr ? c->money : Money(0);

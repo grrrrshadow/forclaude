@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (28) – Psi na farmě: dvůr a ohrady pastvin
+
+- Hráč: *„dej pejsky na farmu“*, pak *„na farmě u ohrady taky u ovci a hlidat kravičky prasatka“*.
+- Hotovo: na každé farmě (průmysl, který dělá pole, i z NewGRF) kolem středu pohledu dva psi na dvoře, chodí mezi
+  budovami podle jejich tvarů (jako chodec z očí; dlaždice průmyslu cesta po dlaždicích nebere). U každé pastviny
+  (krávy, ovce, prasata) jeden pes: chodí kolem plotu zvenku, nejdál k rohu (ne přes pastvinu), zastaví se a dívá
+  se dovnitř na zvířata. Nejvýš 4 farmy a 4 pastviny kolem středu.
+- Jen opravdoví psi (lovecký, hnědý, veselý, pouliční, baset, malamut, jack russell, bulmastif, bulteriér…), ne
+  kočky, lišky a vlci, které index vede taky jako psy. Seznam je v kódu (`FARM_DOGS`), index kolegy se nemění.
+- Velikost: psi na farmě ve skutečné velikosti jako krávy a ovce pastvin (`meritko_zvirat` 1); ostatní zvířata na
+  mapě zůstávají 3× větší (#169). Pes 3× větší vedle ovce byl obr.
+- Rig: `test3d zvirata ukaz farma|pastvina` (pohled na prvního psa toho místa), místa v `test3d zvirata`.
+
 ## 27. 10. (27) – 1203: barvy, kola, interiér, světla, rozhlížení (domluvit / opravit)
 
 - Hráč: *„mužeš převzit barvy z 1203 puvodnich? implicidni? komunisticka červená, blednutí... kola jsou pruhledné
@@ -41,6 +54,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Chyby (opravit): průhledné pneumatiky, zadní kola blízko středu, zelená uvnitř, kulatá/hranatá světla podle
   značky, zadní světlo nevybarvené. Domluvit: barvy (původní 1203, rudá, blednutí, konfigurátor), rozhlížení
   pravým tlačítkem v kabině.
+- Odpověď hráče: *„1 barvy z mych 1203grf stary. 2D 1203. sprity. jo ať blednou zase jako ostatni auta.
+  konfigurator ten čzdlik v levo dole okna přestavby otvira menu vyběru potom. děla to grrrrf k tatram nakladnim .
+  special taky ma konfigurator. 2 ano“* – barvy ze starého 2D GRF 1203 (sprity), blednutí jako ostatní auta,
+  konfigurátor tlačítkem vlevo dole v okně přestavby (jako Tatry náklaďáky a Special), rozhlížení pravým ano.
 
 ## 27. 10. (26) – Otočení jen jiná kamera, kus 1: celý pohled kartou jedním průchodem (rig)
 

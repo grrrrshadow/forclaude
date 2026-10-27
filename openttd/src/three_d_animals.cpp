@@ -34,6 +34,9 @@
 #include "landscape.h"
 #include "viewport_func.h"
 #include "town.h"
+#include "industry.h"
+#include "industry_map.h"
+#include "clear_map.h"
 #include "house.h"
 #include "rail_map.h"
 #include "track_func.h"
@@ -54,6 +57,8 @@
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (first_person_gui.cpp). */
 bool FirstPersonWalkerAt(double &x, double &y);
 double FirstPersonWalkerHeading();
+/** Whether one can stand on the ground at a world point, as the walker can (first_person_gui.cpp). */
+bool FirstPersonGroundWalkable(double x, double y);
 
 namespace {
 
@@ -78,6 +83,16 @@ constexpr uint CHURCHES_KEPT = 4;          ///< at most so many churches about t
 constexpr double CHURCH_ROUND_TILES = 0.7; ///< it goes about its church so far out from its walls, tiles
 constexpr uint64_t CHURCH_INSIDE_TICKS = 600; ///< and is in it, or gone, at least so long (and as long again at most)
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
+/** The dogs of the farms (the player, 27. 10.: "put the little dogs on the farm"): the true dogs of the streets, not the
+ * cats, the foxes, the wolves the index has as dogs too. */
+constexpr std::string_view FARM_DOGS[] = {"pes_lovecky", "pes_hnedy", "pes_veseli", "pes_ulicni", "pes_nafoceny", "pes_roztomily", "pes_maly", "baset", "malamut", "jack_russell", "bulmastif", "bulterier"};
+constexpr uint FARM_DOGS_KEPT = 2;         ///< so many about each farm's yard ...
+constexpr uint FARMS_KEPT = 4;             ///< ... of so many farms about the middle at most
+constexpr double YARD_DOG_M = 0.3;         ///< a dog of a yard keeps so far from the walls of its buildings, metres
+/** And by the fences of the pastures (the player, 27. 10.: "on the farm by the paddock too, by the sheep, and to guard
+ * the cows, the piglets"): one about each, going along its fence outside, looking in at the animals. */
+constexpr uint PASTURES_KEPT = 4;          ///< so many pastures about the middle have theirs at most
+constexpr double PASTURE_OUT_M = 0.8;      ///< it goes so far out from the fence, metres
 constexpr uint64_t SELLER_TICKS = 20000;   ///< a seller stays so long (about nine minutes) ...
 constexpr uint64_t SELLER_AWAY_TICKS = 4000; ///< ... and the next comes after about so long
 constexpr uint64_t DEAD_TICKS = 600;       ///< a fallen one lies so long
@@ -106,6 +121,8 @@ enum class Place : uint8_t {
 	Forest, ///< in a forest, always (the player, 24. 10.: "trees, mushrooms and the little animals are to be in the forest all the time")
 	ForestNight, ///< a ghost of the forest with a clearing at night, at its places ("noc_postavy")
 	Church, ///< the ghost in its sheet of a church, about it and in it (CHURCH_GHOST)
+	Farm,   ///< a dog of a farm, about its yard (FARM_DOGS)
+	Pasture, ///< a dog of a farm by the fence of a pasture, guarding its animals (FARM_DOGS)
 };
 
 enum class State : uint8_t {
@@ -149,6 +166,8 @@ struct Beast {
 	TileIndex rail_tile = INVALID_TILE;       ///< riding the rails (Place::Rail): the tile it rides through ...
 	Trackdir rail_td = Trackdir::Invalid;     ///< ... along this track of it, to its far edge
 	TileIndex church = INVALID_TILE;          ///< its church's north tile (Place::Church)
+	IndustryID farm = IndustryID::Invalid();  ///< its farm (Place::Farm)
+	TileIndex pasture = INVALID_TILE;         ///< its pasture's north tile (Place::Pasture)
 	bool going_in = false;                    ///< on its way to the church's door, to go in
 	bool inside = false;                      ///< in the church, or vanished: not seen, not hit, till "until"
 	bool out_at_door = false;                 ///< and it comes out of the door (else it appears about the church)
@@ -400,13 +419,150 @@ bool WalkTo(Beast &b, double tx, double ty, double speed_m, uint64_t now, bool f
 	return b.way_at >= b.way.size();
 }
 
-/** A place to walk to near its own, where it can stand. */
+/**
+ * Whether a dog can stand at a point of the yard of a farm: on its tiles, among its buildings by their shapes, as the
+ * walker (the tiles of an industry are not walkable to the way over the tiles, NavWalkable()).
+ */
+bool InFarmYard(IndustryID farm, double x, double y)
+{
+	if (!OnMap(x, y)) return false;
+	const double r = YARD_DOG_M * OBJECT_UNITS_PER_METRE;
+	for (int k = -1; k < 4; k++) {
+		const double px = k < 0 ? x : x + r * std::cos(k * M_PI / 2), py = k < 0 ? y : y + r * std::sin(k * M_PI / 2);
+		const TileIndex t = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
+		if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != farm || !FirstPersonGroundWalkable(px, py)) return false;
+	}
+	return true;
+}
+
+/** Whether a dog of a farm can walk straight from one point of its yard to another (InFarmYard() each half metre). */
+bool FarmYardWay(IndustryID farm, double fx, double fy, double tx, double ty)
+{
+	const int steps = std::max(1, static_cast<int>(std::hypot(tx - fx, ty - fy) / (0.5 * OBJECT_UNITS_PER_METRE)));
+	for (int k = 1; k <= steps; k++) {
+		if (!InFarmYard(farm, fx + (tx - fx) * k / steps, fy + (ty - fy) * k / steps)) return false;
+	}
+	return true;
+}
+
+/** The way round a pasture outside its fence (Place::Pasture), world units: a rectangle. */
+struct PastureRing {
+	double x0, y0, x1, y1;
+
+	explicit PastureRing(TileIndex north)
+	{
+		uint px, py, w, h;
+		GetPastureSpot(north, px, py, w, h);
+		const double out = PASTURE_OUT_M * OBJECT_UNITS_PER_METRE;
+		this->x0 = TileX(north) * TILE_SIZE - out;
+		this->y0 = TileY(north) * TILE_SIZE - out;
+		this->x1 = (TileX(north) + w) * TILE_SIZE + out;
+		this->y1 = (TileY(north) + h) * TILE_SIZE + out;
+	}
+
+	double Length() const { return 2 * (this->x1 - this->x0 + this->y1 - this->y0); }
+
+	/** The corners, so far round from the first (x0, y0). */
+	std::array<double, 4> Corners() const
+	{
+		const double a = this->x1 - this->x0, b = this->y1 - this->y0;
+		return {0, a, a + b, 2 * a + b};
+	}
+
+	/** The point so far round. */
+	void At(double s, double &x, double &y) const
+	{
+		const double a = this->x1 - this->x0, b = this->y1 - this->y0;
+		s = std::fmod(s, this->Length());
+		if (s < 0) s += this->Length();
+		if (s < a) {
+			x = this->x0 + s;
+			y = this->y0;
+		} else if (s < a + b) {
+			x = this->x1;
+			y = this->y0 + (s - a);
+		} else if (s < 2 * a + b) {
+			x = this->x1 - (s - a - b);
+			y = this->y1;
+		} else {
+			x = this->x0;
+			y = this->y1 - (s - 2 * a - b);
+		}
+	}
+
+	/** How far round the point of it nearest to one. */
+	double Nearest(double x, double y) const
+	{
+		const double a = this->x1 - this->x0, b = this->y1 - this->y0;
+		const double cx = std::clamp(x, this->x0, this->x1), cy = std::clamp(y, this->y0, this->y1);
+		const double d[] = {std::abs(y - this->y0), std::abs(x - this->x1), std::abs(y - this->y1), std::abs(x - this->x0)};
+		const int side = static_cast<int>(std::ranges::min_element(d) - std::begin(d));
+		switch (side) {
+			case 0: return cx - this->x0;
+			case 1: return a + (cy - this->y0);
+			case 2: return a + b + (this->x1 - cx);
+			default: return 2 * a + b + (this->y1 - cy);
+		}
+	}
+};
+
+/** Whether a tile is the north tile of a pasture. */
+bool IsPastureNorthTile(TileIndex t)
+{
+	if (!IsPasture(t)) return false;
+	uint x, y, w, h;
+	GetPastureSpot(t, x, y, w, h);
+	return x == 0 && y == 0;
+}
+
+/**
+ * The next place of a dog by a pasture's fence: on along it either way, a corner at most (so that it goes round the
+ * fence, not through the pasture), where it can stand.
+ */
+void PickFenceWalk(Beast &b)
+{
+	b.tx = b.x;
+	b.ty = b.y;
+	if (!IsPastureNorthTile(b.pasture)) return;
+	const PastureRing ring(b.pasture);
+	const double s = ring.Nearest(b.x, b.y), len = ring.Length();
+	const double step = (0.4 + InteractiveRandomRange(100) / 100.0) * TILE_SIZE;
+	const double first = InteractiveRandomRange(2) ? 1 : -1;
+	for (double way : {first, -first}) {
+		double to = s + way * step;
+		/* The first corner on the way, if it comes before. */
+		for (double c : ring.Corners()) {
+			for (double k : {c - len, c, c + len}) {
+				if (way > 0 ? (k > s + 0.5 && k < to) : (k < s - 0.5 && k > to)) to = k;
+			}
+		}
+		double x, y;
+		ring.At(to, x, y);
+		const double ox = x, oy = y;
+		if (!OnMap(x, y) || !NavNearestWalkable(x, y, 1) || std::hypot(x - ox, y - oy) > TILE_SIZE / 4.0) continue;
+		b.tx = x;
+		b.ty = y;
+		b.way.clear();
+		return;
+	}
+}
+
+/** A place to walk to near its own, where it can stand (a farm's dog: in its yard; by a pasture: along its fence). */
 void PickWander(Beast &b)
 {
+	if (b.place == Place::Pasture) {
+		PickFenceWalk(b);
+		return;
+	}
 	for (int tries = 0; tries < 6; tries++) {
 		const double a = InteractiveRandomRange(360) * M_PI / 180.0, r = (0.3 + InteractiveRandomRange(100) / 100.0) * WANDER_TILES * TILE_SIZE;
 		double x = b.home_x + std::cos(a) * r, y = b.home_y + std::sin(a) * r;
-		if (!OnMap(x, y) || !NavNearestWalkable(x, y, 1) || !OnMap(x, y)) continue;
+		if (b.place == Place::Farm) {
+			/* In its yard, straight among the buildings. */
+			if (!FarmYardWay(b.farm, b.x, b.y, x, y)) continue;
+		} else if (!OnMap(x, y) || !NavNearestWalkable(x, y, 1) || !OnMap(x, y)) {
+			continue;
+		}
 		b.tx = x;
 		b.ty = y;
 		b.way.clear();
@@ -756,7 +912,7 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			if (b.place == Place::Door && dist_m < 4.0 && a.Has("vrci")) SetPose(b, "vrci", now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
-			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Forest || b.place == Place::ForestNight || b.place == Place::Ghost || (b.place == Place::Rail && !RidesRails(b, a)) || (b.place == Place::Street && a.Has("chuze")))) {
+			} else if (now >= b.until && Moves(a) && (b.place == Place::Round || b.place == Place::Forest || b.place == Place::ForestNight || b.place == Place::Ghost || b.place == Place::Farm || b.place == Place::Pasture || (b.place == Place::Rail && !RidesRails(b, a)) || (b.place == Place::Street && a.Has("chuze")))) {
 				PickWander(b);
 				b.state = State::Wander;
 			} else if (RidesRails(b, a)) {
@@ -769,13 +925,15 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 			SetPose(b, walk, now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
-			} else if (WalkTo(b, b.tx, b.ty, Speed(b, walk, RidesRails(b, a) ? RAIL_RIDE_M : 0.015), now, a.flies || RidesRails(b, a))) {
+			} else if (WalkTo(b, b.tx, b.ty, Speed(b, walk, RidesRails(b, a) ? RAIL_RIDE_M : 0.015), now, a.flies || RidesRails(b, a) || b.place == Place::Farm)) {
 				/* Along the rails on into the next tile without a stop, as a train. */
 				if (RidesRails(b, a)) {
 					PickRailRide(b);
 				} else {
 					b.state = State::Idle;
 					b.until = now + 150 + InteractiveRandomRange(450);
+					/* By the fence it looks in at the animals it guards. */
+					if (b.place == Place::Pasture) b.heading = std::atan2(b.home_y - b.y, b.home_x - b.x);
 				}
 			}
 			break;
@@ -1023,6 +1181,46 @@ bool Taken(double x, double y, double within)
 	return std::ranges::any_of(_beasts, [&](const Beast &b) { return std::hypot(b.home_x - x, b.home_y - y) < within; });
 }
 
+/** Whether an industry is a farm: one that lays fields about it (of any climate's, of a NewGRF too). */
+bool IsFarm(const Industry *i)
+{
+	return i != nullptr && GetIndustrySpec(i->type)->behaviour.Test(IndustryBehaviour::PlantFields);
+}
+
+/** The farms with a tile about the middle, so many as have their dogs at most (FARMS_KEPT). */
+std::vector<const Industry *> FarmsNear(TileIndex middle)
+{
+	std::vector<const Industry *> farms;
+	const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+	for (const Industry *i : Industry::Iterate()) {
+		if (!IsFarm(i) || farms.size() >= FARMS_KEPT) continue;
+		const int x = TileX(i->location.tile), y = TileY(i->location.tile);
+		if (x + static_cast<int>(i->location.w) < cx - r || x > cx + r || y + static_cast<int>(i->location.h) < cy - r || y > cy + r) continue;
+		farms.push_back(i);
+	}
+	return farms;
+}
+
+/** The pastures about the middle (their north tiles), so many as have their dogs at most (PASTURES_KEPT). */
+std::vector<TileIndex> PasturesNear(TileIndex middle)
+{
+	std::vector<TileIndex> pastures;
+	const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+	for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r) && pastures.size() < PASTURES_KEPT; ty++) {
+		for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r) && pastures.size() < PASTURES_KEPT; tx++) {
+			if (IsPastureNorthTile(TileXY(tx, ty))) pastures.push_back(TileXY(tx, ty));
+		}
+	}
+	return pastures;
+}
+
+/** One of the dogs of the farms out now; nullptr none. */
+const ThreeDAnimal *PickFarmDog(bool night)
+{
+	const std::vector<std::string> names(std::begin(FARM_DOGS), std::end(FARM_DOGS));
+	return PickNamed(names, night, {ThreeDAnimal::Kind::Dog});
+}
+
 /** One more of a place about the middle where it has fewer than it keeps; whether one came. */
 bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t now)
 {
@@ -1172,6 +1370,47 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			}
 			return false;
 		}
+		case Place::Farm: {
+			/* A dog to a farm about the middle with fewer than its own, on its yard where one can stand. */
+			for (const Industry *farm : FarmsNear(middle)) {
+				const IndustryID id = farm->index;
+				if (std::ranges::count_if(_beasts, [id](const Beast &o) { return o.place == Place::Farm && o.farm == id && o.state != State::Dead; }) >= FARM_DOGS_KEPT) continue;
+				bool found = false;
+				for (int tries = 0; tries < 12 && !found; tries++) {
+					const TileIndex tile = farm->location.tile + TileDiffXY(InteractiveRandomRange(farm->location.w), InteractiveRandomRange(farm->location.h));
+					if (!IsTileType(tile, TileType::Industry) || GetIndustryIndex(tile) != id) continue;
+					x = TileX(tile) * TILE_SIZE + 2 + InteractiveRandomRange(TILE_SIZE - 4);
+					y = TileY(tile) * TILE_SIZE + 2 + InteractiveRandomRange(TILE_SIZE - 4);
+					found = InFarmYard(id, x, y) && !Taken(x, y, 6);
+				}
+				if (!found) return false;
+				const ThreeDAnimal *a = PickFarmDog(night);
+				if (a == nullptr) return false;
+				Beast &b = Put(*a, place, x, y, 0, InteractiveRandomRange(360) * M_PI / 180.0, now);
+				b.farm = id;
+				return true;
+			}
+			return false;
+		}
+		case Place::Pasture: {
+			/* A dog to a pasture about the middle without its own, somewhere along its fence, looking in. */
+			for (TileIndex north : PasturesNear(middle)) {
+				if (std::ranges::any_of(_beasts, [north](const Beast &o) { return o.place == Place::Pasture && o.pasture == north && o.state != State::Dead; })) continue;
+				const PastureRing ring(north);
+				ring.At(InteractiveRandomRange(1000) / 1000.0 * ring.Length(), x, y);
+				const double ox = x, oy = y;
+				if (!OnMap(x, y) || !NavNearestWalkable(x, y, 1) || std::hypot(x - ox, y - oy) > TILE_SIZE / 4.0) return false;
+				const ThreeDAnimal *a = PickFarmDog(night);
+				if (a == nullptr) return false;
+				const double mx = (ring.x0 + ring.x1) / 2, my = (ring.y0 + ring.y1) / 2;
+				Beast &b = Put(*a, place, x, y, 0, std::atan2(my - y, mx - x), now);
+				b.pasture = north;
+				b.home_x = mx;
+				b.home_y = my;
+				return true;
+			}
+			return false;
+		}
 		case Place::Pet:
 			return false;
 	}
@@ -1285,12 +1524,14 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
 		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u}, {Place::Church, CHURCHES_KEPT},
+		{Place::Farm, FARM_DOGS_KEPT}, {Place::Pasture, 1},
 	};
 	/* One a time, the place picked in turn. The forests' game and ghosts are there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
-	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight) return;
-	/* A church's ghost to each church about the middle. */
-	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.kept;
+	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight && w.place != Place::Farm && w.place != Place::Pasture) return;
+	/* A church's ghost to each church about the middle; the dogs to each farm. */
+	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.place == Place::Farm ? static_cast<uint>(FarmsNear(middle).size()) * w.kept :
+			w.place == Place::Pasture ? static_cast<uint>(PasturesNear(middle).size()) * w.kept : w.kept;
 	if (Count(w.place) < kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
 
@@ -1368,7 +1609,7 @@ bool InBody(const Beast &b, const ThreeDAnimal &a, double x, double y, double z,
 
 /**
  * The dogs, the animals and the ghosts on the map, as figures at their "meritko", three times that (the sellers, people,
- * as the girls); one floating ("vyska_m") floats as much higher as it is bigger (the turned view, and north with the
+ * as the girls; the dogs of the farms as their animals); one floating ("vyska_m") floats as much higher as it is bigger (the turned view, and north with the
  * houses as objects).
  */
 void AddThreeDAnimalsToViewport(ZoomLevel zoom)
@@ -1378,7 +1619,9 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 		if (a == nullptr || b.inside) continue;
 		/* A few poses of each, no passages between them (ThreeDMapPose()). */
 		const std::string figure = FigureIn(b, b.pose);
-		const float scale = a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
+		/* The dogs of a farm as big as the cows and the sheep of its pastures, their true size ("meritko_zvirat"). */
+		const bool farm = b.place == Place::Farm || b.place == Place::Pasture;
+		const float scale = farm ? 1.0f : a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
 		const int z = b.z + static_cast<int>(std::lround(a->hover_m * OBJECT_HEIGHT_PER_METRE * (scale - 1.0f)));
 		AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), z, Facing(b), zoom, INVALID_TILE, 0, ThreeDMapPose(figure, b.frame));
 	}
@@ -1554,10 +1797,24 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 	return true;
 }
 
+/** The names of the places (Place), to the rig. */
+static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci", "kostel", "farma", "pastvina"};
+
+/** The rig: where the first of a place (its name, PLACES) is, world units; false none. */
+bool ThreeDAnimalOfPlace(std::string_view place, double &x, double &y)
+{
+	for (const Beast &b : _beasts) {
+		if (PLACES[static_cast<int>(b.place)] != place) continue;
+		x = b.x;
+		y = b.y;
+		return true;
+	}
+	return false;
+}
+
 /** The rig: those about, a line each. */
 std::string DescribeThreeDAnimals()
 {
-	static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci", "kostel"};
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
 	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
 	for (const Beast &b : _beasts) {

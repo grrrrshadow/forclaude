@@ -23,6 +23,7 @@ int BlastThreeDAnimals(double x, double y, double z, double radius_m, int damage
 uint TakeThreeDAnimalDamage();
 bool SendThreeDAnimal(std::string_view name, double x, double y);
 std::string DescribeThreeDAnimals();
+bool ThreeDAnimalOfPlace(std::string_view place, double &x, double &y);
 
 /** A seller of dogs near the walker: what it sells (the names of ThreeDAnimal), where it stands. */
 struct ThreeDDogSeller {

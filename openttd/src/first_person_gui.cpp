@@ -2059,6 +2059,12 @@ bool FirstPersonWalkerAt(double &x, double &y)
 	return true;
 }
 
+/** Whether one can stand on the ground at a world point, as the walker can (among the buildings of an industry by their shapes; three_d_animals.cpp: the dogs of a farm's yard). */
+bool FirstPersonGroundWalkable(double x, double y)
+{
+	return FirstPersonWalkable(x, y);
+}
+
 /** The rig: the direction the walker of the view from the first person faces, radians (0 without the window). */
 double FirstPersonWalkerHeading()
 {
