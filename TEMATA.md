@@ -48,6 +48,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Rig (CPU i GL): Sgs s kládami, bednami na paletách a barely ve dvou vrstvách, Holidays se dvěma 20′ kontejnery různých
   barev, Smmps se 40′ Evergreen. Pád rigu `_globset.IsEmpty()` byl od tratí testu, které se křížily (vůz se nenašel,
   trať zůstala), ne od hry.
+- Hráč: *„kolega piše, zvlaštni vozy udělame bez nákladů“*. `Zvlastni_vozy_3D` dostane stavy `naklad` + `loze` jako
+  V3S: přívěs Autosan za Zetorem (dnes kupy bednám, cihlám, kládám, prknům, pytlům, sudům, dobytku) a balíky Terrna a
+  lesovozu. Hra je připravená (`naklad`, `loze`, `barva`, `misto`), čeká se na balíček. Pozor na délku kusu proti
+  loži (klády 3,99 m a prkna 4,0 m se na V3S nevešly) a dobytek jen s `bocnice` > 0.
 
 ## 26. 10. (18) – Návěs přes tahač, V3S s kusovými náklady, barva nákladu ze stavu
 
