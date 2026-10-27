@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (34) – Naložit / vyložit z kabiny na průjezdné zastávce
+
+- Hráč: *„naložit, vyložit . zajede na zastavku a v tom prostoru dlaždice zastavky auto naloži vyloži , musi mit
+  spravny naklad na zastavce a přestavbu auta. když bude malo na zastavce tak tam bude naloženo 1/4 1/2 a bude
+  mačkat dokud nebude naloženy plny. jen nevim jak to udělat aby byl na řadě, prostě ma přednost před ostatnimi
+  auty.“*, pak *„jen prujezdne , nevyloži mimo zastavku ktera to nebere. 1/4 , 1/2 ne najednou, postupně, a když
+  nebude tak bude do pulky. 1-999 ano 2 zalivova zastavka nemusi byt“*.
+- Tlačítka **Naložit** a **Vyložit**: v pohledu z očí v autě (lišta: Sem, Na mapu, Řídit/Jeď svou trasu, Naložit,
+  Vyložit, Inventář) i v okně kabiny. Znovu stisknuté přestane.
+- Jen auto řízené ručně (šipkami), stojící na průjezdné zastávce své firmy. Postupně: krok asi za sekundu, každá
+  část auta nejvýš čtvrtinu své kapacity (1/4, 1/2, …). Když náklad na zastávce dojde, skončí (třeba v půlce);
+  rozjetí nebo odjetí ze zastávky taky ukončí.
+- Přednost: bere rovnou z hromady na zastávce, a když volného nestačí, vrátí na zastávku i to, co si odložila jiná
+  nakládající auta, a vezme to.
+- Vyložit jen tam, kde stanice náklad bere (jinak hláška „stanice tenhle náklad nebere“); zaplaceno jako
+  doručení, peníze a částka nad autem na konci vykládání. Náklad naložený na téže stanici zůstane v autě.
+- Hra: příkaz `CmdCabCargo`, `Vehicle::cab_cargo` a `cab_cargo_ticks` v savu (verze 383 `CabCargo`), krok
+  `CabCargoTick()` v tiku auta. Rig: `test3d zastavka <x> <y> [naklad <LABEL> <n> <src_x> <src_y> | bere <LABEL>]`,
+  `test3d zastavka stav <auto>`, `test3d kabina klik nalozit|vylozit`.
+
 ## 27. 10. (33) – 1203: vnitřek celý v barvě laku
 
 - Hráč: *„to vypada blbě když je vidět dovnitř a vevnitř je všechno modry pajda karavan. teď vše červeny“*.

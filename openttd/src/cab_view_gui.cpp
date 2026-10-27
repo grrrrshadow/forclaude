@@ -83,6 +83,8 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_VEHICLE), SetStringTip(STR_CAB_VIEW_VEHICLE, STR_CAB_VIEW_VEHICLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CENTRE), SetStringTip(STR_CAB_VIEW_CENTRE, STR_CAB_VIEW_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_LOAD), SetStringTip(STR_CAB_VIEW_LOAD_CARGO, STR_CAB_VIEW_LOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
@@ -221,6 +223,16 @@ void CabToggleRoute(const Vehicle *v, CabArrows &arrows)
 		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
 	}
 	if (v->cab_speed_limit != 0) Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+}
+
+/**
+ * Load or unload from the cab (the player, 27. 10.: "load, unload"; CmdCabCargo()): begun, or stopped when it does so
+ * already.
+ */
+void CabCargo(const Vehicle *v, bool unload)
+{
+	const uint8_t op = unload ? Vehicle::CAB_CARGO_UNLOAD : Vehicle::CAB_CARGO_LOAD;
+	Command<Commands::CabCargo>::Post(unload ? STR_ERROR_CAB_CAN_T_UNLOAD : STR_ERROR_CAB_CAN_T_LOAD, v->tile, v->index, v->cab_cargo == op ? Vehicle::CAB_CARGO_NONE : op);
 }
 
 /**
@@ -562,6 +574,9 @@ struct CabViewWindow : Window {
 		/* A road vehicle, a ship and an aircraft can be steered: a train follows its rails. Only the company's. */
 		const bool ours = v->owner == _local_company;
 		this->SetWidgetDisabledState(WID_CV_AUTO, !ours);
+		this->SetWidgetsDisabledState(!ours || v->type != VehicleType::Road, WID_CV_LOAD, WID_CV_UNLOAD);
+		this->SetWidgetLoweredState(WID_CV_LOAD, v->cab_cargo == Vehicle::CAB_CARGO_LOAD);
+		this->SetWidgetLoweredState(WID_CV_UNLOAD, v->cab_cargo == Vehicle::CAB_CARGO_UNLOAD);
 		this->DrawWidgets();
 	}
 
@@ -772,6 +787,11 @@ struct CabViewWindow : Window {
 			}
 			case WID_CV_AUTO:
 				CabToggleRoute(v, this->arrows);
+				this->SetDirty();
+				break;
+			case WID_CV_LOAD:
+			case WID_CV_UNLOAD:
+				CabCargo(v, widget == WID_CV_UNLOAD);
 				this->SetDirty();
 				break;
 			default:

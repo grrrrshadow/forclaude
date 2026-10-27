@@ -434,6 +434,7 @@ enum class SaveLoadVersion : uint16_t {
 	WalkerPlants, ///< Saveload version: 380\n The marijuana the walkers planted, where and since when (WalkerPlant, walker_inventory.h; the WPLT chunk).
 	WalkerQuickKeys, ///< Saveload version: 381\n The walker's quick keys 1 to 9, the things the player put under them (CompanyProperties::walker_quick).
 	CabReverse, ///< Saveload version: 382\n A road vehicle driven freely from its cab going backwards (Vehicle::cab_reverse, cab_drive.h).
+	CabCargo, ///< Saveload version: 383\n A road vehicle driven from its cab loading or unloading at a stop, step by step (Vehicle::cab_cargo, cab_cargo_ticks; CmdCabCargo()).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

@@ -295,7 +295,12 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 		/* In a vehicle its route instead of running (the player, 27. 10.: "put the button 'go your route' there"). */
 		NWidget(NWID_SELECTION, Colours::Invalid, WID_FP_RUN_SEL),
 			NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_RUN), SetStringTip(STR_FIRST_PERSON_RUN, STR_FIRST_PERSON_RUN_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_ROUTE), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+			/* And loading and unloading at a stop (the player: "naložit, vyložit"). */
+			NWidget(NWID_HORIZONTAL),
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_ROUTE), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+				NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_LOAD), SetStringTip(STR_CAB_VIEW_LOAD_CARGO, STR_CAB_VIEW_LOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+				NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+			EndContainer(),
 		EndContainer(),
 		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_FP_INVENTORY), SetStringTip(STR_FIRST_PERSON_INVENTORY, STR_FIRST_PERSON_INVENTORY_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
@@ -1704,6 +1709,10 @@ struct FirstPersonWindow : Window {
 	void OnPaint() override
 	{
 		this->SetWidgetLoweredState(WID_FP_RUN, this->running);
+		const Vehicle *rv = this->Riding();
+		this->SetWidgetLoweredState(WID_FP_LOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_LOAD);
+		this->SetWidgetLoweredState(WID_FP_UNLOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_UNLOAD);
+		this->SetWidgetsDisabledState(rv == nullptr || rv->owner != _local_company || rv->type != VehicleType::Road, WID_FP_LOAD, WID_FP_UNLOAD);
 		this->DrawWidgets();
 	}
 
@@ -1842,6 +1851,13 @@ struct FirstPersonWindow : Window {
 			case WID_FP_ROUTE:
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
 					CabToggleRoute(rv, this->arrows);
+					this->SetDirty();
+				}
+				break;
+			case WID_FP_LOAD:
+			case WID_FP_UNLOAD:
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+					CabCargo(rv, widget == WID_FP_UNLOAD);
 					this->SetDirty();
 				}
 				break;

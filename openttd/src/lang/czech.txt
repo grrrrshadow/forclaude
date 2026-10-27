@@ -2488,6 +2488,18 @@ STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled p
 STR_CAB_VIEW_AUTO                                               :{BLACK}Jeď svou trasu
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; šipky ho zase převezmou a jede se volně
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Řídit
+STR_CAB_VIEW_LOAD_CARGO                                         :{BLACK}Naložit
+STR_CAB_VIEW_LOAD_CARGO_TOOLTIP                                 :{BLACK}Naložit, co čeká na zastávce, postupně po čtvrtinách, před všemi ostatními auty; auto stojí na průjezdné zastávce tvé firmy. Znovu stisknuté: přestat
+STR_CAB_VIEW_UNLOAD_CARGO                                       :{BLACK}Vyložit
+STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP                               :{BLACK}Vyložit, co stanice bere, postupně po čtvrtinách, zaplaceno jako doručení; auto stojí na průjezdné zastávce tvé firmy. Znovu stisknuté: přestat
+STR_ERROR_CAB_CAN_T_LOAD                                        :{WHITE}Nelze naložit...
+STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Nelze vyložit...
+STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... auto jede svou trasu a nakládá podle rozkazů; šipkou převezmeš volant
+STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... auto musí stát na průjezdné zastávce tvé firmy
+STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... stanice tenhle náklad nebere
+STR_ERROR_CAB_NOTHING_WAITING                                   :{WHITE}... na zastávce nečeká nic, co auto veze
+STR_ERROR_CAB_FULL                                              :{WHITE}... auto je plné
+STR_ERROR_CAB_EMPTY                                             :{WHITE}... auto je prázdné
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Příští zastávka: {STATION}

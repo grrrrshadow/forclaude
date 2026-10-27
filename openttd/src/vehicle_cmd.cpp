@@ -41,6 +41,9 @@
 #include "train_cmd.h"
 #include "ship_cmd.h"
 #include "cab_drive.h"
+#include "economy_func.h"
+#include "station_base.h"
+#include "cargotype.h"
 #include "station_map.h"
 #include "road.h"
 #include <charconv>
@@ -1343,6 +1346,63 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 		if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
 		SetWindowDirty(WindowClass::CabView, v->index);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
+	}
+	return CommandCost();
+}
+
+/**
+ * Load or unload a road vehicle driven from its cab (cab_view.h) at a drive-through stop of its company, a step at a
+ * time (CabCargoTick()); or stop doing so.
+ * @param flags type of operation
+ * @param veh_id the vehicle
+ * @param op Vehicle::CAB_CARGO_LOAD, Vehicle::CAB_CARGO_UNLOAD, or Vehicle::CAB_CARGO_NONE to stop
+ */
+CommandCost CmdCabCargo(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
+{
+	Vehicle *v = Vehicle::GetIfValid(veh_id);
+	if (v == nullptr || !v->IsPrimaryVehicle() || v->type != VehicleType::Road || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
+	if (op > Vehicle::CAB_CARGO_UNLOAD) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	if (op == Vehicle::CAB_CARGO_NONE) {
+		/* Stopped, its money paid for what it delivered. */
+		if (flags.Test(DoCommandFlag::Execute) && v->cab_cargo != Vehicle::CAB_CARGO_NONE) CabCargoStop(v);
+		return CommandCost();
+	}
+	/* The player drives it: on its route it loads as its orders say. */
+	if (!v->cab_free || v->cab_rejoin) return CommandCost(STR_ERROR_CAB_NOT_DRIVEN);
+	if (v->current_order.IsType(OT_LOADING)) return CommandCost(STR_ERROR_CAB_NOT_DRIVEN);
+	Station *st = CabCargoStation(v);
+	if (st == nullptr) return CommandCost(STR_ERROR_CAB_NOT_AT_STOP);
+
+	const bool unload = op == Vehicle::CAB_CARGO_UNLOAD;
+	bool any = false, room = false, waiting = false, accepted = false;
+	for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
+		if (u->cargo_cap == 0 || u->cargo_type == _road_vehicle_cargo) continue;
+		const GoodsEntry &ge = st->goods[u->cargo_type];
+		if (u->cargo.StoredCount() > 0) {
+			any = true;
+			if (ge.status.Test(GoodsEntry::State::Acceptance)) accepted = true;
+		}
+		if (u->cargo.StoredCount() < u->cargo_cap) {
+			room = true;
+			if (ge.TotalCount() > 0) waiting = true;
+		}
+	}
+	if (unload) {
+		if (!any) return CommandCost(STR_ERROR_CAB_EMPTY);
+		/* Not where the station does not take it (the player, 27. 10.: "it won't unload at a stop that does not take it"). */
+		if (!accepted) return CommandCost(STR_ERROR_CAB_NOT_ACCEPTED);
+	} else {
+		if (!room) return CommandCost(STR_ERROR_CAB_FULL);
+		if (!waiting) return CommandCost(STR_ERROR_CAB_NOTHING_WAITING);
+	}
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		CabCargoStart(v, st, unload);
+		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 	}
 	return CommandCost();
 }

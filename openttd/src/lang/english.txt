@@ -2380,6 +2380,18 @@ STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view
 STR_CAB_VIEW_AUTO                                               :{BLACK}Go your route
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; the arrows take the wheel again, driving freely
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Drive
+STR_CAB_VIEW_LOAD_CARGO                                         :{BLACK}Load
+STR_CAB_VIEW_LOAD_CARGO_TOOLTIP                                 :{BLACK}Load what waits at the stop, a quarter at a time, before every other vehicle there; the car stands on a drive-through stop of your company. Pressed again: stop
+STR_CAB_VIEW_UNLOAD_CARGO                                       :{BLACK}Unload
+STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP                               :{BLACK}Unload what the station accepts, a quarter at a time, paid as delivered; the car stands on a drive-through stop of your company. Pressed again: stop
+STR_ERROR_CAB_CAN_T_LOAD                                        :{WHITE}Can't load...
+STR_ERROR_CAB_CAN_T_UNLOAD                                      :{WHITE}Can't unload...
+STR_ERROR_CAB_NOT_DRIVEN                                        :{WHITE}... the vehicle goes its route and loads as its orders say; an arrow takes the wheel
+STR_ERROR_CAB_NOT_AT_STOP                                       :{WHITE}... the vehicle must stand on a drive-through stop of your company
+STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... the station does not take this cargo
+STR_ERROR_CAB_NOTHING_WAITING                                   :{WHITE}... nothing it can carry waits at the stop
+STR_ERROR_CAB_FULL                                              :{WHITE}... the vehicle is full
+STR_ERROR_CAB_EMPTY                                             :{WHITE}... the vehicle is empty
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
 STR_CAB_VIEW_NEXT_STOP                                          :Next stop: {STATION}

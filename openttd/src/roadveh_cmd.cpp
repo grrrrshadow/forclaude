@@ -13,6 +13,7 @@
 #include "error_func.h"
 #include "news_func.h"
 #include "station_base.h"
+#include "economy_func.h"
 #include "company_func.h"
 #include "articulated_vehicles.h"
 #include "newgrf_sound.h"
@@ -2254,6 +2255,8 @@ bool RoadVehicle::Tick()
 		if (this->IsCarried()) return CarriedRoadVehicleTick(this);
 
 		if (!this->vehstatus.Test(VehState::Stopped)) this->running_ticks++;
+		/* Loading or unloading from its cab at a stop, a step now and then (CmdCabCargo()). */
+		CabCargoTick(this);
 		return RoadVehController(this);
 	}
 

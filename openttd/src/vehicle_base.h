@@ -329,6 +329,13 @@ public:
 	bool cab_reverse = false;
 	/** And so fast at most, in the units the vehicle shows (the player, 27. 10.: "30 km when I hold it long"). */
 	static constexpr int CAB_REVERSE_SPEED = 30;
+	/** A road vehicle driven from its cab loading or unloading at a drive-through stop of its company, a step at a time (CmdCabCargo(), CabCargoTick()). */
+	uint8_t cab_cargo = 0;
+	static constexpr uint8_t CAB_CARGO_NONE = 0;   ///< #cab_cargo: neither
+	static constexpr uint8_t CAB_CARGO_LOAD = 1;   ///< #cab_cargo: loading what waits there
+	static constexpr uint8_t CAB_CARGO_UNLOAD = 2; ///< #cab_cargo: unloading what the station accepts
+	/** And the ticks till its next step. */
+	uint8_t cab_cargo_ticks = 0;
 	/** The lights as the player switches them from the cab (F): at night (#CAB_LIGHTS_AUTO), on or off. Not saved:
 	 * only how this computer draws the vehicle (VehicleLightsOn()). */
 	uint8_t cab_lights = 0;

@@ -20,6 +20,8 @@ enum CabViewWidgets : WidgetID {
 	WID_CV_STOP,    ///< Stop the vehicle, or start it again.
 	WID_CV_FULL,    ///< The window over the whole screen, and back.
 	WID_CV_AUTO,    ///< Go as the orders say again, or take the wheel.
+	WID_CV_LOAD,    ///< Load at the stop it stands on (CmdCabCargo()).
+	WID_CV_UNLOAD,  ///< Unload there.
 };
 
 #endif /* WIDGETS_CAB_VIEW_WIDGET_H */

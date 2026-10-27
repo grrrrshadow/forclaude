@@ -247,6 +247,7 @@ enum class Commands : uint8_t {
 	SetCabHeading, ///< steer a vehicle from its cab: the direction it is to go in, or none (cab_view.h)
 	CabDrive, ///< drive a vehicle freely from its cab: off the road, a step left or right, back to the orders (cab_drive.h)
 	SetCabSpeedLimit, ///< hold a vehicle to a speed from its cab, the brake and the throttle there (cab_view.h)
+	CabCargo, ///< load or unload a road vehicle driven from its cab at a drive-through stop (cab_view.h)
 	BuyWalkerItem, ///< buy a thing for the walker's inventory where it is sold (walker_inventory.h)
 	UseWalkerItem, ///< use a thing of the walker's inventory: drink the beer (walker_inventory.h)
 	ShootWalkerItem, ///< an arrow or a bolt of the walker's inventory shot (walker_inventory.h)

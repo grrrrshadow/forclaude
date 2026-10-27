@@ -10483,6 +10483,60 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		IConsolePrint(CC_ERROR, "test3d: autojizda: takove vozidlo neni.");
+	} else if (what == "zastavka" && argv.size() > 3) {
+		/* The rig, the loading from the cab (CmdCabCargo()): 'zastavka <x> <y>' a drive-through stop of a station of its
+		 * own on the road there; 'zastavka <x> <y> naklad <LABEL> <n> <src_x> <src_y>' so much of a cargo waiting at it,
+		 * come from the station at the other tile; 'zastavka <x> <y> bere <LABEL>' the station accepting it now;
+		 * 'zastavka stav <unit>' a road vehicle's load, its loading and the company's money. */
+		auto cargo_of = [](std::string_view label) {
+			uint32_t v = 0;
+			for (size_t i = 0; i < 4; i++) v = (v << 8) | static_cast<uint8_t>(i < label.size() ? label[i] : ' ');
+			return GetCargoTypeByLabel(CargoLabel{v});
+		};
+		if (argv[2] == "stav") {
+			auto unit = number(3);
+			for (const Vehicle *u : Vehicle::Iterate()) {
+				if (u->type != VehicleType::Road || !u->IsPrimaryVehicle() || !unit.has_value() || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+				const Company *c = Company::GetIfValid(u->owner);
+				IConsolePrint(CC_DEFAULT, "test3d: zastavka stav {}: naklad {}/{} nakladani {} volne {} rychlost {} na {},{} penize {}", *unit, u->cargo.StoredCount(), u->cargo_cap,
+						u->cab_cargo, u->cab_free ? "ano" : "ne", u->cur_speed, TileX(u->tile), TileY(u->tile), c != nullptr ? c->money.base() : 0);
+				return true;
+			}
+			IConsolePrint(CC_ERROR, "test3d: zastavka stav: takove auto neni.");
+			return true;
+		}
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		const TileIndex tile = TileXY(static_cast<uint>(*x), static_cast<uint>(*y));
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		if (argv.size() == 4) {
+			CommandCost r = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, tile, 1, 1, RoadStopType::Truck, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: zastavka {},{}: {}", *x, *y, r.Succeeded() ? fmt::format("stanice {}", GetStationIndex(tile)) : RefusalReason(r));
+			return true;
+		}
+		if (!IsTileType(tile, TileType::Station)) {
+			IConsolePrint(CC_ERROR, "test3d: zastavka {},{}: neni tu stanice.", *x, *y);
+			return true;
+		}
+		Station *st = Station::GetByTile(tile);
+		const CargoType cargo = cargo_of(argv.size() > 5 ? argv[5] : std::string_view{});
+		if (!IsValidCargoType(cargo)) {
+			IConsolePrint(CC_ERROR, "test3d: zastavka: takovy naklad neni.");
+			return true;
+		}
+		GoodsEntry &ge = st->goods[cargo];
+		if (argv[4] == "naklad" && argv.size() > 8) {
+			auto n = number(6), sx = number(7), sy = number(8);
+			const TileIndex src = TileXY(static_cast<uint>(sx.value_or(0)), static_cast<uint>(sy.value_or(0)));
+			const StationID from = IsTileType(src, TileType::Station) ? GetStationIndex(src) : StationID::Invalid();
+			if (n.has_value() && *n > 0 && CargoPacket::CanAllocateItem()) {
+				ge.GetOrCreateData().cargo.Append(CargoPacket::Create(static_cast<uint16_t>(*n), 0, from, src, 0), StationID::Invalid());
+			}
+			ge.status.Set(GoodsEntry::State::Rating);
+		} else if (argv[4] == "bere") {
+			ge.status.Set(GoodsEntry::State::Acceptance);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: zastavka {},{} stanice {}: ceka {} (volne {}), bere {}", *x, *y, st->index, ge.TotalCount(), ge.AvailableCount(), ge.status.Test(GoodsEntry::State::Acceptance) ? "ano" : "ne");
 	} else if (what == "stopni" && argv.size() > 3) {
 		/* 'stopni <type> <unit>': its stop button pressed, as the player stops it in its window. */
 		auto type = number(2), unit = number(3);
@@ -10511,9 +10565,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klik") {
-			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely>' (the arrows steer and brake). */
+			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely|nalozit|vylozit>' (the arrows steer and brake). */
 			static const std::pair<std::string_view, WidgetID> buttons[] = {
-				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL},
+				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL}, {"nalozit", WID_CV_LOAD}, {"vylozit", WID_CV_UNLOAD},
 			};
 			WidgetID id = -1;
 			for (const auto &[name, wid] : buttons) if (argv[3] == name) id = wid;

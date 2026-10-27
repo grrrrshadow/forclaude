@@ -24,6 +24,7 @@ CommandCost CmdConfigureVehicle(DoCommandFlags flags, VehicleID veh_id, uint8_t 
 CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t limit);
 CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t heading);
 CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op);
+CommandCost CmdCabCargo(DoCommandFlags flags, VehicleID veh_id, uint8_t op);
 CommandCost CmdSendVehicleToDepot(DoCommandFlags flags, VehicleID veh_id, DepotCommandFlags depot_cmd, const VehicleListIdentifier &vli);
 CommandCost CmdChangeServiceInt(DoCommandFlags flags, VehicleID veh_id, uint16_t serv_int, bool is_custom, bool is_percent);
 CommandCost CmdRenameVehicle(DoCommandFlags flags, VehicleID veh_id, const std::string &text);
@@ -40,6 +41,7 @@ DEF_CMD_TRAIT(Commands::ConfigureVehicle, CmdConfigureVehicle, CommandFlag::Loca
 DEF_CMD_TRAIT(Commands::SetCabSpeedLimit, CmdSetCabSpeedLimit, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::SetCabHeading, CmdSetCabHeading, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::CabDrive, CmdCabDrive, CommandFlag::Location, CommandType::VehicleManagement)
+DEF_CMD_TRAIT(Commands::CabCargo, CmdCabCargo, CommandFlag::Location, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::SendVehicleToDepot, CmdSendVehicleToDepot, {}, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::ChangeServiceInterval, CmdChangeServiceInt, {}, CommandType::VehicleManagement)
 DEF_CMD_TRAIT(Commands::RenameVehicle, CmdRenameVehicle, {}, CommandType::OtherManagement)

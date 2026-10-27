@@ -1994,6 +1994,125 @@ static void LoadUnloadVehicle(Vehicle *front)
 	}
 }
 
+/** Ticks between the steps of the loading and unloading from a cab (CabCargoTick()): about a second. */
+static constexpr uint8_t CAB_CARGO_STEP_TICKS = Ticks::DAY_TICKS / 2;
+
+/**
+ * The station a road vehicle driven from its cab loads and unloads at (CmdCabCargo()): it stands on a drive-through
+ * stop of its company (the player, 27. 10.: "only drive-through ones; the bay stop need not be").
+ * @return the station, nullptr where it cannot
+ */
+Station *CabCargoStation(const Vehicle *front)
+{
+	if (front->type != VehicleType::Road || !front->cab_free || front->cab_rejoin || front->cur_speed != 0) return nullptr;
+	if (!IsTileType(front->tile, TileType::Station) || !IsDriveThroughStopTile(front->tile)) return nullptr;
+	Station *st = Station::GetByTile(front->tile);
+	return st->owner == front->owner ? st : nullptr;
+}
+
+/**
+ * The loading or unloading from the cab begun (CmdCabCargo()): to unload, what the station accepts staged to be
+ * delivered, paid as the vehicle leaves off (CabCargoTick()).
+ */
+void CabCargoStart(Vehicle *front, Station *st, bool unload)
+{
+	front->cab_cargo = unload ? Vehicle::CAB_CARGO_UNLOAD : Vehicle::CAB_CARGO_LOAD;
+	front->cab_cargo_ticks = 0;
+	if (!unload) return;
+	front->last_station_visited = st->index;
+	/* One CargoPayment a vehicle at most, as many as vehicles may be (PrepareUnload()). */
+	if (front->cargo_payment == nullptr && CargoPayment::CanAllocateItem()) front->cargo_payment = CargoPayment::Create(front);
+	std::vector<StationID> next_station;
+	front->GetNextStoppingStation(next_station);
+	for (Vehicle *v = front; v != nullptr; v = v->Next()) {
+		if (v->cargo_cap == 0 || v->cargo.StoredCount() == 0 || v->cargo_type == _road_vehicle_cargo) continue;
+		GoodsEntry &ge = st->goods[v->cargo_type];
+		v->cargo.Stage(ge.status.Test(GoodsEntry::State::Acceptance), st->index, next_station, OrderUnloadType::UnloadIfPossible, &ge, v->cargo_type, front->cargo_payment, v->GetCargoTile());
+	}
+}
+
+/** The loading or unloading from the cab ended: the money for what was delivered, and its figure over the vehicle. */
+void CabCargoStop(Vehicle *front)
+{
+	front->cab_cargo = Vehicle::CAB_CARGO_NONE;
+	for (Vehicle *v = front; v != nullptr; v = v->Next()) v->cargo.KeepAll();
+	if (front->cargo_payment != nullptr && !front->current_order.IsType(OT_LOADING)) delete front->cargo_payment;
+	SetWindowDirty(WindowClass::CabView, front->index);
+	SetWindowDirty(WindowClass::FirstPerson, 0);
+}
+
+/**
+ * A road vehicle driven from its cab loading or unloading at a drive-through stop (the player, 27. 10.: "it drives
+ * onto the stop and loads and unloads there, it must have the right cargo at the stop and the refit", "a quarter, a
+ * half, not at once, gradually, and when there is none, up to a half"): a step about every second, each part at
+ * most a quarter of its capacity (or its load amount, less). Loading takes what waits at the stop before every other
+ * vehicle there (the player: "it simply goes before the other cars"), what they have reserved too; unloading delivers
+ * what the station accepts, paid. It ends when a step moves nothing, or the vehicle moves off or leaves the stop.
+ */
+void CabCargoTick(Vehicle *front)
+{
+	if (front->cab_cargo == Vehicle::CAB_CARGO_NONE) return;
+	Station *st = CabCargoStation(front);
+	if (st == nullptr) {
+		CabCargoStop(front);
+		return;
+	}
+	if (front->cab_cargo_ticks > 0) {
+		front->cab_cargo_ticks--;
+		return;
+	}
+	front->cab_cargo_ticks = CAB_CARGO_STEP_TICKS;
+
+	std::vector<StationID> next_station;
+	front->GetNextStoppingStation(next_station);
+	uint moved = 0;
+	for (Vehicle *v = front; v != nullptr; v = v->Next()) {
+		if (v->cargo_cap == 0 || v->cargo_type == _road_vehicle_cargo) continue;
+		GoodsEntry &ge = st->goods[v->cargo_type];
+		const uint step = std::max(1u, std::min(GetLoadAmount(v), CeilDiv(v->cargo_cap, 4u)));
+		if (front->cab_cargo == Vehicle::CAB_CARGO_UNLOAD) {
+			if (v->cargo.UnloadCount() == 0 || front->cargo_payment == nullptr) continue;
+			const uint unloaded = v->cargo.Unload(step, &ge.GetOrCreateData().cargo, v->cargo_type, front->cargo_payment, v->GetCargoTile());
+			if (unloaded > 0) st->time_since_unload = 0;
+			moved += unloaded;
+			continue;
+		}
+		/* Loading: the stop served by a vehicle of its company. */
+		ge.last_speed = ClampTo<uint8_t>(front->vcache.cached_max_speed / 2);
+		ge.last_age = ClampTo<uint8_t>(TimerGameCalendar::year - front->build_year);
+		ge.time_since_pickup = 0;
+		if (!ge.HasRating()) {
+			InvalidateWindowData(WindowClass::StationList, st->owner);
+			ge.status.Set(GoodsEntry::State::Rating);
+		}
+		const uint cap_left = v->cargo_cap - v->cargo.StoredCount();
+		if (cap_left == 0 || !ge.HasData() || !MayLoadUnderExclusiveRights(st, v)) continue;
+		const uint want = std::min(cap_left, step);
+		/* Before the others: what they keep for themselves back to the stop when what is free is not enough. */
+		if (ge.AvailableCount() < want) {
+			for (Vehicle *other : st->loading_vehicles) {
+				for (Vehicle *u = other; u != nullptr; u = u->Next()) {
+					if (u->cargo_type == v->cargo_type && u->cargo.ActionCount(VehicleCargoList::MoveToAction::Load) > 0) {
+						u->cargo.Return(UINT_MAX, &ge.GetOrCreateData().cargo, StationID::Invalid(), u->GetCargoTile());
+					}
+				}
+			}
+		}
+		if (ge.AvailableCount() == 0) continue;
+		if (v->cargo.StoredCount() == 0) TriggerVehicleRandomisation(v, VehicleRandomTrigger::NewCargo);
+		moved += ge.GetOrCreateData().cargo.Load(want, &v->cargo, next_station, v->GetCargoTile());
+	}
+	if (moved == 0) {
+		CabCargoStop(front);
+		return;
+	}
+	front->MarkDirty();
+	SetWindowDirty(GetWindowClassForVehicleType(front->type), front->owner);
+	SetWindowDirty(WindowClass::VehicleDetails, front->index);
+	SetWindowDirty(WindowClass::StationView, st->index);
+	st->MarkTilesDirty(true);
+}
+
 /**
  * Load/unload the vehicles in this station according to the order
  * they entered.

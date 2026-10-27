@@ -107,6 +107,7 @@ struct CabArrows {
 	void Drive(const Vehicle *v, DirectionKeys now, int ms);
 };
 void CabToggleRoute(const Vehicle *v, CabArrows &arrows);
+void CabCargo(const Vehicle *v, bool unload);
 
 /**
  * The walker of the view from the first person (first_person_gui.cpp; the player, 15. 10.: "let's make Morrowind,
