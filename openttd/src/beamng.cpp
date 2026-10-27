@@ -715,6 +715,10 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 				if (value.type == JValue::Type::Number) parts.vars[name] = value.number;
 			}
 		}
+		/* Our 1203's rear wheels out to the side of the body as its front ones look (the player, 27. 10.: "put them
+		 * further from the middle, so that they are really as the front ones at the side of the car"): the mod's own
+		 * "Wheel Offset" of the rear at its widest. */
+		if (IsS1203(v)) parts.vars["$trackoffset_R"] = 0.05;
 		/* Its own paints, in their order: the colours its paint design lays (the yellow and the white of the VB). */
 		if (const JValue *paints = cfg.Get("paints"); paints != nullptr && paints->IsArray()) {
 			for (const JValue &paint : paints->items) {
@@ -3024,10 +3028,39 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 		return it->second.second.second[static_cast<size_t>(y) * w + x];
 	};
 
+	/*
+	 * The wheels on the ground (the player, 27. 10.: "posaď kola na zem"): a car of BeamNG is as it is spawned, before
+	 * its springs settle -- the Škoda 1203's rear wheels hang 11 cm higher than its front ones. Each axle (a part in a
+	 * slot "wheel_...", its tyres and hubcaps moved as it is) as low as the lowest, its tyres the same; and what of its
+	 * suspension is within a wheel of its middle with it, the hubs, drums and the rigid axle.
+	 */
+	struct Axle {
+		double y, z;     ///< its middle along and up, BeamNG's axes (the slot's "nodeOffset")
+		double drop = 0; ///< how far it is lowered
+	};
+	static constexpr double WHEEL_REACH_M = 0.45;
+	std::vector<Axle> axles;
+	for (const JValue *part : drawn) {
+		const JValue *type = part->Get("slotType");
+		auto off = parts.offsets.find(part);
+		if (type == nullptr || !type->IsString() || !type->text.starts_with("wheel_") || off == parts.offsets.end()) continue;
+		if (std::ranges::none_of(axles, [&off](const Axle &a) { return a.y == off->second[1] && a.z == off->second[2]; })) axles.push_back({off->second[1], off->second[2]});
+	}
+	if (!axles.empty()) {
+		const double lowest = std::ranges::min_element(axles, {}, &Axle::z)->z;
+		for (Axle &a : axles) a.drop = lowest - a.z;
+	}
 	/* The flexbodies of the parts: a mesh, its groups, and where it is put. */
 	int meshes = 0, missing = 0;
 	std::set<std::string> drawn_groups; // the groups of nodes the meshes drawn hang on (a wheel's "wheel_FR", "tire_FR")
 	for (const JValue *part : drawn) {
+		/* Its axle's drop: a wheel's own, else that of the axle its meshes are about (below). */
+		const Axle *own_axle = nullptr;
+		if (auto off = parts.offsets.find(part); off != parts.offsets.end()) {
+			for (const Axle &a : axles) {
+				if (a.y == off->second[1] && a.z == off->second[2]) own_axle = &a;
+			}
+		}
 		const JValue *flex = part->Get("flexbodies");
 		if (flex == nullptr || !flex->IsArray()) continue;
 		const size_t first_tri = mesh.tri.size() / 3;
@@ -3089,7 +3122,25 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 			units[0] = units[5] = units[10] = unit;
 			if (pl->second.y_up) units = {unit, 0, 0, 0, 0, 0, -unit, 0, 0, unit, 0, 0, 0, 0, 0, 1};
 			const Matrix m = Multiply(place, Multiply(units, pl->second.world));
-			for (Triangles &t : ReadGeometry(*pl->second.geometry)) {
+			std::vector<Triangles> geometry = ReadGeometry(*pl->second.geometry);
+			/* Lowered with its axle: a wheel's mesh, or one of the suspension wholly within a wheel of an axle's middle. */
+			double drop = own_axle != nullptr ? own_axle->drop : 0;
+			if (own_axle == nullptr) {
+				double lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+				for (const Triangles &t : geometry) {
+					for (size_t k = 0; k + 2 < t.pos.size(); k += 3) {
+						for (int r = 0; r < 3; r++) {
+							const double w = m[r * 4] * t.pos[k] + m[r * 4 + 1] * t.pos[k + 1] + m[r * 4 + 2] * t.pos[k + 2] + m[r * 4 + 3];
+							lo[r] = std::min(lo[r], w);
+							hi[r] = std::max(hi[r], w);
+						}
+					}
+				}
+				for (const Axle &a : axles) {
+					if (a.drop != 0 && lo[1] >= a.y - WHEEL_REACH_M && hi[1] <= a.y + WHEEL_REACH_M && lo[2] >= a.z - WHEEL_REACH_M && hi[2] <= a.z + WHEEL_REACH_M) drop = a.drop;
+				}
+			}
+			for (Triangles &t : geometry) {
 				auto bound = pl->second.materials.find(t.material);
 				const std::string named = skinned(bound != pl->second.materials.end() ? bound->second : t.material);
 				/* Drawn as its "off" material if it is one of the glow map; glowing at night by its own name. */
@@ -3122,7 +3173,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 					for (size_t j = 0; j < 3; j++) {
 						const size_t k = c + j;
 						const double x = t.pos[k * 3], y = t.pos[k * 3 + 1], z = t.pos[k * 3 + 2];
-						const double wx = m[0] * x + m[1] * y + m[2] * z + m[3], wy = m[4] * x + m[5] * y + m[6] * z + m[7], wz = m[8] * x + m[9] * y + m[10] * z + m[11];
+						const double wx = m[0] * x + m[1] * y + m[2] * z + m[3], wy = m[4] * x + m[5] * y + m[6] * z + m[7], wz = m[8] * x + m[9] * y + m[10] * z + m[11] + drop;
 						auto o = ToObject(frame, wx, wy, wz);
 						mesh.pos.insert(mesh.pos.end(), o.begin(), o.end());
 						const double nx = t.nrm[k * 3], ny = t.nrm[k * 3 + 1], nz = t.nrm[k * 3 + 2];

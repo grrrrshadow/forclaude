@@ -48,8 +48,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   konfigurátoru dál červená, žlutá, modrá. Motor má číslo za všemi auty modu, ostatní si čísla nechávají (savy).
 - Pohled z očí: když sedíš v autě, je místo „Běhat“ tlačítko „Řídit“ / „Jeď svou trasu“ (jako T).
 - Rozchod: kola jsou vpředu i vzadu ±0,68 m od středu, pneumatika 17 cm uvnitř boku karoserie (skutečná 1203 má
-  rozchod asi 1,28–1,30 m). Zadní kola ale sedí o 11 cm výš než přední (stav modu před usazením na pružinách) –
-  nedotýkají se země. Čeká na hráče, jestli myslel tohle.
+  rozchod asi 1,28–1,30 m). Zadní kola ale seděla o 11 cm výš než přední (stav modu před usazením na pružinách).
+  Hráč: *„jo posaď kola na zem, tak ona ma byt nakloněna naložena takhle vzadu klesne. tak vystrč kola nebo se z
+  toho nevymotame , tak stejně je dej dal id středu ať jsou fakt jako přední u boku auta“*. Teď každá náprava
+  (díl ve slotu `wheel_…` s pneumatikami a poklicemi) sedí tak nízko jako ta nejnižší, s ní i náboje, bubny a tuhá
+  zadní náprava (sítě podvozku do 0,45 m od středu kola) – pro všechna auta BeamNG. Zadní kola 1203 o 5 cm víc ven:
+  vlastní nastavení modu „Wheel Offset“ (`$trackoffset_R`) na jeho maximu.
 - Naložit/vyložit z kabiny: návrh poslaný hráči, čeká na domluvu.
 
 ## 27. 10. (31) – Řízení z kabiny: šipky převezmou volant, pryč „příští křižovatka vpravo“
