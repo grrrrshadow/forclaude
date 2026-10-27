@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (20) – Holky jen ze sady hry, balíčky dávají polohu
+
+- Hráč: *„budem davat holky náklad i řidičky grrrrf jen definuje polohu. a tak muže sedět mat nebo colege girl
+  konfiguratorem. grrrf da pryč řidičky z volhy kabeioletu , holky z tater ale definuje polohy a ktery ingame holky
+  použije. to jsou holky grf ktery bude vždy u hry. duležite je předat i velikost holek.“*
+- Hra to umí už teď: posádka v záznamu (`postava`, `poloha`, `otoceni`, `meritko`, `misto_ridicky`) hledá postavu
+  napřed v balíčku vozidla, pak v sadě hry `postavy` (ta je u hry vždy). Mat nebo College Girl: dvě skupiny
+  `posadky`, stav GRF (konfigurátor) vybere skupinu. Velikost: `meritko` místa, postavy sady hry jsou ve skutečné
+  výšce.
+- Na kolegovi: smazat glb holek z balíčků, holky Tater (uzly v `nt_holky_*`) rozepsat na místa, pózy na míru
+  (`college_girl_ridi_v3s`, `galaxia_v3s`) buď pózy hry, nebo jednou do sady `postavy`. SPECIAL (tlačí, táhnou) zatím
+  zůstává. Čeká se, jestli kolegovi píšu já, nebo hráč.
+
 ## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
 
 - Hráč: *„mame hotove vagony3D.grf“*. Kolega (grrrrf `hra/3d/VAGONY-3D-V8-PRO-HRU.md`) cituje hráče: *„vagony3d grf
