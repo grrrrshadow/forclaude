@@ -621,6 +621,8 @@ struct CarParts {
 	std::map<std::string, std::array<double, 3>> nodes; ///< the places of the nodes of the parts used, metres in the axes of BeamNG
 	std::map<std::string, double> vars;                 ///< the variables ("$name"): the configuration's, else the parts' own
 	std::map<const JValue *, std::array<double, 3>> offsets; ///< how far its slots move a part used ("nodeOffset")
+	std::string skin;             ///< the configuration's paint design: "globalSkin" of a part used (the Škoda 1203's VB, the slot "paint_design")
+	std::vector<uint32_t> paints; ///< the configuration's own paints ("paints" of the .pc, its "baseColor"), Colour::data: the colours of its paint design
 
 	/** A number of the parts' (JbeamNumber()). */
 	double Number(const JValue &v, double def = 0) const
@@ -667,6 +669,8 @@ std::vector<PartSlot> SlotsOf(const JValue &part)
 	return out;
 }
 
+uint32_t ColourOf(const JValue &v);
+
 /** Read the car's .jbeam files and pick its parts: the main one, then what each slot takes (by the .pc, else by default). */
 bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 {
@@ -695,6 +699,12 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 		if (const JValue *vars = cfg.Get("vars"); vars != nullptr && vars->IsObject()) {
 			for (const auto &[name, value] : vars->members) {
 				if (value.type == JValue::Type::Number) parts.vars[name] = value.number;
+			}
+		}
+		/* Its own paints, in their order: the colours its paint design lays (the yellow and the white of the VB). */
+		if (const JValue *paints = cfg.Get("paints"); paints != nullptr && paints->IsArray()) {
+			for (const JValue &paint : paints->items) {
+				if (const JValue *base = paint.Get("baseColor"); base != nullptr) parts.paints.push_back(ColourOf(*base));
 			}
 		}
 	}
@@ -733,6 +743,10 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 			todo.push_back(it->second);
 			slotted.emplace(it->second, std::make_pair(part, slot.options));
 		}
+	}
+	/* Its paint design: the skin a part used names for the whole car ("globalSkin"). */
+	for (const JValue *part : parts.used) {
+		if (const JValue *skin = part->Get("globalSkin"); skin != nullptr && skin->IsString() && !skin->text.empty()) parts.skin = skin->text;
 	}
 	/* The variables: the configuration's, else the default of the part that has them ([name, type, unit, category, default, ...]). */
 	for (const JValue *part : parts.used) {
@@ -1781,6 +1795,9 @@ struct CarMaterial {
 	bool mask_uv1 = false;
 	std::string paint_mask;       ///< the paint's layer's "opacityMap": the paint where it is light, the first layer's picture where dark
 	bool paint_mask_uv1 = false;
+	std::string palette;          ///< the paint's layer's "colorPaletteMap": which of the paints where, red the first, green the second, blue the third (a paint design's)
+	std::string decal;            ///< a layer after the paint's with a picture of its own ("baseColorMap"): laid over the paint, the VB's letters ...
+	std::string decal_mask;       ///< ... where its "opacityMap" is light
 	bool see_through = false;     ///< "translucent" and not "alphaTest" (the glass): its "opacityMap" how much hides what is behind it, not holes
 	bool both_sides = false;      ///< "doubleSided": seen from behind too; BeamNG leaves out the side of the others facing away
 };
@@ -1891,12 +1908,22 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 							if (const JValue *b = st.Get(k); b != nullptr && b->IsTrue()) painted = true;
 						}
 						if (!painted) continue;
+						/* A layer after the paint's with a picture and a mask of its own: a paint design's letters over it. */
+						if (m.paint && &st != first && m.decal.empty()) {
+							const JValue *t = st.Get("baseColorMap"), *o = st.Get("opacityMap");
+							if (t != nullptr && t->IsString() && o != nullptr && o->IsString()) {
+								m.decal = t->text;
+								m.decal_mask = o->text;
+								continue;
+							}
+						}
 						m.paint = true;
 						/* The paint a layer over the first, where its mask is light (the Škoda 1203's body: its rubber, chrome
 						 * and lamps in the first layer's picture, dark in the mask). */
 						if (&st != first) {
 							if (const JValue *t = st.Get("opacityMap"); t != nullptr && t->IsString() && m.paint_mask.empty()) m.paint_mask = t->text;
 							if (const JValue *t = st.Get("opacityMapUseUV"); t != nullptr) m.paint_mask_uv1 = t->Num() == 1;
+							if (const JValue *t = st.Get("colorPaletteMap"); t != nullptr && t->IsString() && m.palette.empty()) m.palette = t->text;
 						}
 					}
 				}
@@ -1957,9 +1984,153 @@ void Bc4Values(const uint8_t *b, uint8_t a[8])
 	}
 }
 
+/*
+ * BC7 (BeamNG's own textures, the Škoda 1203's: DXGI 98 and 99): a block of 16 bytes, one of eight modes -- one to
+ * three subsets of its pixels, each between two endpoints, its pixels' indices weighing them. The tables of the
+ * partitions and of the subsets' anchor pixels are the format's (Microsoft's "BC7 Format Mode Reference").
+ */
+
+/** The subset of each pixel of a block of two subsets, by its partition: bit n the pixel n. */
+static const uint16_t BC7_PARTITIONS_2[64] = {
+	0xCCCC, 0x8888, 0xEEEE, 0xECC8, 0xC880, 0xFEEC, 0xFEC8, 0xEC80,
+	0xC800, 0xFFEC, 0xFE80, 0xE800, 0xFFE8, 0xFF00, 0xFFF0, 0xF000,
+	0xF710, 0x008E, 0x7100, 0x08CE, 0x008C, 0x7310, 0x3100, 0x8CCE,
+	0x088C, 0x3110, 0x6666, 0x366C, 0x17E8, 0x0FF0, 0x718E, 0x399C,
+	0xAAAA, 0xF0F0, 0x5A5A, 0x33CC, 0x3C3C, 0x55AA, 0x9696, 0xA55A,
+	0x73CE, 0x13C8, 0x324C, 0x3BDC, 0x6996, 0xC33C, 0x9966, 0x0660,
+	0x0272, 0x04E4, 0x4E40, 0x2720, 0xC936, 0x936C, 0x39C6, 0x639C,
+	0x9336, 0x9CC6, 0x817E, 0xE718, 0xCCF0, 0x0FCC, 0x7744, 0xEE22,
+};
+/** Of three subsets: two bits a pixel. */
+static const uint32_t BC7_PARTITIONS_3[64] = {
+	0xAA685050, 0x6A5A5040, 0x5A5A4200, 0x5450A0A8, 0xA5A50000, 0xA0A05050, 0x5555A0A0, 0x5A5A5050,
+	0xAA550000, 0xAA555500, 0xAAAA5500, 0x90909090, 0x94949494, 0xA4A4A4A4, 0xA9A59450, 0x2A0A4250,
+	0xA5945040, 0x0A425054, 0xA5A5A500, 0x55A0A0A0, 0xA8A85454, 0x6A6A4040, 0xA4A45000, 0x1A1A0500,
+	0x0050A4A4, 0xAAA59090, 0x14696914, 0x69691400, 0xA08585A0, 0xAA821414, 0x50A4A450, 0x6A5A0200,
+	0xA9A58000, 0x5090A0A8, 0xA8A09050, 0x24242424, 0x00AA5500, 0x24924924, 0x24499224, 0x50A50A50,
+	0x500AA550, 0xAAAA4444, 0x66660000, 0xA5A0A5A0, 0x50A050A0, 0x69286928, 0x44AAAA44, 0x66666600,
+	0xAA444444, 0x54A854A8, 0x95809580, 0x96969600, 0xA85454A8, 0x80959580, 0xAA141414, 0x96960000,
+	0xAAAA1414, 0xA05050A0, 0xA0A5A5A0, 0x96000000, 0x40804080, 0xA9A8A9A8, 0xAAAAAA44, 0x2A4A5254,
+};
+/** The anchor pixel of the second subset of two, by the partition (the first subset's is pixel 0). */
+static const uint8_t BC7_ANCHORS_2[64] = {
+	15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15,
+	15, 2, 8, 2, 2, 8, 8, 15, 2, 8, 2, 2, 8, 8, 2, 2,
+	15, 15, 6, 8, 2, 8, 15, 15, 2, 8, 2, 2, 2, 15, 15, 6,
+	6, 2, 6, 8, 15, 15, 2, 2, 15, 15, 15, 15, 15, 2, 2, 15,
+};
+/** The anchor pixels of the second and the third subset of three. */
+static const uint8_t BC7_ANCHORS_3[64][2] = {
+	{3, 15}, {3, 8}, {15, 8}, {15, 3}, {8, 15}, {3, 15}, {15, 3}, {15, 8},
+	{8, 15}, {8, 15}, {6, 15}, {6, 15}, {6, 15}, {5, 15}, {3, 15}, {3, 8},
+	{3, 15}, {3, 8}, {8, 15}, {15, 3}, {3, 15}, {3, 8}, {6, 15}, {10, 8},
+	{5, 3}, {8, 15}, {8, 6}, {6, 10}, {8, 15}, {5, 15}, {15, 10}, {15, 8},
+	{8, 15}, {15, 3}, {3, 15}, {5, 10}, {6, 10}, {10, 8}, {8, 9}, {15, 10},
+	{15, 6}, {3, 15}, {15, 8}, {5, 15}, {15, 3}, {15, 6}, {15, 6}, {15, 8},
+	{3, 15}, {15, 3}, {5, 15}, {5, 15}, {5, 15}, {8, 15}, {5, 15}, {10, 15},
+	{5, 15}, {10, 15}, {8, 15}, {13, 15}, {15, 3}, {12, 15}, {3, 15}, {3, 8},
+};
+
+/** A block of BC7 as 16 pixels of RGBA, row by row. */
+static void Bc7Block(const uint8_t *b, uint8_t out[16][4])
+{
+	struct Mode {
+		uint8_t subsets, partition_bits, rotation_bits, selection_bits, colour_bits, alpha_bits, endpoint_pbits, shared_pbits, index_bits, index2_bits;
+	};
+	static const Mode MODES[8] = {
+		{3, 4, 0, 0, 4, 0, 1, 0, 3, 0},
+		{2, 6, 0, 0, 6, 0, 0, 1, 3, 0},
+		{3, 6, 0, 0, 5, 0, 0, 0, 2, 0},
+		{2, 6, 0, 0, 7, 0, 1, 0, 2, 0},
+		{1, 0, 2, 1, 5, 6, 0, 0, 2, 3},
+		{1, 0, 2, 0, 7, 8, 0, 0, 2, 2},
+		{1, 0, 0, 0, 7, 7, 1, 0, 4, 0},
+		{2, 6, 0, 0, 5, 5, 1, 0, 2, 0},
+	};
+	static const uint8_t WEIGHTS_2[4] = {0, 21, 43, 64};
+	static const uint8_t WEIGHTS_3[8] = {0, 9, 18, 27, 37, 46, 55, 64};
+	static const uint8_t WEIGHTS_4[16] = {0, 4, 9, 13, 17, 21, 26, 30, 34, 38, 43, 47, 51, 55, 60, 64};
+	int at = 0;
+	auto bits = [&](int n) -> uint32_t {
+		uint32_t v = 0;
+		for (int i = 0; i < n; i++, at++) v |= static_cast<uint32_t>((b[at >> 3] >> (at & 7)) & 1) << i;
+		return v;
+	};
+	int mode = 0;
+	while (mode < 8 && bits(1) == 0) mode++;
+	if (mode == 8) {
+		for (int i = 0; i < 16; i++) out[i][0] = out[i][1] = out[i][2] = out[i][3] = 0;
+		return;
+	}
+	const Mode &m = MODES[mode];
+	const uint32_t partition = bits(m.partition_bits), rotation = bits(m.rotation_bits), selection = bits(m.selection_bits);
+	const int ends = m.subsets * 2;
+	uint32_t e[6][4] = {};
+	for (int c = 0; c < 3; c++) {
+		for (int k = 0; k < ends; k++) e[k][c] = bits(m.colour_bits);
+	}
+	for (int k = 0; k < ends; k++) e[k][3] = m.alpha_bits > 0 ? bits(m.alpha_bits) : 255;
+	/* The p-bits: a lowest bit more of every endpoint's numbers, of each endpoint or shared by a subset's two. */
+	int colour_bits = m.colour_bits, alpha_bits = m.alpha_bits;
+	if (m.endpoint_pbits || m.shared_pbits) {
+		uint32_t p[6] = {};
+		if (m.endpoint_pbits) {
+			for (int k = 0; k < ends; k++) p[k] = bits(1);
+		} else {
+			for (int s = 0; s < m.subsets; s++) p[2 * s] = p[2 * s + 1] = bits(1);
+		}
+		for (int k = 0; k < ends; k++) {
+			for (int c = 0; c < 4; c++) {
+				if (c < 3 || m.alpha_bits > 0) e[k][c] = e[k][c] << 1 | p[k];
+			}
+		}
+		colour_bits++;
+		if (alpha_bits > 0) alpha_bits++;
+	}
+	auto expand = [](uint32_t v, int n) { return static_cast<uint32_t>((v << (8 - n)) | (v >> (2 * n - 8))); };
+	for (int k = 0; k < ends; k++) {
+		for (int c = 0; c < 3; c++) e[k][c] = expand(e[k][c], colour_bits);
+		if (alpha_bits > 0) e[k][3] = expand(e[k][3], alpha_bits);
+	}
+	auto subset_of = [&](int i) -> int {
+		if (m.subsets == 2) return (BC7_PARTITIONS_2[partition] >> i) & 1;
+		if (m.subsets == 3) return (BC7_PARTITIONS_3[partition] >> (2 * i)) & 3;
+		return 0;
+	};
+	auto anchor = [&](int i) {
+		if (i == 0) return true;
+		if (m.subsets == 2) return i == BC7_ANCHORS_2[partition];
+		if (m.subsets == 3) return i == BC7_ANCHORS_3[partition][0] || i == BC7_ANCHORS_3[partition][1];
+		return false;
+	};
+	uint8_t index[16] = {}, index2[16] = {};
+	for (int i = 0; i < 16; i++) index[i] = static_cast<uint8_t>(bits(m.index_bits - (anchor(i) ? 1 : 0)));
+	if (m.index2_bits > 0) {
+		for (int i = 0; i < 16; i++) index2[i] = static_cast<uint8_t>(bits(m.index2_bits - (i == 0 ? 1 : 0)));
+	}
+	auto weight = [](int n, int i) { return n == 2 ? WEIGHTS_2[i] : n == 3 ? WEIGHTS_3[i] : WEIGHTS_4[i]; };
+	for (int i = 0; i < 16; i++) {
+		const int s = subset_of(i);
+		const uint32_t *e0 = e[2 * s], *e1 = e[2 * s + 1];
+		/* Of two sets of indices (modes 4 and 5) the colour by one and the alpha by the other, which by the selection bit. */
+		int cw, aw;
+		if (m.index2_bits > 0) {
+			cw = selection ? weight(m.index2_bits, index2[i]) : weight(m.index_bits, index[i]);
+			aw = selection ? weight(m.index_bits, index[i]) : weight(m.index2_bits, index2[i]);
+		} else {
+			cw = aw = weight(m.index_bits, index[i]);
+		}
+		for (int c = 0; c < 4; c++) {
+			const int w = c < 3 ? cw : aw;
+			out[i][c] = static_cast<uint8_t>(((64 - w) * e0[c] + w * e1[c] + 32) >> 6);
+		}
+		if (rotation > 0) std::swap(out[i][3], out[i][rotation - 1]);
+	}
+}
+
 /**
- * A .dds as RGBA: BC1, BC2, BC3 and BC4 (DXT1, DXT3, DXT5, ATI1; of the old header or of DX10's) and 32-bit pixels;
- * the first of its sizes no bigger than 1024. BC5 (normals), BC6 and BC7 not.
+ * A .dds as RGBA: BC1, BC2, BC3, BC4 (DXT1, DXT3, DXT5, ATI1; of the old header or of DX10's), BC7 (DX10's) and 32-bit
+ * pixels; the first of its sizes no bigger than 1024. BC5 (normals) and BC6 not.
  */
 bool DecodeDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_t> &rgba)
 {
@@ -1970,7 +2141,7 @@ bool DecodeDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_
 	const uint32_t pf_flags = Le32(&d[80]);
 	const std::string_view fourcc(reinterpret_cast<const char *>(&d[84]), 4);
 	size_t at = 128;
-	enum class Kind : uint8_t { None, Bc1, Bc2, Bc3, Bc4, Rgba, Bgra } kind = Kind::None;
+	enum class Kind : uint8_t { None, Bc1, Bc2, Bc3, Bc4, Bc7, Rgba, Bgra } kind = Kind::None;
 	if (fourcc == "DXT1") kind = Kind::Bc1;
 	else if (fourcc == "DXT3") kind = Kind::Bc2;
 	else if (fourcc == "DXT5") kind = Kind::Bc3;
@@ -1982,6 +2153,7 @@ bool DecodeDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_
 		else if (dxgi == 74 || dxgi == 75) kind = Kind::Bc2;
 		else if (dxgi == 77 || dxgi == 78) kind = Kind::Bc3;
 		else if (dxgi == 80 || dxgi == 81) kind = Kind::Bc4;
+		else if (dxgi == 98 || dxgi == 99) kind = Kind::Bc7;
 		else if (dxgi == 28 || dxgi == 29) kind = Kind::Rgba;
 		else if (dxgi == 87 || dxgi == 91) kind = Kind::Bgra;
 	} else if ((pf_flags & 0x40) != 0 && Le32(&d[88]) == 32) {
@@ -2015,6 +2187,15 @@ bool DecodeDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_
 	for (int by = 0; by < bh; by++) {
 		for (int bx = 0; bx < bw; bx++) {
 			const uint8_t *b = &d[at + (static_cast<size_t>(by) * bw + bx) * block_bytes];
+			if (kind == Kind::Bc7) {
+				uint8_t px[16][4];
+				Bc7Block(b, px);
+				for (int i = 0; i < 16; i++) {
+					const int x = bx * 4 + i % 4, y = by * 4 + i / 4;
+					if (x < w && y < h) std::copy_n(px[i], 4, &rgba[(static_cast<size_t>(y) * w + x) * 4]);
+				}
+				continue;
+			}
 			uint8_t c[4][4] = {}, a[8] = {};
 			const uint8_t *colour = kind == Kind::Bc1 ? b : b + 8;
 			if (kind != Kind::Bc4) Bc1Colours(colour, c, kind != Kind::Bc1);
@@ -2162,6 +2343,12 @@ void Simplify(BeamngMesh &mesh, float cell)
 }
 
 } // namespace
+
+/** A .dds of a mod as the game reads it (DecodeDds()): the rig's 'test3d dds'. */
+bool DecodeBeamngDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_t> &rgba)
+{
+	return DecodeDds(d, w, h, rgba);
+}
 
 /** "beamng_path" of the configuration: folders of mods of BeamNG besides the usual ones, separated by ';'. */
 std::string _beamng_path;
@@ -2369,6 +2556,63 @@ static void AddBeamngWheel(BeamngMesh &mesh, const CarFrame &frame, const std::a
 }
 
 /**
+ * A paint design ("globalSkin", the Škoda 1203's VB in yellow and white with its letters) laid into a painted material's
+ * picture: where the paint's mask is light, the configuration's paint its palette names there (red the first, green the
+ * second, blue the third) at the picture's lightness, as the game paints a car (three_d_gpu.cpp); over it its letters
+ * where their mask is light. The mask is then dark all over: the car keeps the design's colours, not the GRF's.
+ * @param paints the configuration's paints (CarParts::paints), else the car's own
+ */
+static void LaySkin(const BeamngVehicle &v, const CarMaterial &cm, const std::vector<uint32_t> &paints, BeamngMesh::PaintSource &src)
+{
+	if (src.rgba.empty() || src.w <= 0 || src.h <= 0) return;
+	BeamngMesh::Material palette, decal, decal_mask;
+	if (!ReadTexture(v, cm.palette, palette, nullptr)) {
+		Debug(misc, 1, "BeamNG {}: paint design {} without its palette {}", v.id, src.name, cm.palette);
+		return;
+	}
+	const bool letters = !cm.decal.empty() && ReadTexture(v, cm.decal, decal, nullptr) && ReadTexture(v, cm.decal_mask, decal_mask, nullptr);
+	auto at = [](const std::vector<uint8_t> &rgba, int w, int h, double u, double vv) -> const uint8_t * {
+		const int x = std::clamp(static_cast<int>(u * w), 0, w - 1), y = std::clamp(static_cast<int>(vv * h), 0, h - 1);
+		return &rgba[(static_cast<size_t>(y) * w + x) * 4];
+	};
+	auto paint = [&](size_t k) { return k < paints.size() ? paints[k] : k < v.paints.size() ? v.paints[k] : 0xFFFFFFFFu; };
+	const uint32_t colours[3] = {paint(0), paint(1), paint(2)};
+	for (int y = 0; y < src.h; y++) {
+		for (int x = 0; x < src.w; x++) {
+			const double u = (x + 0.5) / src.w, vv = (y + 0.5) / src.h;
+			uint8_t *c = &src.rgba[(static_cast<size_t>(y) * src.w + x) * 4];
+			const double m = src.mask_rgba.empty() ? 1.0 : at(src.mask_rgba, src.mw, src.mh, u, vv)[0] / 255.0;
+			if (m > 0) {
+				const uint8_t *p = at(palette.rgba, palette.w, palette.h, u, vv);
+				const double sum = p[0] + p[1] + p[2];
+				const double light = std::max({c[0], c[1], c[2]}) / 255.0;
+				for (int k = 0; k < 3; k++) {
+					double want = 0;
+					for (int j = 0; j < 3; j++) {
+						const uint8_t channel = static_cast<uint8_t>(colours[j] >> (16 - 8 * k));
+						want += channel * (sum > 0 ? p[j] / sum : j == 0 ? 1.0 : 0.0);
+					}
+					c[k] = static_cast<uint8_t>(std::lround(c[k] + (std::min(255.0, want * light) - c[k]) * m));
+				}
+			}
+			if (letters) {
+				const double a = at(decal_mask.rgba, decal_mask.w, decal_mask.h, u, vv)[0] / 255.0;
+				if (a > 0) {
+					const uint8_t *d = at(decal.rgba, decal.w, decal.h, u, vv);
+					for (int k = 0; k < 3; k++) c[k] = static_cast<uint8_t>(std::lround(c[k] + (d[k] - c[k]) * a));
+				}
+			}
+		}
+	}
+	Debug(misc, 1, "BeamNG {}: paint design {} laid ({} paints, letters {})", v.id, src.name, std::min<size_t>(3, paints.size()), letters ? "yes" : "no");
+	src.png.clear();
+	src.mw = src.w;
+	src.mh = src.h;
+	src.mask_rgba.assign(static_cast<size_t>(src.w) * src.h * 4, 0);
+	src.mask_png.clear();
+}
+
+/**
  * Read a car's model for drawing: the meshes its flexbodies name, each where its flexbody puts it ("pos", "rot" in
  * degrees about x, y and z, "scale"; else where its node in the .dae is), in the frame of the vehicle objects; the
  * materials' colours, textures and paint; the body's holes cut by its mask; the glass of its lights and where they are.
@@ -2509,6 +2753,13 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 		index[name] = at;
 		return at;
 	};
+	/* A material of the configuration's paint design instead, where the mod has one ("<material>.skin.<design>": BeamNG's
+	 * "globalSkin", the Škoda 1203's VB). */
+	auto skinned = [&](const std::string &name) {
+		if (parts.skin.empty()) return name;
+		const std::string designed = name + ".skin." + parts.skin;
+		return materials.contains(designed) ? designed : name;
+	};
 	/* A painted material's cell of the paint's texture: its first layer's picture and its paint's mask (CarMaterial::paint_mask). */
 	std::map<std::string, int16_t> cells;
 	auto cell_of = [&](const std::string &name, const CarMaterial &cm) -> int16_t {
@@ -2529,6 +2780,8 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			src.mask_rgba = std::move(mask.rgba);
 			src.mask_png = std::move(mask.png);
 		}
+		/* A paint design's material (its name "<material>.skin.<design>"): its colours laid in. */
+		if (!cm.palette.empty() && name.find(".skin.") != std::string::npos) LaySkin(v, cm, parts.paints, src);
 		const int16_t at = static_cast<int16_t>(mesh.paint_sources.size());
 		mesh.paint_sources.push_back(std::move(src));
 		cells[name] = at;
@@ -2611,7 +2864,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			const Matrix m = Multiply(place, Multiply(units, pl->second.world));
 			for (Triangles &t : ReadGeometry(*pl->second.geometry)) {
 				auto bound = pl->second.materials.find(t.material);
-				const std::string material = bound != pl->second.materials.end() ? bound->second : t.material;
+				const std::string material = skinned(bound != pl->second.materials.end() ? bound->second : t.material);
 				const uint8_t tex = material_of(material);
 				auto cm = materials.find(material);
 				const bool cut = cm != materials.end() && !cm->second.mask.empty() && !cm->second.see_through;

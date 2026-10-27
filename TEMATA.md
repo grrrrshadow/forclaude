@@ -90,6 +90,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   má přes 20 (7 holek × 3 skupiny), Vivi a další stály. Teď se počítají jen chodící, které stav ukazuje. Girl #16 má
   textury v JPEG, hra čte PNG: šedá, kolegovi. Nehotové u kolegy: balíčky Tater, V3S, Vagonů bez holek s pózami kabin,
   staré pózy na kostru, dvě lavice za sebou (Tatry v5).
+- Hráč (screenshot #304, TAZ 1203 dodávka oranžová bez detailů): *„dvanacetrojky nejdou, chcybi disky kol a barva
+  textura, vb je bilo žlutá a je jenom jednou barvou“*, pak *„cpu gpu bez změny“*. Příčina: textury modu jsou DDS
+  BC7 (DXGI 98/99), hra uměla jen BC1–BC4 → žádná textura, auto jednou barvou, kola bez disků. Hotovo: dekodér BC7
+  (tabulky dělení a kotev ověřené proti PIL, textury 1024 shodné na pixel); skiny BeamNG: díl `paint_design` s
+  `globalSkin` → materiál `<materiál>.skin.<skin>`, paleta (`colorPaletteMap`: červená 1. barva, zelená 2., modrá 3.
+  z `paints` konfigurace) a nápisy (vrstva s `baseColorMap` + `opacityMap`) zapečené do obrázku těla, lak GRF se na
+  ně nedává. Rig: VB modrobílá s pruhem, VB žlutá s bílými dveřmi a VB, Spoje s pruhem, sanitka s křížem.
+- Hráč: *„to pada protože neni dokončeny přechod na gpu tak to musime dokončit a pak to mužem ladit . ale flastrovat
+  pady nedokončene přestavby je kravina“*: pády pod zátěží (testy 16–18) neřešit záplatami, dokončit přechod na kartu.
 - Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
   `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
   na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.

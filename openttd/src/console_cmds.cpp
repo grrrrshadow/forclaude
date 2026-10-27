@@ -9860,6 +9860,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_cull = argv.size() < 3 || argv[2] != "0";
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: zadni steny {}", _turned_cull ? "vynechane" : "kreslene");
+	} else if (what == "dds" && argv.size() > 3) {
+		/* 'dds <file> <out.ppm>': a .dds of a mod as the game reads it (DecodeBeamngDds()), its colours as a PPM. */
+		extern bool DecodeBeamngDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_t> &rgba);
+		std::vector<uint8_t> bytes;
+		if (auto f = FileHandle::Open(std::string(argv[2]), "rb"); f.has_value()) {
+			uint8_t buf[65536];
+			for (size_t n; (n = fread(buf, 1, sizeof(buf), *f)) > 0;) bytes.insert(bytes.end(), buf, buf + n);
+		}
+		int w = 0, h = 0;
+		std::vector<uint8_t> rgba;
+		if (!DecodeBeamngDds(bytes, w, h, rgba)) {
+			IConsolePrint(CC_ERROR, "test3d: dds {} neprecteno", argv[2]);
+			return true;
+		}
+		if (auto f = FileHandle::Open(std::string(argv[3]), "wb"); f.has_value()) {
+			std::string head = fmt::format("P6\n{} {}\n255\n", w, h);
+			fwrite(head.data(), 1, head.size(), *f);
+			for (size_t i = 0; i < rgba.size(); i += 4) fwrite(&rgba[i], 1, 3, *f);
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: dds {}: {}x{}", argv[2], w, h);
 	} else if (what == "postava" && argv.size() > 3) {
 		/* 'postava <figure> <frame> [file] [times]': the picture of a figure at a frame (a dragon's pose with its bones, a
 		 * passage "<jmeno>/<a>@<snimek>><b>"), facing the view at the closest zoom, so many times bigger, as a PPM in the
