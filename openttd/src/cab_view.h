@@ -44,6 +44,8 @@ struct CabViewPicture {
 struct CabViewCamera {
 	double heading = 0.0; ///< radians, the world direction the eye looks along (atan2 of the direction's y, x)
 	bool valid = false;   ///< whether heading is set
+	double head = 0.0;    ///< radians the head is turned from it by the right button, left positive (the player, 27. 10.: "look about with the right button, turn the head and look out of the right window")
+	double pitch = 0.0;   ///< and up (positive) or down
 	double eye_dz = -1.0; ///< how high the eye is over the vehicle, units of height: it bows under a low bridge; -1 not yet
 	double ms = 0.0;      ///< rig: how long the last picture took, milliseconds: collecting and drawing
 	double collect_ms = 0.0; ///< rig: of it, collecting what to draw, under the lock of the game (CollectEyeFrame())

@@ -50,6 +50,8 @@
 #include "widgets/cab_view_widget.h"
 #include "video/video_driver.hpp"
 #include "fileio_func.h"
+#include "map_drag.h"
+#include "three_d.h"
 #include "3rdparty/fmt/format.h"
 
 #include "table/strings.h"
@@ -500,6 +502,12 @@ struct CabViewWindow : Window {
 		this->SetWidgetDirty(WID_CV_STOP);
 	}};
 
+	/* Looking about with the right button (OnRightClick()). */
+	static constexpr double CAB_LOOK_MOUSE = 0.005;     ///< radians a pixel the hand moves, as from the eyes
+	static constexpr double CAB_LOOK_PITCH_MAX = 0.8;   ///< up or down at most, radians
+	bool looked = false;                                ///< the head turned since the right button went down
+	std::chrono::steady_clock::time_point look_clicked{}; ///< when it went down last, for two clicks
+
 	/* The arrows drive (CabArrows), looked at this often. */
 	CabArrows arrows{};
 	static constexpr int DRIVE_MS = 30;
@@ -707,6 +715,36 @@ struct CabViewWindow : Window {
 		return EventState::NotHandled;
 	}
 
+	bool OnRightClick([[maybe_unused]] Point pt, WidgetID widget) override
+	{
+		/* Looking about with the right button held, as from the eyes (first_person_gui.cpp): the pointer pinned where
+		 * it went down, each move only how far the hand went; two clicks without a look between look ahead again. */
+		if (widget != WID_CV_CANVAS || _scrolling_viewport) return false;
+		const auto now = std::chrono::steady_clock::now();
+		if (!this->looked && now - this->look_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+			this->camera.head = 0;
+			this->camera.pitch = 0;
+			this->look_clicked = {};
+			this->SetWidgetDirty(WID_CV_CANVAS);
+		} else {
+			this->look_clicked = now;
+		}
+		this->looked = false;
+		_scrolling_viewport = true;
+		_cursor.fix_at = true;
+		_look_pinned = true;
+		return true;
+	}
+
+	void OnScroll(Point delta) override
+	{
+		/* The pointer to the right looks to the right, down looks down; round to the back window and on. */
+		if (delta.x != 0 || delta.y != 0) this->looked = true;
+		this->camera.head = std::remainder(this->camera.head - delta.x * CAB_LOOK_MOUSE, 2 * M_PI);
+		this->camera.pitch = std::clamp(this->camera.pitch - delta.y * CAB_LOOK_MOUSE, -CAB_LOOK_PITCH_MAX, CAB_LOOK_PITCH_MAX);
+		this->SetWidgetDirty(WID_CV_CANVAS);
+	}
+
 	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
 	{
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
@@ -812,4 +850,21 @@ std::string DescribeCarHorn()
 	const SoundEntry *e = horn.has_value() ? GetSound(*horn) : nullptr;
 	if (e == nullptr || e->data == nullptr) return "klakson neni";
 	return fmt::format("klakson zvuk {}: {} Hz, {} bitu, {} vzorku", *horn, e->rate, e->bits_per_sample, e->data->size() / (e->bits_per_sample / 8));
+}
+
+/**
+ * The rig: the right button held on the picture of the cab view open and the hand moved so many pixels, as the player
+ * looks about (CabViewWindow::OnRightClick(), OnScroll()), let go.
+ * @return how the head is turned then
+ */
+std::string RigCabLook(int dx, int dy)
+{
+	CabViewWindow *w = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
+	if (w == nullptr) return "zadna kabina";
+	const bool taken = w->OnRightClick({}, WID_CV_CANVAS);
+	if (dx != 0 || dy != 0) w->OnScroll({dx, dy});
+	_scrolling_viewport = false;
+	_cursor.fix_at = false;
+	_look_pinned = false;
+	return fmt::format("{}: otoceni {:.0f} stupnu, nahoru {:.0f}", taken ? "vzato" : "NEVZATO", w->camera.head * 180.0 / M_PI, w->camera.pitch * 180.0 / M_PI);
 }

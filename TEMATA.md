@@ -46,7 +46,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   karoserie (doplněk s barvou přes celou texturu). VB, sanitky, Spoje, hasiči, pohřební a De Luxe mají svoje.
 - Ověřeno v rigu: modrá kabina se šedou plachtou, červená se šedou, žlutá se žlutou, prázdný modrý valník
   s dřevěnou korbou.
-- Ještě: rozhlížení pravým tlačítkem v kabině (*„2 ano“*), chyby #226, Pajda karavan (domluvit).
+- Rozhlížení pravým tlačítkem v kabině (*„2 ano“*): tažení pravým otočí hlavu (do stran bez dorazu, nahoru a dolů do
+  45°), ukazatel stojí na místě, dvojklik pravým se dívá zase rovně, jako v pohledu z očí. Oko sedí dál na místě
+  řidiče, jen se dívá jinam. Rig: `test3d kabina hlava <dx> <dy>`.
+- Ještě: chyby #226, Pajda karavan (domluvit).
 
 ## 27. 10. (28) – Psi na farmě: dvůr a ohrady pastvin
 

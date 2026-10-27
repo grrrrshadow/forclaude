@@ -10536,6 +10536,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			return true;
 		}
+		if (argv.size() > 4 && argv[2] == "hlava") {
+			/* The right button held down on the picture of the cab view open and the hand moved so many pixels right and
+			 * down, as the player looks about (the player, 27. 10.: "look out of the right window"); 'hlava 0 0' twice
+			 * the two clicks that look ahead again. */
+			extern std::string RigCabLook(int dx, int dy);
+			IConsolePrint(CC_DEFAULT, "test3d: kabina hlava {}", RigCabLook(number(3).value_or(0), number(4).value_or(0)));
+			return true;
+		}
 		if (argv.size() > 3 && argv[2] == "klavesa") {
 			/* A key pressed in the window the arrows go to: 'test3d kabina klavesa <i|f|t|e>' -- the horn, the lights,
 			 * the route, getting in or out (the player, 17. 10.). */

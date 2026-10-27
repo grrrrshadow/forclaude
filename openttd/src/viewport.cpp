@@ -12623,8 +12623,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		camera.heading = std::remainder(camera.heading + d * CAB_TURN_RATE, 2 * M_PI);
 	}
 	CabEye eye;
-	eye.fx = std::cos(camera.heading);
-	eye.fy = std::sin(camera.heading);
+	/* The eye sits by the way the vehicle faces; it looks the way the head is turned (CabViewCamera::head). */
+	const double bfx = std::cos(camera.heading), bfy = std::sin(camera.heading);
+	const double look = walker != nullptr ? camera.heading : camera.heading + camera.head;
+	eye.fx = std::cos(look);
+	eye.fy = std::sin(look);
 	eye.rx = eye.fy;
 	eye.ry = -eye.fx;
 	if (walker != nullptr) {
@@ -12642,20 +12645,20 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double go = CabEyeAhead(m, m.PartsOf(own_model.state), ta);
 		const double kx = m.cab[0] + go * std::cos(ta), ky = m.cab[1] - go * std::sin(ta);
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
-		eye.x = own_model.x + cx * ahead * eye.fx - cy * across * eye.fy;
-		eye.y = own_model.y + cx * ahead * eye.fy + cy * across * eye.fx;
+		eye.x = own_model.x + cx * ahead * bfx - cy * across * bfy;
+		eye.y = own_model.y + cx * ahead * bfy + cy * across * bfx;
 		eye.z = own_model.z + CabEyeHeight(m) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
-		eye.x = v->x_pos + eye.fx * CAB_EYE_AHEAD;
-		eye.y = v->y_pos + eye.fy * CAB_EYE_AHEAD;
+		eye.x = v->x_pos + bfx * CAB_EYE_AHEAD;
+		eye.y = v->y_pos + bfy * CAB_EYE_AHEAD;
 		{
 			/* The eye's height over the vehicle: as the type has it, bowed under a low bridge just ahead, so it passes
 			 * under the deck, which is only a level over the road or the rails. */
 			double want = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
 			bool close = false;
 			for (int k = -1; k <= 3; k++) {
-				double px = v->x_pos + eye.fx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + eye.fy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
+				double px = v->x_pos + bfx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + bfy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
 				if (px < 0 || py < 0 || px >= Map::SizeX() * TILE_SIZE || py >= Map::SizeY() * TILE_SIZE) continue;
 				TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
 				if (!IsBridgeAbove(tile)) continue;
@@ -12683,7 +12686,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.25 : CAB_NEAR);
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
-	if (walker != nullptr) eye.cy += std::tan(walker->pitch) * eye.focal;
+	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch) * eye.focal;
 	out.eye = eye;
 	out.near_plane = _cab_near;
 
@@ -13418,7 +13421,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		bills.push_back({c.f, bx, by, static_cast<double>(ps.zmin), kind, w0, w1, ps});
 	}
 	/* The other vehicles: their picture of the direction as seen from the eye, as the turned map shows them. */
-	double yaw_deg = camera.heading * 180.0 / M_PI + 135.0;
+	double yaw_deg = std::atan2(eye.fy, eye.fx) * 180.0 / M_PI + 135.0;
 	int step = static_cast<int>(std::lround(yaw_deg / 45.0)) & 7;
 	const Vehicle *own = v != nullptr ? v->First() : nullptr;
 	/* The cab the eye is in, round it. */
