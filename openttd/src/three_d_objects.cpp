@@ -3734,6 +3734,7 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 	ThreeDLoadPiece piece;
 	piece.name = e.value("jmeno", std::string());
 	if (piece.name.empty()) return;
+	piece.package = package;
 	if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
 		for (int k = 0; k < 3; k++) piece.size[k] = std::max(0.05f, e.at("rozmer_m").at(k).get<float>());
 	}

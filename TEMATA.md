@@ -62,6 +62,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
     založený starým objektem a nový první objekt v něm chyběl. Teď se seznam při převzetí smaže a založí znovu.
   - SPECIAL v2 v rigu: dvoukolák s bednou i uhlím a kolečko se kreslí, holky táhnou a tlačí, snímky chůze běží,
     jedou pomalu (rychlost 8). Co přesně „nefunguje“, se ptám hráče.
+- Hráč: *„modularně aby tvurci mohli rozšiřovat, pozu musí dodat s objektem.“*, *„kryž nedava objekt dava pozu
+  řidiče s autem“*, *„jo použije ingame chuzi. to je rozumny. tak mu to napiš“*: holky jsou hry; balíček dává polohu,
+  holku hry a `meritko`; pózu, kterou hra nemá, dodá tvůrce se svým objektem (hra hledá postavu napřed v balíčku).
+  SPECIAL bez vlastních holek, chůze ze hry. Místa na lavici kusu teď taky hledají postavu napřed v balíčku kusu.
 
 ## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
 

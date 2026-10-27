@@ -820,7 +820,8 @@ struct ThreeDLoadPiece {
 	bool quarter_turn = false;       ///< "otaceni" with 90: it may lie across the bed
 	std::vector<std::pair<uint32_t, int>> colours; ///< the labels of its table ("naklady") with a colour, each with the state of its figure in that colour
 	std::vector<std::pair<uint32_t, int>> own_colours; ///< the colours the vehicles' states give it ("naklad" "barva", Colour::data), each with the state of its figure in that colour
-	std::vector<ThreeDVehicleCrew> seats; ///< "posadka": the figures of the game sitting on it (a bench of the girls), in its frame, filled in their order as the load is
+	std::vector<ThreeDVehicleCrew> seats; ///< "posadka": the figures sitting on it (a bench of the girls), in its frame, filled in their order as the load is
+	std::string package;             ///< the package it is of: its seats' figures are looked for there first, then in the game's (GetThreeDFigure())
 };
 
 /** Where a piece of a load lies on the bed: its foot, metres in the vehicle's frame, how it is turned, degrees, and its size. */

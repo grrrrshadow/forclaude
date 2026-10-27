@@ -325,7 +325,7 @@ bool GetThreeDLoadPieces(const ThreeDVehicleState *st, std::vector<ThreeDLoadPie
 			for (const ThreeDVehicleCrew &seat : piece->seats) {
 				if (figures <= 0) break;
 				figures--;
-				ThreeDLoadPieces *k = kind(GetThreeDFigure(seat.figure), 0, 0);
+				ThreeDLoadPieces *k = kind(GetThreeDFigure(seat.figure, piece->package), 0, 0);
 				if (k == nullptr) continue;
 				k->places.push_back({{at.at[0] + seat.at[0] * c - seat.at[1] * s, at.at[1] + seat.at[0] * s + seat.at[1] * c, at.at[2] + seat.at[2]}, at.turn + seat.turn, seat.scale});
 			}
