@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (32) – Pajda karavan, „Jeď svou trasu“ v pohledu z očí, rozchod kol 1203
+
+- Hráč: *„v modu jsou karoserie vic druhu a jedna určitě přečniva nad čelni sklo ma vystupek ale to je jedno, tak
+  bude bez toho. 1 uzky rozchod. 3 jo dej tam tlačitko jeď svou trasu. naložit, vyložit …“*
+- Pajda karavan: vlastní konfigurace hry „pajda“ z mikrobusu modu (`passenger.pc`, karoserie verze 1968), jen
+  značka Škoda od roku 1968, kulatá světla s chromovanou maskou, petrolejová (4B7F99 ze starého 2D GRF). V
+  konfigurátoru dál červená, žlutá, modrá. Motor má číslo za všemi auty modu, ostatní si čísla nechávají (savy).
+- Pohled z očí: když sedíš v autě, je místo „Běhat“ tlačítko „Řídit“ / „Jeď svou trasu“ (jako T).
+- Rozchod: kola jsou vpředu i vzadu ±0,68 m od středu, pneumatika 17 cm uvnitř boku karoserie (skutečná 1203 má
+  rozchod asi 1,28–1,30 m). Zadní kola ale sedí o 11 cm výš než přední (stav modu před usazením na pružinách) –
+  nedotýkají se země. Čeká na hráče, jestli myslel tohle.
+- Naložit/vyložit z kabiny: návrh poslaný hráči, čeká na domluvu.
+
 ## 27. 10. (31) – Řízení z kabiny: šipky převezmou volant, pryč „příští křižovatka vpravo“
 
 - Hráč: *„ty chodiš do auta přes cab view , ja nastupuju E z first person view a mam v autě když nastoupim menu

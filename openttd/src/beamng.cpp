@@ -692,7 +692,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 	std::sort(files.begin(), files.end());
 	std::map<std::string, std::string> chosen;
 	/* The configuration: its own, else info.json's "default_pc", else the only .pc. */
-	std::string pc = v.config.empty() ? std::string() : v.config + ".pc";
+	std::string pc = !v.base_config.empty() ? v.base_config + ".pc" : v.config.empty() ? std::string() : v.config + ".pc";
 	if (const JValue *d = info != nullptr ? info->Get("default_pc") : nullptr; pc.empty() && d != nullptr && d->IsString()) pc = d->text + ".pc";
 	if (pc.empty()) {
 		for (const std::string &f : files) {
@@ -905,6 +905,15 @@ static constexpr BeamngMake S1203_MAKES[] = {
 static constexpr std::pair<std::string_view, std::string_view> S1203_KINDS[] = {
 	{"police2", "VB žlutá"}, {"police", "VB"}, {"ambulance", "vojenská sanitka"}, {"ambulance2", "sanitka"}, {"hearse", "pohřební"}, {"flatbed", "valník"},
 	{"van", "dodávka"}, {"com", "kombi"}, {"passenger", "mikrobus"}, {"lux", "De Luxe"}, {"spoje", "Spoje"}, {"fire", "hasiči"},
+	{"pajda", "Pajda karavan"},
+};
+/**
+ * The configurations of our 1203 the game makes of the mod's own (BeamngVehicle::base_config): the Pajda karavan (the
+ * player, 27. 10.: "one of the first 1203s, Škoda from Vrchlabí, round lights", "pajda karavan") of the bus, the body
+ * of 1968; a Škoda only, of the petrol blue of the old 2D GRF.
+ */
+static constexpr std::pair<std::string_view, std::string_view> S1203_OWN_CONFIGS[] = {
+	{"pajda", "passenger"},
 };
 
 /** Is it our Škoda 1203: the folder "S1203" of its mod. */
@@ -961,7 +970,9 @@ static void MakeModels(BeamngVehicle &v, const std::string &own_config)
 			break;
 		}
 	}
+	const bool skoda_only = !v.base_config.empty();
 	for (const BeamngMake &make : S1203_MAKES) {
+		if (skoda_only && &make != &S1203_MAKES[0]) break;
 		BeamngModel m;
 		m.make = static_cast<int>(&make - S1203_MAKES);
 		m.name = std::string(make.name) + (kind.empty() ? std::string() : " " + kind);
@@ -992,6 +1003,8 @@ static void ChoosePaints(BeamngVehicle &v, const std::string &own_config)
 		v.body_paints = {YELLOW, RED, BLUE};
 	} else if (StrEqualsIgnoreCase(own_config, "van")) {
 		v.body_paints = {BLUE, RED, YELLOW};
+	} else if (StrEqualsIgnoreCase(own_config, "pajda")) {
+		v.body_paints = {{"petrolejová", 0xFF4B7F99}, RED, YELLOW, BLUE};
 	} else {
 		return;
 	}
@@ -1072,13 +1085,18 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	v.folder = folder;
 	v.id = id;
 	v.config = config;
+	if (StrEqualsIgnoreCase(id, "S1203")) {
+		for (const auto &[own, base] : S1203_OWN_CONFIGS) {
+			if (StrEqualsIgnoreCase(config, own)) v.base_config = base;
+		}
+	}
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
 	/* Its configuration's name: its own, or for the car itself info.json's "default_pc". */
 	std::string own_config = config;
 	if (const JValue *d = info.Get("default_pc"); own_config.empty() && d != nullptr && d->IsString()) own_config = d->text;
 	/* The configuration's own info_<name>.json over the car's: its name ("Configuration"), its years, its paint, its body. */
 	if (!own_config.empty() && info.IsObject()) {
-		JValue own = ParseJson(ReadModFile(v, "info_" + own_config + ".json"));
+		JValue own = ParseJson(ReadModFile(v, "info_" + (v.base_config.empty() ? own_config : v.base_config) + ".json"));
 		if (own.IsObject()) {
 			for (auto &[k, val] : own.members) {
 				auto it = std::ranges::find_if(info.members, [&k](const auto &m) { return m.first == k; });
@@ -1109,7 +1127,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	v.name = !brand.empty() && name.find(brand) == std::string::npos ? brand + " " + name : name;
 	if (!config.empty()) {
 		const JValue *c = info.Get("Configuration");
-		v.name += " " + (c != nullptr && c->IsString() && !c->text.empty() ? c->text : config);
+		v.name += " " + (v.base_config.empty() && c != nullptr && c->IsString() && !c->text.empty() ? c->text : config);
 	}
 	if (const JValue *a = info.Get("Author"); a != nullptr && a->IsString()) v.author = a->text;
 	if (const JValue *y = info.Get("Years"); y != nullptr && y->IsObject()) {
@@ -1282,7 +1300,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	 * valuables of each climate. The army's ambulance (the khaki "ambulance" of the 1203, the yellow is "ambulance2")
 	 * as the other ("to asi nebudem vozit vybušniny sanitkou").
 	 */
-	std::string what = own_config + " ";
+	std::string what = own_config + " " + v.base_config + " ";
 	if (const JValue *c = info.Get("Configuration"); c != nullptr && c->IsString()) what += c->text;
 	strtolower(what);
 	auto has = [&what](std::initializer_list<std::string_view> words) { return std::ranges::any_of(words, [&what](std::string_view w) { return what.find(w) != std::string::npos; }); };
@@ -2557,7 +2575,13 @@ const std::vector<BeamngVehicle> &FindBeamngVehicles()
 		if (!car.has_value()) return;
 		uint16_t next_id = BEAMNG_ENGINE_ID;
 		take(std::move(car), next_id);
-		for (const std::string &config : OtherConfigs(zip, car_folder, id)) take(ReadCar(zip, car_folder, id, config), next_id);
+		const std::vector<std::string> configs = OtherConfigs(zip, car_folder, id);
+		for (const std::string &config : configs) take(ReadCar(zip, car_folder, id, config), next_id);
+		/* The game's own configurations of our 1203, of a .pc the mod has; numbered after the mod's, so these keep theirs. */
+		if (!StrEqualsIgnoreCase(id, "S1203")) return;
+		for (const auto &[own, base] : S1203_OWN_CONFIGS) {
+			if (std::ranges::any_of(configs, [base](const std::string &c) { return StrEqualsIgnoreCase(c, base); })) take(ReadCar(zip, car_folder, id, std::string(own)), next_id);
+		}
 	};
 	for (const std::string &folder : ModFolders()) {
 		Debug(grf, 1, "BeamNG: mods looked for in {}", folder);

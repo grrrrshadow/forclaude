@@ -292,7 +292,11 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_HERE), SetStringTip(STR_FIRST_PERSON_HERE, STR_FIRST_PERSON_HERE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CENTRE), SetStringTip(STR_FIRST_PERSON_CENTRE, STR_FIRST_PERSON_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_RUN), SetStringTip(STR_FIRST_PERSON_RUN, STR_FIRST_PERSON_RUN_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		/* In a vehicle its route instead of running (the player, 27. 10.: "put the button 'go your route' there"). */
+		NWidget(NWID_SELECTION, Colours::Invalid, WID_FP_RUN_SEL),
+			NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_RUN), SetStringTip(STR_FIRST_PERSON_RUN, STR_FIRST_PERSON_RUN_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_ROUTE), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		EndContainer(),
 		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_FP_INVENTORY), SetStringTip(STR_FIRST_PERSON_INVENTORY, STR_FIRST_PERSON_INVENTORY_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
@@ -799,8 +803,12 @@ struct FirstPersonWindow : Window {
 		if (rv != nullptr) {
 			this->walker.x = rv->x_pos;
 			this->walker.y = rv->y_pos;
+			const bool route = this->arrows.route;
 			this->arrows.Drive(rv, ArrowsWindow() == this ? _dirkeys : DirectionKeys{}, static_cast<int>(steps) * FIRST_PERSON_TICK_MS);
+			if (this->arrows.route != route) this->SetWidgetDirty(WID_FP_ROUTE);
 		}
+		/* The button of the route in a vehicle, of running on foot. */
+		if (this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0)) this->ReInit();
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
 		if (c != nullptr && c->walker_health == 0) {
@@ -1616,6 +1624,7 @@ struct FirstPersonWindow : Window {
 			if (key == 't' || key == 'T') {
 				CabToggleRoute(rv, this->arrows);
 				this->SetWidgetDirty(WID_FP_CANVAS);
+				this->SetWidgetDirty(WID_FP_ROUTE);
 				return EventState::Handled;
 			}
 		}
@@ -1696,6 +1705,13 @@ struct FirstPersonWindow : Window {
 	{
 		this->SetWidgetLoweredState(WID_FP_RUN, this->running);
 		this->DrawWidgets();
+	}
+
+	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
+	{
+		/* Its route, or the wheel again (as the cab view's). */
+		if (widget == WID_FP_ROUTE) return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
+		return this->Window::GetWidgetString(widget, stringid);
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
@@ -1822,6 +1838,12 @@ struct FirstPersonWindow : Window {
 			case WID_FP_RUN:
 				this->running = !this->running;
 				this->SetDirty();
+				break;
+			case WID_FP_ROUTE:
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
+					CabToggleRoute(rv, this->arrows);
+					this->SetDirty();
+				}
 				break;
 			case WID_FP_INVENTORY:
 				ShowWalkerInventoryWindow();

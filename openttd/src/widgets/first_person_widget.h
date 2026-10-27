@@ -17,7 +17,9 @@ enum FirstPersonWidgets : WidgetID {
 	WID_FP_FULL,    ///< The window over the whole screen, and back.
 	WID_FP_HERE,    ///< Put the walker where the main view looks.
 	WID_FP_CENTRE,  ///< Put the main view on the walker.
+	WID_FP_RUN_SEL, ///< Walk or run on foot, the route in a vehicle.
 	WID_FP_RUN,     ///< Walk or run.
+	WID_FP_ROUTE,   ///< In a vehicle: go its route, or take the wheel.
 	WID_FP_INVENTORY, ///< The walker's inventory.
 };
 
