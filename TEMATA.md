@@ -52,6 +52,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   V3S: přívěs Autosan za Zetorem (dnes kupy bednám, cihlám, kládám, prknům, pytlům, sudům, dobytku) a balíky Terrna a
   lesovozu. Hra je připravená (`naklad`, `loze`, `barva`, `misto`), čeká se na balíček. Pozor na délku kusu proti
   loži (klády 3,99 m a prkna 4,0 m se na V3S nevešly) a dobytek jen s `bocnice` > 0.
+- Hráč: *„udělej požadavky hry“*, *„napiš mu ať ti napiše co piše mně“*: grrrrf `hra/3d/PROSBA-ZVLASTNI-VOZY-NAKLADY.md`
+  (e8ff65e). Kolega má psát do `hra/3d` i to, co píše hráči. Autosan: sady → kusy, korba podle jeho `loze/prives.json`
+  asi 3,96 m, takže klády a prkna se nevejdou (kratší kusy nebo delší lože, i pro V3S). Cihly `cihly_sede` s barvou
+  `A84832`: která? Terrno a lesovoz: `balik` nebo nový kus. Nákup ukazuje tahač i návěs v jednom stavu, ale stav má jen
+  jedno `loze`: uzly `*_oba` nechat jen pro nákup, nebo hra udělá `loze` jako pole.
 
 ## 26. 10. (18) – Návěs přes tahač, V3S s kusovými náklady, barva nákladu ze stavu
 
