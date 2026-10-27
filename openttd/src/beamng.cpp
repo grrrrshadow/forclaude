@@ -30,8 +30,10 @@
 
 #include <array>
 #include <charconv>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <limits>
 #include <map>
 #include <optional>
 #include <set>
@@ -2824,20 +2826,117 @@ static void LaySkin(const BeamngVehicle &v, const CarMaterial &cm, const std::ve
 }
 
 /**
- * Read a car's model for drawing: the meshes its flexbodies name, each where its flexbody puts it ("pos", "rot" in
- * degrees about x, y and z, "scale"; else where its node in the .dae is), in the frame of the vehicle objects; the
- * materials' colours, textures and paint; the body's holes cut by its mask; the glass of its lights and where they are.
+ * Make a car's wheels its mod leaves to BeamNG's own parts (the player, 26. 10.: the Škoda 1203 "has no wheels": its
+ * "S1203_wheel_F", tyres and hubcaps are in none of its files): for each wheel no mesh hangs on, a wheel of its own on
+ * its hub -- a tyre of the wheel's radius and a grey rim, between its two hub nodes.
+ * @param drawn_groups the groups of nodes the meshes drawn hang on
+ * @return how many wheels it made
  */
-bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
+static int AddCarWheels(const CarParts &parts, const std::set<std::string> &drawn_groups, const CarFrame &frame, BeamngMesh &mesh)
 {
-	JValue info = ParseJson(ReadModFile(v, "info.json"));
-	CarParts parts;
-	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts, make)) return false;
-	auto fr = _frames.find(v.Package() + "|" + v.folder + "|" + v.config);
-	const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
+	int made_wheels = 0;
+	for (const JValue *part : parts.used) {
+		for (const char *kind : {"pressureWheels", "hubWheels", "hubWheelsTSV", "pressureWheelsTSV"}) {
+			const JValue *wheels = part->Get(kind);
+			if (wheels == nullptr || !wheels->IsArray()) continue;
+			double r = 0.3, width = 0.17, hub = 0;
+			for (const JValue &row : wheels->items) {
+				if (row.IsObject()) {
+					for (const auto &[k, val] : row.members) {
+						if (k == "radius" && val.type == JValue::Type::Number) r = val.number;
+						if (k == "tireWidth" && val.type == JValue::Type::Number) width = val.number;
+						if (k == "hubRadius" && val.type == JValue::Type::Number) hub = val.number;
+					}
+					continue;
+				}
+				if (!row.IsArray() || row.items.size() < 5 || !row.items[0].IsString() || row.items[0].text == "name") continue;
+				if (!row.items[3].IsString() || !row.items[4].IsString()) continue;
+				const std::string hub_group = row.items[1].IsString() ? row.items[1].text : std::string();
+				const std::string tire_group = row.items[2].IsString() ? row.items[2].text : std::string();
+				if ((!hub_group.empty() && drawn_groups.contains(hub_group)) || (!tire_group.empty() && drawn_groups.contains(tire_group))) continue;
+				auto n1 = parts.nodes.find(row.items[3].text), n2 = parts.nodes.find(row.items[4].text);
+				if (n1 == parts.nodes.end() || n2 == parts.nodes.end()) continue;
+				AddBeamngWheel(mesh, frame, n1->second, n2->second, r, width, hub > 0 ? hub : r * 0.62);
+				made_wheels++;
+			}
+		}
+	}
+	return made_wheels;
+}
 
-	/* The model: the .dae files of the folder; and those the mod shares in vehicles/common/ when a flexbody names a mesh
-	 * they have (the Škoda 1203's wheels, S1203_wheels/wheel.dae). The first that has a mesh places it. */
+/**
+ * Where a flexbody of a part puts its mesh (a row of its "flexbodies"), in BeamNG's axes: its "pos", "rot" (degrees,
+ * about x, then y, then z) and "scale", moved as its part's slots move it; the units of its .dae and its up; the node's
+ * matrix of the .dae before it.
+ */
+static Matrix FlexbodyPlace(const CarParts &parts, const JValue *part, const JValue &row, const Placed &pl)
+{
+	double pos[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
+	for (size_t i = 1; i < row.items.size(); i++) {
+		const JValue &o = row.items[i];
+		if (!o.IsObject()) continue;
+		auto xyz = [&](const char *key, double *out) {
+			if (const JValue *p = o.Get(key); p != nullptr && p->IsObject()) {
+				out[0] = p->Get("x") != nullptr ? parts.Number(*p->Get("x"), out[0]) : out[0];
+				out[1] = p->Get("y") != nullptr ? parts.Number(*p->Get("y"), out[1]) : out[1];
+				out[2] = p->Get("z") != nullptr ? parts.Number(*p->Get("z"), out[2]) : out[2];
+			}
+		};
+		xyz("pos", pos);
+		xyz("rot", rot);
+		xyz("scale", scale);
+	}
+	/* Where its part's slots move it (the wheels out to their track). */
+	const auto moved = parts.Moved(part, pos[0], pos[1], pos[2]);
+	std::copy(moved.begin(), moved.end(), pos);
+	const double rx = rot[0] * M_PI / 180, ry = rot[1] * M_PI / 180, rz = rot[2] * M_PI / 180;
+	const Matrix mx = {1, 0, 0, 0, 0, std::cos(rx), -std::sin(rx), 0, 0, std::sin(rx), std::cos(rx), 0, 0, 0, 0, 1};
+	const Matrix my = {std::cos(ry), 0, std::sin(ry), 0, 0, 1, 0, 0, -std::sin(ry), 0, std::cos(ry), 0, 0, 0, 0, 1};
+	const Matrix mz = {std::cos(rz), -std::sin(rz), 0, 0, std::sin(rz), std::cos(rz), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+	Matrix place = Multiply(Multiply(mz, my), mx);
+	for (int r = 0; r < 3; r++) {
+		for (int c = 0; c < 3; c++) place[r * 4 + c] *= scale[c];
+		place[r * 4 + 3] = pos[r];
+	}
+	/* The units of its .dae and its up: metres, z up. */
+	const double unit = pl.unit;
+	Matrix units = IDENTITY;
+	units[0] = units[5] = units[10] = unit;
+	if (pl.y_up) units = {unit, 0, 0, 0, 0, 0, -unit, 0, 0, unit, 0, 0, 0, 0, 0, 1};
+	return Multiply(place, Multiply(units, pl.world));
+}
+
+/** A car's .dae files read (ReadCarDaes()): the meshes they place by their names, lower case; docs holds what placed points into. */
+struct CarDaes {
+	std::vector<XmlNode> docs;
+	std::map<std::string, Placed> placed;
+};
+
+/** The meshes the flexbodies of the parts name, lower case. */
+static std::set<std::string> FlexbodyMeshes(const std::vector<const JValue *> &parts)
+{
+	std::set<std::string> wanted;
+	for (const JValue *part : parts) {
+		const JValue *flex = part->Get("flexbodies");
+		if (flex == nullptr || !flex->IsArray()) continue;
+		for (const JValue &row : flex->items) {
+			if (!row.IsArray() || row.items.empty() || !row.items[0].IsString() || row.items[0].text == "mesh") continue;
+			std::string name = row.items[0].text;
+			strtolower(name);
+			wanted.insert(name);
+		}
+	}
+	return wanted;
+}
+
+/**
+ * Read the model of a car's folder: the .dae files of the folder; and those the mod shares in vehicles/common/ when a
+ * mesh wanted is in none of them (the Škoda 1203's wheels, S1203_wheels/wheel.dae). The first that has a mesh places it.
+ * @param wanted the meshes the flexbodies name (FlexbodyMeshes())
+ * @return false: the folder has no .dae
+ */
+static bool ReadCarDaes(const BeamngVehicle &v, const std::set<std::string> &wanted, CarDaes &out)
+{
 	std::vector<std::string> daes;
 	for (const std::string &f : ListCarFiles(v)) {
 		if (EndsWithIgnoreCase(f, ".dae")) daes.push_back(f);
@@ -2848,30 +2947,16 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 	for (const std::string &f : ListModCommonFiles(v)) {
 		if (EndsWithIgnoreCase(f, ".dae")) common_daes.push_back(f);
 	}
-	/* The parts drawn: those used, and the tarp of a flatbed, a part of the shape of its own. */
-	std::vector<const JValue *> drawn = parts.used;
-	if (parts.tarp != nullptr) drawn.push_back(parts.tarp);
-	std::set<std::string> wanted; // the meshes the flexbodies name
-	for (const JValue *part : drawn) {
-		const JValue *flex = part->Get("flexbodies");
-		if (flex == nullptr || !flex->IsArray()) continue;
-		for (const JValue &row : flex->items) {
-			if (!row.IsArray() || row.items.empty() || !row.items[0].IsString() || row.items[0].text == "mesh") continue;
-			std::string name = row.items[0].text;
-			strtolower(name);
-			wanted.insert(name);
-		}
-	}
-	std::vector<XmlNode> docs(daes.size() + common_daes.size());
-	std::map<std::string, Placed> placed;
+	out.docs.resize(daes.size() + common_daes.size());
+	std::map<std::string, Placed> &placed = out.placed;
 	for (size_t i = 0; i < daes.size(); i++) {
 		/* The shared ones when the car's own leave a mesh out. */
 		if (i + 1 == own_daes && std::ranges::any_of(wanted, [&placed](const std::string &n) { return !placed.contains(n); })) {
 			daes.insert(daes.end(), common_daes.begin(), common_daes.end());
 		}
 		std::vector<uint8_t> bytes = ReadModFile(v, daes[i]);
-		if (!ParseXml(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()), docs[i])) continue;
-		const XmlNode *collada = docs[i].Kid("COLLADA");
+		if (!ParseXml(std::string_view(reinterpret_cast<const char *>(bytes.data()), bytes.size()), out.docs[i])) continue;
+		const XmlNode *collada = out.docs[i].Kid("COLLADA");
 		if (collada == nullptr) continue;
 		double unit = 1;
 		bool y_up = false;
@@ -2911,6 +2996,28 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 			placed.emplace(key, std::move(p));
 		}
 	}
+	return true;
+}
+
+/**
+ * Read a car's model for drawing: the meshes its flexbodies name, each where its flexbody puts it ("pos", "rot" in
+ * degrees about x, y and z, "scale"; else where its node in the .dae is), in the frame of the vehicle objects; the
+ * materials' colours, textures and paint; the body's holes cut by its mask; the glass of its lights and where they are.
+ */
+bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
+{
+	JValue info = ParseJson(ReadModFile(v, "info.json"));
+	CarParts parts;
+	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts, make)) return false;
+	auto fr = _frames.find(v.Package() + "|" + v.folder + "|" + v.config);
+	const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
+
+	/* The parts drawn: those used, and the tarp of a flatbed, a part of the shape of its own. */
+	std::vector<const JValue *> drawn = parts.used;
+	if (parts.tarp != nullptr) drawn.push_back(parts.tarp);
+	CarDaes daes;
+	if (!ReadCarDaes(v, FlexbodyMeshes(drawn), daes)) return false;
+	const std::map<std::string, Placed> &placed = daes.placed;
 
 	std::map<std::string, CarMaterial> materials = ReadMaterials(v);
 	/* The glowing glass: a material of "glowMap" with its lights ("lowbeam", "highbeam": ahead; "brake": at the back). */
@@ -3088,40 +3195,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 					if (g.IsString()) drawn_groups.insert(g.text);
 				}
 			}
-			/* Its placing: "pos", "rot" (degrees, about x, then y, then z), "scale"; the node's matrix of the .dae before it. */
-			double pos[3] = {0, 0, 0}, rot[3] = {0, 0, 0}, scale[3] = {1, 1, 1};
-			for (size_t i = 1; i < row.items.size(); i++) {
-				const JValue &o = row.items[i];
-				if (!o.IsObject()) continue;
-				auto xyz = [&](const char *key, double *out) {
-					if (const JValue *p = o.Get(key); p != nullptr && p->IsObject()) {
-						out[0] = p->Get("x") != nullptr ? parts.Number(*p->Get("x"), out[0]) : out[0];
-						out[1] = p->Get("y") != nullptr ? parts.Number(*p->Get("y"), out[1]) : out[1];
-						out[2] = p->Get("z") != nullptr ? parts.Number(*p->Get("z"), out[2]) : out[2];
-					}
-				};
-				xyz("pos", pos);
-				xyz("rot", rot);
-				xyz("scale", scale);
-			}
-			/* Where its part's slots move it (the wheels out to their track). */
-			const auto moved = parts.Moved(part, pos[0], pos[1], pos[2]);
-			std::copy(moved.begin(), moved.end(), pos);
-			const double rx = rot[0] * M_PI / 180, ry = rot[1] * M_PI / 180, rz = rot[2] * M_PI / 180;
-			const Matrix mx = {1, 0, 0, 0, 0, std::cos(rx), -std::sin(rx), 0, 0, std::sin(rx), std::cos(rx), 0, 0, 0, 0, 1};
-			const Matrix my = {std::cos(ry), 0, std::sin(ry), 0, 0, 1, 0, 0, -std::sin(ry), 0, std::cos(ry), 0, 0, 0, 0, 1};
-			const Matrix mz = {std::cos(rz), -std::sin(rz), 0, 0, std::sin(rz), std::cos(rz), 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
-			Matrix place = Multiply(Multiply(mz, my), mx);
-			for (int r = 0; r < 3; r++) {
-				for (int c = 0; c < 3; c++) place[r * 4 + c] *= scale[c];
-				place[r * 4 + 3] = pos[r];
-			}
-			/* The units of its .dae and its up: metres, z up. */
-			const double unit = pl->second.unit;
-			Matrix units = IDENTITY;
-			units[0] = units[5] = units[10] = unit;
-			if (pl->second.y_up) units = {unit, 0, 0, 0, 0, 0, -unit, 0, 0, unit, 0, 0, 0, 0, 0, 1};
-			const Matrix m = Multiply(place, Multiply(units, pl->second.world));
+			const Matrix m = FlexbodyPlace(parts, part, row, pl->second);
 			std::vector<Triangles> geometry = ReadGeometry(*pl->second.geometry);
 			/* Lowered with its axle: a wheel's mesh, or one of the suspension wholly within a wheel of an axle's middle. */
 			double drop = own_axle != nullptr ? own_axle->drop : 0;
@@ -3204,38 +3278,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 		}
 		mark_tarp();
 	}
-	/*
-	 * Its wheels the mod leaves to BeamNG's own parts (the player, 26. 10.: the Škoda 1203 "has no wheels": its
-	 * "S1203_wheel_F", tyres and hubcaps are in none of its files): for each wheel no mesh hangs on, a wheel of its own on
-	 * its hub -- a tyre of the wheel's radius and a grey rim, between its two hub nodes.
-	 */
-	int made_wheels = 0;
-	for (const JValue *part : parts.used) {
-		for (const char *kind : {"pressureWheels", "hubWheels", "hubWheelsTSV", "pressureWheelsTSV"}) {
-			const JValue *wheels = part->Get(kind);
-			if (wheels == nullptr || !wheels->IsArray()) continue;
-			double r = 0.3, width = 0.17, hub = 0;
-			for (const JValue &row : wheels->items) {
-				if (row.IsObject()) {
-					for (const auto &[k, val] : row.members) {
-						if (k == "radius" && val.type == JValue::Type::Number) r = val.number;
-						if (k == "tireWidth" && val.type == JValue::Type::Number) width = val.number;
-						if (k == "hubRadius" && val.type == JValue::Type::Number) hub = val.number;
-					}
-					continue;
-				}
-				if (!row.IsArray() || row.items.size() < 5 || !row.items[0].IsString() || row.items[0].text == "name") continue;
-				if (!row.items[3].IsString() || !row.items[4].IsString()) continue;
-				const std::string hub_group = row.items[1].IsString() ? row.items[1].text : std::string();
-				const std::string tire_group = row.items[2].IsString() ? row.items[2].text : std::string();
-				if ((!hub_group.empty() && drawn_groups.contains(hub_group)) || (!tire_group.empty() && drawn_groups.contains(tire_group))) continue;
-				auto n1 = parts.nodes.find(row.items[3].text), n2 = parts.nodes.find(row.items[4].text);
-				if (n1 == parts.nodes.end() || n2 == parts.nodes.end()) continue;
-				AddBeamngWheel(mesh, frame, n1->second, n2->second, r, width, hub > 0 ? hub : r * 0.62);
-				made_wheels++;
-			}
-		}
-	}
+	const int made_wheels = AddCarWheels(parts, drawn_groups, frame, mesh);
 	if (mesh.tri.empty()) return false;
 	/* The paint's triangles into their materials' cells of its texture: each where it is in its own picture (one beyond
 	 * its edge moved back whole into it), then in the cell. */
@@ -3289,4 +3332,96 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 	Debug(misc, 1, "BeamNG {}: {} meshes ({} not in the model), {} wheels of the game's own, {} triangles ({} in the model), {} materials, {} of glass, lights {} ahead and {} at the back",
 			v.name, meshes, missing, made_wheels, mesh.tri.size() / 3, full, mesh.materials.size(), mesh.night_tri.size() / 3, mesh.front_lights.size() / 3, mesh.back_lights.size() / 3);
 	return true;
+}
+
+/**
+ * How long a car is (along x of the frame of the vehicle objects), metres, as its model reaches: of a configuration,
+ * and of a make of our 1203 (BeamngModel::make, -1 none). The corners of its meshes and its wheels alone, none of its
+ * textures and paint read (ReadBeamngShape()): the length of every car is asked when a new game starts (the depot
+ * window's sizes, before the window of the generating comes up), and each of the 36 cars of our 1203s read whole for
+ * it held the player's phone there for minutes (#306). So all the configurations and makes of its folder at once,
+ * its .dae files read once, and kept for as long as the game runs. One thread at a time, as ReadBeamngShape().
+ * @return 0: not known (no model)
+ */
+float BeamngLength(const BeamngVehicle &v, int make)
+{
+	static std::map<std::string, float> known;
+	const auto start = std::chrono::steady_clock::now();
+	auto key_of = [](const BeamngVehicle &b, int m) { return fmt::format("{}|{}|{}|{}", b.Package(), b.folder, b.config, m); };
+	if (auto it = known.find(key_of(v, make)); it != known.end()) return it->second;
+
+	/* The cars of the folder: each configuration, as it is and as each of its makes. */
+	std::vector<std::pair<const BeamngVehicle *, int>> cars;
+	for (const BeamngVehicle &b : FindBeamngVehicles()) {
+		if (b.Package() != v.Package() || b.folder != v.folder) continue;
+		cars.emplace_back(&b, -1);
+		std::set<int> makes;
+		for (const BeamngModel &m : b.models) {
+			if (m.make >= 0 && makes.insert(m.make).second) cars.emplace_back(&b, m.make);
+		}
+	}
+	if (std::ranges::none_of(cars, [&](const auto &c) { return c.first->config == v.config && c.second == make; })) cars.emplace_back(&v, make);
+
+	/* Their parts drawn (ReadBeamngShape(): those used and the tarp), read twice -- the parts of every car kept would be
+	 * the jbeam of the folder over and over -- and the meshes all of them name, the model read once for all. */
+	JValue info = ParseJson(ReadModFile(v, "info.json"));
+	auto drawn_of = [](const CarParts &parts) {
+		std::vector<const JValue *> drawn = parts.used;
+		if (parts.tarp != nullptr) drawn.push_back(parts.tarp);
+		return drawn;
+	};
+	std::set<std::string> wanted;
+	for (const auto &[b, m] : cars) {
+		CarParts parts;
+		if (!ReadCarParts(*b, info.IsObject() ? &info : nullptr, parts, m)) continue;
+		wanted.merge(FlexbodyMeshes(drawn_of(parts)));
+	}
+	CarDaes daes;
+	const bool modelled = ReadCarDaes(v, wanted, daes);
+	std::map<const XmlNode *, std::vector<float>> corners; // of a geometry, x, y, z each
+	for (const auto &[b, m] : cars) {
+		float &length = known[key_of(*b, m)];
+		CarParts parts;
+		if (!modelled || !ReadCarParts(*b, info.IsObject() ? &info : nullptr, parts, m)) continue;
+		auto fr = _frames.find(b->Package() + "|" + b->folder + "|" + b->config);
+		const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
+		double lo = std::numeric_limits<double>::infinity(), hi = -lo;
+		std::set<std::string> drawn_groups;
+		for (const JValue *part : drawn_of(parts)) {
+			const JValue *flex = part->Get("flexbodies");
+			if (flex == nullptr || !flex->IsArray()) continue;
+			for (const JValue &row : flex->items) {
+				if (!row.IsArray() || row.items.empty() || !row.items[0].IsString() || row.items[0].text == "mesh") continue;
+				std::string mesh_name = row.items[0].text;
+				strtolower(mesh_name);
+				auto pl = daes.placed.find(mesh_name);
+				if (pl == daes.placed.end()) continue;
+				if (row.items.size() > 1 && row.items[1].IsArray()) {
+					for (const JValue &g : row.items[1].items) {
+						if (g.IsString()) drawn_groups.insert(g.text);
+					}
+				}
+				auto [c, added] = corners.try_emplace(pl->second.geometry);
+				if (added) {
+					for (const Triangles &t : ReadGeometry(*pl->second.geometry)) c->second.insert(c->second.end(), t.pos.begin(), t.pos.end());
+				}
+				/* Along the car: BeamNG's y backwards, the object's x forwards (ToObject()). */
+				const Matrix place = FlexbodyPlace(parts, part, row, pl->second);
+				for (size_t k = 0; k + 2 < c->second.size(); k += 3) {
+					const double x = -(place[4] * c->second[k] + place[5] * c->second[k + 1] + place[6] * c->second[k + 2] + place[7] - frame.mid_y);
+					lo = std::min(lo, x);
+					hi = std::max(hi, x);
+				}
+			}
+		}
+		BeamngMesh wheels;
+		AddCarWheels(parts, drawn_groups, frame, wheels);
+		for (size_t k = 0; k + 2 < wheels.pos.size(); k += 3) {
+			lo = std::min<double>(lo, wheels.pos[k]);
+			hi = std::max<double>(hi, wheels.pos[k]);
+		}
+		if (hi > lo) length = static_cast<float>(hi - lo);
+	}
+	Debug(misc, 1, "BeamNG {}: the lengths of the {} cars of its folder in {} ms", v.id, cars.size(), std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
+	return known[key_of(v, make)];
 }

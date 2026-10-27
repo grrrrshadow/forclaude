@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (37) – #306 zamrzá při „Vytvořit novou krajinu“
+
+Hráč: „#306 build dvakrat zamrznul při generovani nove hry“, „zamrzlo to zas při vyzvořit novou krajinu ani to
+nezačne generovat“, „tam se asi ještě nečte auto, tam ještě neni načteny ani prumysl, vubec to nedojde ke generovani“.
+
+- Příčina: po načtení GRF (u hráče dvě kola, Karibik se vypne) a ještě před oknem generování `GenerateWorld` →
+  `ResetWindowSystem` → velikosti okna depa ptá každé auto na obrázek, ten na délku z objektu (`Length()`) a u aut
+  BeamNG se kvůli délce četl celý model se všemi texturami a lakem. Od 7755a87 má každá značka 1203 vlastní objekt,
+  takže 36 celých modelů na hlavním vlákně hry (v rigu 37 s, na telefonu minuty a stovky MB paměti).
+- Oprava: délka auta BeamNG jen z rohů jeho dílů a kol (`BeamngLength()`), bez textur; všechny konfigurace a značky
+  jedné složky naráz (.dae čtené jednou) a pamatované po celý běh hry. Rig (GRF, která se vypne jako Karibik):
+  nová hra za 2 s místo 37 s, 57 délek 1203 za 1,5 s; délky sedí s kresleným modelem (4,549 m proti 4,54).
+
 ## 27. 10. (36) – Otočená mapa kartou 2, kus 4: krabice, mosty a depa kartou (rig)
 
 - Hráč: *„jo pokračuj“*.

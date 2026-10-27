@@ -198,6 +198,22 @@ static std::string BeamngObjectFile(const BeamngVehicle &b, int make)
 	return file;
 }
 
+/** The car of BeamNG an object is drawn from (BeamngObjectFile()) and the make of our 1203, -1 none; nullptr none. */
+static std::pair<const BeamngVehicle *, int> BeamngCarOf(std::string_view file)
+{
+	if (!file.starts_with("beamng:")) return {nullptr, -1};
+	for (const BeamngVehicle &b : FindBeamngVehicles()) {
+		if (file == BeamngObjectFile(b, -1)) return {&b, -1};
+		for (const BeamngModel &m : b.models) {
+			if (m.make >= 0 && file == BeamngObjectFile(b, m.make)) return {&b, m.make};
+		}
+	}
+	return {nullptr, -1};
+}
+
+/** The mods of BeamNG read one thread at a time (ReadBeamngShape(), BeamngLength()): the .zip files they are in are opened once, for all. */
+static std::mutex _beamng_mutex;
+
 /** The most texels a side a painted material of a car of BeamNG has in the body's texture (BeamngMesh::PaintSource): four of them 2048 x 2048. */
 static constexpr int PAINT_CELL_MOST = 1024;
 
@@ -6111,19 +6127,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->file.starts_with("beamng:")) {
 		/* A car of a mod of BeamNG (beamng.h): its materials as they are, the paint first, white; its lights of the mod.
 		 * One at a time: the zips of the mods are opened as they are read (beamng.cpp), and this may be either thread. */
-		static std::mutex beamng_mutex;
-		std::lock_guard beamng_lock(beamng_mutex);
-		const BeamngVehicle *car = nullptr;
-		int make = -1;
-		for (const BeamngVehicle &b : FindBeamngVehicles()) {
-			if (this->file == BeamngObjectFile(b, -1)) car = &b;
-			for (const BeamngModel &m : b.models) {
-				if (m.make >= 0 && this->file == BeamngObjectFile(b, m.make)) {
-					car = &b;
-					make = m.make;
-				}
-			}
-		}
+		std::lock_guard beamng_lock(_beamng_mutex);
+		const auto [car, make] = BeamngCarOf(this->file);
 		BeamngMesh bm;
 		if (car == nullptr || !ReadBeamngShape(*car, bm, make)) return nullptr;
 		auto made = std::make_shared<ThreeDVehicleShape>();
@@ -6901,6 +6906,15 @@ bool ThreeDVehicleObject::HasDetails() const
 float ThreeDVehicleObject::Length() const
 {
 	if (this->length_m > 0) return this->length_m;
+	/* A car of BeamNG: as long as its model reaches, its model not read to draw (BeamngLength(): every car is asked when
+	 * a new game starts). */
+	if (this->file.starts_with("beamng:")) {
+		std::lock_guard beamng_lock(_beamng_mutex);
+		const auto [car, make] = BeamngCarOf(this->file);
+		if (car != nullptr) {
+			if (const float length = BeamngLength(*car, make); length > 0) return length;
+		}
+	}
 	const ThreeDVehicleShape *shape = this->GetShape();
 	return shape != nullptr ? shape->x1 - shape->x0 : 0.0f;
 }
