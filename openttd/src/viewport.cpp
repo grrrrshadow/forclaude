@@ -10378,10 +10378,12 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureMode
 	 * way gone; one not read yet is left out this frame. */
 	model.crew.clear();
 	const std::vector<ThreeDWalkingCrew> &walking = fig->WalkingCrew();
+	size_t slot = 0;
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, model.parts)) continue;
-		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(k < 8 ? static_cast<int>((fg.walk >> (8 * k)) & 0xFF) : 0);
+		const size_t shown = slot++;
+		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(shown < 8 ? static_cast<int>((fg.walk >> (8 * shown)) & 0xFF) : 0);
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
 		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}};

@@ -459,8 +459,9 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
 /**
  * The frames of the crew that walks (ThreeDVehicleObject::WalkingCrew()) the state shows, the way gone so far (the
  * colleague's hra/3d/PROSBA-SPECIAL-3D.md): a round of a figure's frames each "krok_m" of its own as big as it is drawn,
- * forward as it faces; the frame of the k-th in the bits 8k to 8k + 7, of the first eight. Standing, a figure stays in
- * its step.
+ * forward as it faces; the frame of the k-th of those the state shows in the bits 8k to 8k + 7, of the first eight (of
+ * all its crew that walks, the colleague's Special 3D v3 has seven girls in three groups each). Standing, a figure
+ * stays in its step.
  * @param walked the way gone as drawn (EyeTrail::walked), world units
  * @param scale the object's metres to the game's
  */
@@ -471,16 +472,18 @@ static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walke
 	const ThreeDParts parts = obj->PartsOf(state);
 	const float turn = StateTurn(obj, state);
 	uint64_t code = 0;
-	for (size_t k = 0; k < walking.size() && k < 8; k++) {
+	size_t slot = 0;
+	for (size_t k = 0; k < walking.size() && slot < 8; k++) {
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
+		const size_t shown = slot++;
 		const ThreeDVehicleObject &f = *w.figure;
 		const double step = f.walk_step * scale * w.scale * UNITS_PER_METRE;
 		if (step <= 0 || f.frames < 2) continue;
 		/* Facing back as it goes (turned round in the vehicle, or the vehicle turned round), it walks back. */
 		const double rounds = (std::cos((turn + w.turn) * M_PI / 180.0) < 0 ? -walked : walked) / step;
 		const int frame = std::clamp(static_cast<int>((rounds - std::floor(rounds)) * f.frames), 0, f.frames - 1);
-		code |= static_cast<uint64_t>(std::min(frame, 255)) << (8 * k);
+		code |= static_cast<uint64_t>(std::min(frame, 255)) << (8 * shown);
 	}
 	return code;
 }
@@ -1340,10 +1343,12 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		}
 	};
 	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
+	size_t slot = 0;
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
+		const size_t shown = slot++;
+		const ThreeDVehicleShape *fs = w.figure->GetShape(shown < 8 ? static_cast<int>((walk >> (8 * shown)) & 0xFF) : 0);
 		if (fs != nullptr) add_piece(w.figure, fs, w.at, w.turn, w.scale, 0);
 	}
 	/* The pieces of the shared loads on its bed (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): each where it
@@ -1895,10 +1900,12 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	/* The crew that walks: each figure the state shows at its frame of the way gone, turned, sized and stood at its
 	 * place in the vehicle's frame, then as the vehicle; its textures as they are. */
 	const std::vector<ThreeDWalkingCrew> &walking = obj.WalkingCrew();
+	size_t slot = 0;
 	for (size_t k = 0; k < walking.size(); k++) {
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(k < 8 ? static_cast<int>((walk >> (8 * k)) & 0xFF) : 0);
+		const size_t shown = slot++;
+		const ThreeDVehicleShape *fs = w.figure->GetShape(shown < 8 ? static_cast<int>((walk >> (8 * shown)) & 0xFF) : 0);
 		if (fs == nullptr) continue;
 		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
 		auto crew_to = [&cam, &w, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {

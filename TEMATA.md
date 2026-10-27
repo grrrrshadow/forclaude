@@ -84,6 +84,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   `<jmeno>/<pohyb>`, v posádce `postava` + `poza`. Rig: všechny tři holky ve všech pohybech; V3S s `college_girl` +
   `za_volantem` sedí jako dnešní řidička. Staré pózy v `postavy` zůstávají, dokud je balíčky používají.
 - Zvlastni_vozy_3D v2 (kolega): Autosan STUD, za jízdy GRF vybere stav s lavicí (sprite 1233), řidičky hry. Rig sedí.
+- Hráč: *„special sel až v #304 buildu. piše grrrrf? ma hotovo ? co nema hotove?“*. Kolega: další holky na kostře
+  (char16, Vivi, Cute Cartoon, Female Girl; převzato) a Special 3D v3 (7 holek hry v konfigurátoru, jen jejich pohyby s
+  vozíkem v balíčku). Oprava: snímek chůze posádky se ukládal jen pro prvních 8 chodících celé posádky; Special v3 jich
+  má přes 20 (7 holek × 3 skupiny), Vivi a další stály. Teď se počítají jen chodící, které stav ukazuje. Girl #16 má
+  textury v JPEG, hra čte PNG: šedá, kolegovi. Nehotové u kolegy: balíčky Tater, V3S, Vagonů bez holek s pózami kabin,
+  staré pózy na kostru, dvě lavice za sebou (Tatry v5).
 - Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
   `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
   na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.

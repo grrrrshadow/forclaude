@@ -36,6 +36,54 @@
   "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
  },
  {
+  "soubor": "char16.glb",
+  "jmeno": "char16",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.62,
+  "vyska_kycli": 0.9537,
+  "trojuhelniku": 14259,
+  "autor": "character girl #16 (FBX), BELAZ (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést BELAZ)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "vivi.glb",
+  "jmeno": "vivi",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.58,
+  "vyska_kycli": 0.9003,
+  "trojuhelniku": 20000,
+  "autor": "Vivi manga student girl style, daydev (Sketchfab, CC BY-NC-SA 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY-NC-SA 4.0 (uvést daydev)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "cute_cartoon.glb",
+  "jmeno": "cute_cartoon",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.55,
+  "vyska_kycli": 0.84,
+  "trojuhelniku": 11873,
+  "autor": "Cute Cartoon Girl, Chenchanchong (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést Chenchanchong)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "female_girl.glb",
+  "jmeno": "female_girl",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.62,
+  "vyska_kycli": 0.8769,
+  "trojuhelniku": 20000,
+  "autor": "Female Girl, Ezau954gamer (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést Ezau954gamer)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
   "soubor": "dzoint.glb",
   "jmeno": "dzoint",
   "druh": "predmet",

@@ -160,8 +160,9 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   Mat točí pivo ze sudu u grilu na stadionu (`mat_toci`) a řídí hasičskou Tatru (`mat_ridi`). Chimata (Chimata for
   Touhou Multi Scroll Shooting 2, skydash, Sketchfab, CC BY 4.0, otočená, textury nejvýš 1024 px) čeká na interiéry.
 - `humanoidi/` – holky hry s jednou kostrou (22 kostí se jmény jako v Mixamu; od kolegy, grrrrf
-  `hra/3d/objekty/humanoidi/`): College Girl (Rotmill), Galaxia anime girl (Tatenashi) a pubg Girl (iysif), všechny
-  Sketchfab, CC BY 4.0. Pohyby v `humanoid_pohyby.glb` (stojí, sedí, za volantem, chůze, kouří s velkým džointem
+  `hra/3d/objekty/humanoidi/`): College Girl (Rotmill), Galaxia anime girl (Tatenashi), pubg Girl (iysif), character
+  girl #16 (BELAZ), Cute Cartoon Girl (Chenchanchong) a Female Girl (Ezau954gamer), Sketchfab, CC BY 4.0; Vivi manga
+  student girl (daydev, Sketchfab, **CC BY-NC-SA 4.0**: jen nekomerčně, obrázky s ní pod stejnou licencí). Pohyby v `humanoid_pohyby.glb` (stojí, sedí, za volantem, chůze, kouří s velkým džointem
   `dzoint.glb` v ruce) hra nasadí na každou podle jmen kostí: postava `<jmeno>/<pohyb>`, v posádce `postava` a `poza`.
   Pohyby se stejnou kostrou může přinést i balíček vozidla (`druh` `pohyby`, pózy jeho sedadel), hledají se napřed tam.
 - Domy se hledají podle čísla, v kterémkoli klimatu: i v tematickém městě
