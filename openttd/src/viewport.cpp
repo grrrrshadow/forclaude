@@ -10620,9 +10620,9 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 			const double wa = at.turn * M_PI / 180.0, wc = std::cos(wa), ws = std::sin(wa);
 			auto load_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
 				const double fx0 = ls.pos[i * 3], fy0 = ls.pos[i * 3 + 1];
-				px = at.at[0] + fx0 * wc - fy0 * ws;
-				py = at.at[1] + fx0 * ws + fy0 * wc;
-				pz = at.at[2] + ls.pos[i * 3 + 2];
+				px = at.at[0] + (fx0 * wc - fy0 * ws) * at.scale;
+				py = at.at[1] + (fx0 * ws + fy0 * wc) * at.scale;
+				pz = at.at[2] + ls.pos[i * 3 + 2] * at.scale;
 				if (load_lit) {
 					const double n0 = ls.nrm[i * 3], n1 = ls.nrm[i * 3 + 1];
 					nx = n0 * wc - n1 * ws;
@@ -10731,7 +10731,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 	for (const CabFigureModel::Load &load : model.loads) {
 		for (const ThreeDLoadPlace &at : load.places) {
 			const M3 lt = about_z(at.turn);
-			mesh(*load.shape, load.texs, lt, {at.at[0], at.at[1], at.at[2]}, lt);
+			mesh(*load.shape, load.texs, mul(lt, M3{at.scale, 0, 0, 0, at.scale, 0, 0, 0, at.scale}), {at.at[0], at.at[1], at.at[2]}, lt);
 		}
 	}
 	return true;

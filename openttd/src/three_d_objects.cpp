@@ -2549,6 +2549,28 @@ static std::string FigureNamed(const nlohmann::json &f)
 	return name;
 }
 
+/**
+ * The figures riding on a vehicle or sitting on a piece of a load ("posadka", "posadky"): each "postava" at its
+ * "poloha", turned ("otoceni"), bigger than it is by "meritko" (the girls on a lorry's back), at the driver's seat
+ * ("misto_ridicky"). The figure is the vehicle's package's, else the game's (GetThreeDFigure()).
+ */
+static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out)
+{
+	if (!list.is_array()) return;
+	for (const auto &c : list) {
+		if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
+		ThreeDVehicleCrew crew;
+		crew.figure = FigureNamed(c);
+		const auto &at = c.at("poloha");
+		if (!at.is_array() || at.size() != 3) continue;
+		for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+		crew.turn = c.value("otoceni", 0.0f);
+		crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
+		crew.driver_seat = c.value("misto_ridicky", false);
+		out.push_back(std::move(crew));
+	}
+}
+
 /** The figures standing on a building ("postavy") and its doors ("dvere"). */
 /** A figure of a list ("postava", "poza", "poloha", "otoceni", "meritko"); whether it is one. */
 static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
@@ -3703,7 +3725,9 @@ static void ReadLoadBed(const nlohmann::json &e, ThreeDLoadBed &bed)
 /**
  * A piece of the shared loads ("druh": "naklad", the colleague's objekty/naklady): a file of its own, coloured over
  * its mask ("barvy") by the cargo -- each colour of its table ("naklady") a state of its figure, as a vehicle's paint
- * --, or an animal of "zvirata" standing ("uzel" its frame).
+ * --, or an animal of "zvirata" standing ("uzel" its frame); and the figures of the game on its seats ("posadka":
+ * the girls on a bench, the player, 27. 10.: "the game will have the girls of the loads and the bench they sit on"),
+ * without a file of its own only them (the girls standing on a lorry's back).
  */
 static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, const std::string &package)
 {
@@ -3722,6 +3746,7 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 			}
 		}
 	}
+	if (e.contains("posadka")) ReadCrew(e.at("posadka"), piece.seats);
 	ThreeDVehicleObject fig;
 	if (e.contains("soubor") && e.at("soubor").is_string()) {
 		fig.package = package;
@@ -3743,7 +3768,7 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 		const std::string prefix = last == std::string::npos ? std::string() : node.substr(0, last + 1);
 		piece.frame = last + 1 < node.size() ? ParseInteger<int>(node.substr(last + 1), 10).value_or(0) : 0;
 		piece.figure = piece.animal + "/" + (prefix.ends_with("_") ? prefix.substr(0, prefix.size() - 1) : prefix);
-	} else {
+	} else if (piece.seats.empty()) {
 		return;
 	}
 	/* Its colours by the cargo: each a state of the figure, the paint's colour over its mask. */
@@ -4377,23 +4402,8 @@ static void ReadThreeDVehicleObjects()
 						}
 					}
 				}
-				/* The crew: figures riding in it, never fading; bigger than they are by "meritko" (the girls on a lorry's back). */
-				auto read_crew = [](const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out) {
-					if (!list.is_array()) return;
-					for (const auto &c : list) {
-						if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
-						ThreeDVehicleCrew crew;
-						crew.figure = FigureNamed(c);
-						const auto &at = c.at("poloha");
-						if (!at.is_array() || at.size() != 3) continue;
-						for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
-						crew.turn = c.value("otoceni", 0.0f);
-						crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
-						crew.driver_seat = c.value("misto_ridicky", false);
-						out.push_back(std::move(crew));
-					}
-				};
-				if (e.contains("posadka")) read_crew(e.at("posadka"), obj.crew);
+				/* The crew: figures riding in it, never fading. */
+				if (e.contains("posadka")) ReadCrew(e.at("posadka"), obj.crew);
 				/* The parts a state shows (the colleague's hra/3d/PROSBA-V3S-3D.md): each node of each add-on, then each
 				 * group of the crew; part 0 is what is always drawn. */
 				obj.part_names.assign(1, std::string());
@@ -4427,7 +4437,7 @@ static void ReadThreeDVehicleObjects()
 				if (e.contains("posadky") && e.at("posadky").is_object()) {
 					for (const auto &[group, list] : e.at("posadky").items()) {
 						std::vector<ThreeDVehicleCrew> crew;
-						read_crew(list, crew);
+						ReadCrew(list, crew);
 						obj.part_names.push_back("posadky/" + group);
 						obj.crew_groups.emplace_back(group, std::move(crew));
 					}

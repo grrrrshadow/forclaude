@@ -179,7 +179,8 @@ static const Vehicle *PieceAway(const Vehicle *v, int steps);
  * body): how many pieces -- of those its bed takes, as many as it is loaded (the colleague: "half the load, half the
  * pallets"), at least one with any cargo; its bed full in the purchase list -- and of which cargo, made one with the
  * state (ThreeDVehicleObject::ComposeState()). The pieces a layer puts on their places ("misto") are there whatever is
- * loaded, only of its cargo's colour.
+ * loaded, only of its cargo's colour. Of pieces with seats (a bench of the girls) the count is of the figures on the
+ * seats of all of them, the benches all there.
  * @param v the piece of the vehicle the cargo is in, nullptr in the purchase list
  * @return the count above the cargo's label, 0 none
  */
@@ -196,13 +197,13 @@ static uint64_t LoadCode(const ThreeDVehicleObject *obj, const std::vector<int> 
 		if (!s.placed_loads.empty()) placed = true;
 	}
 	const ThreeDLoadPiece *piece = !name.empty() && bed.Given() ? GetThreeDLoadPiece(name) : nullptr;
-	const int capacity = piece != nullptr ? ThreeDLoadCapacity(*piece, bed) : 0;
+	const int capacity = piece != nullptr ? ThreeDLoadCapacity(*piece, bed) * std::max<int>(1, static_cast<int>(piece->seats.size())) : 0;
 	if (capacity <= 0 && !placed) return 0;
-	int count = capacity;
+	int count = std::min(capacity, 255);
 	CargoType cargo = INVALID_CARGO;
 	if (v != nullptr) {
 		const uint stored = v->cargo.StoredCount(), cap = v->cargo_cap;
-		count = cap == 0 || capacity <= 0 ? 0 : std::clamp<int>(static_cast<int>((static_cast<uint64_t>(stored) * capacity + cap / 2) / cap), stored > 0 ? 1 : 0, capacity);
+		count = cap == 0 || capacity <= 0 ? 0 : std::clamp<int>(static_cast<int>((static_cast<uint64_t>(stored) * capacity + cap / 2) / cap), stored > 0 ? 1 : 0, std::min(capacity, 255));
 		cargo = v->cargo_type;
 	} else if (const Engine *e = Engine::GetIfValid(engine); e != nullptr) {
 		cargo = e->GetDefaultCargoType();
@@ -293,25 +294,41 @@ bool GetThreeDLoadPieces(const ThreeDVehicleState *st, std::vector<ThreeDLoadPie
 {
 	out.clear();
 	if (st == nullptr || !st->bed.Given()) return false;
-	/* The kind of a piece in a colour, those of one kind together. */
-	auto kind_of = [&out, st](const ThreeDLoadPiece &piece, uint32_t colour) -> ThreeDLoadPieces * {
-		const ThreeDVehicleObject *fig = GetThreeDFigure(piece.figure);
+	/* The kind of a figure in a frame and a state, those of one kind together. */
+	auto kind = [&out](const ThreeDVehicleObject *fig, int frame, int state) -> ThreeDLoadPieces * {
 		if (fig == nullptr) return nullptr;
-		const int state = ThreeDLoadColourState(piece, st->load_label, colour);
 		for (ThreeDLoadPieces &k : out) {
-			if (k.fig == fig && k.frame == piece.frame && k.state == state) return &k;
+			if (k.fig == fig && k.frame == frame && k.state == state) return &k;
 		}
 		ThreeDLoadPieces &k = out.emplace_back();
 		k.fig = fig;
-		k.frame = piece.frame;
+		k.frame = frame;
 		k.state = state;
 		return &k;
 	};
-	if (const ThreeDLoadPiece *piece = st->load_count > 0 ? GetThreeDLoadPiece(st->load_piece) : nullptr; piece != nullptr) {
-		if (ThreeDLoadPieces *k = kind_of(*piece, st->load_colour); k != nullptr) {
-			std::vector<ThreeDLoadPlace> places;
-			ThreeDLoadPlaces(*piece, st->bed, st->load_count, places);
-			k->places.insert(k->places.end(), places.begin(), places.end());
+	/* Of a piece, in a colour. */
+	auto kind_of = [&kind, st](const ThreeDLoadPiece &piece, uint32_t colour) -> ThreeDLoadPieces * {
+		if (piece.figure.empty()) return nullptr;
+		return kind(GetThreeDFigure(piece.figure), piece.frame, ThreeDLoadColourState(piece, st->load_label, colour));
+	};
+	const ThreeDLoadPiece *piece = st->load_piece.empty() ? nullptr : GetThreeDLoadPiece(st->load_piece);
+	if (piece != nullptr && (st->load_count > 0 || !piece->seats.empty())) {
+		/* Pieces with seats (the benches of the girls) all, as many as the bed takes, empty too when the state shows them;
+		 * the others as many as are loaded. */
+		std::vector<ThreeDLoadPlace> places;
+		ThreeDLoadPlaces(*piece, st->bed, piece->seats.empty() ? st->load_count : ThreeDLoadCapacity(*piece, st->bed), places);
+		if (ThreeDLoadPieces *k = kind_of(*piece, st->load_colour); k != nullptr) k->places.insert(k->places.end(), places.begin(), places.end());
+		/* The figures on their seats, as many as are loaded, from the front bench on, each bench's seats in their order. */
+		int figures = piece->seats.empty() ? 0 : st->load_count;
+		for (const ThreeDLoadPlace &at : places) {
+			const float a = at.turn * static_cast<float>(M_PI) / 180.0f, c = std::cos(a), s = std::sin(a);
+			for (const ThreeDVehicleCrew &seat : piece->seats) {
+				if (figures <= 0) break;
+				figures--;
+				ThreeDLoadPieces *k = kind(GetThreeDFigure(seat.figure), 0, 0);
+				if (k == nullptr) continue;
+				k->places.push_back({{at.at[0] + seat.at[0] * c - seat.at[1] * s, at.at[1] + seat.at[0] * s + seat.at[1] * c, at.at[2] + seat.at[2]}, at.turn + seat.turn, seat.scale});
+			}
 		}
 	}
 	for (const ThreeDPlacedLoad &placed : st->placed_loads) {
@@ -1334,7 +1351,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	if (std::vector<ThreeDLoadPieces> loads; GetThreeDLoadPieces(st, loads)) {
 		for (const ThreeDLoadPieces &load : loads) {
 			if (const ThreeDVehicleShape *ls = load.fig->GetShape(load.frame); ls != nullptr) {
-				for (const ThreeDLoadPlace &at : load.places) add_piece(load.fig, ls, at.at, at.turn, 1.0f, load.state);
+				for (const ThreeDLoadPlace &at : load.places) add_piece(load.fig, ls, at.at, at.turn, at.scale, load.state);
 			}
 		}
 	}
@@ -1907,8 +1924,11 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	GetThreeDLoadPieces(st, loads);
 	for (const ThreeDLoadPieces &load : loads) {
 		if (const ThreeDVehicleShape *ls = load.fig->GetShape(load.frame); ls != nullptr) {
+			/* Its textures as fine as its biggest one needs (a girl on a bench twice her size). */
+			float biggest = 1.0f;
+			for (const ThreeDLoadPlace &at : load.places) biggest = std::max(biggest, at.scale);
 			int load_level = 0;
-			for (float d = TexelsPerMetre(*load.fig, *ls); d >= 2.0f * p && load_level < 12; d /= 2.0f) load_level++;
+			for (float d = TexelsPerMetre(*load.fig, *ls); d >= 2.0f * p * biggest && load_level < 12; d /= 2.0f) load_level++;
 			std::shared_ptr<const ThreeDGpuTriangles> triangles = ThreeDGpuTrianglesOf(*ls, 0, false, ls->pngs.size());
 			std::vector<const ThreeDObjectTexture *> textures(triangles->used.size(), nullptr);
 			for (size_t i = 0; i < textures.size(); i++) {
@@ -1926,7 +1946,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			for (const ThreeDLoadPlace &at : load.places) {
 				const float wa = at.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
 				auto piece_to = [&cam, &at, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
-					cam.Place(at.at[0] + fx0 * wc - fy0 * ws, at.at[1] + fx0 * ws + fy0 * wc, at.at[2] + fz0, ox, oy, od);
+					cam.Place(at.at[0] + (fx0 * wc - fy0 * ws) * at.scale, at.at[1] + (fx0 * ws + fy0 * wc) * at.scale, at.at[2] + fz0 * at.scale, ox, oy, od);
 				};
 				ThreeDGpuMesh &m = pic.meshes.emplace_back();
 				m.shape = ls;

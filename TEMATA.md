@@ -43,6 +43,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Na kolegovi: smazat glb holek z balíčků, holky Tater (uzly v `nt_holky_*`) rozepsat na místa, pózy na míru
   (`college_girl_ridi_v3s`, `galaxia_v3s`) buď pózy hry, nebo jednou do sady `postavy`. SPECIAL (tlačí, táhnou) zatím
   zůstává. Čeká se, jestli kolegovi píšu já, nebo hráč.
+- Hráč: *„holky z nákladů bude mít hra a lavičku na kterych sedí taky a dame na návěs valnik dvě lavičky zasebou se
+  vejdou“*, *„napiš mu rady a porady jak na to, ja mu pujdu řict že holky bude ingame“*: grrrrf
+  `hra/3d/HOLKY-VE-HRE-JAK-NA-TO.md` (8190104).
+- **Místa v kusu nákladu** (three_d_objects.cpp, three_d_vehicle_object.cpp, viewport.cpp): záznam kusu má `posadka`
+  (jako posádka vozidla, v rámu kusu). Kusů s místy (lavice) stojí tolik, kolik se vejde, i prázdných, když je stav
+  ukazuje. Náklad počítá holky (místa všech lavic), sedají od předu v pořadí míst. Kus bez `soubor` jsou jen místa
+  (stojící studentky). Velikost `meritko` místa platí na mapě, kartě i z očí.
+- Rig se zkušebními místy na kládách V3S (jen v buildu): holky 2× i 1×, mapa, karta i kresli. Hráč: *„naproti holky až
+  k bočnici. jsou uprostřed sedi mimo“*, *„maš v3s naloženou dřevem hlavně“* (klády byly jen náhrada lavice) →
+  druhá zkouška naproti sobě u bočnic; kolegovi do lavice: naproti sobě, až k bočnici.
 
 ## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
 
