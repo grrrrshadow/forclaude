@@ -2172,8 +2172,10 @@ void TurnedTimingsPrint()
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
 	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_apart, t.standing_card_ms);
 	/* With a window the console is not written out: the diary too (the rig). */
-	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {}, spritu {}, budov {} ({} trojuhelniku), zvlast procesorem {}, karta {:.1f} ms",
-			t.drawn, t.standing, t.models, t.standing_card, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_apart, t.standing_card_ms);
+	extern uint64_t _turned_card_view_passes;
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_apart, t.standing_card_ms);
+	_turned_card_view_passes = 0;
 	extern void TurnedGroundTimingsPrint();
 	TurnedGroundTimingsPrint();
 	_turned_times = TurnedTimes();
@@ -5306,6 +5308,8 @@ struct TurnedCardGround {
 	std::vector<uint8_t> have;     ///< each pixel: laid
 };
 static TurnedCardGround _turned_card_ground;
+/** The whole turned main view being drawn for the card (TurnedViewWholeOnCard()): into a picture of its own, not the screen. */
+static bool _turned_whole_view_pass = false;
 bool _turned_card_ground_on = true; ///< Rig: the ground of the turned main view shown straight from the card (test3d zem ukaz); else read back into the screen
 /**
  * Rig: what stands on the turned main view laid by the card over its ground, shown straight from it (ThreeDGpuStanding;
@@ -5332,8 +5336,8 @@ static void HideTurnedCardGround()
 static bool TurnedCardGroundUsable(const DrawPixelInfo &frame)
 {
 	if (!_turned_card_ground_on || _turned_vp == nullptr || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return false;
-	/* Not into a screenshot. */
-	if (_screen_disable_anim || frame.dst_ptr == nullptr) return false;
+	/* Not into a screenshot; but the whole view drawn for the card (TurnedViewWholeOnCard()), drawn nowhere else. */
+	if ((_screen_disable_anim && !_turned_whole_view_pass) || frame.dst_ptr == nullptr) return false;
 	const Window *main = GetMainWindow();
 	if (main == nullptr || main->viewport == nullptr || static_cast<const Viewport *>(main->viewport.get()) != _turned_vp) return false;
 	/* The blitter that draws over a hole as over what shows through it (Blitter_40bppAnim::ComposeOver()). */
@@ -6253,7 +6257,31 @@ static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &
 	}
 }
 
-static void ViewportDoDrawTurned()
+/** The signs and the floating texts of a block of the turned view: collected north-up against its north-up box, then each moved to where the ground under it is drawn turned. */
+static void CollectTurnedStrings(DrawPixelInfo &cdpi, ZoomLevel zoom)
+{
+	size_t first_string = _vd.string_sprites_to_draw.size();
+	ViewportAddKdtreeSigns(&cdpi);
+	DrawTextEffects(&cdpi);
+	for (size_t i = first_string; i < _vd.string_sprites_to_draw.size(); i++) {
+		StringSpriteToDraw &ss = _vd.string_sprites_to_draw[i];
+		int cx = ss.x + ScaleByZoom(ss.width / 2, zoom), cy = ss.y + 24 * ZOOM_BASE;
+		Point ground = InverseRemapCoords2(cx, cy);
+		int z = (ground.x >= 0 && ground.x < static_cast<int>(Map::SizeX() * TILE_SIZE) && ground.y >= 0 && ground.y < static_cast<int>(Map::SizeY() * TILE_SIZE)) ? GetSlopePixelZ(ground.x, ground.y) : 0;
+		Point classic = RemapCoords(ground.x, ground.y, z);
+		Point turned = ProjectTurned(ground.x, ground.y, z);
+		ss.x += turned.x - classic.x;
+		ss.y += turned.y - classic.y;
+	}
+}
+
+/**
+ * Draw a block of the turned view (the second renderer, three_d.h): its tiles collected, its ground laid, what stands on
+ * it drawn far first.
+ * @param hole_only the whole view drawn by the card already this pass (TurnedViewWholeOnCard()): the block only a hole
+ *                  for it, its signs collected
+ */
+static void ViewportDoDrawTurned(bool hole_only = false)
 {
 	const DrawPixelInfo frame = _vd.dpi;
 	ZoomLevel zoom = frame.zoom;
@@ -6295,6 +6323,13 @@ static void ViewportDoDrawTurned()
 		cdpi.top = (ct - MAX_TILE_EXTENT_TOP) & mask;
 		cdpi.width = (cr + MAX_TILE_EXTENT_RIGHT - cdpi.left + ~mask) & mask;
 		cdpi.height = (cb + MAX_TILE_EXTENT_BOTTOM - cdpi.top + ~mask) & mask;
+	}
+
+	if (hole_only) {
+		/* All of it from the card: a hole, the signs over it. */
+		PunchTurnedCardGround(frame);
+		CollectTurnedStrings(cdpi, zoom);
+		return;
 	}
 
 	/* 3. Clear the block: black, and the animation buffer told these pixels do not animate. */
@@ -6691,20 +6726,7 @@ static void ViewportDoDrawTurned()
 	AddThreeDDriversToViewport(zoom);
 	AddThreeDEffectsToViewport(zoom);
 
-	/* The signs and the floating texts: collected north-up, then each moved to where the ground under it is drawn turned. */
-	size_t first_string = _vd.string_sprites_to_draw.size();
-	ViewportAddKdtreeSigns(&cdpi);
-	DrawTextEffects(&cdpi);
-	for (size_t i = first_string; i < _vd.string_sprites_to_draw.size(); i++) {
-		StringSpriteToDraw &ss = _vd.string_sprites_to_draw[i];
-		int cx = ss.x + ScaleByZoom(ss.width / 2, zoom), cy = ss.y + 24 * ZOOM_BASE;
-		Point ground = InverseRemapCoords2(cx, cy);
-		int z = (ground.x >= 0 && ground.x < static_cast<int>(Map::SizeX() * TILE_SIZE) && ground.y >= 0 && ground.y < static_cast<int>(Map::SizeY() * TILE_SIZE)) ? GetSlopePixelZ(ground.x, ground.y) : 0;
-		Point classic = RemapCoords(ground.x, ground.y, z);
-		Point turned = ProjectTurned(ground.x, ground.y, z);
-		ss.x += turned.x - classic.x;
-		ss.y += turned.y - classic.y;
-	}
+	CollectTurnedStrings(cdpi, zoom);
 	_vd.dpi = frame;
 
 	/* 5. Everything standing: each sprite hung from its anchor turned, far first. */
@@ -7121,6 +7143,105 @@ static void DrawNight(bool turned)
 	}
 }
 
+/**
+ * The turned main view drawn by the card at once (the player, 27. 10.: "the turning only another camera"): when its
+ * camera changed -- turned, zoomed, moved --, its tiles are collected once for all of it and its ground and what stands
+ * on it laid by the card in one pass, not again for each block of the screen (a house was drawn in every block it
+ * reached into, ten times a frame); the blocks of that pass are then only holes for it, their signs over them. With what
+ * stands on it on the card (_turned_card_standing_on); while the camera stays, the blocks drawn again are drawn each.
+ */
+struct TurnedCardView {
+	uint64_t pass = UINT64_MAX;       ///< the pass of DrawDirtyBlocks() it was drawn in
+	bool ok = false;                  ///< whether the card laid all of it then
+	const Viewport *vp = nullptr;
+	float yaw = 0;
+	double pivot_x = 0, pivot_y = 0;
+	ZoomLevel zoom = ZoomLevel::Normal;
+	int left = 0, top = 0, width = 0, height = 0; ///< the view, virtual coordinates (whole pixels of its zoom)
+	std::vector<std::array<double, 4>> glows;    ///< the glows of the lights it told (_night_glows)
+	std::vector<uint8_t> lit;                     ///< which of its pixels the card left lit (_night_lit_card), a row its width
+	std::vector<uint32_t> scratch;                ///< where the processor's part of the pass goes: nowhere seen
+};
+static TurnedCardView _turned_card_view;
+uint64_t _turned_card_view_passes = 0; ///< the rig: how many times the card laid all of the view (test3d cas)
+bool _turned_card_view_on = true; ///< the rig: the whole view laid at once when the camera changed (test3d stojici cely); else each block
+
+/**
+ * The whole turned main view laid by the card, once a pass of DrawDirtyBlocks() when its camera changed (TurnedCardView).
+ * @return whether the card laid all of it this pass: a block of it is a hole for it
+ */
+static bool TurnedViewWholeOnCard(const Viewport &vp)
+{
+	extern uint64_t _dirty_blocks_pass;
+	TurnedCardView &cv = _turned_card_view;
+	if (!_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim) return false;
+	if (cv.pass == _dirty_blocks_pass && cv.vp == &vp) return cv.ok;
+	const Window *main = GetMainWindow();
+	if (main == nullptr || main->viewport == nullptr || static_cast<const Viewport *>(main->viewport.get()) != &vp) return false;
+	const int mask = ScaleByZoom(-1, vp.zoom);
+	const int left = vp.virtual_left & mask, top = vp.virtual_top & mask;
+	const int width = ScaleByZoom(vp.width, vp.zoom) & mask, height = ScaleByZoom(vp.height, vp.zoom) & mask;
+	double c, s, px, py;
+	GetViewTurn(c, s, px, py);
+	if (cv.vp == &vp && cv.yaw == GetViewYaw() && cv.pivot_x == px && cv.pivot_y == py && cv.zoom == vp.zoom &&
+			cv.left == left && cv.top == top && cv.width == width && cv.height == height) {
+		/* The camera stays: the blocks drawn again (a vehicle moved) each laid as before. */
+		return false;
+	}
+	cv.vp = &vp;
+	cv.yaw = GetViewYaw();
+	cv.pivot_x = px;
+	cv.pivot_y = py;
+	cv.zoom = vp.zoom;
+	cv.left = left;
+	cv.top = top;
+	cv.width = width;
+	cv.height = height;
+	cv.pass = _dirty_blocks_pass;
+	cv.ok = false;
+	const int fw = UnScaleByZoom(width, vp.zoom), fh = UnScaleByZoom(height, vp.zoom);
+	if (fw <= 0 || fh <= 0) return false;
+	/* All of it as one block, drawn nowhere but on the card. */
+	cv.scratch.assign(static_cast<size_t>(fw) * fh, 0);
+	DrawPixelInfo whole{};
+	whole.dst_ptr = cv.scratch.data();
+	whole.left = left;
+	whole.top = top;
+	whole.width = width;
+	whole.height = height;
+	whole.pitch = fw;
+	whole.zoom = vp.zoom;
+	{
+		AutoRestoreBackup vd_dpi(_vd.dpi, whole);
+		AutoRestoreBackup cur_dpi(_cur_dpi, &_vd.dpi);
+		AutoRestoreBackup turned_vp(_turned_vp, &vp);
+		AutoRestoreBackup night(_night_windows_now, IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32);
+		/* Not the screen: the blitter draws into the picture as into any other (no animation of the screen's). */
+		AutoRestoreBackup anim(_screen_disable_anim, true);
+		AutoRestoreBackup whole_pass(_turned_whole_view_pass, true);
+		_vd.combine_sprites = SpriteCombineMode::None;
+		_vd.last_child = LAST_CHILD_NONE;
+		_night_lit.clear();
+		_night_lit_card.clear();
+		_night_glows.clear();
+		const int laid = _turned_times.standing_card;
+		ViewportDoDrawTurned();
+		cv.ok = _turned_times.standing_card > laid;
+		cv.glows = std::move(_night_glows);
+		cv.lit = std::move(_night_lit_card);
+		_night_lit.clear();
+		_night_lit_card.clear();
+		_night_glows.clear();
+		_vd.string_sprites_to_draw.clear();
+		_vd.tile_sprites_to_draw.clear();
+		_vd.parent_sprites_to_draw.clear();
+		_vd.parent_sprites_to_sort.clear();
+		_vd.child_screen_sprites_to_draw.clear();
+	}
+	if (cv.ok) _turned_card_view_passes++;
+	return cv.ok;
+}
+
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
 	/* The map's 3D pictures not made yet: the nearest made stands in, the thread makes them; the drawing waits for no card. */
@@ -7129,6 +7250,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	KeepThreeDPicturesOfBlock();
 	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
 	RoundTrackPass round_track_pass(IsViewportTurned(vp));
+	/* The whole turned main view laid by the card this pass: the block only a hole for it. */
+	const bool whole_on_card = IsViewportTurned(vp) && TurnedViewWholeOnCard(vp);
 	_vd.dpi.zoom = vp.zoom;
 	int mask = ScaleByZoom(-1, vp.zoom);
 
@@ -7152,10 +7275,25 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.dst_ptr = BlitterFactory::GetCurrentBlitter()->MoveTo(_cur_dpi->dst_ptr, x - _cur_dpi->left, y - _cur_dpi->top);
 	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
 
+	if (whole_on_card) {
+		/* The night of the block as the card's pass told it: the glows of its lights, its lit pixels. */
+		const TurnedCardView &cv = _turned_card_view;
+		_night_glows = cv.glows;
+		const int vs = ScaleByZoom(1, vp.zoom), cw = UnScaleByZoom(cv.width, vp.zoom), ch = UnScaleByZoom(cv.height, vp.zoom);
+		const int bx = (_vd.dpi.left - cv.left) / vs, by = (_vd.dpi.top - cv.top) / vs;
+		const int bw = UnScaleByZoom(_vd.dpi.width, vp.zoom), bh = UnScaleByZoom(_vd.dpi.height, vp.zoom);
+		if (cv.lit.size() == static_cast<size_t>(cw) * ch && bw > 0 && bh > 0) {
+			_night_lit_card.assign(static_cast<size_t>(bw) * bh, 0);
+			for (int y = std::max(0, -by); y < bh && by + y < ch; y++) {
+				const int x0 = std::max(0, -bx), x1 = std::min(bw, cw - bx);
+				if (x0 < x1) std::copy_n(&cv.lit[static_cast<size_t>(by + y) * cw + bx + x0], x1 - x0, &_night_lit_card[static_cast<size_t>(y) * bw + x0]);
+			}
+		}
+	}
 	if (IsViewportTurned(vp)) {
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
 		AutoRestoreBackup turned_vp(_turned_vp, &vp);
-		ViewportDoDrawTurned();
+		ViewportDoDrawTurned(whole_on_card);
 	} else {
 		/* Facing north again: the turned view's ground from the card shown no more (TurnedCardGround). */
 		if (_turned_card_ground.vp == &vp) HideTurnedCardGround();

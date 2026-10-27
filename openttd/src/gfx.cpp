@@ -1462,8 +1462,12 @@ void RedrawScreenRect(int left, int top, int right, int bottom)
  *
  * @ingroup dirty
  */
+/** Counts the passes of DrawDirtyBlocks(): what is drawn once a pass for all its blocks knows by it (the turned view on the card, TurnedViewWholeOnCard()). */
+uint64_t _dirty_blocks_pass = 0;
+
 void DrawDirtyBlocks()
 {
+	_dirty_blocks_pass++;
 	auto is_dirty = [](auto block) -> bool { return block != 0; };
 	auto block = _dirty_blocks.begin();
 

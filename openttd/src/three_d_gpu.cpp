@@ -938,8 +938,9 @@ void main()
 )";
 
 /* A building among what stands on the turned map (DrawStandingOnCard()), with MAP_BUILDING_VERTEX: as the buildings'
- * pictures (MAP_BUILDING_FRAGMENT), whole, not lit; or its lit glass at night (u_night), each pixel its texel as it is
- * where the texture has one, marked lit. */
+ * pictures (MAP_BUILDING_FRAGMENT), as see-through as its texel (a yard's grass with the paths of the ground through it,
+ * the colleague's pv_dvur_trava), not lit; or its lit glass at night (u_night), each pixel its texel as it is where the
+ * texture has one, whole, marked lit. */
 const char *const STANDING_BUILDING_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform int u_night;
@@ -966,13 +967,15 @@ void main()
 		}
 		if (t == vec4(0.0)) discard;
 	}
+	float a = u_night != 0 ? 1.0 : t.a;
+	if (a == 0.0) discard;
 	vec3 c = floor(t.rgb * 255.0 + 0.5);
 	if (u_night == 0) {
 		float l = floor(max(0.0, v_light));
 		c = min(vec3(255.0), floor(c * l / 256.0));
 	}
-	o_colour = vec4(c / 255.0, 1.0);
-	o_lit = vec4(u_night != 0 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
+	o_colour = vec4(c / 255.0 * a, a);
+	o_lit = vec4(u_night != 0 ? 1.0 : 0.0, 0.0, 0.0, a);
 }
 )";
 

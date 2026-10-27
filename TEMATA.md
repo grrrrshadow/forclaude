@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (27) – 1203: barvy, kola, interiér, světla, rozhlížení (domluvit / opravit)
+
+- Hráč: *„mužeš převzit barvy z 1203 puvodnich? implicidni? komunisticka červená, blednutí... kola jsou pruhledné
+  pneumatiky. a zadní kola jsou moc blízko ke středu auta . uvnitř auta byla ta zelená indikační. chci se pravym
+  čudlikem myši rozhlidnout otočit hlavu a kouknout do pravyho okynka jestli něco nejede . 1203 mivaj světla hranaty
+  ale to už nejsou škoda , to je taz. 1503 ma zas některa kulaty světla, to je asi chyba. #305 naklad mari tam byl,
+  barvy bych chtěl asi konfigurator. zadní světlo je stejný jako škoda 1000 osobní , není vybarvené“*.
+- Chyby (opravit): průhledné pneumatiky, zadní kola blízko středu, zelená uvnitř, kulatá/hranatá světla podle
+  značky, zadní světlo nevybarvené. Domluvit: barvy (původní 1203, rudá, blednutí, konfigurátor), rozhlížení
+  pravým tlačítkem v kabině.
+
+## 27. 10. (26) – Otočení jen jiná kamera, kus 1: celý pohled kartou jedním průchodem (rig)
+
+- Hráč: *„udělej otačeni jen jina kamera“*.
+- Hotovo: když se změní kamera otočeného hlavního pohledu (otočení, zoom, posun), karta ho položí celý jedním
+  průchodem: sběr dlaždic jednou pro celý pohled, zem i stojící věci najednou (`TurnedViewWholeOnCard()`, kreslí do
+  vlastního obrázku mimo obrazovku). Bloky obrazovky v témže průchodu jsou jen díra s nápisy, noc dostanou záře a
+  svítící pixely z průchodu karty. Když kamera stojí, překreslené bloky (jedoucí auto) se kladou po jednom jako dřív.
+- Oprava cestou: kreslení domu kartou bere průhlednost texelu (alfa).
+- Ověřeno v rigu: stejná kamera karta vs procesor 1317 px (animace; procesor navíc kreslí šedé klínky sousedních
+  budov – stará chyba #41, karta je nemá), noc 731 px. Otáčení 30 kroků: celý pohled 17 průchodů, 4,9 mil.
+  trojúhelníků, karta 759 ms; po blocích 374 bloků, 22,4 mil., 2 818 ms.
+- Rig: `test3d stojici cely 0|1`, `test3d cas` píše `celych pohledu`.
+- Další kusy: kamera jako matice na kartě (zem, domy, plakáty ve světových souřadnicích), mezipaměť scény po
+  dlaždicích (otočení nic nesbírá znovu), vozidla a postavy jako tvary, krabice/mosty jako tvary; pak zapnout.
+
 ## 27. 10. (25) – Rigs of Rods bod 1: brzdovky a couvání z kabiny; co mají technicky
 
 - Hráč: *„rigs of rods bod 1 brzdovky když budou spomalovat ve dne se rozsviti zadni červene a v noci se rozsviti vic .

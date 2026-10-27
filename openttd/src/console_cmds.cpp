@@ -10042,6 +10042,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_standing_on = number(3).value_or(0) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici {}", _turned_card_standing_on ? "karta" : "procesor");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "cely") {
+		/* 'stojici cely 0|1': with the camera changed the whole turned main view laid by the card at once (1;
+		 * TurnedViewWholeOnCard()), or each block of it by itself (0). */
+		extern bool _turned_card_view_on;
+		_turned_card_view_on = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici cely {}", _turned_card_view_on ? "ano" : "ne");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.
