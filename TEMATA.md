@@ -74,6 +74,9 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   *„počkej až budou stejny kostry, pak budem přenašet. mat je dekorace jako strašidlo“*: společná kostra a animace
   (chůze, kouření) jen pro holky, Mat si nechá svoje jako strašidla. Kolega začne kostrami holek (grrrrf 562442c);
   přenos animací podle jmen kostí až budou kostry stejné.
+- Hráč: *„krok 1 hry autosan tam mumlá“*: kolegovi (grrrrf 3dd5078) krok 1 hry hotový od `f9c590f`, na nic
+  nečeká. Autosan s `lavice_studentky_v3s` (6 sedí) a `studentky_stoji_v3s` (8 stojí) vyzkoušený v rigu na kopii jeho
+  v1 taru, ZTS s řidičkou hry. Zbývá jeho strana: GRF Zvlastni_vozy_3D v2 (Autosan STUD), dva stavy, holky z balíčku pryč.
 - Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
   `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
   na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.
