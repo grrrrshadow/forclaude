@@ -41,8 +41,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Zadní světlo a zelené kontrolky na palubce: materiály z `glowMap` jsou jen zástupci bez vlastních vrstev, BeamNG
   místo nich kreslí jejich materiál `off` (zhasnuté), svítí pod vlastním jménem. Hra kreslila zástupce – bez barvy.
   Teď kreslí `off` a v noci svítí podle jména zástupce.
-- Zbývá: světla podle značky (Škoda kulatá s původní maskou, TAZ hranatá s maskou TAZ), zadní kola u středu (do
-  strany, nebo podélně?), zelená uvnitř (kde přesně?).
+- Světla podle značky: každá značka 1203 je vlastní 3D tvar (textury sdílené). Škoda 1203 má původní chromovanou
+  masku s kulatými světly a kulatými blinkry, chladič Škoda. TAZ 1203, TAZ 1500 a 1.9D mají plastovou masku TAZ
+  s hranatými světly, nápis TAZ a chladič TAZ. De Luxe si nechává své čtyři světla, valník těžký chladič.
+  Díl se teď dává jen do slotu svého typu jako v BeamNG (masky mají ve slotu mlhovek výchozí kulatá světla).
+- Zbývá: zadní kola u středu (do strany, nebo podélně?), zelená uvnitř (kde přesně?).
 
 ## 27. 10. (29) – 1203: barvy ze starého 2D GRF, konfigurátor, dřevěný valník
 

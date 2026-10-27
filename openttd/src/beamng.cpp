@@ -673,7 +673,20 @@ std::vector<PartSlot> SlotsOf(const JValue &part)
 uint32_t ColourOf(const JValue &v);
 
 /** Read the car's .jbeam files and pick its parts: the main one, then what each slot takes (by the .pc, else by default). */
-bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
+static bool IsS1203(const BeamngVehicle &v);
+static void ChooseMakeParts(const BeamngVehicle &v, int make, std::map<std::string, std::string> &chosen);
+
+/** Is it a part for a slot of the type: its "slotType" the type, or one of them. BeamNG puts no other there (the Škoda 1203's plastic masks name its round headlights for their foglights' slots). */
+static bool FitsSlot(const JValue &part, const std::string &type)
+{
+	const JValue *t = part.Get("slotType");
+	if (t == nullptr) return true;
+	if (t->IsString()) return StrEqualsIgnoreCase(t->text, type);
+	if (t->IsArray()) return std::ranges::any_of(t->items, [&type](const JValue &i) { return i.IsString() && StrEqualsIgnoreCase(i.text, type); });
+	return true;
+}
+
+bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, int make = -1)
 {
 	std::vector<std::string> files = ListCarFiles(v);
 	std::sort(files.begin(), files.end());
@@ -709,6 +722,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 			}
 		}
 	}
+	ChooseMakeParts(v, make, chosen);
 	for (const std::string &f : files) {
 		if (EndsWithIgnoreCase(f, ".jbeam")) parts.files.push_back(ParseJson(ReadModFile(v, f)));
 	}
@@ -743,7 +757,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 			const std::string &name = c != chosen.end() ? c->second : slot.part;
 			if (name.empty()) continue;
 			auto it = by_name.find(name);
-			if (it == by_name.end()) continue;
+			if (it == by_name.end() || !FitsSlot(*it->second, slot.type)) continue;
 			todo.push_back(it->second);
 			slotted.emplace(it->second, std::make_pair(part, slot.options));
 		}
@@ -897,6 +911,31 @@ static constexpr std::pair<std::string_view, std::string_view> S1203_KINDS[] = {
 static bool IsS1203(const BeamngVehicle &v)
 {
 	return StrEqualsIgnoreCase(v.id, "S1203");
+}
+
+/**
+ * The front of a make of our 1203 (the player, 27. 10.: "the 1203s have square lights, but those are no Škodas any
+ * more, that is TAZ", "the 1500 has round ones on some, that is a mistake"): the Škoda its chrome mask with round
+ * headlights and indicators, its radiator the Škoda's; the TAZs their plastic mask of TAZ with square ones and its
+ * letters, the TAZ radiator. Whatever the configuration had there -- but the De Luxe's four lamps and a flatbed's
+ * heavy radiator, its own.
+ */
+static void ChooseMakeParts(const BeamngVehicle &v, int make, std::map<std::string, std::string> &chosen)
+{
+	if (make < 0 || !IsS1203(v)) return;
+	if (auto mask = chosen.find("S1203_mask"); mask != chosen.end() && mask->second == "S1203_mask_quad") return;
+	const bool skoda = make == 0;
+	if (skoda) {
+		chosen["S1203_mask"] = "S1203_mask";
+		for (const char *slot : {"S1203_headlight_L", "S1203_headlight_R", "S1203_indicator_FL", "S1203_indicator_FR"}) chosen[slot] = slot;
+	} else {
+		chosen["S1203_mask"] = "S1203_mask_new_taz";
+		for (const char *slot : {"S1203_headlight_new_L", "S1203_headlight_new_R", "S1203_indicator_new_FL", "S1203_indicator_new_FR"}) chosen[slot] = slot;
+		chosen["S1203_mask_lettering"] = "S1203_lettering_TAZ-S1203";
+	}
+	if (auto radiator = chosen.find("S1203_radiator"); radiator == chosen.end() || radiator->second != "S1203_radiator_super") {
+		chosen["S1203_radiator"] = skoda ? "S1203_radiator" : "S1203_radiator_taz";
+	}
 }
 
 /**
@@ -2742,11 +2781,11 @@ static void LaySkin(const BeamngVehicle &v, const CarMaterial &cm, const std::ve
  * degrees about x, y and z, "scale"; else where its node in the .dae is), in the frame of the vehicle objects; the
  * materials' colours, textures and paint; the body's holes cut by its mask; the glass of its lights and where they are.
  */
-bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
+bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 {
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
 	CarParts parts;
-	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts)) return false;
+	if (!ReadCarParts(v, info.IsObject() ? &info : nullptr, parts, make)) return false;
 	auto fr = _frames.find(v.Package() + "|" + v.folder + "|" + v.config);
 	const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
 

@@ -190,6 +190,14 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 /** A texture's bytes that are its pixels as they are and not a PNG begin so (DecodeTextureLevels()): a model of MSTS's. */
 static constexpr std::string_view RAW_TEXTURE_MARK = "OTTD-RGBA";
 
+/** What a car of BeamNG is drawn from (ThreeDVehicleObject::file): its configuration, and the make of our 1203 (BeamngModel::make), -1 none. */
+static std::string BeamngObjectFile(const BeamngVehicle &b, int make)
+{
+	std::string file = "beamng:" + b.Package() + "|" + b.folder + "|" + b.config;
+	if (make >= 0) file += fmt::format("|{}", make);
+	return file;
+}
+
 /** The most texels a side a painted material of a car of BeamNG has in the body's texture (BeamngMesh::PaintSource): four of them 2048 x 2048. */
 static constexpr int PAINT_CELL_MOST = 1024;
 
@@ -4834,7 +4842,7 @@ static void ReadThreeDVehicleObjects()
 		ThreeDVehicleObject obj;
 		obj.name = b.name;
 		obj.package = b.Package();
-		obj.file = "beamng:" + b.Package() + "|" + b.folder + "|" + b.config;
+		obj.file = BeamngObjectFile(b, -1);
 		obj.type = VehicleType::Road;
 		obj.grfid = b.grfid;
 		/* Each car of the purchase list made of the configuration (the 1203's makes over the years) drawn from it. */
@@ -4924,6 +4932,18 @@ static void ReadThreeDVehicleObjects()
 			driver.at[1] = b.cab[1];
 			driver.at[2] = b.cab[2] - 0.72f;
 			obj.crew.push_back(std::move(driver));
+		}
+		/* Each make of our 1203 an object of its own: its front as the make has it (ReadBeamngShape()), the Škoda's
+		 * round lights, the TAZ's square ones; their pictures shared. */
+		if (std::ranges::any_of(b.models, [](const BeamngModel &m) { return m.make >= 0; })) {
+			for (const BeamngModel &m : b.models) {
+				ThreeDVehicleObject of_make = obj;
+				of_make.name = m.name;
+				of_make.file = BeamngObjectFile(b, m.make);
+				of_make.pieces = {m.id};
+				_vehicle_objects.push_back(std::move(of_make));
+			}
+			continue;
 		}
 		_vehicle_objects.push_back(std::move(obj));
 	}
@@ -6054,11 +6074,18 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		static std::mutex beamng_mutex;
 		std::lock_guard beamng_lock(beamng_mutex);
 		const BeamngVehicle *car = nullptr;
+		int make = -1;
 		for (const BeamngVehicle &b : FindBeamngVehicles()) {
-			if (this->file == "beamng:" + b.Package() + "|" + b.folder + "|" + b.config) car = &b;
+			if (this->file == BeamngObjectFile(b, -1)) car = &b;
+			for (const BeamngModel &m : b.models) {
+				if (m.make >= 0 && this->file == BeamngObjectFile(b, m.make)) {
+					car = &b;
+					make = m.make;
+				}
+			}
 		}
 		BeamngMesh bm;
-		if (car == nullptr || !ReadBeamngShape(*car, bm)) return nullptr;
+		if (car == nullptr || !ReadBeamngShape(*car, bm, make)) return nullptr;
 		auto made = std::make_shared<ThreeDVehicleShape>();
 		made->pos = std::move(bm.pos);
 		made->nrm = std::move(bm.nrm);

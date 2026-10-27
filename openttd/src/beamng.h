@@ -136,7 +136,8 @@ struct BeamngMesh {
 	static constexpr uint8_t OWN_TARP = 0;
 	static constexpr uint8_t OWN_BED = 1;
 };
-bool ReadBeamngShape(const BeamngVehicle &vehicle, BeamngMesh &mesh);
+/** Read a car's model; of a make of our 1203 its front as that make has it (BeamngModel::make), -1 as the configuration has it. */
+bool ReadBeamngShape(const BeamngVehicle &vehicle, BeamngMesh &mesh, int make = -1);
 const BeamngVehicle *GetBeamngVehicle(size_t index);
 
 #endif /* BEAMNG_H */
