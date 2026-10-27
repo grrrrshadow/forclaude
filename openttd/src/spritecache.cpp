@@ -1894,6 +1894,7 @@ void GfxInitSpriteMem()
 	ResetCutoutSprites();
 	ResetShiftedSprites();
 	ResetThreeDVehicleObjectSprites();
+	ForgetTurnedSpritePictures();
 }
 
 /**

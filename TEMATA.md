@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (23) – Otočená mapa kartou 2, kus 1: stojící věci bloku kreslí karta (zatím jen rig)
+
+- Hráč: *„udělej zas kus na gpu“*. Pokračování přechodu (#206, #221): co stojí na bloku mapy, kreslí karta.
+- Hotovo: karta má vedle země pohledu dvě textury stojících věcí (barva předem vynásobená průhledností a značka
+  „svítí“). Posouvají se se zemí. Blok se kreslí v pořadí malíře jako čtverce z atlasu. Sprity hry se jednou převedou
+  do RGBA (kreslení přes černou a přes bílou dá průhlednost), svítící pixely nesou průhlednost 254. Ostatní druhy
+  (3D objekty, vozidla, krabice, mosty) zatím kreslí procesor „zvlášť“ do vlastního obrázku a karta ho položí.
+  Ovladač obrazu skládá zem × světlo, přes ni stojící věci (svítící bez tmy) a navrch procesorový obraz (nápisy).
+- Ověřeno v rigu (xvfb, sdl-opengl): den stejný jako procesor kromě animací. Noc: okna svítí stejně, záře
+  oken jednou (procesor viděl svítící pixely jen ze své mapy `_night_lit`, teď i z karty).
+- Zatím vypínač jen pro rig (`test3d stojici ukaz 0|1`), výchozí vypnuto: ~90 % věcí „zvlášť“ jsou 3D objekty
+  a procesor je kreslí dvakrát (černá + bílá), na llvmpipe stojící věci 73 → 459 ms. Další kus: 3D objekty přímo
+  kartou (trojúhelníky s hloubkou), pak vozidla jako obrázky na kartě, krabice, mosty, depa; pak zapnout a měřit
+  na telefonu.
+
 ## 27. 10. (22) – 1203 valník: kusové náklady hry, plachta pro náklad bez grafiky
 
 - Hráč: *„to asi nebudem vozit vybušniny sanitkou. ingame naklady dej na valniky 1203 1500 .....“*, *„je tam valnik s

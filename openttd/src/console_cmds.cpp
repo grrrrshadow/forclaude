@@ -10035,6 +10035,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: inventar: mari {}, sazenice {}, seno {}, houby {}, zdravi {}", c->walker_items[to_underlying(WalkerItem::Marijuana)], c->walker_items[to_underlying(WalkerItem::Seedling)],
 					c->walker_items[to_underlying(WalkerItem::Hay)], c->walker_items[to_underlying(WalkerItem::Mushrooms)], c->walker_health);
 		}
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "ukaz") {
+		/* 'stojici ukaz 0|1': what stands on the turned main view laid by the card over its ground, shown straight from
+		 * it (1; ThreeDGpuStanding), or drawn by the processor into the screen (0). */
+		extern bool _turned_card_standing_on;
+		_turned_card_standing_on = number(3).value_or(0) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici {}", _turned_card_standing_on ? "karta" : "procesor");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.

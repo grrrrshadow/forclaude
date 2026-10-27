@@ -150,7 +150,7 @@ public:
 
 	void ClearSystemSprites() override;
 
-	bool ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0) override;
+	bool ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0) override;
 
 	void HideThreeDPicture(const void *owner) override;
 

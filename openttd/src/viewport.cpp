@@ -2039,6 +2039,8 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
 static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 4>> _night_glows;
+/** The lit pixels of the block laid by the card over its ground (ThreeDGpuStanding), x and y of the block: where the glows of the lights are seen as by _night_lit. */
+static std::vector<std::pair<int, int>> _night_lit_card;
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
 static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
@@ -2145,6 +2147,10 @@ struct TurnedTimes {
 	double models_project = 0; ///< of that: their corners projected and their triangles sorted
 	double models_raster = 0;  ///< of that: their pixels
 	int models_drawn = 0;      ///< objects drawn (an object in several blocks, once for each)
+	int standing_card = 0;     ///< blocks whose standing things the card laid (ThreeDGpuStanding)
+	int standing_sprites = 0;  ///< and of their pictures, the sprites'
+	int standing_apart = 0;    ///< and those the processor drew apart (DrawTurnedStandingApart())
+	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -2161,6 +2167,10 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
+	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_apart, t.standing_card_ms);
+	/* With a window the console is not written out: the diary too (the rig). */
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {}, spritu {}, zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, t.standing_sprites, t.standing_apart, t.standing_card_ms);
 	extern void TurnedGroundTimingsPrint();
 	TurnedGroundTimingsPrint();
 	_turned_times = TurnedTimes();
@@ -2345,6 +2355,7 @@ static inline uint32_t TurnedGroundTileKey(int x, int y)
 /** Forget the kept picture of the ground: the sprites are made again (GfxClearSpriteCache()), or the rig asks. */
 void ResetTurnedGround()
 {
+	ForgetTurnedSpritePictures();
 	_turned_ground = TurnedGround();
 	_turned_ground_version++;
 	extern void ForgetTurnedFoundations();
@@ -5289,6 +5300,12 @@ struct TurnedCardGround {
 };
 static TurnedCardGround _turned_card_ground;
 bool _turned_card_ground_on = true; ///< Rig: the ground of the turned main view shown straight from the card (test3d zem ukaz); else read back into the screen
+/**
+ * Rig: what stands on the turned main view laid by the card over its ground, shown straight from it (ThreeDGpuStanding;
+ * the player, 26. 10.: "the card to compose the turned map", step 2; test3d stojici ukaz); else drawn by the processor
+ * into the block. The rig's till the card draws every kind of them itself.
+ */
+bool _turned_card_standing_on = false;
 
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
@@ -5409,7 +5426,10 @@ static void ShowTurnedCardGround()
 	if (g.vp == nullptr) return;
 	const Viewport &vp = *g.vp;
 	const bool was = g.shown;
-	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&_turned_card_ground, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, true, NightLightOfCard());
+	/* What stands on it, laid by the card over it (ThreeDGpuStanding). */
+	uint32_t over_lit = 0;
+	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(&over_lit) : 0;
+	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&_turned_card_ground, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, true, NightLightOfCard(), over, over != 0 ? over_lit : 0);
 	/* Shown first now: the blocks drawn before it are drawn again as holes. */
 	if (g.shown && !was) {
 		Debug(misc, 1, "3D: the turned map's ground shown straight from the graphics card ({}x{})", vp.width, vp.height);
@@ -5545,9 +5565,9 @@ static void LayTurnedGround(TurnedGroundLaying &lay)
  * Take the ground the card was laying meanwhile (LayTurnedGround()): in the block now, what stands on it can go over
  * it. The card could not lay it: the processor does now.
  */
-static void FinishTurnedGround(TurnedGroundLaying &lay)
+static bool FinishTurnedGround(TurnedGroundLaying &lay)
 {
-	if (!lay.started) return;
+	if (!lay.started) return false;
 	lay.started = false;
 	double t0 = TurnedNow();
 	const bool laid = ThreeDGpuDrawGroundTake();
@@ -5573,7 +5593,7 @@ static void FinishTurnedGround(TurnedGroundLaying &lay)
 		}
 		(laid ? _turned_ground_times.card_blocks : _turned_ground_times.processor_blocks)++;
 		_turned_times.warp += TurnedNow() - t0;
-		return;
+		return laid;
 	}
 	if (!laid || _turned_ground_check) LayTurnedGroundByProcessor(lay);
 	if (laid && _turned_ground_check) {
@@ -5588,6 +5608,7 @@ static void FinishTurnedGround(TurnedGroundLaying &lay)
 	}
 	(laid ? _turned_ground_times.card_blocks : _turned_ground_times.processor_blocks)++;
 	_turned_times.warp += TurnedNow() - t0;
+	return false;
 }
 
 /**
@@ -5695,6 +5716,286 @@ static void KeepTurnedGroundOfView(const DrawPixelInfo &frame)
  * by ViewportDoDraw() with _vd.dpi set up for the block and _cur_dpi pointing
  * at it; takes care of everything up to the clearing of the lists.
  */
+/** Draw a standing thing of the turned view into the block by the processor: its box, its likeness, or its sprites. */
+static void DrawTurnedStandingByProcessor(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	switch (ps.box_kind) {
+		case 1: DrawTurnedHouseBox(frame, ps); return;
+		case 2: DrawTurnedGenericBox(frame, ps); return;
+		case 4: return; // a tile of a building that is a 3D object: drawn whole (box_kind 7)
+		case 5: DrawTurnedVehicle(frame, ps, false); return;
+		case 6: DrawTurnedSlab(frame, ps); return;
+		case 7: DrawTurnedObject(frame, ps); return;
+		case 8: DrawTurnedBridgeDeck(frame, ps); return;
+		case 9: DrawTurnedBridgeRailing(frame, ps); return;
+		case 10: DrawTurnedBridgeRamp(frame, ps); return;
+		case 11: DrawTurnedBridgePillar(frame, ps); return;
+		case 12: DrawTurnedDepot(frame, ps); return;
+		default: break;
+	}
+	if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
+	int child_idx = ps.first_child;
+	while (child_idx >= 0) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		if (cs.relative) {
+			DrawSpriteViewport(cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+		} else {
+			DrawSpriteViewport(cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+		}
+	}
+}
+
+/**
+ * The pixels of a picture for the card (ThreeDGpuStandingPicture) of what was drawn over black and over white: its
+ * alpha what tells them apart, its colour (with its alpha in it) what it gave over black; a pixel lit at night whole and
+ * marked lit.
+ */
+static void TurnedStandingPixels(const std::vector<uint32_t> &black, const std::vector<uint32_t> &white, const std::vector<uint8_t> *lit, std::vector<uint32_t> &out)
+{
+	out.resize(black.size());
+	for (size_t i = 0; i < black.size(); i++) {
+		const Colour b(black[i]), w(white[i]);
+		const int through = std::max({static_cast<int>(w.r) - b.r, static_cast<int>(w.g) - b.g, static_cast<int>(w.b) - b.b, 0});
+		int a = 255 - std::min(255, through);
+		if (a == 0) {
+			out[i] = 0;
+		} else if (lit != nullptr && (*lit)[i] != 0) {
+			out[i] = Colour(b.r, b.g, b.b, THREE_D_GPU_LIT_ALPHA).data;
+		} else {
+			if (a == THREE_D_GPU_LIT_ALPHA) a--;
+			out[i] = Colour(static_cast<uint8_t>(std::min<int>(b.r, a)), static_cast<uint8_t>(std::min<int>(b.g, a)), static_cast<uint8_t>(std::min<int>(b.b, a)), static_cast<uint8_t>(a)).data;
+		}
+	}
+}
+
+/** A sprite's picture for the card (TurnedStandingSprite()), by its sprite, palette, zoom and the part of it drawn. */
+struct TurnedSpriteKey {
+	SpriteID image;
+	PaletteID pal;
+	ZoomLevel zoom;
+	std::array<int, 4> sub; ///< the part: left, top, right, bottom; all -1 the whole
+	bool operator==(const TurnedSpriteKey &) const = default;
+};
+struct TurnedSpriteKeyHash {
+	size_t operator()(const TurnedSpriteKey &k) const
+	{
+		uint64_t h = 1469598103934665603ULL;
+		auto mix = [&h](uint64_t v) {
+			h ^= v;
+			h *= 1099511628211ULL;
+		};
+		mix(k.image);
+		mix(k.pal);
+		mix(to_underlying(k.zoom));
+		for (int v : k.sub) mix(static_cast<uint32_t>(v));
+		return static_cast<size_t>(h);
+	}
+};
+struct TurnedSpritePicture {
+	std::shared_ptr<const ThreeDGpuStandingPicture> picture;
+	uint64_t uid = 0; ///< kept on the card by this number (ThreeDGpuStandingItem::key), never another picture's
+};
+static std::unordered_map<TurnedSpriteKey, TurnedSpritePicture, TurnedSpriteKeyHash> _turned_sprite_pictures;
+static size_t _turned_sprite_picture_bytes = 0;
+static uint64_t _turned_sprite_picture_uid = 0;
+static constexpr size_t TURNED_SPRITE_PICTURE_BYTES = 64u << 20; ///< kept at most; then they are made anew as they are drawn
+
+/** Forget the sprites' pictures for the card (their sprites read anew, GfxInitSpriteMem(), GfxClearSpriteCache()). */
+void ForgetTurnedSpritePictures()
+{
+	_turned_sprite_pictures.clear();
+	_turned_sprite_picture_bytes = 0;
+}
+
+/**
+ * A sprite's picture for the card, made the first time (drawn over black and white, TurnedStandingPixels()): its top
+ * left where the sprite's is, (x + x_offs, y + y_offs) at its zoom.
+ * @param[out] spr the sprite
+ * @return nullptr: none
+ */
+static const TurnedSpritePicture *TurnedStandingSprite(SpriteID image, PaletteID pal, ZoomLevel zoom, const SubSprite *sub, const Sprite *&spr)
+{
+	spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+	if (spr == nullptr) return nullptr;
+	TurnedSpriteKey key{image, pal, zoom, {-1, -1, -1, -1}};
+	if (sub != nullptr) key.sub = {sub->left, sub->top, sub->right, sub->bottom};
+	auto it = _turned_sprite_pictures.find(key);
+	if (it != _turned_sprite_pictures.end()) return &it->second;
+	const int w = UnScaleByZoom(spr->width, zoom), h = UnScaleByZoom(spr->height, zoom);
+	if (w <= 0 || h <= 0) return nullptr;
+	const int x_offs = spr->x_offs, y_offs = spr->y_offs;
+	std::vector<uint32_t> black(static_cast<size_t>(w) * h, 0xFF000000u), white(static_cast<size_t>(w) * h, 0xFFFFFFFFu);
+	for (std::vector<uint32_t> *buf : {&black, &white}) {
+		DrawPixelInfo d{
+			.dst_ptr = buf->data(),
+			.left = 0,
+			.top = 0,
+			.width = ScaleByZoom(w, zoom),
+			.height = ScaleByZoom(h, zoom),
+			.pitch = w,
+			.zoom = zoom
+		};
+		AutoRestoreBackup dpi_backup(_cur_dpi, &d);
+		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+		DrawSpriteViewport(image, pal, -x_offs, -y_offs, sub);
+	}
+	auto pic = std::make_shared<ThreeDGpuStandingPicture>();
+	pic->width = w;
+	pic->height = h;
+	TurnedStandingPixels(black, white, nullptr, pic->pixels);
+	if (_turned_sprite_picture_bytes > TURNED_SPRITE_PICTURE_BYTES) ForgetTurnedSpritePictures();
+	_turned_sprite_picture_bytes += pic->pixels.size() * sizeof(uint32_t) + sizeof(ThreeDGpuStandingPicture) + 64;
+	TurnedSpritePicture &made = _turned_sprite_pictures[key];
+	made.picture = std::move(pic);
+	made.uid = ++_turned_sprite_picture_uid;
+	spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+	return &made;
+}
+
+/** A sprite of the block among what stands on it for the card (ThreeDGpuStanding), where DrawSpriteViewport() puts it. */
+static void AddTurnedStandingSprite(ThreeDGpuStanding &out, const DrawPixelInfo &frame, SpriteID image, PaletteID pal, int x, int y, const SubSprite *sub)
+{
+	const Sprite *spr = nullptr;
+	const TurnedSpritePicture *p = TurnedStandingSprite(image, pal, frame.zoom, sub, spr);
+	if (p == nullptr || p->picture == nullptr || spr == nullptr) return;
+	const int px = UnScaleByZoom(x + spr->x_offs - frame.left, frame.zoom), py = UnScaleByZoom(y + spr->y_offs - frame.top, frame.zoom);
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	if (px >= fw || py >= fh || px + p->picture->width <= 0 || py + p->picture->height <= 0) return;
+	out.items.push_back({px, py, p->uid, p->picture});
+	_turned_times.standing_sprites++;
+}
+
+/**
+ * Where a standing thing drawn by the processor (a box, a likeness, a 3D building) may draw in the block: its box turned,
+ * with what overhangs it (half a tile) and the figures on it (six metres), pixels of the block.
+ * @return false: nothing of it in the block
+ */
+static bool TurnedStandingRect(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, int &x0, int &y0, int &w, int &h)
+{
+	const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
+	double l = std::numeric_limits<double>::infinity(), r = -l, t = l, b = -l;
+	for (int corner = 0; corner < 4; corner++) {
+		for (int z : {ps.zmin, ps.zmax + figures}) {
+			double vx, vy;
+			ProjectTurnedF((corner & 1) ? ps.xmax + over : ps.xmin - over, (corner & 2) ? ps.ymax + over : ps.ymin - over, z, vx, vy);
+			l = std::min(l, vx);
+			r = std::max(r, vx);
+			t = std::min(t, vy);
+			b = std::max(b, vy);
+		}
+	}
+	const double scale = 1.0 / (1 << to_underlying(frame.zoom));
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	x0 = std::max(0, static_cast<int>(std::floor((l - frame.left) * scale)) - 8);
+	y0 = std::max(0, static_cast<int>(std::floor((t - frame.top) * scale)) - 8);
+	const int x1 = std::min(fw, static_cast<int>(std::ceil((r - frame.left) * scale)) + 8);
+	const int y1 = std::min(fh, static_cast<int>(std::ceil((b - frame.top) * scale)) + 8);
+	w = x1 - x0;
+	h = y1 - y0;
+	return w > 0 && h > 0;
+}
+
+/**
+ * A standing thing the card has no way of its own for yet, drawn by the processor into a picture of its own
+ * (DrawTurnedStandingByProcessor()) over black and over white (TurnedStandingPixels()), the pixels it lit at night
+ * (_night_lit) marked lit; cut to what it drew.
+ * @param[in,out] x0,y0 where it is in the block: where it may draw, then the picture's top left
+ * @return nullptr: it drew nothing
+ */
+static std::shared_ptr<ThreeDGpuStandingPicture> DrawTurnedStandingApart(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, int &x0, int &y0, int w, int h)
+{
+	const size_t n = static_cast<size_t>(w) * h;
+	std::vector<uint32_t> black(n, 0xFF000000u), white(n, 0xFFFFFFFFu);
+	std::vector<uint8_t> lit(n, 0);
+	/* The glows of its lights (_night_glows) told once, by the first drawing. */
+	size_t glows = SIZE_MAX;
+	for (std::vector<uint32_t> *buf : {&black, &white}) {
+		DrawPixelInfo d = frame;
+		d.dst_ptr = buf->data();
+		d.left = frame.left + ScaleByZoom(x0, frame.zoom);
+		d.top = frame.top + ScaleByZoom(y0, frame.zoom);
+		d.width = ScaleByZoom(w, frame.zoom);
+		d.height = ScaleByZoom(h, frame.zoom);
+		d.pitch = w;
+		const size_t lit_before = _night_lit.size();
+		{
+			AutoRestoreBackup dpi_backup(_cur_dpi, &d);
+			AutoRestoreBackup vd_backup(_vd.dpi, d);
+			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			DrawTurnedStandingByProcessor(d, ps);
+		}
+		for (size_t i = lit_before; i < _night_lit.size(); i++) {
+			const ptrdiff_t at = _night_lit[i].first - buf->data();
+			if (at >= 0 && static_cast<size_t>(at) < n && *_night_lit[i].first == _night_lit[i].second) lit[at] = 1;
+		}
+		_night_lit.resize(lit_before);
+		if (glows == SIZE_MAX) {
+			glows = _night_glows.size();
+		} else {
+			_night_glows.resize(glows);
+		}
+	}
+	std::vector<uint32_t> px;
+	TurnedStandingPixels(black, white, &lit, px);
+	int l = w, r = -1, t = h, b = -1;
+	for (int y = 0; y < h; y++) {
+		const uint32_t *row = &px[static_cast<size_t>(y) * w];
+		for (int x = 0; x < w; x++) {
+			if (row[x] == 0) continue;
+			l = std::min(l, x);
+			r = std::max(r, x);
+			t = std::min(t, y);
+			b = std::max(b, y);
+		}
+	}
+	if (r < l || b < t) return nullptr;
+	auto pic = std::make_shared<ThreeDGpuStandingPicture>();
+	pic->width = r - l + 1;
+	pic->height = b - t + 1;
+	pic->pixels.resize(static_cast<size_t>(pic->width) * pic->height);
+	for (int y = 0; y < pic->height; y++) std::copy_n(&px[static_cast<size_t>(t + y) * w + l], pic->width, &pic->pixels[static_cast<size_t>(y) * pic->width]);
+	x0 += l;
+	y0 += t;
+	return pic;
+}
+
+/** A standing thing of the block among what stands on it for the card (ThreeDGpuStanding): its sprites, or a picture the processor drew of it. */
+static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	switch (ps.box_kind) {
+		case 4: return;
+		case 1: case 2: case 5: case 6: case 7: case 8: case 9: case 10: case 11: case 12: {
+			int x0, y0, w, h;
+			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return;
+			std::shared_ptr<ThreeDGpuStandingPicture> pic = DrawTurnedStandingApart(frame, ps, x0, y0, w, h);
+			if (pic != nullptr) {
+				/* Its lit pixels, where the glows of the lights by them are seen (DrawNight()). */
+				for (int y = 0; y < pic->height && _night_windows_now; y++) {
+					for (int x = 0; x < pic->width; x++) {
+						if ((pic->pixels[static_cast<size_t>(y) * pic->width + x] >> 24) == THREE_D_GPU_LIT_ALPHA) _night_lit_card.emplace_back(x0 + x, y0 + y);
+					}
+				}
+				out.items.push_back({x0, y0, 0, std::move(pic)});
+				_turned_times.standing_apart++;
+			}
+			return;
+		}
+		default: break;
+	}
+	if (ps.image != SPR_EMPTY_BOUNDING_BOX) AddTurnedStandingSprite(out, frame, ps.image, ps.pal, ps.x, ps.y, ps.sub);
+	int child_idx = ps.first_child;
+	while (child_idx >= 0) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		if (cs.relative) {
+			AddTurnedStandingSprite(out, frame, cs.image, cs.pal, ps.left + cs.x, ps.top + cs.y, cs.sub);
+		} else {
+			AddTurnedStandingSprite(out, frame, cs.image, cs.pal, ps.x + cs.x, ps.y + cs.y, cs.sub);
+		}
+	}
+}
+
 static void ViewportDoDrawTurned()
 {
 	const DrawPixelInfo frame = _vd.dpi;
@@ -6171,66 +6472,33 @@ static void ViewportDoDrawTurned()
 	std::sort(standing.begin(), standing.end(), [](const TurnedSprite &a, const TurnedSprite &b) { return a.near < b.near; });
 	/* The ground the card was laying while all the above was collected and sorted: in the block now, before anything
 	 * is drawn over it. */
-	FinishTurnedGround(ground_laying);
+	const bool ground_on_card = FinishTurnedGround(ground_laying) || card_has;
 	if (!card_usable && !ground_of_view && ground_laying.kept != nullptr) KeepTurnedGroundOfView(frame);
 	/* Its own ground in the block while the card's picture of the view's is shown: nothing of that through it. */
 	if (!card_has && !ground_laying.into_view) MakeTurnedBlockWhole(frame);
 	if (card_has) ShowTurnedCardGround();
 	double tb0 = TurnedNow();
-	for (const TurnedSprite &s : standing) {
-		const ParentSpriteToDraw *ps = s.ps;
-		if (ps->box_kind == 1) {
-			DrawTurnedHouseBox(frame, *ps);
-			continue;
+	/* Laid by the card over its ground, the block a hole (the rig's for now); else drawn into the block. */
+	bool standing_on_card = false;
+	if (_turned_card_standing_on && ground_on_card && _turned_card_ground.vp != nullptr) {
+		ThreeDGpuStanding on_card;
+		on_card.view_x = ground_laying.view_x;
+		on_card.view_y = ground_laying.view_y;
+		on_card.width = UnScaleByZoom(frame.width, frame.zoom);
+		on_card.height = UnScaleByZoom(frame.height, frame.zoom);
+		on_card.view_w = _turned_card_ground.w;
+		on_card.view_h = _turned_card_ground.h;
+		for (const TurnedSprite &s : standing) AddTurnedStandingThing(on_card, frame, *s.ps);
+		const double tc0 = TurnedNow();
+		standing_on_card = ThreeDGpuDrawStanding(on_card);
+		_turned_times.standing_card_ms += TurnedNow() - tc0;
+		if (standing_on_card) {
+			_turned_times.standing_card++;
+			ShowTurnedCardGround();
 		}
-		if (ps->box_kind == 2) {
-			DrawTurnedGenericBox(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 4) continue; // a tile of a building that is a 3D object: drawn whole (box_kind 7)
-		if (ps->box_kind == 5) {
-			DrawTurnedVehicle(frame, *ps, false);
-			continue;
-		}
-		if (ps->box_kind == 6) {
-			DrawTurnedSlab(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 7) {
-			DrawTurnedObject(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 8) {
-			DrawTurnedBridgeDeck(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 9) {
-			DrawTurnedBridgeRailing(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 10) {
-			DrawTurnedBridgeRamp(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 11) {
-			DrawTurnedBridgePillar(frame, *ps);
-			continue;
-		}
-		if (ps->box_kind == 12) {
-			DrawTurnedDepot(frame, *ps);
-			continue;
-		}
-		if (ps->image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps->image, ps->pal, ps->x, ps->y, ps->sub);
-		int child_idx = ps->first_child;
-		while (child_idx >= 0) {
-			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
-			child_idx = cs.next;
-			if (cs.relative) {
-				DrawSpriteViewport(cs.image, cs.pal, ps->left + cs.x, ps->top + cs.y, cs.sub);
-			} else {
-				DrawSpriteViewport(cs.image, cs.pal, ps->x + cs.x, ps->y + cs.y, cs.sub);
-			}
-		}
+	}
+	if (!standing_on_card) {
+		for (const TurnedSprite &s : standing) DrawTurnedStandingByProcessor(frame, *s.ps);
 	}
 	_turned_times.standing += TurnedNow() - tb0;
 }
@@ -6430,6 +6698,9 @@ static void DrawNight(bool turned)
 				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
 				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
 			}
+			for (const auto &[x, y] : _night_lit_card) {
+				if (x >= 0 && y >= 0 && x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
+			}
 		}
 		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
 			for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
@@ -6585,6 +6856,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.top = top & mask;
 	/* The lit windows of the houses, when the night is drawn on 32 bpp (DrawNight()). */
 	_night_lit.clear();
+	_night_lit_card.clear();
 	_night_glows.clear();
 	_night_windows_now = IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 	_vd.dpi.pitch = _cur_dpi->pitch;
@@ -6635,6 +6907,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	/* The night over it all but the signs (gui.night). */
 	if (IsNightNow()) DrawNight(IsViewportTurned(vp));
 	_night_lit.clear();
+	_night_lit_card.clear();
 	_night_glows.clear();
 	_night_windows_now = false;
 

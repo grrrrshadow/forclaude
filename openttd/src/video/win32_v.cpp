@@ -1774,11 +1774,11 @@ std::optional<std::string_view> VideoDriver_Win32OpenGL::AllocateContext()
 	return backend_err;
 }
 
-bool VideoDriver_Win32OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light)
+bool VideoDriver_Win32OpenGL::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light, uint32_t over, uint32_t over_lit)
 {
 	OpenGLBackend *backend = OpenGLBackend::Get();
 	if (backend == nullptr || !backend->CanShowThreeDPictures()) return false;
-	backend->ShowThreeDPicture(owner, r, texture, tint, under, light);
+	backend->ShowThreeDPicture(owner, r, texture, tint, under, light, over, over_lit);
 	return true;
 }
 

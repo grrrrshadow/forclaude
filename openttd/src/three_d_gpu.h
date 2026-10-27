@@ -349,6 +349,36 @@ struct ThreeDGpuEyeFrame {
 	uint32_t shown = 0;              ///< the texture of the video driver's OpenGL it is in, top row first (shown)
 };
 
+/**
+ * A picture of a thing standing on the turned map as the card lays it (ThreeDGpuStanding): its colours with their alpha
+ * multiplied in (Colour::data, what it gives over black), top row first; a pixel lit at night (a window, a lamp's
+ * glass: the night does not darken it) whole, of alpha THREE_D_GPU_LIT_ALPHA.
+ */
+struct ThreeDGpuStandingPicture {
+	int width = 0, height = 0;
+	std::vector<uint32_t> pixels;
+};
+static constexpr uint8_t THREE_D_GPU_LIT_ALPHA = 254;
+
+/** A thing standing on a block of the turned map: its picture laid at its place. */
+struct ThreeDGpuStandingItem {
+	int x = 0, y = 0; ///< its top left in the block, pixels
+	uint64_t key = 0; ///< kept on the card by this (a sprite's picture); 0 this block's alone
+	std::shared_ptr<const ThreeDGpuStandingPicture> picture;
+};
+
+/**
+ * What stands on a block of the turned map, laid by the card into the picture of the view's standing things, far
+ * first, each over those before; shown straight from the card over the view's ground (ThreeDGpuViewGround()) and under
+ * the screen (the player, 26. 10.: "the card to compose the turned map", step 2). The block cleared first.
+ */
+struct ThreeDGpuStanding {
+	int view_x = 0, view_y = 0;  ///< where the block is in the picture of the view, pixels from its top left
+	int width = 0, height = 0;   ///< the block
+	int view_w = 0, view_h = 0;  ///< the view's (as its ground's)
+	std::vector<ThreeDGpuStandingItem> items;
+};
+
 bool ThreeDGpuAvailable(bool wait = false);
 bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
@@ -358,6 +388,8 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
 uint32_t ThreeDGpuViewGround(uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
+bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
+uint32_t ThreeDGpuViewStanding(uint32_t *lit = nullptr);
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);

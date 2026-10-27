@@ -728,9 +728,14 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 		this->three_d_size_loc = _glGetUniformLocation(this->three_d_program, "screen_size");
 		this->three_d_tint_loc = _glGetUniformLocation(this->three_d_program, "tint");
 		this->three_d_light_loc = _glGetUniformLocation(this->three_d_program, "light");
+		this->three_d_over_loc = _glGetUniformLocation(this->three_d_program, "has_over");
+		GLint over_tex_location = _glGetUniformLocation(this->three_d_program, "over_tex");
+		GLint over_lit_tex_location = _glGetUniformLocation(this->three_d_program, "over_lit_tex");
 		_glUseProgram(this->three_d_program);
-		_glUniform1i(tex_location, 0);        // Texture unit 0.
-		_glUniform1i(screen_tex_location, 1); // Texture unit 1.
+		_glUniform1i(tex_location, 0);           // Texture unit 0.
+		_glUniform1i(screen_tex_location, 1);    // Texture unit 1.
+		_glUniform1i(over_tex_location, 2);      // Texture unit 2.
+		_glUniform1i(over_lit_tex_location, 3);  // Texture unit 3.
 	}
 	(void)_glGetError(); // Clear errors.
 
@@ -1146,8 +1151,19 @@ void OpenGLBackend::Paint()
 				_glUniform4f(this->three_d_tint_loc, tint.r / 255.0f, tint.g / 255.0f, tint.b / 255.0f, pic.tint == 0 ? 0.0f : tint.a / 255.0f);
 				const Colour light(pic.light);
 				_glUniform4f(this->three_d_light_loc, pic.light == 0 ? 1.0f : light.r / 256.0f, pic.light == 0 ? 1.0f : light.g / 256.0f, pic.light == 0 ? 1.0f : light.b / 256.0f, 1.0f);
+				/* What stands on the turned map over its ground (ThreeDGpuViewStanding()). */
+				_glUniform1f(this->three_d_over_loc, pic.over != 0 ? 1.0f : 0.0f);
+				_glActiveTexture(GL_TEXTURE2);
+				_glBindTexture(GL_TEXTURE_2D, pic.over);
+				_glActiveTexture(GL_TEXTURE3);
+				_glBindTexture(GL_TEXTURE_2D, pic.over_lit);
+				_glActiveTexture(GL_TEXTURE0);
 				_glBindTexture(GL_TEXTURE_2D, pic.texture);
 				_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+			}
+			for (GLenum unit : {GL_TEXTURE2, GL_TEXTURE3}) {
+				_glActiveTexture(unit);
+				_glBindTexture(GL_TEXTURE_2D, 0);
 			}
 			_glActiveTexture(GL_TEXTURE1);
 			_glBindTexture(GL_TEXTURE_2D, 0);
@@ -1186,11 +1202,13 @@ void OpenGLBackend::Paint()
  * @param tint laid over it by its alpha (Colour::data), 0 none
  * @param under shown under the others
  * @param light its colours multiplied by these, 256ths (Colour::data), 0 as they are
+ * @param over the card's picture laid over it (what stands on the turned map), its alpha multiplied in, 0 none
+ * @param over_lit which of over's pixels the light leaves as they are (its red), 0 none
  */
-void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light)
+void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light, uint32_t over, uint32_t over_lit)
 {
 	std::lock_guard lock(this->three_d_mutex);
-	this->three_d_pictures[owner] = {r, texture, tint, under, light};
+	this->three_d_pictures[owner] = {r, texture, tint, under, light, over, over_lit};
 }
 
 /** A window's picture of the graphics card shown no more. */
