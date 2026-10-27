@@ -57,6 +57,17 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   asi 3,96 m, takže klády a prkna se nevejdou (kratší kusy nebo delší lože, i pro V3S). Cihly `cihly_sede` s barvou
   `A84832`: která? Terrno a lesovoz: `balik` nebo nový kus. Nákup ukazuje tahač i návěs v jednom stavu, ale stav má jen
   jedno `loze`: uzly `*_oba` nechat jen pro nákup, nebo hra udělá `loze` jako pole.
+- Kolega (`ZVLASTNI-VOZY-NAKLADY-PRO-HRU.md`), hráč: *„cihly budou sede i cervene a drevo ti piše od včera skratit“*,
+  *„lesovoz vozil dřevo, nic neměniš, přesouvaš naklady . když to nejde do ingame nakladů tak ten naklad zustane
+  v grf“*:
+  - `klady` a `prkna` v sadě `naklady` jsou 3,6 m (jména stejná); vejdou se na V3S (1 svazek klád nebo 2 prken),
+    Autosan i Liaz MTS;
+  - Autosan (`Zvlastni_vozy_3D-v1`, nový tar md5 c6241ae4…, GRF stejný) bere kusy hry, cihly barvou podle nákladu
+    (BRCK/BDMT), `loze` ve stavu těla; kupy mari a ovoce zůstávají jeho;
+  - Terrno (kulaté balíky ve třech vrstvách) a lesovoz (9 m kmeny) zůstávají v GRF, nákup taky.
+  - Rig: Autosan se 6 prasátky a 2 svazky klád, V3S s kládami i prkny.
+- Kolega (`BUILD-PRO-HRU.md`): za grrrrf build nic nebrzdí. Hráči radí nechat v newgrf jen poslední verze (Vagony v8,
+  Tatry v4).
 
 ## 26. 10. (18) – Návěs přes tahač, V3S s kusovými náklady, barva nákladu ze stavu
 

@@ -489,7 +489,7 @@
    "en": "logs"
   },
   "rozmer_m": [
-   3.99,
+   3.59,
    1.025,
    0.917
   ],
@@ -515,7 +515,7 @@
   ],
   "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "svazek šesti klád 4 m (3 + 2 + 1, průměr asi 0,34 m), kůra a letokruhy na čelech, bez palety; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 11 kB, glb z gltfpacku"
+  "poznamka": "svazek šesti klád 3,6 m (3 + 2 + 1, průměr asi 0,34 m), kůra a letokruhy na čelech, bez palety; od 27. 10. kratší (dřív 4 m), aby se vešly na V3S, Autosan a Liaz MTS; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 11 kB, glb z gltfpacku"
  },
  {
   "soubor": "prkna.glb",
@@ -526,7 +526,7 @@
    "en": "planks"
   },
   "rozmer_m": [
-   4.0,
+   3.6,
    1.0,
    0.64
   ],
@@ -548,7 +548,7 @@
   ],
   "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "svazek prken 4 × 1 m ve čtyřech vrstvách na prokladech, bez palety; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 13 kB, glb z gltfpacku"
+  "poznamka": "svazek prken 3,6 × 1 m ve čtyřech vrstvách na prokladech, bez palety; od 27. 10. kratší (dřív 4 m); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 13 kB, glb z gltfpacku"
  },
  {
   "soubor": "balik.glb",
