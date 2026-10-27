@@ -9752,6 +9752,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		std::string list;
 		for (int s : _three_d_rig_states) list += fmt::format(" {}", s);
 		IConsolePrint(CC_DEFAULT, "test3d: stav{}", list.empty() ? " 0" : list);
+	} else if (what == "naklad" && argv.size() > 2) {
+		/* 'naklad <LABEL>|0': the cargo the load is of in a drawing of no vehicle ('kresli', the purchase list), 0 the
+		 * engine's own (the flatbed of the 1203 with the pieces of its cargo). */
+		extern uint32_t _three_d_rig_cargo;
+		const std::string_view l = argv[2];
+		_three_d_rig_cargo = l.size() == 4 ? static_cast<uint32_t>(static_cast<uint8_t>(l[0])) << 24 | static_cast<uint32_t>(static_cast<uint8_t>(l[1])) << 16 | static_cast<uint32_t>(static_cast<uint8_t>(l[2])) << 8 | static_cast<uint8_t>(l[3]) : 0;
+		IConsolePrint(CC_DEFAULT, "test3d: naklad {}", _three_d_rig_cargo != 0 ? l : "0");
 	} else if (what == "lampy") {
 		/* 'lampy': the road tiles with the game's street lights (Roadside::StreetLights), where the 3D views stand
 		 * the colleague's lamps (GetThreeDStreetLamp()); how many and the first few. */

@@ -3858,8 +3858,10 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 	/* Its colours by the cargo: each a state of the figure, the paint's colour over its mask. */
 	if (e.contains("naklady") && e.at("naklady").is_array()) {
 		for (const auto &n : e.at("naklady")) {
-			if (!n.is_object() || !n.contains("barva") || !n.at("barva").is_string() || fig.file.empty()) continue;
+			if (!n.is_object()) continue;
 			const uint32_t label = ParseLoadLabel(n.value("naklad", nlohmann::json()));
+			if (label != 0) piece.cargoes.push_back(label);
+			if (!n.contains("barva") || !n.at("barva").is_string() || fig.file.empty()) continue;
 			std::string c = n.at("barva").get<std::string>();
 			if (c.starts_with("#")) c = c.substr(1);
 			auto rgb = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
@@ -4854,11 +4856,27 @@ static void ReadThreeDVehicleObjects()
 				}
 				ThreeDVehicleState st;
 				st.colour = Colour(now[0], now[1], now[2], c.a).data;
+				st.given = ThreeDVehicleState::GIVEN_COLOUR;
+				/* A flatbed's bed, the pieces of its cargo on it (the player, 27. 10.: "ingame naklady dej na valniky 1203 1500"). */
+				if (b.has_bed) {
+					st.bed.floor = b.bed_floor;
+					std::copy(std::begin(b.bed_x), std::end(b.bed_x), st.bed.x);
+					std::copy(std::begin(b.bed_y), std::end(b.bed_y), st.bed.y);
+					st.bed.sides = b.bed_sides;
+					st.bed.top = b.bed_top;
+				}
 				obj.states.push_back(st);
 			}
 		}
 		obj.paint_random = true;
 		obj.paint_years = BEAMNG_FADE_YEARS + 1;
+		obj.loads_by_cargo = b.has_bed;
+		/* Its tarp, over a load of a cargo the shared loads have no piece of (the player, 27. 10.: "když poveze naklad
+		 * ktery nemame grafiku připravenou tak plná s plachtou"). */
+		if (b.has_tarp) {
+			obj.part_names = {std::string(), "plachta"};
+			obj.cover_part = BeamngMesh::PART_TARP;
+		}
 		if (b.has_cab) {
 			std::copy(std::begin(b.cab), std::end(b.cab), obj.cab);
 			obj.has_cab = true;
@@ -4954,6 +4972,21 @@ const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name)
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	for (const ThreeDLoadPiece &p : _load_pieces) {
 		if (p.name == name) return &p;
+	}
+	return nullptr;
+}
+
+/**
+ * The piece of the shared loads of a cargo, for a vehicle no GRF picks one for (ThreeDVehicleObject::loads_by_cargo,
+ * a flatbed of BeamNG): the first whose table ("naklady") has the cargo and of which its bed takes one at least.
+ * @return nullptr none
+ */
+const ThreeDLoadPiece *GetThreeDLoadPieceOfCargo(uint32_t label, const ThreeDLoadBed &bed)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (label == 0) return nullptr;
+	for (const ThreeDLoadPiece &p : _load_pieces) {
+		if (std::ranges::find(p.cargoes, label) != p.cargoes.end() && ThreeDLoadCapacity(p, bed) > 0) return &p;
 	}
 	return nullptr;
 }
@@ -5981,6 +6014,10 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->tri = std::move(bm.tri);
 		made->tri_tex = std::move(bm.tri_tex);
 		made->facing = std::move(bm.tri_facing);
+		if (!bm.tri_part.empty()) {
+			made->tri_part = std::move(bm.tri_part);
+			made->tri_part.resize(made->tri.size() / 3, 0);
+		}
 		/* Pixels as they are, marked so (DecodeTextureLevels()). */
 		auto raw_of = [](int w, int h, const std::vector<uint8_t> &rgba) {
 			std::vector<uint8_t> raw(RAW_TEXTURE_MARK.begin(), RAW_TEXTURE_MARK.end());
@@ -6864,10 +6901,16 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 	/* How many pieces lie on its bed, of which cargo (ThreeDLoadCode()). */
 	made.load_count = static_cast<uint8_t>(std::min<uint64_t>(load >> 32, 255));
 	made.load_label = static_cast<uint32_t>(load);
+	/* No GRF names the piece: its cargo's. */
+	if (made.load_piece.empty() && this->loads_by_cargo && made.bed.Given()) {
+		if (const ThreeDLoadPiece *piece = GetThreeDLoadPieceOfCargo(made.load_label, made.bed); piece != nullptr) made.load_piece = piece->name;
+	}
 	for (int16_t part : made.addon_parts) {
 		if (part > 0) made.parts.Set(part);
 	}
 	if (made.crew_part > 0) made.parts.Set(made.crew_part);
+	/* Loaded with a cargo of no piece: its cover over it (the tarp of a flatbed of BeamNG). */
+	if (this->cover_part > 0 && made.load_piece.empty() && made.load_count > 0) made.parts.Set(this->cover_part);
 	this->composed.push_back(std::move(made));
 	const int step = static_cast<int>(this->states.size() + this->composed.size());
 	this->composed_steps.emplace(std::make_tuple(layers, true_colours, load), step);

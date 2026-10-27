@@ -697,6 +697,8 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
 	bool paint_random = false;      ///< a car of a mod of BeamNG (beamng.h): its states the paints of the mod, one of them each car by its random bits
 	uint8_t paint_years = 1;        ///< and of each paint so many states, one a year of its age, the paint fading (BEAMNG_FADE_YEARS + 1)
+	bool loads_by_cargo = false;    ///< the piece of the shared loads on the bed of its states is its cargo's (GetThreeDLoadPieceOfCargo()), no GRF picking it: a flatbed of BeamNG
+	uint8_t cover_part = 0;         ///< and the part over a load of a cargo of no piece, shown when it is loaded (the flatbed's tarp, BeamngMesh::PART_TARP); 0 none
 	HouseID drive_house = UINT16_MAX; ///< a car of the game's own ("auto" with "jizda"): drives between the houses of this original house, from stop ("stani") to stop
 	float drive_kmh = 60;           ///< "rychlost_kmh"
 	int drive_stand = 400;          ///< "stoji_tiku": ticks it stands at a stop
@@ -824,6 +826,7 @@ struct ThreeDLoadPiece {
 	float size[3] = {};              ///< "rozmer_m": along, across, up, metres; an animal's with room about it
 	int layers = 1;                  ///< "skladani" "max_vrstev"
 	bool quarter_turn = false;       ///< "otaceni" with 90: it may lie across the bed
+	std::vector<uint32_t> cargoes;   ///< the labels of its table ("naklady"), with a colour or without
 	std::vector<std::pair<uint32_t, int>> colours; ///< the labels of its table ("naklady") with a colour, each with the state of its figure in that colour
 	std::vector<std::pair<uint32_t, int>> own_colours; ///< the colours the vehicles' states give it ("naklad" "barva", Colour::data), each with the state of its figure in that colour
 	std::vector<ThreeDVehicleCrew> seats; ///< "posadka": the figures sitting on it (a bench of the girls), in its frame, filled in their order as the load is
@@ -838,6 +841,7 @@ struct ThreeDLoadPlace {
 };
 
 const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name);
+const ThreeDLoadPiece *GetThreeDLoadPieceOfCargo(uint32_t label, const ThreeDLoadBed &bed);
 int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed);
 void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out);
 int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label, uint32_t colour = 0);

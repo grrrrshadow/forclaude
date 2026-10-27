@@ -623,6 +623,7 @@ struct CarParts {
 	std::map<const JValue *, std::array<double, 3>> offsets; ///< how far its slots move a part used ("nodeOffset")
 	std::string skin;             ///< the configuration's paint design: "globalSkin" of a part used (the Škoda 1203's VB, the slot "paint_design")
 	std::vector<uint32_t> paints; ///< the configuration's own paints ("paints" of the .pc, its "baseColor"), Colour::data: the colours of its paint design
+	const JValue *tarp = nullptr; ///< the tarp over a flatbed's bed: the part of the bed's slot of a roof ("..._roof") the configuration leaves empty, drawn when the game covers a load (BeamngMesh::PART_TARP)
 
 	/** A number of the parts' (JbeamNumber()). */
 	double Number(const JValue &v, double def = 0) const
@@ -735,6 +736,9 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 		if (!seen.insert(part).second) continue;
 		parts.used.push_back(part);
 		for (const PartSlot &slot : SlotsOf(*part)) {
+			/* Not the load a mod puts on its bed (the wooden crate of the Škoda 1203's flatbed, "S1203_bed_cargo"): the
+			 * game lays its own there, those of its cargo (FindBed()). */
+			if (EndsWithIgnoreCase(slot.type, "_bed_cargo")) continue;
 			auto c = chosen.find(slot.type);
 			const std::string &name = c != chosen.end() ? c->second : slot.part;
 			if (name.empty()) continue;
@@ -771,6 +775,26 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts)
 			}
 		}
 		if (off[0] != 0 || off[1] != 0 || off[2] != 0) parts.offsets[part] = off;
+	}
+	/* The tarp of a flatbed (the player, 27. 10.: "je tam valnik s plachtou, když poveze naklad ktery nemame grafiku
+	 * připravenou tak plná s plachtou"): the first part made for its bed's empty slot of a roof (the Škoda 1203's
+	 * S1203_roof, "Tarp Roof"), moved as its bed is. */
+	for (const JValue *part : parts.used) {
+		const JValue *type = part->Get("slotType");
+		if (type == nullptr || !type->IsString() || !EndsWithIgnoreCase(type->text, "_bed")) continue;
+		for (const PartSlot &slot : SlotsOf(*part)) {
+			if (!EndsWithIgnoreCase(slot.type, "_roof")) continue;
+			auto c = chosen.find(slot.type);
+			if (!(c != chosen.end() ? c->second : slot.part).empty()) continue;
+			for (const auto &[name, p] : by_name) {
+				const JValue *t = p->Get("slotType");
+				if (t == nullptr || !t->IsString() || t->text != slot.type) continue;
+				parts.tarp = p;
+				if (auto off = parts.offsets.find(part); off != parts.offsets.end()) parts.offsets[p] = off->second;
+				break;
+			}
+		}
+		break;
 	}
 	/* The nodes: a row [id, x, y, z, {...}], weighed by the "nodeWeight" set before it or in it; moved by their part's slots. */
 	for (const JValue *part : parts.used) {
@@ -915,6 +939,67 @@ static void MakeModels(BeamngVehicle &v, const std::string &own_config)
  * A car of its folder in the mod, if it is one with a model and an engine.
  * @param config its configuration, a .pc of the folder without ".pc"; empty the default one
  */
+/**
+ * The bed of a flatbed, where the game lays the pieces of its shared loads (the player, 27. 10.: "ingame naklady dej na
+ * valniky 1203 1500"): the nodes of the part in the slot of its bed ("..._bed", the Škoda 1203's S1203_bed, its floor
+ * and its gates). Its floor the height most of them are at, from its back to its front and from side to side as far
+ * as those of the floor go, its sides as high as the highest of them over it.
+ */
+static void FindBed(const CarParts &parts, const CarFrame &frame, BeamngVehicle &v)
+{
+	static constexpr double FLOOR_M = 0.03; ///< how far a node of the floor may be from its height
+	for (const JValue *part : parts.used) {
+		const JValue *type = part->Get("slotType");
+		if (type == nullptr || !type->IsString() || !EndsWithIgnoreCase(type->text, "_bed")) continue;
+		const JValue *nodes = part->Get("nodes");
+		if (nodes == nullptr || !nodes->IsArray()) continue;
+		std::vector<std::array<double, 3>> at;
+		for (const JValue &row : nodes->items) {
+			if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString()) continue;
+			if (auto n = parts.nodes.find(row.items[0].text); n != parts.nodes.end()) at.push_back(n->second);
+		}
+		double floor = 0;
+		size_t most = 0;
+		for (const auto &a : at) {
+			const size_t near = std::ranges::count_if(at, [&a](const auto &b) { return std::abs(b[2] - a[2]) <= FLOOR_M; });
+			if (near > most) {
+				most = near;
+				floor = a[2];
+			}
+		}
+		if (most < 4) continue;
+		double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, top = floor;
+		for (const auto &a : at) {
+			top = std::max(top, a[2]);
+			if (std::abs(a[2] - floor) > FLOOR_M) continue;
+			x0 = std::min(x0, a[0]);
+			x1 = std::max(x1, a[0]);
+			y0 = std::min(y0, a[1]);
+			y1 = std::max(y1, a[1]);
+		}
+		if (x1 - x0 < 0.5 || y1 - y0 < 0.5) continue;
+		/* BeamNG's y backwards is the game's x forward, its x to the left the game's y. */
+		const std::array<float, 3> back = ToObject(frame, x0, y1, floor), front = ToObject(frame, x1, y0, floor);
+		v.bed_x[0] = std::min(back[0], front[0]);
+		v.bed_x[1] = std::max(back[0], front[0]);
+		v.bed_y[0] = std::min(back[1], front[1]);
+		v.bed_y[1] = std::max(back[1], front[1]);
+		v.bed_floor = back[2];
+		v.bed_sides = static_cast<float>(top - floor);
+		/* No load higher than its tarp goes (a 1203 does not carry its bales two high over its cab). */
+		if (const JValue *tarp_nodes = parts.tarp != nullptr ? parts.tarp->Get("nodes") : nullptr; tarp_nodes != nullptr && tarp_nodes->IsArray()) {
+			double high = floor;
+			for (const JValue &row : tarp_nodes->items) {
+				if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || !IsJbeamNumber(row.items[1])) continue;
+				high = std::max(high, parts.Moved(parts.tarp, parts.Number(row.items[1]), parts.Number(row.items[2]), parts.Number(row.items[3]))[2]);
+			}
+			if (high > floor + 0.3) v.bed_top = ToObject(frame, 0, 0, high)[2];
+		}
+		v.has_bed = true;
+		return;
+	}
+}
+
 std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &folder, const std::string &id, const std::string &config = {})
 {
 	BeamngVehicle v;
@@ -1128,19 +1213,15 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	 * Its cargoes by what it is (the player, 26. 10., of the 1203's configurations): a police car ("VB") or an ambulance
 	 * one passenger or one studentka; a passenger van its people; a flatbed and a van the cargoes of our 1203 with a
 	 * tarp, the flatbed without people. Any other car every cargo of the game (the player: "give the BeamNG cars all
-	 * the cargoes in the game"). The post's van and the army's (the player, 27. 10.: "spoje to je pošta ceniny a
-	 * vojenska explosives", "sanitka to je vojenska" -- the khaki ambulance of the 1203, not the yellow ambulance2):
-	 * the post's the mail and the valuables of each climate, the army's explosives, in a game without them (no
-	 * economy.extra_industries) one passenger as the other ambulance.
+	 * the cargoes in the game"). The post's van (the player, 27. 10.: "spoje to je pošta ceniny") the mail and the
+	 * valuables of each climate. The army's ambulance (the khaki "ambulance" of the 1203, the yellow is "ambulance2")
+	 * as the other ("to asi nebudem vozit vybušniny sanitkou").
 	 */
 	std::string what = own_config + " ";
 	if (const JValue *c = info.Get("Configuration"); c != nullptr && c->IsString()) what += c->text;
 	strtolower(what);
 	auto has = [&what](std::initializer_list<std::string_view> words) { return std::ranges::any_of(words, [&what](std::string_view w) { return what.find(w) != std::string::npos; }); };
-	if (StrEqualsIgnoreCase(own_config, "ambulance")) {
-		v.cargoes = {"BOOM", "PASS"};
-		v.goods = true;
-	} else if (has({"spoje"})) {
+	if (has({"spoje"})) {
 		v.cargoes = {"MAIL", "VALU", "GOLD", "DIAM"};
 		v.goods = true;
 	} else if (has({"police", "vb", "ambulance", "sanit"})) {
@@ -1156,6 +1237,8 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 			if (std::ranges::find(PEOPLE_CARGOES, c) == PEOPLE_CARGOES.end()) v.cargoes.push_back(c);
 		}
 		v.goods = true;
+		FindBed(parts, frame, v);
+		v.has_tarp = v.has_bed && parts.tarp != nullptr;
 	} else if (style.find("van") != std::string::npos || has({"van", "com", "hearse", "fire", "dodav"})) {
 		v.cargoes = TARP_1203_CARGOES;
 		v.goods = true;
@@ -2309,6 +2392,7 @@ void Simplify(BeamngMesh &mesh, float cell)
 	std::vector<uint8_t> tri_tex;
 	std::vector<int16_t> tri_cell;
 	std::vector<int8_t> tri_facing;
+	std::vector<uint8_t> tri_part;
 	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
 		const uint8_t material = t / 3 < mesh.tri_tex.size() ? mesh.tri_tex[t / 3] : 0;
 		const int16_t paint_cell = t / 3 < mesh.tri_cell.size() ? mesh.tri_cell[t / 3] : -1;
@@ -2336,6 +2420,7 @@ void Simplify(BeamngMesh &mesh, float cell)
 		tri_tex.push_back(material);
 		tri_cell.push_back(paint_cell);
 		tri_facing.push_back(t / 3 < mesh.tri_facing.size() ? mesh.tri_facing[t / 3] : 0);
+		if (!mesh.tri_part.empty()) tri_part.push_back(t / 3 < mesh.tri_part.size() ? mesh.tri_part[t / 3] : 0);
 	}
 	nrm.resize(sums.size());
 	for (size_t i = 0; i + 2 < sums.size(); i += 3) {
@@ -2349,6 +2434,7 @@ void Simplify(BeamngMesh &mesh, float cell)
 	mesh.tri_tex = std::move(tri_tex);
 	mesh.tri_cell = std::move(tri_cell);
 	mesh.tri_facing = std::move(tri_facing);
+	mesh.tri_part = std::move(tri_part);
 }
 
 } // namespace
@@ -2646,8 +2732,11 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	for (const std::string &f : ListModCommonFiles(v)) {
 		if (EndsWithIgnoreCase(f, ".dae")) common_daes.push_back(f);
 	}
+	/* The parts drawn: those used, and the tarp of a flatbed, a part of the shape of its own. */
+	std::vector<const JValue *> drawn = parts.used;
+	if (parts.tarp != nullptr) drawn.push_back(parts.tarp);
 	std::set<std::string> wanted; // the meshes the flexbodies name
-	for (const JValue *part : parts.used) {
+	for (const JValue *part : drawn) {
 		const JValue *flex = part->Get("flexbodies");
 		if (flex == nullptr || !flex->IsArray()) continue;
 		for (const JValue &row : flex->items) {
@@ -2819,9 +2908,16 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	/* The flexbodies of the parts: a mesh, its groups, and where it is put. */
 	int meshes = 0, missing = 0;
 	std::set<std::string> drawn_groups; // the groups of nodes the meshes drawn hang on (a wheel's "wheel_FR", "tire_FR")
-	for (const JValue *part : parts.used) {
+	for (const JValue *part : drawn) {
 		const JValue *flex = part->Get("flexbodies");
 		if (flex == nullptr || !flex->IsArray()) continue;
+		const size_t first_tri = mesh.tri.size() / 3;
+		/* The tarp's triangles a part of their own. */
+		auto mark_tarp = [&]() {
+			if (part != parts.tarp) return;
+			mesh.tri_part.resize(mesh.tri.size() / 3, 0);
+			std::fill(mesh.tri_part.begin() + first_tri, mesh.tri_part.end(), BeamngMesh::PART_TARP);
+		};
 		for (const JValue &row : flex->items) {
 			if (!row.IsArray() || row.items.empty() || !row.items[0].IsString() || row.items[0].text == "mesh") continue;
 			std::string mesh_name = row.items[0].text;
@@ -2922,6 +3018,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 				}
 			}
 		}
+		mark_tarp();
 	}
 	/*
 	 * Its wheels the mod leaves to BeamNG's own parts (the player, 26. 10.: the Škoda 1203 "has no wheels": its

@@ -165,6 +165,7 @@ static float ObjectScale(const ThreeDVehicleObject *obj)
 
 /** The rig: 'test3d stav <n> [<n> ...]' draws every vehicle object with states in its state n, several the states of its layers made one (empty: as its GRF picks). */
 std::vector<int> _three_d_rig_states;
+uint32_t _three_d_rig_cargo = 0; ///< the rig's cargo ('test3d naklad'): its label the load of a drawing of no vehicle (the purchase list, 'kresli') is of, 0 the engine's own
 
 /**
  * The state of a vehicle's object its GRF picks ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): for each layer of its
@@ -196,19 +197,29 @@ static uint64_t LoadCode(const ThreeDVehicleObject *obj, const std::vector<int> 
 		if (s.bed.Given()) bed = s.bed;
 		if (!s.placed_loads.empty()) placed = true;
 	}
-	const ThreeDLoadPiece *piece = !name.empty() && bed.Given() ? GetThreeDLoadPiece(name) : nullptr;
-	const int capacity = piece != nullptr ? ThreeDLoadCapacity(*piece, bed) * std::max<int>(1, static_cast<int>(piece->seats.size())) : 0;
-	if (capacity <= 0 && !placed) return 0;
-	int count = std::min(capacity, 255);
 	CargoType cargo = INVALID_CARGO;
 	if (v != nullptr) {
-		const uint stored = v->cargo.StoredCount(), cap = v->cargo_cap;
-		count = cap == 0 || capacity <= 0 ? 0 : std::clamp<int>(static_cast<int>((static_cast<uint64_t>(stored) * capacity + cap / 2) / cap), stored > 0 ? 1 : 0, std::min(capacity, 255));
 		cargo = v->cargo_type;
 	} else if (const Engine *e = Engine::GetIfValid(engine); e != nullptr) {
 		cargo = e->GetDefaultCargoType();
 	}
-	const uint32_t label = IsValidCargoType(cargo) ? CargoSpec::Get(cargo)->label.base() : 0;
+	const uint32_t label = v == nullptr && _three_d_rig_cargo != 0 ? _three_d_rig_cargo : IsValidCargoType(cargo) ? CargoSpec::Get(cargo)->label.base() : 0;
+	const ThreeDLoadPiece *piece = !name.empty() && bed.Given() ? GetThreeDLoadPiece(name) : nullptr;
+	/* No GRF names it (a flatbed of BeamNG): its cargo's (ThreeDVehicleObject::ComposeState() puts it so). */
+	if (piece == nullptr && name.empty() && obj->loads_by_cargo && bed.Given()) piece = GetThreeDLoadPieceOfCargo(label, bed);
+	const int capacity = piece != nullptr ? ThreeDLoadCapacity(*piece, bed) * std::max<int>(1, static_cast<int>(piece->seats.size())) : 0;
+	/* A cargo of no piece under its cover (the tarp of a flatbed of BeamNG): one, whenever anything is loaded. */
+	const bool covered = piece == nullptr && name.empty() && obj->cover_part > 0 && bed.Given() && label != 0;
+	if (capacity <= 0 && !placed && !covered) return 0;
+	int count = covered ? 1 : std::min(capacity, 255);
+	if (v != nullptr) {
+		const uint stored = v->cargo.StoredCount(), cap = v->cargo_cap;
+		if (covered) {
+			count = stored > 0 ? 1 : 0;
+		} else {
+			count = cap == 0 || capacity <= 0 ? 0 : std::clamp<int>(static_cast<int>((static_cast<uint64_t>(stored) * capacity + cap / 2) / cap), stored > 0 ? 1 : 0, std::min(capacity, 255));
+		}
+	}
 	return static_cast<uint64_t>(count) << 32 | label;
 }
 
@@ -223,12 +234,17 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
 		return obj->ComposeState(layers, colours, LoadCode(obj, layers, nullptr, engine));
 	}
-	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years. */
+	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years; a
+	 * flatbed with the pieces of its cargo on its bed, as many as it is loaded. */
 	if (obj->paint_random) {
 		const size_t years = std::max<size_t>(obj->paint_years, 1), paints = std::max<size_t>(obj->states.size() / years, 1);
-		if (v == nullptr) return 1;
-		const size_t age = std::min<size_t>(static_cast<size_t>(std::max(v->age.base(), 0)) / CalendarTime::DAYS_IN_YEAR, years - 1);
-		return 1 + static_cast<int>((v->random_bits % paints) * years + age);
+		int step = 1;
+		if (v != nullptr) {
+			const size_t age = std::min<size_t>(static_cast<size_t>(std::max(v->age.base(), 0)) / CalendarTime::DAYS_IN_YEAR, years - 1);
+			step = 1 + static_cast<int>((v->random_bits % paints) * years + age);
+		}
+		if (!obj->loads_by_cargo) return step;
+		return obj->ComposeState({step}, 0, LoadCode(obj, {step}, v, engine));
 	}
 	/* The sets of the layers of its pieces, each piece's after the one before: of every piece of it (the colleague's
 	 * semi-trailer has its sets in its first piece and hangs from its middle one, the lesovoz has them in its second,

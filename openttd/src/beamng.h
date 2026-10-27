@@ -56,6 +56,13 @@ struct BeamngVehicle {
 	std::vector<std::string> cargoes; ///< the labels of the cargoes it may be refitted to, the first its own; empty every cargo of the game
 	bool has_cab = false;         ///< a camera of the driver given
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
+	bool has_bed = false;         ///< a flatbed: the game's shared loads lie on its bed (ThreeDLoadBed), the piece of its cargo
+	float bed_x[2] = {};          ///< its bed from its back to its front, metres in that frame
+	float bed_y[2] = {};          ///< from side to side
+	float bed_floor = 0;          ///< the height of its floor
+	float bed_sides = 0;          ///< how high its sides are over the floor
+	float bed_top = 0;            ///< no piece of a load higher: the top of its tarp; 0 none
+	bool has_tarp = false;        ///< the tarp of its bed is a part of its shape (BeamngMesh::PART_TARP), over a load of no pieces
 	int year_from = 0;            ///< "Years" of its info.json: the first year made, 0 none given
 	std::vector<BeamngModel> models; ///< the cars of the purchase list made of it
 	uint32_t grfid = 0;           ///< the GRF's id, of its .zip's and folder's names: one GRF a folder, all its configurations in it
@@ -77,6 +84,8 @@ struct BeamngMesh {
 	std::vector<uint8_t> tri_tex; ///< each triangle's material: 0 the paint (the painted materials side by side, painted in the car's colour)
 	std::vector<int16_t> tri_cell; ///< each triangle of the paint: its painted material (paint_sources), -1 none; the triangles after it none
 	std::vector<int8_t> tri_facing; ///< each triangle's outer side: 1 as its corners go round, -1 the other way, 0 seen from both sides (a material "doubleSided"); the triangles after it both
+	static constexpr uint8_t PART_TARP = 1; ///< tri_part: the tarp over a flatbed's bed (BeamngVehicle::has_tarp)
+	std::vector<uint8_t> tri_part; ///< each triangle's part: 0 always, PART_TARP; the triangles after it 0, empty all 0
 	/** A material: its texture as RGBA, 4 bytes a pixel, or its colour alone. */
 	struct Material {
 		std::string name;

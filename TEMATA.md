@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (22) – 1203 valník: kusové náklady hry, plachta pro náklad bez grafiky
+
+- Hráč: *„to asi nebudem vozit vybušniny sanitkou. ingame naklady dej na valniky 1203 1500 .....“*, *„je tam valnik s
+  plachtou, když poveze naklad ktery nemame grafiku připravenou tak plná s plachtou“*, *„když maš grafiku sudy naklad
+  tak nemusiš davat tu plachtu přece“*.
+- Hotovo: vojenská sanitka vozí jako sanitka (cestující, studentka), výbušniny ne. Valník všech značek (Škoda 1203,
+  TAZ 1203, TAZ 1500, TAZ 1.9D) má lože z uzlů dílu modu `S1203_bed` (podlaha 0,79 m, 2,65 × 1,87 m, bočnice 0,48 m,
+  strop výška plachty). Kus vybere hra podle nákladu z tabulek sady `naklady` (i záznamy bez barvy: pivo → sudy,
+  dobytek → zvířata), kolik naloženo, tolik kusů. Náklad bez kusu (ocel, pošta…) → plachta modu (`S1203_roof`,
+  „Tarp Roof“) jako díl tvaru, jen když je něco naloženo; prázdný valník otevřený. Bedna modu na loži
+  (`S1203_bed_cargo`) se nekreslí. Oprava cestou: `Simplify()` zahazoval značky dílů trojúhelníků.
+- Rig: `test3d naklad <LABEL>|0` – náklad pro kreslení bez vozidla (`kresli`, nákup).
+
 ## 27. 10. (21) – 1203: Spoje pošta a ceniny, vojenská sanitka výbušniny, mikrobus
 
 - Hráč: *„spoje to je pošta ceniny a vojenska explosives“*, *„valnik a dodavky potřebujem microbusy“*, *„je tam
