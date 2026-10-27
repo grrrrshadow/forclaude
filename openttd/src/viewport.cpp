@@ -2152,6 +2152,7 @@ struct TurnedTimes {
 	int standing_sprites = 0;  ///< and of their pictures, the sprites'
 	int standing_apart = 0;    ///< and those the processor drew apart (DrawTurnedStandingApart())
 	int standing_objects = 0;  ///< and the buildings the card drew among them (AddTurnedStandingObject())
+	int standing_likeness = 0; ///< and the vehicles and figures it laid as their pictures (AddTurnedStandingLikeness())
 	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int tiles = 0;      ///< tiles looked at
@@ -2170,11 +2171,11 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
-	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_apart, t.standing_card_ms);
+	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_apart, t.standing_card_ms);
 	/* With a window the console is not written out: the diary too (the rig). */
 	extern uint64_t _turned_card_view_passes;
-	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), zvlast procesorem {}, karta {:.1f} ms",
-			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_apart, t.standing_card_ms);
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_likeness, t.standing_apart, t.standing_card_ms);
 	_turned_card_view_passes = 0;
 	extern void TurnedGroundTimingsPrint();
 	TurnedGroundTimingsPrint();
@@ -5977,35 +5978,63 @@ static size_t _turned_figure_picture_bytes = 0;
 /** Their keys on the card (ThreeDGpuStandingItem::key), apart from the sprites'. */
 static constexpr uint64_t TURNED_FIGURE_KEY = uint64_t{1} << 62;
 
-/** A figure's picture for the card: its colours with their alpha multiplied in, made the first time. */
-static std::shared_ptr<const ThreeDGpuStandingPicture> TurnedFigurePicture(const ThreeDModelPicture &pic)
+/** A figure's picture's number for the card, by how many times its pixels are doubled and whether its lit pixels are marked (TurnedFigurePicture()); 0 none. */
+static uint64_t TurnedFigureKey(const ThreeDModelPicture &pic, int up, bool lit)
 {
-	if (pic.uid != 0) {
-		auto it = _turned_figure_pictures.find(pic.uid);
+	return pic.uid != 0 ? (pic.uid << 4 | static_cast<uint64_t>(up) << 1 | (lit ? 1 : 0)) : 0;
+}
+
+/**
+ * A figure's picture for the card: its colours with their alpha multiplied in, made the first time.
+ * @param up its pixels doubled so many times (0-3; a picture made at a coarser zoom, AddTurnedVehiclePicture())
+ * @param lit the pixels of its lit glass (ThreeDModelPicture::lit) whole, marked lit (THREE_D_GPU_LIT_ALPHA)
+ */
+static std::shared_ptr<const ThreeDGpuStandingPicture> TurnedFigurePicture(const ThreeDModelPicture &pic, int up = 0, bool lit = false)
+{
+	const uint64_t key = TurnedFigureKey(pic, up, lit);
+	if (key != 0) {
+		auto it = _turned_figure_pictures.find(key);
 		if (it != _turned_figure_pictures.end()) return it->second;
 	}
 	if (pic.width <= 0 || pic.height <= 0 || pic.pixels.size() < static_cast<size_t>(pic.width) * pic.height) return nullptr;
-	auto made = std::make_shared<ThreeDGpuStandingPicture>();
-	made->width = pic.width;
-	made->height = pic.height;
-	made->pixels.resize(static_cast<size_t>(pic.width) * pic.height);
-	for (size_t i = 0; i < made->pixels.size(); i++) {
+	std::vector<uint32_t> own(pic.pixels.size());
+	for (size_t i = 0; i < own.size(); i++) {
 		const Colour c(pic.pixels[i]);
 		if (c.a == 0) {
-			made->pixels[i] = 0;
+			own[i] = 0;
 			continue;
 		}
 		/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
 		const uint a = c.a == THREE_D_GPU_LIT_ALPHA ? 255 : c.a;
-		made->pixels[i] = Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
+		own[i] = Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
 	}
-	if (pic.uid != 0) {
+	if (lit) {
+		for (uint32_t i : pic.lit) {
+			if (i >= own.size()) continue;
+			const Colour c(pic.pixels[i]);
+			own[i] = Colour(c.r, c.g, c.b, THREE_D_GPU_LIT_ALPHA).data;
+		}
+	}
+	auto made = std::make_shared<ThreeDGpuStandingPicture>();
+	made->width = pic.width << up;
+	made->height = pic.height << up;
+	if (up == 0) {
+		made->pixels = std::move(own);
+	} else {
+		made->pixels.resize(static_cast<size_t>(made->width) * made->height);
+		for (int y = 0; y < made->height; y++) {
+			const uint32_t *src = &own[static_cast<size_t>(y >> up) * pic.width];
+			uint32_t *row = &made->pixels[static_cast<size_t>(y) * made->width];
+			for (int x = 0; x < made->width; x++) row[x] = src[x >> up];
+		}
+	}
+	if (key != 0) {
 		if (_turned_figure_picture_bytes > TURNED_SPRITE_PICTURE_BYTES) {
 			_turned_figure_pictures.clear();
 			_turned_figure_picture_bytes = 0;
 		}
 		_turned_figure_picture_bytes += made->pixels.size() * sizeof(uint32_t) + sizeof(ThreeDGpuStandingPicture) + 64;
-		_turned_figure_pictures[pic.uid] = made;
+		_turned_figure_pictures[key] = made;
 	}
 	return made;
 }
@@ -6207,7 +6236,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				ThreeDGpuStandingItem &item = out.items.emplace_back();
 				item.x = f.x;
 				item.y = f.y;
-				item.key = f.pic->uid != 0 ? (f.pic->uid | TURNED_FIGURE_KEY) : 0;
+				item.key = f.pic->uid != 0 ? (TurnedFigureKey(*f.pic, 0, false) | TURNED_FIGURE_KEY) : 0;
 				item.picture = std::move(pic);
 				item.depth = cleared ? depth_of(f.near + 0.05) : -1.0f;
 			}
@@ -6226,13 +6255,44 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	return true;
 }
 
+/**
+ * A vehicle's or a figure's likeness among what stands on a block for the card (box_kind 5): its picture, and those
+ * drawn with it after it, laid where DrawTurnedVehicle() blits them, kept on the card by their numbers -- not drawn
+ * by the processor apart.
+ */
+static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_vehicle_pictures.size()) return;
+	const size_t end = std::min(_turned_vehicle_pictures.size(), static_cast<size_t>(ps.box_dx) + 1 + _turned_vehicle_pictures[ps.box_dx].more);
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	const double scale = 1.0 / (1 << to_underlying(frame.zoom));
+	for (size_t k = ps.box_dx; k < end; k++) {
+		const TurnedVehiclePicture &p = _turned_vehicle_pictures[k];
+		const int up = std::clamp(p.up, 0, 3);
+		double vx, vy;
+		ProjectTurnedF(p.ax, p.ay, p.az, vx, vy);
+		const int x = static_cast<int>(std::lround((vx - frame.left) * scale)) + (p.pic->left << up);
+		const int y = static_cast<int>(std::lround((vy - frame.top) * scale)) + (p.pic->top << up);
+		if (x >= fw || y >= fh || x + (p.pic->width << up) <= 0 || y + (p.pic->height << up) <= 0) continue;
+		std::shared_ptr<const ThreeDGpuStandingPicture> pic = TurnedFigurePicture(*p.pic, up, true);
+		if (pic == nullptr) continue;
+		ThreeDGpuStandingItem &item = out.items.emplace_back();
+		item.x = x;
+		item.y = y;
+		item.key = p.pic->uid != 0 ? (TurnedFigureKey(*p.pic, up, true) | TURNED_FIGURE_KEY) : 0;
+		item.picture = std::move(pic);
+	}
+	_turned_times.standing_likeness++;
+}
+
 /** A standing thing of the block among what stands on it for the card (ThreeDGpuStanding): its sprites, or a picture the processor drew of it. */
 static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
 	if (ps.box_kind == 7 && AddTurnedStandingObject(out, frame, ps)) return;
 	switch (ps.box_kind) {
 		case 4: return;
-		case 1: case 2: case 5: case 6: case 7: case 8: case 9: case 10: case 11: case 12: {
+		case 5: AddTurnedStandingLikeness(out, frame, ps); return;
+		case 1: case 2: case 6: case 7: case 8: case 9: case 10: case 11: case 12: {
 			int x0, y0, w, h;
 			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return;
 			std::shared_ptr<ThreeDGpuStandingPicture> pic = DrawTurnedStandingApart(frame, ps, x0, y0, w, h);
