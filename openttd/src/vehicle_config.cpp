@@ -23,6 +23,7 @@
 #include "debug.h"
 #include "timer/timer_game_calendar.h"
 #include "window_func.h"
+#include "three_d_objects.h"
 
 #include "safeguards.h"
 
@@ -73,6 +74,9 @@ static std::optional<VehicleConfigTextResult> VehicleConfigText(EngineID engine,
  */
 std::vector<VehicleConfigAspect> GetVehicleConfigAspects(EngineID engine, const Vehicle *v)
 {
+	/* An engine the game makes itself (our 1203s of BeamNG, the paints of the player's old 2D 1203): its details the
+	 * game's own, not asked of a set. */
+	if (std::vector<VehicleConfigAspect> own = GetThreeDOwnConfigAspects(engine); !own.empty()) return own;
 	std::vector<VehicleConfigAspect> aspects;
 	const Engine *e = Engine::GetIfValid(engine);
 	if (e == nullptr || e->GetGRF() == nullptr) return aspects;

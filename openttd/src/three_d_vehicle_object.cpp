@@ -234,14 +234,23 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
 		return obj->ComposeState(layers, colours, LoadCode(obj, layers, nullptr, engine));
 	}
-	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years; a
-	 * flatbed with the pieces of its cargo on its bed, as many as it is loaded. */
+	/* A car of BeamNG: one of the mod's paints each car, the first in the purchase list, faded by its whole years; our
+	 * 1203s the paint and the tarp's the player chose in the configurator (GetThreeDOwnConfigAspects()); a flatbed with
+	 * the pieces of its cargo on its bed, as many as it is loaded. */
 	if (obj->paint_random) {
 		const size_t years = std::max<size_t>(obj->paint_years, 1), paints = std::max<size_t>(obj->states.size() / years, 1);
 		int step = 1;
 		if (v != nullptr) {
 			const size_t age = std::min<size_t>(static_cast<size_t>(std::max(v->age.base(), 0)) / CalendarTime::DAYS_IN_YEAR, years - 1);
-			step = 1 + static_cast<int>((v->random_bits % paints) * years + age);
+			size_t paint = v->random_bits % paints;
+			if (!obj->paint_names.empty()) {
+				const Vehicle *head = VehicleConfigHead(v);
+				const size_t tarps = std::max<size_t>(obj->tarp_names.size(), 1);
+				const size_t body = head->config_options[0] < obj->paint_names.size() ? head->config_options[0] : 0;
+				const size_t tarp = head->config_options[1] < tarps ? head->config_options[1] : 0;
+				paint = std::min(body * tarps + tarp, paints - 1);
+			}
+			step = 1 + static_cast<int>(paint * years + age);
 		}
 		if (!obj->loads_by_cargo) return step;
 		return obj->ComposeState({step}, 0, LoadCode(obj, {step}, v, engine));

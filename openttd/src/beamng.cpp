@@ -936,6 +936,32 @@ static void MakeModels(BeamngVehicle &v, const std::string &own_config)
 }
 
 /**
+ * The paints of our 1203 to choose from in the configurator (the player, 27. 10.: "the colours of my old 1203 GRF, the
+ * 2D one, the sprites", "red, yellow, blue", "the tarp grey, yellow"): as the old VWT1-S1203modradodavka.grf has
+ * them, each configuration first the one it had there -- the flatbed red with a yellow tarp ("a wooden flatbed, a tarp
+ * could go on, a car of three colours, the body red, a nicely coloured car"), the bus yellow, the van blue; the kombi,
+ * the car itself, red. The designs (VB, the ambulances, Spoje, the firemen), the hearse and the De Luxe in two colours
+ * keep their own.
+ */
+static void ChoosePaints(BeamngVehicle &v, const std::string &own_config)
+{
+	if (!IsS1203(v)) return;
+	static const BeamngVehicle::Choice RED{"červená", 0xFFBF5B55}, YELLOW{"žlutá", 0xFFC4A64C}, BLUE{"modrá", 0xFF3A7DA6};
+	if (StrEqualsIgnoreCase(own_config, "flatbed") || StrEqualsIgnoreCase(own_config, "com")) {
+		v.body_paints = {RED, YELLOW, BLUE};
+	} else if (StrEqualsIgnoreCase(own_config, "passenger")) {
+		v.body_paints = {YELLOW, RED, BLUE};
+	} else if (StrEqualsIgnoreCase(own_config, "van")) {
+		v.body_paints = {BLUE, RED, YELLOW};
+	} else {
+		return;
+	}
+	if (v.has_tarp) v.tarp_paints = {{"žlutá", 0xFFA99A3B}, {"šedá", 0xFFA5A396}};
+	/* The wooden flatbed ("dřevěnej valník") brown as the old one's, whatever the body. */
+	if (v.has_bed) v.bed_paint = 0xFF604225;
+}
+
+/**
  * A car of its folder in the mod, if it is one with a model and an engine.
  * @param config its configuration, a .pc of the folder without ".pc"; empty the default one
  */
@@ -1272,6 +1298,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	/* One GRF a folder, of the id it always had: the games saved with the car keep it. */
 	v.grfid = GrfIdOf(zip_name + "/" + id);
 	MakeModels(v, own_config);
+	ChoosePaints(v, own_config);
 	return v;
 }
 
@@ -2821,12 +2848,14 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	mesh.materials.push_back(std::move(paint));
 	std::map<std::string, uint8_t> index;
 	std::map<std::string, std::pair<int, std::pair<int, std::vector<uint8_t>>>> masks; // mask texture: w, h, grey
-	auto material_of = [&](const std::string &name) -> uint8_t {
-		auto it = index.find(name);
+	/* own: a painted material as one of its own, out of the paint, for what (the tarp, the bed: BeamngMesh::own_paints). */
+	auto material_of = [&](const std::string &name, std::string_view own = {}) -> uint8_t {
+		const std::string key = own.empty() ? name : name + "|" + std::string(own);
+		auto it = index.find(key);
 		if (it != index.end()) return it->second;
 		auto m = materials.find(name);
 		uint8_t at = 0;
-		if (m == materials.end() || !m->second.paint) {
+		if (m == materials.end() || !m->second.paint || !own.empty()) {
 			if (mesh.materials.size() >= 255) return 0;
 			BeamngMesh::Material made;
 			made.name = name;
@@ -2848,7 +2877,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			at = static_cast<uint8_t>(mesh.materials.size());
 			mesh.materials.push_back(std::move(made));
 		}
-		index[name] = at;
+		index[key] = at;
 		return at;
 	};
 	/* A material of the configuration's paint design instead, where the mod has one ("<material>.skin.<design>": BeamNG's
@@ -2912,6 +2941,9 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 		const JValue *flex = part->Get("flexbodies");
 		if (flex == nullptr || !flex->IsArray()) continue;
 		const size_t first_tri = mesh.tri.size() / 3;
+		/* The bed's (its slot "..._bed", FindBed()) painted apart from the body (BeamngVehicle::bed_paint). */
+		const JValue *slot = part->Get("slotType");
+		const bool bed_part = v.bed_paint != 0 && slot != nullptr && slot->IsString() && EndsWithIgnoreCase(slot->text, "_bed");
 		/* The tarp's triangles a part of their own. */
 		auto mark_tarp = [&]() {
 			if (part != parts.tarp) return;
@@ -2970,12 +3002,20 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			for (Triangles &t : ReadGeometry(*pl->second.geometry)) {
 				auto bound = pl->second.materials.find(t.material);
 				const std::string material = skinned(bound != pl->second.materials.end() ? bound->second : t.material);
-				const uint8_t tex = material_of(material);
 				auto cm = materials.find(material);
+				/* The tarp's paint its own, apart from the body's, where the player chooses it (BeamngVehicle::tarp_paints);
+				 * and the bed's (BeamngVehicle::bed_paint). */
+				const bool painted = cm != materials.end() && cm->second.paint;
+				const bool own_tarp = part == parts.tarp && !v.tarp_paints.empty() && painted;
+				const bool own_bed = bed_part && painted;
+				const uint8_t tex = material_of(material, own_tarp ? "tarp" : own_bed ? "bed" : "");
+				if ((own_tarp || own_bed) && std::ranges::find(mesh.own_paints, tex, &std::pair<uint8_t, uint8_t>::first) == mesh.own_paints.end()) {
+					mesh.own_paints.emplace_back(tex, own_tarp ? BeamngMesh::OWN_TARP : BeamngMesh::OWN_BED);
+				}
 				const bool cut = cm != materials.end() && !cm->second.mask.empty() && !cm->second.see_through;
 				auto gl = glow.find(material);
 				const size_t corners = t.pos.size() / 3;
-				const int16_t cell = cm != materials.end() && cm->second.paint ? cell_of(material, cm->second) : -1;
+				const int16_t cell = painted && !own_tarp && !own_bed ? cell_of(material, cm->second) : -1;
 				for (size_t c = 0; c + 2 < corners; c += 3) {
 					if (cut) {
 						/* A hole of the body where its mask is dark at the triangle's middle. */

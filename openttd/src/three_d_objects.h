@@ -632,6 +632,7 @@ struct ThreeDVehicleAddon {
 	std::string mask_file;      ///< "barva" "maska": where it takes the state's colour ("barvy_doplnku"), its path; empty nowhere
 	int start = 0;              ///< "barva" "zacatek": the texture's lightness where the colour is its own
 	std::string detail_file;    ///< "maska_podrobnosti": its mask of details (ThreeDDetailMask), its path; empty none
+	bool whole = false;         ///< its colour over all of its texture, no mask (the tarp of a flatbed of BeamNG: its own material, BeamngMesh::tarp_material)
 };
 
 /**
@@ -697,6 +698,8 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
 	bool paint_random = false;      ///< a car of a mod of BeamNG (beamng.h): its states the paints of the mod, one of them each car by its random bits
 	uint8_t paint_years = 1;        ///< and of each paint so many states, one a year of its age, the paint fading (BEAMNG_FADE_YEARS + 1)
+	std::vector<std::string> paint_names; ///< a car of BeamNG whose paint the player chooses in the configurator (BeamngVehicle::body_paints): their names, detail 0; empty by chance
+	std::vector<std::string> tarp_names;  ///< and its tarp's (BeamngVehicle::tarp_paints), detail 1, its add-on 0; its states body by tarp by year
 	bool loads_by_cargo = false;    ///< the piece of the shared loads on the bed of its states is its cargo's (GetThreeDLoadPieceOfCargo()), no GRF picking it: a flatbed of BeamNG
 	uint8_t cover_part = 0;         ///< and the part over a load of a cargo of no piece, shown when it is loaded (the flatbed's tarp, BeamngMesh::PART_TARP); 0 none
 	HouseID drive_house = UINT16_MAX; ///< a car of the game's own ("auto" with "jizda"): drives between the houses of this original house, from stop ("stani") to stop
@@ -811,6 +814,7 @@ private:
 };
 
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
+std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
 

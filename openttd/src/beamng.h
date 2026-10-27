@@ -47,6 +47,14 @@ struct BeamngVehicle {
 	std::string name;             ///< "Name" of its info.json, with "Brand" before it
 	std::string author;           ///< "Author"
 	std::vector<uint32_t> paints; ///< the colours of its info.json ("colors", "paints"), Colour::data; the default first
+	/** A paint the player chooses in the configurator (vehicle_config.h): its name and its colour, Colour::data. */
+	struct Choice {
+		std::string name;
+		uint32_t colour = 0;
+	};
+	std::vector<Choice> body_paints; ///< the paints of its body to choose from, its own first (our 1203s); empty: one of the mod's (paints) each car by chance
+	std::vector<Choice> tarp_paints; ///< and of the tarp of its bed apart from the body (has_tarp); empty: the body's
+	uint32_t bed_paint = 0;          ///< the colour of its bed apart from the body (our 1203's wooden flatbed), Colour::data; 0 the body's
 	double power_kw = 0;          ///< the most of its engine's torque curve
 	double speed_kmh = 0;         ///< as fast as its gearing and its power against the air let it
 	double mass_t = 0;            ///< the weights of its nodes
@@ -123,6 +131,10 @@ struct BeamngMesh {
 	std::vector<uint8_t> night_kind;
 	/** Where its headlights and its lights at the back shine from (its "props" of lights), x, y, z each. */
 	std::vector<float> front_lights, back_lights;
+	/** The tarp's and the bed's materials of their own, out of the paint (BeamngVehicle::tarp_paints, bed_paint), each painted in its own colour: the material, 0 the tarp's or 1 the bed's. */
+	std::vector<std::pair<uint8_t, uint8_t>> own_paints;
+	static constexpr uint8_t OWN_TARP = 0;
+	static constexpr uint8_t OWN_BED = 1;
 };
 bool ReadBeamngShape(const BeamngVehicle &vehicle, BeamngMesh &mesh);
 const BeamngVehicle *GetBeamngVehicle(size_t index);

@@ -46,6 +46,7 @@
 #include "strings_func.h"
 #include "string_func.h"
 #include "window_func.h"
+#include "vehicle_config.h"
 #include "table/strings.h"
 
 #include <algorithm>
@@ -4845,27 +4846,59 @@ static void ReadThreeDVehicleObjects()
 		 */
 		static constexpr int BEAMNG_FADE_YEARS = 20;
 		static constexpr uint8_t FADED[3] = {0xB8, 0xB8, 0xB2};
-		for (uint32_t colour : b.paints) {
+		auto faded = [](uint32_t colour, int year) {
 			const Colour c(colour);
 			const uint8_t from[3] = {c.r, c.g, c.b};
-			for (int year = 0; year <= BEAMNG_FADE_YEARS; year++) {
-				uint8_t now[3];
-				for (int k = 0; k < 3; k++) {
-					const int to = (from[k] + FADED[k] + 1) / 2;
-					now[k] = static_cast<uint8_t>(from[k] + static_cast<int>(std::lround((to - from[k]) * static_cast<double>(year) / BEAMNG_FADE_YEARS)));
+			uint8_t now[3];
+			for (int k = 0; k < 3; k++) {
+				const int to = (from[k] + FADED[k] + 1) / 2;
+				now[k] = static_cast<uint8_t>(from[k] + static_cast<int>(std::lround((to - from[k]) * static_cast<double>(year) / BEAMNG_FADE_YEARS)));
+			}
+			return Colour(now[0], now[1], now[2], c.a).data;
+		};
+		/* Our 1203s: the paints the player chooses in the configurator (BeamngVehicle::body_paints), the tarp's apart, an
+		 * add-on over all of its own material, fading as the body (BLEDNUTI-1203-PRO-HRU.md: "the tarp fades too"). */
+		std::vector<uint32_t> bodies = b.paints, tarps = {0};
+		if (!b.body_paints.empty()) {
+			bodies.clear();
+			for (const BeamngVehicle::Choice &c : b.body_paints) {
+				bodies.push_back(c.colour);
+				obj.paint_names.push_back(c.name);
+			}
+		}
+		if (!b.body_paints.empty() && !b.tarp_paints.empty()) {
+			tarps.clear();
+			for (const BeamngVehicle::Choice &c : b.tarp_paints) {
+				tarps.push_back(c.colour);
+				obj.tarp_names.push_back(c.name);
+			}
+		}
+		/* The tarp and the wooden bed, each an add-on over all of its own materials (BeamngMesh::own_paints, in their order). */
+		if (!b.body_paints.empty()) {
+			for (const char *key : {"plachta", "korba"}) {
+				ThreeDVehicleAddon own;
+				own.key = key;
+				own.whole = true;
+				obj.addons.push_back(std::move(own));
+			}
+		}
+		for (uint32_t colour : bodies) {
+			for (uint32_t tarp_colour : tarps) {
+				for (int year = 0; year <= BEAMNG_FADE_YEARS; year++) {
+					ThreeDVehicleState st;
+					st.colour = faded(colour, year);
+					st.given = ThreeDVehicleState::GIVEN_COLOUR;
+					if (!b.body_paints.empty()) st.addon_colours = {tarp_colour != 0 ? faded(tarp_colour, year) : 0u, b.bed_paint != 0 ? faded(b.bed_paint, year) : 0u};
+					/* A flatbed's bed, the pieces of its cargo on it (the player, 27. 10.: "ingame naklady dej na valniky 1203 1500"). */
+					if (b.has_bed) {
+						st.bed.floor = b.bed_floor;
+						std::copy(std::begin(b.bed_x), std::end(b.bed_x), st.bed.x);
+						std::copy(std::begin(b.bed_y), std::end(b.bed_y), st.bed.y);
+						st.bed.sides = b.bed_sides;
+						st.bed.top = b.bed_top;
+					}
+					obj.states.push_back(st);
 				}
-				ThreeDVehicleState st;
-				st.colour = Colour(now[0], now[1], now[2], c.a).data;
-				st.given = ThreeDVehicleState::GIVEN_COLOUR;
-				/* A flatbed's bed, the pieces of its cargo on it (the player, 27. 10.: "ingame naklady dej na valniky 1203 1500"). */
-				if (b.has_bed) {
-					st.bed.floor = b.bed_floor;
-					std::copy(std::begin(b.bed_x), std::end(b.bed_x), st.bed.x);
-					std::copy(std::begin(b.bed_y), std::end(b.bed_y), st.bed.y);
-					st.bed.sides = b.bed_sides;
-					st.bed.top = b.bed_top;
-				}
-				obj.states.push_back(st);
 			}
 		}
 		obj.paint_random = true;
@@ -5093,6 +5126,25 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 	if (it == _vehicle_object_pieces.end()) return nullptr;
 	if (piece != nullptr) *piece = it->second.second;
 	return &_vehicle_objects[it->second.first];
+}
+
+/**
+ * The details the player chooses on an engine the game makes, not a set (vehicle_config.h): the paints of our 1203s
+ * (BeamngVehicle::body_paints, tarp_paints), each a detail of the configurator; empty for any other.
+ */
+std::vector<VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine)
+{
+	std::vector<VehicleConfigAspect> aspects;
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObject(engine, nullptr);
+	if (obj == nullptr || obj->paint_names.empty()) return aspects;
+	auto add = [&aspects](std::string name, const std::vector<std::string> &options) {
+		VehicleConfigAspect &a = aspects.emplace_back();
+		a.name = std::move(name);
+		for (const std::string &o : options) a.options.push_back({o, false});
+	};
+	add("Karoserie", obj->paint_names);
+	if (!obj->tarp_names.empty()) add("Plachta", obj->tarp_names);
+	return aspects;
 }
 
 /** The key of a vehicle's piece in _vehicle_object_pieces, 0 for none of a set. */
@@ -6113,6 +6165,12 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			made->pngs[0] = InternThreeDTextureBytes(raw_of(w, w, atlas));
 			made->paint_mask = InternThreeDTextureBytes(raw_of(mw, mw, mask));
 		}
+		/* The tarp and the bed materials of their own, each of the add-on its colour is given to (ThreeDVehicleAddon::whole). */
+		for (const auto &[tex, which] : bm.own_paints) {
+			if (tex >= made->pngs.size() || which >= this->addons.size() || !this->addons[which].whole) continue;
+			made->tex_addon.resize(made->pngs.size(), -1);
+			made->tex_addon[tex] = static_cast<int8_t>(which);
+		}
 		made->night_pos = std::move(bm.night_pos);
 		made->night_tri = std::move(bm.night_tri);
 		made->night_colour = std::move(bm.night_colour);
@@ -6668,6 +6726,9 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 /** An add-on's colour mask ("doplnky" "barva" "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetAddonMask(size_t addon, int level) const
 {
+	/* Coloured all over (ThreeDVehicleAddon::whole): a texel of white. */
+	static const ThreeDObjectTexture WHOLE{1, 1, {0xFFFFFFFFu}, {}};
+	if (addon < this->addons.size() && this->addons[addon].whole) return &WHOLE;
 	if (addon >= this->addons.size() || this->addons[addon].mask_file.empty()) return nullptr;
 	level = std::max(level, 0);
 	MakeOnce(this, LAZY_ADDON_MASK + static_cast<int>(addon), [this, addon, level] {

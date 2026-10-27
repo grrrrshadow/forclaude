@@ -31,6 +31,23 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (29) – 1203: barvy ze starého 2D GRF, konfigurátor, dřevěný valník
+
+- Hráč: *„1 barvy z mych 1203grf stary. 2D 1203. sprity. jo ať blednou zase jako ostatni auta. konfigurator ten
+  čzdlik v levo dole okna přestavby otvira menu vyběru potom. děla to grrrrf k tatram nakladnim . special taky ma
+  konfigurator. 2 ano“*, *„plachta šeda žluta, barvy červena, žluta, modra“*, *„jo dřevěnej valnik, dala se plachta a
+  bylo to třibarevny auto červena karoserie a bylo to hezky barevny auto“*.
+- Starý GRF je `VWT1-S1203modradodavka.grf` v grrrrf `auta/` (MAX\x08): Pajda karavan petrolejová, TAZ 1203 valník
+  korálově červený s hnědým dřevem, plachta olivově žlutá nebo šedá, TAZ 1500 bus hořčicový, dodávka nebesky modrá.
+  Barvy odměřené z jeho spritů.
+- Hotovo: konfigurátor 1203 dává hra sama (GRF těch aut píše hra, ne mod): Karoserie červená / žlutá / modrá, u
+  valníku Plachta žlutá / šedá. Výchozí podle starého GRF: valník a kombi červené, mikrobus žlutý, dodávka modrá.
+  Korba valníku dřevěně hnědá. Vše bledne 20 let jako ostatní auta. Plachta a korba jsou vlastní materiály mimo lak
+  karoserie (doplněk s barvou přes celou texturu). VB, sanitky, Spoje, hasiči, pohřební a De Luxe mají svoje.
+- Ověřeno v rigu: modrá kabina se šedou plachtou, červená se šedou, žlutá se žlutou, prázdný modrý valník
+  s dřevěnou korbou.
+- Ještě: rozhlížení pravým tlačítkem v kabině (*„2 ano“*), chyby #226, Pajda karavan (domluvit).
+
 ## 27. 10. (28) – Psi na farmě: dvůr a ohrady pastvin
 
 - Hráč: *„dej pejsky na farmu“*, pak *„na farmě u ohrady taky u ovci a hlidat kravičky prasatka“*.

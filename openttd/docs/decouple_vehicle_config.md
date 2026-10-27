@@ -474,3 +474,22 @@ feature (section 1): any other set is drawn as it always was.
 - The colours are asked once for each engine and choice (and cargo, subtype,
   and the random byte for a set that asked for it) and kept until the sets are
   read again; keep callback 1C1 without side effects too.
+
+## Details the game gives itself
+
+A vehicle the game makes, not a set, has its details from the game, and no
+callback is asked: the cars of BeamNG.drive mods are drawn from their models
+and the game writes their GRF itself (`src/beamng.cpp`). Our Škoda 1203s (the
+mod's folder `S1203`) have the paints of the player's old 2D 1203
+(`VWT1-S1203modradodavka.grf`) to choose from:
+
+- **Karoserie** (detail 0): red `BF5B55`, yellow `C4A64C`, blue `3A7DA6`;
+  each configuration first the one it had there -- the flatbed and the kombi
+  red, the bus yellow, the van blue.
+- **Plachta** (detail 1, the flatbeds): yellow `A99A3B`, grey `A5A396`.
+- The flatbed's bed is wood brown `604225`, whatever the body.
+
+All of them fade as the game's cars do (20 years, half way to `B8B8B2`). The
+designs (VB, the ambulances, Spoje, the firemen), the hearse and the De Luxe
+keep the mod's own paints and have no details. The choice is kept and saved
+as any other (`Vehicle::config_options`).
