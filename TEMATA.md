@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (30) – 1203: průhledné pneumatiky, nebarevné zadní světlo
+
+- Hráč: *„kola jsou pruhledné pneumatiky. a zadní kola jsou moc blízko ke středu auta . uvnitř auta byla ta zelená
+  indikační. … 1203 mivaj světla hranaty ale to už nejsou škoda , to je taz. 1503 ma zas některa kulaty světla, to je
+  asi chyba. … zadní světlo je stejný jako škoda 1000 osobní , není vybarvené“*.
+- Pneumatiky: materiál je `translucent`, ale s `"translucentBlendOp": "None"` – BeamNG ho kreslí celý. Hra ho brala
+  jako sklo. Teď je průhledné jen to, co se opravdu míchá.
+- Zadní světlo a zelené kontrolky na palubce: materiály z `glowMap` jsou jen zástupci bez vlastních vrstev, BeamNG
+  místo nich kreslí jejich materiál `off` (zhasnuté), svítí pod vlastním jménem. Hra kreslila zástupce – bez barvy.
+  Teď kreslí `off` a v noci svítí podle jména zástupce.
+- Zbývá: světla podle značky (Škoda kulatá s původní maskou, TAZ hranatá s maskou TAZ), zadní kola u středu (do
+  strany, nebo podélně?), zelená uvnitř (kde přesně?).
+
 ## 27. 10. (29) – 1203: barvy ze starého 2D GRF, konfigurátor, dřevěný valník
 
 - Hráč: *„1 barvy z mych 1203grf stary. 2D 1203. sprity. jo ať blednou zase jako ostatni auta. konfigurator ten

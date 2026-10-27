@@ -1917,7 +1917,7 @@ struct CarMaterial {
 	std::string palette;          ///< the paint's layer's "colorPaletteMap": which of the paints where, red the first, green the second, blue the third (a paint design's)
 	std::string decal;            ///< a layer after the paint's with a picture of its own ("baseColorMap"): laid over the paint, the VB's letters ...
 	std::string decal_mask;       ///< ... where its "opacityMap" is light
-	bool see_through = false;     ///< "translucent" and not "alphaTest" (the glass): its "opacityMap" how much hides what is behind it, not holes
+	bool see_through = false;     ///< "translucent" and not "alphaTest", blended ("translucentBlendOp" not "None": the Škoda 1203's tyres are not) -- the glass: its "opacityMap" how much hides what is behind it, not holes
 	bool both_sides = false;      ///< "doubleSided": seen from behind too; BeamNG leaves out the side of the others facing away
 };
 
@@ -1982,7 +1982,7 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 				m.mask = get("opacityMap[0]");
 				m.mask_uv1 = get("opacityMapUV[0]") == "1";
 				auto yes = [&get](const std::string &k) { const std::string val = get(k); return val == "true" || val == "1"; };
-				m.see_through = yes("translucent") && !yes("alphaTest");
+				m.see_through = yes("translucent") && !yes("alphaTest") && get("translucentBlendOp") != "None";
 				m.both_sides = yes("doubleSided");
 				std::string map_to = get("mapTo");
 				const std::string key = map_to.empty() ? name : map_to;
@@ -2046,8 +2046,11 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 						}
 					}
 				}
-				const JValue *translucent = mat.Get("translucent"), *alpha_test = mat.Get("alphaTest");
-				m.see_through = translucent != nullptr && translucent->IsTrue() && !(alpha_test != nullptr && alpha_test->IsTrue());
+				const JValue *translucent = mat.Get("translucent"), *alpha_test = mat.Get("alphaTest"), *blend = mat.Get("translucentBlendOp");
+				/* Translucent without blending ("translucentBlendOp": "None") is drawn whole (the tyres of the Škoda 1203,
+				 * the player: "the tyres are see-through"). */
+				const bool blended = blend == nullptr || !blend->IsString() || blend->text != "None";
+				m.see_through = translucent != nullptr && translucent->IsTrue() && !(alpha_test != nullptr && alpha_test->IsTrue()) && blended;
 				const JValue *both = mat.Get("doubleSided");
 				m.both_sides = both != nullptr && both->IsTrue();
 				std::string map_to = mat.Get("mapTo") != nullptr && mat.Get("mapTo")->IsString() ? mat.Get("mapTo")->text : name;
@@ -2826,9 +2829,14 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 	std::map<std::string, CarMaterial> materials = ReadMaterials(v);
 	/* The glowing glass: a material of "glowMap" with its lights ("lowbeam", "highbeam": ahead; "brake": at the back). */
 	std::map<std::string, bool> glow; // material to whether it is at the back
+	/* A material of the glow map is a stand-in, of no layers of its own (the Škoda 1203's "S1203_brakelight_glass", the
+	 * green lamps of its dash): BeamNG draws its "off" material in its place while it does not glow (the player: "the
+	 * rear light is not coloured"). */
+	std::map<std::string, std::string> glow_off;
 	for (const JValue *part : parts.used) {
 		if (const JValue *g = part->Get("glowMap"); g != nullptr && g->IsObject()) {
 			for (const auto &[name, entry] : g->members) {
+				if (const JValue *off = entry.Get("off"); off != nullptr && off->IsString() && materials.contains(off->text)) glow_off.try_emplace(name, off->text);
 				const JValue *fn = entry.Get("simpleFunction");
 				if (fn == nullptr || !fn->IsObject()) continue;
 				bool ahead = false, back = false;
@@ -3001,7 +3009,10 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 			const Matrix m = Multiply(place, Multiply(units, pl->second.world));
 			for (Triangles &t : ReadGeometry(*pl->second.geometry)) {
 				auto bound = pl->second.materials.find(t.material);
-				const std::string material = skinned(bound != pl->second.materials.end() ? bound->second : t.material);
+				const std::string named = skinned(bound != pl->second.materials.end() ? bound->second : t.material);
+				/* Drawn as its "off" material if it is one of the glow map; glowing at night by its own name. */
+				auto off = glow_off.find(named);
+				const std::string material = off != glow_off.end() ? skinned(off->second) : named;
 				auto cm = materials.find(material);
 				/* The tarp's paint its own, apart from the body's, where the player chooses it (BeamngVehicle::tarp_paints);
 				 * and the bed's (BeamngVehicle::bed_paint). */
@@ -3013,7 +3024,7 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh)
 					mesh.own_paints.emplace_back(tex, own_tarp ? BeamngMesh::OWN_TARP : BeamngMesh::OWN_BED);
 				}
 				const bool cut = cm != materials.end() && !cm->second.mask.empty() && !cm->second.see_through;
-				auto gl = glow.find(material);
+				auto gl = glow.find(named);
 				const size_t corners = t.pos.size() / 3;
 				const int16_t cell = painted && !own_tarp && !own_bed ? cell_of(material, cm->second) : -1;
 				for (size_t c = 0; c + 2 < corners; c += 3) {
