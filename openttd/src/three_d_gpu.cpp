@@ -533,6 +533,7 @@ struct GpuProgram {
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
 };
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _map_building_program, _ground_program, _standing_program;
+GpuProgram _standing_building_program; ///< the buildings among what stands on the turned map (DrawStandingOnCard())
 /* The buildings of the turned map drawn into (DrawBuildingsOnCard()): their colours, their nearness as floats, depths. */
 GLuint _bfbo = 0, _b_colour_rb = 0, _b_near_rb = 0, _b_depth_rb = 0;
 int _bfbo_w = 0, _bfbo_h = 0;
@@ -577,6 +578,7 @@ bool _ground_program_ok = false;
  * player, 26. 10.: "the card to compose the turned map", step 2): their colours with their alpha multiplied in, and
  * which of them are lit at night. Made with the picture of the view's ground, moved with it, shown over it. */
 GLuint _view_standing = 0, _view_standing_lit = 0, _view_standing_fbo = 0;
+GLuint _view_standing_depth = 0; ///< the depth of the building being drawn among them (ThreeDGpuStandingBuilding)
 std::atomic<uint32_t> _view_standing_name = 0, _view_standing_lit_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
 /* The pictures laid: a sprite's kept by its key in the atlas, the block's others in the stream; started over when full. */
 GLuint _standing_atlas = 0, _standing_stream = 0;
@@ -587,6 +589,7 @@ struct StandingShelf {
 StandingShelf _standing_atlas_shelf, _standing_stream_shelf;
 std::unordered_map<uint64_t, std::array<int, 2>> _standing_places;
 GLuint _standing_vao = 0, _standing_vbo = 0;
+GLuint _standing_tri_vao = 0, _standing_tri_vbo = 0; ///< the lit glass of the buildings at night, placed already
 bool _standing_program_ok = false;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
@@ -907,13 +910,13 @@ void main()
 /* What stands on the turned map (DrawStandingOnCard()): each picture's texel as it is, its alpha multiplied in, laid
  * over what is there; a lit one (alpha THREE_D_GPU_LIT_ALPHA) whole, marked lit. */
 const char *const STANDING_VERTEX = R"(#version 330 core
-layout(location = 0) in vec2 a_pos;
+layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
 uniform vec2 u_size;
 noperspective out vec2 v_uv;
 void main()
 {
-	gl_Position = vec4(a_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4(a_pos.xy / u_size * 2.0 - 1.0, a_pos.z * 2.0 - 1.0, 1.0);
 	v_uv = a_uv;
 }
 )";
@@ -931,6 +934,45 @@ void main()
 	float a = lit > 0.5 ? 1.0 : t.a;
 	o_colour = vec4(t.rgb, a);
 	o_lit = vec4(lit, 0.0, 0.0, a);
+}
+)";
+
+/* A building among what stands on the turned map (DrawStandingOnCard()), with MAP_BUILDING_VERTEX: as the buildings'
+ * pictures (MAP_BUILDING_FRAGMENT), whole, not lit; or its lit glass at night (u_night), each pixel its texel as it is
+ * where the texture has one, marked lit. */
+const char *const STANDING_BUILDING_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_tex;
+uniform int u_night;
+noperspective in vec2 v_uv;
+noperspective in float v_light;
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_lit;
+const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
+		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
+		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
+void main()
+{
+	ivec2 size = textureSize(u_tex, 0);
+	ivec2 at = ivec2(floor(v_uv * vec2(size)));
+	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
+	vec4 t = texelFetch(u_tex, at, 0);
+	if (t == vec4(0.0)) {
+		if (u_night != 0) discard;
+		for (int k = 0; k < 24; k++) {
+			ivec2 n = at + NEAR[k];
+			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
+			t = texelFetch(u_tex, n, 0);
+			if (t != vec4(0.0)) break;
+		}
+		if (t == vec4(0.0)) discard;
+	}
+	vec3 c = floor(t.rgb * 255.0 + 0.5);
+	if (u_night == 0) {
+		float l = floor(max(0.0, v_light));
+		c = min(vec3(255.0), floor(c * l / 256.0));
+	}
+	o_colour = vec4(c / 255.0, 1.0);
+	o_lit = vec4(u_night != 0 ? 1.0 : 0.0, 0.0, 0.0, 1.0);
 }
 )";
 
@@ -1848,7 +1890,8 @@ bool StartCard(std::string &why, std::string &describe)
 		_ground_program_ok = MakeProgram(_ground_program, GROUND_VERTEX, GROUND_FRAGMENT, ground_why);
 		if (!_ground_program_ok) Diary("zem plochy kresli procesor: " + ground_why, true);
 		std::string standing_why;
-		_standing_program_ok = MakeProgram(_standing_program, STANDING_VERTEX, STANDING_FRAGMENT, standing_why);
+		_standing_program_ok = MakeProgram(_standing_program, STANDING_VERTEX, STANDING_FRAGMENT, standing_why) &&
+				MakeProgram(_standing_building_program, MAP_BUILDING_VERTEX, STANDING_BUILDING_FRAGMENT, standing_why);
 		if (!_standing_program_ok) Diary("co stoji na plose kresli procesor: " + standing_why, true);
 	}
 	Step("preklad programu postav z oci (shader)");
@@ -1890,10 +1933,21 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glGenBuffers(1, &_standing_vbo);
 	gl.glBindVertexArray(_standing_vao);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
-	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
 	gl.glEnableVertexAttribArray(0);
-	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<const void *>(2 * sizeof(float)));
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
+	gl.glBindVertexArray(0);
+	gl.glGenVertexArrays(1, &_standing_tri_vao);
+	gl.glGenBuffers(1, &_standing_tri_vbo);
+	gl.glBindVertexArray(_standing_tri_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_tri_vbo);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	gl.glEnableVertexAttribArray(0);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glEnableVertexAttribArray(1);
+	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glEnableVertexAttribArray(2);
 	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_night_vao);
 	gl.glGenBuffers(1, &_night_vbo);
@@ -1959,6 +2013,8 @@ void ForgetCard()
 	}
 	_view_standing = _view_standing_lit = 0;
 	_view_standing_name = _view_standing_lit_name = 0;
+	if (_view_standing_depth != 0) gl.glDeleteRenderbuffers(1, &_view_standing_depth);
+	_view_standing_depth = 0;
 	if (_standing_atlas != 0) {
 		gl.glDeleteTextures(1, &_standing_atlas);
 		gl.glDeleteTextures(1, &_standing_stream);
@@ -1985,7 +2041,10 @@ void EndCard()
 		if (_view_standing_fbo != 0) gl.glDeleteFramebuffers(1, &_view_standing_fbo);
 		if (_standing_vbo != 0) gl.glDeleteBuffers(1, &_standing_vbo);
 		if (_standing_vao != 0) gl.glDeleteVertexArrays(1, &_standing_vao);
+		if (_standing_tri_vbo != 0) gl.glDeleteBuffers(1, &_standing_tri_vbo);
+		if (_standing_tri_vao != 0) gl.glDeleteVertexArrays(1, &_standing_tri_vao);
 		if (_standing_program.program != 0) gl.glDeleteProgram(_standing_program.program);
+		if (_standing_building_program.program != 0) gl.glDeleteProgram(_standing_building_program.program);
 		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb, _g_colour_rb};
 		for (GLuint rb : rbs) if (rb != 0) gl.glDeleteRenderbuffers(1, &rb);
 		if (_night_vbo != 0) gl.glDeleteBuffers(1, &_night_vbo);
@@ -2928,11 +2987,16 @@ bool ViewGroundOfSize(int w, int h)
 		gl.glClearColor(0, 0, 0, 1);
 		gl.glClear(GL_COLOR_BUFFER_BIT);
 	}
-	/* What stands on it: nothing yet. */
+	/* What stands on it: nothing yet; the depth of a building drawn among it. */
 	if (_view_standing_fbo == 0) gl.glGenFramebuffers(1, &_view_standing_fbo);
+	if (_view_standing_depth == 0) gl.glGenRenderbuffers(1, &_view_standing_depth);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, _view_standing_depth);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, w, h);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _view_standing, 0);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _view_standing_lit, 0);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _view_standing_depth);
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glDrawBuffers(2, colour_and_lit);
 	const bool standing_complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
@@ -3167,13 +3231,15 @@ bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::arra
 
 /**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
- * (ThreeDGpuStanding): the block cleared, each picture laid over those before it, far first. Not all laid (one bigger
- * than the card's textures, an error), the block left clear: the processor draws what stands on it.
+ * (ThreeDGpuStanding): the block cleared, each picture laid over those before it, far first; a building drawn through
+ * a depth of its own (ThreeDGpuStandingBuilding), the figures on it in its depth. Not all laid (one bigger than the
+ * card's textures, a texture it cannot hold, an error), the block left clear: the processor draws what stands on it.
  */
 bool DrawStandingOnCard(ThreeDGpuStanding &s)
 {
 	if (!_standing_program_ok || !ViewGroundOfSize(s.view_w, s.view_h) || _view_standing_name == 0) return false;
 	if (s.width <= 0 || s.height <= 0) return false;
+	_card_clock++;
 	if (_standing_atlas == 0) {
 		_standing_atlas_size = std::min(4096, _max_texture);
 		Step(fmt::format("atlas toho, co stoji na plose, {}x{}", _standing_atlas_size, _standing_atlas_size));
@@ -3184,7 +3250,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		_standing_places.clear();
 	}
 	_standing_stream_shelf = {};
-	Step(fmt::format("co stoji na plose {}x{}: {} obrazku", s.width, s.height, s.items.size()));
+	Step(fmt::format("co stoji na plose {}x{}: {} obrazku, {} budov", s.width, s.height, s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
 	gl.glDrawBuffers(2, colour_and_lit);
@@ -3199,24 +3265,119 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glClear(GL_COLOR_BUFFER_BIT);
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+	gl.glDepthFunc(GL_GEQUAL);
+	gl.glDepthMask(GL_TRUE);
+	gl.glClearDepth(0.0);
+	gl.glFrontFace(GL_CCW);
 	const GLuint p = _standing_program.program;
-	gl.glUseProgram(p);
-	gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
-	gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
-	gl.glActiveTexture(GL_TEXTURE0);
-	gl.glBindVertexArray(_standing_vao);
-	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+	auto use_pictures = [&]() {
+		gl.glUseProgram(p);
+		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindVertexArray(_standing_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+	};
+	use_pictures();
+	/* A building's corner on the block to the card: the block's pixels in the view's picture, its depth 0-1. */
+	const float vw = static_cast<float>(s.view_w), vh = static_cast<float>(s.view_h);
+	const ThreeDGpuMatrix to_view = {
+		2.0f / vw, 0, 0, -1.0f + 2.0f * s.view_x / vw,
+		0, 2.0f / vh, 0, -1.0f + 2.0f * s.view_y / vh,
+		0, 0, 2.0f, -1.0f,
+		0, 0, 0, 1,
+	};
 	std::vector<float> corners;
 	GLuint drawing = 0;
+	bool in_depth = false; ///< the pictures being gathered are laid in the depth of the building before them
 	auto flush = [&]() {
 		if (corners.empty()) return;
+		if (in_depth) {
+			gl.glEnable(GL_DEPTH_TEST);
+		} else {
+			gl.glDisable(GL_DEPTH_TEST);
+		}
 		gl.glBindTexture(GL_TEXTURE_2D, drawing);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 4));
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 5));
 		corners.clear();
+	};
+	/* A building: its depth cleared over its rectangle, its triangles by texture and side, at night its lit glass. */
+	std::vector<GLuint> textures;
+	std::vector<float> night;
+	auto draw_building = [&](const ThreeDGpuStandingBuilding &b) {
+		const GpuBuilding *on = MapBuildingOnCard(b.building);
+		if (on == nullptr) return false;
+		textures.clear();
+		for (const ThreeDObjectTexture *t : b.building.textures) {
+			const GpuTexture *g = t != nullptr ? TextureOnCard(*t) : nullptr;
+			if (t != nullptr && g == nullptr) return false;
+			textures.push_back(g != nullptr ? g->name : 0);
+		}
+		if (b.clear) {
+			const int x0 = std::max(0, b.clear_x), y0 = std::max(0, b.clear_y);
+			const int x1 = std::min(s.width, b.clear_x + b.clear_w), y1 = std::min(s.height, b.clear_y + b.clear_h);
+			if (x1 > x0 && y1 > y0) {
+				gl.glScissor(s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0);
+				gl.glClear(GL_DEPTH_BUFFER_BIT);
+				gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+			}
+		}
+		const GpuProgram &bp = _standing_building_program;
+		gl.glUseProgram(bp.program);
+		gl.glUniform1i(bp.tex, 0);
+		const GLint night_at = gl.glGetUniformLocation(bp.program, "u_night");
+		gl.glUniform1i(night_at, 0);
+		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
+		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
+		gl.glEnable(GL_DEPTH_TEST);
+		gl.glBindVertexArray(on->vao);
+		for (const GpuBuilding::Run &r : on->runs) {
+			if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
+			/* The side turned away left out, as the pictures of the buildings (DrawBuildingsOnCard()). */
+			if (!b.building.cull || r.facing == 0) {
+				gl.glDisable(GL_CULL_FACE);
+			} else {
+				gl.glEnable(GL_CULL_FACE);
+				gl.glCullFace(r.facing > 0 ? GL_FRONT : GL_BACK);
+			}
+			gl.glBindTexture(GL_TEXTURE_2D, textures[r.texture]);
+			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
+		}
+		gl.glDisable(GL_CULL_FACE);
+		if (!b.night.empty()) {
+			gl.glUniform1i(night_at, 1);
+			gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, to_view.data());
+			gl.glBindVertexArray(_standing_tri_vao);
+			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_tri_vbo);
+			const size_t tris = std::min(b.night.size() / 18, b.night_texture.size());
+			for (size_t k = 0; k < textures.size(); k++) {
+				if (textures[k] == 0) continue;
+				night.clear();
+				for (size_t t = 0; t < tris; t++) {
+					if (b.night_texture[t] == k) night.insert(night.end(), b.night.begin() + t * 18, b.night.begin() + (t + 1) * 18);
+				}
+				if (night.empty()) continue;
+				gl.glBindTexture(GL_TEXTURE_2D, textures[k]);
+				gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(night.size() * sizeof(float)), night.data(), GL_STREAM_DRAW);
+				gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(night.size() / 6));
+			}
+		}
+		gl.glDisable(GL_DEPTH_TEST);
+		return true;
 	};
 	bool all = true;
 	for (const ThreeDGpuStandingItem &item : s.items) {
+		if (item.building >= 0) {
+			flush();
+			if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
+				all = false;
+				break;
+			}
+			use_pictures();
+			drawing = 0;
+			continue;
+		}
 		if (item.picture == nullptr) continue;
 		GLuint texture = 0;
 		std::array<int, 2> place;
@@ -3224,21 +3385,34 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			all = false;
 			break;
 		}
-		if (texture != drawing) {
+		const bool depth = item.depth >= 0;
+		if (texture != drawing || depth != in_depth) {
 			flush();
 			drawing = texture;
+			in_depth = depth;
 		}
 		const float w = static_cast<float>(item.picture->width), h = static_cast<float>(item.picture->height);
 		const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
 		const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-		corners.insert(corners.end(), {x0, y0, u0, v0, x1, y0, u1, v0, x1, y1, u1, v1, x0, y0, u0, v0, x1, y1, u1, v1, x0, y1, u0, v1});
+		const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
+		corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
 	}
 	flush();
 	gl.glBindVertexArray(0);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	gl.glDisable(GL_BLEND);
+	gl.glDisable(GL_DEPTH_TEST);
 	if (!all) gl.glClear(GL_COLOR_BUFFER_BIT);
 	gl.glDisable(GL_SCISSOR_TEST);
+	/* At night which of its pixels are lit, for the glows by them. */
+	if (s.read_lit && all) {
+		Step(fmt::format("svitici body plochy zpet (glReadPixels), {}x{}", s.width, s.height));
+		s.lit.resize(static_cast<size_t>(s.width) * s.height);
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT1);
+		gl.glPixelStorei(GL_PACK_ALIGNMENT, 1);
+		gl.glReadPixels(s.view_x, s.view_y, s.width, s.height, GL_RED, GL_UNSIGNED_BYTE, s.lit.data());
+		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	}
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	/* Shown straight from the card: done before the screen shows it. */
 	gl.glFinish();
@@ -3248,6 +3422,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (error == GL_OUT_OF_MEMORY) ForgetCard();
 		return false;
 	}
+	TrimCard();
 	return all;
 }
 

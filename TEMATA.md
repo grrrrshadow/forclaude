@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (25) – Rigs of Rods bod 1: brzdovky, couvání; co mají technicky (čeká na domluvu)
+
+- Hráč: *„rigs of rods bod 1 brzdovky když budou spomalovat ve dne se rozsviti zadni červene a v noci se rozsviti vic .
+  blinkry asi ne. necouvame, chtěl bych couvat když dlouho držim brzdu v cab view. šipkou dolu brzdit i couvat
+  potom.“* a *„co maj rigs of rods technologicky aby se jim hejbal obraz? co maj tady nebo v openmw?
+  https://github.com/alexbatalov/fallout2-ce … ale hlavně co maj technologicky dobrý“*.
+- Stav: domluvit podrobnosti (která vozidla, jak dlouho držet, rychlost couvání), pak kódovat.
+
+## 27. 10. (24) – Otočená mapa kartou 2, kus 2: domy kartou trojúhelníky (rig), měření
+
+- Hráč: *„jo pokračuj“* (3D objekty přímo kartou).
+- Hotovo: dům (3D objekt) kreslí karta rovnou mezi stojícími věcmi bloku: trojúhelníky přes vlastní hloubku (vymazaná
+  přes jeho obdélník; díly kreslené s ním, seno, dveře, v téže hloubce), holky a rostliny na něm jako obrázky
+  v jeho hloubce podle středu výšky, v noci okna jako svítící trojúhelníky, záře oken jako dřív. Karta po bloku
+  vrátí, které pixely svítí (záře jen u viditelných oken). Obrázky domů se při tom nedělají. Obrázky postav mají
+  své číslo (`uid`), karta je drží v atlasu.
+- Ověřeno v rigu: den 580 px rozdílu proti procesoru (kontrola 150, animace), noc okna i záře stejné.
+- Měření (llvmpipe): 94 bloků, 5048 kreslení domů, 13,3 milionu trojúhelníků, karta 1485 ms; procesor s hotovými
+  obrázky 39 ms. Dům se kreslí znovu v každém bloku, do kterého zasahuje (~10×). Vypínač zůstává jen pro rig.
+  Závěr: kreslit celý pohled jedním průchodem (jako z očí), ne po blocích – návrh hráči.
+
 ## 27. 10. (23) – Otočená mapa kartou 2, kus 1: stojící věci bloku kreslí karta (zatím jen rig)
 
 - Hráč: *„udělej zas kus na gpu“*. Pokračování přechodu (#206, #221): co stojí na bloku mapy, kreslí karta.

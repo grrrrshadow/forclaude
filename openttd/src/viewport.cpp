@@ -2039,8 +2039,8 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
 static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 4>> _night_glows;
-/** The lit pixels of the block laid by the card over its ground (ThreeDGpuStanding), x and y of the block: where the glows of the lights are seen as by _night_lit. */
-static std::vector<std::pair<int, int>> _night_lit_card;
+/** Which pixels of the block the card left lit (ThreeDGpuStanding::lit), a byte a pixel: where the glows of the lights are seen as by _night_lit; empty none. */
+static std::vector<uint8_t> _night_lit_card;
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
 static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
@@ -2150,6 +2150,8 @@ struct TurnedTimes {
 	int standing_card = 0;     ///< blocks whose standing things the card laid (ThreeDGpuStanding)
 	int standing_sprites = 0;  ///< and of their pictures, the sprites'
 	int standing_apart = 0;    ///< and those the processor drew apart (DrawTurnedStandingApart())
+	int standing_objects = 0;  ///< and the buildings the card drew among them (AddTurnedStandingObject())
+	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
@@ -2167,10 +2169,10 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
-	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_apart, t.standing_card_ms);
+	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_apart, t.standing_card_ms);
 	/* With a window the console is not written out: the diary too (the rig). */
-	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {}, spritu {}, zvlast procesorem {}, karta {:.1f} ms",
-			t.drawn, t.standing, t.models, t.standing_card, t.standing_sprites, t.standing_apart, t.standing_card_ms);
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {}, spritu {}, budov {} ({} trojuhelniku), zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_apart, t.standing_card_ms);
 	extern void TurnedGroundTimingsPrint();
 	TurnedGroundTimingsPrint();
 	_turned_times = TurnedTimes();
@@ -4758,8 +4760,12 @@ bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, fl
 	return true;
 }
 
-/** Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7). */
-static void AddTurnedObjectsToDraw()
+/**
+ * Each building that is a 3D object is one thing to draw among the standing ones, by the box of its plot (box_kind 7).
+ * @param pictures whether their pictures are made (MakeTurnedObjectPicturesOnCard()); not when the card draws them
+ *                 among what stands on the block (AddTurnedStandingObject())
+ */
+static void AddTurnedObjectsToDraw(bool pictures = true)
 {
 	/* Their textures made on every core first, before they are drawn. */
 	std::vector<ThreeDTextureWanted> wanted;
@@ -4770,7 +4776,7 @@ static void AddTurnedObjectsToDraw()
 	}
 	PrepareThreeDObjectTextures(wanted);
 	/* Their pictures by the card, all at once (MakeTurnedObjectPicturesOnCard()). */
-	MakeTurnedObjectPicturesOnCard();
+	if (pictures) MakeTurnedObjectPicturesOnCard();
 	/* The pictures of the figures and plants standing on them made before they are drawn, all at once: by the card in
 	 * one go (MakeThreeDPicturesAtOnce()), not one at a time as each building is drawn -- a turn of the map a new one of
 	 * each at every degree. Asked as DrawObjectInto() will ask. */
@@ -5960,9 +5966,265 @@ static std::shared_ptr<ThreeDGpuStandingPicture> DrawTurnedStandingApart(const D
 	return pic;
 }
 
+/** The pictures of the figures and plants on the buildings for the card, by their picture's number (ThreeDModelPicture::uid). */
+static std::unordered_map<uint64_t, std::shared_ptr<const ThreeDGpuStandingPicture>> _turned_figure_pictures;
+static size_t _turned_figure_picture_bytes = 0;
+/** Their keys on the card (ThreeDGpuStandingItem::key), apart from the sprites'. */
+static constexpr uint64_t TURNED_FIGURE_KEY = uint64_t{1} << 62;
+
+/** A figure's picture for the card: its colours with their alpha multiplied in, made the first time. */
+static std::shared_ptr<const ThreeDGpuStandingPicture> TurnedFigurePicture(const ThreeDModelPicture &pic)
+{
+	if (pic.uid != 0) {
+		auto it = _turned_figure_pictures.find(pic.uid);
+		if (it != _turned_figure_pictures.end()) return it->second;
+	}
+	if (pic.width <= 0 || pic.height <= 0 || pic.pixels.size() < static_cast<size_t>(pic.width) * pic.height) return nullptr;
+	auto made = std::make_shared<ThreeDGpuStandingPicture>();
+	made->width = pic.width;
+	made->height = pic.height;
+	made->pixels.resize(static_cast<size_t>(pic.width) * pic.height);
+	for (size_t i = 0; i < made->pixels.size(); i++) {
+		const Colour c(pic.pixels[i]);
+		if (c.a == 0) {
+			made->pixels[i] = 0;
+			continue;
+		}
+		/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
+		const uint a = c.a == THREE_D_GPU_LIT_ALPHA ? 255 : c.a;
+		made->pixels[i] = Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
+	}
+	if (pic.uid != 0) {
+		if (_turned_figure_picture_bytes > TURNED_SPRITE_PICTURE_BYTES) {
+			_turned_figure_pictures.clear();
+			_turned_figure_picture_bytes = 0;
+		}
+		_turned_figure_picture_bytes += made->pixels.size() * sizeof(uint32_t) + sizeof(ThreeDGpuStandingPicture) + 64;
+		_turned_figure_pictures[pic.uid] = made;
+	}
+	return made;
+}
+
+/** The box of a shape's corners, by its number (ThreeDObjectShapeView::uid): x0, x1, y0, y1, z0, z1 from the object's north corner. */
+static std::unordered_map<uint64_t, std::array<float, 6>> _turned_shape_boxes;
+
+static const std::array<float, 6> &TurnedShapeBox(const ThreeDObjectShapeView &shape)
+{
+	if (_turned_shape_boxes.size() > 65536) _turned_shape_boxes.clear();
+	auto [it, added] = _turned_shape_boxes.try_emplace(shape.uid);
+	if (added) {
+		std::array<float, 6> &b = it->second;
+		const float most = std::numeric_limits<float>::max();
+		b = {most, -most, most, -most, most, -most};
+		for (size_t i = 0; i + 2 < shape.pos.size(); i += 3) {
+			for (int k = 0; k < 3; k++) {
+				b[k * 2] = std::min(b[k * 2], shape.pos[i + k]);
+				b[k * 2 + 1] = std::max(b[k * 2 + 1], shape.pos[i + k]);
+			}
+		}
+	}
+	return it->second;
+}
+
+/**
+ * A building that is a 3D object among what stands on a block for the card (box_kind 7), as DrawTurnedObject() draws
+ * it: each part's triangles drawn by the card through a depth of its own -- the field's soil alone, the building and
+ * the parts drawn with it in one --, the figures and plants on a part laid in that depth by how near their middle
+ * is, at night its lit glass over them, its glows told (DrawNight()). No picture of it made (the player, 25. 10.:
+ * "finish the move to the GPU").
+ * @return false: the card cannot draw it so (the processor draws it apart)
+ */
+static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (_north_house_objects_now) return false;
+	if (ps.box_dx < 0 || static_cast<size_t>(ps.box_dx) >= _turned_objects.size()) return true;
+	const TurnedObject &to = _turned_objects[ps.box_dx];
+	const ObjectLay lay = MapLay(frame);
+	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
+	const double ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE, oz = to.z;
+	/* A point of it (world units from its north corner, its height in units of height) on the block, and how near. */
+	auto place = [&](double x, double y, double h, double &sx, double &sy, double &d) {
+		lay.Project(ox + x, oy + y, oz + h, sx, sy);
+		double xr, yr;
+		lay.Turn(ox + x, oy + y, xr, yr);
+		d = xr + yr + 2 * h;
+	};
+	struct Part {
+		const ThreeDObject *o;
+		std::span<const ThreeDObjectFigure> more;
+		bool own_depth; ///< the first of those drawn in one depth
+		ThreeDObjectShapeView shape{};
+		struct Figure {
+			const ThreeDModelPicture *pic;
+			int x, y;
+			double near;
+		};
+		std::vector<Figure> figures{};
+	};
+	std::vector<Part> parts;
+	if (to.ground != nullptr) parts.push_back({to.ground, {}, true});
+	parts.push_back({to.obj, to.more, true});
+	for (const ThreeDObject *w : to.with) parts.push_back({w, {}, false});
+	for (Part &p : parts) {
+		if (p.o == nullptr) continue;
+		p.shape = TurnedObjectShape(p.o, lay);
+		if (!p.shape.tri.empty() && p.shape.uid == 0) return false;
+	}
+	const uint64_t stood_in = ThreeDStandInsGiven();
+	for (size_t at = 0; at < parts.size();) {
+		size_t end = at + 1;
+		while (end < parts.size() && !parts[end].own_depth) end++;
+		/* The depths of all drawn in one depth, and the rectangle they cover. */
+		const double most = std::numeric_limits<double>::max();
+		double dn = most, df = -most;
+		double rx0 = most, ry0 = most, rx1 = -most, ry1 = -most;
+		auto cover = [&](double x0, double y0, double x1, double y1) {
+			rx0 = std::min(rx0, x0);
+			ry0 = std::min(ry0, y0);
+			rx1 = std::max(rx1, x1);
+			ry1 = std::max(ry1, y1);
+		};
+		for (size_t k = at; k < end; k++) {
+			Part &p = parts[k];
+			if (!p.shape.tri.empty()) {
+				/* Its box's corners: how near and where any corner of it is lies between theirs. */
+				const std::array<float, 6> &b = TurnedShapeBox(p.shape);
+				for (int c = 0; c < 8; c++) {
+					double sx, sy, d;
+					place(b[(c & 1) ? 1 : 0], b[(c & 2) ? 3 : 2], b[(c & 4) ? 5 : 4], sx, sy, d);
+					dn = std::min(dn, d);
+					df = std::max(df, d);
+					cover(sx, sy, sx, sy);
+				}
+			}
+			if (p.o != nullptr && _night_windows_now) {
+				for (size_t i = 0; i + 2 < p.o->night_pos.size(); i += 3) {
+					double sx, sy, d;
+					place(p.o->night_pos[i], p.o->night_pos[i + 1], p.o->night_pos[i + 2], sx, sy, d);
+					dn = std::min(dn, d);
+					df = std::max(df, d + 0.05);
+				}
+			}
+			/* Its figures and plants as DrawObjectInto() stands them. */
+			auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
+				const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+				int height = 0;
+				const ThreeDModelPicture *pic = StandingFigurePicture(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height);
+				if (pic == nullptr) return;
+				double xr, yr, sx, sy;
+				lay.Turn(wx, wy, xr, yr);
+				lay.Project(wx, wy, wz, sx, sy);
+				const double near = xr + yr + 2 * (wz - oz + height / 2.0);
+				const int px = static_cast<int>(std::lround(sx)) + pic->left, py = static_cast<int>(std::lround(sy)) + pic->top;
+				p.figures.push_back({pic, px, py, near});
+				dn = std::min(dn, near);
+				df = std::max(df, near + 0.05);
+				cover(px, py, px + pic->width, py + pic->height);
+			};
+			if (p.o != nullptr) {
+				if (BuildingFiguresSeen(lay.zoom)) {
+					for (const ThreeDObjectFigure &f : p.o->figures) stand(f, false);
+				}
+				for (const ThreeDObjectFigure &f : p.o->plants) stand(f, true);
+			}
+			for (const ThreeDObjectFigure &f : p.more) stand(f, false);
+		}
+		/* How near, 0-1 of their span. */
+		const double span = df > dn ? df - dn : 1.0;
+		const double scale = 0.998 / span, offset = 0.001 - dn * scale;
+		auto depth_of = [&](double d) { return static_cast<float>(std::clamp(d * scale + offset, 0.0, 1.0)); };
+		bool cleared = false;
+		for (size_t k = at; k < end; k++) {
+			Part &p = parts[k];
+			if (!p.shape.tri.empty()) {
+				const size_t index = out.buildings.size();
+				ThreeDGpuStandingBuilding &sb = out.buildings.emplace_back();
+				ThreeDGpuBuilding &b = sb.building;
+				b.uid = p.shape.uid;
+				b.pos = p.shape.pos;
+				b.uv = p.shape.uv;
+				b.light = p.shape.light;
+				b.tri = p.shape.tri;
+				b.facing = p.shape.facing;
+				b.tri_tex = p.shape.tri_tex;
+				b.cull = _turned_cull;
+				/* Its textures as DrawObjectInto() has them: its own painted, its add-ons' each in its colour at this place. */
+				b.textures.push_back(p.o->GetTexture(to_underlying(lay.zoom), p.o->PaintAt(to.origin)));
+				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->GetTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
+				/* A corner to the block: affine, so where its origin and unit steps go. */
+				double o0[3], e[3][3];
+				place(0, 0, 0, o0[0], o0[1], o0[2]);
+				for (int a = 0; a < 3; a++) {
+					place(a == 0 ? 1 : 0, a == 1 ? 1 : 0, a == 2 ? 1 : 0, e[a][0], e[a][1], e[a][2]);
+					for (int r = 0; r < 3; r++) e[a][r] -= o0[r];
+				}
+				o0[2] = o0[2] * scale + offset;
+				for (int a = 0; a < 3; a++) e[a][2] *= scale;
+				ThreeDGpuMatrix &m = sb.matrix;
+				m = {};
+				for (int r = 0; r < 3; r++) {
+					for (int a = 0; a < 3; a++) m[r * 4 + a] = static_cast<float>(e[a][r]);
+					m[r * 4 + 3] = static_cast<float>(o0[r]);
+				}
+				m[15] = 1.0f;
+				/* The depth its own over all it covers, unless it is drawn with the one before. */
+				sb.clear = !cleared;
+				sb.clear_x = static_cast<int>(std::floor(rx0)) - 2;
+				sb.clear_y = static_cast<int>(std::floor(ry0)) - 2;
+				sb.clear_w = static_cast<int>(std::ceil(rx1)) + 2 - sb.clear_x;
+				sb.clear_h = static_cast<int>(std::ceil(ry1)) + 2 - sb.clear_y;
+				cleared = true;
+				/* At night its lit glass, where it is as near as what is there by a hair (DrawTexturedTriangle()). */
+				if (_night_windows_now && !p.o->night_tri.empty()) {
+					const size_t corners = p.o->night_pos.size() / 3;
+					for (size_t t = 0; t + 2 < p.o->night_tri.size(); t += 3) {
+						const uint8_t tex = p.o->NightTexture(t);
+						if (tex >= b.textures.size() || std::max({p.o->night_tri[t], p.o->night_tri[t + 1], p.o->night_tri[t + 2]}) >= corners) continue;
+						for (int c = 0; c < 3; c++) {
+							const uint32_t i = p.o->night_tri[t + c];
+							double sx, sy, d;
+							place(p.o->night_pos[i * 3], p.o->night_pos[i * 3 + 1], p.o->night_pos[i * 3 + 2], sx, sy, d);
+							sb.night.insert(sb.night.end(), {static_cast<float>(sx), static_cast<float>(sy), depth_of(d + 0.05), p.o->night_uv[i * 2], p.o->night_uv[i * 2 + 1], 256.0f});
+						}
+						sb.night_texture.push_back(tex);
+					}
+				}
+				ThreeDGpuStandingItem &item = out.items.emplace_back();
+				item.building = static_cast<int>(index);
+				_turned_times.standing_triangles += p.shape.tri.size() / 3;
+			}
+			/* Its figures far first, in its depth when it has one: hidden behind its walls nearer than their middle. */
+			std::ranges::sort(p.figures, {}, &Part::Figure::near);
+			for (const Part::Figure &f : p.figures) {
+				if (f.x >= fw || f.y >= fh || f.x + f.pic->width <= 0 || f.y + f.pic->height <= 0) continue;
+				std::shared_ptr<const ThreeDGpuStandingPicture> pic = TurnedFigurePicture(*f.pic);
+				if (pic == nullptr) continue;
+				ThreeDGpuStandingItem &item = out.items.emplace_back();
+				item.x = f.x;
+				item.y = f.y;
+				item.key = f.pic->uid != 0 ? (f.pic->uid | TURNED_FIGURE_KEY) : 0;
+				item.picture = std::move(pic);
+				item.depth = cleared ? depth_of(f.near + 0.05) : -1.0f;
+			}
+			if (_night_windows_now && p.o != nullptr) {
+				for (size_t i = 0; i + 2 < p.o->lights.size(); i += 3) _night_glows.push_back({ox + p.o->lights[i], oy + p.o->lights[i + 1], oz + p.o->lights[i + 2], ThreeDGlowShare(p.o->lights, i)});
+			}
+		}
+		at = end;
+	}
+	if (ThreeDStandInsGiven() != stood_in) {
+		/* A figure or a plant of it drawn with another standing in: the building drawn again when its own comes. */
+		const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
+		OweThreeDPictureBox(ps.xmin - over, ps.ymin - over, ps.xmax + over, ps.ymax + over, ps.zmin, ps.zmax + figures);
+	}
+	_turned_times.standing_objects++;
+	return true;
+}
+
 /** A standing thing of the block among what stands on it for the card (ThreeDGpuStanding): its sprites, or a picture the processor drew of it. */
 static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
+	if (ps.box_kind == 7 && AddTurnedStandingObject(out, frame, ps)) return;
 	switch (ps.box_kind) {
 		case 4: return;
 		case 1: case 2: case 5: case 6: case 7: case 8: case 9: case 10: case 11: case 12: {
@@ -5970,12 +6232,6 @@ static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &
 			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return;
 			std::shared_ptr<ThreeDGpuStandingPicture> pic = DrawTurnedStandingApart(frame, ps, x0, y0, w, h);
 			if (pic != nullptr) {
-				/* Its lit pixels, where the glows of the lights by them are seen (DrawNight()). */
-				for (int y = 0; y < pic->height && _night_windows_now; y++) {
-					for (int x = 0; x < pic->width; x++) {
-						if ((pic->pixels[static_cast<size_t>(y) * pic->width + x] >> 24) == THREE_D_GPU_LIT_ALPHA) _night_lit_card.emplace_back(x0 + x, y0 + y);
-					}
-				}
 				out.items.push_back({x0, y0, 0, std::move(pic)});
 				_turned_times.standing_apart++;
 			}
@@ -6268,7 +6524,7 @@ static void ViewportDoDrawTurned()
 	}
 	_turned_times.collect += t_collect;
 
-	AddTurnedObjectsToDraw();
+	AddTurnedObjectsToDraw(!(_turned_card_standing_on && TurnedCardGroundUsable(frame)));
 
 	/* The tiles whose ground can be seen in the block, a tile more every way: the ground of the others is not drawn
 	 * (they were collected for what stands on them, which may reach in), and a foundation of one is taken off the
@@ -6488,6 +6744,8 @@ static void ViewportDoDrawTurned()
 		on_card.height = UnScaleByZoom(frame.height, frame.zoom);
 		on_card.view_w = _turned_card_ground.w;
 		on_card.view_h = _turned_card_ground.h;
+		on_card.read_lit = _night_windows_now;
+		const size_t glows_before = _night_glows.size();
 		for (const TurnedSprite &s : standing) AddTurnedStandingThing(on_card, frame, *s.ps);
 		const double tc0 = TurnedNow();
 		standing_on_card = ThreeDGpuDrawStanding(on_card);
@@ -6495,6 +6753,10 @@ static void ViewportDoDrawTurned()
 		if (standing_on_card) {
 			_turned_times.standing_card++;
 			ShowTurnedCardGround();
+			_night_lit_card = std::move(on_card.lit);
+		} else {
+			/* Drawn again by the processor, its glows told again. */
+			_night_glows.resize(glows_before);
 		}
 	}
 	if (!standing_on_card) {
@@ -6698,8 +6960,8 @@ static void DrawNight(bool turned)
 				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
 				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
 			}
-			for (const auto &[x, y] : _night_lit_card) {
-				if (x >= 0 && y >= 0 && x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
+			if (_night_lit_card.size() == seen.size()) {
+				for (size_t i = 0; i < seen.size(); i++) seen[i] |= _night_lit_card[i] != 0;
 			}
 		}
 		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {

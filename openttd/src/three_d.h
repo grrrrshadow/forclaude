@@ -109,6 +109,7 @@ struct ThreeDModelPicture {
 	std::vector<uint32_t> pixels; ///< Colour::data, alpha 0 where there is nothing
 	std::vector<uint32_t> lit;    ///< at night the pixels of the lit glass of its lights (its "noc"): kept bright when the night darkens the map
 	std::vector<ThreeDPictureLight> lights; ///< at night its lights that are on
+	uint64_t uid = 0; ///< its own number, another for every picture made (the card keeps its pixels by it); 0 none
 };
 
 /**

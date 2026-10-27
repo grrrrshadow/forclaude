@@ -2406,6 +2406,8 @@ static void MakeRoomForPicture()
 /** A picture of the turned view from an object drawn into pixels (RasterObject()). */
 static void PictureOfRaster(ThreeDModelPicture &picture, ObjectRaster &r)
 {
+	static std::atomic<uint64_t> uids = 0;
+	picture.uid = ++uids;
 	picture.width = r.width;
 	picture.height = r.height;
 	picture.left = r.left;

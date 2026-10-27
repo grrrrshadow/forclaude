@@ -360,11 +360,32 @@ struct ThreeDGpuStandingPicture {
 };
 static constexpr uint8_t THREE_D_GPU_LIT_ALPHA = 254;
 
-/** A thing standing on a block of the turned map: its picture laid at its place. */
+/**
+ * A building of the turned map drawn by the card among what stands on a block (ThreeDGpuStandingItem::building), as
+ * DrawObjectInto() of viewport.cpp draws it: its triangles through a depth of its own -- cleared over its rectangle
+ * first, unless it is a part drawn with the one before (the farm's hay, the doors) --, the figures on it after them, at
+ * night its lit glass over them.
+ */
+struct ThreeDGpuStandingBuilding {
+	ThreeDGpuBuilding building;
+	ThreeDGpuMatrix matrix{};             ///< a corner (world units from its north corner) to the block: x, y pixels, z how near, 0-1
+	bool clear = true;                    ///< its depth cleared first over clear_x, clear_y, clear_w, clear_h (pixels of the block)
+	int clear_x = 0, clear_y = 0, clear_w = 0, clear_h = 0;
+	/** At night its lit glass: each triangle's corners on the block already -- x, y pixels, z how near (0-1, as the
+	 * matrix's), u, v of its texture (0-1), 256 --, drawn as they are where they are nearer, marked lit. */
+	std::vector<float> night;
+	std::vector<uint8_t> night_texture;   ///< each such triangle's texture (ThreeDGpuBuilding::textures)
+};
+
+/** A thing standing on a block of the turned map: its picture laid at its place, or a building drawn there. */
 struct ThreeDGpuStandingItem {
 	int x = 0, y = 0; ///< its top left in the block, pixels
 	uint64_t key = 0; ///< kept on the card by this (a sprite's picture); 0 this block's alone
 	std::shared_ptr<const ThreeDGpuStandingPicture> picture;
+	/** A picture among the triangles of the building before it (a figure on it): how near it is, as that building's
+	 * depth (0-1); laid where it is nearer, its depth kept. Below 0: laid over all. */
+	float depth = -1;
+	int building = -1; ///< not a picture: the building of ThreeDGpuStanding::buildings drawn here
 };
 
 /**
@@ -377,6 +398,11 @@ struct ThreeDGpuStanding {
 	int width = 0, height = 0;   ///< the block
 	int view_w = 0, view_h = 0;  ///< the view's (as its ground's)
 	std::vector<ThreeDGpuStandingItem> items;
+	std::vector<ThreeDGpuStandingBuilding> buildings;
+	/** At night: which pixels of the block are lit once all is laid (the glows of the lights only where they are
+	 * seen, DrawNight() of viewport.cpp), read back into lit, a byte a pixel, top row first. */
+	bool read_lit = false;
+	std::vector<uint8_t> lit;
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
