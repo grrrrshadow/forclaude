@@ -724,6 +724,12 @@ struct ThreeDVehicleObject {
 	float spin_centre[3] = {};      ///< "stred": a point of the axis, metres
 	std::string skeleton_file;      ///< a creature's "kostra": its mesh with bones and animations; its frames are posed from them, a frame a tick
 	std::string skeleton_anim;      ///< the animation of it this figure is
+	std::string motion_file;        ///< a humanoid's motion (hra/3d/KOSTRA-POSTAV-PRO-HRU.md): the file its animation is of, put on the bones of skeleton_file by their names; empty, skeleton_file's own
+	float motion_scale = 1.0f;      ///< and how far the hips move: its hips' height over the motions' ("vyska_kycli")
+	std::string held_file;          ///< a thing held by a bone in the motion ("predmet": the joint in the hand of one smoking), empty none
+	std::string held_bone;          ///< the bone holding it ("kost")
+	float held_at[3] = {};          ///< where, metres in the bone's frame, glTF's axes ("poloha")
+	float held_turn[4] = {0, 0, 0, 1}; ///< turned so there, a quaternion x, y, z, w ("rotace")
 	const ThreeDVehicleObject *blend_from = nullptr; ///< a passage from another animation of the creature (GetThreeDFigure("<jmeno>/<a>@<snimek>><b>")): the figure it comes from ...
 	const ThreeDVehicleObject *blend_to = nullptr;   ///< ... and the one it goes to
 	int blend_from_frame = 0;       ///< the frame of the one it comes from

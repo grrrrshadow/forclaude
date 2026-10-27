@@ -77,6 +77,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Hráč: *„krok 1 hry autosan tam mumlá“*: kolegovi (grrrrf 3dd5078) krok 1 hry hotový od `f9c590f`, na nic
   nečeká. Autosan s `lavice_studentky_v3s` (6 sedí) a `studentky_stoji_v3s` (8 stojí) vyzkoušený v rigu na kopii jeho
   v1 taru, ZTS s řidičkou hry. Zbývá jeho strana: GRF Zvlastni_vozy_3D v2 (Autosan STUD), dva stavy, holky z balíčku pryč.
+- Hráč: *„piše grrrrf že dělá kostry“*. Kolega (cb72b5f): sada `humanoidi` (College Girl, Galaxia, pubg Girl s
+  jednou kostrou, 22 kostí jako Mixamo), `humanoid_pohyby.glb` (stojí, sedí, za volantem, chůze, kouří) a `dzoint.glb`.
+  Hra: přenos pohybů podle jmen kostí (rotace kostí, kyčle krát poměr výšky kyčlí), předmět v ruce (`predmet`: kost,
+  poloha, rotace), snímky z `doba_s` (12 za sekundu), pohyby i z balíčku vozidla (napřed tam). Postava
+  `<jmeno>/<pohyb>`, v posádce `postava` + `poza`. Rig: všechny tři holky ve všech pohybech; V3S s `college_girl` +
+  `za_volantem` sedí jako dnešní řidička. Staré pózy v `postavy` zůstávají, dokud je balíčky používají.
+- Zvlastni_vozy_3D v2 (kolega): Autosan STUD, za jízdy GRF vybere stav s lavicí (sprite 1233), řidičky hry. Rig sedí.
 - Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
   `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
   na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.

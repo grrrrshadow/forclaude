@@ -197,6 +197,38 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+
+/**
+ * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
+ * a file of the bones and their animations without a mesh, put on every figure of that kind by the bones' names.
+ */
+struct ThreeDMotionSet {
+	struct Motion {
+		std::string name;    ///< the animation
+		int frames = 1;      ///< "snimku", else 12 a second of "doba_s"; 1 a pose standing still
+		int frame_ticks = 1; ///< game ticks a frame is held
+		bool loop = true;    ///< "smycka"
+		float walk_m = 0;    ///< "krok_m": metres walked a round, by hips as high as the motions'
+		std::string held_file;  ///< "predmet": a thing held by a bone, its file
+		std::string held_bone;  ///< "kost"
+		float held_at[3] = {};  ///< "poloha"
+		float held_turn[4] = {0, 0, 0, 1}; ///< "rotace"
+	};
+	std::string package;
+	std::string file;
+	std::string kind;    ///< "kostra": the kind of bones they are for
+	float hips = 1.0f;   ///< "vyska_kycli": the height of the hips the animations are made for, metres
+	std::vector<Motion> motions;
+};
+/** The sets of motions of the indices: the game's, a vehicle's package's poses of its seats. */
+static std::vector<ThreeDMotionSet> _motion_sets;
+/** A figure of a kind of bones ("kostra" a name, not a file), posed by the motions of its kind (MakeHumanoidFigures()). */
+struct ThreeDHumanoid {
+	ThreeDVehicleObject figure;
+	std::string kind;
+	float hips = 1.0f;   ///< "vyska_kycli"
+};
+static std::vector<ThreeDHumanoid> _humanoids;
 /** The pieces of the shared loads (ThreeDLoadPiece), by the indices' order. */
 static std::vector<ThreeDLoadPiece> _load_pieces;
 /** The sounds of the things of the indices ("zvuky"): "<jmeno>/<zvuk>" to its file (a path, or in a tar: IN_TAR, IN_BASESET_TAR). */
@@ -1507,6 +1539,7 @@ struct BonePose {
 /** A creature's mesh with its bones and its animations (ReadGlbSkeleton()). */
 struct GlbSkeleton {
 	struct Node {
+		std::string name;
 		int parent = -1;
 		bool has_matrix = false; ///< its place a matrix (not animated)
 		BoneMatrix matrix{};
@@ -1542,6 +1575,64 @@ struct GlbSkeleton {
 			if (a.name == name) return &a;
 		}
 		return nullptr;
+	}
+
+	/** The node of a bone by its name, -1 none. */
+	int NodeNamed(std::string_view name) const
+	{
+		for (size_t i = 0; i < this->nodes.size(); i++) {
+			if (this->nodes[i].name == name) return static_cast<int>(i);
+		}
+		return -1;
+	}
+
+	/**
+	 * A pose of other bones put on these by the bones' names (a humanoid's motions, the colleague's
+	 * hra/3d/KOSTRA-POSTAV-PRO-HRU.md: the joints at rest unturned, so a turning means the same on every figure): each
+	 * bone turned as its namesake, moved only where the animation moves it (the hips), so far times scale; the
+	 * figure's own lengths of the others kept.
+	 * @param from the bones of the motions
+	 * @param from_pose their pose (from.Pose())
+	 * @param anim the animation of it, nullptr none
+	 * @param scale the figure's hips' height over the motions'
+	 */
+	std::vector<BonePose> Retarget(const GlbSkeleton &from, const std::vector<BonePose> &from_pose, const Animation *anim, double scale) const
+	{
+		std::vector<BonePose> pose;
+		pose.reserve(this->nodes.size());
+		for (const Node &n : this->nodes) pose.push_back(n.rest);
+		std::vector<bool> moved(from.nodes.size(), false);
+		if (anim != nullptr) {
+			for (const Channel &c : anim->channels) {
+				if (c.path == 0 && c.node >= 0 && static_cast<size_t>(c.node) < moved.size()) moved[c.node] = true;
+			}
+		}
+		for (size_t i = 0; i < from.nodes.size() && i < from_pose.size(); i++) {
+			if (from.nodes[i].name.empty()) continue;
+			const int to = this->NodeNamed(from.nodes[i].name);
+			if (to < 0) continue;
+			std::copy_n(from_pose[i].r, 4, pose[to].r);
+			if (moved[i]) for (int k = 0; k < 3; k++) pose[to].t[k] = from_pose[i].t[k] * scale;
+		}
+		return pose;
+	}
+
+	/** Every node's place in the file in a pose, glTF's axes. */
+	std::vector<BoneMatrix> Globals(const std::vector<BonePose> &pose) const
+	{
+		std::vector<BoneMatrix> global(this->nodes.size());
+		std::vector<bool> done(this->nodes.size(), false);
+		std::function<const BoneMatrix &(int)> place = [&](int i) -> const BoneMatrix & {
+			if (!done[i]) {
+				const Node &n = this->nodes[i];
+				const BoneMatrix own = n.has_matrix ? n.matrix : pose[i].Matrix();
+				global[i] = n.parent >= 0 ? BoneMultiply(place(n.parent), own) : own;
+				done[i] = true;
+			}
+			return global[i];
+		};
+		for (size_t i = 0; i < this->nodes.size(); i++) place(static_cast<int>(i));
+		return global;
 	}
 
 	/** Every bone's place against its parent in an animation at a time, seconds (none: at rest). */
@@ -1581,19 +1672,9 @@ struct GlbSkeleton {
 	 */
 	void Skin(const std::vector<BonePose> &pose, std::vector<float> &out_pos, std::vector<float> &out_nrm) const
 	{
-		std::vector<BoneMatrix> global(this->nodes.size());
-		std::vector<bool> done(this->nodes.size(), false);
-		std::function<const BoneMatrix &(int)> place = [&](int i) -> const BoneMatrix & {
-			if (!done[i]) {
-				const Node &n = this->nodes[i];
-				const BoneMatrix own = n.has_matrix ? n.matrix : pose[i].Matrix();
-				global[i] = n.parent >= 0 ? BoneMultiply(place(n.parent), own) : own;
-				done[i] = true;
-			}
-			return global[i];
-		};
+		const std::vector<BoneMatrix> global = this->Globals(pose);
 		std::vector<BoneMatrix> joint(this->joints.size());
-		for (size_t k = 0; k < this->joints.size(); k++) joint[k] = BoneMultiply(place(this->joints[k]), this->inverse_bind[k]);
+		for (size_t k = 0; k < this->joints.size(); k++) joint[k] = BoneMultiply(global[this->joints[k]], this->inverse_bind[k]);
 		const size_t corners = this->pos.size() / 3;
 		out_pos.resize(corners * 3);
 		out_nrm.resize(this->nrm.size() == corners * 3 ? corners * 3 : 0);
@@ -1664,16 +1745,18 @@ static void ReadGlbAccessor(const nlohmann::json &j, std::span<const uint8_t> bi
 
 /**
  * Read a creature's mesh with its bones and animations (its "kostra"), kept for the next asking.
- * @return nullptr when the file has no mesh with a skin
+ * @param with_mesh whether it has to have a mesh with a skin; else its bones and animations will do (a humanoid's
+ *                  motions, "druh": "pohyby")
+ * @return nullptr when the file has no mesh with a skin and it has to
  */
-static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
+static const GlbSkeleton *ReadGlbSkeleton(const std::string &path, bool with_mesh = true)
 {
 	/* One at a time: a shape may be made on the thread making the pictures of the vehicles too (MakeOnce()). */
 	static std::mutex kept_mutex;
 	std::lock_guard lock(kept_mutex);
 	static std::map<std::string, std::unique_ptr<GlbSkeleton>> kept;
 	auto found = kept.find(path);
-	if (found != kept.end()) return found->second.get();
+	if (found != kept.end()) return found->second != nullptr && with_mesh && found->second->tri.empty() ? nullptr : found->second.get();
 	std::unique_ptr<GlbSkeleton> &slot = kept[path];
 
 	const std::shared_ptr<const std::vector<uint8_t>> file = GlbFileBytes(path);
@@ -1701,6 +1784,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 		for (size_t i = 0; i < nodes.size(); i++) {
 			const auto &n = nodes.at(i);
 			GlbSkeleton::Node &node = sk->nodes[i];
+			node.name = n.value("name", std::string());
 			if (n.contains("matrix")) {
 				node.has_matrix = true;
 				for (int k = 0; k < 16; k++) node.matrix[k] = n.at("matrix").at(k).get<double>();
@@ -1831,7 +1915,7 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 				}
 			}
 		}
-		if (sk->tri.empty()) {
+		if (sk->tri.empty() && with_mesh) {
 			Debug(misc, 0, "3D skeleton {}: no mesh with a skin", path);
 			return nullptr;
 		}
@@ -1872,10 +1956,9 @@ static const GlbSkeleton *ReadGlbSkeleton(const std::string &path)
 		Debug(misc, 0, "3D skeleton {}: {}", path, e.what());
 		return nullptr;
 	}
-	if (sk->tri.empty()) return nullptr;
 	Debug(misc, 1, "3D skeleton {}: {} joints, {} corners, {} animations", path, sk->joints.size(), sk->pos.size() / 3, sk->animations.size());
 	slot = std::move(sk);
-	return slot.get();
+	return with_mesh && slot->tri.empty() ? nullptr : slot.get();
 }
 
 /**
@@ -3799,6 +3882,98 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 	_load_pieces.push_back(std::move(piece));
 }
 
+/**
+ * Read a set of motions ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md): its file, the kind of
+ * bones ("kostra"), the hips' height they are made for ("vyska_kycli"), and of each motion ("pohyby") how it goes
+ * round ("smycka", "doba_s", "snimku"), how far it walks ("krok_m") and the thing a bone holds in it ("predmet").
+ */
+static void ReadMotionSet(const nlohmann::json &e, const std::string &folder, const std::string &package)
+{
+	if (!e.contains("soubor") || !e.contains("kostra") || !e.at("kostra").is_string() || !e.contains("pohyby") || !e.at("pohyby").is_object()) return;
+	ThreeDMotionSet set;
+	set.package = package;
+	set.file = folder + e.at("soubor").get<std::string>();
+	set.kind = e.at("kostra").get<std::string>();
+	set.hips = std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f);
+	for (const auto &[name, p] : e.at("pohyby").items()) {
+		ThreeDMotionSet::Motion m;
+		m.name = name;
+		if (p.is_object()) {
+			m.loop = p.value("smycka", false);
+			const float seconds = std::clamp(p.value("doba_s", 0.0f), 0.0f, 60.0f);
+			m.frames = std::clamp(p.value("snimku", seconds > 0 ? static_cast<int>(std::lround(seconds * 12)) : 1), 1, 64);
+			if (m.frames > 1 && seconds > 0) m.frame_ticks = std::max(1, static_cast<int>(std::lround(seconds * 1000 / MILLISECONDS_PER_TICK / m.frames)));
+			m.walk_m = std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f);
+			if (p.contains("predmet") && p.at("predmet").is_object()) {
+				const auto &h = p.at("predmet");
+				if (h.contains("soubor") && h.at("soubor").is_string() && h.contains("kost") && h.at("kost").is_string()) {
+					m.held_file = folder + h.at("soubor").get<std::string>();
+					m.held_bone = h.at("kost").get<std::string>();
+					if (h.contains("poloha") && h.at("poloha").is_array() && h.at("poloha").size() == 3) {
+						for (int k = 0; k < 3; k++) m.held_at[k] = h.at("poloha").at(k).get<float>();
+					}
+					if (h.contains("rotace") && h.at("rotace").is_array() && h.at("rotace").size() == 4) {
+						for (int k = 0; k < 4; k++) m.held_turn[k] = h.at("rotace").at(k).get<float>();
+					}
+				}
+			}
+		}
+		set.motions.push_back(std::move(m));
+	}
+	if (!set.motions.empty()) _motion_sets.push_back(std::move(set));
+}
+
+/**
+ * The figures of the humanoids (ThreeDHumanoid) in their motions: of each, "<jmeno>/<pohyb>" for every motion of its
+ * kind -- of its own package's first, then of the vehicles' packages (their seats' poses, found first for their crews,
+ * GetThreeDFigure()) -- and "<jmeno>" alone standing ("stoji", else its first motion; else as it is in its file).
+ */
+static void MakeHumanoidFigures()
+{
+	for (const ThreeDHumanoid &h : _humanoids) {
+		std::string first;
+		for (const bool own : {true, false}) {
+			for (const ThreeDMotionSet &set : _motion_sets) {
+				if (set.kind != h.kind || (set.package == h.figure.package) != own) continue;
+				for (const ThreeDMotionSet::Motion &m : set.motions) {
+					ThreeDVehicleObject one = h.figure;
+					one.name = h.figure.name + "/" + m.name;
+					one.package = set.package;
+					one.skeleton_anim = m.name;
+					one.motion_file = set.file;
+					one.motion_scale = h.hips / set.hips;
+					one.frames = m.frames;
+					one.frame_ticks = m.frame_ticks;
+					one.loop = m.loop;
+					one.walk_step = m.walk_m * one.motion_scale;
+					/* (A figure of frames walks by them: the frames of the motion, though of bones, not of nodes.) */
+					if (one.frames >= 2) one.frame_prefix = m.name + "_";
+					one.held_file = m.held_file;
+					one.held_bone = m.held_bone;
+					std::copy_n(m.held_at, 3, one.held_at);
+					std::copy_n(m.held_turn, 4, one.held_turn);
+					if (first.empty()) first = one.name;
+					_figure_objects.push_back(std::move(one));
+				}
+			}
+		}
+		/* Standing: of its own package's motions first. */
+		const ThreeDVehicleObject *posed = nullptr;
+		for (const ThreeDVehicleObject &f : _figure_objects) {
+			if (f.name == h.figure.name + "/stoji" && (posed == nullptr || f.package == h.figure.package)) posed = &f;
+		}
+		if (posed == nullptr && !first.empty()) {
+			auto it = std::ranges::find(_figure_objects, first, &ThreeDVehicleObject::name);
+			if (it != _figure_objects.end()) posed = &*it;
+		}
+		ThreeDVehicleObject standing = posed != nullptr ? *posed : h.figure;
+		if (posed == nullptr) standing.skeleton_file.clear();
+		standing.name = h.figure.name;
+		standing.package = h.figure.package;
+		_figure_objects.push_back(std::move(standing));
+	}
+}
+
 /** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
 static void ReadThreeDVehicleObjects()
 {
@@ -3844,6 +4019,10 @@ static void ReadThreeDVehicleObjects()
 					continue;
 				}
 				const std::string figure_kind = e.value("druh", std::string("dum"));
+				if (figure_kind == "pohyby") {
+					ReadMotionSet(e, folder, package);
+					continue;
+				}
 				if ((figure_kind == "tvor" || figure_kind == "carodejnice") && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
 					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". A witch so too, the
 					 * glass of her lights and their places read from each frame. */
@@ -4116,6 +4295,13 @@ static void ReadThreeDVehicleObjects()
 							break;
 						}
 						note_animal(std::move(names));
+						continue;
+					}
+					/* A figure of a kind of bones ("kostra" its name, not a file: the colleague's humanoids), posed by the
+					 * motions of its kind once all the indices are read (MakeHumanoidFigures()). */
+					if (figure_kind == "postava" && !animal && !e.contains("pozy") && e.contains("kostra") && e.at("kostra").is_string()) {
+						fig.skeleton_file = fig.file;
+						_humanoids.push_back({std::move(fig), e.at("kostra").get<std::string>(), std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f)});
 						continue;
 					}
 					if ((figure_kind == "postava" || animal) && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
@@ -4758,6 +4944,7 @@ static void ReadThreeDVehicleObjects()
 			for (const ThreeDPlacedLoad &placed : s.placed_loads) own_colour(placed.piece, placed.colour);
 		}
 	}
+	MakeHumanoidFigures();
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
 }
 
@@ -4933,6 +5120,8 @@ void ResetThreeDVehicleObjects()
 {
 	_vehicle_objects.clear();
 	_figure_objects.clear();
+	_motion_sets.clear();
+	_humanoids.clear();
 	_load_pieces.clear();
 	_effect_objects.clear();
 	_driving_objects.clear();
@@ -5050,7 +5239,7 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 		if (slash == std::string_view::npos || slash > at || !frame.has_value()) return nullptr;
 		const ThreeDVehicleObject *from = GetThreeDFigure(name.substr(0, at), package);
 		const ThreeDVehicleObject *to = GetThreeDFigure(std::string(name.substr(0, slash + 1)) + std::string(name.substr(to_at + 1)), package);
-		if (from == nullptr || to == nullptr || from->skeleton_file.empty() || from->skeleton_file != to->skeleton_file) return to;
+		if (from == nullptr || to == nullptr || from->skeleton_file.empty() || from->skeleton_file != to->skeleton_file || from->motion_file != to->motion_file) return to;
 		auto passage = std::make_unique<ThreeDVehicleObject>();
 		passage->name = std::string(name);
 		passage->package = to->package;
@@ -5059,6 +5248,12 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 		passage->type = to->type;
 		passage->skeleton_file = to->skeleton_file;
 		passage->skeleton_anim = to->skeleton_anim;
+		passage->motion_file = to->motion_file;
+		passage->motion_scale = to->motion_scale;
+		passage->held_file = to->held_file;
+		passage->held_bone = to->held_bone;
+		std::copy_n(to->held_at, 3, passage->held_at);
+		std::copy_n(to->held_turn, 4, passage->held_turn);
 		passage->blend_from = from;
 		passage->blend_to = to;
 		passage->blend_from_frame = std::clamp(*frame, 0, std::max(0, from->frames - 1));
@@ -5602,6 +5797,64 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 }
 
 /**
+ * A thing held by a bone of a posed figure ("predmet" of a humanoid's motion, the colleague's
+ * hra/3d/KOSTRA-POSTAV-PRO-HRU.md: the big joint in the right hand of one smoking): its mesh where the bone is in the
+ * pose, at its place in the bone's frame, added to the figure's with its textures after the figure's.
+ */
+static void AddHeldThing(const ThreeDVehicleObject &f, const GlbSkeleton &sk, const std::vector<BonePose> &pose, ThreeDVehicleShape &made)
+{
+	const int bone = sk.NodeNamed(f.held_bone);
+	if (bone < 0) return;
+	GlbMesh thing;
+	if (!ReadGlbMesh(f.held_file, thing, true) || thing.pos.empty()) return;
+	if (made.pngs.size() + thing.textures.size() > 255) return;
+	BonePose on;
+	std::copy_n(f.held_at, 3, on.t);
+	std::copy_n(f.held_turn, 4, on.r);
+	const BoneMatrix m = BoneMultiply(sk.Globals(pose)[bone], on.Matrix());
+	const uint32_t base = static_cast<uint32_t>(made.pos.size() / 3);
+	const uint8_t first_texture = static_cast<uint8_t>(made.pngs.size());
+	const bool normals = !made.nrm.empty();
+	const size_t corners = thing.pos.size() / 3;
+	for (size_t i = 0; i < corners; i++) {
+		/* The game's axes (x, y, z up) back into glTF's (x, z, -y), placed, and into the game's again. */
+		const double X = thing.pos[i * 3], Y = thing.pos[i * 3 + 2], Z = -thing.pos[i * 3 + 1];
+		const double gx = m[0] * X + m[4] * Y + m[8] * Z + m[12];
+		const double gy = m[1] * X + m[5] * Y + m[9] * Z + m[13];
+		const double gz = m[2] * X + m[6] * Y + m[10] * Z + m[14];
+		made.pos.insert(made.pos.end(), {static_cast<float>(gx), static_cast<float>(-gz), static_cast<float>(gy)});
+		if (!normals) continue;
+		if (thing.nrm.size() != thing.pos.size()) {
+			made.nrm.insert(made.nrm.end(), {0.0f, 0.0f, 1.0f});
+			continue;
+		}
+		const double nx = thing.nrm[i * 3], ny = thing.nrm[i * 3 + 2], nz = -thing.nrm[i * 3 + 1];
+		double hx = m[0] * nx + m[4] * ny + m[8] * nz, hy = m[1] * nx + m[5] * ny + m[9] * nz, hz = m[2] * nx + m[6] * ny + m[10] * nz;
+		const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+		if (l > 0) {
+			hx /= l;
+			hy /= l;
+			hz /= l;
+		}
+		made.nrm.insert(made.nrm.end(), {static_cast<float>(hx), static_cast<float>(-hz), static_cast<float>(hy)});
+	}
+	if (thing.uv.size() == corners * 2) {
+		made.uv.insert(made.uv.end(), thing.uv.begin(), thing.uv.end());
+	} else {
+		made.uv.resize(made.uv.size() + corners * 2, 0.0f);
+	}
+	for (uint32_t c : thing.tri) made.tri.push_back(base + c);
+	for (size_t t = 0; t < thing.tri.size() / 3; t++) made.tri_tex.push_back(static_cast<uint8_t>(first_texture + (t < thing.tri_tex.size() ? thing.tri_tex[t] : 0)));
+	for (const GlbTexture &t : thing.textures) {
+		made.pngs.push_back(t.png);
+		made.flats.push_back(t.flat);
+		made.tex_names.push_back(t.name);
+		made.tex_glow.push_back(t.glow);
+		made.tex_alpha.push_back(t.alpha);
+	}
+}
+
+/**
  * A frame of a creature with bones (skeleton_file): the mesh posed by its animation at the frame's time -- a round of
  * the frames is the animation from its first key to its last; one that does not go round ends on its last. A
  * passage (blend_from) mixes the pose it comes from and the one it goes to, bone by bone, more of the latter each
@@ -5611,10 +5864,14 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 {
 	GlbFilesScope files;
 	std::string key = fmt::format("{}#{}#{}/{}{}", this->skeleton_file, this->skeleton_anim, frame, this->frames, this->loop ? "o" : "-");
+	if (!this->motion_file.empty()) key += fmt::format("#{}x{:.4f}#{}", this->motion_file, this->motion_scale, this->held_file);
 	if (this->blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", this->blend_from->skeleton_anim, this->blend_from_frame, this->blend_from->frames, this->blend_ticks);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
 	const GlbSkeleton *sk = ReadGlbSkeleton(this->skeleton_file);
 	if (sk == nullptr) return nullptr;
+	/* The animations: its own, or a humanoid's motions, put on its bones by their names. */
+	const GlbSkeleton *moves = this->motion_file.empty() ? sk : ReadGlbSkeleton(this->motion_file, false);
+	if (moves == nullptr) return nullptr;
 	/* The time of a frame of a figure, seconds. */
 	auto time_of = [](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
 		if (a == nullptr) return 0.0;
@@ -5622,18 +5879,21 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 		const double phase = f.loop ? static_cast<double>(fr) / f.frames : static_cast<double>(fr) / (f.frames - 1);
 		return a->start + (a->end - a->start) * std::clamp(phase, 0.0, 1.0);
 	};
+	auto pose_of = [&](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
+		std::vector<BonePose> p = moves->Pose(a, time_of(f, a, fr));
+		return moves == sk ? p : sk->Retarget(*moves, p, a, this->motion_scale);
+	};
 	std::vector<BonePose> pose;
 	if (this->blend_from != nullptr && this->blend_to != nullptr && this->blend_ticks > 0) {
 		const int own = frame / this->blend_ticks, tick = frame % this->blend_ticks;
-		const GlbSkeleton::Animation *from = sk->Find(this->blend_from->skeleton_anim), *to = sk->Find(this->blend_to->skeleton_anim);
-		const std::vector<BonePose> a = sk->Pose(from, time_of(*this->blend_from, from, this->blend_from_frame));
-		const std::vector<BonePose> b = sk->Pose(to, time_of(*this->blend_to, to, own));
+		const GlbSkeleton::Animation *from = moves->Find(this->blend_from->skeleton_anim), *to = moves->Find(this->blend_to->skeleton_anim);
+		const std::vector<BonePose> a = pose_of(*this->blend_from, from, this->blend_from_frame);
+		const std::vector<BonePose> b = pose_of(*this->blend_to, to, own);
 		const double k = (tick + 1.0) / (this->blend_ticks + 1.0);
 		pose.reserve(a.size());
 		for (size_t i = 0; i < a.size(); i++) pose.push_back(a[i].Mix(b[i], k));
 	} else {
-		const GlbSkeleton::Animation *anim = sk->Find(this->skeleton_anim);
-		pose = sk->Pose(anim, time_of(*this, anim, frame));
+		pose = pose_of(*this, moves->Find(this->skeleton_anim), frame);
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	sk->Skin(pose, made->pos, made->nrm);
@@ -5647,6 +5907,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 		made->tex_glow.push_back(t.glow);
 		made->tex_alpha.push_back(t.alpha);
 	}
+	if (!this->held_file.empty()) AddHeldThing(*this, *sk, pose, *made);
 	/* Its extent as posed (how big it is in the view from the eyes, CabFigure). */
 	if (!made->pos.empty()) {
 		made->x0 = made->y0 = made->z0 = std::numeric_limits<float>::infinity();

@@ -1,0 +1,195 @@
+[
+ {
+  "soubor": "college_girl.glb",
+  "jmeno": "college_girl",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.62,
+  "vyska_kycli": 0.9971,
+  "trojuhelniku": 11778,
+  "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést Rotmill)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "galaxia.glb",
+  "jmeno": "galaxia",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.58,
+  "vyska_kycli": 0.8822,
+  "trojuhelniku": 20000,
+  "autor": "Galaxia anime girl, Tatenashi (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést Tatenashi)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "pubg_girl.glb",
+  "jmeno": "pubg_girl",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.62,
+  "vyska_kycli": 0.8567,
+  "trojuhelniku": 20000,
+  "autor": "pubg Girl Pose T, iysif (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést iysif)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "dzoint.glb",
+  "jmeno": "dzoint",
+  "druh": "predmet",
+  "trojuhelniku": 144,
+  "rozmer_m": {
+   "delka": 0.18,
+   "prumer": 0.048
+  },
+  "autor": "grrrrf: postavy/dzoint.py",
+  "licence": "CC BY 4.0",
+  "poznamka": "velký džoint jako trychtýř (hráč: \"udělej pro holky džonta trychtyř velký když budou kouřit\"): počátek tam, kde ho drží prsty, osa +x k žhavému konci, úzký konec u pusy 0,09 m za počátkem; drží ho pravá ruka v pohybu kouri (humanoid_pohyby, predmet)"
+ },
+ {
+  "soubor": "humanoid_pohyby.glb",
+  "jmeno": "humanoid_pohyby",
+  "druh": "pohyby",
+  "kostra": "humanoid",
+  "vyska_kycli": 0.9971,
+  "kosti": [
+   [
+    "Hips",
+    null
+   ],
+   [
+    "Spine",
+    "Hips"
+   ],
+   [
+    "Spine1",
+    "Spine"
+   ],
+   [
+    "Spine2",
+    "Spine1"
+   ],
+   [
+    "Neck",
+    "Spine2"
+   ],
+   [
+    "Head",
+    "Neck"
+   ],
+   [
+    "LeftShoulder",
+    "Spine2"
+   ],
+   [
+    "LeftArm",
+    "LeftShoulder"
+   ],
+   [
+    "LeftForeArm",
+    "LeftArm"
+   ],
+   [
+    "LeftHand",
+    "LeftForeArm"
+   ],
+   [
+    "RightShoulder",
+    "Spine2"
+   ],
+   [
+    "RightArm",
+    "RightShoulder"
+   ],
+   [
+    "RightForeArm",
+    "RightArm"
+   ],
+   [
+    "RightHand",
+    "RightForeArm"
+   ],
+   [
+    "LeftUpLeg",
+    "Hips"
+   ],
+   [
+    "LeftLeg",
+    "LeftUpLeg"
+   ],
+   [
+    "LeftFoot",
+    "LeftLeg"
+   ],
+   [
+    "LeftToeBase",
+    "LeftFoot"
+   ],
+   [
+    "RightUpLeg",
+    "Hips"
+   ],
+   [
+    "RightLeg",
+    "RightUpLeg"
+   ],
+   [
+    "RightFoot",
+    "RightLeg"
+   ],
+   [
+    "RightToeBase",
+    "RightFoot"
+   ]
+  ],
+  "pohyby": {
+   "stoji": {
+    "kotva": "chodidla",
+    "popis": "stojí, ruce podél těla"
+   },
+   "sedi": {
+    "kotva": "sed",
+    "popis": "sedí, stehna dopředu, lýtka dolů, dlaně na stehnech; počátek v bodě sedu"
+   },
+   "za_volantem": {
+    "kotva": "sed",
+    "popis": "řídí auto (GAZ-21: podlaha 0,256 m pod bodem sedu, volant 0,338 m před a 0,432 m nad ním, poloměr 0,22 m, sklon 20°); počátek v bodě sedu"
+   },
+   "chuze": {
+    "kotva": "chodidla",
+    "smycka": true,
+    "krok_m": 1.0,
+    "doba_s": 1.0,
+    "popis": "chůze na místě, jeden cyklus (dva kroky); chodidla neklouzají, když postava jde krok_m za doba_s krát výška jejích kyčlí ku vyska_kycli"
+   },
+   "kouri": {
+    "kotva": "chodidla",
+    "smycka": true,
+    "doba_s": 2.0,
+    "popis": "stojí, pravá ruka jde k puse a zpátky (kouří), loket dole u těla; 8 klíčů jako snímky college_girl_kouri",
+    "predmet": {
+     "soubor": "dzoint.glb",
+     "jmeno": "dzoint",
+     "kost": "RightHand",
+     "poloha": [
+      0.0003,
+      -0.0007,
+      0.0747
+     ],
+     "rotace": [
+      0.47502,
+      0.52701,
+      0.65256,
+      0.26605
+     ],
+     "poznamka": "velký džoint (trychtýř) v pravé ruce, jen v pohybu kouri: poloha a rotace (x, y, z, w) v rámu kosti RightHand (glTF), jde s rukou"
+    }
+   }
+  },
+  "autor": "grrrrf: postavy/kostra_pozy.py (pózy a chůze udělané na College Girl)",
+  "licence": "CC BY 4.0",
+  "poznamka": "jen kostra (uzly kostí s klidovým odsazením College Girl) a animace: rotation všech kostí (lokální, vůči rodiči), translation kosti Hips (místo vůči počátku postavy); póza je jeden klíč v čase 0. Na postavu: rotace podle jmen kostí, translace kostí její vlastní, jen Hips z pohybu krát vyska_kycli postavy / vyska_kycli pohybů. kotva chodidla: počátek mezi chodidly; kotva sed: počátek v bodě sedu (poloha z = výška sedáku)"
+ }
+]

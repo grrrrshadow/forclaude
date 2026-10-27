@@ -9861,10 +9861,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: zadni steny {}", _turned_cull ? "vynechane" : "kreslene");
 	} else if (what == "postava" && argv.size() > 3) {
-		/* 'postava <figure> <frame> [file]': the picture of a figure at a frame (a dragon's pose with its bones, a
-		 * passage "<jmeno>/<a>@<snimek>><b>"), facing the view at the closest zoom, as a PPM in the working folder. */
+		/* 'postava <figure> <frame> [file] [times]': the picture of a figure at a frame (a dragon's pose with its bones, a
+		 * passage "<jmeno>/<a>@<snimek>><b>"), facing the view at the closest zoom, so many times bigger, as a PPM in the
+		 * working folder. */
 		const auto frame = number(3);
-		const ThreeDModelPicture *pic = frame.has_value() ? GetThreeDFigurePicture(argv[2], 1.0f, 90.0f, ZoomLevel::In4x, INVALID_TILE, 0, nullptr, *frame, 0.0f) : nullptr;
+		const float times = static_cast<float>(std::clamp(number(5).value_or(1), 1, 32));
+		const ThreeDModelPicture *pic = frame.has_value() ? GetThreeDFigurePicture(argv[2], times, 90.0f, ZoomLevel::In4x, INVALID_TILE, 0, nullptr, *frame, 0.0f) : nullptr;
 		if (pic == nullptr || pic->width <= 0 || pic->height <= 0) {
 			IConsolePrint(CC_ERROR, "test3d: postava {} snimek {} nema obrazek", argv[2], argv[3]);
 			return true;
