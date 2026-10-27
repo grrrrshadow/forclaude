@@ -53,6 +53,15 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Rig se zkušebními místy na kládách V3S (jen v buildu): holky 2× i 1×, mapa, karta i kresli. Hráč: *„naproti holky až
   k bočnici. jsou uprostřed sedi mimo“*, *„maš v3s naloženou dřevem hlavně“* (klády byly jen náhrada lavice) →
   druhá zkouška naproti sobě u bočnic; kolegovi do lavice: naproti sobě, až k bočnici.
+- Kolega (`HOLKY-AUTOSAN-SPECIAL-PRO-HRU.md`), hráč: *„zetor autosan přivěs bude vozit studentky . postavy holek z grf
+  pryč, napišeš jen polohu pro řidičku , nebo polohu pro náklad holky na lavičce. mame na zastávce že stojí
+  vystupují. to bych chtěl zachovat. tatry, v3s , ušetřime spoustu mista. special nefunguje v2,muže za to asi přechod
+  v nakladech .“*
+  - Kolega pošle lavice a balíčky bez holek najednou; stojící na zastávce jako kus bez souboru; Autosan na STUD (GRF v2).
+  - **Chyba v opravě sdílených dílů** (kolega ji našel): když nový balíček díl převzal, seznam sdílených zůstal
+    založený starým objektem a nový první objekt v něm chyběl. Teď se seznam při převzetí smaže a založí znovu.
+  - SPECIAL v2 v rigu: dvoukolák s bednou i uhlím a kolečko se kreslí, holky táhnou a tlačí, snímky chůze běží,
+    jedou pomalu (rychlost 8). Co přesně „nefunguje“, se ptám hráče.
 
 ## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
 

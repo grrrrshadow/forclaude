@@ -4704,6 +4704,10 @@ static void ReadThreeDVehicleObjects()
 			}
 			if (added || !here || PackageBesideLoadedGrf(_vehicle_objects[it->second.first].package, o.grfid)) continue;
 			Debug(misc, 1, "3D vehicles: {} of {} beside its loaded GRF, not of {}", o.name, o.package, _vehicle_objects[it->second.first].package);
+			/* The objects of the old package sharing it are not its any more: the next of this package to have it starts
+			 * the list anew with this one (the colleague: of the old package's A and B and the new one's A and B, the new
+			 * A was missing from the list, and the piece was always drawn as it). */
+			_vehicle_object_shared_pieces.erase(it->first);
 			it->second = std::make_pair(static_cast<uint32_t>(i), static_cast<int>(k));
 		}
 	}
