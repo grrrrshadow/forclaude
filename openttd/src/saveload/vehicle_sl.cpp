@@ -741,6 +741,7 @@ public:
 		SLE_CONDVAR(Vehicle, cab_px, VarTypes::I32, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, cab_py, VarTypes::I32, SaveLoadVersion::CabDriving, SaveLoadVersion::MaxVersion),
 		SLE_CONDVAR(Vehicle, cab_altitude, VarTypes::U16, SaveLoadVersion::CabAltitude, SaveLoadVersion::MaxVersion),
+		SLE_CONDVAR(Vehicle, cab_reverse, VarTypes::BOOL, SaveLoadVersion::CabReverse, SaveLoadVersion::MaxVersion),
 		SLEG_CONDVAR("cargo_days", _cargo_periods, VarTypes::U8, SaveLoadVersion::MinVersion, SaveLoadVersion::CargoPackets),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarFileType::U8 | VarMemType::U16, SaveLoadVersion::MinVersion, SaveLoadVersion::LargerCargoSource),
 		SLEG_CONDVAR("cargo_source", _cargo_source, VarTypes::U16, SaveLoadVersion::LargerCargoSource, SaveLoadVersion::CargoPackets),

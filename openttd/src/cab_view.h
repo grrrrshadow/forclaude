@@ -98,6 +98,8 @@ struct CabArrows {
 	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (twice in a row: full speed, Drive())
 	int still_ms = 0;               ///< milliseconds it has stood since Up was pressed (its record, jizda.log)
 	bool still_told = false;        ///< that standing written down, till it moves
+	int down_still_ms = 0;          ///< milliseconds Down has been held with the vehicle stopped (long enough: backwards)
+	int backwards_wait = 0;         ///< milliseconds till backwards or forwards is asked again, as the command takes its time
 	std::string done;               ///< what the arrows did last, and how it came out, for that record
 	void Drive(const Vehicle *v, DirectionKeys now, int ms);
 };

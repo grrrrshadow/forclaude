@@ -148,7 +148,7 @@ void CabSpeed(const Vehicle *v, bool faster)
 	int base = limit != 0 ? std::min(limit, now) : now;
 	int next;
 	if (!faster) {
-		next = std::max(5, base - step);
+		next = std::max(CAB_SLOWEST, base - step);
 	} else {
 		base = limit != 0 ? limit : now;
 		next = base + step;
@@ -248,6 +248,8 @@ void CabLetGo(const Vehicle *v)
 	}
 }
 
+/** Down held so long with the vehicle stopped: it goes backwards (CabArrows::Drive()). */
+static constexpr int CAB_BACKWARDS_HOLD_MS = 800;
 /** Up pressed twice within this many milliseconds: full speed, on by itself (CabArrows::Drive()). */
 static constexpr int CAB_DOUBLE_TAP_MS = 400;
 /** Up pressed and the vehicle standing so long: why, into jizda.log (CabStandingRecord()). */
@@ -317,6 +319,12 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		}
 	}
 	const bool flying = v != nullptr && v->type == VehicleType::Aircraft;
+	/* A road vehicle driven freely goes backwards too (the player, 27. 10.: "Down to brake and then reverse"): Down
+	 * brakes it to the slowest and then stops it; held on with it stopped (CAB_BACKWARDS_HOLD_MS), it goes backwards
+	 * while it is held, at most Vehicle::CAB_REVERSE_SPEED, and stops as it is let go; Up stops it and turns it
+	 * forwards again. */
+	const bool backwards_too = v != nullptr && v->type == VehicleType::Road && v->cab_free && !v->cab_rejoin;
+	if (this->backwards_wait > 0) this->backwards_wait -= ms;
 	auto arrow = [&](DirectionKey key) {
 		switch (key) {
 			case DirectionKey::Left:
@@ -331,6 +339,31 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 					if (!v->cab_free) return false;
 					Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(key == DirectionKey::Up ? CabDriveOp::Up : CabDriveOp::Down));
 					return true;
+				}
+				if (backwards_too && v->cab_reverse) {
+					if (key == DirectionKey::Down) {
+						/* Backwards: on again from where it stopped. */
+						if (v->vehstatus.Test(VehState::Stopped)) CabStartStop(v);
+						this->done = "dolu: couva";
+						return true;
+					}
+					/* Up: stopped, forwards again; the next Up starts it. */
+					if (this->backwards_wait <= 0) {
+						Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Forward));
+						if (!v->vehstatus.Test(VehState::Stopped)) CabStartStop(v);
+						this->backwards_wait = 500;
+					}
+					this->done = "nahoru: z couvani dopredu";
+					return true;
+				}
+				if (backwards_too && key == DirectionKey::Down) {
+					/* Stopped already: held on, it goes backwards (below). At the slowest: it stops. */
+					if (v->vehstatus.Test(VehState::Stopped)) return true;
+					if (v->cab_speed_limit != 0 && v->cab_speed_limit <= CAB_SLOWEST) {
+						CabStartStop(v);
+						this->done = "dolu: zastavit";
+						return true;
+					}
 				}
 				if (key == DirectionKey::Up && v->vehstatus.Test(VehState::Stopped)) {
 					CabStartStop(v);
@@ -350,7 +383,7 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		/* Turning and an aircraft's height: about seven steps a second (a quarter turn held a second and a quarter);
 		 * the speed three. */
 		const int again = key == DirectionKey::Left || key == DirectionKey::Right || flying ? 150 : 300;
-		if (!this->held.Test(key) && key == DirectionKey::Up && !flying && !v->vehstatus.Test(VehState::Stopped) && this->up_tapped < CAB_DOUBLE_TAP_MS) {
+		if (!this->held.Test(key) && key == DirectionKey::Up && !flying && !v->vehstatus.Test(VehState::Stopped) && this->up_tapped < CAB_DOUBLE_TAP_MS && !(backwards_too && v->cab_reverse)) {
 			/* Up the second time in a row: full speed (no limit), kept with the arrow let go, till braked. */
 			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
 			this->done = fmt::format("nahoru dvakrat: plna rychlost (omezeni {})", v->cab_speed_limit);
@@ -362,6 +395,22 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		} else if (left != INT_MAX && (left -= ms) <= 0) {
 			left = arrow(key) ? again : INT_MAX;
 		}
+	}
+	/* Down held with it stopped: backwards after a while; backwards and Down let go: it stops. */
+	if (backwards_too && !v->cab_reverse && now.Test(DirectionKey::Down) && v->vehstatus.Test(VehState::Stopped)) {
+		if ((this->down_still_ms += ms) >= CAB_BACKWARDS_HOLD_MS && this->backwards_wait <= 0) {
+			Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Reverse));
+			CabStartStop(v);
+			this->backwards_wait = 500;
+			this->down_still_ms = 0;
+			this->done = "dolu drzeno: couvat";
+		}
+	} else {
+		this->down_still_ms = 0;
+	}
+	if (backwards_too && v->cab_reverse && this->held.Test(DirectionKey::Down) && !now.Test(DirectionKey::Down) && !v->vehstatus.Test(VehState::Stopped)) {
+		CabStartStop(v);
+		this->done = "dolu pusteno: stat";
 	}
 	this->held = now;
 	/* Up pressed, and it stands: after two seconds of that, why (CabStandingRecord()); once till it moves. */

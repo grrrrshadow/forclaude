@@ -15762,6 +15762,7 @@ bool Train::Tick()
 
 	if (this->IsFrontEngine()) {
 		PerformanceAccumulator framerate(PerformanceElement::GameLoopTrains);
+		this->BrakeLightsTick();
 
 		/* A wreck nobody came for clears itself off the line. Vanilla does this
 		 * by shedding a wagon at a time until there is none left, which cannot

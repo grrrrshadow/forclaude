@@ -16,6 +16,7 @@
 #include "window_func.h"
 
 #include "widgets/vehicle_widget.h"
+#include "timer/timer_game_tick.h"
 
 /** What is the status of our acceleration? */
 enum AccelStatus : uint8_t {
@@ -73,6 +74,24 @@ struct GroundVehicleCache {
  */
 template <class T, VehicleType Type>
 struct GroundVehicle : public SpecializedVehicle<T, Type> {
+	/** The game's tick it last slowed down (SetLastSpeed()), 0 never: its brake lights while it is recent (BrakeLightsOn()). Drawn only, not saved. */
+	uint64_t braked_tick = 0;
+	/** So many ticks after it slowed down its brake lights stay on. */
+	static constexpr uint64_t BRAKE_LIGHT_TICKS = 20;
+
+	/** Whether its brake lights are on: it slowed down a moment ago. */
+	inline bool BrakeLightsOn() const
+	{
+		return this->braked_tick != 0 && TimerGameTick::counter - this->braked_tick < BRAKE_LIGHT_TICKS;
+	}
+
+	/** A tick of its front: its brake lights going out drawn, also when it stands (stopped at a station it is not drawn again otherwise). */
+	inline void BrakeLightsTick()
+	{
+		if (this->braked_tick == 0 || TimerGameTick::counter - this->braked_tick != BRAKE_LIGHT_TICKS) return;
+		for (Vehicle *u = this; u != nullptr; u = u->Next()) u->MarkAllViewportsDirty();
+	}
+
 	GroundVehicleCache gcache{}; ///< Cache of often calculated values.
 	GroundVehicleFlags gv_flags{}; ///< @see GroundVehicleFlags.
 
@@ -351,6 +370,8 @@ struct GroundVehicle : public SpecializedVehicle<T, Type> {
 	 */
 	inline void SetLastSpeed()
 	{
+		/* Slower than before: its brake lights on (the player, 27. 10.: "brake lights when they slow down"). */
+		if (this->cur_speed < this->gcache.last_speed) this->braked_tick = TimerGameTick::counter;
 		if (this->cur_speed != this->gcache.last_speed) {
 			SetWindowWidgetDirty(WindowClass::VehicleView, this->index, WID_VV_START_STOP);
 			this->gcache.last_speed = this->cur_speed;

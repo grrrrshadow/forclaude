@@ -433,6 +433,7 @@ enum class SaveLoadVersion : uint16_t {
 	WalkerPet, ///< Saveload version: 379\n The walker's dog, bought of a seller of dogs, the company's (CompanyProperties::walker_pet, three_d_animals.h).
 	WalkerPlants, ///< Saveload version: 380\n The marijuana the walkers planted, where and since when (WalkerPlant, walker_inventory.h; the WPLT chunk).
 	WalkerQuickKeys, ///< Saveload version: 381\n The walker's quick keys 1 to 9, the things the player put under them (CompanyProperties::walker_quick).
+	CabReverse, ///< Saveload version: 382\n A road vehicle driven freely from its cab going backwards (Vehicle::cab_reverse, cab_drive.h).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

@@ -135,6 +135,7 @@ extern float _title_night;
 bool IsNightNow();
 struct Vehicle;
 bool VehicleLightsOn(const Vehicle *v);
+bool VehicleBrakeLightsOn(const Vehicle *v);
 
 template <class T>
 void SetViewportCatchmentSpecializedStation(const T *st, bool sel);

@@ -1907,7 +1907,8 @@ static bool RoadVehFreeInYard(TileIndex from, TileIndex to)
 std::string DescribeRoadVehFreeAhead(const Vehicle *v)
 {
 	if (v->type != VehicleType::Road || !v->cab_free) return "-";
-	const int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+	const int way = v->cab_reverse ? -1 : 1;
+	const int32_t px = v->cab_px + way * CabCos(v->cab_yaw), py = v->cab_py + way * CabSin(v->cab_yaw);
 	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
 			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {
@@ -1935,6 +1936,7 @@ static bool RoadVehRejoinRoad(RoadVehicle *v, TileIndex tile, DiagDirection ente
 
 	v->cab_free = false;
 	v->cab_rejoin = false;
+	v->cab_reverse = false;
 	v->cab_turn = Vehicle::CAB_TURN_NONE;
 	v->path.clear();
 	Trackdir td = RoadFindPathToDest(v, tile, enterdir);
@@ -2035,12 +2037,14 @@ static void RoadVehPullChain(RoadVehicle *v)
 }
 
 /**
- * A unit along the heading of a road vehicle driven freely from its cab (cab_drive.h), its trailers after it.
+ * A unit along the heading of a road vehicle driven freely from its cab (cab_drive.h), its trailers after it; going
+ * backwards (Vehicle::cab_reverse) a unit against it, still facing along it, its trailers pushed back on their line.
  * @return false when it may not go on: it stands, and may turn
  */
 static bool RoadVehFreeStep(RoadVehicle *v)
 {
-	int32_t px = v->cab_px + CabCos(v->cab_yaw), py = v->cab_py + CabSin(v->cab_yaw);
+	const int way = v->cab_reverse ? -1 : 1;
+	int32_t px = v->cab_px + way * CabCos(v->cab_yaw), py = v->cab_py + way * CabSin(v->cab_yaw);
 	int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 	/* Not off the map, nor onto its outer tiles. */
 	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
@@ -2278,6 +2282,7 @@ bool RoadVehicle::Tick()
 	this->tick_counter++;
 
 	if (this->IsFrontEngine()) {
+		this->BrakeLightsTick();
 		/* Riding on a train: none of the driving below applies, it goes where
 		 * the wagon goes. See road_on_rail.h. */
 		if (this->IsCarried()) return CarriedRoadVehicleTick(this);

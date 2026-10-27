@@ -73,6 +73,7 @@
 #include "vehicle_base.h"
 #include "aircraft.h"
 #include "train.h"
+#include "roadveh.h"
 #include "timer/timer_game_tick.h"
 #include "vehicle_gui.h"
 #include "blitter/factory.hpp"
@@ -6810,6 +6811,18 @@ float _title_night = 0;
  * Whether a vehicle's lights are on: at night, unless the player switched them off from its cab; by day too when the
  * player switched them on (F, Vehicle::cab_lights).
  */
+/**
+ * Whether a vehicle's brake lights are on (the player, 27. 10.: "brake lights: as they slow down, by day the red ones
+ * at the back light up, at night they light more"): it slowed down a moment ago (GroundVehicle::BrakeLightsOn()).
+ */
+bool VehicleBrakeLightsOn(const Vehicle *v)
+{
+	const Vehicle *f = v->First();
+	if (f->type == VehicleType::Road) return RoadVehicle::From(f)->BrakeLightsOn();
+	if (f->type == VehicleType::Train) return Train::From(f)->BrakeLightsOn();
+	return false;
+}
+
 bool VehicleLightsOn(const Vehicle *v)
 {
 	const uint8_t asked = v->First()->cab_lights;
@@ -6980,15 +6993,21 @@ static void DrawNight(bool turned)
 		if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
 		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit * g[3], 1.4 * unit * g[3], window, 0.35);
 	}
-	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block. */
-	auto model_light = [&](double hx, double hy, const ThreeDPictureLight &l) {
+	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block; braking,
+	 * its red lights glow more (VehicleBrakeLightsOn()). */
+	auto model_light = [&](double hx, double hy, const ThreeDPictureLight &l, bool braking = false) {
 		const double px = hx + l.x, py = hy + l.y;
 		switch (l.kind) {
 			case ThreeDPictureLight::Kind::Front:
 				if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
 				break;
 			case ThreeDPictureLight::Kind::Back:
-				if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
+				if (!lit_near(static_cast<int>(px), static_cast<int>(py))) break;
+				if (braking) {
+					AddNightLight(dst, dpi.pitch, w, h, px, py, 1.3 * unit, 1.3 * unit, tail, 0.9);
+				} else {
+					AddNightLight(dst, dpi.pitch, w, h, px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
+				}
 				break;
 			case ThreeDPictureLight::Kind::PoolNear:
 				AddNightLight(dst, dpi.pitch, w, h, px, py, 4 * unit, 2 * unit, pool, 0.4);
@@ -7030,7 +7049,8 @@ static void DrawNight(bool turned)
 			if (GetThreeDVehicleObjectLights(v, dpi.zoom, round ? &pose : nullptr, model_lights, ax, ay, az)) {
 				double hx, hy;
 				project(ax, ay, az, hx, hy);
-				for (const ThreeDPictureLight &l : model_lights) model_light(hx, hy, l);
+				const bool braking = VehicleBrakeLightsOn(v);
+				for (const ThreeDPictureLight &l : model_lights) model_light(hx, hy, l, braking);
 				continue;
 			}
 		}
@@ -7067,10 +7087,12 @@ static void DrawNight(bool turned)
 			}
 		}
 		if (last && v->type != VehicleType::Ship) {
+			/* Braking, they glow more (VehicleBrakeLightsOn()). */
+			const double r = VehicleBrakeLightsOn(v) ? 1.6 : 1.0;
 			for (int side = -1; side <= 1; side += 2) {
 				double px, py;
 				project(v->x_pos - fx * half + sx * side * 1.5, v->y_pos - fy * half + sy * side * 1.5, z + 2, px, py);
-				AddNightLight(dst, dpi.pitch, w, h, px, py, 1.0 * unit, 1.0 * unit, tail, 0.9);
+				AddNightLight(dst, dpi.pitch, w, h, px, py, r * unit, r * unit, tail, 0.9);
 			}
 		}
 	}
@@ -11565,12 +11587,19 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
 	const double reach = CAB_RANGE_TILES * TILE_SIZE;
 	std::vector<ThreeDWorldLight> model_lights;
-	auto shine = [&](const std::vector<ThreeDWorldLight> &lights) {
+	auto shine = [&](const std::vector<ThreeDWorldLight> &lights, bool braking = false) {
 		for (const ThreeDWorldLight &l : lights) {
 			if (!faces_eye(l.x, l.y, l.fx, l.fy)) continue;
 			switch (l.kind) {
 				case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0, true); break;
-				case ThreeDPictureLight::Kind::Back: glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0, true); break;
+				case ThreeDPictureLight::Kind::Back:
+					/* Braking, more (VehicleBrakeLightsOn()). */
+					if (braking) {
+						glow(l.x, l.y, l.z, 0.45, tail, 1.0, 1.0, true);
+					} else {
+						glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0, true);
+					}
+					break;
 				case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
 				case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
 			}
@@ -11595,7 +11624,7 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		 * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md). Not the own one's, seen from inside. */
 		const bool own_one = own != nullptr && u->First() == own;
 		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights)) {
-			shine(model_lights);
+			shine(model_lights, VehicleBrakeLightsOn(u));
 			continue;
 		}
 		if (!front && !last) continue;

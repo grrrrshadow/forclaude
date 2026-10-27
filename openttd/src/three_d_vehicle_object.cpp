@@ -2866,8 +2866,11 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom);
 
 static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *front, const Vehicle *last, bool reversed, ZoomLevel zoom)
 {
-	/* At night, or as the player switched them from the cab (VehicleLightsOn()). */
-	if (!VehicleLightsOn(front)) return 0;
+	/* At night, or as the player switched them from the cab (VehicleLightsOn()); braking, the red ones by day too
+	 * (VehicleBrakeLightsOn()). */
+	const bool on = VehicleLightsOn(front);
+	if (!on && !VehicleBrakeLightsOn(front)) return 0;
+	const int red = LIGHTS_BACK | LIGHTS_BACK_AT_FRONT;
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	const bool leads = front->Previous() == nullptr;
@@ -2876,8 +2879,8 @@ static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *
 	const bool last_one = last->Next() == nullptr || NothingSeenAfter(last, zoom);
 	/* Turned round, going back first (the colleague's hra/3d/VAGONY-3D-V5-PRO-HRU.md): the headlights on its back end
 	 * when it leads, the red lights on its front end when nothing follows; without those, none. */
-	if (reversed) return shape->HasLightsGoingBack() ? (leads ? LIGHTS_FRONT_AT_BACK : 0) | (last_one ? LIGHTS_BACK_AT_FRONT : 0) : 0;
-	return (leads ? LIGHTS_FRONT : 0) | (last_one ? LIGHTS_BACK : 0);
+	if (reversed) return (shape->HasLightsGoingBack() ? (leads ? LIGHTS_FRONT_AT_BACK : 0) | (last_one ? LIGHTS_BACK_AT_FRONT : 0) : 0) & (on ? ~0 : red);
+	return ((leads ? LIGHTS_FRONT : 0) | (last_one ? LIGHTS_BACK : 0)) & (on ? ~0 : red);
 }
 
 /** The first and the last piece of a vehicle an object hung from its anchor piece covers (an article of a train of lorries its own). */

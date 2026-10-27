@@ -1363,11 +1363,14 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Down)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::Forward)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
 	const bool height = what == CabDriveOp::Up || what == CabDriveOp::Down;
+	/* Backwards only a road vehicle driven freely already. */
+	const bool backwards = what == CabDriveOp::Reverse || what == CabDriveOp::Forward;
+	if (backwards && (v->type != VehicleType::Road || !v->cab_free)) return CMD_ERROR;
 
 	if (v->type == VehicleType::Road) {
 		const RoadVehicle *rv = RoadVehicle::From(v);
@@ -1438,7 +1441,17 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 				v->cab_yaw = static_cast<uint8_t>((v->cab_yaw + (what == CabDriveOp::Left ? CAB_YAW_STEP : -CAB_YAW_STEP)) & (CAB_YAW_TURN - 1));
 				break;
 			case CabDriveOp::Rejoin:
+				/* To the road forwards. */
 				v->cab_rejoin = true;
+				v->cab_reverse = false;
+				break;
+			case CabDriveOp::Reverse:
+				v->cab_reverse = true;
+				v->cab_speed_limit = Vehicle::CAB_REVERSE_SPEED;
+				break;
+			case CabDriveOp::Forward:
+				v->cab_reverse = false;
+				v->cab_speed_limit = CAB_SLOWEST;
 				break;
 		}
 		SetWindowDirty(WindowClass::CabView, v->index);

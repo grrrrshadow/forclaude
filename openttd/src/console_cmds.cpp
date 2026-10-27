@@ -10329,7 +10329,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, pieces, hidden ? "skryte" : "videt",
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",
-					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "") : "");
+					v->cab_free ? fmt::format(" volne yaw {} rychlost {}{}{}{}", v->cab_yaw, v->cur_speed, v->cab_rejoin ? " zpet" : "", v->cab_reverse ? " couva" : "", VehicleBrakeLightsOn(v) ? " brzdi" : "") : "");
 			if (v->type == VehicleType::Road) IConsolePrint(CC_DEFAULT, "test3d:   rychlost {} rozkaz {} stav {:#x} snimek {}", v->cur_speed, static_cast<int>(v->cur_real_order_index), RoadVehicle::From(v)->state, RoadVehicle::From(v)->frame);
 			if (!hidden) seen++;
 		}

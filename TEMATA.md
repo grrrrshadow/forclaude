@@ -31,13 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
-## 27. 10. (25) – Rigs of Rods bod 1: brzdovky, couvání; co mají technicky (čeká na domluvu)
+## 27. 10. (25) – Rigs of Rods bod 1: brzdovky a couvání z kabiny; co mají technicky
 
 - Hráč: *„rigs of rods bod 1 brzdovky když budou spomalovat ve dne se rozsviti zadni červene a v noci se rozsviti vic .
   blinkry asi ne. necouvame, chtěl bych couvat když dlouho držim brzdu v cab view. šipkou dolu brzdit i couvat
   potom.“* a *„co maj rigs of rods technologicky aby se jim hejbal obraz? co maj tady nebo v openmw?
   https://github.com/alexbatalov/fallout2-ce … ale hlavně co maj technologicky dobrý“*.
-- Stav: domluvit podrobnosti (která vozidla, jak dlouho držet, rychlost couvání), pak kódovat.
+- Domluva: *„1 u všech 2 30km když ji držim dlouho 3 žadny rozkazy nejsou jakmile se dotknu šipek. funguje to šahnu
+  na šipky a řidim. tak to ma bejt. vlaky mi sou fuk.“*
+- Hotovo, brzdovky: vozidlo, kterému klesla rychlost, má 20 tiků brzdová světla (`GroundVehicle::braked_tick`, jen
+  pro kreslení, neukládá se). Ve dne se rozsvítí sklo zadních červených světel modelu (auta i vlaky), v noci mají
+  zadní světla větší a silnější záři (mapa i pohled z očí, i auta bez modelu). Stojící vozidlo se po zhasnutí
+  překreslí.
+- Hotovo, couvání (silniční vozidla při jízdě z kabiny): šipka dolů brzdí po krocích až na 5 km/h, další stisk
+  zastaví. Držená dál 0,8 s se stojícím autem → couvá (`cab_reverse`, uloženo, savegame 382), nejvýš 30 km/h, auto
+  pořád natočené dopředu, návěs/přívěs se tlačí. Puštění šipky dolů = stát. Šipka nahoru = stát a dopředu, další
+  nahoru rozjede. Návrat na trasu jede dopředu.
+- Rig: `test3d vozidla` ukazuje `couva` a `brzdi`. Ověřeno: Regal z kabiny jede, brzdí („brzdi“), couvá rychlostí
+  do 28 km/h, po puštění stojí, nahoru jede dopředu.
 
 ## 27. 10. (24) – Otočená mapa kartou 2, kus 2: domy kartou trojúhelníky (rig), měření
 

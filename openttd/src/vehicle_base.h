@@ -325,6 +325,10 @@ public:
 	int32_t cab_py = 0;
 	/** The height an aircraft flown freely from its cab climbs or sinks to (cab_drive.h), units of z. */
 	uint16_t cab_altitude = 0;
+	/** A road vehicle driven freely from its cab goes backwards, facing as it did (cab_drive.h, CabDriveOp::Reverse). */
+	bool cab_reverse = false;
+	/** And so fast at most, in the units the vehicle shows (the player, 27. 10.: "30 km when I hold it long"). */
+	static constexpr int CAB_REVERSE_SPEED = 30;
 	/** The lights as the player switches them from the cab (F): at night (#CAB_LIGHTS_AUTO), on or off. Not saved:
 	 * only how this computer draws the vehicle (VehicleLightsOn()). */
 	uint8_t cab_lights = 0;
@@ -341,8 +345,9 @@ public:
 	/** The cab's speed limit in the vehicle's own units of speed, or no limit at all. */
 	inline int CabSpeedLimitInternal() const
 	{
-		if (this->cab_speed_limit == 0) return INT32_MAX;
-		return (this->type == VehicleType::Road || this->type == VehicleType::Ship) ? this->cab_speed_limit * 2 : this->cab_speed_limit;
+		const int limit = this->cab_reverse ? (this->cab_speed_limit == 0 ? CAB_REVERSE_SPEED : std::min<int>(this->cab_speed_limit, CAB_REVERSE_SPEED)) : this->cab_speed_limit;
+		if (limit == 0) return INT32_MAX;
+		return (this->type == VehicleType::Road || this->type == VehicleType::Ship) ? limit * 2 : limit;
 	}
 	uint8_t subspeed = 0; ///< fractional speed
 	uint8_t acceleration = 0; ///< used by train & aircraft
