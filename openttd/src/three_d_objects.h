@@ -548,6 +548,16 @@ struct ThreeDLoadBed {
 };
 
 /**
+ * One piece of the shared loads a state puts on its own place ("naklad" with "misto", the colleague's
+ * hra/3d/VAGONY-3D-V8-PRO-HRU.md): a container on the front or the back place of a flat wagon, whatever is loaded.
+ */
+struct ThreeDPlacedLoad {
+	std::string piece;          ///< "kus": the piece (ThreeDLoadPiece)
+	uint32_t colour = 0;        ///< "barva": its colour (Colour::data) instead of its cargo's in its table, 0 that
+	float at[2] = {};           ///< "misto": the middle of its bottom, metres in the vehicle's frame, on the floor of the bed
+};
+
+/**
  * A state of a vehicle object chosen by its GRF ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): the GRF picks a set of
  * its sprites for the vehicle by its own rules (random bits, age, breakdown, load …) and a set whose first sprite is
  * numbered within [first, last] in the GRF draws the object so. The game decides nothing of it by itself (the player,
@@ -576,6 +586,7 @@ struct ThreeDVehicleState {
 	std::string load_piece;     ///< "naklad" "kus": the piece (ThreeDLoadPiece), empty none
 	uint32_t load_colour = 0;   ///< "naklad" "barva": the pieces' colour (Colour::data) instead of their cargo's in their table, 0 that
 	ThreeDLoadBed bed;          ///< "loze": the bed of the body it shows
+	std::vector<ThreeDPlacedLoad> placed_loads; ///< "naklad" with "misto": one piece each on its place; of the layers made one, each layer's
 	uint8_t load_count = 0;     ///< of the layers made one (ComposeState()): how many pieces lie on the bed
 	uint32_t load_label = 0;    ///< and the label of their cargo (their colour)
 	/**

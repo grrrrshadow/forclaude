@@ -73,14 +73,14 @@ struct ThreeDEyeVehicle {
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 
-/** The pieces of the shared loads a state of a vehicle object carries (ThreeDLoadPiece): the figure, its frame and colour, and where each lies. */
+/** Pieces of a kind of the shared loads a state of a vehicle object carries (ThreeDLoadPiece): the figure, its frame and colour, and where each lies. */
 struct ThreeDLoadPieces {
 	const struct ThreeDVehicleObject *fig = nullptr;
 	int frame = 0;                       ///< the figure's frame (an animal standing)
 	int state = 0;                       ///< the figure's state in the colour of the cargo, 0 its own
 	std::vector<struct ThreeDLoadPlace> places;
 };
-bool GetThreeDLoadPieces(const struct ThreeDVehicleState *st, ThreeDLoadPieces &out);
+bool GetThreeDLoadPieces(const struct ThreeDVehicleState *st, std::vector<ThreeDLoadPieces> &out);
 void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);
 struct ThreeDObjectTexture;
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);

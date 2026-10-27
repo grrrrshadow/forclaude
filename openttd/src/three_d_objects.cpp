@@ -4528,13 +4528,23 @@ static void ReadThreeDVehicleObjects()
 						/* The pieces of the shared loads its set carries, and the bed of the body it shows. */
 						if (st.contains("naklad") && st.at("naklad").is_object()) {
 							const auto &load = st.at("naklad");
-							state.load_piece = load.value("kus", std::string());
+							std::string piece = load.value("kus", std::string());
 							/* Its own colour, before its cargo's (the V3S's red and grey bricks, either of BRCK and BDMT). */
+							uint32_t colour = 0;
 							if (load.contains("barva") && load.at("barva").is_string()) {
 								std::string c = load.at("barva").get<std::string>();
 								if (c.starts_with("#")) c = c.substr(1);
 								auto n = c.size() == 6 ? ParseInteger<uint32_t>(c, 16) : std::nullopt;
-								if (n.has_value()) state.load_colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+								if (n.has_value()) colour = Colour(static_cast<uint8_t>(*n >> 16), static_cast<uint8_t>(*n >> 8), static_cast<uint8_t>(*n)).data;
+							}
+							/* One piece on its own place (a container on the front or the back of a flat wagon), else as many
+							 * as are loaded, side by side on the bed. */
+							const nlohmann::json place = load.value("misto", nlohmann::json());
+							if (place.is_array() && place.size() >= 2 && place[0].is_number() && place[1].is_number()) {
+								if (!piece.empty()) state.placed_loads.push_back({piece, colour, {place[0].get<float>(), place[1].get<float>()}});
+							} else {
+								state.load_piece = std::move(piece);
+								state.load_colour = colour;
 							}
 						}
 						if (st.contains("loze")) ReadLoadBed(st.at("loze"), state.bed);
@@ -4708,25 +4718,29 @@ static void ReadThreeDVehicleObjects()
 		}
 	}
 	/* The colours the vehicles' states give their pieces ("naklad" "barva"): each a state of the piece's figure. */
+	auto own_colour = [](std::string_view name, uint32_t colour) {
+		if (colour == 0 || name.empty()) return;
+		auto piece = std::ranges::find(_load_pieces, name, &ThreeDLoadPiece::name);
+		if (piece == _load_pieces.end() || std::ranges::any_of(piece->own_colours, [colour](const auto &c) { return c.first == colour; })) return;
+		auto fig = std::ranges::find(_figure_objects, piece->figure, &ThreeDVehicleObject::name);
+		if (fig == _figure_objects.end() || fig->paint.mask_file.empty()) return;
+		int step = 0;
+		for (size_t k = 0; k < fig->states.size(); k++) {
+			if (fig->states[k].colour == colour) step = static_cast<int>(k) + 1;
+		}
+		if (step == 0) {
+			ThreeDVehicleState st;
+			st.colour = colour;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			fig->states.push_back(st);
+			step = static_cast<int>(fig->states.size());
+		}
+		piece->own_colours.emplace_back(colour, step);
+	};
 	for (const ThreeDVehicleObject &o : _vehicle_objects) {
 		for (const ThreeDVehicleState &s : o.states) {
-			if (s.load_colour == 0 || s.load_piece.empty()) continue;
-			auto piece = std::ranges::find(_load_pieces, s.load_piece, &ThreeDLoadPiece::name);
-			if (piece == _load_pieces.end() || std::ranges::any_of(piece->own_colours, [&s](const auto &c) { return c.first == s.load_colour; })) continue;
-			auto fig = std::ranges::find(_figure_objects, piece->figure, &ThreeDVehicleObject::name);
-			if (fig == _figure_objects.end() || fig->paint.mask_file.empty()) continue;
-			int step = 0;
-			for (size_t k = 0; k < fig->states.size(); k++) {
-				if (fig->states[k].colour == s.load_colour) step = static_cast<int>(k) + 1;
-			}
-			if (step == 0) {
-				ThreeDVehicleState st;
-				st.colour = s.load_colour;
-				st.given = ThreeDVehicleState::GIVEN_COLOUR;
-				fig->states.push_back(st);
-				step = static_cast<int>(fig->states.size());
-			}
-			piece->own_colours.emplace_back(s.load_colour, step);
+			own_colour(s.load_piece, s.load_colour);
+			for (const ThreeDPlacedLoad &placed : s.placed_loads) own_colour(placed.piece, placed.colour);
 		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
@@ -6567,6 +6581,8 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			made.load_piece = s.load_piece;
 			made.load_colour = s.load_colour;
 		}
+		/* Each layer its piece on its place (a blue container in front, a red one behind). */
+		made.placed_loads.insert(made.placed_loads.end(), s.placed_loads.begin(), s.placed_loads.end());
 		if (s.bed.Given()) made.bed = s.bed;
 	}
 	/* How many pieces lie on its bed, of which cargo (ThreeDLoadCode()). */

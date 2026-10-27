@@ -31,6 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
+
+- Hráč: *„mame hotove vagony3D.grf“*. Kolega (grrrrf `hra/3d/VAGONY-3D-V8-PRO-HRU.md`) cituje hráče: *„vagony3d grf
+  taky potom bez nákladů. plošinový vagony rola jsou náklady jak auta valnik jen nemaj bočnice tak tam nejde kupa .
+  kontainer nahrazuje plachtu když nejsou obrazky nákladu veze se to v kontaineru“*.
+- Balíček `Vagony_3D-v8.tar` (md5 4bc941e2…, GRF `MAX7` verze 8): Sgs, Smmps a Holidays mají stavy `naklad` + `loze`.
+- **Sada `naklady`:** pět kontejnerů od kolegy (`kontejner_20_modry`, `_zeleny`, `_cerveny`, `_evergreen`,
+  `kontejner_40_evergreen`), barvy z textury, nic se nebarví. Licence CC BY 4.0 a 3D Warehouse jsou v záznamech.
+- **`naklad.misto` [x, y]** (kolegův návrh, three_d_objects.cpp, three_d_vehicle_object.cpp, viewport.cpp):
+  - stav s `misto` položí právě jeden svůj kus na to místo (na `dno` lože), ať je naloženo kolik chce. Jestli tam je,
+    rozhoduje GRF sadou;
+  - každá vrstva má svůj kus, takže vpředu může být modrý a vzadu zelený kontejner. Bez `misto` by oba měly kus
+    poslední vrstvy;
+  - kreslení (obrázky na mapě, na kartě i pohled z očí) bere seznam druhů kusů, ne jen jeden.
+- Rig (CPU i GL): Sgs s kládami, bednami na paletách a barely ve dvou vrstvách, Holidays se dvěma 20′ kontejnery různých
+  barev, Smmps se 40′ Evergreen. Pád rigu `_globset.IsEmpty()` byl od tratí testu, které se křížily (vůz se nenašel,
+  trať zůstala), ne od hry.
+
 ## 26. 10. (18) – Návěs přes tahač, V3S s kusovými náklady, barva nákladu ze stavu
 
 - Hráč přes kolegu (grrrrf `hra/3d/TAHAC-NAVES-PORADI-PRO-HRU.md`): *„tatry maj tahač nakreslený přes navěs v jv a jz

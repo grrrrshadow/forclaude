@@ -684,5 +684,135 @@
    "poznamka": "zvířata stojí vedle sebe s mezerou (rozmer_nakladu v záznamu zvířete), jen na plochách s bočnicemi"
   },
   "poznamka": "ovečka z objekty/zvirata (snímek pase_00: stojí s hlavou nahoře), náklad dobytka LVST; hra vybere druh (jeden na vůz, nebo podle podtypu z GRF)"
+ },
+ {
+  "soubor": "kontejner_20_cerveny.glb",
+  "jmeno": "kontejner_20_cerveny",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "červený kontejner 20′",
+   "en": "red 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7046,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "červený kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 787 px; 526 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_evergreen.glb",
+  "jmeno": "kontejner_20_evergreen",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner Evergreen 20′",
+   "en": "Evergreen 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 3064,
+  "autor": "natasha_homci (3D Warehouse)",
+  "licence": "3D Warehouse General Model License",
+  "poznamka": "kontejner Evergreen 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 228 × 718 px; 129 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_40_evergreen.glb",
+  "jmeno": "kontejner_40_evergreen",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner Evergreen 40′",
+   "en": "Evergreen 40' container"
+  },
+  "rozmer_m": [
+   12.12,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 12,
+  "autor": "Shipping Container Man (3D Warehouse)",
+  "licence": "3D Warehouse General Model License",
+  "poznamka": "kontejner Evergreen 40′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 932 × 372 px; 367 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_modry.glb",
+  "jmeno": "kontejner_20_modry",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "modrý kontejner 20′",
+   "en": "blue 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7044,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "modrý kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 788 px; 595 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_zeleny.glb",
+  "jmeno": "kontejner_20_zeleny",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "zelený kontejner 20′",
+   "en": "green 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7046,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "zelený kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 788 px; 552 kB, glb z gltfpacku"
  }
 ]
