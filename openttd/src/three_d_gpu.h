@@ -377,7 +377,23 @@ struct ThreeDGpuStandingBuilding {
 	std::vector<uint8_t> night_texture;   ///< each such triangle's texture (ThreeDGpuBuilding::textures)
 };
 
-/** A thing standing on a block of the turned map: its picture laid at its place, or a building drawn there. */
+/**
+ * A vehicle of the turned map drawn by the card among what stands on a block, with no picture of it made (the player,
+ * 25. 10.: "finish the move to the GPU"): its shapes as its picture would have them (PrepareGpuObject() of
+ * three_d_vehicle_object.cpp), drawn at supersample times its size into a picture of the card's own, shrunk from it
+ * there as the processor shrinks the picture into the pictures kept on the card, and laid from them as a picture is;
+ * nothing read back. Looking the same in another block or frame (key), it is laid from them again, not drawn.
+ */
+struct ThreeDGpuStandingVehicle {
+	ThreeDGpuPicture pic;      ///< its shapes, at supersample times the block's pixels (its size whole multiples of it)
+	uint64_t key = 0;          ///< what it looks like (the object, its angles, its state): shrunk once, kept on the card by it among the pictures
+	int supersample = 1;
+	int left = 0, top = 0;     ///< its top left from the world point it hangs from, pixels of the block
+	int width = 0, height = 0; ///< pixels of the block
+	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held; ///< what its paints need, kept till it is drawn
+};
+
+/** A thing standing on a block of the turned map: its picture laid at its place, or a building or a vehicle drawn there. */
 struct ThreeDGpuStandingItem {
 	int x = 0, y = 0; ///< its top left in the block, pixels
 	uint64_t key = 0; ///< kept on the card by this (a sprite's picture); 0 this block's alone
@@ -386,6 +402,7 @@ struct ThreeDGpuStandingItem {
 	 * depth (0-1); laid where it is nearer, its depth kept. Below 0: laid over all. */
 	float depth = -1;
 	int building = -1; ///< not a picture: the building of ThreeDGpuStanding::buildings drawn here
+	std::shared_ptr<const ThreeDGpuStandingVehicle> vehicle = nullptr; ///< not a picture: this vehicle drawn here, laid over all
 };
 
 /**

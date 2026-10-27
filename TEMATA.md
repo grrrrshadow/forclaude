@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (35) – Otočená mapa kartou 2, kus 3: vozidla kartou bez obrázku (rig)
+
+- Hráč: *„jak jsme daleko s gpu? pokračuj gpu ja udělam build a projedu 1203“*.
+- Stav: zem otočené mapy kartou (zapnuto). Domy, sprity a celý pohled jedním průchodem kartou jsou hotové, ale jen
+  v rigu (`test3d stojici ukaz 1`). Procesor ještě kreslí „zvlášť“ krabice, mosty a depa.
+- Hotovo, kus A: vozidla a postavy (obrázky, box_kind 5) karta pokládá rovnou ze svých obrázků, drží je podle čísla;
+  procesor je už nekreslí přes černou a bílou. V rigu karta = procesor na pixel.
+- Hotovo, kus B: vozidlo-objekt v otočené mapě kreslí karta z trojúhelníků, žádný obrázek se nedělá ani nečte zpět:
+  připraví se jako pro obrázek (`PrepareGpuObject`), karta ho nakreslí 2× větší do vlastního rámu, zmenší jako
+  procesor do svého atlasu a položí; podle klíče (objekt, úhly, stav, světla) ho pak jen pokládá z atlasu, i v dalších
+  blocích a snímcích. Na hlavním vlákně se nic nečeká: nový režim líného načítání „bez čekání“ (`ThreeDLazyNoWait`) –
+  co ještě není načtené (tvar, textura, maska, zjednodušený tvar), zadá vláknu na pozadí a vozidlo je ten snímek
+  ještě obrázkem. Světla v noci z téže přípravy.
+- Ověřeno v rigu (Tatry 148 + 1203, zastavené): procesor / karta s obrázky / karta s trojúhelníky – auta stejná,
+  rozdíl 52 px jsou zvířata v pohybu; v noci světla i záře stejné. 36 aut v pohledu, nakreslena 2 různá, zbytek
+  z atlasu.
+- Rig: `test3d stojici auta 0|1` (karta kreslí vozidla / pokládá jejich obrázky), `test3d cas` píše i
+  `vehicles of the turned map N drawn, M as kept`.
+- Další kusy: krabice, mosty a depa kartou; pak kamera jako matice a mezipaměť scény; pak zapnout a změřit na telefonu.
+
 ## 27. 10. (34) – Naložit / vyložit z kabiny na průjezdné zastávce
 
 - Hráč: *„naložit, vyložit . zajede na zastavku a v tom prostoru dlaždice zastavky auto naloži vyloži , musi mit

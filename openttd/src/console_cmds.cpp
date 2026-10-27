@@ -10051,6 +10051,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_standing_on = number(3).value_or(0) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici {}", _turned_card_standing_on ? "karta" : "procesor");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "auta") {
+		/* 'stojici auta 0|1': the vehicles among what the card lays drawn by it, no pictures of them (1;
+		 * ThreeDGpuStandingVehicle), or laid as their pictures (0). */
+		extern bool _standing_vehicles_on_card;
+		_standing_vehicles_on_card = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici auta {}", _standing_vehicles_on_card ? "kartou" : "obrazkem");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "cely") {
 		/* 'stojici cely 0|1': with the camera changed the whole turned main view laid by the card at once (1;
 		 * TurnedViewWholeOnCard()), or each block of it by itself (0). */

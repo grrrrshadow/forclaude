@@ -1124,6 +1124,20 @@ void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, i
  */
 void ThreeDLoadInBackground(std::function<void()> job);
 extern bool _three_d_load_at_once; ///< the rig: a job is run the moment it is asked for, so a picture is of the moment
+
+/**
+ * While one stands, the getters of the vehicle objects on this thread make nothing that is not made yet (a shape read,
+ * a texture or a mask decoded, a simpler shape): they ask the thread in the background for it, give what there is
+ * (nothing, or a shape without the parts asked for), and it is noted (Missed()) -- a vehicle of the map is drawn by
+ * the card only from what is made, not waited for on the main thread (ThreeDGpuStandingVehicle).
+ */
+class ThreeDLazyNoWait {
+public:
+	ThreeDLazyNoWait();
+	~ThreeDLazyNoWait();
+	bool Missed() const;
+};
+bool ThreeDLazyMissedNow();
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();

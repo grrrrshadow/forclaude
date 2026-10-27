@@ -28,6 +28,7 @@
 #include <deque>
 #include <map>
 #include <mutex>
+#include <set>
 #include <thread>
 #include <functional>
 #include <unordered_map>
@@ -452,6 +453,8 @@ std::string _gpu_describe = "not started";
 double _gpu_ms = 0;                 ///< the time the card took for the pictures since the last ThreeDGpuTimes()
 uint64_t _gpu_pictures = 0;         ///< and how many
 uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the processor did)
+uint64_t _gpu_standing_vehicles = 0;      ///< the vehicles of the turned map it drew and shrunk since the last ThreeDGpuTimes() (ThreeDGpuStandingVehicle)
+uint64_t _gpu_standing_vehicles_kept = 0; ///< and those it laid as they were kept
 double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes()
 uint64_t _gpu_grounds = 0;          ///< and how many blocks
 uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the processor did)
@@ -591,6 +594,15 @@ std::unordered_map<uint64_t, std::array<int, 2>> _standing_places;
 GLuint _standing_vao = 0, _standing_vbo = 0;
 GLuint _standing_tri_vao = 0, _standing_tri_vbo = 0; ///< the lit glass of the buildings at night, placed already
 bool _standing_program_ok = false;
+/* The vehicles among them drawn first at supersample times their size (ThreeDGpuStandingVehicle): their colours and
+ * which of them are lit as textures, shrunk from them as they are laid. */
+GLuint _sv_fbo = 0, _sv_colour = 0, _sv_lit = 0, _sv_depth = 0;
+int _sv_w = 0, _sv_h = 0;
+GLuint _standing_atlas_fbo = 0; ///< the kept pictures drawn into (a vehicle shrunk into them)
+/** The keys of the vehicles among the kept pictures (ThreeDGpuStandingVehicle::key), apart from the sprites' and the figures'. */
+constexpr uint64_t STANDING_VEHICLE_KEY = uint64_t{1} << 61;
+GpuProgram _standing_shrink_program;
+bool _standing_shrink_ok = false;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
@@ -934,6 +946,42 @@ void main()
 	float a = lit > 0.5 ? 1.0 : t.a;
 	o_colour = vec4(t.rgb, a);
 	o_lit = vec4(lit, 0.0, 0.0, a);
+}
+)";
+
+/* A vehicle among what stands on the turned map (ThreeDGpuStandingVehicle), with STANDING_VERTEX: shrunk from its
+ * picture on the card into the pictures kept there as FinishGpuObject() of three_d_vehicle_object.cpp shrinks it --
+ * each pixel the mean of its subpixels (their alpha multiplied in); one any of them is lit of, its colour whole, of
+ * alpha THREE_D_GPU_LIT_ALPHA, as a picture's lit pixel (STANDING_FRAGMENT). */
+const char *const STANDING_SHRINK_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_colour;
+uniform sampler2D u_lit;
+uniform int u_ss;
+noperspective in vec2 v_uv;
+layout(location = 0) out vec4 o_colour;
+void main()
+{
+	ivec2 at = ivec2(floor(v_uv)) * u_ss;
+	vec4 sum = vec4(0.0);
+	float lit = 0.0;
+	for (int dy = 0; dy < u_ss; dy++) {
+		for (int dx = 0; dx < u_ss; dx++) {
+			sum += texelFetch(u_colour, at + ivec2(dx, dy), 0);
+			lit = max(lit, texelFetch(u_lit, at + ivec2(dx, dy), 0).r);
+		}
+	}
+	if (sum.a <= 0.0) {
+		o_colour = vec4(0.0);
+		return;
+	}
+	if (lit > 0.0) {
+		o_colour = vec4(sum.rgb / sum.a, 254.0 / 255.0);
+		return;
+	}
+	vec4 c = sum / float(u_ss * u_ss);
+	/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
+	if (abs(c.a * 255.0 - 254.0) < 0.5) c = vec4(c.rgb / c.a, 1.0);
+	o_colour = c;
 }
 )";
 
@@ -1896,6 +1944,9 @@ bool StartCard(std::string &why, std::string &describe)
 		_standing_program_ok = MakeProgram(_standing_program, STANDING_VERTEX, STANDING_FRAGMENT, standing_why) &&
 				MakeProgram(_standing_building_program, MAP_BUILDING_VERTEX, STANDING_BUILDING_FRAGMENT, standing_why);
 		if (!_standing_program_ok) Diary("co stoji na plose kresli procesor: " + standing_why, true);
+		std::string shrink_why;
+		_standing_shrink_ok = _standing_program_ok && MakeProgram(_standing_shrink_program, STANDING_VERTEX, STANDING_SHRINK_FRAGMENT, shrink_why);
+		if (_standing_program_ok && !_standing_shrink_ok) Diary("vozidla plochy jako obrazky: " + shrink_why, true);
 	}
 	Step("preklad programu postav z oci (shader)");
 	const std::string eye_vertex = EyeMeshSource(MESH_VERTEX, false), eye_fragment = EyeMeshSource(MESH_FRAGMENT, true);
@@ -2025,6 +2076,14 @@ void ForgetCard()
 	_standing_atlas = _standing_stream = 0;
 	_standing_atlas_size = 0;
 	_standing_places.clear();
+	if (_sv_colour != 0) {
+		gl.glDeleteTextures(1, &_sv_colour);
+		gl.glDeleteTextures(1, &_sv_lit);
+	}
+	_sv_colour = _sv_lit = 0;
+	if (_sv_depth != 0) gl.glDeleteRenderbuffers(1, &_sv_depth);
+	_sv_depth = 0;
+	_sv_w = _sv_h = 0;
 }
 
 void EndCard()
@@ -2048,6 +2107,9 @@ void EndCard()
 		if (_standing_tri_vao != 0) gl.glDeleteVertexArrays(1, &_standing_tri_vao);
 		if (_standing_program.program != 0) gl.glDeleteProgram(_standing_program.program);
 		if (_standing_building_program.program != 0) gl.glDeleteProgram(_standing_building_program.program);
+		if (_standing_shrink_program.program != 0) gl.glDeleteProgram(_standing_shrink_program.program);
+		if (_sv_fbo != 0) gl.glDeleteFramebuffers(1, &_sv_fbo);
+		if (_standing_atlas_fbo != 0) gl.glDeleteFramebuffers(1, &_standing_atlas_fbo);
 		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb, _g_colour_rb};
 		for (GLuint rb : rbs) if (rb != 0) gl.glDeleteRenderbuffers(1, &rb);
 		if (_night_vbo != 0) gl.glDeleteBuffers(1, &_night_vbo);
@@ -3194,6 +3256,29 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
  * drawn from them drawn first (flush).
  * @return false when it is bigger than they are
  */
+/**
+ * A place of so many pixels among the pictures laid (DrawStandingOnCard()), shelf by shelf: the kept ones (kept) or the
+ * block's others. When they are full, those gathered are laid (flush) and they start over -- the kept forgotten.
+ */
+std::array<int, 2> StandingReserve(bool kept, int w, int h, const std::function<void()> &flush)
+{
+	StandingShelf &shelf = kept ? _standing_atlas_shelf : _standing_stream_shelf;
+	if (shelf.x + w > _standing_atlas_size) {
+		shelf.y += shelf.h;
+		shelf.x = 0;
+		shelf.h = 0;
+	}
+	if (shelf.y + h > _standing_atlas_size) {
+		flush();
+		shelf = {};
+		if (kept) _standing_places.clear();
+	}
+	const std::array<int, 2> place = {shelf.x, shelf.y};
+	shelf.x += w;
+	shelf.h = std::max(shelf.h, h);
+	return place;
+}
+
 bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::array<int, 2> &place, const std::function<void()> &flush)
 {
 	const ThreeDGpuStandingPicture &p = *item.picture;
@@ -3208,27 +3293,51 @@ bool StandingPlace(const ThreeDGpuStandingItem &item, GLuint &texture, std::arra
 			return true;
 		}
 	}
-	StandingShelf &shelf = kept ? _standing_atlas_shelf : _standing_stream_shelf;
-	if (shelf.x + p.width > _standing_atlas_size) {
-		shelf.y += shelf.h;
-		shelf.x = 0;
-		shelf.h = 0;
-	}
-	if (shelf.y + p.height > _standing_atlas_size) {
-		flush();
-		shelf = {};
-		if (kept) _standing_places.clear();
-	}
-	place = {shelf.x, shelf.y};
+	place = StandingReserve(kept, p.width, p.height, flush);
 	texture = kept ? _standing_atlas : _standing_stream;
 	gl.glBindTexture(GL_TEXTURE_2D, texture);
 	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
 	gl.glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, place[0], place[1], p.width, p.height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, p.pixels.data());
 	_card_sent += static_cast<size_t>(p.width) * p.height * 4;
-	shelf.x += p.width;
-	shelf.h = std::max(shelf.h, p.height);
 	if (kept) _standing_places[item.key] = place;
+	return true;
+}
+
+/** The picture the vehicles among what stands on the turned map are drawn into first, at least as big as asked (ThreeDGpuStandingVehicle). */
+bool StandingVehiclesTargetOfSize(int w, int h)
+{
+	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target) return false;
+	if (w <= _sv_w && h <= _sv_h && _sv_colour != 0) return true;
+	const int nw = std::min(_max_target, (std::max(_sv_w, w) + 255) / 256 * 256), nh = std::min(_max_target, (std::max(_sv_h, h) + 255) / 256 * 256);
+	Step(fmt::format("ramec vozidel plochy {}x{}", nw, nh));
+	if (_sv_fbo == 0) gl.glGenFramebuffers(1, &_sv_fbo);
+	if (_sv_depth == 0) gl.glGenRenderbuffers(1, &_sv_depth);
+	if (_sv_colour != 0) {
+		gl.glDeleteTextures(1, &_sv_colour);
+		gl.glDeleteTextures(1, &_sv_lit);
+	}
+	_sv_colour = NewGroundTexture(nw, nh);
+	_sv_lit = NewGroundTexture(nw, nh);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, _sv_depth);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, nw, nh);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, _sv_fbo);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _sv_colour, 0);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _sv_lit, 0);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _sv_depth);
+	const bool complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	if (!complete) {
+		gl.glDeleteTextures(1, &_sv_colour);
+		gl.glDeleteTextures(1, &_sv_lit);
+		_sv_colour = _sv_lit = 0;
+		_sv_w = _sv_h = 0;
+		return false;
+	}
+	_sv_w = nw;
+	_sv_h = nh;
 	return true;
 }
 
@@ -3369,8 +3478,154 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDisable(GL_DEPTH_TEST);
 		return true;
 	};
+	/* The vehicles (ThreeDGpuStandingVehicle): drawn into the picture of the card's own first -- as many as it holds at
+	 * once, from the one coming on --, each then shrunk from it as it comes. Where each is in it, subpixels; -1 not
+	 * drawn yet, -2 not drawn at all (one the card cannot hold). */
+	std::vector<std::array<int, 2>> vehicle_at(s.items.size(), {-1, -1});
+	auto draw_vehicles = [&](size_t from) {
+		struct Placed {
+			size_t item;
+			std::vector<MeshOnCard> draws;
+		};
+		std::vector<Placed> placed;
+		std::set<uint64_t> keys;
+		const int frame_w = std::min(_max_target, 2048);
+		int x = 0, y = 0, row = 0;
+		for (size_t k = from; k < s.items.size(); k++) {
+			if (s.items[k].vehicle == nullptr || vehicle_at[k][0] != -1) continue;
+			/* Kept already, or drawn in this one before: laid from that. */
+			const uint64_t key = s.items[k].vehicle->key | STANDING_VEHICLE_KEY;
+			if (_standing_places.contains(key) || !keys.insert(key).second) continue;
+			const ThreeDGpuPicture &pic = s.items[k].vehicle->pic;
+			std::vector<MeshOnCard> draws;
+			if (pic.width <= 0 || pic.height <= 0 || pic.width > frame_w || pic.height > _max_target || !PictureOnCard(pic, draws)) {
+				vehicle_at[k] = {-2, -2};
+				continue;
+			}
+			if (x + pic.width > frame_w) {
+				y += row;
+				x = 0;
+				row = 0;
+			}
+			if (y + pic.height > _max_target) break;
+			vehicle_at[k] = {x, y};
+			placed.push_back({k, std::move(draws)});
+			x += pic.width;
+			row = std::max(row, pic.height);
+		}
+		if (placed.empty()) return;
+		const int frame_h = y + row;
+		if (!StandingVehiclesTargetOfSize(frame_w, frame_h)) {
+			for (const Placed &p : placed) vehicle_at[p.item] = {-2, -2};
+			return;
+		}
+		Step(fmt::format("vozidla plochy {}: {}x{}", placed.size(), frame_w, frame_h));
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _sv_fbo);
+		gl.glDrawBuffers(2, colour_and_lit);
+		gl.glDisable(GL_BLEND);
+		gl.glScissor(0, 0, frame_w, frame_h);
+		gl.glClearColor(0, 0, 0, 0);
+		gl.glClearDepth(1.0);
+		gl.glDepthMask(GL_TRUE);
+		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		gl.glDisable(GL_SCISSOR_TEST);
+		for (const Placed &p : placed) DrawPictureAt(s.items[p.item].vehicle->pic, p.draws, vehicle_at[p.item][0], vehicle_at[p.item][1]);
+		/* Back to what stands on the view, as it was. */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
+		gl.glDrawBuffers(2, colour_and_lit);
+		gl.glViewport(0, 0, s.view_w, s.view_h);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glDisable(GL_CULL_FACE);
+		gl.glFrontFace(GL_CCW);
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		gl.glDepthFunc(GL_GEQUAL);
+		gl.glDepthMask(GL_TRUE);
+		gl.glClearDepth(0.0);
+	};
+	/* A vehicle shrunk from that picture into the kept pictures (STANDING_SHRINK_FRAGMENT), kept there by its key. */
+	auto shrink_vehicle = [&](const ThreeDGpuStandingVehicle &v, const std::array<int, 2> &at, uint64_t key, std::array<int, 2> &place) {
+		const int ss = std::max(1, v.supersample);
+		if (v.width <= 0 || v.height <= 0 || v.width > _standing_atlas_size || v.height > _standing_atlas_size) return false;
+		place = StandingReserve(true, v.width, v.height, flush);
+		if (_standing_atlas_fbo == 0) gl.glGenFramebuffers(1, &_standing_atlas_fbo);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _standing_atlas_fbo);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _standing_atlas, 0);
+		static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
+		gl.glDrawBuffers(1, colour_only);
+		gl.glViewport(0, 0, _standing_atlas_size, _standing_atlas_size);
+		gl.glDisable(GL_SCISSOR_TEST);
+		gl.glDisable(GL_BLEND);
+		gl.glDisable(GL_DEPTH_TEST);
+		const GLuint sp = _standing_shrink_program.program;
+		gl.glUseProgram(sp);
+		gl.glUniform2f(gl.glGetUniformLocation(sp, "u_size"), static_cast<float>(_standing_atlas_size), static_cast<float>(_standing_atlas_size));
+		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_colour"), 0);
+		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_lit"), 1);
+		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_ss"), ss);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, _sv_lit);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, _sv_colour);
+		gl.glBindVertexArray(_standing_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+		const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
+		const float x0 = static_cast<float>(place[0]), y0 = static_cast<float>(place[1]), x1 = x0 + w, y1 = y0 + h;
+		const float u0 = static_cast<float>(at[0] / ss), v0 = static_cast<float>(at[1] / ss), u1 = u0 + w, v1 = v0 + h;
+		const float quad[] = {x0, y0, 0, u0, v0, x1, y0, 0, u1, v0, x1, y1, 0, u1, v1, x0, y0, 0, u0, v0, x1, y1, 0, u1, v1, x0, y1, 0, u0, v1};
+		gl.glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STREAM_DRAW);
+		gl.glDrawArrays(GL_TRIANGLES, 0, 6);
+		/* Not bound while the next are drawn into them. */
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		/* Back to what stands on the view, as it was. */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
+		gl.glDrawBuffers(2, colour_and_lit);
+		gl.glViewport(0, 0, s.view_w, s.view_h);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		_standing_places[key] = place;
+		_gpu_standing_vehicles++;
+		return true;
+	};
 	bool all = true;
-	for (const ThreeDGpuStandingItem &item : s.items) {
+	for (size_t k = 0; k < s.items.size(); k++) {
+		const ThreeDGpuStandingItem &item = s.items[k];
+		if (item.vehicle != nullptr) {
+			if (!_standing_shrink_ok) continue;
+			/* Laid as a picture kept by its key: drawn and shrunk into them first, unless it is there. */
+			const ThreeDGpuStandingVehicle &v = *item.vehicle;
+			const uint64_t key = v.key | STANDING_VEHICLE_KEY;
+			std::array<int, 2> place;
+			auto kept = _standing_places.find(key);
+			if (kept != _standing_places.end()) {
+				place = kept->second;
+				_gpu_standing_vehicles_kept++;
+			} else {
+				flush();
+				if (vehicle_at[k][0] == -1) draw_vehicles(k);
+				const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
+				use_pictures();
+				drawing = 0;
+				if (!shrunk) continue;
+			}
+			if (_standing_atlas != drawing || in_depth) {
+				flush();
+				drawing = _standing_atlas;
+				in_depth = false;
+			}
+			const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
+			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
+			const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
+			corners.insert(corners.end(), {x0, y0, 0, u0, v0, x1, y0, 0, u1, v0, x1, y1, 0, u1, v1, x0, y0, 0, u0, v0, x1, y1, 0, u1, v1, x0, y1, 0, u0, v1});
+			continue;
+		}
 		if (item.building >= 0) {
 			flush();
 			if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
@@ -4809,6 +5064,9 @@ std::string ThreeDGpuTimes()
 	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x, read back at most {}x{}", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
 			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
+	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
+	_gpu_standing_vehicles = 0;
+	_gpu_standing_vehicles_kept = 0;
 	_gpu_ground_ms = 0;
 	_gpu_grounds = 0;
 	_gpu_grounds_failed = 0;

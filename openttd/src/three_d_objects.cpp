@@ -5432,10 +5432,49 @@ enum LazyThing : int {
  * @param make make it: outside the lock, so it may ask for the others (the shape of a crew's figure)
  * @param store keep what was made (even nothing, when it could not be made): under the lock, as made()
  */
+/** How many ThreeDLazyNoWait stand on this thread, and whether a getter missed something since the first did. */
+static thread_local int _lazy_no_wait = 0;
+static thread_local bool _lazy_missed = false;
+
+ThreeDLazyNoWait::ThreeDLazyNoWait()
+{
+	if (_lazy_no_wait++ == 0) _lazy_missed = false;
+}
+
+ThreeDLazyNoWait::~ThreeDLazyNoWait()
+{
+	_lazy_no_wait--;
+}
+
+/** Whether a getter missed something not made yet since it was made (it was asked of the thread in the background). */
+bool ThreeDLazyNoWait::Missed() const
+{
+	return _lazy_missed;
+}
+
+/** Whether a ThreeDLazyNoWait stands on this thread and a getter missed something since: what is being made of it may stop. */
+bool ThreeDLazyMissedNow()
+{
+	return _lazy_no_wait > 0 && _lazy_missed;
+}
+
 template <typename Made, typename Make, typename Store>
 static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
 {
 	const std::pair<const void *, int> key(of, thing);
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) {
+		/* Not waited for (ThreeDLazyNoWait): asked of the thread in the background, once, unless it is being made. */
+		{
+			std::lock_guard lock(_lazy_mutex);
+			if (made()) return;
+			_lazy_missed = true;
+			if (_lazy_making.contains(key) || !_lazy_asked.insert(key).second) return;
+		}
+		ThreeDLoadInBackground([of, thing, made = std::decay_t<Made>(made), make = std::decay_t<Make>(make), store = std::decay_t<Store>(store)]() mutable {
+			MakeOnce(of, thing, made, make, store);
+		});
+		return;
+	}
 	std::unique_lock lock(_lazy_mutex);
 	for (;;) {
 		if (made()) return;
@@ -5873,7 +5912,8 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
 	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
-	return made.get();
+	/* Not made yet, not waited for (ThreeDLazyNoWait): the shape itself meanwhile. */
+	return made != nullptr ? made.get() : this;
 }
 
 /** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */

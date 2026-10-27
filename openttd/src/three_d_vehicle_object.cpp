@@ -118,6 +118,8 @@ struct ObjectPictureEntry {
 using ObjectPictureKey = std::tuple<const ThreeDVehicleObject *, int, int, int, int, int, int, int, int, uint64_t>;
 static std::map<ObjectPictureKey, ObjectPictureEntry> _object_pictures;
 static uint64_t _object_pictures_clock = 0;
+/** Counts the times the objects were read anew (ResetThreeDVehicleObjectSprites()): another object may be where one was. */
+static uint64_t _object_pictures_generation = 0;
 
 static void ForgetEyePainted();
 static void ForgetGuiSpritesAndPreviews();
@@ -132,6 +134,7 @@ void ResetThreeDVehicleObjectSprites()
 	_object_sprites.clear();
 	_object_empty_sprite = 0;
 	_object_pictures.clear();
+	_object_pictures_generation++;
 	ForgetEyePainted();
 	ForgetGuiSpritesAndPreviews();
 	/* The GRFs are loaded anew: their packages read again the next time they are looked at, one put into the NewGRF
@@ -1845,6 +1848,8 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	const ObjectCamera cam(obj, st, scale, cam_az, world_az, along, p, stretch, spin, pitch, roll);
 	/* Its corners joined about one and a half pixels apart, as RasterObject() draws it (Simpler()). */
 	const ThreeDVehicleShape &shape = *whole.Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
+	/* Not made yet, not waited for (ThreeDLazyNoWait, CardVehicle()): not the whole shape's triangles meanwhile. */
+	if (ThreeDLazyMissedNow()) return false;
 	const bool lit = !shape.nrm.empty();
 
 	ThreeDGpuPicture &pic = gp.pic;
@@ -2753,48 +2758,56 @@ static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::millis
  * A picture of an object in the turned view at an angle and zoom, kept (RasterObject()): made now, or, for a vehicle
  * of the map (_object_picture_may_wait), asked of the thread and the nearest made given meanwhile.
  */
-static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f, uint64_t walk = 0)
+/**
+ * What a picture of an object is made of, as ObjectPicture() is asked for it: the angles in whole degrees, the paint of
+ * its state, foreshortened on its track as the map does (smoothly between the directions, as the likeness,
+ * RenderThreeDVehicle()); its key.
+ */
+static PictureToMake PictureRequest(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame, int tint_index, float stretch, int spin_step, int pitch, int roll, int lights, float along_given, uint64_t walk)
 {
 	int cam_step = static_cast<int>(std::lround(std::fmod(cam_az + 720.0f, 360.0f))) % 360;
 	int world_step = static_cast<int>(std::lround(std::fmod(world_az + 720.0f, 360.0f))) % 360;
 	pitch = std::clamp(pitch, -60, 60);
 	roll = std::clamp(roll, -60, 60);
-	const ObjectPictureKey key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
-	const uint32_t tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
+	PictureToMake p;
+	p.key = std::make_tuple(obj, to_underlying(zoom), cam_step, world_step, static_cast<int>(std::lround(scale * 1000)), (fade & 0xFFFF) | (pitch + 64) << 16 | (roll + 64) << 24, frame | spin_step << 8 | (tint_index + 1) << 16 | lights << 28, static_cast<int>(std::lround(stretch * 1000)), static_cast<int>(std::lround(along_given * 1000)), walk);
+	const float f = cam_step * static_cast<float>(M_PI) / 180.0f;
+	p.obj = obj;
+	p.scale = scale;
+	p.cam_az = static_cast<float>(cam_step);
+	p.world_az = static_cast<float>(world_step);
+	p.along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
+	p.pxm = PXM_16X / (1 << to_underlying(zoom));
+	p.fade = FadeAmount(obj, fade);
+	p.rust_time = RustTime(obj, fade);
+	p.tint = tint_index >= 0 && static_cast<size_t>(tint_index) < obj->tint_palette.size() ? obj->tint_palette[tint_index] : 0;
+	p.paint_colour = PaletteColour(obj, fade);
+	p.stretch = stretch;
+	p.spin = spin_step * 360.0f / SPIN_STEPS;
+	p.pitch = static_cast<float>(pitch);
+	p.roll = static_cast<float>(roll);
+	p.frame = frame;
+	p.lights = lights;
+	p.state = fade;
+	p.walk = walk;
+	return p;
+}
+
+static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f, uint64_t walk = 0)
+{
+	PictureToMake p = PictureRequest(obj, scale, zoom, cam_az, world_az, squeeze, fade, frame, tint_index, stretch, spin_step, pitch, roll, lights, along_given, walk);
+	const ObjectPictureKey key = p.key;
+	const int cam_step = std::get<2>(key), world_step = std::get<3>(key);
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
 		return it->second.picture.width > 0 ? &it->second.picture : nullptr;
 	}
-	/* On the track foreshortened along itself as the map does, smoothly between the directions (as the likeness, RenderThreeDVehicle()). */
-	float f = cam_step * static_cast<float>(M_PI) / 180.0f;
-	float along = along_given > 0 ? along_given : (squeeze ? 1.0f - (1.0f - SQUEEZE) * std::fabs(std::sin(2.0f * f)) : 1.0f);
-	const float pxm = PXM_16X / (1 << to_underlying(zoom));
 	/* Drawing the map (_three_d_pictures_stand_in): the drawing waits for no card -- the nearest made of the object stands
 	 * in, the thread makes this one and its place is drawn again when it comes (OweThreeDPictureBox()). Only the first of
 	 * an object at a zoom is made at once. */
 	const bool stand_in = _three_d_pictures_stand_in && !_object_picture_may_wait && !_three_d_load_at_once;
 	if (_pictures_collected != nullptr || _object_picture_may_wait || stand_in) {
-		PictureToMake p;
-		p.key = key;
-		p.obj = obj;
-		p.scale = scale;
-		p.cam_az = static_cast<float>(cam_step);
-		p.world_az = static_cast<float>(world_step);
-		p.along = along;
-		p.pxm = pxm;
-		p.fade = FadeAmount(obj, fade);
-		p.rust_time = RustTime(obj, fade);
-		p.tint = tint;
-		p.paint_colour = PaletteColour(obj, fade);
-		p.stretch = stretch;
-		p.spin = spin_step * 360.0f / SPIN_STEPS;
-		p.pitch = static_cast<float>(pitch);
-		p.roll = static_cast<float>(roll);
-		p.frame = frame;
-		p.lights = lights;
-		p.state = fade;
-		p.walk = walk;
 		/* Till it comes: the nearest made of the object at the zoom, its size and its state, by the angle seen. */
 		const ThreeDModelPicture *nearest = nullptr;
 		int best = INT_MAX;
@@ -2829,7 +2842,7 @@ static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, f
 	ObjectRaster r;
 	auto start = std::chrono::steady_clock::now();
 	_object_pictures_made++;
-	if (RasterObject(*obj, scale, static_cast<float>(cam_step), static_cast<float>(world_step), along, pxm, FadeAmount(obj, fade), r, frame, RustTime(obj, fade), tint, PaletteColour(obj, fade), stretch, spin_step * 360.0f / SPIN_STEPS, static_cast<float>(pitch), static_cast<float>(roll), lights, fade, walk)) {
+	if (RasterObject(*obj, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, r, p.frame, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk)) {
 		Debug(sprite, 4, "3D vehicle {}: picture at {} degrees, zoom {}: {}x{}, {} ms", obj->name, cam_step, to_underlying(zoom), r.width, r.height,
 				std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		PictureOfRaster(e.picture, r);
@@ -2906,7 +2919,64 @@ struct VehicleObjectPlace {
 	const ThreeDModelPicture *pic = nullptr; ///< its picture at the view's angle, nullptr when it has none
 	int ax = 0, ay = 0, az = 0;              ///< the world point the picture hangs from
 	int xmin = 0, ymin = 0, zmin = 0, xmax = 0, ymax = 0, zmax = 0; ///< the box of its pieces, for the sorting
+	bool on_card = false;                    ///< drawn by the card, no picture (card; ViewportVehiclesOnCard())
+	std::shared_ptr<const ThreeDGpuStandingVehicle> card; ///< then its shapes, nullptr when it draws nothing so
+	std::vector<ThreeDPictureLight> card_lights; ///< and its lights on at night, as its picture's
 };
+
+/**
+ * A vehicle of the map drawn by the card among what stands on the turned view (ThreeDGpuStandingVehicle; the player,
+ * 25. 10.: "finish the move to the GPU"): its shapes as its picture would have them (PrepareGpuObject()), prepared now
+ * from what is made of its object -- nothing waited for (ThreeDLazyNoWait): what is not made yet is made in the
+ * background, and the vehicle is its picture meanwhile.
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
+ * @param[out] lights its lights on at night, as its picture's (ThreeDModelPicture::lights)
+ * @return false: something of it not made yet
+ */
+static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::vector<ThreeDPictureLight> &lights)
+{
+	/* What it looks like, as its picture is kept by (ObjectPictureKey), and of which reading of the objects. */
+	uint64_t key = 14695981039346656037ull;
+	auto mix = [&key](uint64_t v) {
+		key ^= v + 0x9E3779B97F4A7C15ull + (key << 6) + (key >> 2);
+		key *= 1099511628211ull;
+	};
+	mix(_object_pictures_generation);
+	std::apply([&mix](const auto &...e) {
+		auto one = [&mix](const auto &x) {
+			if constexpr (std::is_pointer_v<std::decay_t<decltype(x)>>) {
+				mix(static_cast<uint64_t>(reinterpret_cast<uintptr_t>(x)));
+			} else {
+				mix(static_cast<uint64_t>(x));
+			}
+		};
+		(one(e), ...);
+	}, p.key);
+	card = nullptr;
+	lights.clear();
+	GpuObjectPicture gp;
+	bool drawn = false;
+	{
+		ThreeDLazyNoWait no_wait;
+		const ThreeDVehicleShape *whole = p.obj->GetShape(p.frame, p.obj->PartsOf(p.state));
+		if (no_wait.Missed()) return false;
+		drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp);
+		if (no_wait.Missed()) return false;
+	}
+	if (!drawn) return true;
+	auto v = std::make_shared<ThreeDGpuStandingVehicle>();
+	v->key = key;
+	v->supersample = SUPERSAMPLE;
+	v->left = gp.left / SUPERSAMPLE;
+	v->top = gp.top / SUPERSAMPLE;
+	v->width = gp.pic.width / SUPERSAMPLE;
+	v->height = gp.pic.height / SUPERSAMPLE;
+	v->pic = std::move(gp.pic);
+	v->held = std::move(gp.held);
+	lights = std::move(gp.lights);
+	card = std::move(v);
+	return true;
+}
 
 /**
  * Where and as which picture a vehicle drawn as an object is drawn on the map: the object at the angle of the view,
@@ -2954,7 +3024,7 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
 }
 
-static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place)
+static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card = false)
 {
 	int piece = 0;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
@@ -3002,11 +3072,16 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	}
 	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
 	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
-	_object_picture_may_wait = true;
-	_object_picture_waited = false;
-	place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, WalkCode(obj, state, WalkedOf(v, obj), scale));
-	_object_picture_may_wait = false;
-	if (_object_picture_waited) _vehicles_owed_pictures.insert(v->index);
+	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale);
+	/* Drawn by the card from what is made of it (CardVehicle()); else, or till that is made, its picture. */
+	if (on_card) place.on_card = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights);
+	if (!place.on_card) {
+		_object_picture_may_wait = true;
+		_object_picture_waited = false;
+		place.pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk);
+		_object_picture_may_wait = false;
+		if (_object_picture_waited) _vehicles_owed_pictures.insert(v->index);
+	}
 	place.ax = static_cast<int>(std::lround(ox));
 	place.ay = static_cast<int>(std::lround(oy));
 	place.az = v->z_pos;
@@ -3027,8 +3102,8 @@ static bool ObjectDrawsNothing(const ThreeDVehicleObject *obj, const Vehicle *v,
 	const Vehicle *anchor = PieceAway(v, obj->anchor - piece);
 	if (anchor == nullptr) return false;
 	VehicleObjectPlace place;
-	PlaceVehicleObject(anchor, zoom, nullptr, place);
-	return place.pic == nullptr;
+	PlaceVehicleObject(anchor, zoom, nullptr, place, ViewportVehiclesOnCard());
+	return place.on_card ? place.card == nullptr : place.pic == nullptr;
 }
 
 /** Whether all that follows a piece of a vehicle is drawn as objects that draw nothing now (ObjectDrawsNothing()). */
@@ -3051,8 +3126,10 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom)
  */
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose)
 {
+	/* What stands on the turned view's block laid by the card: the vehicle drawn by it, no picture (CardVehicle()). */
+	const bool on_card = ViewportVehiclesOnCard();
 	VehicleObjectPlace place;
-	const ThreeDVehicleObject *obj = PlaceVehicleObject(v, zoom, pose, place);
+	const ThreeDVehicleObject *obj = PlaceVehicleObject(v, zoom, pose, place, on_card);
 	if (obj == nullptr) return false;
 	/* Articles drawn over the ones they are coupled behind (DrawnOverBefore()): one entry with them, the first article's
 	 * picture first, sorted by the box of all their pieces; once in the block, from whichever piece of them comes. */
@@ -3093,9 +3170,9 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 			int xmin = INT32_MAX, ymin = INT32_MAX, zmin = INT32_MAX, xmax = INT32_MIN, ymax = INT32_MIN, zmax = INT32_MIN;
 			for (const auto &[a_obj, a] : group) {
 				VehicleObjectPlace at;
-				PlaceVehicleObject(a, zoom, nullptr, at);
-				if (at.pic == nullptr) continue;
-				parts.push_back({at.pic, at.ax, at.ay, at.az});
+				PlaceVehicleObject(a, zoom, nullptr, at, on_card);
+				if (at.on_card ? at.card == nullptr : at.pic == nullptr) continue;
+				parts.push_back({at.pic, at.ax, at.ay, at.az, at.card});
 				xmin = std::min(xmin, at.xmin); ymin = std::min(ymin, at.ymin); zmin = std::min(zmin, at.zmin);
 				xmax = std::max(xmax, at.xmax); ymax = std::max(ymax, at.ymax); zmax = std::max(zmax, at.zmax);
 			}
@@ -3103,7 +3180,11 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 			return true;
 		}
 	}
-	if (place.pic != nullptr) AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
+	if (place.on_card) {
+		AddTurnedVehicleOnCard(place.card, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
+	} else if (place.pic != nullptr) {
+		AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
+	}
 	return true;
 }
 
@@ -3173,9 +3254,14 @@ bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundT
 	const ThreeDVehicleShape *shape = obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return false;
 	VehicleObjectPlace place;
-	PlaceVehicleObject(v, zoom, pose, place);
-	if (place.pic == nullptr) return true;
-	lights = place.pic->lights;
+	PlaceVehicleObject(v, zoom, pose, place, ViewportVehiclesOnCard());
+	if (place.on_card) {
+		lights = std::move(place.card_lights);
+	} else if (place.pic != nullptr) {
+		lights = place.pic->lights;
+	} else {
+		return true;
+	}
 	ax = place.ax;
 	ay = place.ay;
 	az = place.az;

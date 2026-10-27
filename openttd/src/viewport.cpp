@@ -2153,6 +2153,7 @@ struct TurnedTimes {
 	int standing_apart = 0;    ///< and those the processor drew apart (DrawTurnedStandingApart())
 	int standing_objects = 0;  ///< and the buildings the card drew among them (AddTurnedStandingObject())
 	int standing_likeness = 0; ///< and the vehicles and figures it laid as their pictures (AddTurnedStandingLikeness())
+	int standing_vehicles = 0; ///< and the vehicles it drew, no picture of them (ThreeDGpuStandingVehicle)
 	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int tiles = 0;      ///< tiles looked at
@@ -2171,12 +2172,13 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
-	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_apart, t.standing_card_ms);
+	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, vozidel kartou {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_vehicles, t.standing_apart, t.standing_card_ms);
 	/* With a window the console is not written out: the diary too (the rig). */
 	extern uint64_t _turned_card_view_passes;
-	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, zvlast procesorem {}, karta {:.1f} ms",
-			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_likeness, t.standing_apart, t.standing_card_ms);
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, vozidel kartou {}, zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_likeness, t.standing_vehicles, t.standing_apart, t.standing_card_ms);
 	_turned_card_view_passes = 0;
+	Debug(misc, 1, "test3d cas: {}", ThreeDGpuTimes());
 	extern void TurnedGroundTimingsPrint();
 	TurnedGroundTimingsPrint();
 	_turned_times = TurnedTimes();
@@ -3601,10 +3603,11 @@ static void TurnedBridgeHead(TileIndex head, size_t first_parent)
 
 /** A picture of a vehicle of the block being drawn (box_kind 5), where it hangs, and those drawn with it after it. */
 struct TurnedVehiclePicture {
-	const ThreeDModelPicture *pic;
+	const ThreeDModelPicture *pic; ///< nullptr: drawn by the card (card)
 	int ax, ay, az;  ///< the world point it hangs from
 	int up;          ///< its pixels drawn doubled so many times
 	int more;        ///< how many of the pictures after it are drawn with it, in their order (AddTurnedVehiclePictures())
+	std::shared_ptr<const ThreeDGpuStandingVehicle> card = nullptr; ///< the vehicle drawn by the card, no picture of it (ViewportVehiclesOnCard())
 };
 /** The vehicles of the block being drawn as their likeness (box_kind 5, AddTurnedVehiclePicture()); ParentSpriteToDraw::box_dx is the index of the first. */
 static std::vector<TurnedVehiclePicture> _turned_vehicle_pictures;
@@ -3620,6 +3623,18 @@ static std::vector<CabBridgeSprites> _cab_bridge_sprites;
 bool ViewportDrawingTurned()
 {
 	return _drawing_turned;
+}
+
+/** Whether the vehicles of the turned main view's block being drawn are drawn by the card, not as their pictures (set by ViewportDoDrawTurned()). */
+static bool _turned_vehicles_on_card = false;
+
+/**
+ * Whether the vehicles of the block being drawn are drawn by the card among what stands on it (ThreeDGpuStandingVehicle,
+ * AddTurnedVehicleOnCard()): no picture of them made.
+ */
+bool ViewportVehiclesOnCard()
+{
+	return _turned_vehicles_on_card;
 }
 
 static bool _north_house_objects_now = false;
@@ -3640,17 +3655,37 @@ bool ViewportDrawingNorthObjects()
  * @param xmin,ymin,zmin,xmax,ymax,zmax the box of the parts, world units
  * @param up its pixels drawn doubled so many times (a picture made at a coarser zoom, GetThreeDFigurePicture())
  */
+static void AddTurnedLikeness(const ThreeDModelPicture *pic, std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up);
+
 void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up)
 {
 	if (pic == nullptr || pic->width <= 0) return;
+	AddTurnedLikeness(pic, nullptr, ax, ay, az, xmin, ymin, zmin, xmax, ymax, zmax, up);
+}
+
+/**
+ * A vehicle of the turned view drawn by the card (ViewportVehiclesOnCard()): as its likeness (AddTurnedVehiclePicture()),
+ * its shapes where its picture would be, no picture made.
+ */
+void AddTurnedVehicleOnCard(std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax)
+{
+	if (card == nullptr || card->width <= 0) return;
+	AddTurnedLikeness(nullptr, std::move(card), ax, ay, az, xmin, ymin, zmin, xmax, ymax, zmax, 0);
+}
+
+/** A likeness of the turned view (box_kind 5): its picture, or the card's vehicle (card), hung from its world point. */
+static void AddTurnedLikeness(const ThreeDModelPicture *pic, std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up)
+{
 	/* Not in the block at all? The picture about its point, in the units of the collecting dpi (16x). */
 	Point pt = RemapCoords(ax, ay, az);
 	int scale = (1 << to_underlying(_vd.dpi.zoom)) << up;
-	int left = pt.x + pic->left * scale, top = pt.y + pic->top * scale;
-	int right = left + pic->width * scale, bottom = top + pic->height * scale;
+	const int pic_left = pic != nullptr ? pic->left : card->left, pic_top = pic != nullptr ? pic->top : card->top;
+	const int pic_w = pic != nullptr ? pic->width : card->width, pic_h = pic != nullptr ? pic->height : card->height;
+	int left = pt.x + pic_left * scale, top = pt.y + pic_top * scale;
+	int right = left + pic_w * scale, bottom = top + pic_h * scale;
 	if (left >= _vd.dpi.left + _vd.dpi.width || right <= _vd.dpi.left || top >= _vd.dpi.top + _vd.dpi.height || bottom <= _vd.dpi.top) return;
 	if (_turned_vehicle_pictures.size() >= 32000) return;
-	if (ThreeDPictureStandsIn(pic)) {
+	if (pic != nullptr && ThreeDPictureStandsIn(pic)) {
 		/* Drawn with another standing in (ObjectPicture()): where it reaches, drawn again when its own comes. */
 		const int reach = std::max(pic->width, pic->height) * scale / ZOOM_BASE + 2;
 		OweThreeDPictureBox(std::min(xmin, ax) - reach, std::min(ymin, ay) - reach, std::max(xmax, ax) + reach, std::max(ymax, ay) + reach, std::min(zmin, az) - reach, std::max(zmax, az) + 2 * reach);
@@ -3682,7 +3717,7 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 	ps.box_dx = static_cast<int16_t>(_turned_vehicle_pictures.size());
 	ps.box_dy = static_cast<int16_t>(up);
 	ps.box_kind = 5;
-	_turned_vehicle_pictures.push_back({pic, ax, ay, az, up, 0});
+	_turned_vehicle_pictures.push_back({pic, ax, ay, az, up, 0, std::move(card)});
 	_vd.last_child = LAST_CHILD_NONE;
 }
 
@@ -3700,6 +3735,14 @@ void AddTurnedVehiclePictures(std::span<const TurnedVehiclePart> parts, int xmin
 	const int scale = 1 << to_underlying(_vd.dpi.zoom);
 	int left = INT32_MAX, top = INT32_MAX, right = INT32_MIN, bottom = INT32_MIN;
 	for (const TurnedVehiclePart &p : parts) {
+		if (p.card != nullptr && p.card->width > 0) {
+			const Point pt = RemapCoords(p.ax, p.ay, p.az);
+			left = std::min(left, pt.x + p.card->left * scale);
+			top = std::min(top, pt.y + p.card->top * scale);
+			right = std::max(right, pt.x + (p.card->left + p.card->width) * scale);
+			bottom = std::max(bottom, pt.y + (p.card->top + p.card->height) * scale);
+			continue;
+		}
 		if (p.pic == nullptr || p.pic->width <= 0) continue;
 		const Point pt = RemapCoords(p.ax, p.ay, p.az);
 		left = std::min(left, pt.x + p.pic->left * scale);
@@ -3717,9 +3760,10 @@ void AddTurnedVehiclePictures(std::span<const TurnedVehiclePart> parts, int xmin
 	const size_t at = _turned_vehicle_pictures.size();
 	const TurnedVehiclePart *first = nullptr;
 	for (const TurnedVehiclePart &p : parts) {
-		if (p.pic == nullptr || p.pic->width <= 0) continue;
+		const bool on_card = p.card != nullptr && p.card->width > 0;
+		if (!on_card && (p.pic == nullptr || p.pic->width <= 0)) continue;
 		if (first == nullptr) first = &p;
-		_turned_vehicle_pictures.push_back({p.pic, p.ax, p.ay, p.az, 0, 0});
+		_turned_vehicle_pictures.push_back({on_card ? nullptr : p.pic, p.ax, p.ay, p.az, 0, 0, on_card ? p.card : nullptr});
 	}
 	_turned_vehicle_pictures[at].more = static_cast<int>(_turned_vehicle_pictures.size() - at - 1);
 
@@ -3890,7 +3934,8 @@ static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDr
 	const size_t end = std::min(_turned_vehicle_pictures.size(), static_cast<size_t>(ps.box_dx) + 1 + _turned_vehicle_pictures[ps.box_dx].more);
 	for (size_t k = ps.box_dx; k < end; k++) {
 		const TurnedVehiclePicture &p = _turned_vehicle_pictures[k];
-		BlitTurnedPicture(frame, *p.pic, p.ax, p.ay, p.az, north, p.up);
+		/* One the card draws has no picture: nothing of it drawn so (the card failed the block). */
+		if (p.pic != nullptr) BlitTurnedPicture(frame, *p.pic, p.ax, p.ay, p.az, north, p.up);
 	}
 }
 
@@ -5318,6 +5363,8 @@ bool _turned_card_ground_on = true; ///< Rig: the ground of the turned main view
  * into the block. The rig's till the card draws every kind of them itself.
  */
 bool _turned_card_standing_on = false;
+/** The rig: the vehicles among it drawn by the card, no pictures of them (ThreeDGpuStandingVehicle; test3d stojici auta); else laid as their pictures. */
+bool _standing_vehicles_on_card = true;
 
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
@@ -6271,6 +6318,19 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 		const int up = std::clamp(p.up, 0, 3);
 		double vx, vy;
 		ProjectTurnedF(p.ax, p.ay, p.az, vx, vy);
+		if (p.card != nullptr) {
+			/* Drawn by the card where its picture would be laid. */
+			const int x = static_cast<int>(std::lround((vx - frame.left) * scale)) + p.card->left;
+			const int y = static_cast<int>(std::lround((vy - frame.top) * scale)) + p.card->top;
+			if (x >= fw || y >= fh || x + p.card->width <= 0 || y + p.card->height <= 0) continue;
+			ThreeDGpuStandingItem &item = out.items.emplace_back();
+			item.x = x;
+			item.y = y;
+			item.vehicle = p.card;
+			_turned_times.standing_vehicles++;
+			continue;
+		}
+		if (p.pic == nullptr) continue;
 		const int x = static_cast<int>(std::lround((vx - frame.left) * scale)) + (p.pic->left << up);
 		const int y = static_cast<int>(std::lround((vy - frame.top) * scale)) + (p.pic->top << up);
 		if (x >= fw || y >= fh || x + (p.pic->width << up) <= 0 || y + (p.pic->height << up) <= 0) continue;
@@ -6348,6 +6408,8 @@ static void ViewportDoDrawTurned(bool hole_only = false)
 	int mask = ScaleByZoom(-1, zoom);
 	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
 	if (fw <= 0 || fh <= 0) return;
+	/* What stands on it laid by the card: its vehicles drawn by it, no pictures of them (till the night over the block is drawn). */
+	_turned_vehicles_on_card = _turned_card_standing_on && _standing_vehicles_on_card && (hole_only || TurnedCardGroundUsable(frame));
 
 	/* 1. The world box under the block, from the ground up to the tallest thing there can be. */
 	int zmax = (_settings_game.construction.map_height_limit + _settings_game.construction.max_bridge_height) * TILE_HEIGHT + MAX_BUILDING_PIXELS;
@@ -7388,6 +7450,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 
 	/* The night over it all but the signs (gui.night). */
 	if (IsNightNow()) DrawNight(IsViewportTurned(vp));
+	_turned_vehicles_on_card = false;
 	_night_lit.clear();
 	_night_lit_card.clear();
 	_night_glows.clear();
