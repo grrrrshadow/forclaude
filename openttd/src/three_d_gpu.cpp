@@ -599,6 +599,11 @@ bool _standing_program_ok = false;
 GLuint _sv_fbo = 0, _sv_colour = 0, _sv_lit = 0, _sv_depth = 0;
 int _sv_w = 0, _sv_h = 0;
 GLuint _standing_atlas_fbo = 0; ///< the kept pictures drawn into (a vehicle shrunk into them)
+GpuProgram _standing_faces_program; ///< the faces of the boxes among them (ThreeDGpuStandingFaces)
+bool _standing_faces_ok = false;
+GLuint _standing_faces_vao = 0, _standing_faces_vbo = 0;
+/** The keys of the boxes' textures among the kept pictures (ThreeDGpuStandingFaces::key). */
+constexpr uint64_t STANDING_FACES_KEY = uint64_t{1} << 60;
 /** The keys of the vehicles among the kept pictures (ThreeDGpuStandingVehicle::key), apart from the sprites' and the figures'. */
 constexpr uint64_t STANDING_VEHICLE_KEY = uint64_t{1} << 61;
 GpuProgram _standing_shrink_program;
@@ -982,6 +987,52 @@ void main()
 	/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
 	if (abs(c.a * 255.0 - 254.0) < 0.5) c = vec4(c.rgb / c.a, 1.0);
 	o_colour = c;
+}
+)";
+
+/* The faces of a box among what stands on the turned map (ThreeDGpuStandingFaces): a corner at its pixel of the view's
+ * picture, its texel's place in the texture; each pixel at its middle the texel under it of the texture where it is
+ * among the pictures (u_bounds) -- one it has nothing for (0) the nearest drawn within three when u_fill, in the
+ * processor's order --, whole, not lit. */
+const char *const STANDING_FACES_VERTEX = R"(#version 330 core
+layout(location = 0) in vec2 a_pos;
+layout(location = 1) in vec2 a_uv;
+uniform vec2 u_size;
+noperspective out vec2 v_uv;
+void main()
+{
+	gl_Position = vec4(a_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
+	v_uv = a_uv;
+}
+)";
+
+const char *const STANDING_FACES_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_texture;
+uniform vec4 u_bounds;
+uniform int u_fill;
+noperspective in vec2 v_uv;
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_lit;
+const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
+		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
+		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
+void main()
+{
+	ivec2 size = ivec2(u_bounds.zw);
+	ivec2 at = ivec2(floor(v_uv));
+	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
+	vec4 t = texelFetch(u_texture, ivec2(u_bounds.xy) + at, 0);
+	if (t == vec4(0.0) && u_fill != 0) {
+		for (int k = 0; k < 24; k++) {
+			ivec2 n = at + NEAR[k];
+			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
+			t = texelFetch(u_texture, ivec2(u_bounds.xy) + n, 0);
+			if (t != vec4(0.0)) break;
+		}
+	}
+	if (t == vec4(0.0)) discard;
+	o_colour = vec4(t.rgb, 1.0);
+	o_lit = vec4(0.0, 0.0, 0.0, 1.0);
 }
 )";
 
@@ -1944,6 +1995,9 @@ bool StartCard(std::string &why, std::string &describe)
 		_standing_program_ok = MakeProgram(_standing_program, STANDING_VERTEX, STANDING_FRAGMENT, standing_why) &&
 				MakeProgram(_standing_building_program, MAP_BUILDING_VERTEX, STANDING_BUILDING_FRAGMENT, standing_why);
 		if (!_standing_program_ok) Diary("co stoji na plose kresli procesor: " + standing_why, true);
+		std::string faces_why;
+		_standing_faces_ok = _standing_program_ok && MakeProgram(_standing_faces_program, STANDING_FACES_VERTEX, STANDING_FACES_FRAGMENT, faces_why);
+		if (_standing_program_ok && !_standing_faces_ok) Diary("krabice plochy kresli procesor: " + faces_why, true);
 		std::string shrink_why;
 		_standing_shrink_ok = _standing_program_ok && MakeProgram(_standing_shrink_program, STANDING_VERTEX, STANDING_SHRINK_FRAGMENT, shrink_why);
 		if (_standing_program_ok && !_standing_shrink_ok) Diary("vozidla plochy jako obrazky: " + shrink_why, true);
@@ -1990,6 +2044,15 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
 	gl.glEnableVertexAttribArray(0);
 	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glEnableVertexAttribArray(1);
+	gl.glBindVertexArray(0);
+	gl.glGenVertexArrays(1, &_standing_faces_vao);
+	gl.glGenBuffers(1, &_standing_faces_vbo);
+	gl.glBindVertexArray(_standing_faces_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_faces_vbo);
+	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
+	gl.glEnableVertexAttribArray(0);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<const void *>(2 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
 	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_standing_tri_vao);
@@ -2108,6 +2171,9 @@ void EndCard()
 		if (_standing_program.program != 0) gl.glDeleteProgram(_standing_program.program);
 		if (_standing_building_program.program != 0) gl.glDeleteProgram(_standing_building_program.program);
 		if (_standing_shrink_program.program != 0) gl.glDeleteProgram(_standing_shrink_program.program);
+		if (_standing_faces_program.program != 0) gl.glDeleteProgram(_standing_faces_program.program);
+		if (_standing_faces_vbo != 0) gl.glDeleteBuffers(1, &_standing_faces_vbo);
+		if (_standing_faces_vao != 0) gl.glDeleteVertexArrays(1, &_standing_faces_vao);
 		if (_sv_fbo != 0) gl.glDeleteFramebuffers(1, &_sv_fbo);
 		if (_standing_atlas_fbo != 0) gl.glDeleteFramebuffers(1, &_standing_atlas_fbo);
 		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb, _g_colour_rb};
@@ -3594,9 +3660,51 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		_gpu_standing_vehicles++;
 		return true;
 	};
+	/* A box: its texture among the pictures (kept by its key), its faces' triangles over what is there. */
+	std::vector<float> face_corners;
+	auto draw_faces = [&](const ThreeDGpuStandingFaces &f) {
+		if (f.texture == nullptr || f.corners.empty()) return true;
+		ThreeDGpuStandingItem as_picture;
+		as_picture.picture = f.texture;
+		as_picture.key = f.key != 0 ? ((f.key & (STANDING_FACES_KEY - 1)) | STANDING_FACES_KEY) : 0;
+		GLuint texture = 0;
+		std::array<int, 2> place;
+		if (!StandingPlace(as_picture, texture, place, flush)) return false;
+		const GLuint fp = _standing_faces_program.program;
+		gl.glUseProgram(fp);
+		gl.glUniform2f(gl.glGetUniformLocation(fp, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
+		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_texture"), 0);
+		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_bounds"), static_cast<float>(place[0]), static_cast<float>(place[1]), static_cast<float>(f.texture->width), static_cast<float>(f.texture->height));
+		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_fill"), f.fill ? 1 : 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindTexture(GL_TEXTURE_2D, texture);
+		gl.glDisable(GL_DEPTH_TEST);
+		face_corners.resize(f.corners.size());
+		for (size_t i = 0; i + 3 < f.corners.size(); i += 4) {
+			face_corners[i] = f.corners[i] + s.view_x;
+			face_corners[i + 1] = f.corners[i + 1] + s.view_y;
+			face_corners[i + 2] = f.corners[i + 2];
+			face_corners[i + 3] = f.corners[i + 3];
+		}
+		gl.glBindVertexArray(_standing_faces_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_faces_vbo);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(face_corners.size() * sizeof(float)), face_corners.data(), GL_STREAM_DRAW);
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(face_corners.size() / 4));
+		return true;
+	};
 	bool all = true;
 	for (size_t k = 0; k < s.items.size(); k++) {
 		const ThreeDGpuStandingItem &item = s.items[k];
+		if (item.faces >= 0) {
+			flush();
+			if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces])) {
+				all = false;
+				break;
+			}
+			use_pictures();
+			drawing = 0;
+			continue;
+		}
 		if (item.vehicle != nullptr) {
 			if (!_standing_shrink_ok) continue;
 			/* Laid as a picture kept by its key: drawn and shrunk into them first, unless it is there. */

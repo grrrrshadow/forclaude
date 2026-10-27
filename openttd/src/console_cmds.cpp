@@ -10051,6 +10051,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_standing_on = number(3).value_or(0) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici {}", _turned_card_standing_on ? "karta" : "procesor");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "krabice") {
+		/* 'stojici krabice 0|1': the boxes among what the card lays (houses of the original game, bridges, depots) drawn
+		 * by it (1; ThreeDGpuStandingFaces), or by the processor apart (0). */
+		extern bool _standing_faces_on_card;
+		_standing_faces_on_card = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici krabice {}", _standing_faces_on_card ? "kartou" : "procesorem");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "auta") {
 		/* 'stojici auta 0|1': the vehicles among what the card lays drawn by it, no pictures of them (1;
 		 * ThreeDGpuStandingVehicle), or laid as their pictures (0). */

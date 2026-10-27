@@ -2154,6 +2154,7 @@ struct TurnedTimes {
 	int standing_objects = 0;  ///< and the buildings the card drew among them (AddTurnedStandingObject())
 	int standing_likeness = 0; ///< and the vehicles and figures it laid as their pictures (AddTurnedStandingLikeness())
 	int standing_vehicles = 0; ///< and the vehicles it drew, no picture of them (ThreeDGpuStandingVehicle)
+	int standing_faces = 0;    ///< and the boxes it drew (ThreeDGpuStandingFaces)
 	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int tiles = 0;      ///< tiles looked at
@@ -2172,11 +2173,11 @@ void TurnedTimingsPrint()
 	const TurnedTimes &t = _turned_times;
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
-	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, vozidel kartou {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_vehicles, t.standing_apart, t.standing_card_ms);
+	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, vozidel kartou {}, krabic {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_vehicles, t.standing_faces, t.standing_apart, t.standing_card_ms);
 	/* With a window the console is not written out: the diary too (the rig). */
 	extern uint64_t _turned_card_view_passes;
-	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, vozidel kartou {}, zvlast procesorem {}, karta {:.1f} ms",
-			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_likeness, t.standing_vehicles, t.standing_apart, t.standing_card_ms);
+	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, vozidel kartou {}, krabic {}, zvlast procesorem {}, karta {:.1f} ms",
+			t.drawn, t.standing, t.models, t.standing_card, _turned_card_view_passes, t.standing_sprites, t.standing_objects, t.standing_triangles, t.standing_likeness, t.standing_vehicles, t.standing_faces, t.standing_apart, t.standing_card_ms);
 	_turned_card_view_passes = 0;
 	Debug(misc, 1, "test3d cas: {}", ThreeDGpuTimes());
 	extern void TurnedGroundTimingsPrint();
@@ -3063,6 +3064,24 @@ static std::vector<BoxFace> _box_faces; ///< The faces of the house being drawn.
  * @param centre_x,centre_y the middle of the thing in its frame, which the boxes snap about
  * @param period the turn after which the front comes round again: 90 degrees for a square thing, 180 for a longer one
  */
+/**
+ * The faces of a box of the turned view for the card (ThreeDGpuStandingFaces, AddTurnedStandingFaces()): while it is
+ * given (_turned_faces_out), MakeTurnedTexture() and DrawTurnedFaces() hand it their texture and their triangles
+ * instead of drawing into the block.
+ */
+struct TurnedFacesOut {
+	std::shared_ptr<const ThreeDGpuStandingPicture> texture;
+	uint64_t key = 0;
+	int textures = 0;           ///< how many MakeTurnedTexture() made (more than one: drawn apart)
+	std::vector<float> corners; ///< x, y on the block, u, v in the texture, three a triangle
+	bool fill = true;
+};
+static TurnedFacesOut *_turned_faces_out = nullptr;
+/** The textures of the boxes for the card, by what is drawn into them (MakeTurnedTexture()), made the first time. */
+static std::unordered_map<uint64_t, std::shared_ptr<const ThreeDGpuStandingPicture>> _turned_face_textures;
+static size_t _turned_face_texture_bytes = 0;
+static constexpr size_t TURNED_FACE_TEXTURE_BYTES = 64u << 20; ///< kept at most; then they are made anew as they are drawn
+
 /** Where the sprite of a standing thing lies, drawn north-up into _turned_texture (MakeTurnedTexture()). */
 struct TurnedTexture {
 	int left, top;     ///< its top left corner, virtual pixels
@@ -3103,6 +3122,41 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 	int theight = (bbottom + margin - ttop + ~mask) & mask;
 	int tw = UnScaleByZoom(twidth, zoom), th = UnScaleByZoom(theight, zoom);
 	if (tw <= 0 || th <= 0) return false;
+	/* For the card (_turned_faces_out): drawn the first time only, kept by what is drawn into it and where. */
+	uint64_t key = 0;
+	if (_turned_faces_out != nullptr) {
+		key = 1469598103934665603ULL;
+		auto mix = [&key](uint64_t v) {
+			key ^= v;
+			key *= 1099511628211ULL;
+		};
+		auto sprite = [&](SpriteID image, PaletteID pal, const SubSprite *sub, int x, int y) {
+			mix(image);
+			mix(pal);
+			mix(static_cast<uint32_t>(x - tleft));
+			mix(static_cast<uint32_t>(y - ttop));
+			if (sub != nullptr) {
+				for (int v : {sub->left, sub->top, sub->right, sub->bottom}) mix(static_cast<uint32_t>(v));
+			}
+		};
+		mix(to_underlying(zoom));
+		mix(static_cast<uint32_t>(tw));
+		mix(static_cast<uint32_t>(th));
+		sprite(ps.image, ps.pal, ps.sub, sx, sy);
+		for (int child_idx = ps.first_child; child_idx >= 0;) {
+			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+			child_idx = cs.next;
+			sprite(cs.image, cs.pal, cs.sub, (cs.relative ? sleft : sx) + cs.x, (cs.relative ? stop : sy) + cs.y);
+		}
+		_turned_faces_out->textures++;
+		_turned_faces_out->key = key;
+		auto it = _turned_face_textures.find(key);
+		if (it != _turned_face_textures.end()) {
+			_turned_faces_out->texture = it->second;
+			tex = {tleft, ttop, tw, th};
+			return true;
+		}
+	}
 	double t0 = TurnedNow();
 	_turned_texture.assign(static_cast<size_t>(tw) * th, 0);
 	DrawPixelInfo tdpi{
@@ -3131,6 +3185,19 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 	}
 	_turned_times.texture += TurnedNow() - t0;
 	tex = {tleft, ttop, tw, th};
+	if (_turned_faces_out != nullptr) {
+		auto pic = std::make_shared<ThreeDGpuStandingPicture>();
+		pic->width = tw;
+		pic->height = th;
+		pic->pixels = _turned_texture;
+		if (_turned_face_texture_bytes > TURNED_FACE_TEXTURE_BYTES) {
+			_turned_face_textures.clear();
+			_turned_face_texture_bytes = 0;
+		}
+		_turned_face_texture_bytes += pic->pixels.size() * sizeof(uint32_t) + sizeof(ThreeDGpuStandingPicture) + 64;
+		_turned_faces_out->texture = pic;
+		_turned_face_textures[key] = std::move(pic);
+	}
 	return true;
 }
 
@@ -3173,6 +3240,20 @@ static void DrawTurnedFaces(const DrawPixelInfo &frame, const ParentSpriteToDraw
 		r.v = (cyv - ttop) * scale;
 		return r;
 	};
+	if (_turned_faces_out != nullptr) {
+		/* For the card: the triangles, as they would be drawn. */
+		TurnedFacesOut &out = *_turned_faces_out;
+		out.fill = fill;
+		for (const BoxFace &face : faces) {
+			const TurnedVertex a = vertex(face.v[0]);
+			for (size_t i = 1; i + 1 < face.v.size(); i++) {
+				for (const TurnedVertex &c : {a, vertex(face.v[i]), vertex(face.v[i + 1])}) {
+					out.corners.insert(out.corners.end(), {static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.u), static_cast<float>(c.v)});
+				}
+			}
+		}
+		return;
+	}
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	int fw = UnScaleByZoom(frame.width, zoom), fh = UnScaleByZoom(frame.height, zoom);
 	const uint32_t *pixels = _turned_texture.data();
@@ -5865,6 +5946,8 @@ void ForgetTurnedSpritePictures()
 {
 	_turned_sprite_pictures.clear();
 	_turned_sprite_picture_bytes = 0;
+	_turned_face_textures.clear();
+	_turned_face_texture_bytes = 0;
 }
 
 /**
@@ -6345,6 +6428,36 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 	_turned_times.standing_likeness++;
 }
 
+/** The rig: the boxes among what the card lays drawn by it (ThreeDGpuStandingFaces; test3d stojici krabice); else drawn by the processor apart. */
+bool _standing_faces_on_card = true;
+
+/**
+ * A box of the block among what stands on it for the card (box_kind 1, 2, 6, 8-12: a house of the original game, a
+ * building as its box, a slab, a bridge, a depot): its sprites drawn north-up into its texture once (kept by what is
+ * drawn into it, MakeTurnedTexture()), its faces' triangles as the processor would lay them (DrawTurnedFaces()).
+ * @return false: the card cannot draw it so (the processor draws it apart)
+ */
+static bool AddTurnedStandingFaces(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	if (!_standing_faces_on_card) return false;
+	TurnedFacesOut faces;
+	{
+		AutoRestoreBackup out_backup(_turned_faces_out, &faces);
+		DrawTurnedStandingByProcessor(frame, ps);
+	}
+	if (faces.textures > 1) return false;
+	if (faces.texture == nullptr || faces.corners.empty()) return true;
+	const size_t index = out.faces.size();
+	ThreeDGpuStandingFaces &f = out.faces.emplace_back();
+	f.texture = std::move(faces.texture);
+	f.key = faces.key;
+	f.corners = std::move(faces.corners);
+	f.fill = faces.fill;
+	out.items.emplace_back().faces = static_cast<int>(index);
+	_turned_times.standing_faces++;
+	return true;
+}
+
 /** A standing thing of the block among what stands on it for the card (ThreeDGpuStanding): its sprites, or a picture the processor drew of it. */
 static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
@@ -6352,7 +6465,10 @@ static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &
 	switch (ps.box_kind) {
 		case 4: return;
 		case 5: AddTurnedStandingLikeness(out, frame, ps); return;
-		case 1: case 2: case 6: case 7: case 8: case 9: case 10: case 11: case 12: {
+		case 1: case 2: case 6: case 8: case 9: case 10: case 11: case 12:
+			if (AddTurnedStandingFaces(out, frame, ps)) return;
+			[[fallthrough]];
+		case 7: {
 			int x0, y0, w, h;
 			if (!TurnedStandingRect(frame, ps, x0, y0, w, h)) return;
 			std::shared_ptr<ThreeDGpuStandingPicture> pic = DrawTurnedStandingApart(frame, ps, x0, y0, w, h);

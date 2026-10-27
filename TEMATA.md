@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (36) – Otočená mapa kartou 2, kus 4: krabice, mosty a depa kartou (rig)
+
+- Hráč: *„jo pokračuj“*.
+- Hotovo: krabice domů původní hry, budovy jako krabice, plošiny stanic, mosty (mostovka, zábradlí, pilíře, nájezdy)
+  a depa kreslí karta. Sprity věci se nakreslí na sever do textury jednou (drží se podle toho, co a kam se do ní
+  kreslí), karta ji napne na stěny stejně jako procesor: každý bod texel pod ním, díra nejbližším bodem do 3 px
+  (zábradlí mostu bez vyplňování), trojúhelník přes trojúhelník. Procesor už nic „zvlášť“ nekreslí – v rigu
+  `zvlast procesorem 0`.
+- Ověřeno v rigu: depa u silnice i ocelový most s vlakem – karta proti procesoru stejné, liší se jen kouř vlaku
+  a jedoucí autobus (pohyb mezi snímky).
+- Rig: `test3d stojici krabice 0|1`, `test3d cas` píše `krabic N`.
+- Další: zapnout stojící věci kartou ve hře a změřit na telefonu; pak kamera jako matice a mezipaměť scény.
+
 ## 27. 10. (35) – Otočená mapa kartou 2, kus 3: vozidla kartou bez obrázku (rig)
 
 - Hráč: *„jak jsme daleko s gpu? pokračuj gpu ja udělam build a projedu 1203“*.

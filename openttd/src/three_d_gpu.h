@@ -393,7 +393,20 @@ struct ThreeDGpuStandingVehicle {
 	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held; ///< what its paints need, kept till it is drawn
 };
 
-/** A thing standing on a block of the turned map: its picture laid at its place, or a building or a vehicle drawn there. */
+/**
+ * The faces of a box of the turned map -- a house of the original game, an industry's building, a slab of a station, a
+ * bridge, a depot -- laid by the card among what stands on a block as DrawTexturedTriangle() of viewport.cpp lays them:
+ * each pixel the texel under it of the thing's sprites drawn north-up, whole -- one they have nothing for (0) the
+ * nearest drawn within three, when fill --, each triangle over those before.
+ */
+struct ThreeDGpuStandingFaces {
+	std::shared_ptr<const ThreeDGpuStandingPicture> texture; ///< its sprites drawn north-up as they are (Colour::data, 0 nothing)
+	uint64_t key = 0;           ///< kept on the card by it among the pictures; 0 this block's alone
+	std::vector<float> corners; ///< x, y on the block, u, v in the texture, pixels; three a triangle
+	bool fill = true;
+};
+
+/** A thing standing on a block of the turned map: its picture laid at its place, or a building, a vehicle or a box drawn there. */
 struct ThreeDGpuStandingItem {
 	int x = 0, y = 0; ///< its top left in the block, pixels
 	uint64_t key = 0; ///< kept on the card by this (a sprite's picture); 0 this block's alone
@@ -403,6 +416,7 @@ struct ThreeDGpuStandingItem {
 	float depth = -1;
 	int building = -1; ///< not a picture: the building of ThreeDGpuStanding::buildings drawn here
 	std::shared_ptr<const ThreeDGpuStandingVehicle> vehicle = nullptr; ///< not a picture: this vehicle drawn here, laid over all
+	int faces = -1;   ///< not a picture: the box of ThreeDGpuStanding::faces drawn here
 };
 
 /**
@@ -416,6 +430,7 @@ struct ThreeDGpuStanding {
 	int view_w = 0, view_h = 0;  ///< the view's (as its ground's)
 	std::vector<ThreeDGpuStandingItem> items;
 	std::vector<ThreeDGpuStandingBuilding> buildings;
+	std::vector<ThreeDGpuStandingFaces> faces;
 	/** At night: which pixels of the block are lit once all is laid (the glows of the lights only where they are
 	 * seen, DrawNight() of viewport.cpp), read back into lit, a byte a pixel, top row first. */
 	bool read_lit = false;
