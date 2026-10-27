@@ -814,5 +814,306 @@
   "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
   "licence": "CC BY 4.0",
   "poznamka": "zelený kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 788 px; 552 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "lavice_studentky.glb",
+  "jmeno": "lavice_studentky",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "lavice se studentkami (Tatra)",
+   "en": "students' benches (Tatra)"
+  },
+  "rozmer_m": [
+   5.34,
+   2.4,
+   0.94
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "celé lavice za sebou na loži, holky sedají od přední lavice v pořadí míst"
+  },
+  "posadka": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     2.27,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     1.736,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     0.935,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     0.4,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     -0.4,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     -0.934,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     -1.735,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     -2.269,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   }
+  ],
+  "trojuhelniku": 96,
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou postavy hry",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dvě vysoké lavice podél bočnic valníku Tater (sedák 0,94 m nad podlahou), 4 + 4 místa naproti sobě; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.48 m); místa: bod sedu 0.9 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 370 × 562 px, 5 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "lavice_studentky_v3s.glb",
+  "jmeno": "lavice_studentky_v3s",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "lavice se studentkami (V3S)",
+   "en": "students' benches (V3S)"
+  },
+  "rozmer_m": [
+   3.92,
+   2.0,
+   0.94
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "celé lavice za sebou na loži, holky sedají od přední lavice v pořadí míst"
+  },
+  "posadka": [
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     1.568,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -277.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     1.045,
+     0.75,
+     0.94
+    ],
+    "otoceni": -80.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     0.261,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -263.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_sedi",
+    "poloha": [
+     -0.262,
+     0.75,
+     0.94
+    ],
+    "otoceni": -87.9,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     -1.046,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -277.2,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     -1.568,
+     0.75,
+     0.94
+    ],
+    "otoceni": -98.4,
+    "meritko": 2.0
+   }
+  ],
+  "trojuhelniku": 96,
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou postavy hry",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dvě vysoké lavice podél bočnic korby V3S (sedák 0,94 m nad podlahou), 3 + 3 místa naproti sobě; i na Autosan; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.18 m); místa: bod sedu 0.75 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 482 × 482 px, 175 kB, glb z gltfpacku"
+ },
+ {
+  "jmeno": "studentky_stoji_v3s",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "studentky stojí (V3S)",
+   "en": "students standing (V3S)"
+  },
+  "rozmer_m": [
+   3.92,
+   2.0,
+   3.24
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ]
+  },
+  "posadka": [
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     1.539,
+     0.55,
+     0.0
+    ],
+    "otoceni": -9.1,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     1.485,
+     -0.57,
+     0.0
+    ],
+    "otoceni": 61.1,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     0.531,
+     -0.423,
+     0.0
+    ],
+    "otoceni": -7.5,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     0.481,
+     0.543,
+     0.0
+    ],
+    "otoceni": -16.7,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia_stoji",
+    "poloha": [
+     -0.494,
+     -0.55,
+     0.0
+    ],
+    "otoceni": 6.3,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     -0.562,
+     0.449,
+     0.0
+    ],
+    "otoceni": -17.3,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     -1.413,
+     0.501,
+     0.0
+    ],
+    "otoceni": -20.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     -1.446,
+     -0.428,
+     0.0
+    ],
+    "otoceni": -15.5,
+    "meritko": 2.0
+   }
+  ],
+  "autor": "grrrrf; holky jsou postavy hry",
+  "licence": "GPL-2.0",
+  "poznamka": "8 studentek stojí na korbě V3S na zastávce (při nakládání a vykládání), bez lavic; kus bez souboru, jen místa (počátek uprostřed podlahy korby, meritko 2), pořadí od předu"
  }
 ]

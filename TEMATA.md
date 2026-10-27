@@ -66,6 +66,13 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   řidiče s autem“*, *„jo použije ingame chuzi. to je rozumny. tak mu to napiš“*: holky jsou hry; balíček dává polohu,
   holku hry a `meritko`; pózu, kterou hra nemá, dodá tvůrce se svým objektem (hra hledá postavu napřed v balíčku).
   SPECIAL bez vlastních holek, chůze ze hry. Místa na lavici kusu teď taky hledají postavu napřed v balíčku kusu.
+- Hráč: *„všechny mužou chodit stejně, ja nevim proč by měl ufon chodit jinak než mat“*, *„tak jo, ufon je strašidlo
+  ale holky nepotřebujou extra každá animaci jinou“*: jedna společná chůze pro holky a Mata (kostra se stejnými
+  jmény kostí, chůze přenesená podle kostí). Kolegovi otázka, jestli postavy s kostrou dodá; do té doby SPECIAL beze
+  změny. Strašidla a ufon mají svoje animace.
+- Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
+  `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
+  na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.
 
 ## 27. 10. (19) – Vagony_3D v8: plošiny vozí kusy sady, kontejnery na svých místech
 
