@@ -77,17 +77,13 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_EMPTY, Colours::Invalid, WID_CV_CANVAS), SetMinimalSize(360, 240), SetResize(1, 1), SetFill(1, 1),
 	EndContainer(),
 	NWidget(WWT_PANEL, Colours::Grey, WID_CV_PANEL), SetMinimalSize(360, 50), SetResize(1, 0), SetFill(1, 0), EndContainer(),
+	/* No buttons to steer or brake: the arrows drive (the player, 27. 10.: "the buttons arrows left, right, brake need
+	 * not be in the cab view window any more"). */
 	NWidget(NWID_HORIZONTAL),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_VEHICLE), SetStringTip(STR_CAB_VIEW_VEHICLE, STR_CAB_VIEW_VEHICLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CENTRE), SetStringTip(STR_CAB_VIEW_CENTRE, STR_CAB_VIEW_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_BRAKE), SetStringTip(STR_CAB_VIEW_BRAKE, STR_CAB_VIEW_BRAKE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_THROTTLE), SetStringTip(STR_CAB_VIEW_THROTTLE, STR_CAB_VIEW_THROTTLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-	EndContainer(),
-	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_LEFT), SetStringTip(STR_CAB_VIEW_LEFT, STR_CAB_VIEW_LEFT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(2, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_RIGHT), SetStringTip(STR_CAB_VIEW_RIGHT, STR_CAB_VIEW_RIGHT_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -116,9 +112,11 @@ static bool CabCanDriveFreely(const Vehicle *v)
 }
 
 /**
- * Left or right from the cab (its buttons, its arrows): a heading driven freely or a ship's a small angle; a road
- * vehicle on the road the turn at the next junction, like a blinker, the other way back to straight on.
- * @return whether it turns by a step again while held (a heading)
+ * Left or right from the cab (its arrows): the heading driven freely, a ship's or an aircraft's in the air, a small
+ * angle. A road vehicle that cannot be driven freely yet (its depot, a bay, a tunnel) turns as soon as it can, the
+ * arrow held; no turn at the next junction (the player, 27. 10.: "right arrow and it turns right at the next junction,
+ * that was not used and should not be there").
+ * @return whether it turns by a step again while held
  */
 bool CabTurn(const Vehicle *v, bool left)
 {
@@ -127,14 +125,7 @@ bool CabTurn(const Vehicle *v, bool left)
 		Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(left ? CabDriveOp::Left : CabDriveOp::Right));
 		return true;
 	}
-	if (v->type == VehicleType::Road) {
-		DirDiff now = v->cab_turn != Vehicle::CAB_TURN_NONE ? static_cast<DirDiff>(v->cab_turn) : DirDiff::Same;
-		DirDiff asked = left ? DirDiff::Left90 : DirDiff::Right90;
-		DirDiff opposite = left ? DirDiff::Right90 : DirDiff::Left90;
-		DirDiff next = now == opposite ? DirDiff::Same : asked;
-		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(to_underlying(next)));
-	}
-	return false;
+	return v->type == VehicleType::Road;
 }
 
 /**
@@ -226,7 +217,7 @@ void CabToggleRoute(const Vehicle *v, CabArrows &arrows)
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	if (v->cab_free) {
 		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
-	} else if (v->cab_heading != Direction::Invalid || v->cab_turn != Vehicle::CAB_TURN_NONE) {
+	} else if (v->cab_heading != Direction::Invalid) {
 		Command<Commands::SetCabHeading>::Post(v->tile, v->index, static_cast<uint8_t>(0xFF));
 	}
 	if (v->cab_speed_limit != 0) Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
@@ -309,7 +300,18 @@ static void CabStandingRecord(const Vehicle *v, const CabArrows &arrows, Directi
 void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 {
 	const DirectionKeys pressed = now;
-	if (v == nullptr || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed) || this->route) now = {};
+	const bool mine = v != nullptr && v->owner == _local_company && !v->vehstatus.Test(VehState::Crashed);
+	/* Going its route: an arrow pressed takes the wheel, driven freely from here (the player, 27. 10.: "off road by
+	 * default as soon as the player touches the arrows; he can go back to the route at any time"). */
+	if (mine && this->route) {
+		for (DirectionKey key : {DirectionKey::Left, DirectionKey::Up, DirectionKey::Right, DirectionKey::Down}) {
+			if (!pressed.Test(key) || this->held.Test(key)) continue;
+			this->route = false;
+			this->free_wait = 0;
+			break;
+		}
+	}
+	if (!mine || this->route) now = {};
 	/* As the player's click: the local company's command (the windows' timers run where nobody is). */
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	/* At the wheel: as soon as the vehicle can be driven freely, it is (out of its depot, an aircraft in the air);
@@ -414,7 +416,8 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		CabStartStop(v);
 		this->done = "dolu pusteno: stat";
 	}
-	this->held = now;
+	/* Going its route, the arrows held so: let go and pressed again they take the wheel. */
+	this->held = this->route ? pressed : now;
 	/* Up pressed, and it stands: after two seconds of that, why (CabStandingRecord()); once till it moves. */
 	if (v != nullptr && !flying) {
 		if (v->cur_speed != 0) {
@@ -558,9 +561,6 @@ struct CabViewWindow : Window {
 		}
 		/* A road vehicle, a ship and an aircraft can be steered: a train follows its rails. Only the company's. */
 		const bool ours = v->owner == _local_company;
-		const bool steerable = ours && v->type != VehicleType::Train;
-		this->SetWidgetDisabledState(WID_CV_LEFT, !steerable);
-		this->SetWidgetDisabledState(WID_CV_RIGHT, !steerable);
 		this->SetWidgetDisabledState(WID_CV_AUTO, !ours);
 		this->DrawWidgets();
 	}
@@ -669,12 +669,6 @@ struct CabViewWindow : Window {
 		if (v->cab_free) {
 			/* Driven freely: so, or on the way back to the orders. */
 			DrawString(note_x, sright, state_y, GetString(v->cab_rejoin ? STR_CAB_VIEW_FREE_BACK : STR_CAB_VIEW_FREE), TextColour::FromString);
-		} else if (v->cab_turn != Vehicle::CAB_TURN_NONE) {
-			/* A road vehicle: the turn it takes at the next junction. */
-			StringID turn = STR_CAB_VIEW_STEERED_STRAIGHT;
-			if (v->cab_turn == to_underlying(DirDiff::Right90)) turn = STR_CAB_VIEW_STEERED_RIGHT;
-			if (v->cab_turn == to_underlying(DirDiff::Left90)) turn = STR_CAB_VIEW_STEERED_LEFT;
-			DrawString(note_x, sright, state_y, GetString(turn), TextColour::FromString);
 		} else if (v->cab_heading != Direction::Invalid) {
 			DrawString(note_x, sright, state_y, GetString(STR_CAB_VIEW_STEERED), TextColour::FromString);
 		}
@@ -776,17 +770,9 @@ struct CabViewWindow : Window {
 				MarkWholeScreenDirty();
 				break;
 			}
-			case WID_CV_LEFT:
-			case WID_CV_RIGHT:
-				CabTurn(v, widget == WID_CV_LEFT);
-				break;
 			case WID_CV_AUTO:
 				CabToggleRoute(v, this->arrows);
 				this->SetDirty();
-				break;
-			case WID_CV_BRAKE:
-			case WID_CV_THROTTLE:
-				CabSpeed(v, widget == WID_CV_THROTTLE);
 				break;
 			default:
 				break;
@@ -835,7 +821,7 @@ std::string DescribeCabViews()
 				cw->camera.ms, cw->camera.collect_ms, cw->camera.draw_ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
 		const Vehicle *v = Vehicle::GetIfValid(w->window_number);
 		if (v != nullptr) {
-			s += fmt::format(", zatoceni {} volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_turn, v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
+			s += fmt::format(", volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
 			if (v->type == VehicleType::Aircraft) s += fmt::format(" vyska {} cil {} stav {} na {},{}", v->z_pos, v->cab_altitude, Aircraft::From(v)->state, v->x_pos, v->y_pos);
 		}
 		s += "; ";

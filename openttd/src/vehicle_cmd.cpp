@@ -1311,12 +1311,11 @@ CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t
 
 /**
  * Steer a vehicle from its cab (cab_view.h). A ship takes a heading: it leaves its shed for it and takes the track
- * nearest to it on every tile. A road vehicle takes a turn: the road it takes at the next junction, and straight on
- * after it. Until the steering is taken off again: then the vehicle finds its way to its orders anew.
+ * nearest to it on every tile. Until the steering is taken off again: then the vehicle finds its way to its orders
+ * anew. A road vehicle only that: it is driven freely instead (CmdCabDrive()).
  * @param flags type of operation
  * @param veh_id the vehicle
- * @param heading a ship: the Direction; a road vehicle: the turn, a DirDiff (Same, Right90 or Left90); or 0xFF for
- *                none, the vehicle goes as its orders say
+ * @param heading a ship: the Direction; or 0xFF for none, the vehicle goes as its orders say
  */
 CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t heading)
 {
@@ -1327,9 +1326,6 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 			case VehicleType::Ship:
 				if (heading >= 8) return CMD_ERROR;
 				break;
-			case VehicleType::Road:
-				if (heading != to_underlying(DirDiff::Same) && heading != to_underlying(DirDiff::Right90) && heading != to_underlying(DirDiff::Left90)) return CMD_ERROR;
-				break;
 			default:
 				return CMD_ERROR;
 		}
@@ -1339,7 +1335,7 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		if (v->type == VehicleType::Road) {
-			v->cab_turn = heading;
+			v->cab_turn = Vehicle::CAB_TURN_NONE;
 			RoadVehicle::From(v)->path.clear();
 		} else {
 			v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
@@ -1380,7 +1376,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 			if (RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
 			if (!v->cab_free && (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried())) return CMD_ERROR;
 		} else if (!v->cab_free) {
-			return CMD_ERROR; // on the road, left and right are the next junction's turn (CmdSetCabHeading())
+			return CMD_ERROR; // on the road, driven freely first
 		}
 	} else if (v->type == VehicleType::Ship) {
 		const Ship *s = Ship::From(v);

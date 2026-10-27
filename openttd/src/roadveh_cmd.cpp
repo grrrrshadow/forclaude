@@ -1112,39 +1112,6 @@ static Trackdir RoadFindPathToDest(RoadVehicle *v, TileIndex tile, DiagDirection
 		}
 	}
 
-	if (v->cab_turn != Vehicle::CAB_TURN_NONE) {
-		/* Steered from the cab (cab_view.h): the player's turn at the next junction, then straight on. A bend has a
-		 * single way on and is no junction: the turn waits for the next tile with a choice. */
-		if (!v->path.empty()) v->path.clear();
-		if (ts.trackdirs.Count() == 1) return FilterRedSignal(ts.trackdirs.GetNthSetBit(0).value());
-		auto way_to = [&](DiagDirDiff turn) {
-			DiagDirection want = ChangeDiagDir(enterdir, turn);
-			for (uint i = 0; i < ts.trackdirs.Count(); i++) {
-				Trackdir td = ts.trackdirs.GetNthSetBit(i).value();
-				if (TrackdirToExitdir(td) == want) return td;
-			}
-			return Trackdir::Invalid;
-		};
-		const DiagDirDiff asked = static_cast<DiagDirDiff>(v->cab_turn / 2);
-		const DiagDirDiff keep_side = _settings_game.vehicle.road_side == RoadVehicleDrivingSide::Right ? DiagDirDiff::Right90 : DiagDirDiff::Left90;
-		const DiagDirDiff other_side = keep_side == DiagDirDiff::Right90 ? DiagDirDiff::Left90 : DiagDirDiff::Right90;
-		Trackdir td = way_to(asked);
-		if (td != Trackdir::Invalid) {
-			/* Taken: straight on from here. */
-			v->cab_turn = to_underlying(DirDiff::Same);
-		} else {
-			/* Not to be had here: straight on if it goes, the turn kept for the next junction; else round the corner,
-			 * the side the vehicles keep to first. */
-			for (DiagDirDiff d : {DiagDirDiff::Same, keep_side, other_side}) {
-				td = way_to(d);
-				if (td != Trackdir::Invalid) break;
-			}
-		}
-		if (td == Trackdir::Invalid) td = ts.trackdirs.GetNthSetBit(0).value();
-		Debug(misc, 5, "road vehicle {} steered: tile {} enters {} asked {} takes trackdir {}, turn now {}", v->unitnumber, tile.base(), to_underlying(enterdir), to_underlying(asked), to_underlying(td), v->cab_turn);
-		return FilterRedSignal(td);
-	}
-
 	if (v->dest_tile == INVALID_TILE) {
 		/* We've got no destination, pick a random track */
 		return FilterRedSignal(ts.trackdirs.GetNthSetBit(RandomRange(ts.trackdirs.Count())).value());
@@ -1207,9 +1174,8 @@ bool RoadVehLeaveDepot(RoadVehicle *v, bool first)
 	int y = TileY(v->tile) * TILE_SIZE + (rdp[RVC_DEPOT_START_FRAME].y & 0xF);
 
 	if (first) {
-		/* We are leaving a depot, but have to go to the exact same one; re-enter. Not when the player drives it out
-		 * from the cab (cab_view.h). */
-		if (v->cab_turn == Vehicle::CAB_TURN_NONE && v->current_order.IsType(OT_GOTO_DEPOT) && v->tile == v->dest_tile) {
+		/* We are leaving a depot, but have to go to the exact same one; re-enter. */
+		if (v->current_order.IsType(OT_GOTO_DEPOT) && v->tile == v->dest_tile) {
 			VehicleEnterDepot(v);
 			return true;
 		}

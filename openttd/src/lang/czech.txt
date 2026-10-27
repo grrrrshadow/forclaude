@@ -2480,24 +2480,13 @@ STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Přesuno
 STR_CAB_VIEW_STOP                                               :{BLACK}Zastavit
 STR_CAB_VIEW_GO                                                 :{BLACK}Jet
 STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Zastavit vozidlo, nebo ho zase rozjet
-STR_CAB_VIEW_BRAKE                                              :{BLACK}Brzda -
-STR_CAB_VIEW_BRAKE_TOOLTIP                                      :{BLACK}Přibrzdit: vozidlo se drží o krok nižší rychlosti
-STR_CAB_VIEW_THROTTLE                                           :{BLACK}Plyn +
-STR_CAB_VIEW_THROTTLE_TOOLTIP                                   :{BLACK}Přidat: o krok vyšší rychlost; nad maximem vozidla jede zase podle rozkazů
 STR_CAB_VIEW_LIMIT                                              :{YELLOW}drženo na {VELOCITY}
 STR_CAB_VIEW_STEERED                                            :{YELLOW}řízeno ručně
-STR_CAB_VIEW_STEERED_STRAIGHT                                   :{YELLOW}ručně: rovně
-STR_CAB_VIEW_STEERED_RIGHT                                      :{YELLOW}ručně: příště vpravo
 STR_CAB_VIEW_FREE                                               :{YELLOW}ručně: volně
 STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}zpět k rozkazům
-STR_CAB_VIEW_STEERED_LEFT                                       :{YELLOW}ručně: příště vlevo
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled přes celou obrazovku, a zpět
-STR_CAB_VIEW_LEFT                                               :{BLACK}< Doleva
-STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Řídit doleva: auto, loď a letadlo ve vzduchu zatočí o malý úhel (loď kvůli tomu vyjede z doku); výšku letadla mění šipky nahoru a dolů
-STR_CAB_VIEW_RIGHT                                              :{BLACK}Doprava >
-STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Řídit doprava: auto, loď a letadlo ve vzduchu zatočí o malý úhel
 STR_CAB_VIEW_AUTO                                               :{BLACK}Jeď svou trasu
-STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; znovu stisknuté: řídíš ty
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; šipky ho zase převezmou a jede se volně
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Řídit
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}

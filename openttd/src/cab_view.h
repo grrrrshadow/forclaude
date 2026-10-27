@@ -85,17 +85,18 @@ void CabToggleLights(const Vehicle *v);
 
 /**
  * At the wheel of a vehicle from its cab (the player, 17. 10.: "while the cab view is open the arrows are for driving,
- * as in the view from the first person"; "as soon as you get into the cab you drive"): the vehicle is driven freely as
- * soon as it can be (CmdCabDrive()), until the player asks for its route. Left and right turn it as the cab's buttons
- * do, up is the throttle (and off, a vehicle that stands), down the brake; an aircraft's up and down its height. Held,
- * again every so often; the turn at the next junction once. Up twice in a row: full speed, on by itself till braked
- * (the player, 22. 10.: "and the driving on by itself too"). The view from the cab and the walker riding in the view
- * from the first person each have one.
+ * as in the view from the first person"; 27. 10.: "off road by default as soon as the player touches the arrows; he
+ * can go back to the route at any time"): the vehicle goes its route till an arrow is pressed, then it is driven
+ * freely as soon as it can be (CmdCabDrive()), till the player asks for its route again. Left and right turn it by a
+ * small angle, up is the throttle (and off, a vehicle that stands), down the brake; an aircraft's up and down its
+ * height. Held, again every so often. Up twice in a row: full speed, on by itself till braked (the player, 22. 10.:
+ * "and the driving on by itself too"). The view from the cab and the walker riding in the view from the first person
+ * each have one.
  */
 struct CabArrows {
 	DirectionKeys held{};           ///< the arrows held at the last look
 	std::array<int, 4> repeat_in{}; ///< for each arrow held, milliseconds till it does it again
-	bool route = false;             ///< the player asked for its route (CabToggleRoute()): the arrows do not drive
+	bool route = true;              ///< it goes its route (CabToggleRoute()): an arrow pressed takes the wheel
 	int free_wait = 0;              ///< milliseconds till the wheel is taken again, as the command takes its time
 	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (twice in a row: full speed, Drive())
 	int still_ms = 0;               ///< milliseconds it has stood since Up was pressed (its record, jizda.log)

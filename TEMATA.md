@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (31) – Řízení z kabiny: šipky převezmou volant, pryč „příští křižovatka vpravo“
+
+- Hráč: *„ty chodiš do auta přes cab view , ja nastupuju E z first person view a mam v autě když nastoupim menu
+  běžet. čudliky šipky do leva doprava brzda už v okně cab view byt nemusi . implicidni je offroad jakmile šahne
+  hrač na šipky. muže dat kdykoli vratit se na trasu. po silnici přišti doprava se ruši. že když da šipku doprava tak
+  přišti křižovatku pojede doprava, to se nepouživalo a nemělo by to tam byt“*.
+- Po nástupu (E z očí i okno kabiny) jede auto svou trasu. Jakmile hráč stiskne kteroukoli šipku, převezme volant a
+  jede se volně (i mimo silnici). T (v okně kabiny tlačítko „Jeď svou trasu“) ho kdykoli vrátí na trasu, další
+  šipka ho zase převezme.
+- Z okna kabiny pryč tlačítka Doleva, Doprava, Brzda, Plyn. Zůstalo Vozidlo, Na mapu, Jeď svou trasu/Řídit,
+  Zastavit.
+- „Příští křižovatka vpravo/vlevo/rovně“ zrušené celé (i v hledání cesty aut). Auto, které ještě nejde řídit volně
+  (depo, zastávka v zálivu, tunel), zatočí šipkou, jakmile vyjede.
+
 ## 27. 10. (30) – 1203: průhledné pneumatiky, nebarevné zadní světlo
 
 - Hráč: *„kola jsou pruhledné pneumatiky. a zadní kola jsou moc blízko ke středu auta . uvnitř auta byla ta zelená

@@ -2372,24 +2372,13 @@ STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Put the 
 STR_CAB_VIEW_STOP                                               :{BLACK}Stop
 STR_CAB_VIEW_GO                                                 :{BLACK}Go
 STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Stop the vehicle, or start it again
-STR_CAB_VIEW_BRAKE                                              :{BLACK}Brake -
-STR_CAB_VIEW_BRAKE_TOOLTIP                                      :{BLACK}Hold the vehicle to a lower speed, a step at a time
-STR_CAB_VIEW_THROTTLE                                           :{BLACK}Throttle +
-STR_CAB_VIEW_THROTTLE_TOOLTIP                                   :{BLACK}Let the vehicle go faster, a step at a time; past its top speed it goes as its orders say
 STR_CAB_VIEW_LIMIT                                              :{YELLOW}held to {VELOCITY}
 STR_CAB_VIEW_STEERED                                            :{YELLOW}steered by hand
-STR_CAB_VIEW_STEERED_STRAIGHT                                   :{YELLOW}by hand: straight
-STR_CAB_VIEW_STEERED_RIGHT                                      :{YELLOW}by hand: next right
 STR_CAB_VIEW_FREE                                               :{YELLOW}by hand: free
 STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}back to the orders
-STR_CAB_VIEW_STEERED_LEFT                                       :{YELLOW}by hand: next left
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view over the whole screen, and back
-STR_CAB_VIEW_LEFT                                               :{BLACK}< Left
-STR_CAB_VIEW_LEFT_TOOLTIP                                       :{BLACK}Steer left: a car, a ship and an aircraft in the air turn by a small angle (a car on the road as long as it is driven freely; a ship leaves its dock for it); an aircraft's height the arrows up and down
-STR_CAB_VIEW_RIGHT                                              :{BLACK}Right >
-STR_CAB_VIEW_RIGHT_TOOLTIP                                      :{BLACK}Steer right: a car, a ship and an aircraft in the air turn by a small angle
 STR_CAB_VIEW_AUTO                                               :{BLACK}Go your route
-STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; pressed again you take the wheel
+STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; the arrows take the wheel again, driving freely
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Drive
 STR_CAB_VIEW_SPEED                                              :{VELOCITY}
 STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}

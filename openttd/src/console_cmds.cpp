@@ -10511,11 +10511,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klik") {
-			/* A click on a button of the cab view open: 'test3d kabina klik <vlevo|vpravo|trasa|stop|brzda|plyn|cely>',
-			 * the way the player steers from it (the player: "the car cannot be steered from the cab any more"). */
+			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely>' (the arrows steer and brake). */
 			static const std::pair<std::string_view, WidgetID> buttons[] = {
-				{"vlevo", WID_CV_LEFT}, {"vpravo", WID_CV_RIGHT}, {"trasa", WID_CV_AUTO},
-				{"stop", WID_CV_STOP}, {"brzda", WID_CV_BRAKE}, {"plyn", WID_CV_THROTTLE}, {"cely", WID_CV_FULL},
+				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL},
 			};
 			WidgetID id = -1;
 			for (const auto &[name, wid] : buttons) if (argv[3] == name) id = wid;
@@ -10531,8 +10529,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			const Vehicle *cv = Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number));
 			if (cv != nullptr) {
-				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} zatoceni {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
-						to_underlying(cv->direction), cv->cab_turn, to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
+				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
+						to_underlying(cv->direction), to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
 			}
 			return true;
 		}
