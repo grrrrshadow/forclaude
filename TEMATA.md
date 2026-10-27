@@ -31,6 +31,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (21) – 1203: Spoje pošta a ceniny, vojenská sanitka výbušniny, mikrobus
+
+- Hráč: *„spoje to je pošta ceniny a vojenska explosives“*, *„valnik a dodavky potřebujem microbusy“*, *„je tam
+  vojenska ale sanitka to je vojenska“*, *„předposledni je sanitka ale vojenska“*. Konfigurace `ambulance` (khaki,
+  1968–1974) je vojenská sanitka, `ambulance2` (žlutá s červenou, od 1983) civilní sanitka.
+- Hotovo: Spoje vozí poštu a ceniny klimatu (MAIL, VALU, GOLD, DIAM), vojenská sanitka výbušniny (BOOM; bez
+  rozšířeného průmyslu nejsou, pak jednoho cestujícího), sanitka jednoho cestujícího nebo studentku. Jména v nákupu:
+  „vojenská sanitka“, „sanitka“ (dřív „ambulance2“). Valník a dodávky beze změny, mikrobus (a De Luxe) už jsou:
+  cestující a studentky, 8 míst.
+
 ## 27. 10. (20) – Holky jen ze sady hry, balíčky dávají polohu
 
 - Hráč: *„budem davat holky náklad i řidičky grrrrf jen definuje polohu. a tak muže sedět mat nebo colege girl

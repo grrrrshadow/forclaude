@@ -865,7 +865,7 @@ static constexpr BeamngMake S1203_MAKES[] = {
 };
 /** What each configuration of the 1203 is, in its name. */
 static constexpr std::pair<std::string_view, std::string_view> S1203_KINDS[] = {
-	{"police2", "VB žlutá"}, {"police", "VB"}, {"ambulance", "sanitka"}, {"hearse", "pohřební"}, {"flatbed", "valník"},
+	{"police2", "VB žlutá"}, {"police", "VB"}, {"ambulance", "vojenská sanitka"}, {"ambulance2", "sanitka"}, {"hearse", "pohřební"}, {"flatbed", "valník"},
 	{"van", "dodávka"}, {"com", "kombi"}, {"passenger", "mikrobus"}, {"lux", "De Luxe"}, {"spoje", "Spoje"}, {"fire", "hasiči"},
 };
 
@@ -1128,13 +1128,22 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	 * Its cargoes by what it is (the player, 26. 10., of the 1203's configurations): a police car ("VB") or an ambulance
 	 * one passenger or one studentka; a passenger van its people; a flatbed and a van the cargoes of our 1203 with a
 	 * tarp, the flatbed without people. Any other car every cargo of the game (the player: "give the BeamNG cars all
-	 * the cargoes in the game").
+	 * the cargoes in the game"). The post's van and the army's (the player, 27. 10.: "spoje to je pošta ceniny a
+	 * vojenska explosives", "sanitka to je vojenska" -- the khaki ambulance of the 1203, not the yellow ambulance2):
+	 * the post's the mail and the valuables of each climate, the army's explosives, in a game without them (no
+	 * economy.extra_industries) one passenger as the other ambulance.
 	 */
 	std::string what = own_config + " ";
 	if (const JValue *c = info.Get("Configuration"); c != nullptr && c->IsString()) what += c->text;
 	strtolower(what);
 	auto has = [&what](std::initializer_list<std::string_view> words) { return std::ranges::any_of(words, [&what](std::string_view w) { return what.find(w) != std::string::npos; }); };
-	if (has({"police", "vb", "ambulance", "sanit"})) {
+	if (StrEqualsIgnoreCase(own_config, "ambulance")) {
+		v.cargoes = {"BOOM", "PASS"};
+		v.goods = true;
+	} else if (has({"spoje"})) {
+		v.cargoes = {"MAIL", "VALU", "GOLD", "DIAM"};
+		v.goods = true;
+	} else if (has({"police", "vb", "ambulance", "sanit"})) {
 		v.cargoes = {"PASS", "STUD"};
 		v.capacity = 1;
 		v.goods = false;
@@ -1147,7 +1156,7 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 			if (std::ranges::find(PEOPLE_CARGOES, c) == PEOPLE_CARGOES.end()) v.cargoes.push_back(c);
 		}
 		v.goods = true;
-	} else if (style.find("van") != std::string::npos || has({"van", "com", "spoje", "hearse", "fire", "dodav"})) {
+	} else if (style.find("van") != std::string::npos || has({"van", "com", "hearse", "fire", "dodav"})) {
 		v.cargoes = TARP_1203_CARGOES;
 		v.goods = true;
 	}
