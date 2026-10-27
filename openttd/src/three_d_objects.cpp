@@ -5394,6 +5394,11 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
 	for (const ThreeDVehicleObject &f : _figure_objects) {
 		if (f.name == name) return &f;
 	}
+	/* A figure on no skeleton has its poses as figures of their own, "<jmeno>_<poza>" (the colleague's postavy: mat_ridi,
+	 * college_girl_sedi): "<jmeno>/<poza>" is that one (the fire Tatra's driver, "postava" mat, "poza" ridi). */
+	if (const size_t slash = name.find('/'); slash != std::string_view::npos) {
+		return GetThreeDFigure(fmt::format("{}_{}", name.substr(0, slash), name.substr(slash + 1)), package);
+	}
 	return nullptr;
 }
 

@@ -838,7 +838,8 @@
   },
   "posadka": [
    {
-    "postava": "galaxia_sedi",
+    "postava": "college_girl",
+    "poza": "sedi",
     "poloha": [
      2.27,
      -0.9,
@@ -848,7 +849,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_sedi",
+    "postava": "galaxia",
+    "poza": "sedi",
     "poloha": [
      1.736,
      0.9,
@@ -858,7 +860,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "galaxia_sedi",
+    "postava": "pubg_girl",
+    "poza": "sedi",
     "poloha": [
      0.935,
      -0.9,
@@ -868,7 +871,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_sedi",
+    "postava": "char16",
+    "poza": "sedi",
     "poloha": [
      0.4,
      0.9,
@@ -878,7 +882,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_sedi",
+    "postava": "vivi",
+    "poza": "sedi",
     "poloha": [
      -0.4,
      -0.9,
@@ -888,7 +893,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "galaxia_sedi",
+    "postava": "cute_cartoon",
+    "poza": "sedi",
     "poloha": [
      -0.934,
      0.9,
@@ -898,7 +904,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_sedi",
+    "postava": "female_girl",
+    "poza": "sedi",
     "poloha": [
      -1.735,
      -0.9,
@@ -908,7 +915,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_sedi",
+    "postava": "college_girl",
+    "poza": "sedi",
     "poloha": [
      -2.269,
      0.9,
@@ -919,7 +927,7 @@
    }
   ],
   "trojuhelniku": 96,
-  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou postavy hry",
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou holky hry s kostrou (humanoidi, póza sedi)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "dvě vysoké lavice podél bočnic valníku Tater (sedák 0,94 m nad podlahou), 4 + 4 místa naproti sobě; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.48 m); místa: bod sedu 0.9 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 370 × 562 px, 5 kB, glb z gltfpacku"
  },
@@ -946,7 +954,8 @@
   },
   "posadka": [
    {
-    "postava": "galaxia_sedi",
+    "postava": "college_girl",
+    "poza": "sedi",
     "poloha": [
      1.568,
      -0.75,
@@ -956,7 +965,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_sedi",
+    "postava": "galaxia",
+    "poza": "sedi",
     "poloha": [
      1.045,
      0.75,
@@ -966,7 +976,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_sedi",
+    "postava": "pubg_girl",
+    "poza": "sedi",
     "poloha": [
      0.261,
      -0.75,
@@ -976,7 +987,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "galaxia_sedi",
+    "postava": "char16",
+    "poza": "sedi",
     "poloha": [
      -0.262,
      0.75,
@@ -986,7 +998,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_sedi",
+    "postava": "vivi",
+    "poza": "sedi",
     "poloha": [
      -1.046,
      -0.75,
@@ -996,7 +1009,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_sedi",
+    "postava": "cute_cartoon",
+    "poza": "sedi",
     "poloha": [
      -1.568,
      0.75,
@@ -1007,7 +1021,7 @@
    }
   ],
   "trojuhelniku": 96,
-  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou postavy hry",
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou holky hry s kostrou (humanoidi, póza sedi)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "dvě vysoké lavice podél bočnic korby V3S (sedák 0,94 m nad podlahou), 3 + 3 místa naproti sobě; i na Autosan; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.18 m); místa: bod sedu 0.75 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 482 × 482 px, 175 kB, glb z gltfpacku"
  },
@@ -1032,7 +1046,8 @@
   },
   "posadka": [
    {
-    "postava": "college_girl_stoji",
+    "postava": "college_girl",
+    "poza": "stoji",
     "poloha": [
      1.539,
      0.55,
@@ -1042,7 +1057,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "galaxia_stoji",
+    "postava": "galaxia",
+    "poza": "stoji",
     "poloha": [
      1.485,
      -0.57,
@@ -1052,7 +1068,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_stoji",
+    "postava": "pubg_girl",
+    "poza": "stoji",
     "poloha": [
      0.531,
      -0.423,
@@ -1062,7 +1079,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_stoji",
+    "postava": "char16",
+    "poza": "stoji",
     "poloha": [
      0.481,
      0.543,
@@ -1072,7 +1090,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "galaxia_stoji",
+    "postava": "vivi",
+    "poza": "stoji",
     "poloha": [
      -0.494,
      -0.55,
@@ -1082,7 +1101,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_stoji",
+    "postava": "cute_cartoon",
+    "poza": "stoji",
     "poloha": [
      -0.562,
      0.449,
@@ -1092,7 +1112,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_stoji",
+    "postava": "female_girl",
+    "poza": "stoji",
     "poloha": [
      -1.413,
      0.501,
@@ -1102,7 +1123,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "people_girl_stoji",
+    "postava": "college_girl",
+    "poza": "stoji",
     "poloha": [
      -1.446,
      -0.428,
@@ -1112,7 +1134,7 @@
     "meritko": 2.0
    }
   ],
-  "autor": "grrrrf; holky jsou postavy hry",
+  "autor": "grrrrf; holky jsou holky hry s kostrou (humanoidi, póza stoji)",
   "licence": "GPL-2.0",
   "poznamka": "8 studentek stojí na korbě V3S na zastávce (při nakládání a vykládání), bez lavic; kus bez souboru, jen místa (počátek uprostřed podlahy korby, meritko 2), pořadí od předu"
  }

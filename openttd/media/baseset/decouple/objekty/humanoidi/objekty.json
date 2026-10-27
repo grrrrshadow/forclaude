@@ -97,6 +97,18 @@
   "poznamka": "velký džoint jako trychtýř (hráč: \"udělej pro holky džonta trychtyř velký když budou kouřit\"): počátek tam, kde ho drží prsty, osa +x k žhavému konci, úzký konec u pusy 0,09 m za počátkem; drží ho pravá ruka v pohybu kouri (humanoid_pohyby, predmet)"
  },
  {
+  "soubor": "mic.glb",
+  "jmeno": "mic",
+  "druh": "predmet",
+  "trojuhelniku": 864,
+  "rozmer_m": {
+   "prumer": 0.24
+  },
+  "autor": "grrrrf: postavy/mic.py",
+  "licence": "CC BY 4.0",
+  "poznamka": "basketbalový míč (oranžový, tři tmavé švy), počátek ve středu; drží ho pravá ruka v póze hazi (humanoid_pohyby, predmet), nad rukama jako dřív college_girl_hazi"
+ },
+ {
   "soubor": "humanoid_pohyby.glb",
   "jmeno": "humanoid_pohyby",
   "druh": "pohyby",
@@ -234,6 +246,47 @@
      ],
      "poznamka": "velký džoint (trychtýř) v pravé ruce, jen v pohybu kouri: poloha a rotace (x, y, z, w) v rámu kosti RightHand (glTF), jde s rukou"
     }
+   },
+   "sedi_u_okna": {
+    "kotva": "sed",
+    "popis": "sedí jako sedi, pravým bokem opřená o pravé okno kabiny (trup 12° doprava), hlava k oknu a trochu ven; spolujezdkyně v Tatrách a V3S; počátek v bodě sedu"
+   },
+   "pro_pivo": {
+    "kotva": "chodidla",
+    "popis": "natahuje obě ruce pro pivo (asi 0,48 m před sebe ve výšce 1 m), mírně předkloněná, levá noha vpředu; jako college_girl_pro_pivo (hospoda)"
+   },
+   "objima": {
+    "kotva": "chodidla",
+    "popis": "objímá: ruce dopředu kolem něj, předloktí za ním, hlava zvednutá k němu; jako college_girl_objima (socha Karla)"
+   },
+   "hazi": {
+    "kotva": "chodidla",
+    "popis": "hází na koš: obě ruce nahoru dopředu, míč nad nimi (mic.glb v pravé ruce); jako college_girl_hazi (hřiště gymnázia)",
+    "predmet": {
+     "soubor": "mic.glb",
+     "jmeno": "mic",
+     "kost": "RightHand",
+     "poloha": [
+      0.2191,
+      0.0301,
+      0.1851
+     ],
+     "rotace": [
+      0.24368,
+      -0.61533,
+      -0.35911,
+      0.65805
+     ],
+     "poznamka": "basketbalový míč nad rukama, jen v póze hazi: střed míče, poloha a rotace (x, y, z, w) v rámu kosti RightHand (glTF)"
+    }
+   },
+   "plati": {
+    "kotva": "chodidla",
+    "popis": "platí u automatu: pravá ruka dopředu ke čtečce karet, levá podél těla; jako college_girl_plati"
+   },
+   "oprena_o_pult": {
+    "kotva": "chodidla",
+    "popis": "stojí opřená o pult: předklon 35°, kolena mírně pokrčená, dlaně na pultu 0,95 m vysoko, hlava zvednutá (kouká dopředu z okna); řidička lokomotivy jako college_girl_ridicka (Sergej)"
    }
   },
   "autor": "grrrrf: postavy/kostra_pozy.py (pózy a chůze udělané na College Girl)",

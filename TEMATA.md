@@ -31,6 +31,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (38) – Z grrrrf: pózy na kostře, pózy kabin, balíčky bez holek, Tatry v5
+
+Hráč: *„vem z grrrf co nebylo hotove a dam novy build, pak se uvidi , s novymi grf. zastavky teď nebudem dělat“*.
+
+- Kolega (`hra/3d/HOLKY-NA-KOSTRE-BALICKY-PRO-HRU.md`, 3005be9 až 3a012b3): šest nových póz v `humanoid_pohyby`
+  (pro pivo, objímá, hází s míčem `mic.glb`, platí, opřená o pult, sedí u okna), průmysl (hospoda, socha, gymnázium,
+  automat, dračí farma, hrad) jmenuje holku + pózu, lavice studentek všech sedm holek na kostře, char16 v PNG.
+  Převzato do sady hry: `humanoidi` (char16, pohyby, míč, index), `prumysl`, `naklady`, `mirne` (jen poznámka).
+- Kotvy pohybů (`chodidla`, `sed`, `pod_postavou`) jsou jen popis, kde má póza počátek; hra bere kyčle z pózy, kód
+  netřeba. Balíčky nesou své pohyby (`nt_pohyby`, `v3s_pohyby`, `vg_pohyby`, `zv_pohyby`) – hra je čte už od kostry.
+- Oprava: postava, která není na kostře, má pózy jako samostatné postavy `<jméno>_<póza>`; `mat` + `ridi` je
+  `mat_ridi` (hasičská Tatra, „figure mat/ridi is not there“ už u Tater v4).
+- Rig (nové tary z grrrrf: Tatry v5, V3S, Vagony v8, Zvláštní v2, Sergej v7): V3S s lavicemi a sedmi holkami,
+  řidičky v kabinách V3S, Tater, ZTS, Mat za volantem hasičské Tatry; všech devět póz nakreslených (míč v ruce).
+- Nebráno: zastávky (hráč teď ne), Springfield a Putin (hráč dřív ne), sada `vozidla` (je v balíčku Sergeje).
+
 ## 27. 10. (37) – #306 zamrzá při „Vytvořit novou krajinu“
 
 Hráč: „#306 build dvakrat zamrznul při generovani nove hry“, „zamrzlo to zas při vyzvořit novou krajinu ani to

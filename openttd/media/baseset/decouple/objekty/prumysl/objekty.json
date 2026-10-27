@@ -68,7 +68,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_hazi",
+    "postava": "college_girl",
+    "poza": "hazi",
     "poloha": [
      24.54,
      5.39,
@@ -456,7 +457,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_objima",
+    "postava": "college_girl",
+    "poza": "objima",
     "poloha": [
      7.31,
      8.39,
@@ -762,7 +764,8 @@
   "dlazdic_y": 1,
   "postavy_s_holkami": [
    {
-    "postava": "college_girl_plati",
+    "postava": "college_girl",
+    "poza": "plati",
     "poloha": [
      4.09,
      3.35,
@@ -2078,7 +2081,8 @@
     "poznamka": "Mat točí pivo z pípy, trubka vede ze sudu (hráč: „mat za vyčep … ten moment jak tocí pivo, kouka na holku“)"
    },
    {
-    "postava": "college_girl_pro_pivo",
+    "postava": "college_girl",
+    "poza": "pro_pivo",
     "poloha": [
      17.4,
      21.59,
@@ -3191,7 +3195,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_hazi",
+    "postava": "college_girl",
+    "poza": "hazi",
     "poloha": [
      31.42,
      15.96,
@@ -3201,7 +3206,8 @@
     "meritko": 2.0
    },
    {
-    "postava": "college_girl_objima",
+    "postava": "college_girl",
+    "poza": "objima",
     "poloha": [
      33.51,
      27.53,
@@ -3373,7 +3379,8 @@
   ],
   "postavy_s_holkami": [
    {
-    "postava": "college_girl_hazi",
+    "postava": "college_girl",
+    "poza": "hazi",
     "poloha": [
      27.6,
      33.2,
@@ -3384,7 +3391,8 @@
     "poznamka": "v síni hází seno drakovi"
    },
    {
-    "postava": "college_girl_objima",
+    "postava": "college_girl",
+    "poza": "objima",
     "poloha": [
      14.0,
      15.3,
