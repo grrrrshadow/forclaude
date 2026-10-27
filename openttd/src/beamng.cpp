@@ -2078,28 +2078,47 @@ std::map<std::string, CarMaterial> ReadMaterials(const BeamngVehicle &v)
 					if (const JValue *t = first->Get("opacityMapUseUV"); t != nullptr) m.mask_uv1 = t->Num() == 1;
 				}
 				if (stages != nullptr && stages->IsArray()) {
-					for (const JValue &st : stages->items) {
-						bool painted = false;
+					auto painted = [](const JValue &st) {
 						for (const char *k : {"instanceDiffuse", "useColorPalette"}) {
-							if (const JValue *b = st.Get(k); b != nullptr && b->IsTrue()) painted = true;
+							if (const JValue *b = st.Get(k); b != nullptr && b->IsTrue()) return true;
 						}
-						if (!painted) continue;
-						/* A layer after the paint's with a picture and a mask of its own: a paint design's letters over it. */
-						if (m.paint && &st != first && m.decal.empty()) {
-							const JValue *t = st.Get("baseColorMap"), *o = st.Get("opacityMap");
-							if (t != nullptr && t->IsString() && o != nullptr && o->IsString()) {
-								m.decal = t->text;
-								m.decal_mask = o->text;
-								continue;
-							}
+						return false;
+					};
+					auto of_palette = [](const JValue &st) {
+						const JValue *t = st.Get("colorPaletteMap");
+						return (t != nullptr && t->IsString()) || (st.Get("useColorPalette") != nullptr && st.Get("useColorPalette")->IsTrue());
+					};
+					/*
+					 * The paint's layer: the painted one of a palette, else any painted (the tarp: its whole picture in the
+					 * paint). The Škoda 1203's inside, extras and gear stick have their first layer painted too, but the
+					 * paint only where the mask of their palette's layer is light, the metal (the player, 27. 10.: "it looks
+					 * silly when you see inside and inside all is blue").
+					 */
+					const JValue *paint_layer = nullptr;
+					for (const JValue &st : stages->items) {
+						if (painted(st) && of_palette(st)) {
+							paint_layer = &st;
+							break;
 						}
+					}
+					for (const JValue &st : stages->items) {
+						if (paint_layer == nullptr && painted(st)) paint_layer = &st;
+					}
+					if (paint_layer != nullptr) {
 						m.paint = true;
 						/* The paint a layer over the first, where its mask is light (the Škoda 1203's body: its rubber, chrome
 						 * and lamps in the first layer's picture, dark in the mask). */
-						if (&st != first) {
-							if (const JValue *t = st.Get("opacityMap"); t != nullptr && t->IsString() && m.paint_mask.empty()) m.paint_mask = t->text;
-							if (const JValue *t = st.Get("opacityMapUseUV"); t != nullptr) m.paint_mask_uv1 = t->Num() == 1;
-							if (const JValue *t = st.Get("colorPaletteMap"); t != nullptr && t->IsString() && m.palette.empty()) m.palette = t->text;
+						if (paint_layer != first) {
+							if (const JValue *t = paint_layer->Get("opacityMap"); t != nullptr && t->IsString()) m.paint_mask = t->text;
+							if (const JValue *t = paint_layer->Get("opacityMapUseUV"); t != nullptr) m.paint_mask_uv1 = t->Num() == 1;
+							if (const JValue *t = paint_layer->Get("colorPaletteMap"); t != nullptr && t->IsString()) m.palette = t->text;
+						}
+						/* A painted layer after the paint's with a picture and a mask of its own: a paint design's letters over it. */
+						for (const JValue *st = paint_layer + 1; st < stages->items.data() + stages->items.size() && m.decal.empty(); st++) {
+							const JValue *t = st->Get("baseColorMap"), *o = st->Get("opacityMap");
+							if (!painted(*st) || t == nullptr || !t->IsString() || o == nullptr || !o->IsString()) continue;
+							m.decal = t->text;
+							m.decal_mask = o->text;
 						}
 					}
 				}

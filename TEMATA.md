@@ -31,6 +31,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 27. 10. (33) – 1203: vnitřek celý v barvě laku
+
+- Hráč: *„to vypada blbě když je vidět dovnitř a vevnitř je všechno modry pajda karavan. teď vše červeny“*.
+- Příčina: materiály vnitřku, doplňků a řadicí páky (`S1203_inner`, `S1203_extras`, `S1203_gear`) mají barvu laku
+  zapnutou už v první vrstvě; hra to brala jako lak po celém materiálu a masku druhé vrstvy (kde je plech) jako nápis.
+  Teď je lak vrstva s paletou a jen tam, kde je její maska světlá; sedačky a palubka mají svou barvu. Plachta (lak jen
+  v první vrstvě) zůstává celá v barvě, nápis VB dál přes lak.
+
 ## 27. 10. (32) – Pajda karavan, „Jeď svou trasu“ v pohledu z očí, rozchod kol 1203
 
 - Hráč: *„v modu jsou karoserie vic druhu a jedna určitě přečniva nad čelni sklo ma vystupek ale to je jedno, tak
