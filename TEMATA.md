@@ -43,6 +43,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   „Tarp Roof“) jako díl tvaru, jen když je něco naloženo; prázdný valník otevřený. Bedna modu na loži
   (`S1203_bed_cargo`) se nekreslí. Oprava cestou: `Simplify()` zahazoval značky dílů trojúhelníků.
 - Rig: `test3d naklad <LABEL>|0` – náklad pro kreslení bez vozidla (`kresli`, nákup).
+- Hráč: *„hezky naklady dobře sedi. proč je cely auto zeleny vždycky“*. Příčina: výchozí barvy konfigurací modu
+  („Blue“ valníku, „Red“ dodávky) mezi barvami modu nejsou (ty jsou „Sky Blue“, „Bright Red“…), tak první zůstala
+  abecední „Aquamarine“. Teď první barva, jejíž jméno výchozí obsahuje: valník modrý, dodávka červená (De Luxe
+  „Beige“ nemá žádnou). Ve hře dál každé auto náhodnou barvu modu, v nákupu výchozí.
 
 ## 27. 10. (21) – 1203: Spoje pošta a ceniny, vojenská sanitka výbušniny, mikrobus
 

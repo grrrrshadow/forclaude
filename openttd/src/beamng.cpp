@@ -1057,21 +1057,21 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	std::string def;
 	if (const JValue *d = info.Get("default_color"); d != nullptr && d->IsString()) def = d->text;
 	if (const JValue *d = info.Get("defaultPaintName1"); d != nullptr && d->IsString()) def = d->text;
-	auto add_paint = [&](const std::string &n, uint32_t colour) {
-		if (n == def) {
-			v.paints.insert(v.paints.begin(), colour);
-		} else {
-			v.paints.push_back(colour);
-		}
-	};
+	std::vector<std::pair<std::string, uint32_t>> named;
 	if (const JValue *c = info.Get("colors"); c != nullptr && c->IsObject()) {
-		for (const auto &[n, col] : c->members) add_paint(n, ColourOf(col));
+		for (const auto &[n, col] : c->members) named.emplace_back(n, ColourOf(col));
 	}
 	if (const JValue *c = info.Get("paints"); c != nullptr && c->IsObject()) {
 		for (const auto &[n, paint] : c->members) {
-			if (const JValue *base = paint.Get("baseColor"); base != nullptr) add_paint(n, ColourOf(*base));
+			if (const JValue *base = paint.Get("baseColor"); base != nullptr) named.emplace_back(n, ColourOf(*base));
 		}
 	}
+	/* The default first, by its name, else the first whose name has it (the player, 27. 10., "proč je cely auto zeleny
+	 * vždycky": the 1203's flatbed's "Blue" is none of its paints, which begin with "Aquamarine"; its "Sky Blue" is). */
+	auto def_paint = std::ranges::find_if(named, [&def](const auto &p) { return p.first == def; });
+	if (def_paint == named.end() && !def.empty()) def_paint = std::ranges::find_if(named, [&def](const auto &p) { return StrContainsIgnoreCase(p.first, def); });
+	if (def_paint != named.end()) std::rotate(named.begin(), def_paint, def_paint + 1);
+	for (const auto &[n, colour] : named) v.paints.push_back(colour);
 	if (v.paints.empty()) v.paints.push_back(0xFF8C8C8C);
 
 	/* Its weight: the nodes', each by the "nodeWeight" before it or its own (25 kg as BeamNG has it otherwise), and the wheels' nodes. */
