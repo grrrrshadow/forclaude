@@ -70,6 +70,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   ale holky nepotřebujou extra každá animaci jinou“*: jedna společná chůze pro holky a Mata (kostra se stejnými
   jmény kostí, chůze přenesená podle kostí). Kolegovi otázka, jestli postavy s kostrou dodá; do té doby SPECIAL beze
   změny. Strašidla a ufon mají svoje animace.
+- Hráč: *„mat je strašidlo ale holky mužou chodit stejně. ať začne kostrama. všechny budou kouřit že jo?“*,
+  *„počkej až budou stejny kostry, pak budem přenašet. mat je dekorace jako strašidlo“*: společná kostra a animace
+  (chůze, kouření) jen pro holky, Mat si nechá svoje jako strašidla. Kolega začne kostrami holek (grrrrf 562442c);
+  přenos animací podle jmen kostí až budou kostry stejné.
 - Kolega (20fa77e): lavice jako kusy sady `naklady` (`lavice_studentky` 8 míst, `lavice_studentky_v3s` 6 míst,
   `studentky_stoji_v3s` 8 stojí, bez souboru), V3S bez holek (tar 30 → 9 MB, v kabině postavy hry). Rig: 6 holek
   na lavicích naproti sobě u bočnic, 8 stojících, řidička hry v kabině.
