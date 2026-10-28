@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (46) – Licence 3D enginu: autor Karel Mácha, GPL v2 jen verze 2, jméno a logo vyhrazené
+
+- Hráč: *„three d objects.cpp three d gpu.cpp jsou cely naše, uval na ně přisnou licenci.“* a *„ja to platim o
+  ochraně nepolemizuj co skacim motorovou pilou neni pokaceny sekyrou a neni to proto moje? si stroj, soustruh, co na
+  tobě udělam za svy prachy budu si branit“*.
+- Hotovo: hlavička `three_d_objects.cpp` a `three_d_gpu.cpp` – soubor hry ottd Decouple by Karel Mácha, Copyright (C)
+  2026 Karel Mácha, práva mimo licenci vyhrazená, GPL v2 jen verze 2 (ne „pozdější“), licence nedává právo ke jménu
+  „ottd Decouple“ ani k logu.
+- Mez: oba soubory jsou slinkované s OpenTTD (44 a 17 jeho hlaviček), takže se se hrou šíří pod GPL v2; licence nad
+  GPL by znamenala ztrátu práva hru šířit (GPL v2 §4). Úplně vlastní licence jen po oddělení 3D enginu od kódu OpenTTD
+  do samostatné knihovny (velká přestavba, domluvit). Spočítáno cestou: bez 3D GRF a překladů je naše ~23 % kódu hry
+  (117 z 501 tisíc řádků proti OpenTTD 16.0-beta2).
+
 ## 28. 10. (45) – Budovy po kostkách: blok kolem auta kreslí jen kus budovy, který do něj padne
 
 - Hráč (#311, logy): *„opentitle sav potřebuješ tam nechat ty značky nápisy ? asi maš označený sever jih zapad
