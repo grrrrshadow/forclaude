@@ -31,6 +31,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (39) – #307: zadní kola 1203, pomalý start nové hry
+
+Hráč: *„spravený kolečka má jenom škoda 1203 dodávka, ostatní maj zadní kola furt u středu. bylo znatelné zpomalení
+před generováním, myslel jsem že to zas zamrzlo“*, *„tu jednu maš dobře zadni kola, neni to spraveny na všech“*,
+*„trochu di dál od auta a vem si moje cfg s vyplymi zpravami“*, *„jo to je dobrý“*.
+
+- Kola: všechny konfigurace 1203 mají stejné díly zadní nápravy i `$trackoffset_R`; změřeno v modelu: zadní pneumatika
+  0,67–0,80 m od středu (přední 0,61–0,75) u dodávky, kombi i VB. Pohled z očí 8 m za autem: dodávka, kombi a VB žlutá
+  mají zadní kola stejně na krajích. Zblízka zezadu jsou kola o 1,2 m dál než nárazník, proto vypadají u středu.
+  Rig bere vypnuté zprávy z hráčova cfg (`news_display`).
+- Start nové hry: deník snímků #307 měl jeden tik 77 s (klik → hra). V rigu se všemi balíčky hráče: okna 1,3 s, z toho
+  1,2 s délky 1203 (`BeamngLength()`): jbeam celé složky se parsoval pro každé z 57 aut dvakrát. Teď jednou pro všechna,
+  jeden průchod, bez konfigurace „bez značky“ tam, kde má auto značky: 1187 → 339 ms, okna 0,4 s; délky stejné na mm.
+- log.txt: nadpis „NOVA HRA“ nese, jak dlouho se krajina připravovala: sady (kolik kol čtení), okna, krajina. Zbytek
+  těch 77 s na telefonu (sady FIRS/ECS/CZTR dvakrát kvůli Karibiku, generování) ukáže příští log.
+
 ## 27. 10. (38) – Z grrrrf: pózy na kostře, pózy kabin, balíčky bez holek, Tatry v5
 
 Hráč: *„vem z grrrf co nebylo hotove a dam novy build, pak se uvidi , s novymi grf. zastavky teď nebudem dělat“*.

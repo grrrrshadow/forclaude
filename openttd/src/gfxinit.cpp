@@ -401,6 +401,9 @@ void CheckBlitter()
 	ReInitAllWindows(false);
 }
 
+/** How many rounds the last loading of the sprites read the NewGRFs (GfxLoadSprites()): more than one when one gave up. */
+int _sprite_load_rounds = 0;
+
 /** Initialise and load all the sprites. */
 void GfxLoadSprites()
 {
@@ -420,7 +423,9 @@ void GfxLoadSprites()
 	 * of them, so it ends; with no NewGRF giving up there is one round, as
 	 * ever. */
 	NewGRFLoadRounds rounds;
+	_sprite_load_rounds = 0;
 	do {
+		_sprite_load_rounds++;
 		VideoDriver::GetInstance()->ClearSystemSprites();
 		FontCache::ClearFontCaches(FONTSIZES_ALL);
 		GfxInitSpriteMem();

@@ -11,5 +11,6 @@
 #define GFXINIT_H
 
 void GfxLoadSprites();
+extern int _sprite_load_rounds;
 
 #endif /* GFXINIT_H */

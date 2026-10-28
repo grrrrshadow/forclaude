@@ -946,7 +946,9 @@ static void MakeNewGameDone()
 {
 	/* Before anything else this start does, and on every path out of here --
 	 * a headless server takes an early one a few lines down. */
-	LogGameStart("NOVA HRA");
+	/* And how long the world took to start, in its heading, not as a record of something gone wrong. */
+	const std::string times = DescribeGenerateWorldTimes();
+	LogGameStart(times.empty() ? std::string("NOVA HRA") : fmt::format("NOVA HRA | {}", times));
 
 	SettingsDisableElrail(_settings_game.vehicle.disable_elrails);
 

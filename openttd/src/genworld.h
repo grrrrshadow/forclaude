@@ -78,6 +78,7 @@ DECLARE_ENUM_AS_SEQUENTIAL(GenWorldProgress)
 void GenerateWorldSetCallback(GWDoneProc *proc);
 void GenerateWorldSetAbortCallback(GWAbortProc *proc);
 void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_settings = true);
+std::string DescribeGenerateWorldTimes();
 void AbortGeneratingWorld();
 bool IsGeneratingWorldAborted();
 void HandleGeneratingWorldAbortion();

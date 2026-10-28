@@ -688,7 +688,27 @@ static bool FitsSlot(const JValue &part, const std::string &type)
 	return true;
 }
 
-bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, int make = -1)
+/** The jbeam files of a car's folder read, and those the mod shares in vehicles/common/ (the Škoda 1203's wheels) after them. */
+static std::vector<JValue> ReadCarJbeams(const BeamngVehicle &v)
+{
+	std::vector<JValue> out;
+	std::vector<std::string> files = ListCarFiles(v);
+	std::sort(files.begin(), files.end());
+	for (const std::string &f : files) {
+		if (EndsWithIgnoreCase(f, ".jbeam")) out.push_back(ParseJson(ReadModFile(v, f)));
+	}
+	for (const std::string &f : ListModCommonFiles(v)) {
+		if (EndsWithIgnoreCase(f, ".jbeam")) out.push_back(ParseJson(ReadModFile(v, f)));
+	}
+	return out;
+}
+
+/**
+ * The parts of a car as its configuration has them, of a make of our 1203 (-1 as the configuration has it).
+ * @param jbeams the jbeam files of its folder read already (ReadCarJbeams(): the lengths of all its cars at once,
+ *               BeamngLength()), outliving the parts; nullptr: read them now, the parts' own
+ */
+bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, int make = -1, const std::vector<JValue> *jbeams = nullptr)
 {
 	std::vector<std::string> files = ListCarFiles(v);
 	std::sort(files.begin(), files.end());
@@ -729,16 +749,13 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 		}
 	}
 	ChooseMakeParts(v, make, chosen);
-	for (const std::string &f : files) {
-		if (EndsWithIgnoreCase(f, ".jbeam")) parts.files.push_back(ParseJson(ReadModFile(v, f)));
-	}
-	/* And the parts the mod shares in vehicles/common/ (the Škoda 1203's wheels), after the car's own. */
-	for (const std::string &f : ListModCommonFiles(v)) {
-		if (EndsWithIgnoreCase(f, ".jbeam")) parts.files.push_back(ParseJson(ReadModFile(v, f)));
+	if (jbeams == nullptr) {
+		parts.files = ReadCarJbeams(v);
+		jbeams = &parts.files;
 	}
 	std::map<std::string, const JValue *> by_name;
 	const JValue *main = nullptr;
-	for (const JValue &file : parts.files) {
+	for (const JValue &file : *jbeams) {
 		for (const auto &[name, part] : file.members) {
 			if (!part.IsObject()) continue;
 			by_name.emplace(name, &part);
@@ -3350,39 +3367,45 @@ float BeamngLength(const BeamngVehicle &v, int make)
 	auto key_of = [](const BeamngVehicle &b, int m) { return fmt::format("{}|{}|{}|{}", b.Package(), b.folder, b.config, m); };
 	if (auto it = known.find(key_of(v, make)); it != known.end()) return it->second;
 
-	/* The cars of the folder: each configuration, as it is and as each of its makes. */
+	/* The cars of the folder drawn: each configuration as each of its makes, else as it is. */
 	std::vector<std::pair<const BeamngVehicle *, int>> cars;
 	for (const BeamngVehicle &b : FindBeamngVehicles()) {
 		if (b.Package() != v.Package() || b.folder != v.folder) continue;
-		cars.emplace_back(&b, -1);
 		std::set<int> makes;
 		for (const BeamngModel &m : b.models) {
 			if (m.make >= 0 && makes.insert(m.make).second) cars.emplace_back(&b, m.make);
 		}
+		if (makes.empty()) cars.emplace_back(&b, -1);
 	}
 	if (std::ranges::none_of(cars, [&](const auto &c) { return c.first->config == v.config && c.second == make; })) cars.emplace_back(&v, make);
 
-	/* Their parts drawn (ReadBeamngShape(): those used and the tarp), read twice -- the parts of every car kept would be
-	 * the jbeam of the folder over and over -- and the meshes all of them name, the model read once for all. */
+	/* Their parts drawn (ReadBeamngShape(): those used and the tarp) of the folder's jbeam read once -- read for each car
+	 * of our 1203s, twice, they were two thirds of the time -- and the meshes all of them name, the model read once. */
 	JValue info = ParseJson(ReadModFile(v, "info.json"));
+	const std::vector<JValue> jbeams = ReadCarJbeams(v);
 	auto drawn_of = [](const CarParts &parts) {
 		std::vector<const JValue *> drawn = parts.used;
 		if (parts.tarp != nullptr) drawn.push_back(parts.tarp);
 		return drawn;
 	};
+	std::vector<std::optional<CarParts>> parts_of(cars.size());
 	std::set<std::string> wanted;
-	for (const auto &[b, m] : cars) {
-		CarParts parts;
-		if (!ReadCarParts(*b, info.IsObject() ? &info : nullptr, parts, m)) continue;
+	for (size_t i = 0; i < cars.size(); i++) {
+		CarParts &parts = parts_of[i].emplace();
+		if (!ReadCarParts(*cars[i].first, info.IsObject() ? &info : nullptr, parts, cars[i].second, &jbeams)) {
+			parts_of[i].reset();
+			continue;
+		}
 		wanted.merge(FlexbodyMeshes(drawn_of(parts)));
 	}
 	CarDaes daes;
 	const bool modelled = ReadCarDaes(v, wanted, daes);
 	std::map<const XmlNode *, std::vector<float>> corners; // of a geometry, x, y, z each
-	for (const auto &[b, m] : cars) {
+	for (size_t i = 0; i < cars.size(); i++) {
+		const auto &[b, m] = cars[i];
 		float &length = known[key_of(*b, m)];
-		CarParts parts;
-		if (!modelled || !ReadCarParts(*b, info.IsObject() ? &info : nullptr, parts, m)) continue;
+		if (!modelled || !parts_of[i].has_value()) continue;
+		const CarParts &parts = *parts_of[i];
 		auto fr = _frames.find(b->Package() + "|" + b->folder + "|" + b->config);
 		const CarFrame frame = fr != _frames.end() ? fr->second : CarFrame{};
 		double lo = std::numeric_limits<double>::infinity(), hi = -lo;

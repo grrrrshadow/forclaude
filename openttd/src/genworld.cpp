@@ -45,6 +45,8 @@
 
 #include "table/strings.h"
 
+#include <chrono>
+
 #include "safeguards.h"
 
 
@@ -72,6 +74,15 @@ struct GenWorldInfo {
 
 /** Whether we are generating the map or not. */
 bool _generating_world;
+
+/**
+ * How long the start of a new world takes (the player, 28. 10.: "a slowdown before the generating, I thought it froze
+ * again"): its sets read (GfxLoadSprites(), so many rounds), its windows made anew (ResetWindowSystem(): every engine's
+ * size), then the land; the record (log.txt) says it when the game begins (DescribeGenerateWorldTimes()).
+ */
+static struct {
+	std::chrono::steady_clock::time_point start, sets, windows;
+} _generate_world_times;
 
 class AbortGenerateWorldSignal { };
 
@@ -328,7 +339,9 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 	if (_settings_game.game_creation.generation_seed == GENERATE_NEW_SEED) _settings_game.game_creation.generation_seed = InteractiveRandom();
 
 	/* Load the right landscape stuff, and the NewGRFs! */
+	_generate_world_times.start = std::chrono::steady_clock::now();
 	GfxLoadSprites();
+	_generate_world_times.sets = std::chrono::steady_clock::now();
 	SetCurrentRailTypeLabelList();
 	SetCurrentRoadTypeLabelList();
 	InitializeBuildingCounts();
@@ -336,6 +349,7 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 
 	/* Re-init the windowing system */
 	ResetWindowSystem();
+	_generate_world_times.windows = std::chrono::steady_clock::now();
 
 	/* Create toolbars */
 	SetupColoursAndInitialWindow();
@@ -351,6 +365,17 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 	ScrollMainWindowToTile(TileXY(Map::SizeX() / 2, Map::SizeY() / 2), true);
 
 	_GenerateWorld();
+}
+
+/** How long the start of the new world took till now (_generate_world_times), in words for the record: seconds. */
+std::string DescribeGenerateWorldTimes()
+{
+	const auto &t = _generate_world_times;
+	if (t.start == std::chrono::steady_clock::time_point{}) return {};
+	auto secs = [](auto from, auto to) { return std::chrono::duration<double>(to - from).count(); };
+	const auto now = std::chrono::steady_clock::now();
+	return fmt::format("krajina se pripravovala {:.1f} s: sady {:.1f} s ({} kol cteni), okna {:.1f} s, krajina {:.1f} s",
+			secs(t.start, now), secs(t.start, t.sets), _sprite_load_rounds, secs(t.sets, t.windows), secs(t.windows, now));
 }
 
 /**
