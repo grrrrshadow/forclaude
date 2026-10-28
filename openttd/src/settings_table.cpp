@@ -452,14 +452,8 @@ static void ThreeDChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
-/** The houses of the towns as their 3D objects or the original houses (gui.three_d_houses): every view drawn anew. */
+/** The houses of the towns as their 3D objects or the original houses (gui.three_d_houses), the wheels turning or not (gui.three_d_wheels): every view drawn anew. */
 static void ThreeDHousesChanged(int32_t)
-{
-	MarkWholeScreenDirty();
-}
-
-/** The houses facing north as 3D objects or their sprites (gui.three_d_north_houses): every view drawn anew. */
-static void ThreeDNorthHousesChanged(int32_t)
 {
 	MarkWholeScreenDirty();
 }

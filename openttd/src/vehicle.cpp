@@ -2184,7 +2184,7 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 
 	/* Turned (three_d.h), the vehicle is drawn as its likeness, which may reach further than this sprite does
 	 * (the whole articulated vehicle from its first part, at its true length): room for that. */
-	if (IsViewTurned()) {
+	if (IsViewDrawnTurned()) {
 		int w = new_coord.right - new_coord.left, h = new_coord.bottom - new_coord.top;
 		new_coord.left -= w + 8 * ZOOM_BASE;
 		new_coord.right += w + 8 * ZOOM_BASE;

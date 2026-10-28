@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (42) – Úhel 0 jen další kamera: hlavní okno kartou i na sever
+
+- Hráč: *„v uhlu nula se naš 3D prumysl blbě kresli ,co je vzadu se kresli navrchu, jen v uhlu 0 když točim herni
+  plochou tak je to dobry a v uhlu 0 zas blbě když se vratim do uhlu 0 .“*, *„tak to se musi dodělat přechod na gpu
+  a neflastrovat tohle“*, *„navrhuju přečist ti temata ať viš kde si a co dělaš“*, pak *„123 jo . mala okna se
+  nebudou otačet, jen hlavni velke okno.  bude 3D bez volby postaru“*.
+- Příčina: úhel 0 do přechodu nespadl. Hlavní okno na 0° kreslila stará cesta OpenTTD (řazení spritů podle krabic),
+  všechny díly bloku průmyslu tam měly krabici své kotvy, takže zadní díl přes přední. Od 1° kreslí otočená cesta,
+  která zná hloubku.
+- Hotovo: hlavní okno se zapnutým 3D (32 bpp) kreslí druhý vykreslovač na každém úhlu, i na 0° (`IsViewDrawnTurned()`,
+  `IsViewportTurned()`). Na 0° se body kreslí tam, kde vždycky, takže myš (dlaždice pod kurzorem), hranice mapy,
+  překreslování a kulaté zatáčky zůstávají jako dřív (`IsViewportTurnedAway()`: jen při otočení). Malá okna (pohled
+  vozidla, další pohledy) se neotáčejí a kreslí se postaru (domy jako objekty, když hlavní okno není otočené).
+  Nastavení „domy a průmysl na sever: 3D / původní obrázky“ je pryč. **Stojící věci kartou zapnuté ve hře**
+  (krok 2 z (36)); procesor je kreslí jen tam, kde zem není z karty (screenshot, bez sdílení kontextu, jiný blitter).
+- Na 0° teď platí, co dřív jen při otočení: trolejové vedení a ploty kolejí se nekreslí, chodci a auta výzdoby žijí
+  kolem středu hlavního pohledu.
+- Ověřeno v rigu: ropné vrty a elektrárna s komíny na 0° ve správném pořadí (i po otočení na 1° a zpět), rámeček
+  kurzoru na 0° se zemí z karty a posouvá se s kurzorem, stojící věci kartou = procesorem (liší se jen pole, kouř,
+  ovce a datum, které se mezi snímky samy změnily), bez sdílení kontextu procesorem dobře, kouřová baterie beze změny.
+- Rig: `test3d postav <x> <y> typ<N>` (průmysl hry podle čísla, vrty 11 – v mírném jen do roku 1950),
+  `test3d kurzor <x> <y>` (kurzor s rámečkem jako u stavění); snímky z karty jen `test3d obrazovka`.
+- Další: build, změřit na telefonu (snimky.log, 3d_karta.log), hlavně 0° při stavění; pak kamera jako matice
+  a mezipaměť scény.
+
 ## 28. 10. (41) – Kola 1203: srovnat u všech stejně, beamng.log
 
 Hráč: *„ma zadni kola bliž u sebe než předni #308 všechny teď"*, *„tady jsou asi srovnany ty kola.

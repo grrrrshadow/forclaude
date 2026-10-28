@@ -2238,10 +2238,6 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x z
 STR_CONFIG_SETTING_THREE_D                                      :3D: turning previews and turning the map view: {STRING2}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vehicles (trains, road vehicles, ships, aircraft) at the original game's size, bigger (BRYLE); off smaller (CZTR): {STRING2}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Every vehicle the game draws from its 3D object (the GRFs with objects: not from their pictures), all at once: at the size of the original game, as the bigger sets draw (BRYLE), 20% bigger; off, smaller, at the scale of CZTR. The length of trains and road vehicles is the object's, so a train is as long as it looks. For a new game: set it in the main menu before starting one
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES                         :Houses and the game's own industries when the view faces north (angle 0): {STRING2}
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_HELPTEXT                :How the houses and the game's own industries (the school, the statue, the plantation, the potato field, the distillery, the pub...) that have a 3D object look when the map view faces north (angle 0, as for building): as 3D objects, the same as when the view turns; or their pictures (sprites), as the game drew them before. Those without a 3D object always keep their pictures. Needs 3D on and the 32bpp blitter
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_OBJECTS                 :3D, the same as when turning
-STR_CONFIG_SETTING_THREE_D_NORTH_HOUSES_SPRITES                 :the original pictures
 STR_CONFIG_SETTING_THREE_D_HOUSES                               :Town houses: {STRING2}
 STR_CONFIG_SETTING_THREE_D_HOUSES_HELPTEXT                      :How the houses of the towns look: as 3D objects (the houses the game uses now), or as the original houses of OpenTTD the way this game drew them before the 3D objects - simple boxes when the view turns and in the view from the eyes, their original pictures when the view faces north
 STR_CONFIG_SETTING_THREE_D_HOUSES_OBJECTS                       :3D houses

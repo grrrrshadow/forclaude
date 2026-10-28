@@ -3213,7 +3213,7 @@ void PrepareThreeDVehicleObjectOnMap(const Vehicle *front)
 		if (obj == nullptr || piece != obj->anchor) continue;
 		obj->TryGetShape(0, obj->PartsOf(StateStep(obj, u->engine_type, u, EngineImageType::OnMap)));
 		for (ZoomLevel zoom : zooms) {
-			if (IsViewTurned()) {
+			if (IsViewDrawnTurned()) {
 				VehicleObjectPlace place;
 				PlaceVehicleObject(u, zoom, nullptr, place);
 				continue;

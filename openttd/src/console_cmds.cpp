@@ -8881,14 +8881,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (GetIndustrySpec(it)->enabled && GetIndustrySpec(it)->name == STR_INDUSTRY_NAME_FOREST) forest = it;
 		}
 		if (argv[4] == "les") type = forest;
+		/* An industry of the original game by its number (the oil wells, 3D from the shared parts). */
+		if (type == IT_INVALID && argv[4].starts_with("typ")) {
+			auto n = ParseInteger(argv[4].substr(3));
+			if (n.has_value() && *n < NUM_INDUSTRYTYPES && GetIndustrySpec(static_cast<IndustryType>(*n))->enabled) type = static_cast<IndustryType>(*n);
+		}
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]>' (test3d objekty lists them; paseka the forest with a clearing).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]|typ<N>>' (test3d objekty lists them; paseka the forest with a clearing; typ<N> an industry of the game by its number).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
 		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
-		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST)) {
+		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST || argv[4].starts_with("typ"))) {
 			Industry *ind = Industry::GetByTile(tile);
 			/* The look asked for: the statue's bronze, or the second of two looks (the dragon farm's castle). */
 			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 || GetThreeDIndustryObject(type, true) == obj ? 1 : 0);
@@ -11522,6 +11527,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern TileIndex _turned_debug_tile;
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
+		return true;
+	} else if (what == "kurzor") {
+		/* 'kurzor <x> <y>': the cursor put at a place of the screen with the tile under it marked, as by a building
+		 * tool (a rectangle), for the pictures of the marking (the main view drawn turned facing north too). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: kurzor needs a screen x and y.");
+			return true;
+		}
+		if ((_thd.place_mode & HT_DRAG_MASK) == HT_NONE) SetObjectToPlace(SPR_CURSOR_MOUSE, PAL_NONE, HT_RECT, WindowClass::MainWindow, 0);
+		_cursor.pos.x = *x;
+		_cursor.pos.y = *y;
+		UpdateTileSelection();
+		IConsolePrint(CC_DEFAULT, "test3d: kurzor {},{} dlazdice {},{}", *x, *y, _thd.pos.x / (int)TILE_SIZE, _thd.pos.y / (int)TILE_SIZE);
 		return true;
 	} else if (what == "mys") {
 		auto x = number(2), y = number(3);

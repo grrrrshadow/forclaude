@@ -256,7 +256,6 @@ struct GUISettings {
 	uint32_t sprite_cache_size_mb; ///< Memory for the sprite cache in MB with a 32bpp blitter (a quarter of it with 8bpp), the player's to set: more sets and finer zoom want more, else the game loads sprites over and over.
 	bool sprite_mitchell; ///< The 8x and the 4x a 32bpp set has not got made straight from its finest level with Mitchell's filter (DownscaleMitchell()), not by halves with a 2x2 mean: sharper, and about twice the time to load a sprite.
 	bool three_d; ///< The 3D of this game (three_d.h): the previews that turn and the map view turned to any angle. Off, nothing of it is there.
-	uint8_t three_d_north_houses; ///< The houses that are 3D objects facing north (angle 0): 0 drawn as the objects, the same as in the turned view; 1 the original pictures.
 	uint8_t three_d_houses; ///< The houses of the towns: 0 the 3D objects (three_d_objects.h); 1 the original houses of OpenTTD, the boxes of their hand tables in 3D and their pictures facing north.
 	bool three_d_wheels;          ///< The wheels of the 3D vehicles turn as they go and the front ones steer; off, they stand still in the model.
 	bool three_d_gpu;             ///< The 3D pictures drawn by the graphics card (three_d_gpu.h); off, by the processor.

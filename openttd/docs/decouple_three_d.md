@@ -361,15 +361,15 @@ too.
 - **A name of its own** (`"nazev"`: a string, or `{"cs": ..., "en": ...}`): the land area information shows it
   for the finished house drawn as that object, 3D on (`GetThreeDHouseTitle()`, `TileDesc::name`): house 0x1F is the
   ÚV KSČ building (the colleague's `hra/3d/PROSBA-UV-KSC.md`).
-- **Facing north** (the player, 15. 10.: "which houses show at view 0, the
-  original houses as today or the same as when we turn; by default the same as
-  when we turn"): the setting *Houses when the view faces north* (`gui.three_d_north_houses`,
-  Graphics, under 3D): *3D, the same as when turning* (default) draws such a
+- **Facing north**: the main view is drawn by the second renderer at angle 0 too, the same as turned (the player,
+  28. 10.: "3D without the choice of the old way"; `IsViewDrawnTurned()`, `IsViewportTurned()`; finding the tile
+  under the mouse, the clamp to the map, the dirty rects and the round curves stay as facing north,
+  `IsViewportTurnedAway()`). The setting *Houses when the view faces north* is gone. The small views (a vehicle's,
+  the extra viewports) do not turn; while the main view faces north they draw such a
   house in the game's usual north renderer by the same object
   (`AddNorthHouseObject()` after its tile's draw: its sprites `box_kind` 4, the
   object `box_kind` 7 among the sorted sprites, `ViewportDrawParentSprites()`);
-  fences, catenary and vehicles stay as they are facing north. *The original
-  pictures* keeps the sprites, pixel for pixel. A house on a slope keeps the walls of its foundation, the
+  fences, catenary and vehicles stay as they are facing north. A house on a slope keeps the walls of its foundation, the
   ground on them left out for the object's own plot (`LeaveOutTileSprites()`; the player, 15. 10.: nothing under
   the houses on a slope, black holes in a screenshot -- on the screen what was drawn there before). Only while the main view is at angle 0 (the other views then too),
   3D on and a 32bpp blitter. A full redraw of a dense town at zoom 1 in the rig:
@@ -420,9 +420,8 @@ too.
   the same way with `brambory_male`/`brambory_vzrostle` and the soil's `prace`
   `brambory`; the distillery (`lihovar`, `IT_DISTILLERY`, 3x3, potatoes to alcohol)
   and the pub (`hospoda`, `IT_PUB`, in a town, alcohol to passengers) are drawn
-  from their objects. Facing north the game's own industries are drawn from
-  their objects too, as the houses (`gui.three_d_north_houses`,
-  `AddIndustryObjects()`): the potatoes, the distillery and the pub have no
+  from their objects. In the small views facing north the game's own industries are drawn from
+  their objects too, as the houses (`AddIndustryObjects()`): the potatoes, the distillery and the pub have no
   pictures of their own (without the objects: the soil, a warehouse in a
   concrete yard, an old house).
 - **The girls of the industry** (16. 10., the colleague's
@@ -460,7 +459,7 @@ too.
   placed on the tiles as objects of their own that draw with that texture
   (`ThreeDObject::texture_of`, `PlaceIndustryPart()`), lit by their normals
   turned with them, their windows lit at night (`noc`, `svetlo_NN`). Drawn on
-  the turned map, facing north as the houses (`gui.three_d_north_houses`) and
+  the turned map, in the small views facing north as the houses and
   in the view from the eyes (`AddOriginalIndustryTile()`); an industry being
   built shows its yards only, an animated tile (the mine's wheel, the oil
   wells) the same as at rest; an industry tile of a set (NewGRF) keeps its

@@ -257,7 +257,7 @@ static VpSpriteSorter _vp_sprite_sorter = nullptr;
 
 static Point MapXYZToViewport(const Viewport &vp, int x, int y, int z)
 {
-	Point p = IsViewportTurned(vp) ? ProjectTurned(x, y, z) : RemapCoords(x, y, z);
+	Point p = IsViewportTurnedAway(vp) ? ProjectTurned(x, y, z) : RemapCoords(x, y, z);
 	p.x -= vp.virtual_width / 2;
 	p.y -= vp.virtual_height / 2;
 	return p;
@@ -494,7 +494,7 @@ Point TranslateXYToTileCoord(const Viewport &vp, int x, int y, bool clamp_to_map
 
 	int vx = ScaleByZoom(x - vp.left, vp.zoom) + vp.virtual_left;
 	int vy = ScaleByZoom(y - vp.top, vp.zoom) + vp.virtual_top;
-	if (IsViewportTurned(vp)) return InverseRemapCoordsTurned(vx, vy, clamp_to_map);
+	if (IsViewportTurnedAway(vp)) return InverseRemapCoordsTurned(vx, vy, clamp_to_map);
 	return InverseRemapCoords2(vx, vy, clamp_to_map);
 }
 
@@ -1888,7 +1888,7 @@ static void DrawTurnedVehicle(const DrawPixelInfo &frame, const ParentSpriteToDr
 static void ViewportDrawParentSprites(const ParentSpriteToSortVector *psd, const ChildScreenSpriteToDrawVector *csstdv)
 {
 	for (const ParentSpriteToDraw *ps : *psd) {
-		/* Facing north, a house that is a 3D object as in the turned view (gui.three_d_north_houses): the object
+		/* Facing north in a small view, a house that is a 3D object as in the turned view: the object
 		 * once, whole, in place of the sprites of its tiles (AddNorthHouseObject()). */
 		if (ps->box_kind == 4) continue;
 		if (ps->box_kind == 7) {
@@ -3721,7 +3721,7 @@ bool ViewportVehiclesOnCard()
 static bool _north_house_objects_now = false;
 /**
  * Whether the view facing north being collected draws the houses that are 3D objects as objects
- * (gui.three_d_north_houses): the figures standing among them then come as their likeness too.
+ * (a small view while the main one faces north): the figures standing among them then come as their likeness too.
  */
 bool ViewportDrawingNorthObjects()
 {
@@ -4998,9 +4998,8 @@ static void LeaveOutTileSprites(size_t first_parent, bool keep_foundation)
  * house; a tile of a field (the marijuana plantation, the potato field) laid from the parts of the fields -- the
  * soil under the plants of the stage and the girl at work, and from the tile before the field road the road tile
  * behind it with the road (flat and first, under the cars), the shed and the haystack and the girls by its edges,
- * each its own thing. The sprites the tile just added are left out (box_kind 4). In the turned view, and facing
- * north as the houses (gui.three_d_north_houses): the potato field, the distillery and the pub have no pictures of
- * their own there.
+ * each its own thing. The sprites the tile just added are left out (box_kind 4). In the turned view, and in a small
+ * view facing north as the houses: the potato field, the distillery and the pub have no pictures of their own there.
  * @param first_parent the first of the sprites the tile added
  * @param north whether the view faces north (the foundations stay, LeaveOutTileSprites())
  */
@@ -5214,10 +5213,10 @@ static void AddStreetLamps(size_t first_parent)
 }
 
 /**
- * Facing north, a house that is a real 3D object drawn as in the turned view (the player, 15. 10.: "which houses show
- * at view 0, the original houses as today or the same as when we turn; by default the same as when we turn",
- * gui.three_d_north_houses): the sprites the house's tile just added are left out (box_kind 4) and its object is
- * drawn once, whole, among the standing things (box_kind 7, ViewportDrawParentSprites()).
+ * Facing north in a small view, a house that is a real 3D object drawn as in the turned view (the player, 28. 10.:
+ * "3D without the choice of the old way"; the main view is drawn turned at angle 0 too): the sprites the house's tile
+ * just added are left out (box_kind 4) and its object is drawn once, whole, among the standing things (box_kind 7,
+ * ViewportDrawParentSprites()).
  * @param first_parent the first of the sprites the tile added
  */
 static void AddNorthHouseObject(size_t first_parent)
@@ -5463,11 +5462,12 @@ static TurnedCardGround _turned_card_ground;
 static bool _turned_whole_view_pass = false;
 bool _turned_card_ground_on = true; ///< Rig: the ground of the turned main view shown straight from the card (test3d zem ukaz); else read back into the screen
 /**
- * Rig: what stands on the turned main view laid by the card over its ground, shown straight from it (ThreeDGpuStanding;
- * the player, 26. 10.: "the card to compose the turned map", step 2; test3d stojici ukaz); else drawn by the processor
- * into the block. The rig's till the card draws every kind of them itself.
+ * What stands on the turned main view laid by the card over its ground, shown straight from it (ThreeDGpuStanding;
+ * the player, 26. 10.: "the card to compose the turned map", step 2; on in the game since 28. 10., "finish the move to
+ * the GPU", north too); else drawn by the processor into the block. The processor still draws it where the card's
+ * ground is not there (a screenshot, no shared context, another blitter). Rig: test3d stojici ukaz.
  */
-bool _turned_card_standing_on = false;
+bool _turned_card_standing_on = true;
 /** The rig: the vehicles among it drawn by the card, no pictures of them (ThreeDGpuStandingVehicle; test3d stojici auta); else laid as their pictures. */
 bool _standing_vehicles_on_card = true;
 
@@ -7019,7 +7019,7 @@ static void ViewportDoDrawTurned(bool hole_only = false)
 	if (!card_has && !ground_laying.into_view) MakeTurnedBlockWhole(frame);
 	if (card_has) ShowTurnedCardGround();
 	double tb0 = TurnedNow();
-	/* Laid by the card over its ground, the block a hole (the rig's for now); else drawn into the block. */
+	/* Laid by the card over its ground, the block a hole; else drawn into the block. */
 	bool standing_on_card = false;
 	if (_turned_card_standing_on && ground_on_card && _turned_card_ground.vp != nullptr) {
 		ThreeDGpuStanding on_card;
@@ -7510,8 +7510,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	/* The pictures it asks for kept till it draws them (the memory of the pictures is bounded, MakeRoomForPicture()). */
 	KeepThreeDPicturesOfBlock();
-	/* The round curves of rails (round_track.h), only in the turned view: facing north the player builds, the curves are as always. */
-	RoundTrackPass round_track_pass(IsViewportTurned(vp));
+	/* The round curves of rails (round_track.h), only turned away from north: facing north the player builds, the curves are as always. */
+	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
 	/* The whole turned main view laid by the card this pass: the block only a hole for it. */
 	const bool whole_on_card = IsViewportTurned(vp) && TurnedViewWholeOnCard(vp);
 	_vd.dpi.zoom = vp.zoom;
@@ -7557,9 +7557,11 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		AutoRestoreBackup turned_vp(_turned_vp, &vp);
 		ViewportDoDrawTurned(whole_on_card);
 	} else {
-		/* Facing north again: the turned view's ground from the card shown no more (TurnedCardGround). */
+		/* Drawn as the game drew it (a small view, the 3D off): the turned view's ground from the card shown no more
+		 * (TurnedCardGround). A small view facing north draws the houses that are 3D objects as the objects, while the
+		 * main view is not turned (they are laid with its turn, MapLay()). */
 		if (_turned_card_ground.vp == &vp) HideTurnedCardGround();
-		_north_house_objects = ThreeDEnabled() && _settings_client.gui.three_d_north_houses == 0 && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ObjectsIndexReadOrOwed();
+		_north_house_objects = ThreeDEnabled() && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ObjectsIndexReadOrOwed();
 		_turned_objects.clear();
 		_turned_vehicle_pictures.clear();
 		AutoRestoreBackup north_objects_backup(_north_house_objects_now, _north_house_objects);
@@ -7687,7 +7689,7 @@ static inline void ClampViewportToMap(const Viewport &vp, int *scroll_x, int *sc
 	/* Turned, the view may go on past the edge of the map into the void around it, THREE_D_VOID_TILES tiles
 	 * beyond (the player: the black nothing must be bigger, for the camera to move there); the ground point
 	 * under the middle of the screen is what is kept within that. Facing north the game clamps as it always did. */
-	if (IsViewportTurned(vp)) {
+	if (IsViewportTurnedAway(vp)) {
 		double wx, wy;
 		InverseTurnedFlatF(pt.x, pt.y, 0, wx, wy);
 		const double margin = THREE_D_VOID_TILES * TILE_SIZE;
@@ -7824,7 +7826,7 @@ void UpdateViewportPosition(Window *w, uint32_t delta_ms)
 static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, int bottom)
 {
 	/* Turned (three_d.h), the place is drawn elsewhere on the screen. */
-	if (IsViewportTurned(vp)) TurnDirtyRect(left, top, right, bottom);
+	if (IsViewportTurnedAway(vp)) TurnDirtyRect(left, top, right, bottom);
 
 	/* Rounding wrt. zoom-out level */
 	right += (1 << to_underlying(vp.zoom)) - 1;

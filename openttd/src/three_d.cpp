@@ -85,15 +85,36 @@ bool IsViewTurned()
 }
 
 /**
- * Whether this viewport is drawn turned: only the main view turns, the extra
- * viewports and the ones in vehicle windows keep facing north.
+ * Whether the main view is drawn by the second renderer: with the 3D on, at every angle, north too (the player,
+ * 28. 10.: angle 0 is only another camera, "3D without the choice of the old way"). Not on 8 bpp, where the view
+ * does not turn (SetViewYaw()).
+ */
+bool IsViewDrawnTurned()
+{
+	return ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
+}
+
+/**
+ * Whether this viewport is drawn by the second renderer (IsViewDrawnTurned()): only the main view, the extra
+ * viewports and the ones in vehicle windows keep facing north, drawn as the game drew them.
  * @param vp the viewport about to be drawn
  */
 bool IsViewportTurned(const Viewport &vp)
 {
-	if (!IsViewTurned()) return false;
+	if (!IsViewDrawnTurned()) return false;
 	const Window *w = FindWindowById(WindowClass::MainWindow, 0);
 	return w != nullptr && w->viewport != nullptr && w->viewport.get() == &vp;
+}
+
+/**
+ * Whether this viewport is turned away from north (IsViewportTurned() and IsViewTurned()): its points elsewhere on
+ * the screen. Facing north the second renderer draws them where the game always did, so finding the tile under the
+ * mouse, keeping the view on the map and marking what to repaint stay as they were.
+ * @param vp the viewport
+ */
+bool IsViewportTurnedAway(const Viewport &vp)
+{
+	return IsViewTurned() && IsViewportTurned(vp);
 }
 
 /**
