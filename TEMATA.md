@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (47) – Autorství ve všech našich souborech, návrh licence dat
+
+- Hráč: *„uval to na dalši naše, viewport, first person a dalši naše. ja vim že to nejde na train cmd protože je z
+  vanila. jakou licenci tedy davaš na naše data.“*
+- Hotovo: všech 81 úplně nových souborů v `src/` (mimo `3rdparty`) má hlavičku jako 3D engine (ottd Decouple by Karel
+  Mácha, Copyright (C) 2026 Karel Mácha, práva mimo licenci vyhrazená, GPL v2 jen verze 2, jméno a logo vyhrazené).
+  231 původních souborů OpenTTD s našimi změnami (viewport, train_cmd, console_cmds, industry_cmd…) si nechává hlavičku
+  OpenTTD a má řádek „Changed for ottd Decouple by Karel Mácha: the changes Copyright (C) 2026 Karel Mácha“ (GPL v2
+  §2a to u upravených souborů chce). Vynecháno 48 souborů s 1–2 změněnými řádky (často převzaté opravy z beta3); naše
+  změny odhadnuté proti 16.0-beta2 i beta3.
+- Návrh licence dat: `NAVRH-LICENCE-DAT.md` (smí se hrát, šířit nezměněné, videa a streamy; bez svolení ne: mimo hru,
+  upravené verze, komerčně, AI s výhradou podle § 39d AZ / čl. 4 směrnice 2019/790 – kromě nástrojů autorů hry, obsah
+  s násilím na skutečných lidech, nenávistí, sexuálním obsahem s postavami hry; převzaté části pod svými licencemi).
+  Čeká na hráče; u kolegových balíčků rozhoduje kolega, starší verze zůstávají CC BY 4.0.
+
 ## 28. 10. (46) – Licence 3D enginu: autor Karel Mácha, GPL v2 jen verze 2, jméno a logo vyhrazené
 
 - Hráč: *„three d objects.cpp three d gpu.cpp jsou cely naše, uval na ně přisnou licenci.“* a *„ja to platim o
