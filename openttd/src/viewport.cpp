@@ -1316,9 +1316,11 @@ static std::vector<TileIndex> _tiles_owed_objects;
  */
 static bool ObjectReadyOrOwed(const ThreeDObject *o, TileIndex origin, TileIndex tile)
 {
-	if (ThreeDObjectReadyToDraw(o, to_underlying(_vd.dpi.zoom), o->PaintAt(origin))) return true;
-	if (_tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(tile);
-	return false;
+	bool exact = true;
+	const bool ready = ThreeDObjectReadyToDraw(o, to_underlying(_vd.dpi.zoom), o->PaintAt(origin), &exact);
+	/* Not ready, or drawn with its texture of another zoom standing in: drawn again when its own is there. */
+	if ((!ready || !exact) && _tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(tile);
+	return ready;
 }
 
 /** The indices of the objects were not read yet when a block of the map was drawn (ObjectsIndexReadOrOwed()). */
@@ -4149,6 +4151,8 @@ static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure 
  */
 /** DrawObjectInto(): over the depth of what it drew last, among its triangles (the parts drawn with a building, TurnedObject::with). */
 static bool _turned_over_last = false;
+/** DrawObjectInto(): drawn into a picture that is kept (RenderThreeDObjectsPicture()), with the textures of its zoom. */
+static bool _object_picture_kept = false;
 
 static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const ObjectLay &lay, const ThreeDObject *o, double ox, double oy, double oz, uint32_t paint, std::span<const ThreeDObjectFigure> more, const TurnedObjectPicture *picture = nullptr, bool triangles_only = false, std::vector<float> *depth_out = nullptr, double pic_dx = 0, double pic_dy = 0, float pic_dd = 0)
 {
@@ -4164,13 +4168,16 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	const ThreeDObjectTexture *tex = nullptr;
 	/* Its shape as simple as the zoom allows; none of it when it is drawn already. */
 	const ThreeDObjectShapeView shape = o != nullptr && picture == nullptr ? TurnedObjectShape(o, lay) : ThreeDObjectShapeView{};
-	if (o != nullptr && picture != nullptr) tex = o->GetTexture(to_underlying(lay.zoom), paint);
+	/* Drawn straight into the view, a texture of another zoom stands in while this one's is painted (DrawnTexture());
+	 * into a picture kept (depth_out), the zoom's own. */
+	const bool kept = depth_out != nullptr || _object_picture_kept;
+	if (o != nullptr && picture != nullptr) tex = kept ? o->GetTexture(to_underlying(lay.zoom), paint) : o->DrawnTexture(to_underlying(lay.zoom), paint);
 	if (o != nullptr && !shape.tri.empty()) {
-		tex = o->GetTexture(to_underlying(lay.zoom), paint);
+		tex = kept ? o->GetTexture(to_underlying(lay.zoom), paint) : o->DrawnTexture(to_underlying(lay.zoom), paint);
 		texs.push_back(tex);
 		/* Its add-ons' each in its colour at this house's place (ThreeDObject::AddonPaintAt()). */
 		const TileIndex at = TileXY(std::clamp<int>(static_cast<int>(ox) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(oy) / TILE_SIZE, 0, Map::MaxY()));
-		for (uint8_t k = 1; k < o->Textures(); k++) texs.push_back(o->GetTextureOf(k, to_underlying(lay.zoom), o->AddonPaintAt(at, k)));
+		for (uint8_t k = 1; k < o->Textures(); k++) texs.push_back(kept ? o->GetTextureOf(k, to_underlying(lay.zoom), o->AddonPaintAt(at, k)) : o->DrawnTextureOf(k, to_underlying(lay.zoom), o->AddonPaintAt(at, k)));
 		const bool lit = shape.light.size() == shape.pos.size() / 3;
 		const size_t corners = shape.pos.size() / 3;
 		verts.resize(corners);
@@ -4656,6 +4663,9 @@ static void MakeTurnedObjectPicturesOnCard()
 		/* On its way already: not asked for again -- unless a picture of the moment is wanted (the rig), which draws
 		 * it now and lets the batch's copy overwrite it with the same. */
 		if (_turned_object_pictures.contains(key) || (!_three_d_load_at_once && _turned_batch_inflight.contains(key)) || !keys.insert(key).second) return;
+		/* Its texture of this zoom not painted yet: drawn as it is meanwhile, with another's (DrawnTexture()). */
+		bool exact = true;
+		if (!ThreeDObjectReadyToDraw(o, to_underlying(lay.zoom), paint, &exact) || !exact) return;
 		const ThreeDObjectShapeView shape = TurnedObjectShape(o, lay);
 		if (shape.tri.empty() || shape.uid == 0) return;
 		const double ox = TileX(origin) * TILE_SIZE, oy = TileY(origin) * TILE_SIZE;
@@ -4879,6 +4889,7 @@ bool RenderThreeDObjectsPicture(std::span<const ThreeDObjectPlacement> parts, fl
 	out.left = left;
 	out.top = top;
 	out.pixels.assign(static_cast<size_t>(width) * height, 0);
+	AutoRestoreBackup kept_backup(_object_picture_kept, true);
 	for (const ThreeDObjectPlacement &p : parts) {
 		if (p.ground != nullptr) DrawObjectInto(out.pixels.data(), width, width, height, lay, p.ground, p.x, p.y, p.z, p.paint, {});
 		DrawObjectInto(out.pixels.data(), width, width, height, lay, p.obj, p.x, p.y, p.z, p.paint, p.more);
@@ -6259,6 +6270,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 		if (!p.shape.tri.empty() && p.shape.uid == 0) return false;
 	}
 	const uint64_t stood_in = ThreeDStandInsGiven();
+	const uint64_t textures_stood_in = ThreeDTexturesStoodIn();
 	for (size_t at = 0; at < parts.size();) {
 		size_t end = at + 1;
 		while (end < parts.size() && !parts[end].own_depth) end++;
@@ -6336,9 +6348,10 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				b.facing = p.shape.facing;
 				b.tri_tex = p.shape.tri_tex;
 				b.cull = _turned_cull;
-				/* Its textures as DrawObjectInto() has them: its own painted, its add-ons' each in its colour at this place. */
-				b.textures.push_back(p.o->GetTexture(to_underlying(lay.zoom), p.o->PaintAt(to.origin)));
-				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->GetTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
+				/* Its textures as DrawObjectInto() has them: its own painted, its add-ons' each in its colour at this place --
+				 * of another zoom while this one's are painted, the drawing waiting for no painting (DrawnTexture()). */
+				b.textures.push_back(p.o->DrawnTexture(to_underlying(lay.zoom), p.o->PaintAt(to.origin)));
+				for (uint8_t t = 1; t < p.o->Textures(); t++) b.textures.push_back(p.o->DrawnTextureOf(t, to_underlying(lay.zoom), p.o->AddonPaintAt(to.origin, t)));
 				/* A corner to the block: affine, so where its origin and unit steps go. */
 				double o0[3], e[3][3];
 				place(0, 0, 0, o0[0], o0[1], o0[2]);
@@ -6405,6 +6418,8 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 		const int over = TILE_SIZE / 2, figures = static_cast<int>(6 * OBJECT_HEIGHT_PER_METRE);
 		OweThreeDPictureBox(ps.xmin - over, ps.ymin - over, ps.xmax + over, ps.ymax + over, ps.zmin, ps.zmax + figures);
 	}
+	/* A part drawn with a texture of another zoom (an add-on's, DrawnTexture()): drawn again when its own is painted. */
+	if (ThreeDTexturesStoodIn() != textures_stood_in && _tiles_owed_objects.size() < 4096) _tiles_owed_objects.push_back(to.origin);
 	_turned_times.standing_objects++;
 	return true;
 }

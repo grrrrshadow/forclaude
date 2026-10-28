@@ -11528,6 +11528,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		_turned_debug_tile = (x.has_value() && y.has_value()) ? TileXY(Clamp(*x, 0, Map::MaxX()), Clamp(*y, 0, Map::MaxY())) : INVALID_TILE;
 		return true;
+	} else if (what == "posun" && argv.size() > 4) {
+		/* 'posun mys|klavesy <dx> <dy>': the main view moved as a drag of the right button moves it (OnScroll(), at
+		 * once) or as the arrow keys do (the place it heads for, reached by the smooth scrolling), screen pixels. */
+		auto dx = number(3), dy = number(4);
+		Window *main = GetMainWindow();
+		if (!dx.has_value() || !dy.has_value() || main == nullptr || main->viewport == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d posun mys|klavesy <dx> <dy>'.");
+			return true;
+		}
+		if (argv[2] == "mys") {
+			main->OnScroll({static_cast<int>(*dx), static_cast<int>(*dy)});
+		} else {
+			main->viewport->dest_scrollpos_x += ScaleByZoom(static_cast<int>(*dx), main->viewport->zoom);
+			main->viewport->dest_scrollpos_y += ScaleByZoom(static_cast<int>(*dy), main->viewport->zoom);
+		}
+		return true;
 	} else if (what == "kurzor") {
 		/* 'kurzor <x> <y>': the cursor put at a place of the screen with the tile under it marked, as by a building
 		 * tool (a rectangle), for the pictures of the marking (the main view drawn turned facing north too). */

@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (43) – Krabice místo 3D po změně přiblížení, rostoucí les, cukání posunu
+
+- Hráč (#310, logy z telefonu): *„pořad se kresli original prumysl než se stihne nakreslit 3D prumysl a to stoji čas
+  myslim kreslit něco na chvilku. když se přibližuju, oddaluju pořad jako prvni tam jsou domy a prumysl ručni tabulka
+  krabice a pak se nakreslí nové 3D . z first person view to necuká, plocha cuká z uhlu 0 vic asi ale otačeni ne, jen
+  posun plochy pravym myši cuka a šipkama necuka. prumysl je všechen ingame všechny klimata?“*
+- Příčina krabic: dům nebo průmysl byl „připravený“ ke kreslení jen s texturou nabarvenou přesně pro úroveň přiblížení
+  (`ThreeDObjectReadyToDraw()`). Po změně přiblížení ji neměl, kreslil se jako krabice z ruční tabulky a vlákno ji
+  teprve barvilo; na telefonu to bylo vidět. Oprava: nabarvená textura jiného přiblížení zaskočí
+  (`ThreeDObject::DrawnTexture()`), přesná se nabarví na pozadí a dlaždice se pak překreslí. Krabice jen na začátku hry,
+  než se model vůbec načte. Obrázky, které se drží (budovy pro procesor, náhled u okna průmyslu), dál jen s přesnou.
+- Rostoucí les (dlaždice 17, fáze animace lesa 16 při těžbě) neměl v `prumysl_vanilla` záznam a kreslil se sprity.
+  Teď se snímek animace kreslí jako dlaždice, na kterou se vrací (`anim_next`).
+- Průmysl: v rigu mírné, subarktické i subtropické podnebí – každá dlaždice původního průmyslu ze společných dílů
+  (`test3d puvodni`: N z N). Toyland nemá díly; průmysl z GRF (Housing as Industry, Field Spawner) je mod, kreslí se
+  svými sprity.
+- Cukání posunu: v rigu je obraz po posunu stejný jako po úplném překreslení (žádný starý obraz z karty). Tah pravým
+  jde za rukou 1:1, takže při pomalém snímku (telefon na mapě 3–15 snímků/s, stojící věci 25–160 ms, zem 10–60 ms na
+  snímek) je každý snímek velký skok; šipky posouvají stálou rychlostí. Příčina je čas snímku → další kroky karty.
+- Rig: `test3d posun mys|klavesy <dx> <dy>`.
+
 ## 28. 10. (42) – Úhel 0 jen další kamera: hlavní okno kartou i na sever
 
 - Hráč: *„v uhlu nula se naš 3D prumysl blbě kresli ,co je vzadu se kresli navrchu, jen v uhlu 0 když točim herni

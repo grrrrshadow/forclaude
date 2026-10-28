@@ -7491,6 +7491,12 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
 		}
 	}
 	auto it = resolved.find(gfx);
+	if (it == resolved.end() && gfx < NEW_INDUSTRYTILEOFFSET) {
+		/* A frame of a tile's animation with no record of its own (the forest's growing trees, 17, of its tile 16 while
+		 * it produces): drawn as the tile it goes back to, not as its sprites among the 3D. */
+		const IndustryGfx next = GetIndustryTileSpec(gfx)->anim_next;
+		if (next != INDUSTRYTILE_NOANIM && next != gfx) it = resolved.find(next);
+	}
 	return it == resolved.end() ? nullptr : &it->second;
 }
 
@@ -8825,23 +8831,33 @@ static std::atomic<uint64_t> _three_d_objects_readied = 0;
  * painted. If not, they are made in the background (ThreeDLoadInBackground()) and the map draws the building as its
  * sprites meanwhile, its place drawn again when they are there (ThreeDObjectsReadied()): the first frame of a game read
  * and painted every building in view at once, on the main thread -- one block of the map 10 s on the player's phone
- * (26. 10.: "the long loading of one block, 10 s").
+ * (26. 10.: "the long loading of one block, 10 s"). Painted at another level only (the view zoomed), it is ready: that
+ * level stands in (ThreeDObject::DrawnTexture()) while this one is painted in the background.
  * @param o the object, nullptr none (ready)
  * @param level its level of detail (the zoom's)
  * @param paint its colours (ThreeDObject::PaintAt())
+ * @param[out] exact if given: whether its texture of the level is there, not one of another level standing in
  */
-bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint)
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact)
 {
+	if (exact != nullptr) *exact = true;
 	if (o == nullptr) return true;
 	const ThreeDObject *t = o->texture_of < _three_d_objects.size() ? &_three_d_objects[o->texture_of] : o;
 	/* Read, or tried (a file that cannot be read is drawn as it was, as nothing). */
 	auto tried = [](const ThreeDObject *x) { return x->IsRead() || x->glb_state.value.load(std::memory_order_acquire) != 0; };
-	auto ready = [o, t, level, paint, tried] {
+	bool other_level = false;
+	auto ready = [o, t, level, paint, tried, &other_level] {
+		other_level = false;
 		if (!tried(o) || !tried(t) || t->levels.empty()) return false;
 		if (paint == 0 || t->colours.empty()) return true;
-		return t->painted.contains({std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint});
+		if (t->painted.contains({std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint})) return true;
+		/* Painted at another level already (another zoom): that one stands in (ThreeDObject::DrawnTexture()). */
+		for (const auto &[key, tex] : t->painted) {
+			if (key.second == paint) other_level = true;
+		}
+		return other_level;
 	};
-	return MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, level, paint] {
+	const bool is_ready = MadeOrAsked(o, LAZY_HOUSE_READY, ready, [o, level, paint] {
 		o->Read();
 		o->GetTexture(level, paint, false);
 		{
@@ -8850,12 +8866,77 @@ bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint)
 		}
 		_three_d_objects_readied++;
 	});
+	if (is_ready && other_level) {
+		/* The level of this zoom painted in the background, the place drawn again when it is there. */
+		if (exact != nullptr) *exact = false;
+		const std::pair<int, uint32_t> key(std::clamp<int>(level, 0, static_cast<int>(t->levels.size()) - 1), paint);
+		MadeOrAsked(t, LazyHousePaint(key.first, paint), [t, key] { return t->painted.contains(key); }, [t, key] {
+			t->GetTexture(key.first, key.second, false);
+			_three_d_objects_readied++;
+		});
+	}
+	return is_ready;
 }
 
 /** How many objects were made ready in the background so far (ThreeDObjectReadyToDraw()): the places waiting for them drawn again when it grows. */
 uint64_t ThreeDObjectsReadied()
 {
 	return _three_d_objects_readied.load();
+}
+
+/** How many times a building was drawn with a texture of another level standing in (ThreeDObject::DrawnTexture()). */
+static std::atomic<uint64_t> _three_d_textures_stood_in = 0;
+
+/** How many textures of another level stood in so far: a building drawn with one is drawn again when its own comes (ThreeDObjectsReadied()). */
+uint64_t ThreeDTexturesStoodIn()
+{
+	return _three_d_textures_stood_in.load();
+}
+
+/**
+ * The building's texture to draw it with now, the drawing waiting for no painting (the player, 28. 10.: zooming in and
+ * out showed the boxes of the houses and the industries first and their 3D after; a zoom asks for the texture at
+ * another level, and painting it waited): at the level painted if it is already; else the nearest level painted
+ * already stands in, the level is painted in the background and the building's place drawn again when it is there
+ * (ThreeDObjectsReadied(), ThreeDTexturesStoodIn()). Nothing of it painted yet: painted now, as GetTexture().
+ */
+const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint) const
+{
+	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].DrawnTexture(level, paint);
+	if (paint == 0 || this->colours.empty() || this->levels.empty()) return this->GetTexture(level, paint);
+	MarkThreeDUsed(this->used);
+	const std::pair<int, uint32_t> key(std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1), paint);
+	const ThreeDObjectTexture *nearest = nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->painted.find(key);
+		if (it != this->painted.end()) return &it->second;
+		int best = INT_MAX;
+		for (const auto &[k, tex] : this->painted) {
+			if (k.second != paint || std::abs(k.first - key.first) >= best) continue;
+			best = std::abs(k.first - key.first);
+			nearest = &tex;
+		}
+	}
+	if (nearest == nullptr) return this->GetTexture(level, paint);
+	if (!MadeOrAsked(this, LazyHousePaint(key.first, paint), [this, key] { return this->painted.contains(key); }, [this, key] {
+		this->GetTexture(key.first, key.second, false);
+		_three_d_objects_readied++;
+	})) {
+		_three_d_textures_stood_in++;
+		return nearest;
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto it = this->painted.find(key);
+	return it != this->painted.end() ? &it->second : nearest;
+}
+
+/** A texture of the building's triangles to draw it with now (as GetTextureOf(), by DrawnTexture()). */
+const ThreeDObjectTexture *ThreeDObject::DrawnTextureOf(uint8_t texture, int level, uint32_t paint) const
+{
+	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
+	if (texture == 0 || texture > this->addon_objects.size()) return this->DrawnTexture(level, paint);
+	return _three_d_objects[this->addon_objects[texture - 1]].DrawnTexture(level, paint);
 }
 
 /** The rig: the objects read, a line each. */

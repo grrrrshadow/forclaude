@@ -309,6 +309,8 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *GetTexture(int level, uint32_t paint = 0, bool may_drop = true) const;
 	const ThreeDObjectTexture *GetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *TryGetTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
+	const ThreeDObjectTexture *DrawnTexture(int level, uint32_t paint = 0) const;
+	const ThreeDObjectTexture *DrawnTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	uint32_t AddonPaintAt(TileIndex origin, uint8_t texture) const;
 	/** How many textures its triangles have: its own, its add-ons' and its other materials'. */
 	size_t Textures() const { return 1 + this->addon_objects.size() + this->material_pngs.size(); }
@@ -1112,8 +1114,9 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted);
 void StartReadingThreeDObjects();
 void WaitForReadingThreeDObjects();
 bool ThreeDObjectsIndexRead();
-bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint);
+bool ThreeDObjectReadyToDraw(const ThreeDObject *o, int level, uint32_t paint, bool *exact = nullptr);
 uint64_t ThreeDObjectsReadied();
+uint64_t ThreeDTexturesStoodIn();
 void PrepareThreeDObjectShapes(std::span<const std::pair<const ThreeDObject *, int>> wanted);
 
 /*
