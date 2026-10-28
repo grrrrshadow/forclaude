@@ -22,6 +22,7 @@ enum FirstPersonWidgets : WidgetID {
 	WID_FP_ROUTE,   ///< In a vehicle: go its route, or take the wheel.
 	WID_FP_LOAD,    ///< In a vehicle: load at the stop it stands on (CmdCabCargo()).
 	WID_FP_UNLOAD,  ///< In a vehicle: unload there.
+	WID_FP_CAMERA,  ///< In a vehicle: the next camera of its cab (CabCamera).
 	WID_FP_INVENTORY, ///< The walker's inventory.
 };
 

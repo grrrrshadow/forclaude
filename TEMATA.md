@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (40) – Jedna kabina pro E i ikonku, čudlík Kamera, interiér 1203
+
+Hráč: *„chci aby byly stejný E a ikonka cabview protože pak otáčení hlavou funguje jen v cabview ikonkou z okna auta
+a nastoupeni E nema otačeni hlavou. mame dva druhy cab view. proč to neni stejny, proč budujem 2 cabview"*,
+*„1203 ma hezkej interier, když ho kreslime tak oko cabview muže vidět ten interier okolo. ano to už by chtělo
+přepinače kamery aby si každý vybral mezi interierem okolo a bez interieru nebo pohled na střechu auta . dej čudlik
+kamera , ten bude pohled střidat. otočeni hlavou pravym bude resetovat zmačknutim čudliku pohledu kamery. okoli okna
+je dobry v nastoupeni E . je tam vše potřebne i rychlost"*; kam se dívat po vystoupení: *„mně je to jedno"* (zůstává
+směr jízdy).
+
+- Proč dvě: obraz byl vždycky jeden (`DrawCabView`), jen okno kolem jiné – E podle přání ze 17. 10. zůstává v okně
+  první osoby. Otáčení hlavou (27. 10.) jsem dal jen do okna kabiny; v okně první osoby pravé tlačítko točilo
+  chodcem, kterého obraz z kabiny nečte. Teď společný kus `CabLook` (cab_view.h) pro obě okna.
+- Čudlík **Kamera** v obou oknech (a klávesa C): interiér okolo oka → bez interiéru → nad střechou. Stisk srovná
+  hlavu dopředu (dvojklik pravým taky). Volba je nastavení `gui.cab_camera` (Grafika), pamatuje se.
+- Nad střechou: oko 2 m za zadkem a 1,5 m nad střechou modelu, dívá se mírně dolů; otočení hlavou s ním obchází
+  auto; v tunelu zůstane v tubusu, pod mostem se skloní jako dřív. Vidět je celé auto i s řidičkou.
+- Interiér 1203 nebyl vidět vůbec: kameru řidiče (`camerasInternal`) má 1203 v dílu rámu, ne v hlavním dílu, a hledala
+  se jen v hlavním – oko viselo nad silnicí bez auta. Teď se hledá ve všech dílech auta.
+
 ## 28. 10. (39) – #307: zadní kola 1203, pomalý start nové hry
 
 Hráč: *„spravený kolečka má jenom škoda 1203 dodávka, ostatní maj zadní kola furt u středu. bylo znatelné zpomalení

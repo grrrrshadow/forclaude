@@ -5309,6 +5309,30 @@ static double CabEyeHeight(const ThreeDVehicleObject &m)
 	return z;
 }
 
+/** How a model of a vehicle lies along its length and how high it is, metres in its frame (CabModelBoxOf()). */
+struct CabModelBox {
+	double rear = -2.0;  ///< its back, along the way it goes
+	double front = 2.0;  ///< its front
+	double roof = 1.5;   ///< its top over the ground
+};
+
+/** How a model lies, for the eye over its roof (CabCamera::Roof); a model not read yet as a car is. */
+static CabModelBox CabModelBoxOf(const ThreeDVehicleObject &m)
+{
+	static std::unordered_map<const ThreeDVehicleObject *, CabModelBox> boxes;
+	if (auto it = boxes.find(&m); it != boxes.end()) return it->second;
+	const ThreeDVehicleShape *shape = m.TryGetShape();
+	if (shape == nullptr || shape->pos.size() < 3) return {};
+	CabModelBox box{1e9, -1e9, -1e9};
+	for (size_t c = 0; c + 2 < shape->pos.size(); c += 3) {
+		box.rear = std::min<double>(box.rear, shape->pos[c]);
+		box.front = std::max<double>(box.front, shape->pos[c]);
+		box.roof = std::max<double>(box.roof, shape->pos[c + 2]);
+	}
+	boxes[&m] = box;
+	return box;
+}
+
 /** A solid of the model this near in front of the eye of its cab hides the way ahead (CabEyeAhead()), metres. */
 static constexpr double CAB_EYE_SOLID_M = 1.5;
 /** Solids of the model closer behind one another than this are one, the eye goes past them all, metres. */
@@ -9741,6 +9765,9 @@ static constexpr int CAB_EYE_Z_SHIP = 9;
 static constexpr int CAB_EYE_Z_AIRCRAFT = 14;
 static constexpr double CAB_EYE_Z_LOWEST = 3.0; ///< the eye bows no lower than this
 static constexpr double CAB_EYE_AHEAD = 5.0;   ///< the eye this far ahead of the vehicle's position, world units
+static constexpr double CAB_ROOF_BEHIND_M = 2.0; ///< the eye over the roof (CabCamera::Roof) this far behind the vehicle's back, metres
+static constexpr double CAB_ROOF_ABOVE_M = 1.5;  ///< and this far over its roof, metres
+static constexpr double CAB_ROOF_LOOK = -0.3;    ///< and looking down so much, radians (the head looked up or down from it)
 static constexpr double CAB_TURN_RATE = 0.22;  ///< how much of the way to the vehicle's direction the eye turns a frame
 static constexpr double CAB_HAZE_FROM = 6.0 * TILE_SIZE; ///< the haze begins this far away
 static constexpr size_t CAB_TEXTURES_KEPT = 4096; ///< sprites kept as textures for the billboards
@@ -12827,25 +12854,29 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	static const int8_t dir_dx[8] = {-1, -1, -1, 0, 1, 1, 1, 0};
 	static const int8_t dir_dy[8] = {-1, 0, 1, 1, 1, 0, -1, -1};
 	double target = camera.valid ? camera.heading : std::atan2(-1.0, -1.0);
+	/* The camera of the cab (cab_view.h, the player's choice): the eye in the driver's head with the vehicle's model
+	 * about it or without it, or over its roof. */
+	const CabCamera cab_camera = walker == nullptr ? CabCameraChosen() : CabCamera::Inside;
+	const bool roof = cab_camera == CabCamera::Roof;
 	/* A vehicle drawn from its object with the eye of its cab ("kabina", the colleague's hra/3d/PROSBA-V3S-3D.md): the
-	 * eye in the driver's head, the cab drawn round it (the driver not), facing as the object does. */
+	 * eye in the driver's head, the cab drawn round it (the driver not), facing as the object does. Over the roof the
+	 * first piece drawn from its object, a cab or none: the eye over it. */
 	ThreeDEyeVehicle own_model;
-	bool in_model_cab = false;
+	bool in_model_cab = false, over_model = false;
 	if (walker == nullptr && ThreeDEnabled()) {
-		for (const Vehicle *u = v->First(); u != nullptr && !in_model_cab; u = u->Next()) {
+		for (const Vehicle *u = v->First(); u != nullptr && !in_model_cab && !over_model; u = u->Next()) {
 			ThreeDEyeVehicle ev;
-			if (GetThreeDEyeVehicle(u, ev) && ev.obj != nullptr && ev.obj->has_cab) {
-				own_model = ev;
-				in_model_cab = true;
-			}
+			if (!GetThreeDEyeVehicle(u, ev) || ev.obj == nullptr || (!roof && !ev.obj->has_cab)) continue;
+			own_model = ev;
+			(roof ? over_model : in_model_cab) = true;
 		}
 	}
 	if (walker != nullptr) {
 		/* The walker looks where the player turns it, at once. */
 		target = walker->heading;
 		camera.valid = false;
-	} else if (in_model_cab && !v->cab_free) {
-		/* The cab of a model: as the model faces, which turns smoothly already. */
+	} else if ((in_model_cab || over_model) && !v->cab_free) {
+		/* The cab of a model, or over it: as the model faces, which turns smoothly already. */
 		target = own_model.facing * M_PI / 180.0;
 		camera.valid = false;
 	} else if (v->cab_free) {
@@ -12889,15 +12920,39 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		eye.z = own_model.z + CabEyeHeight(m) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
-		eye.x = v->x_pos + bfx * CAB_EYE_AHEAD;
-		eye.y = v->y_pos + bfy * CAB_EYE_AHEAD;
+		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
+		double want = type_z;
+		if (!roof) {
+			eye.x = v->x_pos + bfx * CAB_EYE_AHEAD;
+			eye.y = v->y_pos + bfy * CAB_EYE_AHEAD;
+		} else {
+			/* Over the roof (CabCamera::Roof; the player, 28. 10.: "the view on the roof of the car"): behind its back
+			 * and over its roof, looking at it and ahead a little down; the head turned goes round it -- not in a
+			 * tunnel, whose tube the eye stays in. */
+			const std::optional<CabTunnel> tunnel_in = v->vehstatus.Test(VehState::Hidden) ? CabTunnelAt(v->tile) : std::nullopt;
+			double mid_x = v->x_pos, mid_y = v->y_pos, behind = (v->type == VehicleType::Train ? 0.6 : 0.4) * TILE_SIZE;
+			want = type_z + CAB_ROOF_ABOVE_M * OBJECT_HEIGHT_PER_METRE;
+			if (over_model) {
+				const CabModelBox box = CabModelBoxOf(*own_model.obj);
+				const double across = own_model.scale * OBJECT_UNITS_PER_METRE, ahead = across * own_model.along;
+				const double mid = (box.rear + box.front) / 2;
+				mid_x = own_model.x + mid * ahead * bfx;
+				mid_y = own_model.y + mid * ahead * bfy;
+				behind = ((box.front - box.rear) / 2 + CAB_ROOF_BEHIND_M) * ahead;
+				want = own_model.z - v->z_pos + (box.roof + CAB_ROOF_ABOVE_M) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
+			}
+			const double round = tunnel_in.has_value() ? camera.heading : look;
+			eye.x = mid_x - behind * std::cos(round);
+			eye.y = mid_y - behind * std::sin(round);
+			/* In a tunnel under its vault. */
+			if (tunnel_in.has_value()) want = std::min(want, tunnel_in->z + CAB_TUNNEL_WALL - 2.0 - v->z_pos);
+		}
 		{
-			/* The eye's height over the vehicle: as the type has it, bowed under a low bridge just ahead, so it passes
-			 * under the deck, which is only a level over the road or the rails. */
-			double want = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
+			/* The eye's height over the vehicle: as the type has it (over the roof higher), bowed under a low bridge just
+			 * ahead, so it passes under the deck, which is only a level over the road or the rails. */
 			bool close = false;
 			for (int k = -1; k <= 3; k++) {
-				double px = v->x_pos + bfx * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0), py = v->y_pos + bfy * (CAB_EYE_AHEAD + k * TILE_SIZE / 2.0);
+				double px = eye.x + bfx * (k * TILE_SIZE / 2.0), py = eye.y + bfy * (k * TILE_SIZE / 2.0);
 				if (px < 0 || py < 0 || px >= Map::SizeX() * TILE_SIZE || py >= Map::SizeY() * TILE_SIZE) continue;
 				TileIndex tile = TileVirtXY(static_cast<int>(px), static_cast<int>(py));
 				if (!IsBridgeAbove(tile)) continue;
@@ -12925,7 +12980,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.25 : CAB_NEAR);
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
-	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch) * eye.focal;
+	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch + (roof ? CAB_ROOF_LOOK : 0.0)) * eye.focal;
 	out.eye = eye;
 	out.near_plane = _cab_near;
 
@@ -13663,15 +13718,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	double yaw_deg = std::atan2(eye.fy, eye.fx) * 180.0 / M_PI + 135.0;
 	int step = static_cast<int>(std::lround(yaw_deg / 45.0)) & 7;
 	const Vehicle *own = v != nullptr ? v->First() : nullptr;
-	/* The cab the eye is in, round it. */
-	if (in_model_cab) {
+	/* The cab the eye is in, round it -- unless the player chose the view without it (CabCamera::Bare). */
+	if (in_model_cab && cab_camera == CabCamera::Inside) {
 		AddCabVehicle(own_model, false);
 		_cab_figures.back().own_cab = true;
 		/* (The eye sits in it level: its cab not tipped round the eye.) */
 		_cab_figures.back().pitch = 0;
 	}
 	for (const Vehicle *u : Vehicle::Iterate()) {
-		if (u->First() == own) continue;
+		/* The vehicle itself only seen from over its roof: all of it, its driver too. */
+		if (u->First() == own && !roof) continue;
 		if (u->vehstatus.Test(VehState::Hidden)) {
 			/* Hidden in the tunnel the eye is in: seen there. */
 			bool same_tunnel = in_tunnel.has_value() && (u->type == VehicleType::Train || u->type == VehicleType::Road) && (u->tile == in_tunnel->a || u->tile == in_tunnel->b);

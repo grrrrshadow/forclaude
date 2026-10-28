@@ -1352,12 +1352,14 @@ std::optional<BeamngVehicle> ReadCar(const std::string &zip, const std::string &
 	/* Mail first, as our 1203's. */
 	if (auto mail = std::ranges::find(v.cargoes, std::string("MAIL")); mail != v.cargoes.end()) std::rotate(v.cargoes.begin(), mail, mail + 1);
 
-	/* The driver's eye: the camera inside of the driver ("driver", "dash"), else the first. */
-	if (const JValue *main = parts.used.front(); main != nullptr) {
-		const JValue *cams = main->Get("camerasInternal");
+	/* The driver's eye: the camera inside of the driver ("driver", "dash"), else the first -- in whichever part of
+	 * the car has it: the 1203's is in its frame, not in its main part, and its cab was never drawn round the eye. */
+	{
 		const JValue *best = nullptr;
 		int best_rank = 0;
-		if (cams != nullptr && cams->IsArray()) {
+		for (const JValue *part : parts.used) {
+			const JValue *cams = part != nullptr ? part->Get("camerasInternal") : nullptr;
+			if (cams == nullptr || !cams->IsArray()) continue;
 			for (const JValue &row : cams->items) {
 				if (!row.IsArray() || row.items.size() < 4 || !row.items[0].IsString() || row.items[1].type != JValue::Type::Number) continue;
 				const std::string &kind = row.items[0].text;

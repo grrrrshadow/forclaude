@@ -22,6 +22,7 @@ enum CabViewWidgets : WidgetID {
 	WID_CV_AUTO,    ///< Go as the orders say again, or take the wheel.
 	WID_CV_LOAD,    ///< Load at the stop it stands on (CmdCabCargo()).
 	WID_CV_UNLOAD,  ///< Unload there.
+	WID_CV_CAMERA,  ///< The next camera: the interior, without it, over the roof (CabCamera).
 };
 
 #endif /* WIDGETS_CAB_VIEW_WIDGET_H */

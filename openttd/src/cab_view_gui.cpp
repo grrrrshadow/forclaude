@@ -48,10 +48,13 @@
 #include "sound_func.h"
 #include "newgrf_sound.h"
 #include "widgets/cab_view_widget.h"
+#include "widgets/first_person_widget.h"
 #include "video/video_driver.hpp"
 #include "fileio_func.h"
 #include "map_drag.h"
 #include "three_d.h"
+#include "settings_type.h"
+#include "core/geometry_func.hpp"
 #include "3rdparty/fmt/format.h"
 
 #include "table/strings.h"
@@ -86,6 +89,7 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_LOAD), SetStringTip(STR_CAB_VIEW_LOAD_CARGO, STR_CAB_VIEW_LOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CAMERA), SetStringTip(STR_CAB_VIEW_CAMERA, STR_CAB_VIEW_CAMERA_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -503,6 +507,66 @@ void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, 
 	}
 }
 
+static constexpr double CAB_LOOK_MOUSE = 0.005;   ///< radians a pixel the hand moves, as from the eyes
+static constexpr double CAB_LOOK_PITCH_MAX = 0.8; ///< up or down at most, radians
+
+/** The camera of the cab chosen (the setting gui.cab_camera). */
+CabCamera CabCameraChosen()
+{
+	return static_cast<CabCamera>(std::min<uint8_t>(_settings_client.gui.cab_camera, to_underlying(CabCamera::Roof)));
+}
+
+/** The next camera of the cab, for both windows; the head looks ahead again (the player, 28. 10.). */
+void CabNextCamera(CabViewCamera &camera)
+{
+	_settings_client.gui.cab_camera = (to_underlying(CabCameraChosen()) + 1) % (to_underlying(CabCamera::Roof) + 1);
+	camera.head = 0;
+	camera.pitch = 0;
+	camera.eye_dz = -1;
+	SetWindowClassesDirty(WindowClass::CabView);
+	SetWindowClassesDirty(WindowClass::FirstPerson);
+	SetWindowClassesDirty(WindowClass::GameOptions);
+}
+
+/** What the button Camera says: the camera chosen. */
+std::string CabCameraText()
+{
+	return GetString(STR_CAB_VIEW_CAMERA, STR_CONFIG_SETTING_CAB_CAMERA_INSIDE + to_underlying(CabCameraChosen()));
+}
+
+/** As big as the button Camera's text is for any camera: it does not change its size as the cameras go round. */
+Dimension CabCameraTextSize()
+{
+	Dimension d{0, 0};
+	for (uint8_t c = 0; c <= to_underlying(CabCamera::Roof); c++) d = maxdim(d, GetStringBoundingBox(GetString(STR_CAB_VIEW_CAMERA, STR_CONFIG_SETTING_CAB_CAMERA_INSIDE + c)));
+	return d;
+}
+
+/** The right button went down on the picture from the cab. */
+void CabLook::Press(CabViewCamera &camera)
+{
+	const auto now = std::chrono::steady_clock::now();
+	if (!this->looked && now - this->clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
+		camera.head = 0;
+		camera.pitch = 0;
+		this->clicked = {};
+	} else {
+		this->clicked = now;
+	}
+	this->looked = false;
+	_scrolling_viewport = true;
+	_cursor.fix_at = true;
+	_look_pinned = true;
+}
+
+/** The hand moved with the right button held: the pointer to the right looks to the right, down looks down; round to the back window and on. */
+void CabLook::Move(CabViewCamera &camera, int dx, int dy)
+{
+	if (dx != 0 || dy != 0) this->looked = true;
+	camera.head = std::remainder(camera.head - dx * CAB_LOOK_MOUSE, 2 * M_PI);
+	camera.pitch = std::clamp(camera.pitch - dy * CAB_LOOK_MOUSE, -CAB_LOOK_PITCH_MAX, CAB_LOOK_PITCH_MAX);
+}
+
 /** The window of the view from a vehicle's cab; the window number is the vehicle. */
 struct CabViewWindow : Window {
 	mutable CabViewCamera camera{};   ///< the eye between frames
@@ -517,11 +581,7 @@ struct CabViewWindow : Window {
 		this->SetWidgetDirty(WID_CV_STOP);
 	}};
 
-	/* Looking about with the right button (OnRightClick()). */
-	static constexpr double CAB_LOOK_MOUSE = 0.005;     ///< radians a pixel the hand moves, as from the eyes
-	static constexpr double CAB_LOOK_PITCH_MAX = 0.8;   ///< up or down at most, radians
-	bool looked = false;                                ///< the head turned since the right button went down
-	std::chrono::steady_clock::time_point look_clicked{}; ///< when it went down last, for two clicks
+	CabLook look{}; ///< looking about with the right button (OnRightClick())
 
 	/* The arrows drive (CabArrows), looked at this often. */
 	CabArrows arrows{};
@@ -548,6 +608,13 @@ struct CabViewWindow : Window {
 		this->Window::Close(data);
 	}
 
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_CV_CAMERA) return;
+		const Dimension d = CabCameraTextSize();
+		size.width = std::max(size.width, d.width + padding.width);
+	}
+
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
@@ -559,6 +626,8 @@ struct CabViewWindow : Window {
 			case WID_CV_AUTO:
 				/* Its route, or the wheel again. */
 				return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
+			case WID_CV_CAMERA:
+				return CabCameraText();
 			default:
 				return this->Window::GetWidgetString(widget, stringid);
 		}
@@ -707,7 +776,7 @@ struct CabViewWindow : Window {
 		}
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
 		if (v == nullptr) return EventState::NotHandled;
-		/* I: the horn; F: the lights; T: its route, or the wheel again. */
+		/* I: the horn; F: the lights; T: its route, or the wheel again; C: the next camera. */
 		if (key == 'i' || key == 'I') {
 			CabHorn(v);
 			return EventState::Handled;
@@ -721,36 +790,26 @@ struct CabViewWindow : Window {
 			this->SetDirty();
 			return EventState::Handled;
 		}
+		/* C: the next camera, as its button. */
+		if (key == 'c' || key == 'C') {
+			CabNextCamera(this->camera);
+			return EventState::Handled;
+		}
 		return EventState::NotHandled;
 	}
 
 	bool OnRightClick([[maybe_unused]] Point pt, WidgetID widget) override
 	{
-		/* Looking about with the right button held, as from the eyes (first_person_gui.cpp): the pointer pinned where
-		 * it went down, each move only how far the hand went; two clicks without a look between look ahead again. */
+		/* Looking about with the right button held (CabLook), as in a vehicle boarded with E. */
 		if (widget != WID_CV_CANVAS || _scrolling_viewport) return false;
-		const auto now = std::chrono::steady_clock::now();
-		if (!this->looked && now - this->look_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
-			this->camera.head = 0;
-			this->camera.pitch = 0;
-			this->look_clicked = {};
-			this->SetWidgetDirty(WID_CV_CANVAS);
-		} else {
-			this->look_clicked = now;
-		}
-		this->looked = false;
-		_scrolling_viewport = true;
-		_cursor.fix_at = true;
-		_look_pinned = true;
+		this->look.Press(this->camera);
+		this->SetWidgetDirty(WID_CV_CANVAS);
 		return true;
 	}
 
 	void OnScroll(Point delta) override
 	{
-		/* The pointer to the right looks to the right, down looks down; round to the back window and on. */
-		if (delta.x != 0 || delta.y != 0) this->looked = true;
-		this->camera.head = std::remainder(this->camera.head - delta.x * CAB_LOOK_MOUSE, 2 * M_PI);
-		this->camera.pitch = std::clamp(this->camera.pitch - delta.y * CAB_LOOK_MOUSE, -CAB_LOOK_PITCH_MAX, CAB_LOOK_PITCH_MAX);
+		this->look.Move(this->camera, delta.x, delta.y);
 		this->SetWidgetDirty(WID_CV_CANVAS);
 	}
 
@@ -788,6 +847,9 @@ struct CabViewWindow : Window {
 			case WID_CV_AUTO:
 				CabToggleRoute(v, this->arrows);
 				this->SetDirty();
+				break;
+			case WID_CV_CAMERA:
+				CabNextCamera(this->camera);
 				break;
 			case WID_CV_LOAD:
 			case WID_CV_UNLOAD:
@@ -865,12 +927,17 @@ std::string DescribeCarHorn()
  */
 std::string RigCabLook(int dx, int dy)
 {
-	CabViewWindow *w = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
-	if (w == nullptr) return "zadna kabina";
-	const bool taken = w->OnRightClick({}, WID_CV_CANVAS);
+	/* The cab view open, else the vehicle the walker rides in (boarded with E). */
+	extern const CabViewCamera *RigFirstPersonCabCamera();
+	CabViewWindow *cw = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
+	Window *w = cw != nullptr ? static_cast<Window *>(cw) : FindWindowById(WindowClass::FirstPerson, 0);
+	const CabViewCamera *camera = cw != nullptr ? &cw->camera : RigFirstPersonCabCamera();
+	if (w == nullptr || camera == nullptr) return "zadna kabina";
+	const bool taken = w->OnRightClick({}, cw != nullptr ? WID_CV_CANVAS : WID_FP_CANVAS);
 	if (dx != 0 || dy != 0) w->OnScroll({dx, dy});
 	_scrolling_viewport = false;
 	_cursor.fix_at = false;
 	_look_pinned = false;
-	return fmt::format("{}: otoceni {:.0f} stupnu, nahoru {:.0f}", taken ? "vzato" : "NEVZATO", w->camera.head * 180.0 / M_PI, w->camera.pitch * 180.0 / M_PI);
+	return fmt::format("{} ({}): otoceni {:.0f} stupnu, nahoru {:.0f}, kamera {}", taken ? "vzato" : "NEVZATO", cw != nullptr ? "okno kabiny" : "nastoupeno E",
+			camera->head * 180.0 / M_PI, camera->pitch * 180.0 / M_PI, to_underlying(CabCameraChosen()));
 }

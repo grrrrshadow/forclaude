@@ -10579,9 +10579,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klik") {
-			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely|nalozit|vylozit>' (the arrows steer and brake). */
+			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely|nalozit|vylozit|kamera>' (the arrows steer and brake). */
 			static const std::pair<std::string_view, WidgetID> buttons[] = {
-				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL}, {"nalozit", WID_CV_LOAD}, {"vylozit", WID_CV_UNLOAD},
+				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL}, {"nalozit", WID_CV_LOAD}, {"vylozit", WID_CV_UNLOAD}, {"kamera", WID_CV_CAMERA},
 			};
 			WidgetID id = -1;
 			for (const auto &[name, wid] : buttons) if (argv[3] == name) id = wid;

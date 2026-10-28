@@ -30,6 +30,8 @@
 #include "tile_type.h"
 
 #include <array>
+#include <chrono>
+#include <string>
 #include <vector>
 
 /** The picture of the cab view: 32bpp, a pixel's alpha 255 where something is drawn. */
@@ -108,6 +110,36 @@ struct CabArrows {
 };
 void CabToggleRoute(const Vehicle *v, CabArrows &arrows);
 void CabCargo(const Vehicle *v, bool unload);
+
+/**
+ * The camera of the cab, the same in the cab view and in a vehicle boarded with E in the view from the first person
+ * (the player, 28. 10.: "the 1203 has a nice interior, when we draw it the eye of the cab view can see the interior
+ * about it ... switches of the camera so that everyone chooses between the interior about and without the interior or
+ * the view on the roof of the car; give a button camera, it will change the view"): the setting gui.cab_camera.
+ */
+enum class CabCamera : uint8_t {
+	Inside, ///< the eye in the driver's head, the vehicle's model drawn about it
+	Bare,   ///< the same eye, the model not drawn
+	Roof,   ///< the eye over the roof and behind, the vehicle seen from above; the head turned goes round it
+};
+CabCamera CabCameraChosen();
+void CabNextCamera(CabViewCamera &camera);
+std::string CabCameraText();
+Dimension CabCameraTextSize();
+
+/**
+ * Looking about from the cab with the right button held, the same in the cab view and in a vehicle boarded with E
+ * (the player, 27. 10.: "look out of the right window"; 28. 10.: "the turning of the head works only in the cab view
+ * of the icon from the vehicle's window, and boarding with E has no turning of the head ... why do we build two cab
+ * views"): the pointer pinned where the button went down, each move only how far the hand went. Two clicks without a
+ * look between, or the button Camera, look ahead again.
+ */
+struct CabLook {
+	bool looked = false;                             ///< the head turned since the right button went down
+	std::chrono::steady_clock::time_point clicked{}; ///< when it went down last, for two clicks
+	void Press(CabViewCamera &camera);
+	void Move(CabViewCamera &camera, int dx, int dy);
+};
 
 /**
  * The walker of the view from the first person (first_person_gui.cpp; the player, 15. 10.: "let's make Morrowind,

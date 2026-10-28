@@ -300,6 +300,8 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_ROUTE), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_LOAD), SetStringTip(STR_CAB_VIEW_LOAD_CARGO, STR_CAB_VIEW_LOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 				NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+				/* And the camera, as the cab view's (the player, 28. 10.: "give a button camera"). */
+				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CAMERA), SetStringTip(STR_CAB_VIEW_CAMERA, STR_CAB_VIEW_CAMERA_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 			EndContainer(),
 		EndContainer(),
 		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_FP_INVENTORY), SetStringTip(STR_FIRST_PERSON_INVENTORY, STR_FIRST_PERSON_INVENTORY_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
@@ -586,6 +588,7 @@ struct FirstPersonWindow : Window {
 	 */
 	VehicleID riding = VehicleID::Invalid(); ///< the vehicle the walker is in, Invalid on foot
 	CabArrows arrows{};                      ///< the arrows driving it
+	CabLook cab_look{};                      ///< the head turned in it with the right button, as in the cab view
 
 	/** The vehicle the walker is in, nullptr on foot. */
 	const Vehicle *Riding() const
@@ -1616,7 +1619,7 @@ struct FirstPersonWindow : Window {
 			this->BoardOrLeave();
 			return EventState::Handled;
 		}
-		/* In a vehicle, as in its cab: I the horn, F the lights, T its route or the wheel again. */
+		/* In a vehicle, as in its cab: I the horn, F the lights, C the next camera, T its route or the wheel again. */
 		if (const Vehicle *rv = this->Riding(); rv != nullptr) {
 			if (key == 'i' || key == 'I') {
 				CabHorn(rv);
@@ -1624,6 +1627,10 @@ struct FirstPersonWindow : Window {
 			}
 			if (key == 'f' || key == 'F') {
 				CabToggleLights(rv);
+				return EventState::Handled;
+			}
+			if (key == 'c' || key == 'C') {
+				CabNextCamera(this->camera);
 				return EventState::Handled;
 			}
 			if (key == 't' || key == 'T') {
@@ -1667,6 +1674,13 @@ struct FirstPersonWindow : Window {
 		 * as the map's turn is"; 23. 10.: "it puts only up and down back, the head stays turned right or left"):
 		 * looking straight ahead the way the body faces, level. */
 		if (widget != WID_FP_CANVAS || _scrolling_viewport) return false;
+		if (this->Riding() != nullptr) {
+			/* In a vehicle the head turns in its cab, as in the cab view (the player, 28. 10.: "boarding with E has no
+			 * turning of the head"): the walker's own heading was turned, which the picture from the cab never read. */
+			this->cab_look.Press(this->camera);
+			this->SetWidgetDirty(WID_FP_CANVAS);
+			return true;
+		}
 		const auto now = std::chrono::steady_clock::now();
 		if (!this->looked && now - this->look_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
 			this->walker.heading = std::remainder(this->walker.heading - this->head, 2 * M_PI);
@@ -1691,6 +1705,11 @@ struct FirstPersonWindow : Window {
 	{
 		/* As the right button moves the view of the map (the player, #287: "turn left, right, up and down in keeping with
 		 * the right button on the map"): the pointer to the right looks to the right, down looks down. */
+		if (this->Riding() != nullptr) {
+			this->cab_look.Move(this->camera, delta.x, delta.y);
+			this->SetWidgetDirty(WID_FP_CANVAS);
+			return;
+		}
 		if (delta.x != 0 || delta.y != 0) this->looked = true;
 		this->walker.heading = std::remainder(this->walker.heading - delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
 		this->head = std::remainder(this->head - delta.x * FIRST_PERSON_MOUSE, 2 * M_PI);
@@ -1720,7 +1739,15 @@ struct FirstPersonWindow : Window {
 	{
 		/* Its route, or the wheel again (as the cab view's). */
 		if (widget == WID_FP_ROUTE) return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
+		if (widget == WID_FP_CAMERA) return CabCameraText();
 		return this->Window::GetWidgetString(widget, stringid);
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_FP_CAMERA) return;
+		const Dimension d = CabCameraTextSize();
+		size.width = std::max(size.width, d.width + padding.width);
 	}
 
 	void DrawWidget(const Rect &r, WidgetID widget) const override
@@ -1860,6 +1887,9 @@ struct FirstPersonWindow : Window {
 					CabCargo(rv, widget == WID_FP_UNLOAD);
 					this->SetDirty();
 				}
+				break;
+			case WID_FP_CAMERA:
+				if (this->Riding() != nullptr) CabNextCamera(this->camera);
 				break;
 			case WID_FP_INVENTORY:
 				ShowWalkerInventoryWindow();
@@ -2576,6 +2606,13 @@ std::pair<double, double> RigFirstPersonDoubleTap(int gap_frames, int frames, bo
  * it, OnScroll()), let go; then a walk of a few steps if asked, else two clicks of the right button. What it says: the
  * pointer pinned while held, the turn of the head and the look after the moves, and the look after the two clicks.
  */
+/** The rig: the eye of the cab of the vehicle the walker rides in (its head turned, CabLook), nullptr on foot or none. */
+const CabViewCamera *RigFirstPersonCabCamera()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr && w->Riding() != nullptr ? &w->camera : nullptr;
+}
+
 std::string RigFirstPersonLook(int dx, int moves, bool walk)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
