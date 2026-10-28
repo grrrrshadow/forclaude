@@ -239,6 +239,7 @@ using GLdouble = double;
 using GLchar = char;
 using GLubyte = unsigned char;
 using GLsizeiptr = std::ptrdiff_t;
+using GLsync = struct __GLsync *;
 
 constexpr GLboolean GL_FALSE = 0;
 constexpr GLboolean GL_TRUE = 1;
@@ -315,6 +316,7 @@ constexpr GLenum GL_FRAMEBUFFER = 0x8D40;
 constexpr GLenum GL_READ_FRAMEBUFFER = 0x8CA8;
 constexpr GLenum GL_DRAW_FRAMEBUFFER = 0x8CA9;
 constexpr GLenum GL_RENDERBUFFER = 0x8D41;
+constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 
 #ifdef THREE_D_GPU_WGL
 #	define THREE_D_GL_API APIENTRY
@@ -400,8 +402,33 @@ struct GlFunctions {
 #define THREE_D_GL_MEMBER(ret, name, args) ret (THREE_D_GL_API *name) args = nullptr;
 	THREE_D_GL_FUNCTIONS(THREE_D_GL_MEMBER)
 #undef THREE_D_GL_MEMBER
+	/* Not every OpenGL has them (3.2): without, glFinish() (ViewPicturesLaid()). */
+	GLsync (THREE_D_GL_API *glFenceSync)(GLenum condition, GLbitfield flags) = nullptr;
+	void (THREE_D_GL_API *glDeleteSync)(GLsync sync) = nullptr;
+	void (THREE_D_GL_API *glFlush)() = nullptr;
 };
 GlFunctions gl;
+
+/* The view's pictures shown by the video driver straight from the card -- the turned map's ground and what stands on
+ * it -- laid: a fence after each job that lays them, which the video driver's context waits for on the card before it
+ * shows them (ThreeDGpuViewPicturesWait()); before, glFinish() after every block, the main thread standing till the card
+ * had drawn it (the player's #310: what stands on the map 25-160 ms a frame). */
+static std::mutex _view_fence_mutex;
+static GLsync _view_fence = nullptr;
+
+/** The view's pictures laid by the card: fenced for the video driver, or finished where it cannot wait for a fence. */
+static void ViewPicturesLaid()
+{
+	if (!_three_d_gpu_driver_waits || gl.glFenceSync == nullptr || gl.glDeleteSync == nullptr || gl.glFlush == nullptr) {
+		gl.glFinish();
+		return;
+	}
+	GLsync fence = gl.glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	gl.glFlush();
+	std::lock_guard lock(_view_fence_mutex);
+	if (_view_fence != nullptr) gl.glDeleteSync(_view_fence);
+	_view_fence = fence;
+}
 
 /** Any function, before it is cast to what it is. */
 using GpuProc = void (*)();
@@ -1883,6 +1910,9 @@ bool LoadGlFunctions(std::string &why)
 	}
 	THREE_D_GL_FUNCTIONS(THREE_D_GL_LOAD)
 #undef THREE_D_GL_LOAD
+	gl.glFenceSync = reinterpret_cast<decltype(gl.glFenceSync)>(GetGlProc("glFenceSync"));
+	gl.glDeleteSync = reinterpret_cast<decltype(gl.glDeleteSync)>(GetGlProc("glDeleteSync"));
+	gl.glFlush = reinterpret_cast<decltype(gl.glFlush)>(GetGlProc("glFlush"));
 	return true;
 }
 
@@ -3204,7 +3234,7 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 		if (!ViewGroundOfSize(g.view_w, g.view_h)) return false;
 		if (g.move_x != 0 || g.move_y != 0) MoveViewGround(g.move_x, g.move_y);
 		if (g.width <= 0 || g.height <= 0) {
-			gl.glFinish();
+			ViewPicturesLaid();
 			const GLenum error = gl.glGetError();
 			if (error == GL_OUT_OF_MEMORY) ForgetCard();
 			return error == 0;
@@ -3287,10 +3317,10 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 	}
 	if (g.into_view) {
-		/* Shown straight from the card: done before the screen shows it. */
+		/* Shown straight from the card: done before the screen shows it (ViewPicturesLaid()). */
 		gl.glDisable(GL_SCISSOR_TEST);
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		gl.glFinish();
+		ViewPicturesLaid();
 		const GLenum error = gl.glGetError();
 		if (error != 0) {
 			Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor lays the ground", error);
@@ -3780,8 +3810,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	}
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	/* Shown straight from the card: done before the screen shows it. */
-	gl.glFinish();
+	/* Shown straight from the card: done before the screen shows it (ViewPicturesLaid()). */
+	ViewPicturesLaid();
 	const GLenum error = gl.glGetError();
 	if (error != 0) {
 		Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor draws what stands on the turned map", error);
@@ -4930,6 +4960,19 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
  * Lay what stands on a block of the turned map on the card, into the picture of the view's standing things (it waits).
  * @return false: not laid (no card, a picture bigger than it holds): the processor draws it
  */
+/**
+ * Have the video driver's context wait on the card for the view's pictures it shows straight from it to be laid
+ * (ViewPicturesLaid()): called by it before it shows them, with the way it waits for a fence (glWaitSync()).
+ * @param wait waits for the fence given, on the card
+ */
+std::atomic<bool> _three_d_gpu_driver_waits = false;
+
+void ThreeDGpuViewPicturesWait(void (*wait)(void *fence))
+{
+	std::lock_guard lock(_view_fence_mutex);
+	if (_view_fence != nullptr) wait(_view_fence);
+}
+
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 {
 	if (!ThreeDGpuAvailable()) return false;
@@ -5198,6 +5241,8 @@ bool ThreeDGpuShows() { return false; }
 uint32_t ThreeDGpuViewGround(uint64_t *made) { if (made != nullptr) *made = 0; return 0; }
 uint32_t ThreeDGpuViewStanding(uint32_t *lit) { if (lit != nullptr) *lit = 0; return 0; }
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
+void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
+std::atomic<bool> _three_d_gpu_driver_waits = false;
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }

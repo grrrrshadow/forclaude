@@ -40,6 +40,7 @@
 
 #include "../table/opengl_shader.h"
 #include "../table/sprites.h"
+#include "../three_d_gpu.h"
 
 
 #include "../safeguards.h"
@@ -90,6 +91,7 @@ GL(glMapBufferRange);
 GL(glClientWaitSync);
 GL(glFenceSync);
 GL(glDeleteSync);
+GL(glWaitSync);
 
 GL(glGenVertexArrays);
 GL(glDeleteVertexArrays);
@@ -420,6 +422,9 @@ static bool BindPersistentBufferExtensions()
 		if (!BindGLProc(_glClientWaitSync, "glClientWaitSync")) return false;
 		if (!BindGLProc(_glFenceSync, "glFenceSync")) return false;
 		if (!BindGLProc(_glDeleteSync, "glDeleteSync")) return false;
+		/* The card's context fences the pictures this one shows straight from it, this one waits on the card
+		 * (ThreeDGpuViewPicturesWait()). */
+		_three_d_gpu_driver_waits = BindGLProc(_glWaitSync, "glWaitSync");
 	}
 #endif
 
@@ -729,6 +734,7 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 		this->three_d_tint_loc = _glGetUniformLocation(this->three_d_program, "tint");
 		this->three_d_light_loc = _glGetUniformLocation(this->three_d_program, "light");
 		this->three_d_over_loc = _glGetUniformLocation(this->three_d_program, "has_over");
+		this->three_d_part_loc = _glGetUniformLocation(this->three_d_program, "part");
 		GLint over_tex_location = _glGetUniformLocation(this->three_d_program, "over_tex");
 		GLint over_lit_tex_location = _glGetUniformLocation(this->three_d_program, "over_lit_tex");
 		_glUseProgram(this->three_d_program);
@@ -1138,6 +1144,8 @@ void OpenGLBackend::Paint()
 	{
 		std::lock_guard lock(this->three_d_mutex);
 		if (!this->three_d_pictures.empty() && this->three_d_program != 0) {
+			/* Laid by the card: waited for there, not here (the card's context fences them, ThreeDGpuViewPicturesWait()). */
+			if (_glWaitSync != nullptr) ThreeDGpuViewPicturesWait([](void *fence) { _glWaitSync(static_cast<GLsync>(fence), 0, GL_TIMEOUT_IGNORED); });
 			_glUseProgram(this->three_d_program);
 			_glUniform2f(this->three_d_screen_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
 			_glUniform2f(this->three_d_size_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
@@ -1153,6 +1161,7 @@ void OpenGLBackend::Paint()
 				_glUniform4f(this->three_d_light_loc, pic.light == 0 ? 1.0f : light.r / 256.0f, pic.light == 0 ? 1.0f : light.g / 256.0f, pic.light == 0 ? 1.0f : light.b / 256.0f, 1.0f);
 				/* What stands on the turned map over its ground (ThreeDGpuViewStanding()). */
 				_glUniform1f(this->three_d_over_loc, pic.over != 0 ? 1.0f : 0.0f);
+				_glUniform4f(this->three_d_part_loc, pic.part[0], pic.part[1], pic.part[2], pic.part[3]);
 				_glActiveTexture(GL_TEXTURE2);
 				_glBindTexture(GL_TEXTURE_2D, pic.over);
 				_glActiveTexture(GL_TEXTURE3);
@@ -1204,11 +1213,12 @@ void OpenGLBackend::Paint()
  * @param light its colours multiplied by these, 256ths (Colour::data), 0 as they are
  * @param over the card's picture laid over it (what stands on the turned map), its alpha multiplied in, 0 none
  * @param over_lit which of over's pixels the light leaves as they are (its red), 0 none
+ * @param part the part of the textures shown: left, top, width, height as parts of theirs
  */
-void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light, uint32_t over, uint32_t over_lit)
+void OpenGLBackend::ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under, uint32_t light, uint32_t over, uint32_t over_lit, const std::array<float, 4> &part)
 {
 	std::lock_guard lock(this->three_d_mutex);
-	this->three_d_pictures[owner] = {r, texture, tint, under, light, over, over_lit};
+	this->three_d_pictures[owner] = {r, texture, tint, under, light, over, over_lit, part};
 }
 
 /** A window's picture of the graphics card shown no more. */

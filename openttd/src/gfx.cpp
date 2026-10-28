@@ -1565,6 +1565,9 @@ void AddDirtyBlock(int left, int top, int right, int bottom)
  */
 void MarkWholeScreenDirty()
 {
+	/* What stands past the turned main view on the card (viewport.cpp, TurnedCardGround) is laid again too. */
+	extern void ForgetTurnedCardBand();
+	ForgetTurnedCardBand();
 	AddDirtyBlock(0, 0, _screen.width, _screen.height);
 }
 

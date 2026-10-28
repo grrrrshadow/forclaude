@@ -448,6 +448,7 @@ bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
 uint32_t ThreeDGpuViewStanding(uint32_t *lit = nullptr);
+void ThreeDGpuViewPicturesWait(void (*wait)(void *fence));
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);
 void ThreeDGpuVideoContext(void *display, void *context, bool shared_with_card = false);
@@ -462,5 +463,6 @@ size_t ThreeDGpuHeldMB();
 
 extern std::atomic<bool> _three_d_gpu_show; ///< the view from the eyes shown straight from the card where it can (ThreeDGpuShows()); the rig's test3d gpu ukaz 0: read back
 extern std::atomic<bool> _three_d_gpu_off; ///< the pictures drawn by the processor, as before: the setting gui.three_d_gpu off (by default), or the rig's test3d gpu 0
+extern std::atomic<bool> _three_d_gpu_driver_waits; ///< the video driver's context waits on the card for the view's pictures (ThreeDGpuViewPicturesWait()): the card fences them, not glFinish()
 
 #endif /* THREE_D_GPU_H */

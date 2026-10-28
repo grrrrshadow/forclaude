@@ -31,6 +31,36 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (44) – Mezipaměť scény: obrázek pohledu na kartě větší než obrazovka; kde stojí čas snímku
+
+- Hráč: *„tak dalsi kroky udělej, kamera matice a mezipaměť sceny“*.
+- Měření nejdřív (rig, 1600×900, zoom 2): při posunu karta kreslila každou budovu znovu pro každý pruh, který krok
+  odkryl – 40 kroků = 1 259 budov, 14,6 mil. trojúhelníků, 1,4 s karty (průměrná budova ~11 600 trojúhelníků). Pokus
+  bez trojúhelníků budov: karta 35 ms místo 1 355 ms, s jedním trojúhelníkem na běh 180 ms → ~86 % času jsou samotné
+  trojúhelníky budov, zbytek volání. Kamera jako matice by tohle nezkrátila (sběr dlaždic je 1 ms), proto nejdřív
+  mezipaměť.
+- Hotovo – okraj (`TurnedCardGround::band`, 192 bodů každým směrem): obrázek pohledu na kartě (zem i co stojí) sahá za
+  obrazovku a ovladač ukazuje jeho střed (`ShowThreeDPicture(..., part)`, uniform `part` v shaderu). Když posun odkryje
+  pruh a karta ho nemá, nakreslí ho jedním průchodem až k okraji obrázku (`TurnedCardBandUncover()`,
+  `TurnedCardRectOnCard()`); další kroky tahu najdou pruh hotový a blok je jen díra (nebo se položí jen zem). Co stojí za
+  okrajem, se pamatuje po bodech (`stood`); změna tam (jedoucí auto, `MarkViewportDirty()`) nebo celé překreslení
+  obrazovky to zapomene. V noci se okraj nepoužívá (svítící body a záře). Rig: `test3d stojici okraj 0|1`; deník
+  a `test3d cas`: `kusu okraje`, `odkrytych bloku z okraje N z M`.
+- Rig (posun pravým, 0° i 30°): snímků 6–8/s místo 4–5, karta 80–110 ms na snímek místo 140–210; ~85 % odkrytých
+  bloků z okraje. Obraz po posunu tam a zpět stejný jako s vypnutým okrajem (rozdíl proti úplnému překreslení
+  7–8 tisíc bodů v obou případech – textura domu se mezitím dobarvila).
+- Oprava cestou (pád i dřív): blittery hry posouvají řádek o šířku obrazovky (`_screen.pitch`), ať kreslí kamkoli.
+  Pomocný obrázek průchodu pro kartu měl řádky po své šířce, takže užší kus psal za konec paměti (halda). Totéž
+  dosavadní průchod celého pohledu, když šířka obrazovky není násobek 4 (pitch se zarovnává na 4) – zápis kousek za
+  konec při každém otočení. Teď mají řádky aspoň `_screen.pitch` (`TurnedPassOnCard()`). AddressSanitizer: posun,
+  otočení, 1366×768 bez chyby.
+- Ploty místo `glFinish()` u obrázků pohledu (`ViewPicturesLaid()`, `glFenceSync` na kartě, `glWaitSync` v ovladači):
+  karta nečeká na dokončení, ovladač počká na kartě až před složením obrazovky.
+- Zjištění pro další krok: i bez posunu karta na 30° za 50 tiků nakreslí 103 bloků s 1 431 budovami (16 mil.
+  trojúhelníků, 2,6 s) – bloky kolem jedoucích aut a chodců kreslí celé budovy, které do nich zasahují. Návrh
+  (domluvit): budovy pohledu jednou do obrázku s hloubkou, auta a chodci jen přes něj; a/nebo méně trojúhelníků budov
+  podle přiblížení (LOD).
+
 ## 28. 10. (43) – Krabice místo 3D po změně přiblížení, rostoucí les, cukání posunu
 
 - Hráč (#310, logy z telefonu): *„pořad se kresli original prumysl než se stihne nakreslit 3D prumysl a to stoji čas

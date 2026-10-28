@@ -150,7 +150,7 @@ public:
 
 	void ClearSystemSprites() override;
 
-	bool ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0) override;
+	bool ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}) override;
 
 	void HideThreeDPicture(const void *owner) override;
 

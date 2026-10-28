@@ -10077,6 +10077,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_view_on = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici cely {}", _turned_card_view_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "okraj") {
+		/* 'stojici okraj 0|1': the picture of the turned main view on the card reaching past it every way, a move of
+		 * the view uncovering what is laid there already (1; TurnedCardGround), or only the view (0). */
+		extern bool _turned_card_band_on;
+		_turned_card_band_on = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici okraj {}", _turned_card_band_on ? "ano" : "ne");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.

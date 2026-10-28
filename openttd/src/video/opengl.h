@@ -84,6 +84,7 @@ private:
 		uint32_t light;   ///< its colours multiplied by these, 256ths (Colour::data), 0 as they are
 		GLuint over = 0;     ///< the card's picture laid over it, its alpha multiplied in, 0 none
 		GLuint over_lit = 0; ///< which of over's pixels the light leaves as they are (its red), 0 none
+		std::array<float, 4> part = {0.0f, 0.0f, 1.0f, 1.0f}; ///< the part of the textures shown: left, top, width, height as parts of theirs
 	};
 	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
 	std::mutex three_d_mutex; ///< of three_d_pictures: set by the game, drawn by Paint()
@@ -94,6 +95,7 @@ private:
 	GLint  three_d_tint_loc = 0; ///< Uniform location for its tint.
 	GLint  three_d_light_loc = -1; ///< Uniform location for its light (the night's).
 	GLint  three_d_over_loc = -1; ///< Uniform location for whether a picture is laid over it.
+	GLint  three_d_part_loc = -1; ///< Uniform location for the part of its textures shown.
 
 	OpenGLBackend();
 	~OpenGLBackend() override;
@@ -134,7 +136,7 @@ public:
 	void ClearCursorCache();
 
 	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
-	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0);
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f});
 	void HideThreeDPicture(const void *owner);
 	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
 
