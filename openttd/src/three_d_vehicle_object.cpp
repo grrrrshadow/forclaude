@@ -38,6 +38,9 @@
 #include "thread.h"
 #include "window_func.h"
 #include "window_gui.h"
+#include "beamng.h"
+#include "strings_func.h"
+#include "table/strings.h"
 
 #include <array>
 #include <atomic>
@@ -3386,6 +3389,16 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale);
 	out.lights = VehicleObjectLightsOn(obj, front, last, reversed, ZoomLevel::Normal);
+	/* A car of BeamNG into its diary (beamng.log) the first time it is seen from the eyes: which object, how big. */
+	if (obj->file.starts_with("beamng:")) {
+		static std::mutex seen_mutex;
+		static std::set<const ThreeDVehicleObject *> seen;
+		std::lock_guard lock(seen_mutex);
+		if (seen.insert(obj).second) {
+			BeamngDiary(fmt::format("z oci: vozidlo '{}' objekt '{}' ({}) meritko {:.3f} zkraceni {:.3f} delka hry {}", GetString(STR_ENGINE_NAME, v->engine_type),
+					obj->name, obj->file, out.scale, out.along, CachedLength(v)));
+		}
+	}
 	return true;
 }
 

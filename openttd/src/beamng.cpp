@@ -35,6 +35,7 @@
 #include <filesystem>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <optional>
 #include <set>
 #include <tuple>
@@ -627,6 +628,9 @@ struct CarParts {
 	std::vector<uint32_t> paints; ///< the configuration's own paints ("paints" of the .pc, its "baseColor"), Colour::data: the colours of its paint design
 	const JValue *tarp = nullptr; ///< the tarp over a flatbed's bed: the part of the bed's slot of a roof ("..._roof") the configuration leaves empty, drawn when the game covers a load (BeamngMesh::PART_TARP)
 	bool s1203 = false;           ///< our Škoda 1203: its wheels as the player aligned them (FlexbodyPlace())
+	std::string pc;               ///< the configuration read, for the diary (BeamngDiary())
+	size_t jbeam_files = 0;       ///< how many .jbeam files were read, for the diary
+	std::map<const JValue *, std::string> names; ///< the names of the parts used, for the diary
 
 	/** A number of the parts' (JbeamNumber()). */
 	double Number(const JValue &v, double def = 0) const
@@ -726,6 +730,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 			}
 		}
 	}
+	parts.pc = pc;
 	if (!pc.empty()) {
 		JValue cfg = ParseJson(ReadModFile(v, pc));
 		if (const JValue *p = cfg.Get("parts"); p != nullptr && p->IsObject()) {
@@ -761,6 +766,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 			if (main == nullptr && type != nullptr && type->IsString() && type->text == "main") main = &part;
 		}
 	}
+	parts.jbeam_files = jbeams->size();
 	if (main == nullptr) return false;
 	std::set<const JValue *> seen;
 	std::vector<const JValue *> todo = {main};
@@ -782,6 +788,9 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 			todo.push_back(it->second);
 			slotted.emplace(it->second, std::make_pair(part, slot.options));
 		}
+	}
+	for (const auto &[name, part] : by_name) {
+		if (std::ranges::find(parts.used, part) != parts.used.end()) parts.names[part] = name;
 	}
 	/* Its paint design: the skin a part used names for the whole car ("globalSkin"). */
 	for (const JValue *part : parts.used) {
@@ -2568,6 +2577,24 @@ void Simplify(BeamngMesh &mesh, float cell)
 
 } // namespace
 
+/**
+ * The diary of the cars of BeamNG, beamng.log in the save folder (the player, 28. 10.: the 1203's wheels wrong on
+ * his phone, right in the rig): each car's shape as it is made -- its configuration, its make, the parts of its
+ * wheels with their slots' offsets, and where its tyres came out -- to be laid beside the rig's.
+ */
+void BeamngDiary(std::string_view line)
+{
+	static std::mutex diary_mutex;
+	static std::optional<FileHandle> diary;
+	std::lock_guard lock(diary_mutex);
+	if (!diary.has_value()) diary = FileHandle::Open(FioDiaryPath("beamng.log"), "w");
+	if (!diary.has_value()) return;
+	std::string text(line);
+	text += '\n';
+	fwrite(text.data(), 1, text.size(), *diary);
+	fflush(*diary);
+}
+
 /** A .dds of a mod as the game reads it (DecodeDds()): the rig's 'test3d dds'. */
 bool DecodeBeamngDds(const std::vector<uint8_t> &d, int &w, int &h, std::vector<uint8_t> &rgba)
 {
@@ -2906,15 +2933,16 @@ static Matrix FlexbodyPlace(const CarParts &parts, const JValue *part, const JVa
 	/* Where its part's slots move it (the wheels out to their track). */
 	const auto moved = parts.Moved(part, pos[0], pos[1], pos[2]);
 	std::copy(moved.begin(), moved.end(), pos);
-	/* Our 1203's wheels -- tyre, rim, hubcap -- as the player aligned them in the model the old 2D GRF was drawn from
-	 * (the player, 28. 10.: "the rear wheels closer together than the front ones", "here the wheels are aligned",
-	 * grrrrf par16, objglbS1203/s1203output.glb): each 1.735 times as wide across as the mod has it, its middle so far
-	 * from the car's, the front ones 0.772 m and the rear ones 0.714 m; the mod's own put the front ones 0.68 m out. */
+	/* Our 1203's wheels -- tyre, rim, hubcap -- as wide across as in the model the old 2D GRF was drawn from (grrrrf
+	 * par16, objglbS1203/s1203output.glb: 1.735 times the mod's), and both axles out alike, the tyres' outer sides a
+	 * little past the body's 0.92 m (the player, 28. 10.: "the rear wheels closer together than the front ones", "it
+	 * is all the same whether the frame of the flatbed or the van, you move the wheels for all; so move the wheels
+	 * and that is it, let them stick out even, and then we will see"). The mod's own put them 0.68 m out. */
 	if (parts.s1203 && !row.items.empty() && row.items[0].IsString()) {
 		const std::string &mesh = row.items[0].text;
 		if (StrStartsWithIgnoreCase(mesh, "S1203_tire") || StrStartsWithIgnoreCase(mesh, "S1203_wheel") || StrStartsWithIgnoreCase(mesh, "S1203_hubcap")) {
-			static constexpr double S1203_WHEEL_WIDER = 1.735, S1203_FRONT_OUT = 0.772, S1203_REAR_OUT = 0.714;
-			if (pos[0] != 0) pos[0] = std::copysign(pos[1] < 0 ? S1203_FRONT_OUT : S1203_REAR_OUT, pos[0]);
+			static constexpr double S1203_WHEEL_WIDER = 1.735, S1203_WHEEL_OUT = 0.83;
+			if (pos[0] != 0) pos[0] = std::copysign(S1203_WHEEL_OUT, pos[0]);
 			scale[0] *= S1203_WHEEL_WIDER;
 		}
 	}
@@ -3360,6 +3388,43 @@ bool ReadBeamngShape(const BeamngVehicle &v, BeamngMesh &mesh, int make)
 	}
 	Debug(misc, 1, "BeamNG {}: {} meshes ({} not in the model), {} wheels of the game's own, {} triangles ({} in the model), {} materials, {} of glass, lights {} ahead and {} at the back",
 			v.name, meshes, missing, made_wheels, mesh.tri.size() / 3, full, mesh.materials.size(), mesh.night_tri.size() / 3, mesh.front_lights.size() / 3, mesh.back_lights.size() / 3);
+
+	/* Into the diary: what it is made of, and where its tyres are (x ahead, y across, metres of the object). */
+	std::string wheel_parts;
+	for (const JValue *part : parts.used) {
+		auto n = parts.names.find(part);
+		if (n == parts.names.end()) continue;
+		std::string low = n->second;
+		strtolower(low);
+		if (low.find("wheel") == std::string::npos && low.find("tire") == std::string::npos && low.find("suspension") == std::string::npos && low.find("frame") == std::string::npos) continue;
+		auto off = parts.offsets.find(part);
+		wheel_parts += off != parts.offsets.end() ? fmt::format(" {} ({:.3f} {:.3f} {:.3f})", n->second, off->second[0], off->second[1], off->second[2]) : fmt::format(" {}", n->second);
+	}
+	double lo[2][2] = {{1e9, 1e9}, {1e9, 1e9}}, hi[2][2] = {{-1e9, -1e9}, {-1e9, -1e9}}; // [front, back][x, |y|]
+	double body_lo = 1e9, body_hi = -1e9, body_y = 0;
+	for (size_t t = 0; t * 3 + 2 < mesh.tri.size(); t++) {
+		const uint8_t m = t < mesh.tri_tex.size() ? mesh.tri_tex[t] : 0;
+		std::string material = m < mesh.materials.size() ? mesh.materials[m].name : std::string();
+		strtolower(material);
+		const bool tyre = material.find("tire") != std::string::npos || material.find("tyre") != std::string::npos;
+		for (int k = 0; k < 3; k++) {
+			const size_t c = mesh.tri[t * 3 + k];
+			if (c * 3 + 2 >= mesh.pos.size()) continue;
+			const double x = mesh.pos[c * 3], y = std::abs(mesh.pos[c * 3 + 1]);
+			body_lo = std::min(body_lo, x);
+			body_hi = std::max(body_hi, x);
+			body_y = std::max(body_y, y);
+			if (!tyre) continue;
+			const int a = x > 0 ? 0 : 1;
+			lo[a][0] = std::min(lo[a][0], x);
+			hi[a][0] = std::max(hi[a][0], x);
+			lo[a][1] = std::min(lo[a][1], y);
+			hi[a][1] = std::max(hi[a][1], y);
+		}
+	}
+	BeamngDiary(fmt::format("{} | znacka {} | konfigurace {} | {} | {} jbeam | dily:{}", v.name, make, parts.pc, v.Package(), parts.jbeam_files, wheel_parts));
+	BeamngDiary(fmt::format("  pneumatiky vpredu x {:.2f}..{:.2f} do boku {:.2f}..{:.2f}, vzadu x {:.2f}..{:.2f} do boku {:.2f}..{:.2f}; karoserie x {:.2f}..{:.2f}, do boku {:.2f}; {} kol hry, {} sitek ({} chybi), {} trojuhelniku",
+			lo[0][0], hi[0][0], lo[0][1], hi[0][1], lo[1][0], hi[1][0], lo[1][1], hi[1][1], body_lo, body_hi, body_y, made_wheels, meshes, missing, mesh.tri.size() / 3));
 	return true;
 }
 

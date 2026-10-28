@@ -31,7 +31,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
-## 28. 10. (41) – Kola 1203 podle hráčova srovnaného modelu (par16)
+## 28. 10. (41) – Kola 1203: srovnat u všech stejně, beamng.log
 
 Hráč: *„ma zadni kola bliž u sebe než předni #308 všechny teď"*, *„tady jsou asi srovnany ty kola.
 https://github.com/grrrrshadow/grrrrf/releases/tag/par16"* (záloha projektu 1203 GRF: bity VWT1, sprity a yagl,
@@ -42,8 +42,17 @@ modely `objglbS1203`, ze kterých se renderoval 2D GRF).
   na cm stejná, zrcátka 0,92 m) je celé kolo – pneumatika, disk, poklice – 1,735× širší a posunuté: střed vpředu
   0,772 m, vzadu 0,714 m (pneumatiky 0,65–0,89 a 0,60–0,83). Samo BeamNG z uzlů dává vpředu 0,68 (vzadu 0,71 díky
   `wheelOffset`), takže par16 je ruční srovnání.
-- Teď: kola naší 1203 (`S1203_tire`, `S1203_wheel*`, `S1203_hubcap*`) jsou přesně jako v par16; starý posun zadku pryč.
-  Rig zepředu, zezadu, z boku i šikmo: kola na boku karoserie, v podbězích.
+- Hráč dál: *„všechny maj kola blbě teď … škoda 1203 dodavka je dobře a ty šel fotit škoda 1203 dodavka … skus Taz
+  nebo 1503"*, *„1500 taz všechny"*, *„to je fuk jestli ram valnik nebo dodavka, posouvaš kola všem. tak posuň kola a
+  hotovo ať mi čouhaj třeba ven a pak uvidime"*, *„prvni co se musi udělat po načteni beamng srovnat kola protože to
+  je stejny pro všechny"*.
+- Teď: kola každé 1203 (všechny konfigurace a značky, hned při stavění modelu z BeamNG) široká jako v par16 a obě nápravy
+  stejně venku, bok pneumatiky 0,95 m od osy (karoserie 0,92) – lehce čouhají. Starý posun zadku pryč.
+- Rig to nereprodukuje: kola podél auta sedí u všech (Škoda i TAZ 1203; v roce 1997 i TAZ 1500 a 1.9D – rig předtím
+  běžel v roce 1985, kdy ty značky nejsou), i po zapomenutí tvaru a novém čtení. Proto `beamng.log` ve složce save:
+  každé auto při stavění (konfigurace, značka, soubor modu, počet jbeam, díly kol s posuny slotů, kde vyšly pneumatiky
+  vpředu a vzadu, karoserie) a z očí poprvé viděné (objekt, měřítko, zkrácení, délka hry). Hráč ho pošle, když to
+  u něj pořád nebude sedět.
 
 ## 28. 10. (40) – Jedna kabina pro E i ikonku, čudlík Kamera, interiér 1203
 

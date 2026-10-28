@@ -141,6 +141,7 @@ struct BeamngMesh {
 bool ReadBeamngShape(const BeamngVehicle &vehicle, BeamngMesh &mesh, int make = -1);
 /** How long a car is as its model reaches, metres, its textures not read; of a make of our 1203 as ReadBeamngShape(). */
 float BeamngLength(const BeamngVehicle &vehicle, int make = -1);
+void BeamngDiary(std::string_view line);
 const BeamngVehicle *GetBeamngVehicle(size_t index);
 
 #endif /* BEAMNG_H */
