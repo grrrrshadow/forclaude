@@ -626,6 +626,7 @@ struct CarParts {
 	std::string skin;             ///< the configuration's paint design: "globalSkin" of a part used (the Škoda 1203's VB, the slot "paint_design")
 	std::vector<uint32_t> paints; ///< the configuration's own paints ("paints" of the .pc, its "baseColor"), Colour::data: the colours of its paint design
 	const JValue *tarp = nullptr; ///< the tarp over a flatbed's bed: the part of the bed's slot of a roof ("..._roof") the configuration leaves empty, drawn when the game covers a load (BeamngMesh::PART_TARP)
+	bool s1203 = false;           ///< our Škoda 1203: its wheels as the player aligned them (FlexbodyPlace())
 
 	/** A number of the parts' (JbeamNumber()). */
 	double Number(const JValue &v, double def = 0) const
@@ -713,6 +714,7 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 	std::vector<std::string> files = ListCarFiles(v);
 	std::sort(files.begin(), files.end());
 	std::map<std::string, std::string> chosen;
+	parts.s1203 = IsS1203(v);
 	/* The configuration: its own, else info.json's "default_pc", else the only .pc. */
 	std::string pc = !v.base_config.empty() ? v.base_config + ".pc" : v.config.empty() ? std::string() : v.config + ".pc";
 	if (const JValue *d = info != nullptr ? info->Get("default_pc") : nullptr; pc.empty() && d != nullptr && d->IsString()) pc = d->text + ".pc";
@@ -737,10 +739,6 @@ bool ReadCarParts(const BeamngVehicle &v, const JValue *info, CarParts &parts, i
 				if (value.type == JValue::Type::Number) parts.vars[name] = value.number;
 			}
 		}
-		/* Our 1203's rear wheels out to the side of the body as its front ones look (the player, 27. 10.: "put them
-		 * further from the middle, so that they are really as the front ones at the side of the car"): the mod's own
-		 * "Wheel Offset" of the rear at its widest. */
-		if (IsS1203(v)) parts.vars["$trackoffset_R"] = 0.05;
 		/* Its own paints, in their order: the colours its paint design lays (the yellow and the white of the VB). */
 		if (const JValue *paints = cfg.Get("paints"); paints != nullptr && paints->IsArray()) {
 			for (const JValue &paint : paints->items) {
@@ -2908,6 +2906,18 @@ static Matrix FlexbodyPlace(const CarParts &parts, const JValue *part, const JVa
 	/* Where its part's slots move it (the wheels out to their track). */
 	const auto moved = parts.Moved(part, pos[0], pos[1], pos[2]);
 	std::copy(moved.begin(), moved.end(), pos);
+	/* Our 1203's wheels -- tyre, rim, hubcap -- as the player aligned them in the model the old 2D GRF was drawn from
+	 * (the player, 28. 10.: "the rear wheels closer together than the front ones", "here the wheels are aligned",
+	 * grrrrf par16, objglbS1203/s1203output.glb): each 1.735 times as wide across as the mod has it, its middle so far
+	 * from the car's, the front ones 0.772 m and the rear ones 0.714 m; the mod's own put the front ones 0.68 m out. */
+	if (parts.s1203 && !row.items.empty() && row.items[0].IsString()) {
+		const std::string &mesh = row.items[0].text;
+		if (StrStartsWithIgnoreCase(mesh, "S1203_tire") || StrStartsWithIgnoreCase(mesh, "S1203_wheel") || StrStartsWithIgnoreCase(mesh, "S1203_hubcap")) {
+			static constexpr double S1203_WHEEL_WIDER = 1.735, S1203_FRONT_OUT = 0.772, S1203_REAR_OUT = 0.714;
+			if (pos[0] != 0) pos[0] = std::copysign(pos[1] < 0 ? S1203_FRONT_OUT : S1203_REAR_OUT, pos[0]);
+			scale[0] *= S1203_WHEEL_WIDER;
+		}
+	}
 	const double rx = rot[0] * M_PI / 180, ry = rot[1] * M_PI / 180, rz = rot[2] * M_PI / 180;
 	const Matrix mx = {1, 0, 0, 0, 0, std::cos(rx), -std::sin(rx), 0, 0, std::sin(rx), std::cos(rx), 0, 0, 0, 0, 1};
 	const Matrix my = {std::cos(ry), 0, std::sin(ry), 0, 0, 1, 0, 0, -std::sin(ry), 0, std::cos(ry), 0, 0, 0, 0, 1};

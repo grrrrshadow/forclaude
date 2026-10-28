@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (41) – Kola 1203 podle hráčova srovnaného modelu (par16)
+
+Hráč: *„ma zadni kola bliž u sebe než předni #308 všechny teď"*, *„tady jsou asi srovnany ty kola.
+https://github.com/grrrrshadow/grrrrf/releases/tag/par16"* (záloha projektu 1203 GRF: bity VWT1, sprity a yagl,
+modely `objglbS1203`, ze kterých se renderoval 2D GRF).
+
+- Změřeno: v našem tvaru byly pneumatiky vpředu 0,61–0,75 m od osy, vzadu 0,67–0,81 (zadek můj natvrdo daný
+  `$trackoffset_R = 0,05` z 27. 10.), široké 0,136 m jako v `wheel.dae` modu. V `s1203output.glb` z par16 (karoserie
+  na cm stejná, zrcátka 0,92 m) je celé kolo – pneumatika, disk, poklice – 1,735× širší a posunuté: střed vpředu
+  0,772 m, vzadu 0,714 m (pneumatiky 0,65–0,89 a 0,60–0,83). Samo BeamNG z uzlů dává vpředu 0,68 (vzadu 0,71 díky
+  `wheelOffset`), takže par16 je ruční srovnání.
+- Teď: kola naší 1203 (`S1203_tire`, `S1203_wheel*`, `S1203_hubcap*`) jsou přesně jako v par16; starý posun zadku pryč.
+  Rig zepředu, zezadu, z boku i šikmo: kola na boku karoserie, v podbězích.
+
 ## 28. 10. (40) – Jedna kabina pro E i ikonku, čudlík Kamera, interiér 1203
 
 Hráč: *„chci aby byly stejný E a ikonka cabview protože pak otáčení hlavou funguje jen v cabview ikonkou z okna auta
