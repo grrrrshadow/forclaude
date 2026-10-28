@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 28. 10. (45) – Budovy po kostkách: blok kolem auta kreslí jen kus budovy, který do něj padne
+
+- Hráč (#311, logy): *„opentitle sav potřebuješ tam nechat ty značky nápisy ? asi maš označený sever jih zapad
+  vychod. hejbalo se to pěkně, pustil jsem zátěž, odešlo my noise a pak to spadlo . start hry byl s malou ram ,
+  firefox byl puštěnej. test nákladů, jezdilo hodně typů aut . test se vratim dokončit, když budu chodit pomaleji a
+  počkam až se to načte tak to nespadne. musime dokončit gpu a pak to mužem ladit. začatek logu je vystavba bez grf
+  opentitle. jen domy a prumysl 3D bez aut“*.
+- Nápisy v opntitle: nejsou to světové strany, ale body kamery úvodní obrazovky (`T1 P 12` … `T4 P 12`, intro_gui.cpp:
+  kamera jede po čtyřech bodech kolem osmiúhelníku, 12 s každý). Úvodní obrazovka je po načtení smaže, takže tam vidět
+  nejsou; ukážou se jen po otevření opntitle jako hry. Pro úvodní hru zůstat musí, jinak kamera stojí.
+- Log #311: stavba v opntitle bez aut 60–85 snímků/s, karta ~1 ms (okraj funguje). Test nákladů s mnoha auty 3–15
+  snímků/s, karta 30–70 ms – bloky kolem jedoucích aut kreslily celé budovy. Pád v pohledu z očí: paměť 3,5 → 5,3 GB za
+  2 minuty (malá RAM, Firefox). Podle hráče až po dokončení GPU.
+- Příčina: dům má ~11 600 trojúhelníků a do bloku kolem auta (desítky bodů) se kreslil celý; karta zahodí, co je mimo
+  blok, ale každý trojúhelník projde.
+- Hotovo: tvar budovy se při nahrání na kartu rozdělí na kostky (čtvrt dlaždice na šířku, půl na výšku, nejvýš 8×8×8,
+  `GpuBuilding::Cell`, `boxes`). Při kreslení do bloku karta promítne rohy každé kostky a kreslí jen trojúhelníky kostek,
+  které do bloku padnou (`glMultiDrawArrays`); budova, která do bloku nepadne vůbec, nic (jen hloubka pro to, co stojí na
+  ní). Vzhled stejný. Rig: `test3d stojici kostky 0|1`; `test3d cas`: „of the buildings' N triangles in the blocks M
+  drawn“.
+- Rig bez posunu, 50 tiků: 0° karta 164 ms místo 680 ms (z budov 13 % trojúhelníků), 30° ~poloviční čas na budovu.
+  Posun pravým: 17–25 snímků/s místo 5–7, karta 10–23 ms místo 90–140 ms. Obraz: překreslení po blocích proti celému
+  stejné s kostkami i bez; přesný test se zastavenou hrou – liší se jen tvorové (strašidlo, liška), kteří se v každém
+  běhu objeví jinde. AddressSanitizer bez chyby.
+
 ## 28. 10. (44) – Mezipaměť scény: obrázek pohledu na kartě větší než obrazovka; kde stojí čas snímku
 
 - Hráč: *„tak dalsi kroky udělej, kamera matice a mezipaměť sceny“*.

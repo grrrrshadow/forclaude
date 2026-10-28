@@ -22,7 +22,9 @@
 #include "timer/timer_window.h"
 #include "table/strings.h"
 #include "frame_diary.h"
+#include "tile_type.h"
 
+#include <cfloat>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
@@ -404,6 +406,8 @@ struct GlFunctions {
 #undef THREE_D_GL_MEMBER
 	/* Not every OpenGL has them (3.2): without, glFinish() (ViewPicturesLaid()). */
 	GLsync (THREE_D_GL_API *glFenceSync)(GLenum condition, GLbitfield flags) = nullptr;
+	/* Without, a glDrawArrays() for each range (DrawStandingOnCard()). */
+	void (THREE_D_GL_API *glMultiDrawArrays)(GLenum mode, const GLint *first, const GLsizei *count, GLsizei drawcount) = nullptr;
 	void (THREE_D_GL_API *glDeleteSync)(GLsync sync) = nullptr;
 	void (THREE_D_GL_API *glFlush)() = nullptr;
 };
@@ -482,6 +486,7 @@ uint64_t _gpu_pictures = 0;         ///< and how many
 uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the processor did)
 uint64_t _gpu_standing_vehicles = 0;      ///< the vehicles of the turned map it drew and shrunk since the last ThreeDGpuTimes() (ThreeDGpuStandingVehicle)
 uint64_t _gpu_standing_vehicles_kept = 0; ///< and those it laid as they were kept
+uint64_t _gpu_standing_triangles[2] = {}; ///< the triangles of the buildings among what stands it drew, and of all of them those in the blocks (GpuBuilding::Cell)
 double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes()
 uint64_t _gpu_grounds = 0;          ///< and how many blocks
 uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the processor did)
@@ -513,13 +518,21 @@ std::unordered_map<uint64_t, GpuIndices> _card_indices;
  * the triangle's light, its corners' mean as the processor shades it --, by texture and side facing out. */
 struct GpuBuilding {
 	GLuint vao = 0, vbo = 0;
+	/** The triangles of a run in one cell of the shape (MapBuildingOnCard()): one after the other in it. */
+	struct Cell {
+		GLint first = 0;
+		GLsizei count = 0;
+		uint16_t id = 0; ///< which cell (boxes)
+	};
 	struct Run {
 		GLint first = 0;
 		GLsizei count = 0;
 		uint8_t texture = 0;
 		int8_t facing = 0;
+		std::vector<Cell> cells; ///< its triangles cell by cell; none: not cut into cells
 	};
 	std::vector<Run> runs;
+	std::vector<std::array<float, 6>> boxes; ///< each cell's box: the least and most x, y, z of its triangles' corners
 	size_t bytes = 0;
 	uint64_t used = 0;
 };
@@ -1911,6 +1924,7 @@ bool LoadGlFunctions(std::string &why)
 	THREE_D_GL_FUNCTIONS(THREE_D_GL_LOAD)
 #undef THREE_D_GL_LOAD
 	gl.glFenceSync = reinterpret_cast<decltype(gl.glFenceSync)>(GetGlProc("glFenceSync"));
+	gl.glMultiDrawArrays = reinterpret_cast<decltype(gl.glMultiDrawArrays)>(GetGlProc("glMultiDrawArrays"));
 	gl.glDeleteSync = reinterpret_cast<decltype(gl.glDeleteSync)>(GetGlProc("glDeleteSync"));
 	gl.glFlush = reinterpret_cast<decltype(gl.glFlush)>(GetGlProc("glFlush"));
 	return true;
@@ -2794,22 +2808,60 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 	const size_t corners = b.pos.size() / 3;
 	if (b.uid == 0 || corners == 0 || b.uv.size() < corners * 2) return nullptr;
 	const bool lit = b.light.size() == corners;
-	std::map<std::pair<uint8_t, int8_t>, std::vector<float>> by;
+	/* Its shape cut into cells, a quarter of a tile across and half a tile high, at most 8 each way: a block of the map
+	 * drawn again (a car went by) draws the triangles of the cells it reaches into, not all of the building's
+	 * (DrawStandingOnCard(); the player's #311, many cars: 30-70 ms a frame, all of it the buildings' triangles). */
+	std::array<float, 3> lo = {FLT_MAX, FLT_MAX, FLT_MAX}, hi = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+	for (size_t i = 0; i < corners; i++) {
+		for (int a = 0; a < 3; a++) {
+			lo[a] = std::min(lo[a], b.pos[i * 3 + a]);
+			hi[a] = std::max(hi[a], b.pos[i * 3 + a]);
+		}
+	}
+	static constexpr float CELL[3] = {TILE_SIZE / 4.0f, TILE_SIZE / 4.0f, TILE_SIZE / 2.0f};
+	std::array<int, 3> n;
+	for (int a = 0; a < 3; a++) n[a] = std::clamp(static_cast<int>(std::ceil((hi[a] - lo[a]) / CELL[a])), 1, 8);
+	auto cell_of = [&](uint32_t ia, uint32_t ib, uint32_t ic) {
+		int c[3];
+		for (int a = 0; a < 3; a++) {
+			const float mid = (b.pos[ia * 3 + a] + b.pos[ib * 3 + a] + b.pos[ic * 3 + a]) / 3.0f;
+			c[a] = hi[a] > lo[a] ? std::clamp(static_cast<int>((mid - lo[a]) / (hi[a] - lo[a]) * n[a]), 0, n[a] - 1) : 0;
+		}
+		return static_cast<uint16_t>((c[2] * n[1] + c[1]) * n[0] + c[0]);
+	};
+	struct Tri {
+		uint16_t cell;
+		uint32_t at; ///< its first corner in tri
+	};
+	std::map<std::pair<uint8_t, int8_t>, std::vector<Tri>> by;
 	for (size_t t = 0; t + 2 < b.tri.size(); t += 3) {
 		const uint32_t ia = b.tri[t], ib = b.tri[t + 1], ic = b.tri[t + 2];
 		if (std::max({ia, ib, ic}) >= corners) continue;
 		const uint8_t texture = t / 3 < b.tri_tex.size() ? b.tri_tex[t / 3] : 0;
 		const int8_t facing = t / 3 < b.facing.size() ? b.facing[t / 3] : 0;
-		std::vector<float> &v = by[{texture, facing}];
-		for (uint32_t i : {ia, ib, ic}) v.insert(v.end(), {b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2], b.uv[i * 2], b.uv[i * 2 + 1], lit ? static_cast<float>(b.light[i]) : 256.0f});
+		by[{texture, facing}].push_back({cell_of(ia, ib, ic), static_cast<uint32_t>(t)});
 	}
 	GpuBuilding g;
+	g.boxes.assign(static_cast<size_t>(n[0]) * n[1] * n[2], {FLT_MAX, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX});
 	std::vector<float> all;
-	for (const auto &[k, v] : by) {
-		g.runs.push_back({static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(v.size() / 6), k.first, k.second});
-		all.insert(all.end(), v.begin(), v.end());
+	for (auto &[k, tris] : by) {
+		std::ranges::stable_sort(tris, {}, &Tri::cell);
+		GpuBuilding::Run run{static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(tris.size() * 3), k.first, k.second, {}};
+		for (const Tri &tri : tris) {
+			if (run.cells.empty() || run.cells.back().id != tri.cell) run.cells.push_back({static_cast<GLint>(all.size() / 6), 0, tri.cell});
+			run.cells.back().count += 3;
+			std::array<float, 6> &box = g.boxes[tri.cell];
+			for (uint32_t i : {b.tri[tri.at], b.tri[tri.at + 1], b.tri[tri.at + 2]}) {
+				all.insert(all.end(), {b.pos[i * 3], b.pos[i * 3 + 1], b.pos[i * 3 + 2], b.uv[i * 2], b.uv[i * 2 + 1], lit ? static_cast<float>(b.light[i]) : 256.0f});
+				for (int a = 0; a < 3; a++) {
+					box[a] = std::min(box[a], b.pos[i * 3 + a]);
+					box[a + 3] = std::max(box[a + 3], b.pos[i * 3 + a]);
+				}
+			}
+		}
+		g.runs.push_back(std::move(run));
 	}
-	Step(fmt::format("budova plochy na kartu: {} trojuhelniku", all.size() / 18));
+	Step(fmt::format("budova plochy na kartu: {} trojuhelniku v {} kostkach", all.size() / 18, g.boxes.size()));
 	gl.glGenVertexArrays(1, &g.vao);
 	gl.glBindVertexArray(g.vao);
 	gl.glGenBuffers(1, &g.vbo);
@@ -3513,6 +3565,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	/* A building: its depth cleared over its rectangle, its triangles by texture and side, at night its lit glass. */
 	std::vector<GLuint> textures;
 	std::vector<float> night;
+	std::vector<uint8_t> cell_in;
+	std::vector<GLint> firsts;
+	std::vector<GLsizei> counts;
 	auto draw_building = [&](const ThreeDGpuStandingBuilding &b) {
 		const GpuBuilding *on = MapBuildingOnCard(b.building);
 		if (on == nullptr) return false;
@@ -3531,17 +3586,69 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				gl.glScissor(s.view_x, s.view_y, s.width, s.height);
 			}
 		}
+		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
+		/* Which of its cells reach into the block (GpuBuilding::boxes): their corners through the matrix to the
+		 * view's pixels, against the block's; a cell it cannot tell of drawn. */
+		cell_in.assign(on->boxes.size(), 1);
+		bool all_cells = true;
+		for (size_t c = 0; c < on->boxes.size() && _gpu_building_cells_on; c++) {
+			const std::array<float, 6> &box = on->boxes[c];
+			if (box[0] > box[3]) {
+				cell_in[c] = 0;
+				continue;
+			}
+			float x0 = FLT_MAX, x1 = -FLT_MAX, y0 = FLT_MAX, y1 = -FLT_MAX;
+			bool behind = false;
+			for (int k = 0; k < 8 && !behind; k++) {
+				const float x = box[(k & 1) ? 3 : 0], y = box[(k & 2) ? 4 : 1], z = box[(k & 4) ? 5 : 2];
+				const float cw = m[12] * x + m[13] * y + m[14] * z + m[15];
+				if (cw <= 0) {
+					behind = true;
+					break;
+				}
+				const float px = ((m[0] * x + m[1] * y + m[2] * z + m[3]) / cw + 1.0f) * 0.5f * vw;
+				const float py = ((m[4] * x + m[5] * y + m[6] * z + m[7]) / cw + 1.0f) * 0.5f * vh;
+				x0 = std::min(x0, px);
+				x1 = std::max(x1, px);
+				y0 = std::min(y0, py);
+				y1 = std::max(y1, py);
+			}
+			if (!behind && (x1 < s.view_x - 1 || x0 > s.view_x + s.width + 1 || y1 < s.view_y - 1 || y0 > s.view_y + s.height + 1)) {
+				cell_in[c] = 0;
+				all_cells = false;
+			}
+		}
+		/* None of it in the block: its depth cleared all the same (what stands on it is laid in it), nothing drawn. */
+		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
 		gl.glUseProgram(bp.program);
 		gl.glUniform1i(bp.tex, 0);
 		const GLint night_at = gl.glGetUniformLocation(bp.program, "u_night");
 		gl.glUniform1i(night_at, 0);
-		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
 		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
 		gl.glEnable(GL_DEPTH_TEST);
 		gl.glBindVertexArray(on->vao);
 		for (const GpuBuilding::Run &r : on->runs) {
 			if (r.texture >= textures.size() || textures[r.texture] == 0) continue;
+			/* Its ranges in the cells that reach into the block, one after the other joined. */
+			firsts.clear();
+			counts.clear();
+			if (all_cells || r.cells.empty()) {
+				firsts.push_back(r.first);
+				counts.push_back(r.count);
+			} else {
+				for (const GpuBuilding::Cell &c : r.cells) {
+					if (c.id >= cell_in.size() || cell_in[c.id] == 0) continue;
+					if (!firsts.empty() && firsts.back() + counts.back() == c.first) {
+						counts.back() += c.count;
+					} else {
+						firsts.push_back(c.first);
+						counts.push_back(c.count);
+					}
+				}
+			}
+			_gpu_standing_triangles[1] += static_cast<uint64_t>(r.count / 3);
+			if (firsts.empty()) continue;
 			/* The side turned away left out, as the pictures of the buildings (DrawBuildingsOnCard()). */
 			if (!b.building.cull || r.facing == 0) {
 				gl.glDisable(GL_CULL_FACE);
@@ -3550,7 +3657,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				gl.glCullFace(r.facing > 0 ? GL_FRONT : GL_BACK);
 			}
 			gl.glBindTexture(GL_TEXTURE_2D, textures[r.texture]);
-			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
+			if (firsts.size() > 1 && gl.glMultiDrawArrays != nullptr) {
+				gl.glMultiDrawArrays(GL_TRIANGLES, firsts.data(), counts.data(), static_cast<GLsizei>(firsts.size()));
+			} else {
+				for (size_t k = 0; k < firsts.size(); k++) gl.glDrawArrays(GL_TRIANGLES, firsts[k], counts[k]);
+			}
+			for (GLsizei c : counts) _gpu_standing_triangles[0] += static_cast<uint64_t>(c / 3);
 		}
 		gl.glDisable(GL_CULL_FACE);
 		if (!b.night.empty()) {
@@ -3847,7 +3959,7 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	GpuBuilding g;
 	std::vector<float> all;
 	for (const auto &[key, v] : by) {
-		g.runs.push_back({static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(v.size() / 6), key.first, key.second});
+		g.runs.push_back({static_cast<GLint>(all.size() / 6), static_cast<GLsizei>(v.size() / 6), key.first, key.second, {}});
 		all.insert(all.end(), v.begin(), v.end());
 	}
 	Step(fmt::format("budova na kartu: {} trojuhelniku", all.size() / 18));
@@ -4956,23 +5068,24 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
 	return job.ok;
 }
 
-/**
- * Lay what stands on a block of the turned map on the card, into the picture of the view's standing things (it waits).
- * @return false: not laid (no card, a picture bigger than it holds): the processor draws it
- */
+std::atomic<bool> _three_d_gpu_driver_waits = false;
+std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
+
 /**
  * Have the video driver's context wait on the card for the view's pictures it shows straight from it to be laid
  * (ViewPicturesLaid()): called by it before it shows them, with the way it waits for a fence (glWaitSync()).
  * @param wait waits for the fence given, on the card
  */
-std::atomic<bool> _three_d_gpu_driver_waits = false;
-
 void ThreeDGpuViewPicturesWait(void (*wait)(void *fence))
 {
 	std::lock_guard lock(_view_fence_mutex);
 	if (_view_fence != nullptr) wait(_view_fence);
 }
 
+/**
+ * Lay what stands on a block of the turned map on the card, into the picture of the view's standing things (it waits).
+ * @return false: not laid (no card, a picture bigger than it holds): the processor draws it
+ */
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 {
 	if (!ThreeDGpuAvailable()) return false;
@@ -5216,8 +5329,10 @@ std::string ThreeDGpuTimes()
 			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
+	if (_gpu_standing_triangles[1] > 0) s += fmt::format("; of the buildings' {} triangles in the blocks {} drawn, in the cells there", _gpu_standing_triangles[1], _gpu_standing_triangles[0]);
 	_gpu_standing_vehicles = 0;
 	_gpu_standing_vehicles_kept = 0;
+	_gpu_standing_triangles[0] = _gpu_standing_triangles[1] = 0;
 	_gpu_ground_ms = 0;
 	_gpu_grounds = 0;
 	_gpu_grounds_failed = 0;
@@ -5243,6 +5358,7 @@ uint32_t ThreeDGpuViewStanding(uint32_t *lit) { if (lit != nullptr) *lit = 0; re
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;
+std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what stands drawn only in the cells of it the block reaches into (test3d stojici kostky); else whole
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }

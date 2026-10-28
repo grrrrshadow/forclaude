@@ -10077,6 +10077,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_view_on = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici cely {}", _turned_card_view_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "kostky") {
+		/* 'stojici kostky 0|1': a building among what the card lays drawn only in the cells of its shape the block
+		 * reaches into (1; GpuBuilding::Cell), or whole (0). */
+		_gpu_building_cells_on = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici kostky {}", _gpu_building_cells_on ? "ano" : "ne");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "okraj") {
 		/* 'stojici okraj 0|1': the picture of the turned main view on the card reaching past it every way, a move of
 		 * the view uncovering what is laid there already (1; TurnedCardGround), or only the view (0). */
