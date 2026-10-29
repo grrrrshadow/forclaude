@@ -31,6 +31,35 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 29. 10. (50) – Figury, kytky a efekty otočené mapy kreslí karta z trojúhelníků
+
+- Hráč: *„ja dam build a ty mužeš pokračovat gpu“*, *„vyser se na falca a bež dělat gpu“* (Falkor: *„nekoupil jsem
+  falco, draci litaj na tom nic neměnime.“* → nic se nemění; nekoupený Falkor ve světě není).
+- Zjištění z logu 29. 10. (`snimky.log`): na mapě dělalo hlavní vlákno obrázky 3D objektů, třeba 38 za 3,1 s
+  a 30 za 2,4 s v pěti sekundách. Auta už kreslila karta z trojúhelníků (35), ale figury mapy ne: stromy, holky
+  na zastávce, zvířata, draci, UFO, Mat, čarodějnice, okrasná auta, ohňostroj, kytky a figury na budovách. Ty se
+  dělaly jako obrázky a karta je kreslila, četla zpět a pokládala.
+- Hotovo: figury, kytky a efekty jdou kartou stejně jako auta (`CardVehicle()`, `ThreeDGpuStandingVehicle`):
+  - požadavek na obrázek a jeho výroba jsou oddělené (`PictureRequest()` / `ObjectPictureOf()`, `FigureRequest()`,
+    `PlantRequest()`), stejný požadavek dostane karta (`GetThreeDFigureOnCard()`, `GetThreeDPlantOnCard()`);
+  - obrázek se udělá jen jako záloha, dokud model nebo textura nejsou načtené;
+  - figury a kytky na budovách se kladou mezi trojúhelníky budovy s hloubkou, položka auta na kartě teď hloubku umí;
+  - velké figury (draci zblízka) karta kreslí v hrubším přiblížení a zvětší (`ThreeDGpuStandingItem::up`). Na kartu
+    se vejde nejvýš 2048 bodů (`THREE_D_GPU_VEHICLE_FRAME`), větší jde obrázkem.
+- Opravy cestou:
+  - velký létající tvor u hospody na kartě chyběl: odhad přiblížení dovolil obrázek přes 2048 bodů a karta ho
+    přeskočila. Teď pro kartu hrubší přiblížení s rezervou; co se nevejde, jde obrázkem;
+  - když se zaplnil zásobník zmenšených obrázků a karta kreslila novou dávku aut, ztratila nezmenšená auta
+    z předchozí dávky. Teď je nakreslí znovu;
+  - čítač „vozidel obrazkem“ v `test3d cas` počítal každou položku, teď jen položené jako obrázek.
+- Rig (GPU, 1600×900, hra zastavená ve stejném tiku, `test3d stojici auta 1|0`):
+  - les na pasece: shodný na bod, den i noc;
+  - hospoda: 12 bodů rozdílu;
+  - město: rozdíl jako mezi dvěma stejnými běhy (Mat a chodci se rodí náhodně).
+  - Za 100 tiků ve městě: dřív karta 73 obrázků figur za 493 ms se čtením zpět, teď 3 obrázky za 22 ms
+    a 143 figur z trojúhelníků.
+- Rig: `test3d stojici auta 0|1` přepíná auta i figury.
+
 ## 29. 10. (49) – Rožeň v lese nad ohništěm, rožeň v hospodě a na hřišti točí a střídá, co dál na GPU
 
 - Gril v lese: *„ja mam taky otazky ke grillu, kde je grill z grrrrf ktery se toči a střida se na něm kravička,

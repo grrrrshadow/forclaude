@@ -58,7 +58,7 @@ void AddSortableSpriteToDraw(SpriteID image, PaletteID pal, int x, int y, int z,
 struct ThreeDModelPicture;
 struct ThreeDGpuStandingVehicle;
 void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up = 0);
-void AddTurnedVehicleOnCard(std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax);
+void AddTurnedVehicleOnCard(std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up = 0);
 /** A picture of a vehicle drawn in one entry with others (AddTurnedVehiclePictures()), and the world point it hangs from. */
 struct TurnedVehiclePart {
 	const ThreeDModelPicture *pic;

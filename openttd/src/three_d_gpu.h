@@ -379,6 +379,9 @@ struct ThreeDGpuStandingBuilding {
 	std::vector<uint8_t> night_texture;   ///< each such triangle's texture (ThreeDGpuBuilding::textures)
 };
 
+/** The most a vehicle (or a figure) drawn by the card among what stands is across or high, subpixels (ThreeDGpuStandingVehicle). */
+static constexpr int THREE_D_GPU_VEHICLE_FRAME = 2048;
+
 /**
  * A vehicle of the turned map drawn by the card among what stands on a block, with no picture of it made (the player,
  * 25. 10.: "finish the move to the GPU"): its shapes as its picture would have them (PrepareGpuObject() of
@@ -417,7 +420,8 @@ struct ThreeDGpuStandingItem {
 	 * depth (0-1); laid where it is nearer, its depth kept. Below 0: laid over all. */
 	float depth = -1;
 	int building = -1; ///< not a picture: the building of ThreeDGpuStanding::buildings drawn here
-	std::shared_ptr<const ThreeDGpuStandingVehicle> vehicle = nullptr; ///< not a picture: this vehicle drawn here, laid over all
+	std::shared_ptr<const ThreeDGpuStandingVehicle> vehicle = nullptr; ///< not a picture: this vehicle (or figure) drawn here, laid as a picture is (depth)
+	int up = 0;       ///< the vehicle laid so many times doubled (a big figure drawn at a coarser zoom)
 	int faces = -1;   ///< not a picture: the box of ThreeDGpuStanding::faces drawn here
 };
 

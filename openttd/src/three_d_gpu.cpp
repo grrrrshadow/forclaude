@@ -3693,13 +3693,19 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	 * drawn yet, -2 not drawn at all (one the card cannot hold). */
 	std::vector<std::array<int, 2>> vehicle_at(s.items.size(), {-1, -1});
 	auto draw_vehicles = [&](size_t from) {
+		/* The picture is drawn anew: those drawn into it before and not shrunk yet (after this one, which comes
+		 * again: its kept picture went as the kept pictures filled up) are not there any more -- drawn again too, or
+		 * they were shrunk from nothing (Mat and the trees of a town went missing with the figures on the card). */
+		for (size_t k = from; k < s.items.size(); k++) {
+			if (vehicle_at[k][0] >= 0) vehicle_at[k] = {-1, -1};
+		}
 		struct Placed {
 			size_t item;
 			std::vector<MeshOnCard> draws;
 		};
 		std::vector<Placed> placed;
 		std::set<uint64_t> keys;
-		const int frame_w = std::min(_max_target, 2048);
+		const int frame_w = std::min(_max_target, THREE_D_GPU_VEHICLE_FRAME);
 		int x = 0, y = 0, row = 0;
 		for (size_t k = from; k < s.items.size(); k++) {
 			if (s.items[k].vehicle == nullptr || vehicle_at[k][0] != -1) continue;
@@ -3867,15 +3873,19 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				drawing = 0;
 				if (!shrunk) continue;
 			}
-			if (_standing_atlas != drawing || in_depth) {
+			/* Among the triangles of the building before it (a figure on it) where it is nearer, as a picture is. */
+			const bool depth = item.depth >= 0;
+			if (_standing_atlas != drawing || depth != in_depth) {
 				flush();
 				drawing = _standing_atlas;
-				in_depth = false;
+				in_depth = depth;
 			}
 			const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
-			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
+			const float times = static_cast<float>(1 << std::clamp(item.up, 0, 3));
+			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w * times, y1 = y0 + h * times;
 			const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-			corners.insert(corners.end(), {x0, y0, 0, u0, v0, x1, y0, 0, u1, v0, x1, y1, 0, u1, v1, x0, y0, 0, u0, v0, x1, y1, 0, u1, v1, x0, y1, 0, u0, v1});
+			const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
+			corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
 			continue;
 		}
 		if (item.building >= 0) {

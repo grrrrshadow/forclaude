@@ -1812,8 +1812,9 @@ static constexpr float FIGURE_PICTURE_SIDE = 2048.0f;
  * The zoom a figure's picture for the map is made at: the map's, or coarser while the picture would be more than
  * FIGURE_PICTURE_SIDE across.
  * @param[out] up how many times coarser: its pixels drawn doubled so many times (AddTurnedVehiclePicture())
+ * @param side the most it may be across, subpixels
  */
-static ZoomLevel FigurePictureZoom(const ThreeDVehicleShape &shape, float scale, ZoomLevel zoom, int &up)
+static ZoomLevel FigurePictureZoom(const ThreeDVehicleShape &shape, float scale, ZoomLevel zoom, int &up, float side = FIGURE_PICTURE_SIDE)
 {
 	float e[6];
 	ShapeExtent(shape, e);
@@ -1821,7 +1822,7 @@ static ZoomLevel FigurePictureZoom(const ThreeDVehicleShape &shape, float scale,
 	const float across = std::hypot(e[1] - e[0], e[3] - e[2]), tall = std::max(0.0f, e[5] - e[4]);
 	const float side_m = std::max(across, across * CAM_SIN + tall * CAM_COS) * scale * SUPERSAMPLE;
 	up = 0;
-	while (zoom < ZoomLevel::Max && side_m * PXM_16X / (1 << to_underlying(zoom)) > FIGURE_PICTURE_SIDE) {
+	while (zoom < ZoomLevel::Max && side_m * PXM_16X / (1 << to_underlying(zoom)) > side) {
 		zoom = static_cast<ZoomLevel>(to_underlying(zoom) + 1);
 		up++;
 	}
@@ -2798,10 +2799,18 @@ static PictureToMake PictureRequest(const ThreeDVehicleObject *obj, float scale,
 	return p;
 }
 
+static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p);
 static const ThreeDModelPicture *ObjectPicture(const ThreeDVehicleObject *obj, float scale, ZoomLevel zoom, float cam_az, float world_az, bool squeeze, int fade, int frame = 0, int tint_index = -1, float stretch = 1.0f, int spin_step = 0, int pitch = 0, int roll = 0, int lights = 0, float along_given = 0.0f, uint64_t walk = 0)
 {
-	PictureToMake p = PictureRequest(obj, scale, zoom, cam_az, world_az, squeeze, fade, frame, tint_index, stretch, spin_step, pitch, roll, lights, along_given, walk);
+	return ObjectPictureOf(PictureRequest(obj, scale, zoom, cam_az, world_az, squeeze, fade, frame, tint_index, stretch, spin_step, pitch, roll, lights, along_given, walk));
+}
+
+/** A picture of an object as asked for (PictureRequest()), kept: ObjectPicture(). */
+static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
+{
+	const ThreeDVehicleObject *obj = p.obj;
 	const ObjectPictureKey key = p.key;
+	const ZoomLevel zoom = static_cast<ZoomLevel>(std::get<1>(key));
 	const int cam_step = std::get<2>(key), world_step = std::get<3>(key);
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
@@ -2969,6 +2978,8 @@ static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuS
 		if (no_wait.Missed()) return false;
 	}
 	if (!drawn) return true;
+	/* Bigger than the card draws one (a dragon zoomed in): its picture instead. */
+	if (gp.pic.width > THREE_D_GPU_VEHICLE_FRAME || gp.pic.height > THREE_D_GPU_VEHICLE_FRAME) return false;
 	auto v = std::make_shared<ThreeDGpuStandingVehicle>();
 	v->key = key;
 	v->supersample = SUPERSAMPLE;
@@ -3906,10 +3917,20 @@ void AddThreeDEffectsToViewport(ZoomLevel zoom)
 		int tint = part == 0 || fx->tint_palette.empty() ? -1 : static_cast<int>(hash % fx->tint_palette.size());
 		const ThreeDVehicleShape *shape = fx->GetShape(frame);
 		if (shape == nullptr) continue;
-		const ThreeDModelPicture *pic = ObjectPicture(fx, 1.0f, zoom, GetViewYaw(), 0.0f, false, 0, frame, tint);
-		if (pic == nullptr) continue;
 		int x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2, y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2, z = GetTileMaxPixelZ(tile);
 		int height = std::max(1, static_cast<int>(std::lround(shape->z1 * 8.0 / 3.0)));
+		const PictureToMake p = PictureRequest(fx, 1.0f, zoom, GetViewYaw(), 0.0f, false, 0, frame, tint, 1.0f, 0, 0, 0, 0, 0.0f, 0);
+		/* Drawn by the card with the block's vehicles (CardVehicle()); till that is made, its picture. */
+		if (ViewportVehiclesOnCard()) {
+			std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+			std::vector<ThreeDPictureLight> lights;
+			if (CardVehicle(p, card, lights)) {
+				if (card != nullptr) AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+				continue;
+			}
+		}
+		const ThreeDModelPicture *pic = ObjectPictureOf(p);
+		if (pic == nullptr) continue;
 		AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
 	}
 	_turned_fireworks.clear();
@@ -3943,19 +3964,6 @@ static const IntervalTimer<TimerGameTick> _moving_figures_timer({TimerGameTick::
 });
 
 /**
- * A figure standing on the turned map (the girls at a bus stop): drawn from its object at the angle of the view,
- * lit as the vehicles, hung from where its feet stand, sorted by a small box about them. A figure that moves
- * ("animace") is drawn in its frame of the game's tick, and its tile is drawn again when the frame changes.
- * @param name the figure's name in the index ("druh": "postava")
- * @param scale its size against true metres (the girls of a stop are drawn twice theirs, as their sprites are)
- * @param x,y,z where its feet stand, world units
- * @param facing the way it faces, degrees in the world: 0 along +x, 90 along +y (the colleague's renders' angles)
- * @param zoom the zoom of the view
- * @param tile the tile it stands on, drawn again when it moves
- * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
- * @return whether it was drawn so; else the caller draws its sprite
- */
-/**
  * A vehicle object of no vehicle on the turned map (a car of the game's own driving about, three_d_walkers.h): at a
  * place, facing a way (degrees, 0 along +x), sorted by a box about it as long as it is.
  */
@@ -3966,10 +3974,21 @@ bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int 
 	float world_az = facing - 135.0f;
 	/* At night (lit) with its lights on, front and back, when its model has them. */
 	const int lights = lit && shape->HasLights() ? LIGHTS_FRONT | LIGHTS_BACK : 0;
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, lights);
-	if (pic == nullptr) return false;
+	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, 0);
 	int half = std::max(1, static_cast<int>(std::lround(std::max(shape->x1 - shape->x0, shape->y1 - shape->y0) * scale * OBJECT_UNITS_PER_METRE / 2)));
 	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+	/* Drawn by the card with the block's vehicles (CardVehicle()); till that is made, its picture. */
+	if (ViewportVehiclesOnCard()) {
+		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+		std::vector<ThreeDPictureLight> on;
+		if (CardVehicle(p, card, on)) {
+			if (card == nullptr) return false;
+			AddTurnedVehicleOnCard(std::move(card), x, y, z, x - half, y - half, z, x + half, y + half, z + height);
+			return true;
+		}
+	}
+	const ThreeDModelPicture *pic = ObjectPictureOf(p);
+	if (pic == nullptr) return false;
 	AddTurnedVehiclePicture(pic, x, y, z, x - half, y - half, z, x + half, y + half, z + height);
 	return true;
 }
@@ -3983,7 +4002,14 @@ const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const ThreeDVehicle
 	const ThreeDVehicleShape *shape = obj != nullptr ? obj->GetShape() : nullptr;
 	if (shape == nullptr || !shape->HasLights()) return nullptr;
 	float world_az = facing - 135.0f;
-	const ThreeDModelPicture *pic = ObjectPicture(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, LIGHTS_FRONT | LIGHTS_BACK);
+	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, LIGHTS_FRONT | LIGHTS_BACK, 0.0f, 0);
+	/* Drawn by the card (AddThreeDObjectToViewport()): its lights as the card's drawing has them, no picture made. */
+	if (ViewportVehiclesOnCard()) {
+		static std::vector<ThreeDPictureLight> on_card;
+		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+		if (CardVehicle(p, card, on_card)) return card != nullptr ? &on_card : nullptr;
+	}
+	const ThreeDModelPicture *pic = ObjectPictureOf(p);
 	return pic != nullptr ? &pic->lights : nullptr;
 }
 
@@ -4010,15 +4036,6 @@ int ThreeDMapPose(std::string_view figure, int frame)
 		return step * (frames - 1) / (MAP_POSES - 1);
 	}
 	return frame * MAP_POSES / frames * frames / MAP_POSES;
-}
-
-bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
-{
-	int height = 0, up = 0;
-	const ThreeDModelPicture *pic = GetThreeDFigurePicture(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up);
-	if (pic == nullptr) return false;
-	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
-	return true;
 }
 
 /**
@@ -4098,46 +4115,47 @@ bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 	return true;
 }
 
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up)
+/**
+ * What a figure of the turned map is drawn as (GetThreeDFigurePicture()): what its picture is asked for by -- or the
+ * card's drawing of it --, how tall it is; its tile drawn again as it moves, as there.
+ * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
+ * @return nothing when the figure is not there (or its frame is not read yet)
+ */
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE)
 {
 	if (up != nullptr) *up = 0;
+	later = false;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	if (name.starts_with("vozidlo:")) {
 		/* A vehicle standing as a figure: at its true size against the building, empty, still. */
 		ThreeDEyeVehicle ev;
-		if (!GetThreeDStandingVehicle(name, ev)) return nullptr;
+		if (!GetThreeDStandingVehicle(name, ev)) return std::nullopt;
 		const bool for_eye = ViewportDrawingEye();
 		const ThreeDParts parts = ev.obj->PartsOf(ev.state);
 		const ThreeDVehicleShape *shape = for_eye ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
-		if (shape == nullptr) return nullptr;
-		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up);
+		if (shape == nullptr) return std::nullopt;
+		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 		const float world_az = facing - 135.0f;
-		_object_picture_may_wait = for_eye;
-		const ThreeDModelPicture *pic = ObjectPicture(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state, 0, -1, 1.0f, 0, static_cast<int>(std::lround(ev.pitch)));
-		_object_picture_may_wait = false;
-		if (pic != nullptr && height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
-		return pic;
+		later = for_eye;
+		if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+		return PictureRequest(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state, 0, -1, 1.0f, 0, static_cast<int>(std::lround(ev.pitch)), 0, 0, 0.0f, 0);
 	}
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
-	if (fig == nullptr) return nullptr;
+	if (fig == nullptr) return std::nullopt;
 	const bool by_tick = frame < 0;
 	if (by_tick) frame = fig->FrameAt(TimerGameTick::counter, phase);
 	/* For the view from the eyes nothing is read now: its frame draws without the figure till it is read (TryGetShape()).
 	 * Nor for a witch flying (three_d_witches.h): drawn again every tick, she comes as her frame is read and her picture
 	 * made on the thread (the colleague's Marisa has 41 000 triangles a frame). */
 	const bool for_eye = ViewportDrawingEye();
-	const bool later = for_eye || fig->frame_lights;
+	later = for_eye || fig->frame_lights;
 	const ThreeDVehicleShape *shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
-	if (shape == nullptr) return nullptr;
-	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up);
+	if (shape == nullptr) return std::nullopt;
+	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
 	const int spin_step = fig->spin_ticks > 0 ? static_cast<int>((TimerGameTick::counter % fig->spin_ticks) * SPIN_STEPS / fig->spin_ticks) : 0;
 	/* The angle as the vehicles count it: the front to the right of the picture at 0, along +x of the world at 135. */
 	float world_az = facing - 135.0f;
-	_object_picture_may_wait = later;
-	const ThreeDModelPicture *pic = ObjectPicture(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step);
-	_object_picture_may_wait = false;
-	if (pic == nullptr) return nullptr;
 	const int tall = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	if (height != nullptr) *height = tall;
 	if ((fig->spin_ticks > 0 || (by_tick && fig->frames > 1)) && tile != INVALID_TILE) {
@@ -4174,7 +4192,78 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 		}
 		if (!known) _moving_figures.push_back(f);
 	}
+	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step, 0, 0, 0, 0.0f, 0);
+}
+
+/** A picture asked for (PictureRequest()) as it is made: now, or not waited for (later, FigureRequest()). */
+static const ThreeDModelPicture *RequestedPicture(PictureToMake p, bool later)
+{
+	_object_picture_may_wait = later;
+	const ThreeDModelPicture *pic = ObjectPictureOf(std::move(p));
+	_object_picture_may_wait = false;
 	return pic;
+}
+
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up)
+{
+	bool later = false;
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later);
+	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
+}
+
+/**
+ * A figure of the turned map drawn by the card where the block's vehicles are (ViewportVehiclesOnCard(); the player,
+ * 29. 10.: "go on with the GPU"): as GetThreeDFigurePicture() would have its picture, its shapes drawn there, no
+ * picture made.
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
+ * @return nothing: the figure is not there; false: something of it not made yet (its picture meanwhile)
+ */
+std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+{
+	bool later = false;
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later);
+	if (!p.has_value()) return std::nullopt;
+	std::vector<ThreeDPictureLight> lights;
+	return CardVehicle(*p, card, lights);
+}
+
+/**
+ * A figure standing on the turned map (the girls at a bus stop): drawn from its object at the angle of the view,
+ * lit as the vehicles, hung from where its feet stand, sorted by a small box about them. A figure that moves
+ * ("animace") is drawn in its frame of the game's tick, and its tile is drawn again when the frame changes. Where the
+ * card draws the block's vehicles it draws the figure too, from its shapes (GetThreeDFigureOnCard()).
+ * @param name the figure's name in the index ("druh": "postava")
+ * @param scale its size against true metres (the girls of a stop are drawn twice theirs, as their sprites are)
+ * @param x,y,z where its feet stand, world units
+ * @param facing the way it faces, degrees in the world: 0 along +x, 90 along +y (the colleague's renders' angles)
+ * @param zoom the zoom of the view
+ * @param tile the tile it stands on, drawn again when it moves
+ * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
+ * @return whether it was drawn so; else the caller draws its sprite
+ */
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
+{
+	int height = 0, up = 0;
+	bool later = false;
+	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
+	 * picture so that it is within what the card draws one in; till that is made, its picture. */
+	if (ViewportVehiclesOnCard()) {
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f);
+		if (!p.has_value()) return false;
+		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+		std::vector<ThreeDPictureLight> lights;
+		if (CardVehicle(*p, card, lights)) {
+			if (card == nullptr) return false;
+			AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+			return true;
+		}
+	}
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later);
+	if (!p.has_value()) return false;
+	const ThreeDModelPicture *pic = RequestedPicture(std::move(*p), later);
+	if (pic == nullptr) return false;
+	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+	return true;
 }
 
 /**
@@ -4185,26 +4274,45 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
  * @param[out] height how tall it is, units of height
  * @param yaw the angle of the view it is seen from, NaN the map's
  */
-const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw)
+/** What the picture of a plant is asked for by (GetThreeDPlantPicture()), and how tall it is; nothing when it is not there. */
+static std::optional<PictureToMake> PlantRequest(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, bool &later)
 {
 	static constexpr float PLANT_STEP = 10.0f;
 	const ThreeDVehicleObject *plant = GetThreeDFigure(name);
-	if (plant == nullptr) return nullptr;
-	const bool for_eye = ViewportDrawingEye();
-	const ThreeDVehicleShape *shape = for_eye ? plant->TryGetShape(0) : plant->GetShape(0);
-	if (shape == nullptr) return nullptr;
+	if (plant == nullptr) return std::nullopt;
+	later = ViewportDrawingEye();
+	const ThreeDVehicleShape *shape = later ? plant->TryGetShape(0) : plant->GetShape(0);
+	if (shape == nullptr) return std::nullopt;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
 	float world_az = std::round((facing - 135.0f) / PLANT_STEP) * PLANT_STEP;
 	float cam_az = std::round((facing - 135.0f + yaw) / PLANT_STEP) * PLANT_STEP;
 	/* Sizes in steps of a twentieth: the plants of a list are each a little other. */
 	scale = std::max(0.05f, std::round(scale * 20.0f) / 20.0f);
 	stretch = std::max(0.05f, std::round(stretch * 20.0f) / 20.0f);
-	_object_picture_may_wait = for_eye;
-	const ThreeDModelPicture *pic = ObjectPicture(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch);
-	_object_picture_may_wait = false;
-	if (pic == nullptr) return nullptr;
 	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * stretch * 8.0 / 3.0)));
-	return pic;
+	return PictureRequest(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch, 0, 0, 0, 0, 0.0f, 0);
+}
+
+const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw)
+{
+	bool later = false;
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later);
+	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
+}
+
+/**
+ * A plant of the turned map drawn by the card (ViewportVehiclesOnCard()), as GetThreeDPlantPicture() would have its
+ * picture: the hundreds of a field share a few, kept on the card by what they look like.
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
+ * @return nothing: the plant is not there; false: something of it not made yet (its picture meanwhile)
+ */
+std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+{
+	bool later = false;
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later);
+	if (!p.has_value()) return std::nullopt;
+	std::vector<ThreeDPictureLight> lights;
+	return CardVehicle(*p, card, lights);
 }
 
 /**

@@ -3763,13 +3763,14 @@ void AddTurnedVehiclePicture(const ThreeDModelPicture *pic, int ax, int ay, int 
 }
 
 /**
- * A vehicle of the turned view drawn by the card (ViewportVehiclesOnCard()): as its likeness (AddTurnedVehiclePicture()),
- * its shapes where its picture would be, no picture made.
+ * A vehicle or a figure of the turned view drawn by the card (ViewportVehiclesOnCard()): as its likeness
+ * (AddTurnedVehiclePicture()), its shapes where its picture would be, no picture made.
+ * @param up drawn at a coarser zoom, laid so many times doubled (a big figure, GetThreeDFigurePicture())
  */
-void AddTurnedVehicleOnCard(std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax)
+void AddTurnedVehicleOnCard(std::shared_ptr<const ThreeDGpuStandingVehicle> card, int ax, int ay, int az, int xmin, int ymin, int zmin, int xmax, int ymax, int zmax, int up)
 {
 	if (card == nullptr || card->width <= 0) return;
-	AddTurnedLikeness(nullptr, std::move(card), ax, ay, az, xmin, ymin, zmin, xmax, ymax, zmax, 0);
+	AddTurnedLikeness(nullptr, std::move(card), ax, ay, az, xmin, ymin, zmin, xmax, ymax, zmax, up);
 }
 
 /** A likeness of the turned view (box_kind 5): its picture, or the card's vehicle (card), hung from its world point. */
@@ -4151,6 +4152,20 @@ static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure 
 	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
 	return GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, f.frame, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
+}
+
+/**
+ * A figure or a plant standing on a 3D object drawn by the card where the block's vehicles are (ViewportVehiclesOnCard()),
+ * as StandingFigurePicture() would have its picture: its shapes, no picture made.
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
+ * @return nothing: not there; false: something of it not made yet (its picture meanwhile)
+ */
+static std::optional<bool> StandingFigureOnCard(const ThreeDObjectFigure &f, bool plant, const ObjectLay &lay, double ox, double oy, double oz, TileIndex origin, size_t index, int &height, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+{
+	if (plant) return GetThreeDPlantOnCard(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw, card);
+	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
+	return GetThreeDFigureOnCard(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, f.frame, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)), nullptr, card);
 }
 
 /**
@@ -6388,9 +6403,12 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 		bool own_depth; ///< the first of those drawn in one depth
 		ThreeDObjectShapeView shape{};
 		struct Figure {
-			const ThreeDModelPicture *pic;
+			const ThreeDModelPicture *pic; ///< nullptr: drawn by the card (card)
 			int x, y;
 			double near;
+			std::shared_ptr<const ThreeDGpuStandingVehicle> card = nullptr;
+			int Width() const { return this->pic != nullptr ? this->pic->width : this->card->width; }
+			int Height() const { return this->pic != nullptr ? this->pic->height : this->card->height; }
 		};
 		std::vector<Figure> figures{};
 	};
@@ -6443,17 +6461,25 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
 				const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 				int height = 0;
-				const ThreeDModelPicture *pic = StandingFigurePicture(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height);
-				if (pic == nullptr) return;
+				/* Drawn by the card with the block's vehicles, no picture of it; till that is made, its picture. */
+				std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+				const ThreeDModelPicture *pic = nullptr;
+				if (ViewportVehiclesOnCard()) {
+					const std::optional<bool> on_card = StandingFigureOnCard(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height, card);
+					if (on_card == true && card == nullptr) return;
+					if (on_card != true) card = nullptr;
+				}
+				if (card == nullptr) pic = StandingFigurePicture(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height);
+				if (pic == nullptr && card == nullptr) return;
 				double xr, yr, sx, sy;
 				lay.Turn(wx, wy, xr, yr);
 				lay.Project(wx, wy, wz, sx, sy);
 				const double near = xr + yr + 2 * (wz - oz + height / 2.0);
-				const int px = static_cast<int>(std::lround(sx)) + pic->left, py = static_cast<int>(std::lround(sy)) + pic->top;
-				p.figures.push_back({pic, px, py, near});
+				const int px = static_cast<int>(std::lround(sx)) + (pic != nullptr ? pic->left : card->left), py = static_cast<int>(std::lround(sy)) + (pic != nullptr ? pic->top : card->top);
+				const Part::Figure &fig = p.figures.emplace_back(Part::Figure{pic, px, py, near, std::move(card)});
 				dn = std::min(dn, near);
 				df = std::max(df, near + 0.05);
-				cover(px, py, px + pic->width, py + pic->height);
+				cover(px, py, px + fig.Width(), py + fig.Height());
 			};
 			if (p.o != nullptr) {
 				if (BuildingFiguresSeen(lay.zoom)) {
@@ -6531,7 +6557,17 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			/* Its figures far first, in its depth when it has one: hidden behind its walls nearer than their middle. */
 			std::ranges::sort(p.figures, {}, &Part::Figure::near);
 			for (const Part::Figure &f : p.figures) {
-				if (f.x >= fw || f.y >= fh || f.x + f.pic->width <= 0 || f.y + f.pic->height <= 0) continue;
+				if (f.x >= fw || f.y >= fh || f.x + f.Width() <= 0 || f.y + f.Height() <= 0) continue;
+				if (f.card != nullptr) {
+					/* Drawn by the card into its own picture, laid among the building's triangles as a picture is. */
+					ThreeDGpuStandingItem &item = out.items.emplace_back();
+					item.x = f.x;
+					item.y = f.y;
+					item.vehicle = f.card;
+					item.depth = cleared ? depth_of(f.near + 0.05) : -1.0f;
+					_turned_times.standing_vehicles++;
+					continue;
+				}
 				std::shared_ptr<const ThreeDGpuStandingPicture> pic = TurnedFigurePicture(*f.pic);
 				if (pic == nullptr) continue;
 				ThreeDGpuStandingItem &item = out.items.emplace_back();
@@ -6575,13 +6611,14 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 		double vx, vy;
 		ProjectTurnedF(p.ax, p.ay, p.az, vx, vy);
 		if (p.card != nullptr) {
-			/* Drawn by the card where its picture would be laid. */
-			const int x = static_cast<int>(std::lround((vx - frame.left) * scale)) + p.card->left;
-			const int y = static_cast<int>(std::lround((vy - frame.top) * scale)) + p.card->top;
-			if (x >= fw || y >= fh || x + p.card->width <= 0 || y + p.card->height <= 0) continue;
+			/* Drawn by the card where its picture would be laid (a big figure drawn coarser, laid doubled). */
+			const int x = static_cast<int>(std::lround((vx - frame.left) * scale)) + (p.card->left << up);
+			const int y = static_cast<int>(std::lround((vy - frame.top) * scale)) + (p.card->top << up);
+			if (x >= fw || y >= fh || x + (p.card->width << up) <= 0 || y + (p.card->height << up) <= 0) continue;
 			ThreeDGpuStandingItem &item = out.items.emplace_back();
 			item.x = x;
 			item.y = y;
+			item.up = up;
 			item.vehicle = p.card;
 			_turned_times.standing_vehicles++;
 			continue;
@@ -6597,8 +6634,8 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 		item.y = y;
 		item.key = p.pic->uid != 0 ? (TurnedFigureKey(*p.pic, up, true) | TURNED_FIGURE_KEY) : 0;
 		item.picture = std::move(pic);
+		_turned_times.standing_likeness++;
 	}
-	_turned_times.standing_likeness++;
 }
 
 /** The rig: the boxes among what the card lays drawn by it (ThreeDGpuStandingFaces; test3d stojici krabice); else drawn by the processor apart. */
@@ -7126,9 +7163,15 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	/* The marijuana the walkers planted (walker_inventory.h). */
 	ForWalkerPlantParts([zoom](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) {
 		int height = 0;
+		const int ix = static_cast<int>(std::lround(x)), iy = static_cast<int>(std::lround(y)), iz = static_cast<int>(std::lround(z));
+		/* Drawn by the card with the block's vehicles; till that is made, its picture. */
+		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+		if (ViewportVehiclesOnCard() && GetThreeDPlantOnCard(name, scale, stretch, facing, zoom, &height, NAN, card) == true) {
+			AddTurnedVehicleOnCard(std::move(card), ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
+			return;
+		}
 		const ThreeDModelPicture *pic = GetThreeDPlantPicture(name, scale, stretch, facing, zoom, &height);
 		if (pic == nullptr) return;
-		const int ix = static_cast<int>(std::lround(x)), iy = static_cast<int>(std::lround(y)), iz = static_cast<int>(std::lround(z));
 		AddTurnedVehiclePicture(pic, ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
 	});
 	AddThreeDDragonsToViewport(zoom);

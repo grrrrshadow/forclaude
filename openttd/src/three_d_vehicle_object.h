@@ -32,6 +32,8 @@
 
 #include <cmath>
 #include <functional>
+#include <memory>
+#include <optional>
 #include <vector>
 
 struct VehicleSpriteSeq;
@@ -101,6 +103,8 @@ const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const struct ThreeD
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1, float yaw = NAN, int z = INT_MIN, int x = 0, int y = 0, int *up = nullptr);
+struct ThreeDGpuStandingVehicle;
+std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, std::shared_ptr<const ThreeDGpuStandingVehicle> &card);
 void PinThreeDPictures(bool pin);
 void KeepThreeDPicturesOfBlock();
 int ThreeDMapPose(std::string_view figure, int frame);
@@ -113,6 +117,7 @@ bool ThreeDPictureStandsIn(const ThreeDModelPicture *pic);
 void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1);
 void StopThreeDPictureThread();
 const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
+std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card);
 struct ThreeDHeldThing;
 /** A triangle of a thing in the walker's hand on the picture of its eyes (ThreeDHeldThingTriangles()). */
 struct ThreeDHeldTriangle {
