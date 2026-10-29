@@ -31,6 +31,36 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 29. 10. (51) – Auta z očí barví karta, ne procesor (paměť u silnice)
+
+- Hráč po testu: *„ja byl v lese, opejkal jsem kravičku prasatko ovečku, všechny jsem sněd a pak jsem dal load save
+  zátěže a šel jsem do zatáčky kde auta zatáčí ale protože jsem spomalil hru tak se stihly vykreslovat a tak jsem
+  viděl že náklady tam jsou v pořádku i na dvanácetrojkách . tam hlavně minule nešly asi 3D domy když byly itl
+  houses“*. Pak: *„to jedou dalši a dalši auta kolona a 3 auta ktery vidim zaberou 750mb posledni paměti“* a
+  *„zatačka tam jsem ve first person view a koukam na auta“*.
+- ITL Houses: deník `3d_domy.log` to potvrzuje („domy z GRF ITL Houses 2.3 nemají 3D model, kreslí se krabice;
+  zapnutých původních domů hry (ty jsou 3D): 0“). ITL vypne původní domy hry a své 3D nemá, proto krabice. Viz
+  19. 10.
+- Příčina 750 MB: pohled z očí barvil textury aut na procesoru. Pro každý stav (barva, lak, rez, náklad) a každou
+  úroveň detailu vznikla celá kopie textury (`GetThreeDEyeVehicleTexture()`). Náklaďák zblízka má texturu
+  4096 × 4096, tedy 64 MB na kopii. Ta se pak ještě nahrála na kartu jako další textura. Tři auta v různých barvách
+  znamenají tři kopie na procesoru a tři na kartě, k tomu původní textura.
+- Hotovo: auta z očí barví karta stejně jako auta na mapě (`TryGetThreeDEyeVehiclePaints()`, `GpuPaintOf()`):
+  - na kartu jde jen původní textura a malé masky (lak, doplňky, rez, podrobnosti), barvy jsou čísla pro shader;
+  - všechna auta stejného typu sdílejí jednu texturu bez ohledu na barvu a stav;
+  - kreslení na kartě: `PrepareEyeObjects()` nahraje masky, `DrawEyeMeshes()` barví stejným `SetPaint()` jako
+    obrázky mapy;
+  - kde karta auto nakreslit nemůže (víc než 32 točících se kol, karta nejde), barví dál procesor jako dřív.
+- `test3d cas` teď ukazuje, co karta drží a co se na ni za tu dobu nahrálo: tvary, trojúhelníky, textury, budovy.
+  `test3d pamet` píše i do deníku (rig karty nemá konzoli).
+- Rig (GPU, 1600 × 900, Tatra 603 v zatáčce, chodec 5–7 m od auta):
+  - hra zastavená ve stejném tiku, stará a nová verze: snímek shodný na bod (rozdíl 0 bodů), červený lak auta
+    stejný;
+  - jedno auto zblízka: lakované textury na procesoru stará 25,3 MB, nová 0 MB; karta stará 65 MB, nová 73 MB
+    (místo jedné lakované kopie drží původní texturu a masky);
+  - kolona 6 aut, 500 tiků: stará verze 63 MB lakovaných textur na procesoru a karta roste ze 143 na 180 MB, nová
+    0 MB na procesoru a karta stále 126 MB, nic dalšího se na ni nenahrává.
+
 ## 29. 10. (50) – Figury, kytky a efekty otočené mapy kreslí karta z trojúhelníků
 
 - Hráč: *„ja dam build a ty mužeš pokračovat gpu“*, *„vyser se na falca a bež dělat gpu“* (Falkor: *„nekoupil jsem

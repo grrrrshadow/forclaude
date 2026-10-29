@@ -89,6 +89,7 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 struct ThreeDObjectTexture;
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
+bool TryGetThreeDEyeVehiclePaints(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, size_t count, std::vector<const ThreeDObjectTexture *> &textures, std::vector<struct ThreeDGpuPaint> &paints, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewPicture(EngineID engine, ZoomLevel zoom, float azimuth);
 const ThreeDModelPicture *GetThreeDVehicleObjectPreviewFit(EngineID engine, int side, float azimuth, int &cx, int &cy);

@@ -970,8 +970,8 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 
 /**
  * The paint of a state over the body's texture (texture 0) of an object: its colour by number, faded with age, then
- * rusted (the colleague's points 6 and 7) -- each texel as RasterObject() draws it and as the view from the eyes
- * paints the texture (GetThreeDVehicleObjectStateTexture()).
+ * rusted (the colleague's points 6 and 7) -- each texel as RasterObject() draws it and as the processor paints a
+ * texture for the view from the eyes (GetThreeDEyeVehicleTexture()); the card paints so by GpuPaintOf().
  */
 struct ObjectPaintOfState {
 	const ThreeDVehicleObject *obj = nullptr;
@@ -3685,6 +3685,39 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
 	std::lock_guard lock(_eye_painted_mutex);
 	auto it = _eye_painted.find(key);
 	return it != _eye_painted.end() ? &it->second : raw;
+}
+
+/**
+ * The textures of an object for the view from the eyes drawn by the graphics card: as they are, at the level of a texel
+ * to a pixel, and how the card paints each as it draws it (GpuPaintOf()) -- the body as its state has it, the add-ons
+ * coloured, the details in the colours of the set -- instead of a copy of each painted on the processor for each state
+ * and level (GetThreeDEyeVehicleTexture()), a lorry close sixty four megabytes (the player, 29. 10.: "3 cars I see take
+ * the last 750 MB"). Only what is made already (ThreeDLazyNoWait); what is not is made in the background.
+ * @param count how many textures its shape draws by
+ * @param[out] textures by index
+ * @param[out] paints by index; empty when its state paints nothing
+ * @param[out] held the colours of the details, kept till the card has drawn
+ * @return false: something of it not made yet
+ */
+bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, size_t count, std::vector<const ThreeDObjectTexture *> &textures, std::vector<ThreeDGpuPaint> &paints, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
+{
+	ThreeDLazyNoWait no_wait;
+	paints.clear();
+	const ThreeDVehicleShape *shape = obj->GetShape();
+	if (shape == nullptr) return false;
+	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
+	textures.assign(count, nullptr);
+	for (size_t i = 0; i < textures.size(); i++) {
+		textures[i] = obj->GetTexture(level, static_cast<int>(i));
+		if (textures[i] == nullptr) return false;
+	}
+	if (state == 0) return !no_wait.Missed();
+	const ThreeDVehicleState *st = obj->State(state);
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
+	const ObjectDetailPaint details(*obj, *shape, st, textures.size(), textures);
+	paints.resize(textures.size());
+	for (size_t i = 0; i < textures.size(); i++) paints[i] = GpuPaintOf(*obj, *shape, st, static_cast<int>(i), painted, details, 0, held);
+	return !no_wait.Missed();
 }
 
 /**

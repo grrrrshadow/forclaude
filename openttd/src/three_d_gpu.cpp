@@ -541,6 +541,11 @@ struct GpuBuilding {
 std::unordered_map<uint64_t, GpuTexture> _card_textures;
 std::unordered_map<uint64_t, GpuBuilding> _card_buildings;
 std::atomic<size_t> _card_bytes = 0; ///< (read by the diary of the frames too, ThreeDGpuHeldMB())
+/** Of it, by kind -- the shapes, their triangles, the textures, the buildings --, and what of each was put on it since
+ * the last line of the diary (ThreeDGpuTimes(); the player's log of 29. 10.: the card holding 635 MB of its 384 and 755 MB
+ * put on it in five seconds in the view from the eyes by a road, the phone's memory growing). */
+std::array<std::atomic<size_t>, 4> _card_bytes_of{};
+std::array<std::atomic<size_t>, 4> _card_sent_of{};
 std::atomic<size_t> _card_sent = 0; ///< the rig: bytes put on the card since the last ThreeDGpuTimes()
 std::atomic<int> _card_trims = 0;   ///< and how many times it let go of what it held the longest not drawn
 std::atomic<int64_t> _card_biggest = 0; ///< and the most pixels of a frame of pictures read back at once (its width << 32 | its height)
@@ -2156,6 +2161,7 @@ void ForgetCard()
 	_card_textures.clear();
 	_card_buildings.clear();
 	_card_bytes = 0;
+	for (std::atomic<size_t> &b : _card_bytes_of) b = 0;
 	for (auto &[key, t] : _ground_textures) gl.glDeleteTextures(1, &t.name);
 	_ground_textures.clear();
 	if (_ground_atlas != 0) gl.glDeleteTextures(1, &_ground_atlas);
@@ -2261,22 +2267,26 @@ void TrimCard()
 			const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel};
 			for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 			_card_bytes -= s.bytes;
+			_card_bytes_of[0] -= s.bytes;
 			_card_shapes.erase(h.uid);
 		} else if (h.kind == 1) {
 			GpuIndices &i = _card_indices[h.uid];
 			gl.glDeleteBuffers(1, &i.ibo);
 			_card_bytes -= i.bytes;
+			_card_bytes_of[1] -= i.bytes;
 			_card_indices.erase(h.uid);
 		} else if (h.kind == 2) {
 			GpuTexture &t = _card_textures[h.uid];
 			gl.glDeleteTextures(1, &t.name);
 			_card_bytes -= t.bytes;
+			_card_bytes_of[2] -= t.bytes;
 			_card_textures.erase(h.uid);
 		} else {
 			GpuBuilding &b = _card_buildings[h.uid];
 			gl.glDeleteVertexArrays(1, &b.vao);
 			gl.glDeleteBuffers(1, &b.vbo);
 			_card_bytes -= b.bytes;
+			_card_bytes_of[3] -= b.bytes;
 			_card_buildings.erase(h.uid);
 		}
 	}
@@ -2321,6 +2331,8 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0));
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[0] += g.bytes;
+	_card_sent_of[0] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_shapes.emplace(s.uid.value, g).first->second;
 }
@@ -2343,6 +2355,8 @@ const GpuIndices *IndicesOnCard(const ThreeDGpuTriangles &t)
 	g.bytes = t.indices.size() * sizeof(uint32_t);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[1] += g.bytes;
+	_card_sent_of[1] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_indices.emplace(t.uid, g).first->second;
 }
@@ -2371,6 +2385,8 @@ const GpuTexture *TextureOnCard(const ThreeDObjectTexture &t)
 	g.bytes = static_cast<size_t>(t.w) * t.h * 4;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[2] += g.bytes;
+	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_textures.emplace(t.uid.value, g).first->second;
 }
@@ -2399,6 +2415,8 @@ const GpuTexture *DetailMaskOnCard(const ThreeDDetailMask &m)
 	g.bytes = static_cast<size_t>(m.w) * m.h;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[2] += g.bytes;
+	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_textures.emplace(m.uid.value, g).first->second;
 }
@@ -2483,6 +2501,88 @@ struct PaintOnCard {
 	GLuint detail = 0, detail_colours = 0, paint_mask = 0, addon_mask = 0, rust_mask = 0;
 };
 
+/** A texture's paint's masks put on the card: false, one it cannot hold. */
+static bool PaintMasksOnCard(const ThreeDGpuPaint &paint, PaintOnCard &pc)
+{
+	auto mask = [](const ThreeDObjectTexture *tex, GLuint &name) {
+		if (tex == nullptr) return true;
+		const GpuTexture *on = TextureOnCard(*tex);
+		if (on == nullptr) return false;
+		name = on->name;
+		return true;
+	};
+	if (paint.detail != nullptr) {
+		const GpuTexture *on = DetailMaskOnCard(*paint.detail);
+		if (on == nullptr || paint.detail_colours == nullptr) return false;
+		pc.detail = on->name;
+	}
+	return mask(paint.detail_colours, pc.detail_colours) && mask(paint.paint_mask, pc.paint_mask) && mask(paint.addon_mask, pc.addon_mask) && mask(paint.rust_mask, pc.rust_mask);
+}
+
+/**
+ * How a program (MESH_FRAGMENT's Paint()) paints the texture drawn next: what of it to do (its bits), its colours, and
+ * its masks on units 1 to 5 (the program's samplers set to them).
+ */
+static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, const PaintOnCard *pc)
+{
+	if (paint == nullptr || pc == nullptr || !paint->Any()) {
+		gl.glUniform1i(program.paint, 0);
+		return;
+	}
+	constexpr int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
+	int bits = 0;
+	if (pc->detail != 0) bits |= PAINT_DETAIL;
+	if (paint->body) bits |= PAINT_BODY;
+	if (pc->paint_mask != 0) bits |= PAINT_MASK;
+	if (paint->coloured) bits |= PAINT_COLOURED;
+	if (pc->addon_mask != 0) bits |= PAINT_ADDON;
+	if (paint->tinted) bits |= PAINT_TINT;
+	if (pc->rust_mask != 0) bits |= PAINT_RUST;
+	if (paint->rust_gradual) bits |= PAINT_GRADUAL;
+	gl.glUniform1i(program.paint, bits);
+	gl.glUniform3f(program.colour, paint->colour[0], paint->colour[1], paint->colour[2]);
+	gl.glUniform3f(program.target, paint->target[0], paint->target[1], paint->target[2]);
+	gl.glUniform1f(program.start, paint->start);
+	gl.glUniform1f(program.fade, paint->fade);
+	gl.glUniform3f(program.addon_colour, paint->addon_colour[0], paint->addon_colour[1], paint->addon_colour[2]);
+	gl.glUniform1f(program.addon_start, paint->addon_start);
+	gl.glUniform3f(program.tint, paint->tint[0], paint->tint[1], paint->tint[2]);
+	gl.glUniform3f(program.rust_colour, paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2]);
+	gl.glUniform1f(program.rust_time, paint->rust_time);
+	gl.glUniform1f(program.rust_ramp, paint->rust_ramp);
+	const GLuint units[5] = {pc->detail, pc->detail_colours, pc->paint_mask, pc->addon_mask, pc->rust_mask};
+	for (int k = 0; k < 5; k++) {
+		if (units[k] == 0) continue;
+		gl.glActiveTexture(GL_TEXTURE0 + 1 + k);
+		gl.glBindTexture(GL_TEXTURE_2D, units[k]);
+	}
+	gl.glActiveTexture(GL_TEXTURE0);
+}
+
+/** A program's samplers of the paint's masks to units 1 to 5 (SetPaint()), its texture's to 0. */
+static void PaintUnits(const GpuProgram &program)
+{
+	gl.glUniform1i(program.tex, 0);
+	gl.glUniform1i(program.detail, 1);
+	gl.glUniform1i(program.detail_colours, 2);
+	gl.glUniform1i(program.paint_mask, 3);
+	gl.glUniform1i(program.addon_mask, 4);
+	gl.glUniform1i(program.rust_mask, 5);
+}
+
+/**
+ * Nothing on the units of the paint's masks: what the view from the eyes draws into is read from those units too (its
+ * depth, DrawEyeFrameOnCard()), and a program that could read what it draws into draws what the card pleases.
+ */
+static void ClearPaintUnits()
+{
+	for (int k = 1; k <= 5; k++) {
+		gl.glActiveTexture(GL_TEXTURE0 + k);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	gl.glActiveTexture(GL_TEXTURE0);
+}
+
 /** A mesh of a picture as the card draws it (PictureOnCard()): its shape, its triangles, its textures and their paints there. */
 struct MeshOnCard {
 	const ThreeDGpuMesh *mesh;
@@ -2517,21 +2617,7 @@ bool PictureOnCard(const ThreeDGpuPicture &pic, std::vector<MeshOnCard> &draws)
 			d.textures[i] = t->name;
 			if (i >= m.paints.size() || !m.paints[i].Any()) continue;
 			/* Its masks on the card too; one it cannot hold, the processor draws the picture. */
-			const ThreeDGpuPaint &paint = m.paints[i];
-			PaintOnCard &pc = d.paints[i];
-			auto mask = [](const ThreeDObjectTexture *tex, GLuint &name) {
-				if (tex == nullptr) return true;
-				const GpuTexture *on = TextureOnCard(*tex);
-				if (on == nullptr) return false;
-				name = on->name;
-				return true;
-			};
-			if (paint.detail != nullptr) {
-				const GpuTexture *on = DetailMaskOnCard(*paint.detail);
-				if (on == nullptr || paint.detail_colours == nullptr) return false;
-				pc.detail = on->name;
-			}
-			if (!mask(paint.detail_colours, pc.detail_colours) || !mask(paint.paint_mask, pc.paint_mask) || !mask(paint.addon_mask, pc.addon_mask) || !mask(paint.rust_mask, pc.rust_mask)) return false;
+			if (!PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
 		}
 		draws.push_back(std::move(d));
 	}
@@ -2561,49 +2647,9 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 		0, 0, 0, 1,
 	};
 	gl.glUseProgram(_mesh_program.program);
-	gl.glUniform1i(_mesh_program.tex, 0);
-	gl.glUniform1i(_mesh_program.detail, 1);
-	gl.glUniform1i(_mesh_program.detail_colours, 2);
-	gl.glUniform1i(_mesh_program.paint_mask, 3);
-	gl.glUniform1i(_mesh_program.addon_mask, 4);
-	gl.glUniform1i(_mesh_program.rust_mask, 5);
+	PaintUnits(_mesh_program);
 	gl.glUniform1f(_mesh_program.glass_alpha, pic.glass_alpha);
 	gl.glActiveTexture(GL_TEXTURE0);
-	/* A texture's paint: what of it to do (the bits of MESH_FRAGMENT), its colours and its masks on their units. */
-	constexpr int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
-	auto set_paint = [](const ThreeDGpuPaint *paint, const PaintOnCard *pc) {
-		if (paint == nullptr || pc == nullptr || !paint->Any()) {
-			gl.glUniform1i(_mesh_program.paint, 0);
-			return;
-		}
-		int bits = 0;
-		if (pc->detail != 0) bits |= PAINT_DETAIL;
-		if (paint->body) bits |= PAINT_BODY;
-		if (pc->paint_mask != 0) bits |= PAINT_MASK;
-		if (paint->coloured) bits |= PAINT_COLOURED;
-		if (pc->addon_mask != 0) bits |= PAINT_ADDON;
-		if (paint->tinted) bits |= PAINT_TINT;
-		if (pc->rust_mask != 0) bits |= PAINT_RUST;
-		if (paint->rust_gradual) bits |= PAINT_GRADUAL;
-		gl.glUniform1i(_mesh_program.paint, bits);
-		gl.glUniform3f(_mesh_program.colour, paint->colour[0], paint->colour[1], paint->colour[2]);
-		gl.glUniform3f(_mesh_program.target, paint->target[0], paint->target[1], paint->target[2]);
-		gl.glUniform1f(_mesh_program.start, paint->start);
-		gl.glUniform1f(_mesh_program.fade, paint->fade);
-		gl.glUniform3f(_mesh_program.addon_colour, paint->addon_colour[0], paint->addon_colour[1], paint->addon_colour[2]);
-		gl.glUniform1f(_mesh_program.addon_start, paint->addon_start);
-		gl.glUniform3f(_mesh_program.tint, paint->tint[0], paint->tint[1], paint->tint[2]);
-		gl.glUniform3f(_mesh_program.rust_colour, paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2]);
-		gl.glUniform1f(_mesh_program.rust_time, paint->rust_time);
-		gl.glUniform1f(_mesh_program.rust_ramp, paint->rust_ramp);
-		const GLuint units[5] = {pc->detail, pc->detail_colours, pc->paint_mask, pc->addon_mask, pc->rust_mask};
-		for (int k = 0; k < 5; k++) {
-			if (units[k] == 0) continue;
-			gl.glActiveTexture(GL_TEXTURE0 + 1 + k);
-			gl.glBindTexture(GL_TEXTURE_2D, units[k]);
-		}
-		gl.glActiveTexture(GL_TEXTURE0);
-	};
 	auto draw_runs = [&](const MeshOnCard &d, const std::vector<ThreeDGpuTriangles::Run> &runs, bool glass) {
 		const ThreeDGpuMatrix m = Multiply(to_card, d.mesh->matrix);
 		const double determinant = Determinant(m);
@@ -2616,7 +2662,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
-			set_paint(r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
+			SetPaint(_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
 			/* Its material's own light, and see-through by its own alpha (a material "BLEND") or the glass's. */
 			const uint32_t glow = d.mesh->shape->Glow(r.texture);
 			const Colour e(glow);
@@ -2879,6 +2925,8 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 	g.bytes = all.size() * sizeof(float);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[3] += g.bytes;
+	_card_sent_of[3] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_buildings.emplace(key, std::move(g)).first->second;
 }
@@ -3990,6 +4038,8 @@ const GpuBuilding *BuildingOnCard(const ThreeDGpuBuilding &b)
 	g.bytes = all.size() * sizeof(float);
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[3] += g.bytes;
+	_card_sent_of[3] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_buildings.emplace(b.uid, std::move(g)).first->second;
 }
@@ -4031,6 +4081,7 @@ struct EyeObjectDraws {
 		const GpuShape *shape;
 		const GpuIndices *indices;
 		std::vector<GLuint> textures;
+		std::vector<PaintOnCard> paints;
 	};
 	std::vector<Draw> draws;
 	std::vector<MeshDraw> mesh_draws;
@@ -4055,10 +4106,10 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 		}
 		out.draws.push_back(std::move(d));
 	}
-	/* The figures' shapes, triangles and textures (painted for the eye already). */
+	/* The figures' shapes, triangles, textures and the masks the card paints them by as it draws them (ThreeDGpuMesh::paints). */
 	for (const ThreeDGpuMesh &m : pic.meshes) {
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
-		EyeObjectDraws::MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0)};
+		EyeObjectDraws::MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0), std::vector<PaintOnCard>(m.textures.size())};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
 		/* As DrawOnCard(): a triangle naming a corner the shape has not, the processor draws. */
 		if (d.indices->largest >= d.shape->corners) return false;
@@ -4067,6 +4118,7 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			const GpuTexture *t = TextureOnCard(*m.textures[i]);
 			if (t == nullptr) return false;
 			d.textures[i] = t->name;
+			if (i < m.paints.size() && m.paints[i].Any() && !PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
 		}
 		out.mesh_draws.push_back(std::move(d));
 	}
@@ -4111,8 +4163,8 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 {
 	gl.glUseProgram(_eye_mesh_program.program);
-	gl.glUniform1i(_eye_mesh_program.tex, 0);
-	gl.glUniform1i(_eye_mesh_program.paint, 0);
+	PaintUnits(_eye_mesh_program);
+	ClearPaintUnits();
 	gl.glUniform1f(_eye_mesh_program.near_plane, near_plane);
 	gl.glActiveTexture(GL_TEXTURE0);
 	if (glass) {
@@ -4144,6 +4196,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 				gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
 			}
 			gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && d.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
+			SetPaint(_eye_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			CullVehicleRun(r.facing, -determinant);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
@@ -4153,6 +4206,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 	gl.glFrontFace(GL_CCW);
 	if (glass) gl.glDisable(GL_BLEND);
 	gl.glBindVertexArray(0);
+	ClearPaintUnits();
 }
 
 /**
@@ -4399,6 +4453,8 @@ const GpuTexture *KeptTextureOnCard(uint64_t uid, const uint32_t *px, int w, int
 	g.bytes = static_cast<size_t>(w) * h * 4;
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
+	_card_bytes_of[2] += g.bytes;
+	_card_sent_of[2] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_textures.emplace(uid, g).first->second;
 }
@@ -5337,8 +5393,11 @@ std::string ThreeDGpuTimes()
 {
 	std::lock_guard lock(_gpu_mutex);
 	const int64_t biggest = _card_biggest.exchange(0);
-	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB, {} MB put on it, let go {}x, read back at most {}x{}", _gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(),
-			_card_bytes >> 20, _card_sent.load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
+	std::string s = fmt::format("card: {} pictures in {:.1f} ms{}, holds {} MB (shapes {}, triangles {}, textures {}, buildings {}), {} MB put on it (shapes {}, triangles {}, textures {}, buildings {}), let go {}x, read back at most {}x{}",
+			_gpu_pictures, _gpu_ms, _gpu_failed > 0 ? fmt::format(", {} left to the processor", _gpu_failed) : std::string(), _card_bytes >> 20,
+			_card_bytes_of[0].load() >> 20, _card_bytes_of[1].load() >> 20, _card_bytes_of[2].load() >> 20, _card_bytes_of[3].load() >> 20, _card_sent.load() >> 20,
+			_card_sent_of[0].load() >> 20, _card_sent_of[1].load() >> 20, _card_sent_of[2].load() >> 20, _card_sent_of[3].load() >> 20, _card_trims.load(), biggest >> 32, biggest & 0xFFFFFFFF);
+	for (std::atomic<size_t> &b : _card_sent_of) b = 0;
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_standing_triangles[1] > 0) s += fmt::format("; of the buildings' {} triangles in the blocks {} drawn, in the cells there", _gpu_standing_triangles[1], _gpu_standing_triangles[0]);

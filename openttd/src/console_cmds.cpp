@@ -9987,8 +9987,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'pamet': how much memory the 3D objects (glb) and the pictures made of them take. */
 		extern std::string DescribeThreeDObjectMemory();
 		extern std::string DescribeThreeDPictureMemory();
-		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDObjectMemory());
-		IConsolePrint(CC_DEFAULT, "test3d: pamet {}", DescribeThreeDPictureMemory());
+		/* In the debug log too: the rig of the graphics card shows no console (scena_gl3.sh). */
+		for (const std::string &line : {DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory()}) {
+			IConsolePrint(CC_DEFAULT, "test3d: pamet {}", line);
+			Debug(misc, 1, "test3d pamet {}", line);
+		}
 	} else if (what == "akce") {
 		/* 'akce [0|1]': the events of the buildings (the new stadium's firemen, spit, Mat and girls) on every day, or
 		 * on their own days as the game has them (GetThreeDHouseEvent()). */
