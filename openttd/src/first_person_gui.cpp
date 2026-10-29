@@ -745,9 +745,13 @@ struct FirstPersonWindow : Window {
 			this->GetOut();
 			return;
 		}
-		/* At a door: opened away from the walker, or shut. */
+		/* At a door: opened away from the walker, or shut. A wing that swings through the walker standing by its hinge
+		 * moves it aside (the player, 29. 10.: "the window of the hut has to push me away when I open it, it stopped
+		 * open through me and I could not leave"); with nowhere to go, the wing stays as it was. */
 		if (const auto door = this->DoorToUse(); door.has_value()) {
-			ToggleThreeDDoor(door->house, door->origin, door->door, this->walker.x - TileX(door->origin) * TILE_SIZE, this->walker.y - TileY(door->origin) * TILE_SIZE);
+			const double lx = this->walker.x - TileX(door->origin) * TILE_SIZE, ly = this->walker.y - TileY(door->origin) * TILE_SIZE;
+			ToggleThreeDDoor(door->house, door->origin, door->door, lx, ly);
+			if (!this->StepAside()) ToggleThreeDDoor(door->house, door->origin, door->door, lx, ly);
 			return;
 		}
 		/* The walker's plant ripe, or dried to hay: harvested (WalkerPlant). */
@@ -924,6 +928,29 @@ struct FirstPersonWindow : Window {
 			z = FirstPersonGroundZ(x, y);
 		}
 		this->PutNear(x, y);
+	}
+
+	/**
+	 * The walker where it stands, or, when something came into its way there (a wing of a door opened through it), the
+	 * nearest place it can go from there, in rings 5 cm apart up to 2 m.
+	 * @return whether it stands free now
+	 */
+	bool StepAside()
+	{
+		if (FirstPersonFreeFrom(this->walker, this->walker.x, this->walker.y)) return true;
+		for (int ring = 1; ring <= 40; ring++) {
+			const double r = ring * 0.05 * OBJECT_UNITS_PER_METRE;
+			for (int k = 0; k < ring * 8; k++) {
+				const double a = k * 2 * M_PI / (ring * 8);
+				const double px = this->walker.x + r * std::cos(a), py = this->walker.y + r * std::sin(a);
+				if (!FirstPersonFreeFrom(this->walker, px, py)) continue;
+				this->walker.x = px;
+				this->walker.y = py;
+				FirstPersonSettle(this->walker);
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/** The walker to the nearest place it can stand from a world point. */

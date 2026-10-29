@@ -31,6 +31,37 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 29. 10. (48) – Okenice u pantu odsune chodce; licence dat platí; kůň do grrrrf; Falkor; pád u silnice
+
+- Hráč: *„licence takhle stačí , dál 123 nebudem dělat nic.“* → licence dat zůstává, jak je v `NAVRH-LICENCE-DAT.md`;
+  oddělení enginu (body 1–3 z 28. 10.) se nedělá.
+- Hráč: *„okno chajdy mě musi odsunout když ho otevřu, zastavilo se otevřený skrz mě a nemoh jsem odejit.“* a
+  *„před pantem musi stat aby se okno otevřelo skrz něj“* → hotovo: když křídlo dveří nebo okenice po E projde
+  chodcem, chodec se posune na nejbližší místo, kde může stát (kruhy po 5 cm, nejvýš 2 m). Když takové místo není,
+  křídlo zůstane, jak bylo. Rig: srub z `test3d postav 100 100 paseka 0` (s `EXTRA=1`), okno 2 zvenku. Na 4,3 a
+  4,5 m od rohu (u pantu) se chodec dřív po otevření nepohnul žádným směrem; teď ho okenice odsune o 0,3–0,4 m a odejde.
+- Pád u silnice: *„jo ja nepočkal a šel jsem bliž k silnici a spadlo to . a předtim jsem byl v lese.“*,
+  *„ja šel bliž k silnici a to je moc zatěž, bez pausy. nebo spomalit hru pomuže“* → `snimky.log`: v lese z očí
+  22 minut stálé ~3 GB, 45–55 snímků/s. Po načtení druhé hry z očí u silnice 2,6 → 4,7 GB za minutu a půl, pak konec
+  logu. Pauza ubere práci procesoru, paměť ne. Podle domluvy až po GPU.
+- Falkor: *„falco letajici pes ať neutočí, letěl okolo a kousnul mě a odletěl, to ma byt hodný pes.“* → v kódu
+  Falkor (sada psi, povaha mírumilovné, jen na prodej) kousnout nemůže. Útočí jen zvířata s povahou „útočí“ nebo
+  vyprovokovaná, mazlíček a prodávaný pes nikdy. „Přiletí, kousne, odletí“ dělají létající draci (jednou se snesou
+  na chodce). Čeká na hráče: měl Falkora koupeného? Mají létající draci přestat?
+- Kůň: *„budem jezdit na koni, kuň bude ve special grf a budem ho řidit jako kolečko nebo jako tatru . pak budou
+  koňove a potahnou vuz. tak napiš do grrrrf že se bzde jezdit na koni ( v tahači ) a že kuň bude mit návěs vůz,
+  několik typů koňů bude mit tři vozy mezi sebou si budou oučovat“* → grrrrf `8d324f0`
+  `hra/3d/PROSBA-KUN-SPECIAL-3D.md`.
+- Dračí hrad: *„vlajky na dračim hradu budou obrys černý parní mašinky na červeným pozadí.“* → ve stejné zprávě
+  kolegovi (prapory jsou v jeho modelu).
+- Gril v lese: *„dame grill do lesa když zmačknu E u ohniště bude okno nabidky grilovat ovečku, grilovat prasatko a
+  grilovat kravičku . a nad ohništěm se objevi ingame grill ze hřiště a z hospody.“* → nová věc, k domluvě.
+- Hráč: *„hejba se to pěkně, otačeni, posun i first person view, tam je pěkný že zezačátku se šipkama otáčí pomalu
+  tak trefim . viděl jsi veverku?hezka je a skače.“*
+- Rig: `test3d chodec` ze skriptu startu hry padá s blitterem 40bpp-anim (`_screen.dst_ptr` je v tiku hry prázdný,
+  obrazovka se mapuje až při kreslení). Ve hře se pohled otevírá kliknutím, kdy paměť obrazovky je. Pro chůzi a
+  kolize stačí `scena_3d_cmd.sh` (null video, vypisuje příkazy).
+
 ## 28. 10. (47) – Autorství ve všech našich souborech, návrh licence dat
 
 - Hráč: *„uval to na dalši naše, viewport, first person a dalši naše. ja vim že to nejde na train cmd protože je z
