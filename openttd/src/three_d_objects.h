@@ -137,7 +137,12 @@ struct ThreeDObjectFigure {
 	float facing = 0;     ///< "otoceni": degrees in the world, 0 along +x, 90 along +y
 	float scale = 1;      ///< "meritko": its size against true metres; the building is in true metres
 	float stretch = 1;    ///< its height against its width (a plant's "meritko" [x, y, z]: z / x)
+	int frame = -1;       ///< a frame of its own (the spit over the forest's fire: the animal chosen), -1 by the game's tick
+	float beyond = 0;     ///< an add-on's place: only its triangles all so far or farther from its foot along its own x (metres), 0 all
 };
+
+/** The animals the spit (the figure "rozen") has, by its frames: the piglet, the calf, the lamb. */
+static constexpr int THREE_D_GRILL_ANIMALS = 3;
 
 /** A door of a building ("dvere"): people come out of it and go in (three_d_walkers.h). */
 struct ThreeDObjectDoor {
@@ -1071,8 +1076,15 @@ struct ThreeDForestPart {
 	std::vector<ThreeDObjectFigure> mushrooms; ///< "houby": where they grow, all the time (the kind drawn by the place)
 	std::vector<ThreeDForestPlace> animals;   ///< "zvirata"
 	std::vector<ThreeDForestPlace> ghosts;    ///< "noc_postavy", at night
+	/* The spit over its fire (the forester's cabin's fireplace, where its embers glow, "svetlo_00" of its night). */
+	const ThreeDObject *grill = nullptr;      ///< the trestles of the pitch's grill (an add-on, without its bricks) over the fire; nullptr no fire
+	std::array<ThreeDObjectFigure, THREE_D_GRILL_ANIMALS> spit; ///< the spit on it, each with an animal of its own (ThreeDObjectFigure::frame)
+	float fire[2] = {};                       ///< where the fire is, metres
 };
 const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile);
+int ThreeDForestGrill(TileIndex tile);
+void SetThreeDForestGrill(TileIndex tile, int animal);
+TileIndex ThreeDForestFireNear(double x, double y, double reach);
 const ThreeDIndustryTileParts *GetThreeDIndustryYard(const Industry *ind, TileIndex tile);
 std::optional<bool> ThreeDOriginalIndustryBlocks(TileIndex tile, double x, double y);
 

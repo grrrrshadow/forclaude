@@ -140,6 +140,8 @@ static constexpr double FIRST_PERSON_PUFF_S = 1.6;
  * smokes the marijuana, its breaths of smoke, seconds; how long the beer takes it to breathe fire, how long it breathes
  * it, how long it smokes after, seconds. */
 static constexpr double FIRST_PERSON_FEED_M = 4.0;
+/** How near the fire of a forest the walker stands for E to grill there (beyond the logs about it), metres. */
+static constexpr double FIRST_PERSON_GRILL_M = 4.0;
 static constexpr double FIRST_PERSON_SMOKE_S = 8.0;
 static constexpr double FIRST_PERSON_BREATH_S = 2.0;
 static constexpr double FIRST_PERSON_GULP_S = 0.8;
@@ -540,6 +542,7 @@ static EngineID YardVehicleEngine(std::string_view figure)
 
 void ShowWalkerInventoryWindow();
 static void ShowDragonFeedWindow(uint32_t place);
+static void ShowForestGrillWindow(TileIndex fire);
 TileIndex FirstPersonShopNearby();
 void RedrawFirstPersonPicture();
 
@@ -769,6 +772,11 @@ struct FirstPersonWindow : Window {
 		/* By a farm's dragon resting: what it is fed chosen (ShowDragonFeedWindow()). */
 		if (const auto dragon = ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M); dragon.has_value()) {
 			ShowDragonFeedWindow(dragon->place);
+			return;
+		}
+		/* By a forest's fire: what is grilled chosen (ShowForestGrillWindow()). */
+		if (const TileIndex fire = ThreeDForestFireNear(this->walker.x, this->walker.y, FIRST_PERSON_GRILL_M * OBJECT_UNITS_PER_METRE); fire != INVALID_TILE) {
+			ShowForestGrillWindow(fire);
 			return;
 		}
 		this->riding = VehicleID::Invalid();
@@ -1851,6 +1859,9 @@ struct FirstPersonWindow : Window {
 				} else if (ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M).has_value()) {
 					/* By a farm's dragon resting: E feeds it. */
 					hint = GetString(STR_FIRST_PERSON_FEED_DRAGON);
+				} else if (ThreeDForestFireNear(this->walker.x, this->walker.y, FIRST_PERSON_GRILL_M * OBJECT_UNITS_PER_METRE) != INVALID_TILE) {
+					/* By a forest's fire: E grills there. */
+					hint = GetString(STR_FIRST_PERSON_GRILL);
 				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
 					/* At a shop: I opens the inventory, where it is bought. */
 					hint = GetString(STR_FIRST_PERSON_SHOP_HERE, shop);
@@ -2095,6 +2106,143 @@ std::string RigDragonFeed(std::string_view what)
 	const Rect ir = w->GetWidget<NWidgetBase>(WID_DF_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
 	w->OnClick({w->width / 2, ir.top + static_cast<int>(it - foods.begin()) * DragonFeedWindow::ButtonHeight() + DragonFeedWindow::ButtonHeight() / 2}, WID_DF_LIST, 1);
 	return out + fmt::format(", krmeno {}, okno {}", what, FindWindowById(WindowClass::DragonFeed, 0) != nullptr ? "zustalo" : "zmizelo");
+}
+
+static constexpr NWidgetPart _nested_forest_grill_widgets[] = {
+	NWidget(NWID_HORIZONTAL),
+		NWidget(WWT_CLOSEBOX, Colours::Brown),
+		NWidget(WWT_CAPTION, Colours::Brown, WID_FG_CAPTION), SetStringTip(STR_FOREST_GRILL_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
+	EndContainer(),
+	NWidget(WWT_PANEL, Colours::Brown, WID_FG_LIST), SetFill(1, 0), EndContainer(),
+};
+
+/**
+ * The grill over a forest's fire the walker stands by (the player, 29. 10.: "E at the fireplace, a menu: grill a lamb,
+ * grill a piglet, grill a calf, and over the fireplace the game's grill of the pitch and the pub"; only to be looked
+ * at, the animal not needed): a button for each animal, the spit with it over the fire (SetThreeDForestGrill()), and
+ * with one on it a button to eat it, the grill gone with it (the player: "not to take it off, to eat it, and the grill
+ * goes"). It goes as the walker walks away.
+ */
+struct ForestGrillWindow : Window {
+	TileIndex fire; ///< the tile of the fire (ThreeDForestFireNear())
+
+	/** The animals as the player named them, by their frames of the spit (ThreeDForestPart::spit). */
+	static constexpr std::array<std::pair<int, StringID>, THREE_D_GRILL_ANIMALS> ANIMALS = {{{2, STR_FOREST_GRILL_LAMB}, {0, STR_FOREST_GRILL_PIGLET}, {1, STR_FOREST_GRILL_CALF}}};
+
+	ForestGrillWindow(WindowDesc &desc, TileIndex fire) : Window(desc), fire(fire)
+	{
+		this->InitNested(0);
+	}
+
+	/** The buttons: the animals, and eating it with one on the spit; -1 that one. */
+	std::vector<int> Buttons() const
+	{
+		std::vector<int> buttons;
+		for (const auto &[animal, name] : ANIMALS) buttons.push_back(animal);
+		if (ThreeDForestGrill(this->fire) >= 0) buttons.push_back(-1);
+		return buttons;
+	}
+
+	static StringID ButtonName(int animal)
+	{
+		for (const auto &[a, name] : ANIMALS) {
+			if (a == animal) return name;
+		}
+		return STR_FOREST_GRILL_EAT;
+	}
+
+	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
+	{
+		if (widget != WID_FG_LIST) return;
+		size.height = static_cast<uint>(this->Buttons().size() * DragonFeedWindow::ButtonHeight()) + padding.height;
+		for (const auto &[animal, name] : ANIMALS) size.width = std::max(size.width, GetStringBoundingBox(name).width);
+		size.width = std::max(size.width, GetStringBoundingBox(STR_FOREST_GRILL_EAT).width);
+		size.width += padding.width + 4 * WidgetDimensions::scaled.framerect.Horizontal();
+	}
+
+	void DrawWidget(const Rect &r, WidgetID widget) const override
+	{
+		if (widget != WID_FG_LIST) return;
+		const Rect ir = r.Shrink(WidgetDimensions::scaled.framerect);
+		const int bh = DragonFeedWindow::ButtonHeight(), text = GetCharacterHeight(FontSize::Normal);
+		const int on = ThreeDForestGrill(this->fire);
+		int y = ir.top;
+		for (int animal : this->Buttons()) {
+			const Rect b{ir.left, y + 1, ir.right, y + bh - 2};
+			/* The animal on the spit now pressed in. */
+			DrawFrameRect(b, Colours::Brown, animal >= 0 && animal == on ? FrameFlags{FrameFlag::Lowered} : FrameFlags{});
+			DrawString(b.left, b.right, b.top + (b.Height() - text) / 2, ButtonName(animal), TextColour::White, AlignmentH::Centre);
+			y += bh;
+		}
+	}
+
+	void OnClick(Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
+	{
+		if (widget != WID_FG_LIST) return;
+		const Rect ir = this->GetWidget<NWidgetBase>(WID_FG_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		const std::vector<int> buttons = this->Buttons();
+		if (pt.y < ir.top) return;
+		const size_t k = static_cast<size_t>((pt.y - ir.top) / DragonFeedWindow::ButtonHeight());
+		if (k >= buttons.size()) return;
+		SetThreeDForestGrill(this->fire, buttons[k]);
+		this->Close();
+	}
+
+	/** The walker walked away from the fire, got into a vehicle or left the view: no grilling then. */
+	IntervalTimer<TimerWindow> check{std::chrono::milliseconds(250), [this](uint) {
+		const FirstPersonWindow *fp = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+		const TileIndex near = fp != nullptr && fp->Riding() == nullptr ? ThreeDForestFireNear(fp->walker.x, fp->walker.y, (FIRST_PERSON_GRILL_M + 2.0) * OBJECT_UNITS_PER_METRE) : INVALID_TILE;
+		if (near != this->fire) this->Close();
+	}};
+};
+
+static WindowDesc _forest_grill_desc(
+	WindowPosition::Center, {}, 0, 0,
+	WindowClass::ForestGrill, WindowClass::None,
+	{},
+	_nested_forest_grill_widgets
+);
+
+/** Open the window of the grill over a forest's fire, instead of one open for another. */
+static void ShowForestGrillWindow(TileIndex fire)
+{
+	CloseWindowById(WindowClass::ForestGrill, 0);
+	new ForestGrillWindow(_forest_grill_desc, fire);
+}
+
+/**
+ * The rig: the walker by the fire of the forest on a tile, E pressed there, a click on a button (as the player would:
+ * "ovecka", "prasatko", "kravicka", "snist"; "" none).
+ * @return the menu it offers and what is on the spit after
+ */
+std::string RigForestGrill(TileIndex tile, std::string_view what)
+{
+	FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (fp == nullptr) return "zadny chodec";
+	const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+	if (forest == nullptr || forest->grill == nullptr) return "zadny ohen";
+	/* Beyond the logs about the fire, on the side of the north corner. */
+	const double fx = TileX(tile) * TILE_SIZE + forest->fire[0] * OBJECT_UNITS_PER_METRE, fy = TileY(tile) * TILE_SIZE + forest->fire[1] * OBJECT_UNITS_PER_METRE;
+	fp->walker.x = fx - 3.2 * OBJECT_UNITS_PER_METRE;
+	fp->walker.y = fy;
+	fp->walker.heading = 0;
+	fp->walker.pitch = -0.3;
+	SetFocusedWindow(fp);
+	fp->OnKeyPress('e', 'E');
+	ForestGrillWindow *w = static_cast<ForestGrillWindow *>(FindWindowById(WindowClass::ForestGrill, 0));
+	if (w == nullptr) return fmt::format("ohen na {:.1f},{:.1f} m, okno zavreno", forest->fire[0], forest->fire[1]);
+	std::string out = fmt::format("ohen na {:.1f},{:.1f} m, nabidka:", forest->fire[0], forest->fire[1]);
+	const std::vector<int> buttons = w->Buttons();
+	for (int animal : buttons) out += " " + GetString(ForestGrillWindow::ButtonName(animal));
+	const int want = what == "prasatko" ? 0 : what == "kravicka" ? 1 : what == "ovecka" ? 2 : what == "snist" ? -1 : -2;
+	const auto it = std::ranges::find(buttons, want);
+	if (it != buttons.end()) {
+		const Rect ir = w->GetWidget<NWidgetBase>(WID_FG_LIST)->GetCurrentRect().Shrink(WidgetDimensions::scaled.framerect);
+		w->OnClick({w->width / 2, ir.top + static_cast<int>(it - buttons.begin()) * DragonFeedWindow::ButtonHeight() + DragonFeedWindow::ButtonHeight() / 2}, WID_FG_LIST, 1);
+	}
+	fp->MakePicture();
+	fp->SetDirty();
+	return out + fmt::format("; na rozni {}", ThreeDForestGrill(tile));
 }
 
 /**

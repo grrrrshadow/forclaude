@@ -31,6 +31,43 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 29. 10. (49) – Rožeň v lese nad ohništěm, rožeň v hospodě a na hřišti točí a střídá, co dál na GPU
+
+- Gril v lese: *„ja mam taky otazky ke grillu, kde je grill z grrrrf ktery se toči a střida se na něm kravička,
+  ovečka, prasatko.? 2 podivana 3 nemusim“*, *„jo dobry, dej rožeň do lesa.“*, *„nebude tam sundat bude tam sníst a
+  gril zmizí“*, *„nech to ohniště v lese . vem jen rožeň“*, *„rožeň vidličky , to přece nedáš na hřiště zděný grill .
+  mužou mit v hospodě normalni ohniště. jestli to ma byt jednotne. ale vem rožeň vidličky, dej to nad ohniště a
+  hotovo. ten grill bude všude stejnej. zviřatka se točej všude stejny“*, *„tak budem davat rožeň do ruznych vidlic
+  ale furt mame jeden objekt universalni . nejsložitějši díl společny pro všechny“*, *„to je fuk jak vysoko bude nad
+  ohněm, tak budou jako vysoké plameny“* → hotovo:
+  - E u ohniště na pasece se srubem otevře okno: Grilovat ovečku, Grilovat prasátko, Grilovat kravičku. Když už se
+    griluje, je tam navíc Sníst. Po Sníst rožeň i kozy zmizí, ohniště lesa zůstane. Je to jen na podívanou, zvíře
+    hráč mít nemusí; neukládá se (jako otevřené dveře).
+  - Nad lesním ohništěm je rožeň `rozen` (jeden společný objekt pro hospodu, hřiště i les; točí se a zvířata se
+    na něm střídají všude stejně) a kozy z grilu hřiště `gril_090fce5f` bez cihel. Kozy jsou v tom samém kusu jako
+    cihly (jedna síť), stojí ale odděleně: cihly sahají ±0,75 m od středu, kozy jsou na ±1,0 m (kolegovo
+    `domy/hospoda.py` `gril()`). Místo doplňku proto nově může položit jen trojúhelníky dál od středu podél x
+    (`ThreeDObjectFigure::beyond`, v lese 0,9 m). Rožeň je 1,01 m nad zemí jako na hřišti.
+  - Rig: `test3d chodec gril 101 101 ovecka|prasatko|kravicka|snist` (paseka z `test3d postav 100 100 paseka 0`,
+    `EXTRA=1`), `test3d chodec zavri` zavře pohled z očí. Snímky z očí i mapy: kozy po stranách kruhu z kamenů,
+    zvíře ve vidlicích, po Sníst nic.
+- Hospoda a hřiště: *„v hospodě je vždycky na grilu prasatko a na hřišti jsem ho ještě neviděl. protože mam vypnuty
+  otačení koleček tak jsem grill neřešil že se netočí a zviřatka se nestřidaj“* → dvě příčiny:
+  - Na mapě byly kravička a ovečka černé: textury všech snímků se berou ze snímku 0 a snímky číslovaly materiály
+    podle pořadí, v jakém je potkaly. Teď mají figury se snímky materiály číslované podle souboru.
+  - Z očí zblízka (plná figura z trojúhelníků) byl vždy snímek 0 a rožeň se netočil. Teď věci mezi figurami berou
+    snímek podle tiku a plné figury se točí kolem osy rožně, na procesoru i na kartě. Točení rožně nezávisí na
+    nastavení točení koleček.
+- Hřiště: *„tam neni vubec hospoda“*, *„na stadionu opejkaj požárnici asi dvakrat měsičně tam je tatra, mat a grill a
+  sud“* → tak to je: akce stadionu jednou za 8–14 dní (bloky po 11 dnech), hasičská Tatra, Mat u sudu, rožeň.
+- Kamera: *„ty si dal pryč kameru s maticí? ja viděl zlepšení významne při pohybu mapou , připraveny pas okolo toho
+  co je vidět“* → nic pryč není. To zlepšení dělá mezipaměť scény s pásem 192 px okolo obrazovky (44), ta zůstává.
+  Kamera maticí se nikdy nedělala (37: neukázala se potřebná).
+- *„co tamame dal na gpu udělat?“* → zbývá (#221): stojící věci otočené mapy kartou (domy, krabice, mosty, sprity;
+  procesoru zůstanou nápisy), vozidla na mapě jako objekt místo obrázků (v logu z telefonu 2593 obrázků objektů),
+  domy bez obrázků, noční záře bez čtení z karty (`glReadPixels` po blocích, 4579× v `3d_karta.log`), sběr pohledu
+  z očí a plakáty figur. Pak paměť u silnice (48).
+
 ## 29. 10. (48) – Okenice u pantu odsune chodce; licence dat platí; kůň do grrrrf; Falkor; pád u silnice
 
 - Hráč: *„licence takhle stačí , dál 123 nebudem dělat nic.“* → licence dat zůstává, jak je v `NAVRH-LICENCE-DAT.md`;

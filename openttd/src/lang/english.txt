@@ -2291,6 +2291,7 @@ STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the 
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: feed the dragon
+STR_FIRST_PERSON_GRILL                                          :E: grill at the fire
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: open the door
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: shut the door
 STR_FIRST_PERSON_WINDOW_OPEN                                    :E: open the window
@@ -2302,6 +2303,11 @@ STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventor
 STR_DRAGON_FEED_CAPTION                                         :{WHITE}Feed the dragon
 STR_DRAGON_FEED_ITEM                                            :{STRING} ({COMMA})
 STR_DRAGON_FEED_NOTHING                                         :You have nothing to give it
+STR_FOREST_GRILL_CAPTION                                        :{WHITE}Grill
+STR_FOREST_GRILL_LAMB                                           :Roast a lamb
+STR_FOREST_GRILL_PIGLET                                         :Roast a piglet
+STR_FOREST_GRILL_CALF                                           :Roast a calf
+STR_FOREST_GRILL_EAT                                            :Eat it
 STR_WALKER_NO_COMPANY                                           :A spectator carries nothing: join a company
 STR_WALKER_HEALTH                                               :Health: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :You carry:

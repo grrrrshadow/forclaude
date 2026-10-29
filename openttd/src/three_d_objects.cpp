@@ -36,6 +36,7 @@
 #include "town.h"
 #include "town_map.h"
 #include "tile_map.h"
+#include "viewport_func.h"
 #include "slope_func.h"
 #include "language.h"
 #include "3rdparty/nlohmann/json.hpp"
@@ -1240,6 +1241,14 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			material_texture.emplace(material, index);
 			return index;
 		};
+		/* A figure that moves by its frames (the pub's spit: the piglet, the calf, the lamb, each a node of its own with
+		 * materials of its own): the textures of every frame numbered as the file's materials go, the same in each, for
+		 * every frame is drawn with the textures of its first (ThreeDVehicleObject::TryGetTexture()). Numbered as each frame
+		 * met them, the calf and the lamb took the colour of the rod, black (the player, 29. 10.: "at the pub there is
+		 * always the piglet on the grill"). */
+		if (!frame_prefix.empty() && j.contains("materials")) {
+			for (size_t material = 0; material < j.at("materials").size(); material++) texture_of(static_cast<int>(material));
+		}
 
 		bool normals = true;
 		int first_material = -1;
@@ -3070,7 +3079,8 @@ static std::map<std::string, IndustryPartMesh> ReadIndustryParts(const nlohmann:
 /** A part of the forest with a clearing as read, by its turn: its object by its place in _three_d_objects. */
 struct ForestPartRead {
 	size_t ground = SIZE_MAX;
-	ThreeDForestPart rest; ///< its girls, mushrooms, game and ghosts (its object put in GetThreeDForestPart())
+	size_t grill = SIZE_MAX; ///< the trestles over its fire (the spit in them), SIZE_MAX no fire
+	ThreeDForestPart rest; ///< its girls, mushrooms, game and ghosts (its objects put in GetThreeDForestPart())
 };
 /** The parts of the forest with a clearing by their "dil", each turned by 0 to 3 quarter turns (GetThreeDForestPart()). */
 static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest_parts_read;
@@ -3163,6 +3173,23 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 	places("noc_postavy", "postavy", as_read.ghosts);
 	ThreeDObject trees_read;
 	ReadBuildingFigures(e, trees_read);
+	/* Its fire, where the embers glow at night ("svetlo_00" of its night, the colleague's forester's cabin): a spit
+	 * can be put over it there (the player, 29. 10.: "a grill in the forest: E at the fireplace, a menu to grill a lamb,
+	 * a piglet, a calf"; "leave the fireplace in the forest, take only the spit"; "the spit and the forks, over the
+	 * fireplace, and done; the grill the same everywhere"): the trestles of the pitch's grill without its bricks (its
+	 * bricks 0.75 m from its middle along the spit, its trestles 1 m, the colleague's domy/hospoda.py gril()) and the
+	 * spit in them as there (dum_20_stadion "akce" "rozen": its rod 1.01 m up in the forks, sized 1.08). */
+	std::vector<float> fire;
+	{
+		GlbMesh mesh;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = "svetlo_00";
+		o.point_prefix = "svetlo_00";
+		o.points = &fire;
+		ReadGlbMesh(folder + file, mesh, o);
+	}
+	static constexpr float SPIT_UP_M = 1.01f, SPIT_SCALE = 1.08f, TRESTLES_M = 0.9f;
 
 	/* Turned about the middle of the tile by quarter turns: exactly, no rounding of the sines. */
 	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE) / 2;
@@ -3194,6 +3221,31 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 		for (ThreeDObjectFigure &f : r.rest.mushrooms) turn(f);
 		for (ThreeDForestPlace &p : r.rest.animals) turn(p.at);
 		for (ThreeDForestPlace &p : r.rest.ghosts) turn(p.at);
+		if (fire.size() >= 3) {
+			ThreeDObjectFigure at;
+			at.at[0] = fire[0];
+			at.at[1] = fire[1];
+			turn(at);
+			r.rest.fire[0] = at.at[0];
+			r.rest.fire[1] = at.at[1];
+			/* The trestles alone, an object of their add-on without a file of its own (as a street lamp, MakeStreetLamps()). */
+			ThreeDObject grill;
+			grill.name = fmt::format("{}/{}/kozy", name, k * 90);
+			grill.variants = 0; // no house's
+			ThreeDObjectFigure &stand = grill.addon_places.emplace_back(at);
+			stand.figure = "gril_090fce5f";
+			stand.beyond = TRESTLES_M;
+			r.grill = _three_d_objects.size();
+			_three_d_objects.push_back(std::move(grill));
+			for (int animal = 0; animal < THREE_D_GRILL_ANIMALS; animal++) {
+				ThreeDObjectFigure &spit = r.rest.spit[animal];
+				spit = at;
+				spit.figure = "rozen";
+				spit.at[2] = SPIT_UP_M;
+				spit.scale = SPIT_SCALE;
+				spit.frame = animal;
+			}
+		}
 	}
 }
 
@@ -3216,6 +3268,7 @@ static const ThreeDForestPart *GetThreeDForestPart(std::string_view part, int tu
 				ThreeDForestPart &p = resolved[name][k];
 				p = turns[k].rest;
 				p.ground = turns[k].ground != SIZE_MAX ? &_three_d_objects[turns[k].ground] : nullptr;
+				p.grill = turns[k].grill != SIZE_MAX ? &_three_d_objects[turns[k].grill] : nullptr;
 			}
 		}
 	}
@@ -3281,6 +3334,50 @@ const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile)
 	}
 	if (path) return GetThreeDForestPart("cesta", turn);
 	return GetThreeDForestPart("zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
+}
+
+/** The grills over the forests' fires (SetThreeDForestGrill()): the animal on each spit by the tile of its fire; never saved, as the doors open. */
+static std::map<TileIndex, int> _three_d_forest_grills;
+
+/** The animal grilled over the fire of the part of a forest on a tile (a frame of the spit, ThreeDForestPart::spit), -1 none. */
+int ThreeDForestGrill(TileIndex tile)
+{
+	auto it = _three_d_forest_grills.find(tile);
+	if (it == _three_d_forest_grills.end()) return -1;
+	const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+	return forest != nullptr && forest->grill != nullptr ? it->second : -1;
+}
+
+/** An animal put on the spit over the fire on a tile (-1: eaten, the grill gone with it), the map drawn again there. */
+void SetThreeDForestGrill(TileIndex tile, int animal)
+{
+	if (animal < 0 || animal >= THREE_D_GRILL_ANIMALS) {
+		_three_d_forest_grills.erase(tile);
+	} else {
+		_three_d_forest_grills[tile] = animal;
+	}
+	MarkTileDirtyByTile(tile);
+}
+
+/** The tile of the forest's fire nearest a world point within reach of it (world units), INVALID_TILE none. */
+TileIndex ThreeDForestFireNear(double x, double y, double reach)
+{
+	TileIndex best = INVALID_TILE;
+	const int tx = static_cast<int>(x / TILE_SIZE), ty = static_cast<int>(y / TILE_SIZE);
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			if (tx + dx < 0 || ty + dy < 0 || tx + dx > static_cast<int>(Map::MaxX()) || ty + dy > static_cast<int>(Map::MaxY())) continue;
+			const TileIndex tile = TileXY(tx + dx, ty + dy);
+			const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
+			if (forest == nullptr || forest->grill == nullptr) continue;
+			const double d = std::hypot(TileX(tile) * TILE_SIZE + forest->fire[0] * OBJECT_UNITS_PER_METRE - x, TileY(tile) * TILE_SIZE + forest->fire[1] * OBJECT_UNITS_PER_METRE - y);
+			if (d < reach) {
+				reach = d;
+				best = tile;
+			}
+		}
+	}
+	return best;
 }
 
 /** A tile of the original industries ("druh": "prumysl_dlazdice"): its ground, its parts placed, its plants, for each of its gfx. */
@@ -8230,17 +8327,27 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		} else if (!read.light.empty()) {
 			read.light.resize(read.pos.size() / 3, 256);
 		}
-		/* A tree ("kmen_r", the colleague's STROMY-SPOLECNE-PRO-HRU.md): its crown in no one's way, only its trunk. */
-		if (a.trunk_r > 0) {
-			read.passable_tris.push_back(static_cast<uint32_t>(read.tri.size() / 3));
-			read.passable_tris.push_back(static_cast<uint32_t>((read.tri.size() + a.tri.size()) / 3));
-			read.trunks.insert(read.trunks.end(), {static_cast<float>(place.at[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(place.at[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE)});
-		}
-		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) */
+		/* (Turned and sized the same along each axis, a triangle keeps its outer side.) Only its ends when the place
+		 * says so: the grill's trestles without its bricks, over the forest's own fire (ReadForestPart()). */
+		const uint32_t first_tri = static_cast<uint32_t>(read.tri.size() / 3);
+		const float beyond = place.beyond * OBJECT_UNITS_PER_METRE;
+		auto kept = [&](size_t t) {
+			for (size_t k = 0; k < 3; k++) {
+				if (std::abs(a.pos[a.tri[t + k] * 3]) < beyond) return false;
+			}
+			return true;
+		};
 		for (size_t t = 0; t + 2 < a.tri.size(); t += 3) {
+			if (beyond > 0 && !kept(t)) continue;
 			read.tri.insert(read.tri.end(), {base + a.tri[t], base + a.tri[t + 1], base + a.tri[t + 2]});
 			read.facing.push_back(t / 3 < a.facing.size() ? a.facing[t / 3] : 0);
 			read.tri_tex.push_back(tex);
+		}
+		/* A tree ("kmen_r", the colleague's STROMY-SPOLECNE-PRO-HRU.md): its crown in no one's way, only its trunk. */
+		if (a.trunk_r > 0) {
+			read.passable_tris.push_back(first_tri);
+			read.passable_tris.push_back(static_cast<uint32_t>(read.tri.size() / 3));
+			read.trunks.insert(read.trunks.end(), {static_cast<float>(place.at[0] * OBJECT_UNITS_PER_METRE), static_cast<float>(place.at[1] * OBJECT_UNITS_PER_METRE), static_cast<float>(a.trunk_r * place.scale * OBJECT_UNITS_PER_METRE)});
 		}
 		/* Its night (the colleague's lamps: their paper, glass and flame in "noc", their glows "svetlo_NN"): laid as it
 		 * is, the glass in its own texture -- the paper in its colour at the place, as by day. */

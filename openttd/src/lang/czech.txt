@@ -2399,6 +2399,7 @@ STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit mari
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: nakrmit draka
+STR_FIRST_PERSON_GRILL                                          :E: grilovat u ohně
 STR_FIRST_PERSON_DOOR_OPEN                                      :E: otevřít dveře
 STR_FIRST_PERSON_DOOR_SHUT                                      :E: zavřít dveře
 STR_FIRST_PERSON_WINDOW_OPEN                                    :E: otevřít okno
@@ -2410,6 +2411,11 @@ STR_WALKER_INVENTORY_CAPTION                                    :{WHITE}Inventá
 STR_DRAGON_FEED_CAPTION                                         :{WHITE}Krmit draka
 STR_DRAGON_FEED_ITEM                                            :{STRING} ({COMMA})
 STR_DRAGON_FEED_NOTHING                                         :Nemáš nic, co mu dát
+STR_FOREST_GRILL_CAPTION                                        :{WHITE}Gril
+STR_FOREST_GRILL_LAMB                                           :Grilovat ovečku
+STR_FOREST_GRILL_PIGLET                                         :Grilovat prasátko
+STR_FOREST_GRILL_CALF                                           :Grilovat kravičku
+STR_FOREST_GRILL_EAT                                            :Sníst
 STR_WALKER_NO_COMPANY                                           :Divák nic nenese: přidej se k firmě
 STR_WALKER_HEALTH                                               :Zdraví: {NUM}/{NUM}
 STR_WALKER_CARRIED                                              :Neseš:

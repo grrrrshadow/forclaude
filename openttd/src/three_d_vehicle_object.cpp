@@ -4140,8 +4140,9 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 	if (pic == nullptr) return nullptr;
 	const int tall = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
 	if (height != nullptr) *height = tall;
-	if (by_tick && (fig->frames > 1 || fig->spin_ticks > 0) && tile != INVALID_TILE) {
-		/* Its tile is drawn again as the picture changes: a frame, or a step of a turn. */
+	if ((fig->spin_ticks > 0 || (by_tick && fig->frames > 1)) && tile != INVALID_TILE) {
+		/* Its tile is drawn again as the picture changes: a frame, or a step of a turn (with a frame of its own too, the
+		 * spit over the forest's fire with the animal chosen). */
 		const int ticks = fig->spin_ticks > 0 ? std::max(1, fig->spin_ticks / SPIN_STEPS) : fig->frame_ticks;
 		uint64_t step = TimerGameTick::counter / ticks;
 		bool known = false;

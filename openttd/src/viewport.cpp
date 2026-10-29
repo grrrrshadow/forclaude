@@ -4150,7 +4150,7 @@ static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure 
 	if (plant) return GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
 	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
-	return GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, -1, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
+	return GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, f.frame, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
 }
 
 /**
@@ -5045,6 +5045,10 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 		std::span<const ThreeDObjectFigure> girls;
 		if (built && HasGirls(ind)) girls = forest->girls;
 		if (forest->ground != nullptr) _turned_objects.push_back({forest->ground, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile), nullptr, girls});
+		/* The grill over its fire with the animal the walker chose on the spit (SetThreeDForestGrill()). */
+		if (const int animal = ThreeDForestGrill(_cur_ti.tile); animal >= 0) {
+			_turned_objects.push_back({forest->grill, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile), nullptr, std::span(&forest->spit[animal], 1)});
+		}
 		return;
 	}
 	const ThreeDObject *obj = built ? GetThreeDIndustryObjectOf(ind) : nullptr;
@@ -11547,6 +11551,7 @@ struct CabFigureModel {
 	std::vector<const ThreeDObjectTexture *> texs; ///< its textures at that detail, painted as its state has them
 	ThreeDParts parts = 1; ///< the parts its state shows
 	double turn = 0;      ///< how far its state turns the whole model, degrees
+	std::array<double, 9> spin{1, 0, 0, 0, 1, 0, 0, 0, 1}; ///< a thing that turns (the spit): how far it turns now about its axis (ThreeDVehicleObject::spin_axis)
 	/** Its crew that walks, each at its frame. */
 	struct Crew {
 		const ThreeDWalkingCrew *w;
@@ -11598,6 +11603,15 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, CabFigureMode
 	model.parts = fig->PartsOf(fg.state);
 	const ThreeDVehicleState *st = fig->State(fg.state);
 	model.turn = st != nullptr ? st->turn : 0.0;
+	/* A thing that turns, as smoothly as the game's ticks go (its picture turns by steps): drawn by its triangles close
+	 * by, it turned as far as its picture does, the spit over the forest's fire too. About its axis (Rodrigues'). */
+	if (fig->spin_ticks > 0) {
+		const double a = (TimerGameTick::counter % fig->spin_ticks) * 2 * M_PI / fig->spin_ticks, c = std::cos(a), s = std::sin(a);
+		const double x = fig->spin_axis[0], y = fig->spin_axis[1], z = fig->spin_axis[2];
+		model.spin = {c + x * x * (1 - c), x * y * (1 - c) - z * s, x * z * (1 - c) + y * s,
+				y * x * (1 - c) + z * s, c + y * y * (1 - c), y * z * (1 - c) - x * s,
+				z * x * (1 - c) - y * s, z * y * (1 - c) + x * s, c + z * z * (1 - c)};
+	}
 	/* Its crew that walks (the colleague's hra/3d/PROSBA-SPECIAL-3D.md): each figure the state shows at its frame of the
 	 * way gone; one not read yet is left out this frame. */
 	model.crew.clear();
@@ -11692,6 +11706,21 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	auto place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
 		px = shape->pos[i * 3]; py = shape->pos[i * 3 + 1]; pz = shape->pos[i * 3 + 2];
 		if (lit) { nx = shape->nrm[i * 3]; ny = shape->nrm[i * 3 + 1]; nz = shape->nrm[i * 3 + 2]; }
+		/* A thing that turns, about its axis through its centre (CabFigureModel::spin). */
+		if (fig->spin_ticks > 0) {
+			const std::array<double, 9> &r = model.spin;
+			const float *c = fig->spin_centre;
+			const double dx = px - c[0], dy = py - c[1], dz = pz - c[2];
+			px = c[0] + r[0] * dx + r[1] * dy + r[2] * dz;
+			py = c[1] + r[3] * dx + r[4] * dy + r[5] * dz;
+			pz = c[2] + r[6] * dx + r[7] * dy + r[8] * dz;
+			if (lit) {
+				const double mx = nx, my = ny, mz = nz;
+				nx = r[0] * mx + r[1] * my + r[2] * mz;
+				ny = r[3] * mx + r[4] * my + r[5] * mz;
+				nz = r[6] * mx + r[7] * my + r[8] * mz;
+			}
+		}
 		const uint8_t wk = i < shape->corner_wheel.size() ? shape->corner_wheel[i] : 0;
 		if (wk != 0 && wk <= wheel_turn.size()) {
 			const WheelTurn &w = wheel_turn[wk - 1];
@@ -11945,8 +11974,12 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		g.lit = s.nrm.size() == s.pos.size();
 		g.textures = texs;
 	};
-	const M3 same{1, 0, 0, 0, 1, 0, 0, 0, 1};
-	mesh(*shape, model.texs, same, {0, 0, 0}, same);
+	/* A thing that turns, about its axis through its centre (CabFigureModel::spin): its corners at R (p - c) + c. */
+	const M3 &spin = model.spin;
+	const float *sc = model.fig->spin_centre;
+	const std::array<double, 3> spun = model.fig->spin_ticks > 0 ? std::array<double, 3>{sc[0] - (spin[0] * sc[0] + spin[1] * sc[1] + spin[2] * sc[2]),
+			sc[1] - (spin[3] * sc[0] + spin[4] * sc[1] + spin[5] * sc[2]), sc[2] - (spin[6] * sc[0] + spin[7] * sc[1] + spin[8] * sc[2])} : std::array<double, 3>{0, 0, 0};
+	mesh(*shape, model.texs, spin, spun, spin);
 	out.back().wheels = std::move(wheels);
 	for (const CabFigureModel::Crew &crew : model.crew) {
 		const ThreeDWalkingCrew &w = *crew.w;
@@ -13515,6 +13548,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, _cur_ti.tile, k), _cur_ti.tile, z});
 				}
 			}
+			/* The grill over its fire, as on the map (AddIndustryObjects()). */
+			if (const int animal = ThreeDForestGrill(_cur_ti.tile); animal >= 0) objects.push_back({forest->grill, _cur_ti.tile, z, std::span(&forest->spit[animal], 1)});
 		} else if (tile_type == TileType::Industry && IsIndustryCompleted(_cur_ti.tile)) {
 			/* One of the game's own industries that is a real 3D object (the pub, the distillery, the gymnasium...): as a house. */
 			const Industry *ind = Industry::GetByTile(_cur_ti.tile);
@@ -13596,7 +13631,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * pub's spit over the grill) stays as big as the building it is on. */
 	for (const CabObject &co : objects) {
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+		/* Each figure's number on it, as the map counts them (DrawObjectInto(): its figures, its plants, those besides). */
+		uint32_t index = 0;
 		auto add = [&](const ThreeDObjectFigure &f) {
+			const uint32_t phase = TileX(co.origin) * 7 + TileY(co.origin) * 13 + index++;
 			/* A vehicle standing among them (the fire Tatra on the pitch, GetThreeDStandingVehicle()): as the vehicles. */
 			if (ThreeDEyeVehicle ev; GetThreeDStandingVehicle(f.figure, ev)) {
 				ev.scale = f.scale;
@@ -13611,10 +13649,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			 * spit stood a foot beside the grill's forks and above them (the player, 25. 10.: "the rod ends too early
 			 * before the fork it should lie in"). */
 			const ThreeDVehicleObject *fig = GetThreeDFigure(f.figure);
+			/* A thing whose frames change by themselves (the pub's spit: the piglet, the calf, the lamb, the player 29. 10.:
+			 * "at the pub there is always the piglet on the grill"): at the frame the map shows, drawn close by its
+			 * triangles too, which took its first frame always. */
+			int frame = f.frame;
+			if (frame < 0 && fig != nullptr && fig->thing && fig->frames > 1) frame = fig->FrameAt(TimerGameTick::counter, phase);
 			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE,
-					oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
+					oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, frame);
 		};
 		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
+		index += static_cast<uint32_t>(co.obj->plants.size());
 		for (const ThreeDObjectFigure &f : co.more) add(f);
 		/* And its plants (the marijuana about the hut and the statue, Matylda's pots by the pub), as on the map. */
 		for (const ThreeDObjectFigure &f : co.obj->plants) {

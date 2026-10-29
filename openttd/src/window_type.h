@@ -381,6 +381,12 @@ enum class WindowClass : uint16_t {
 	DragonFeed,
 
 	/**
+	 * The grill over a forest's fire the walker of the view from the first person stands by (first_person_gui.cpp); %Window numbers:
+	 *   - 0 = #ForestGrillWidgets
+	 */
+	ForestGrill,
+
+	/**
 	 * Station view; %Window numbers:
 	 *   - #StationID = #StationViewWidgets
 	 */

@@ -34,4 +34,10 @@ enum DragonFeedWidgets : WidgetID {
 	WID_DF_LIST,    ///< What the walker carries that the dragon is fed.
 };
 
+/** Widgets of the #ForestGrillWindow class. */
+enum ForestGrillWidgets : WidgetID {
+	WID_FG_CAPTION, ///< Caption of the window.
+	WID_FG_LIST,    ///< The animals to grill, and taking the spit off the fire.
+};
+
 #endif /* WIDGETS_FIRST_PERSON_WIDGET_H */

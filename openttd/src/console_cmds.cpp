@@ -9201,6 +9201,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			 * button of the thing clicked, so many steps after it. */
 			extern std::string RigFirstPersonFeed(std::string_view what, int steps);
 			IConsolePrint(CC_DEFAULT, "test3d: krmeni: {}", RigFirstPersonFeed(argv[3], number(4).value_or(0)));
+		} else if (argv.size() > 4 && argv[2] == "gril") {
+			/* 'chodec gril <x> <y> [ovecka|prasatko|kravicka|snist]': the walker by the fire of the forest on the tile, E
+			 * pressed, the button clicked; what the menu offers and the animal on the spit after (-1 none). */
+			extern std::string RigForestGrill(TileIndex tile, std::string_view what);
+			auto x = number(3), y = number(4);
+			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: gril: {}", RigForestGrill(TileXY(*x, *y), argv.size() > 5 ? argv[5] : std::string_view()));
+		} else if (argv.size() > 2 && argv[2] == "zavri") {
+			/* 'chodec zavri': the view from the first person closed, the map seen again (as Esc). */
+			CloseWindowById(WindowClass::FirstPerson, 0);
+			IConsolePrint(CC_DEFAULT, "test3d: chodec zavren");
 		} else if (argv.size() > 2 && argv[2] == "svetlo") {
 			/* 'chodec svetlo': L pressed (the torch, the lantern, the light put out), held up at once; the inventory
 			 * window closed, so that the picture shows the hand. */
