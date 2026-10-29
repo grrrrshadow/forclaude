@@ -5928,26 +5928,6 @@
     ],
     "otoceni": 0.0,
     "meritko": 1.0
-   },
-   {
-    "jmeno": "gril_090fce5f",
-    "poloha": [
-     24.331,
-     27.312,
-     0.0
-    ],
-    "otoceni": 0.0,
-    "meritko": 1.0
-   },
-   {
-    "jmeno": "sud_s_pipou_99914b93",
-    "poloha": [
-     25.721,
-     27.366,
-     0.0
-    ],
-    "otoceni": 0.0,
-    "meritko": 1.0
    }
   ],
   "postavy": [
@@ -5999,13 +5979,13 @@
   "akce": {
    "rozen": {
     "poloha": [
-     24.33,
-     27.31,
+     16.0,
+     18.868,
      1.01
     ],
     "otoceni": 0,
     "meritko": 1.08,
-    "poznamka": "rožeň nad grilem v rohu za přední tribunou (gril je doplněk domu), osa podél x ve výšce 1,01 m, měřítko 1,08 (hra 25. 10.: osa ve výřezu vidlice 0,99 m + poloměr tyče, tyč ±0,95 skrz vidlice ±0,98..1,02; hráč: „tyčka končí moc brzo před vidličkou“)"
+    "poznamka": "rožeň nad grilem uprostřed hřiště vedle hasičské Tatry (hráč 29. 10.: „chci mata s grilem do prostřed hřiště vedle tatry“; gril je doplněk akce), osa podél x ve výšce 1,01 m, měřítko 1,08 (hra 25. 10.: osa ve výřezu vidlice 0,99 m + poloměr tyče, tyč ±0,95 skrz vidlice ±0,98..1,02; hráč: „tyčka končí moc brzo před vidličkou“)"
    },
    "tatra": {
     "poloha": [
@@ -6018,15 +5998,15 @@
     "objekt": "nt_t148",
     "sada": [
      "kabina 148 hasici",
-     "mrizka 148 hasici",
+     "mrizka 148 nase",
      "nastavba hasici"
     ],
-    "poznamka": "hasičská Tatra 148 stojí prázdná na hřišti čelem ke stánku PIVO (hráč: „na hřišti stojí prázdná Tatra, bez řidiče“)"
+    "poznamka": "hasičská Tatra 148 stojí prázdná na hřišti čelem ke stánku PIVO (hráč: „na hřišti stojí prázdná Tatra, bez řidiče“); červená kabina s bílou mřížkou chladiče (hráč 29. 10.: „dej třeba 148 červenou kabinu s bilou mřižkou chladiče a je hasičská“)"
    },
    "mat": {
     "poloha": [
-     26.421,
-     27.306,
+     18.09,
+     18.864,
      0.0
     ],
     "otoceni": 180,
@@ -6034,6 +6014,30 @@
     "meritko": 1.0,
     "poznamka": "Mat točí pivo z pípy sudu u grilu s rožněm (hráč: „Mat nemůže sedět v hasičské Tatře, bude točit pivo u grilu“, „mat toci pivo, ma sud?“), čelem ke grilu; tělo pípy 0,30 m před ním, 0,06 m vpravo, 0,95 m"
    },
+   "doplnky": [
+    {
+     "jmeno": "gril_090fce5f",
+     "poloha": [
+      16.0,
+      18.87,
+      0.0
+     ],
+     "otoceni": 0.0,
+     "meritko": 1.0,
+     "poznamka": "gril jen při akci, uprostřed hřiště vedle hasičské Tatry (hráč 29. 10.: „chci mata s grilem do prostřed hřiště vedle tatry“); celá skupina gril, rožeň, sud a Mat posunutá z rohu za přední tribunou beze změny vzájemné polohy"
+    },
+    {
+     "jmeno": "sud_s_pipou_99914b93",
+     "poloha": [
+      17.39,
+      18.924,
+      0.0
+     ],
+     "otoceni": 0.0,
+     "meritko": 1.0,
+     "poznamka": "sud piva s pípou jen při akci, u Mata (hráč 29. 10.: „a sud piva taky“)"
+    }
+   ],
    "holky": [
     {
      "poloha": [

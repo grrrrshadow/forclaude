@@ -2710,10 +2710,10 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 		ThreeDObjectFigure fig;
 		if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
 	}
-	/* Its event ("akce", the player, 18. 10.: on the new stadium every week or two for one day the firemen with their
-	 * Tatra, the pig on the spit, Mat drawing beer and the girls of the pub sitting there): the figures standing about it
-	 * on its days (GetThreeDHouseEvent()), each as one of "postavy"; without "postava" the game's own -- the spit, Mat at
-	 * the tap, the girls sitting by turns (their files of a pose a file till the figures have poses). */
+	/* Its event ("akce", the player, 18. 10.: on the new stadium the firemen with their Tatra, the pig on the spit, Mat
+	 * drawing beer and the girls of the pub sitting there; 29. 10.: two weeks once in two months): the figures standing
+	 * about it on its days (GetThreeDHouseEvent()), each as one of "postavy"; without "postava" the game's own -- the
+	 * spit, Mat at the tap, the girls sitting by turns (their files of a pose a file till the figures have poses). */
 	if (e.contains("akce") && e.at("akce").is_object()) {
 		const auto &event = e.at("akce");
 		auto stand = [&obj](const nlohmann::json &p, std::string_view figure) {
@@ -2759,6 +2759,13 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 		/* The firemen are the Tatras' (their package's figures): only those named. */
 		if (event.contains("hasici") && event.at("hasici").is_array()) {
 			for (const auto &h : event.at("hasici")) stand(h, {});
+		}
+		/* Add-ons of the index standing only on its days, each by its name ("jmeno") where "postavy" stand (the grill and
+		 * the barrel of beer by the fire Tatra). */
+		if (event.contains("doplnky") && event.at("doplnky").is_array()) {
+			for (const auto &a : event.at("doplnky")) {
+				if (a.is_object() && a.contains("jmeno") && a.at("jmeno").is_string()) stand(a, a.at("jmeno").get<std::string>());
+			}
 		}
 	}
 	/* Its add-ons ("doplnky"): an add-on of the index by its name ("jmeno"), where its foot stands (metres in the
@@ -4149,6 +4156,20 @@ static void ReadThreeDVehicleObjects()
 					ReadMotionSet(e, folder, package);
 					continue;
 				}
+				if (figure_kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
+					/* An add-on of the buildings a figure too, a thing as big as the building it stands by: one of a
+					 * building's event stands only on its days ("akce" "doplnky": the new stadium's grill and barrel by
+					 * the fire Tatra, the player 29. 10.: "Mat with the grill in the middle of the pitch by the Tatra",
+					 * "and the barrel of beer too"); one laid into the building ("doplnky") is always there. */
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = true;
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
 				if ((figure_kind == "tvor" || figure_kind == "carodejnice") && e.contains("soubor") && e.contains("animace") && e.at("animace").is_object()) {
 					/* A creature: each of its animations a figure of its own, "<jmeno>/<animace>". A witch so too, the
 					 * glass of her lights and their places read from each frame. */
@@ -4795,12 +4816,22 @@ static void ReadThreeDVehicleObjects()
 				/* The states its GRF picks by its sprites ("stavy"): a colour of the paint, how far it has faded and rusted. */
 				if (e.contains("stavy") && e.at("stavy").is_array()) {
 					for (const auto &st : e.at("stavy")) {
-						if (!st.is_object() || !st.contains("sprity") || !st.at("sprity").is_array() || st.at("sprity").size() != 2) continue;
-						auto first = ParseIndexNumber(st.at("sprity").at(0)), last = ParseIndexNumber(st.at("sprity").at(1));
-						if (!first.has_value() || !last.has_value() || *last < *first) continue;
+						if (!st.is_object()) continue;
 						ThreeDVehicleState state;
-						state.first = *first;
-						state.last = *last;
+						if (st.contains("sprity")) {
+							if (!st.at("sprity").is_array() || st.at("sprity").size() != 2) continue;
+							auto first = ParseIndexNumber(st.at("sprity").at(0)), last = ParseIndexNumber(st.at("sprity").at(1));
+							if (!first.has_value() || !last.has_value() || *last < *first) continue;
+							state.first = *first;
+							state.last = *last;
+						} else {
+							/* A set without the GRF's sprites (the colleague's "kabina 148 hasici": the fire Tatra standing on
+							 * the pitch, the player 29. 10.: "the fire Tatra's cab is missing"): no sprite of the GRF picks
+							 * it, only its name does (StateNamed()). */
+							if (!st.contains("sada") || !st.at("sada").is_string()) continue;
+							state.first = 1;
+							state.last = 0;
+						}
 						if (st.contains("barva") && st.at("barva").is_string()) {
 							std::string t = st.at("barva").get<std::string>();
 							if (t.starts_with("#")) t = t.substr(1);
@@ -7346,20 +7377,29 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, 
 /** The rig: every building's event on today (test3d akce 1). */
 bool _three_d_event_forced = false;
 
+/** A building's event ("akce") lasts this many days ... */
+static constexpr int64_t HOUSE_EVENT_DAYS = 14;
+/** ... once in so many days (the player, 29. 10.: "it will stand there two weeks once in two months"). */
+static constexpr int64_t HOUSE_EVENT_PERIOD = 61;
+
 /**
- * The figures of a building's event standing about it today ("akce", the new stadium's): every 8 to 14 days one day,
- * each building on days of its own -- the days counted in blocks of 11, the event on one of the first 4 days of each
- * block, picked by the building's place and the block. Nothing on the other days.
+ * The figures of a building's event standing about it today ("akce", the new stadium's): two weeks once in two months,
+ * each building on days of its own -- the days counted in blocks of HOUSE_EVENT_PERIOD, the event HOUSE_EVENT_DAYS of
+ * them from a day of the block picked by the building's place and the block. Nothing on the other days. (It was one day
+ * in every 11, two seconds of the game each third of a minute: the player, 29. 10.: "it is there for 5 seconds three
+ * times a minute".)
  */
 std::span<const ThreeDObjectFigure> GetThreeDHouseEvent(const ThreeDObject *obj, TileIndex origin)
 {
 	if (obj == nullptr || obj->event_figures.empty()) return {};
 	if (_three_d_event_forced) return obj->event_figures;
 	const uint32_t seed = origin.base() * 2654435761u;
-	const int64_t day = static_cast<int64_t>(TimerGameCalendar::date.base()) + seed % 11;
-	const uint64_t block = static_cast<uint64_t>(day / 11);
-	const uint32_t pick = static_cast<uint32_t>(((block * 40503u) ^ seed) * 2246822519u) >> 28;
-	if (day % 11 != static_cast<int64_t>(pick % 4)) return {};
+	const int64_t day = static_cast<int64_t>(TimerGameCalendar::date.base()) + seed % HOUSE_EVENT_PERIOD;
+	const uint64_t block = static_cast<uint64_t>(day / HOUSE_EVENT_PERIOD);
+	const uint32_t pick = static_cast<uint32_t>(((block * 40503u) ^ seed) * 2246822519u) >> 16;
+	const int64_t start = pick % (HOUSE_EVENT_PERIOD - HOUSE_EVENT_DAYS + 1);
+	const int64_t in_block = day % HOUSE_EVENT_PERIOD;
+	if (in_block < start || in_block >= start + HOUSE_EVENT_DAYS) return {};
 	return obj->event_figures;
 }
 

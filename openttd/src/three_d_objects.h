@@ -574,7 +574,7 @@ struct ThreeDPlacedLoad {
  */
 struct ThreeDVehicleState {
 	uint32_t first = 0;         ///< "sprity": the first ...
-	uint32_t last = 0;          ///< ... and the last sprite number in the GRF
+	uint32_t last = 0;          ///< ... and the last sprite number in the GRF; last < first: no sprite picks it, a set of a vehicle standing (StateNamed())
 	uint32_t colour = 0;        ///< "barva": the paint's colour (Colour::data), over its mask; 0 the texture's own
 	float fade = 0;             ///< "lak": how far the paint has faded to its target, 0 to 1
 	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1

@@ -31,6 +31,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 29. 10. (52) – Hasičská Tatra na hřišti: kabina, plán akce, gril s Matem doprostřed
+
+- Hráč: *„jak je to s hasicskou tatrou na hřišti. špatně načasovaný, je tam na 5 vteřin třikrát za minutu . bude tam
+  stát  dva týdny jednou za dva měsíce . chybí kabina hasičské tatry, dej třeba 148 červenou kabinu s bilou mřižkou
+  chladiče a je hasičská . mata s pivem a gril jsem na hřišti neviděl“*, pak *„vidim mata a grill, jsou mimo hřiště
+  v levo obrazku“*, *„chci mata s grilem do prostřed hřiště vedle tatry“* a *„a sud piva taky“*.
+- Plán akce: dřív jeden den z každých 11 (asi 2 s hry třikrát za minutu). Teď dva týdny jednou za dva měsíce: bloky
+  po 61 dnech, akce 14 dní od dne vybraného podle místa domu a bloku (`GetThreeDHouseEvent()`,
+  `HOUSE_EVENT_DAYS`, `HOUSE_EVENT_PERIOD`). Každý stadion má své dny.
+- Chybějící kabina: kolega dal do balíčku Tater sady bez spritů GRF právě pro stojící Tatru („kabina 148 hasici“,
+  „mrizka 148 hasici“). Hra ale četla jen stavy se `sprity`, takže z „kabina + mřížka + nástavba“ našla jen
+  nástavbu. Teď čte i stav bez spritů, když má `sada`. Má prázdný rozsah spritů, takže ho GRF nikdy nevybere, najde se
+  jen podle jména (`StateNamed()`).
+- Index stadionu (`objekty/mirne`, `dum_20_stadion`): kabina „kabina 148 hasici“ (červená), mřížka „mrizka 148 nase“
+  (bílá), nástavba „nastavba hasici“.
+- Gril, rožeň, sud s pípou a Mat: dřív v rohu za přední tribunou, gril a sud jako doplňky domu (vidět pořád). Teď
+  jsou celá skupina v akci uprostřed hřiště vedle Tatry, posunutá beze změny vzájemné polohy (rožeň ve vidlicích,
+  Mat u pípy). Gril a sud jsou nový klíč `akce` → `doplnky`. Doplněk indexu je teď i figura (věc velká jako dům),
+  takže se ukáže jen ve dnech akce.
+- Rig (procesor i karta, stadion u města, `test3d akce 1|0`): Tatra má kabinu a zepředu bílou mřížku s nápisem
+  TATRA, gril s rožněm, sud a Mat stojí vedle ní. Bez akce je hřiště prázdné.
+
 ## 29. 10. (51) – Auta z očí barví karta, ne procesor (paměť u silnice)
 
 - Hráč po testu: *„ja byl v lese, opejkal jsem kravičku prasatko ovečku, všechny jsem sněd a pak jsem dal load save
