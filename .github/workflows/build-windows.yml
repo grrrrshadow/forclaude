@@ -149,6 +149,9 @@ jobs:
 
     - name: Build OpenTTD
       shell: bash
+      env:
+        # Where the game sends its crash reports (crash_report_send.cpp): the repository's secret, never in the source.
+        CRASH_WEBHOOK: ${{ secrets.CRASH_WEBHOOK }}
       run: |
         mkdir build
         cd build
@@ -159,7 +162,8 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=${{ inputs.arch || 'x64' }}-windows-static \
           -DCMAKE_TOOLCHAIN_FILE="${{ steps.vcpkg.outputs.vcpkg-cmake }}" \
           -DHOST_BINARY_DIR=${GITHUB_WORKSPACE}/build-host \
-          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DDECOUPLE_CRASH_WEBHOOK="${CRASH_WEBHOOK}"
         echo "::endgroup::"
 
         echo "::group::Build"

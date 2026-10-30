@@ -57,11 +57,13 @@ public:
 	 * @param uri      the URI to connect to (https://.../..).
 	 * @param callback the callback to send data back on.
 	 * @param data     the data we want to send. When non-empty, this will be a POST request, otherwise a GET request.
+	 * @param content_type the type of the data; empty: JSON when it starts with a '{', else a form.
 	 */
-	NetworkHTTPRequest(std::string_view uri, HTTPCallback *callback, std::string &&data) :
+	NetworkHTTPRequest(std::string_view uri, HTTPCallback *callback, std::string &&data, std::string_view content_type) :
 		uri(uri),
 		callback(callback),
-		data(std::move(data))
+		data(std::move(data)),
+		content_type(content_type)
 	{
 		std::lock_guard<std::mutex> lock(_new_http_callback_mutex);
 		_new_http_callbacks.push_back(&this->callback);
@@ -77,6 +79,7 @@ public:
 	const std::string uri; ///< URI to connect to.
 	HTTPThreadSafeCallback callback; ///< Callback to send data back on.
 	const std::string data; ///< Data to send, if any.
+	const std::string content_type; ///< Its type, empty: by the data.
 };
 
 static std::thread _http_thread; ///< The thread running the HTTP requests.
@@ -90,7 +93,7 @@ static std::string _http_ca_path = ""; ///< Folder with certificate authority da
 #endif /* UNIX */
 
 
-/* static */ void NetworkHTTPSocketHandler::Connect(std::string_view uri, HTTPCallback *callback, std::string &&data)
+/* static */ void NetworkHTTPSocketHandler::Connect(std::string_view uri, HTTPCallback *callback, std::string &&data, std::string_view content_type)
 {
 #if defined(UNIX)
 	if (_http_ca_file.empty() && _http_ca_path.empty()) {
@@ -100,7 +103,7 @@ static std::string _http_ca_path = ""; ///< Folder with certificate authority da
 #endif /* UNIX */
 
 	std::lock_guard<std::mutex> lock(_http_mutex);
-	_http_requests.push(std::make_unique<NetworkHTTPRequest>(uri, callback, std::move(data)));
+	_http_requests.push(std::make_unique<NetworkHTTPRequest>(uri, callback, std::move(data), content_type));
 	_http_cv.notify_one();
 }
 
@@ -191,13 +194,17 @@ void HttpThread()
 		/* Prepare POST body and URI. */
 		if (!request->data.empty()) {
 			/* When the payload starts with a '{', it is a JSON payload. */
-			if (request->data.starts_with("{")) {
+			if (!request->content_type.empty()) {
+				headers = curl_slist_append(headers, ("Content-Type: " + request->content_type).c_str());
+			} else if (request->data.starts_with("{")) {
 				headers = curl_slist_append(headers, "Content-Type: application/json");
 			} else {
 				headers = curl_slist_append(headers, "Content-Type: application/x-www-form-urlencoded");
 			}
 
 			CurlSetOption(curl, CURLOPT_POST, 1L);
+			/* Its length given: a file in it may hold a zero byte. */
+			CurlSetOption(curl, CURLOPT_POSTFIELDSIZE_LARGE, static_cast<curl_off_t>(request->data.size()));
 			CurlSetOption(curl, CURLOPT_POSTFIELDS, request->data.c_str());
 			CurlSetOption(curl, CURLOPT_HTTPHEADER, headers);
 		}

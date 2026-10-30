@@ -1104,6 +1104,7 @@ STR_NEWS_AIRCRAFT_DEST_TOO_FAR                                  :{WHITE}{VEHICLE
 
 STR_NEWS_ORDER_REFIT_FAILED                                     :{WHITE}{VEHICLE} stojí kvůli selhání příkazu na změnu nákladu
 STR_NEWS_TRAIN_DEPOT_FULL_NO_BUY                                :{WHITE}{VEHICLE} nekoupí vagony, depo je plné ({NUM} vagonů)
+STR_CRASH_REPORT_SENT                                           :{WHITE}Zpráva o pádu minulé hry byla odeslána vývojářům
 STR_NEWS_TRAIN_DEPOT_FULL_NO_DECOUPLE                           :{WHITE}{VEHICLE} neodpojí, depo je plné ({NUM} vagonů)
 STR_NEWS_TRAIN_BUY_NEVER_FULL                                   :{WHITE}{VEHICLE} nekoupí vagony: rozkaz bere jen plné a koupený vagon je prázdný
 STR_NEWS_VEHICLE_AUTORENEW_FAILED                               :{WHITE}Obnovení selhalo pro {VEHICLE}{}{STRING}
@@ -1221,6 +1222,7 @@ STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_TOOLTIP                      :Volba intervalu
 # Autosave dropdown
 ###length 5
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_OFF                          :Vypnuto
+STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_3_MINUTES              :Každé 3 minuty
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_10_MINUTES             :Každých 10 minut
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_30_MINUTES             :Každých 30 minut
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_60_MINUTES             :Každých 60 minut

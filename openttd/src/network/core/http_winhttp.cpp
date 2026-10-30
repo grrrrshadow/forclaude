@@ -29,6 +29,7 @@ private:
 	const std::wstring uri; ///< URI to connect to.
 	HTTPThreadSafeCallback callback; ///< Callback to send data back on.
 	const std::string data; ///< Data to send, if any.
+	const std::string content_type; ///< Its type, empty: by the data.
 
 	HINTERNET connection = nullptr;      ///< Current connection object.
 	HINTERNET request = nullptr;         ///< Current request object.
@@ -36,7 +37,7 @@ private:
 	int depth = 0;                       ///< Current redirect depth we are in.
 
 public:
-	NetworkHTTPRequest(std::wstring &&uri, HTTPCallback *callback, std::string &&data);
+	NetworkHTTPRequest(std::wstring &&uri, HTTPCallback *callback, std::string &&data, std::string_view content_type);
 
 	~NetworkHTTPRequest();
 
@@ -60,11 +61,13 @@ static std::mutex _new_http_callback_mutex; ///< Mutex to prevent concurrent acc
  * @param uri      the URI to connect to (https://.../..).
  * @param callback the callback to send data back on.
  * @param data     the data we want to send. When non-empty, this will be a POST request, otherwise a GET request.
+ * @param content_type the type of the data; empty: JSON when it starts with a '{', else a form.
  */
-NetworkHTTPRequest::NetworkHTTPRequest(std::wstring &&uri, HTTPCallback *callback, std::string &&data) :
+NetworkHTTPRequest::NetworkHTTPRequest(std::wstring &&uri, HTTPCallback *callback, std::string &&data, std::string_view content_type) :
 	uri(std::move(uri)),
 	callback(callback),
-	data(std::move(data))
+	data(std::move(data)),
+	content_type(content_type)
 {
 	std::lock_guard<std::mutex> lock(_new_http_callback_mutex);
 	_new_http_callbacks.push_back(&this->callback);
@@ -268,8 +271,9 @@ void NetworkHTTPRequest::Connect()
 		WinHttpSendRequest(this->request, WINHTTP_NO_ADDITIONAL_HEADERS, 0, WINHTTP_NO_REQUEST_DATA, 0, 0, reinterpret_cast<DWORD_PTR>(this));
 	} else {
 		/* When the payload starts with a '{', it is a JSON payload. */
-		LPCWSTR content_type = data.starts_with("{") ? L"Content-Type: application/json\r\n" : L"Content-Type: application/x-www-form-urlencoded\r\n";
-		WinHttpSendRequest(this->request, content_type, -1, const_cast<char *>(data.data()), static_cast<DWORD>(data.size()), static_cast<DWORD>(data.size()), reinterpret_cast<DWORD_PTR>(this));
+		std::wstring content_type = !this->content_type.empty() ? L"Content-Type: " + std::wstring(this->content_type.begin(), this->content_type.end()) + L"\r\n" :
+				data.starts_with("{") ? L"Content-Type: application/json\r\n" : L"Content-Type: application/x-www-form-urlencoded\r\n";
+		WinHttpSendRequest(this->request, content_type.c_str(), -1, const_cast<char *>(data.data()), static_cast<DWORD>(data.size()), static_cast<DWORD>(data.size()), reinterpret_cast<DWORD_PTR>(this));
 	}
 }
 
@@ -306,9 +310,9 @@ NetworkHTTPRequest::~NetworkHTTPRequest()
 	_http_callbacks.erase(std::remove(_http_callbacks.begin(), _http_callbacks.end(), &this->callback), _http_callbacks.end());
 }
 
-/* static */ void NetworkHTTPSocketHandler::Connect(std::string_view uri, HTTPCallback *callback, std::string &&data)
+/* static */ void NetworkHTTPSocketHandler::Connect(std::string_view uri, HTTPCallback *callback, std::string &&data, std::string_view content_type)
 {
-	auto request = new NetworkHTTPRequest(std::wstring(uri.begin(), uri.end()), callback, std::move(data));
+	auto request = new NetworkHTTPRequest(std::wstring(uri.begin(), uri.end()), callback, std::move(data), content_type);
 	request->Connect();
 
 	std::lock_guard<std::mutex> lock(_new_http_requests_mutex);

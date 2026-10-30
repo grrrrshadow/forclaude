@@ -186,6 +186,7 @@ enum IniFileVersion : uint32_t {
 	IFV_ZOOM_IN_8X,                                        ///< 9  This build: the zoom levels gained In8x in front of 4x, so zoom_min, zoom_max and sprite_zoom_min each name one level more.
 	IFV_ZOOM_IN_16X,                                       ///< 10 This build: the zoom levels gained In16x in front of 8x, one level more again; the sprite memory moved from misc sprite_cache_size_px (megapixels) to gui.sprite_cache_size_mb.
 	IFV_SPRITE_MEMORY_8X,                                  ///< 11 This build: the default sprite memory went from 512 MB (upstream's, for 4x) to SPRITE_CACHE_DEFAULT_MB for the default zoom, 8x.
+	IFV_AUTOSAVE_3_MINUTES,                                ///< 12 This build: the autosave every 3 minutes by default instead of 10, a crash report going with a save of a few minutes before it.
 
 	IFV_MAX_VERSION,       ///< Highest possible ini-file version.
 };
@@ -1734,6 +1735,13 @@ void LoadFromConfig(bool startup)
 				case 4: _settings_client.gui.autosave_interval = 120; break;
 				default: break;
 			}
+		}
+
+		/* Then this build's autosave went from every 10 minutes to every 3 (the player, 30. 10.: a crash report
+		 * goes with a save of a few minutes before it). A config holding exactly the old default is given the new
+		 * one; any other value is the player's own and stays. */
+		if (generic_version < IFV_AUTOSAVE_3_MINUTES && _settings_client.gui.autosave_interval == 10) {
+			_settings_client.gui.autosave_interval = 3;
 		}
 
 		/* Persist the right click close option from older versions. */

@@ -70,6 +70,7 @@
 
 static const StringID _autosave_dropdown[] = {
 	STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_OFF,
+	STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_3_MINUTES,
 	STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_10_MINUTES,
 	STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_30_MINUTES,
 	STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_60_MINUTES,
@@ -80,6 +81,7 @@ static const StringID _autosave_dropdown[] = {
 /** Available settings for autosave intervals. */
 static const uint32_t _autosave_dropdown_to_minutes[] = {
 	0, ///< never
+	3, ///< this build's default: a crash report goes with a save of a few minutes before (crash_report_send.cpp)
 	10,
 	30,
 	60,

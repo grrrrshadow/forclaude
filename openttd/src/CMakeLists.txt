@@ -143,6 +143,8 @@ add_files(
     console_type.h
     cpu.cpp
     cpu.h
+    crash_report_send.cpp
+    crash_report_send.h
     crashlog.cpp
     crashlog.h
     currency.cpp

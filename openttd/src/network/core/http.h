@@ -52,8 +52,9 @@ public:
 	 * @param uri      the URI to connect to (https://.../..).
 	 * @param callback the callback to send data back on.
 	 * @param data     the data we want to send. When non-empty, this will be a POST request, otherwise a GET request.
+	 * @param content_type the type of the data ("multipart/form-data; boundary=..."); empty: JSON when it starts with a '{', else a form.
 	 */
-	static void Connect(std::string_view uri, HTTPCallback *callback, std::string &&data = "");
+	static void Connect(std::string_view uri, HTTPCallback *callback, std::string &&data = "", std::string_view content_type = {});
 
 	/**
 	 * Do the receiving for all HTTP connections.

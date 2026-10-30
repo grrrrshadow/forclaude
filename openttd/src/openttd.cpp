@@ -76,6 +76,7 @@
 #include "industry.h"
 #include "network/network_gui.h"
 #include "network/network_survey.h"
+#include "crash_report_send.h"
 #include "misc_cmd.h"
 #include "timer/timer.h"
 #include "timer/timer_game_calendar.h"
@@ -738,6 +739,9 @@ int openttd_main(std::span<std::string_view> arguments)
 	 * window is opened or a setting can be reached. */
 	if (ConfigNamesShunnedPlayer()) return 0;
 
+	/* A crash report of the last game, with its diaries before this game writes its own (crash_report_send.cpp). */
+	CollectCrashReport();
+
 	if (resolution.width != 0) _cur_resolution = resolution;
 
 	/* Limit width times height times bytes per pixel to fit a 32 bit
@@ -826,6 +830,7 @@ int openttd_main(std::span<std::string_view> arguments)
 
 	SocialIntegration::Initialize();
 	NetworkStartUp(); // initialize network-core
+	SendCrashReport();
 
 	if (!HandleBootstrap()) {
 		ShutdownGame();

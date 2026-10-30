@@ -31,6 +31,40 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 30. 10. (53) – Zprávy o pádu na Discord při startu hry, autosave každé 3 minuty
+
+- Hráč: *„ať nam pošlou crashreporty z adresaře save při startu hry. je crashreport je problem tak bez ptani
+  zveřejnit nam to poslat že jo“*, *„kam to budou posilat? na mail?“*. Pak dal adresu webhooku na Discord a
+  *„všechno je v save. potřebujem maximum dat když už se logy v save tvoří tak je chcem . dmp neni v save a většinou
+  je prazdny. nastav implicidně autosave každe 3 minuty a chcem i save .“*, *„grrrrf je private“*,
+  *„se přepisujou v saves novymi logy“*, *„mouse a crash se nepřepisujou“*, *„0bytu protože jsou nove logy prazdne ,
+  při startu hry se pišou znova, přepisuji stare“*.
+- Mail přímo ne: hra by nesla heslo ke schránce. Discord webhook nepotřebuje server a soubory bere.
+- Adresa webhooku není ve zdrojáku. Repo forclaude je veřejné a kdo adresu má, může do kanálu psát nebo webhook
+  smazat. Build na GitHubu ji bere z tajné proměnné repa `CRASH_WEBHOOK` (Settings → Secrets and variables →
+  Actions) a předá ji hře přes CMake (`DECOUPLE_CRASH_WEBHOOK`). Bez ní hra nic neposílá. Rig ji bere z proměnné
+  prostředí stejného jména.
+- Hotovo (`crash_report_send.cpp`):
+  - při startu, ještě než hra otevře své deníky (přepíše je), najde ve složce save neodeslanou zprávu o pádu
+    (`crash<čas>.json.log`);
+  - deníky padlé hry (`*.log`, `log.txt`), nejnovější `mouse*.log` a nejnovější autosave hned zkopíruje k pádu jako
+    `crash<čas>-<jméno>`, takže je nic nepřepíše, i když se poslat nepovede. Jen k nejnovějšímu pádu, a jen když
+    po něm žádný novější pád už odeslaný není (pak deníky patří jiné hře);
+  - pošle nejnovější pád (zprávu, jeho `.sav` a `.png`, bez `.dmp`) s těmi kopiemi, pak starší pády;
+  - nejvýš 10 souborů a 8 MB na zprávu a 5 zpráv najednou, zbytek při dalším startu (první zpráva řekne kolik);
+    soubory se čtou až při posílání;
+  - prázdné soubory (0 B) se nepřikládají, Discord je nebere; jen se označí. Větší než 8 MB taky, první zpráva je
+    jmenuje; deník tak velký pošle svůj konec;
+  - jméno účtu Windows v cestách deníků je nahrazené `<uzivatel>`;
+  - každá zpráva po doručení označí svoje soubory: pád `crash<čas>-odeslano.*`, kopie smaže. Nedoručená zpráva
+    (bez sítě) jde při příštím startu, doručené se neopakují. Hráč uvidí „Zpráva o pádu minulé hry byla odeslána
+    vývojářům“;
+  - HTTP umí typ obsahu (multipart) a curl posílá i binární data (délka těla, ne do první nuly).
+- Ověřeno v rigu s místním serverem místo Discordu (zkušební binárka s curl): bez sítě nic neoznačeno a kopie
+  zůstaly; se sítí 5 zpráv, 99 souborů označeno, kopie pryč; další start poslal zbytek bez přilepení deníků.
+- Autosave: výchozí každé 3 minuty, v nastavení nová volba „Každé 3 minuty“. Konfigurace se starým výchozím
+  10 minut dostane 3 (`IFV_AUTOSAVE_3_MINUTES`), jiná hodnota zůstane hráčova.
+
 ## 29. 10. (52) – Hasičská Tatra na hřišti: kabina, plán akce, gril s Matem doprostřed
 
 - Hráč: *„jak je to s hasicskou tatrou na hřišti. špatně načasovaný, je tam na 5 vteřin třikrát za minutu . bude tam

@@ -996,6 +996,7 @@ STR_NEWS_AIRCRAFT_DEST_TOO_FAR                                  :{WHITE}{VEHICLE
 
 STR_NEWS_ORDER_REFIT_FAILED                                     :{WHITE}{VEHICLE} stopped because an ordered refit failed
 STR_NEWS_TRAIN_DEPOT_FULL_NO_BUY                                :{WHITE}{VEHICLE} won't buy wagons, the depot is full ({NUM} wagons)
+STR_CRASH_REPORT_SENT                                           :{WHITE}The crash report of the last game was sent to the developers
 STR_NEWS_TRAIN_DEPOT_FULL_NO_DECOUPLE                           :{WHITE}{VEHICLE} won't decouple, the depot is full ({NUM} wagons)
 STR_NEWS_TRAIN_BUY_NEVER_FULL                                   :{WHITE}{VEHICLE} won't buy wagons: the order takes only full ones and a bought wagon is empty
 STR_NEWS_VEHICLE_AUTORENEW_FAILED                               :{WHITE}Autorenew failed on {VEHICLE}{}{STRING1}
@@ -1113,6 +1114,7 @@ STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_TOOLTIP                      :Select interval
 # Autosave dropdown
 ###length 5
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_OFF                          :Off
+STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_3_MINUTES              :Every 3 minutes
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_10_MINUTES             :Every 10 minutes
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_30_MINUTES             :Every 30 minutes
 STR_GAME_OPTIONS_AUTOSAVE_DROPDOWN_EVERY_60_MINUTES             :Every 60 minutes

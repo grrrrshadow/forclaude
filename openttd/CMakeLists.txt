@@ -240,6 +240,15 @@ include_directories(${CMAKE_SOURCE_DIR}/src/3rdparty/squirrel/include)
 include(MSVCFilters)
 
 add_library(openttd_lib OBJECT ${GENERATED_SOURCE_FILES})
+
+# Where the game sends its crash reports when it starts again (crash_report_send.cpp): a Discord webhook given by the
+# build (the repository's secret CRASH_WEBHOOK), not written in the source -- anyone who has it can write to the
+# channel or delete the webhook. Empty: nowhere.
+set(DECOUPLE_CRASH_WEBHOOK "" CACHE STRING "Where the game sends its crash reports (a Discord webhook); empty: nowhere")
+if(DECOUPLE_CRASH_WEBHOOK)
+    target_compile_definitions(openttd_lib PRIVATE "DECOUPLE_CRASH_WEBHOOK=\"${DECOUPLE_CRASH_WEBHOOK}\"")
+endif()
+
 add_executable(openttd WIN32)
 add_executable(openttd_test)
 set_target_properties(openttd PROPERTIES OUTPUT_NAME "${BINARY_NAME}")
