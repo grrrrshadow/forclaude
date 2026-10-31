@@ -322,5 +322,49 @@
   "kde": "okoli",
   "leta": true,
   "vznaseni_m": 1.54
+ },
+ {
+  "soubor": "goblin_saman.glb",
+  "jmeno": "goblin_saman",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "goblin šaman",
+   "en": "goblin shaman"
+  },
+  "kdy": "noc",
+  "kde": "okoli",
+  "povaha": "utoci",
+  "poznamka": "strašidlo z par17 (28. 10.); skutečné metry (1,4 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí, ruce rozpažené jako při čarování); glb z gltfpacku; na kostře se mu trhala ramena pod tlustým límcem (síť dělaná AI)",
+  "meritko": 2,
+  "rozmer_m": [
+   0.66,
+   1.35,
+   1.4
+  ],
+  "trojuhelniku": 19447,
+  "autor": "Goblin Shaman, baurawson (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/goblin-shaman-3baa4773a0c14d5da9c5454386a5723c), převod tvorove/par17_postavy.py bez renderu",
+  "licence": "CC BY 4.0 (uvést baurawson; změny: otočený, zmenšený na skutečnou velikost)"
+ },
+ {
+  "soubor": "strasidlo_les.glb",
+  "jmeno": "strasidlo_les",
+  "druh": "strasidlo",
+  "nazev": {
+   "cs": "lesní strašidlo s parohy",
+   "en": "antlered forest spirit"
+  },
+  "kdy": "noc",
+  "kde": "les",
+  "povaha": "utoci",
+  "poznamka": "strašidlo do lesa (hráč: „strasidlo_do_lesa“) z par17 (28. 10.); skutečné metry (2,4 m i s parohy), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (žena v masce z jelení lebky s parohy, v ruce hůl s panenkou); glb z gltfpacku",
+  "meritko": 2,
+  "rozmer_m": [
+   1.16,
+   1.03,
+   2.4
+  ],
+  "trojuhelniku": 25290,
+  "autor": "Helmet Character, Mariavel (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/helmet-character-874f8a62f0c34c91b68088095503d1b3), převod tvorove/par17_postavy.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Mariavel; změny: otočený, zmenšený na skutečnou velikost)"
  }
 ]

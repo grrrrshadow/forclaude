@@ -6084,7 +6084,22 @@
      "poznamka": "holka z hospody sedí u stolku se slunečníkem"
     }
    ],
-   "poznamka": "hráč: hasiči s hasičskou Tatrou, prase na rožni, Mat točí pivo a holky z hospody si tam sednou (hra/3d/POSTAVY-MODULARNI-A-STADION.md); hasiči ne (hráč: „ne žádný hasič“)"
+   "poznamka": "hráč: hasiči s hasičskou Tatrou, prase na rožni, Mat točí pivo a holky z hospody si tam sednou (hra/3d/POSTAVY-MODULARNI-A-STADION.md); hasiči ne (hráč: „ne žádný hasič“)",
+   "kun": {
+    "zaznam": "special_kun_sedlo",
+    "objekt": "kun_sedlo",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     18.0,
+     18.87,
+     0.0
+    ],
+    "otoceni": 90,
+    "poznamka": "kůň se sedlem stojí na hřišti vedle hasičské Tatry (u města) (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_sedlo balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
   },
   "noc": {
    "uzel": "noc",

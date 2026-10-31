@@ -740,6 +740,8 @@ struct ThreeDVehicleObject {
 	std::string skeleton_anim;      ///< the animation of it this figure is
 	std::string motion_file;        ///< a humanoid's motion (hra/3d/KOSTRA-POSTAV-PRO-HRU.md): the file its animation is of, put on the bones of skeleton_file by their names; empty, skeleton_file's own
 	float motion_scale = 1.0f;      ///< and how far the hips move: its hips' height over the motions' ("vyska_kycli")
+	std::string bone_kind;          ///< the kind of its bones ("kostra" a name, the four-legged "ctyrnozec"): a motion its own file lacks is the kind's (MakePosedShape())
+	float hips = 1.0f;              ///< its hips' height ("vyska_kycli"), for the motions of its kind
 	std::string held_file;          ///< a thing held by a bone in the motion ("predmet": the joint in the hand of one smoking), empty none
 	std::string held_bone;          ///< the bone holding it ("kost")
 	float held_at[3] = {};          ///< where, metres in the bone's frame, glTF's axes ("poloha")
@@ -951,6 +953,7 @@ struct ThreeDAnimal {
 	static constexpr uint8_t ROUND = 4;  ///< "okoli": in the land about the towns
 	static constexpr uint8_t ROOF = 8;   ///< "strecha": on the flat roofs ("strechy")
 	static constexpr uint8_t RAIL = 16;  ///< "koleje": along the railway lines (where the game puts any ghost too)
+	static constexpr uint8_t FOREST = 32; ///< "les": at the places of the forests with a clearing, with the kinds they name
 	/* The towns it is found at ("klima", one or a list): bits, 0 any. */
 	static constexpr uint8_t TEMPERATE = 1; ///< "mirne"
 	static constexpr uint8_t DESERT = 2;    ///< "poust": the desert towns

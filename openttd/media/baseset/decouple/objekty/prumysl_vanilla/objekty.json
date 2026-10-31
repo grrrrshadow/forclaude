@@ -1622,7 +1622,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "stodola"
+  "poznamka": "stodola",
+  "vozidla": [
+   {
+    "zaznam": "special_kun_tazny",
+    "objekt": "kun_tazny",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     7.4,
+     1.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "poznamka": "tažný kůň stojí u jižní zdi stodoly (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_tazny balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_034",
@@ -1672,7 +1689,24 @@
     "meritko": 1.0
    }
   ],
-  "poznamka": "obytný dům statku"
+  "poznamka": "obytný dům statku",
+  "vozidla": [
+   {
+    "zaznam": "special_kun_belous",
+    "objekt": "kun_belous",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     7.4,
+     1.6,
+     0.0
+    ],
+    "otoceni": 0,
+    "poznamka": "bělouš stojí u jižní zdi statku (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_belous balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_036",

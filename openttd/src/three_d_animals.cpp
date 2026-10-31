@@ -1131,13 +1131,13 @@ bool PickGameForestPlace(TileIndex middle, bool ghosts, double &x, double &y, do
 	return true;
 }
 
-/** One of the animals of the indices named, of the kinds, out now; nullptr none. */
-const ThreeDAnimal *PickNamed(std::span<const std::string> names, bool night, std::initializer_list<ThreeDAnimal::Kind> kinds)
+/** One of the animals of the indices named, or found at the places (ThreeDAnimal::places, "les"), of the kinds, out now; nullptr none. */
+const ThreeDAnimal *PickNamed(std::span<const std::string> names, bool night, std::initializer_list<ThreeDAnimal::Kind> kinds, uint8_t places = 0)
 {
 	std::vector<const ThreeDAnimal *> fit;
 	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
 		if (a.sold || !a.OutNow(night) || std::ranges::find(kinds, a.kind) == kinds.end()) continue;
-		if (std::ranges::find(names, a.name) != names.end()) fit.push_back(&a);
+		if (std::ranges::find(names, a.name) != names.end() || (a.places & places) != 0) fit.push_back(&a);
 	}
 	if (fit.empty()) return nullptr;
 	return fit[InteractiveRandomRange(static_cast<uint32_t>(fit.size()))];
@@ -1306,7 +1306,7 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			double heading = 0;
 			std::span<const std::string> kinds;
 			if (PickGameForestPlace(middle, false, x, y, heading, kinds)) {
-				const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Animal, ThreeDAnimal::Kind::Dog});
+				const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Animal, ThreeDAnimal::Kind::Dog}, ThreeDAnimal::FOREST);
 				if (a == nullptr || Taken(x, y, 8)) return false;
 				Put(*a, place, x, y, 0, heading, now);
 				return true;
@@ -1322,7 +1322,7 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			double heading = 0;
 			std::span<const std::string> kinds;
 			if (!night || !PickGameForestPlace(middle, true, x, y, heading, kinds) || Taken(x, y, 8)) return false;
-			const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Ghost});
+			const ThreeDAnimal *a = PickNamed(kinds, night, {ThreeDAnimal::Kind::Ghost}, ThreeDAnimal::FOREST);
 			if (a == nullptr) return false;
 			Put(*a, place, x, y, 0, heading, now);
 			return true;

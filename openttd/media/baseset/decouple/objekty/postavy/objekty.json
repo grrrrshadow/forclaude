@@ -306,5 +306,51 @@
   "autor": "College Girl, Rotmill (Sketchfab, CC BY 4.0); póza postavy/postavy.py za_volantem (kostra modelu, IK rukou a nohou), převod bez renderu",
   "licence": "CC BY 4.0 (uvést Rotmill)",
   "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole): poloha z = výška sedáku, čelem k +x, metry; chodidla 0,26 m pod sedákem a 0,6 až 0,7 m před ním; 11778 trojúhelníků, tři textury 1024 px, s normálami; nikdy nebledne. Řidička GAZ-21 kabrioletu Tatra_osobni_3D (hra 23. 10.: college girl místo to_gaz21_ridicka); college_girl_ridicka zůstává opřená o pult v lokomotivě"
+ },
+ {
+  "soubor": "sestricka_kouri.glb",
+  "jmeno": "sestricka_kouri",
+  "druh": "postava",
+  "nazev": {
+   "cs": "sestřička na cigaretě",
+   "en": "nurse on a smoke break"
+  },
+  "kde": "kostel",
+  "role": "sestricka",
+  "poznamka": "sestřička před kostelem (hráč: „sestřičky budou před kostelem prodavat měsični předplatne zdravotni pojištěni“) z par17 (28. 10.); skutečné metry (1,7 m), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí se zkříženýma nohama a kouří); glb z gltfpacku; zjednodušená gltfpackem; chodí sestricka ze sady humanoidi",
+  "meritko": 2,
+  "rozmer_m": [
+   0.4,
+   0.46,
+   1.7
+  ],
+  "trojuhelniku": 28486,
+  "autor": "Cigarette Break in a Light-Blue Uniform, restore50 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/cigarette-break-in-a-light-blue-uniform-9353381bd1c94d46b3db314cea7b405f), převod tvorove/par17_postavy.py bez renderu",
+  "licence": "CC BY 4.0 (uvést restore50; změny: zjednodušený z 237396 na 28486 trojúhelníků, otočený, zmenšený na skutečnou velikost)",
+  "vyska_m": 1.7,
+  "poza": "stojí se zkříženýma nohama a kouří"
+ },
+ {
+  "soubor": "sestricka_cervena.glb",
+  "jmeno": "sestricka_cervena",
+  "druh": "postava",
+  "nazev": {
+   "cs": "sestřička s červeným křížem",
+   "en": "crimson cross nurse"
+  },
+  "kde": "kostel",
+  "role": "sestricka",
+  "poznamka": "sestřička před kostelem z par17 (28. 10.); skutečné metry (1,75 m i s čepicí), meritko 2, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí, ruce u boků); glb z gltfpacku; zjednodušená gltfpackem; na kostře se síť (476 kusů, dělaná AI) trhala; chodí sestricka ze sady humanoidi",
+  "meritko": 2,
+  "rozmer_m": [
+   0.34,
+   0.43,
+   1.75
+  ],
+  "trojuhelniku": 24322,
+  "autor": "Crimson Cross Nurse, Zizian1987 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/crimson-cross-nurse-cb4712cb69c444a58999d4a12605cb21), převod tvorove/par17_postavy.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Zizian1987; změny: zjednodušený z 173742 na 24322 trojúhelníků, otočený, zmenšený na skutečnou velikost)",
+  "vyska_m": 1.75,
+  "poza": "stojí, ruce u boků"
  }
 ]

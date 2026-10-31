@@ -4361,6 +4361,7 @@ static void ReadThreeDVehicleObjects()
 							if (where == "okoli") a.places |= ThreeDAnimal::ROUND;
 							if (where == "strecha") a.places |= ThreeDAnimal::ROOF;
 							if (where == "koleje") a.places |= ThreeDAnimal::RAIL;
+							if (where == "les") a.places |= ThreeDAnimal::FOREST;
 						};
 						if (e.contains("kde") && e.at("kde").is_string()) place(e.at("kde").get<std::string>());
 						if (e.contains("kde") && e.at("kde").is_array()) {
@@ -4452,7 +4453,13 @@ static void ReadThreeDVehicleObjects()
 						continue;
 					}
 					if ((figure_kind == "postava" || animal) && e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
-						const std::string bones = folder + e.value("kostra", e.at("soubor").get<std::string>());
+						/* "kostra" a file of its bones, or the kind of them (the colleague's four-legged "ctyrnozec", the
+						 * player 31. 10.: "a shared skeleton for the animals with four legs, like the horse", as the
+						 * humanoids' "humanoid"): then its bones are its own file's. */
+						const std::string skeleton = e.contains("kostra") && e.at("kostra").is_string() ? e.at("kostra").get<std::string>() : std::string();
+						const bool kind_named = !skeleton.empty() && !skeleton.ends_with(".glb");
+						const std::string bones = folder + (skeleton.empty() || kind_named ? e.at("soubor").get<std::string>() : skeleton);
+						const float hips = std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f);
 						const auto &poses = e.at("pozy");
 						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
 							ThreeDVehicleObject one = fig;
@@ -4463,6 +4470,8 @@ static void ReadThreeDVehicleObjects()
 							one.frame_ticks = p.is_object() ? std::clamp(p.value("tiku", 1), 1, 1000) : 1;
 							one.loop = p.is_object() ? p.value("smycka", true) : true;
 							one.walk_step = p.is_object() ? std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f) : 0.0f;
+							if (kind_named) one.bone_kind = skeleton;
+							one.hips = hips;
 							/* (A figure of frames walks by them: the frames of the pose, though of bones, not of nodes.) */
 							if (one.frames >= 2) one.frame_prefix = pose + "_";
 							_figure_objects.push_back(std::move(one));
@@ -5134,6 +5143,25 @@ static void ReadThreeDVehicleObjects()
 			piece.size[1] = given ? a.load_size[1] : a.size[1] + LOAD_ANIMAL_ROOM_M;
 			piece.size[2] = given ? a.load_size[2] : a.size[2];
 		}
+		/* An animal posed by its bones: the node the piece names ("pase_00") is its mesh at rest, not a frame of a pose
+		 * (the colleague's cow on the bones of the four-legged, hra/3d/ZVER-NA-KOSTRE-PRO-HRU.md: "without animation it
+		 * stands with its head up, as the frame pase_00 did") -- a figure of that node alone. */
+		auto posed = std::ranges::find(_figure_objects, piece.figure, &ThreeDVehicleObject::name);
+		if (posed == _figure_objects.end() || posed->skeleton_file.empty()) continue;
+		const std::string node = fmt::format("{}_{:02}", piece.figure.substr(piece.animal.size() + 1), piece.frame);
+		ThreeDVehicleObject still = *posed;
+		still.name = piece.animal + "/" + node;
+		still.skeleton_file.clear();
+		still.skeleton_anim.clear();
+		still.bone_kind.clear();
+		still.frame_prefix.clear();
+		still.frames = 0;
+		still.frame_ticks = 1;
+		still.walk_step = 0;
+		still.only_node = node;
+		piece.figure = still.name;
+		piece.frame = 0;
+		if (std::ranges::find(_figure_objects, still.name, &ThreeDVehicleObject::name) == _figure_objects.end()) _figure_objects.push_back(std::move(still));
 	}
 	/* The colours the vehicles' states give their pieces ("naklad" "barva"): each a state of the piece's figure. */
 	auto own_colour = [](std::string_view name, uint32_t colour) {
@@ -6168,6 +6196,19 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 	/* The animations: its own, or a humanoid's motions, put on its bones by their names. */
 	const GlbSkeleton *moves = this->motion_file.empty() ? sk : ReadGlbSkeleton(this->motion_file, false);
 	if (moves == nullptr) return nullptr;
+	float scale = this->motion_scale;
+	if (this->motion_file.empty() && !this->bone_kind.empty() && sk->Find(this->skeleton_anim) == nullptr) {
+		/* A motion its own file lacks: the kind's of its bones, put on them by their names (the four-legged ones'
+		 * "ctyrnozec_pohyby", as the humanoids'). */
+		for (const ThreeDMotionSet &set : _motion_sets) {
+			if (set.kind != this->bone_kind) continue;
+			const GlbSkeleton *kind = ReadGlbSkeleton(set.file, false);
+			if (kind == nullptr || kind->Find(this->skeleton_anim) == nullptr) continue;
+			moves = kind;
+			scale = this->hips / set.hips;
+			break;
+		}
+	}
 	/* The time of a frame of a figure, seconds. */
 	auto time_of = [](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
 		if (a == nullptr) return 0.0;
@@ -6177,7 +6218,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 	};
 	auto pose_of = [&](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
 		std::vector<BonePose> p = moves->Pose(a, time_of(f, a, fr));
-		return moves == sk ? p : sk->Retarget(*moves, p, a, this->motion_scale);
+		return moves == sk ? p : sk->Retarget(*moves, p, a, scale);
 	};
 	std::vector<BonePose> pose;
 	if (this->blend_from != nullptr && this->blend_to != nullptr && this->blend_ticks > 0) {

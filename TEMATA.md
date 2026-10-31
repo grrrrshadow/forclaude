@@ -31,6 +31,41 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (55) – Převzato z grrrrf 27.–31. 10.: draci par18, holky, sestřičky, zvířata na kostře čtyřnožců, koně
+
+- Hráč: *„grrrrf ma hotovo.“*, *„mame humanoidní kostru unifikovanou pro všechny stejnou aby měli stejné pohyby
+  a čtyřnožec je asi další společná kostra pro typ zviřat se 4 nohama jako je kuň.“*, *„bež si přečist temata“*.
+- Z kolegových témat (`temata3.md`, 30.–31. 10.) si beru:
+  - když něco jde ze hry pryč, projít všechno, co to jmenuje;
+  - než se změní soubor sady, najít, kdo na něj odkazuje;
+  - úkoly, které na ničem nečekají, dělat a nečekat.
+- **Převzato do sady hry** (grrrrf `7d0888a`):
+  - `tvorove`: `drak_letajici`, `pterodaktyl`; `drak_kraci` pryč (na farmě a hradu je místo něj `drak_cerny`);
+  - `psi`: vlk bez slin (`vlk`) pryč. Koupený vlk je u firmy jen jménem a hra neznámý druh tiše vynechá;
+  - `humanoidi`: `lady_pink`, `samanka`, `sestricka`. Hra bere holky jen podle jmen, takže se samy nikde
+    neobjeví;
+  - `postavy`: stojící `sestricka_kouri`, `sestricka_cervena` (bez Moea a Lennyho, hráč je dřív nechtěl);
+  - `strasidla`: `goblin_saman` (kolem měst v noci), `strasidlo_les` (bez Putina);
+  - `prumysl`: prapory hradu a farmy s mašinkou, kůň na pasece; `prumysl_vanilla`: koně u statku a stodoly;
+    `mirne`: jen kůň na hřišti stadionu (`akce.kun`), naše úpravy stadionu zůstaly;
+  - `zvirata`: šest koní, kravička, jelen, laň, vidloroh a ovce tlustorohá na kostře, `ctyrnozec_pohyby`.
+- **Kostra čtyřnožců jako druh** (jako `humanoid` holek): `"kostra": "ctyrnozec"` je jméno druhu, ne soubor. Kosti
+  jsou v souboru zvířete. Pohyb, který zvíře samo nemá, vezme hra ze společných pohybů druhu (`druh: pohyby`, tady
+  `ctyrnozec_pohyby`) podle jmen kostí, kyčle krát poměr `vyska_kycli`. Vlastní pohyb zvířete má přednost
+  (tažný kůň a bělouš mají pastvu s předkloněním).
+- **Kdo kravičku jmenuje:**
+  - pastvina (`pase`, `kouka`) kreslí přes `pozy`; kouknutí se teď hýbe (ohlíží se, švihá ocasem), dřív stál první
+    snímek;
+  - náklad dobytka (`uzel pase_00`): u zvířete na kostře je uzel síť v klidu, s hlavou nahoře jako dřív, ne první
+    snímek pastvy.
+- **„kde": „les"** u zvířat a strašidel: přidají se k místům lesa s pasekou vedle druhů, které místo jmenuje
+  (lesní strašidlo, koně).
+- Ověřeno v rigu: koně ve všech chodech, kravička, jelen, oba draci, Lady Pink, šamanka, sestřičky, goblin a lesní
+  strašidlo se kreslí; náklad krávy stojí s hlavou nahoře.
+- **Zbývá:** koně jako vozidla Special 3D v4 (tělo koně podle rychlosti a ujeté dráhy, jezdkyně v sedle, vůz
+  přestavbou) a koně jako dekorace s nasednutím E. Záznam koně nemá `soubor`, hra by zbytek indexu Special v4
+  přeskočila. Sestřičky (předplatné, léčení) a kam dát Lady Pink a šamanku: domluvit s hráčem.
+
 ## 31. 10. (54) – Koně a vozy ve Special 3D: velikost přepínačem, vozy dva
 
 - Hráč ke kolegovu návrhu (`grrrrf hra/3d/VOZY-KONE-SPECIAL-PRO-HRU.md`, vozy a koně ve 2× jako zbytek Specialu, tři

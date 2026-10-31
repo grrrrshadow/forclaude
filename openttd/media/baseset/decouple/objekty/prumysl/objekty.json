@@ -3153,13 +3153,13 @@
      0.0
     ],
     "otoceni": 354.0,
-    "drak": "drak_kraci",
+    "drak": "drak_cerny",
     "kde": "nadvori"
    }
   ],
   "rozhledna": {
    "uzel": "rozhledna",
-   "poznamka": "dřevěná vyhlídka na 11 m věži ve východním rohu: plošina z prken na koruně, zábradlí, čtyři sloupky se šindelovou stříškou, prapor, lucerna v noci; od 26. 10. na ni vedou dřevěné schody na kozách podél přední hradby se třemi loučemi"
+   "poznamka": "dřevěná vyhlídka na 11 m věži ve východním rohu: plošina z prken na koruně, zábradlí, čtyři sloupky se šindelovou stříškou, prapor (od 30. 10. černá parní mašinka na červeném jako na dračím hradu, bez žlutého pruhu), lucerna v noci; od 26. 10. na ni vedou dřevěné schody na kozách podél přední hradby se třemi loučemi"
   },
   "podlaha": {
    "uzel": "podlaha",
@@ -3229,7 +3229,7 @@
   ],
   "autor": "grrrrf: vlastní model domy/draci_farma.py (stavebnice domů, upečeno domy/dum_objekt.py), složení prumysl/draci_farma.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). Od 25. 10. (hráč: „na zřicenině udělej taky rozhlednu a jeskyni zřicenou mistnost s drakem“): dřevěná rozhledna na 11 m věži se schody a loučemi a jeskyně, dutá díra v kopci u východní hradby (žádný interiér), kde leží třetí drak (prumysl/draci_zricenina.py, 1664 trojúhelníků, vlastní atlas 256 px). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
+  "poznamka": "dračí farma jako zřícenina hradu 3 × 3 (hráč 23. 10.: „hrad zřicenina jako by s nadvořim draků kde by měli marihuanovy seno na kupě a tam by někde stala 3D holka“): hradby s rozbitým cimbuřím, čtyři nárožní věže (16, 11, 13 m a pahýl), brána mezi dvěma hranatými věžemi s obloukem, palác bez střechy s okny a štíty, průrvy v ostatních hradbách (průchody ze všech stran); nádvoří s ušlapanou zemí, dlážděnou cestou od brány, rozházeným senem, kamenným žlabem plným sena, balvany pro draky, padlým kmenem, ohništěm a kamenem k sezení; pochodně na zdech; strom a keře v rozích jako společné doplňky (8). Od 25. 10. (hráč: „na zřicenině udělej taky rozhlednu a jeskyni zřicenou mistnost s drakem“): dřevěná rozhledna na 11 m věži se schody a loučemi a jeskyně, dutá díra v kopci u východní hradby (žádný interiér), kde leží třetí drak (prumysl/draci_zricenina.py, 1652 trojúhelníků, vlastní atlas 256 px). 13244 trojúhelníků hradu + kupa sena 972 jednou (osm instancí), atlas 2048 px, kámen barvou číslem; glb z gltfpacku. Draky a jejich létání dělá hra (mista_draku: kde přistanou, čelem ke kupě sena); studentky college girl po dovozu STUD jako u sochy"
  },
  {
   "soubor": "draci_hrad.glb",
@@ -3361,7 +3361,7 @@
      0.0
     ],
     "otoceni": 157.6,
-    "drak": "drak_kraci",
+    "drak": "drak_cerny",
     "kde": "nadvori",
     "poznamka": "na nádvoří, čelem ke kupám sena"
    },
@@ -3434,7 +3434,7 @@
   "moduly": {
    "poznamka": "hrad je složený z kopií: zed (hradba s bránou, cimbuřím a loučemi) 4× (zed_00–03), vez (nárožní věž) 4× (vez_00–03), obojí otočené po 90° kolem středu pozemku; schod 2×; síň jednou (souměrná); v souboru je každá síť jednou, uzly ji kreslí s vlastní polohou a otočením (jako seno_NN)"
   },
-  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“; potom: „modularni čtyři stejny věžičky, čtyři zdi mezi věžičkama a pak mistnost s rozhlednou a schodama tak zrcadlově leva stejna jako prava“): hradby 7 m s ochozem a cimbuřím kolem dokola, v každé brána s vytaženou mříží (průchody ze všech stran, zadní vede do síně), čtyři stejné nárožní věže s praporem (ochoz jimi prochází), souměrná dračí síň u zadní zdi s vjezdem 9 × 6 m uprostřed (není interiér, má zdi kolem sebe), rozhlednou na střeše a schody z obou stran na střechu (terasa na úrovni ochozu) a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení. Hra kreslí 5096 trojúhelníků (dnešní zřícenina 14 864), v souboru je každý modul jednou (2372), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)"
+  "poznamka": "dračí hrad 3 × 3 jako nový vzhled dračí farmy (hráč 25. 10.: „budem dělat hrad aby dole byla mistnost s drakem a zvenku schody nahoru na střechu te mistnosti, na hradby a tam budou v noci svitit louče“, „hranaty mi je jedno ale aby neměl hodně trojuhelničků“; potom: „modularni čtyři stejny věžičky, čtyři zdi mezi věžičkama a pak mistnost s rozhlednou a schodama tak zrcadlově leva stejna jako prava“): hradby 7 m s ochozem a cimbuřím kolem dokola, v každé brána s vytaženou mříží (průchody ze všech stran, zadní vede do síně), čtyři stejné nárožní věže s praporem (ochoz jimi prochází; prapory od 30. 10. černá parní mašinka na červeném), souměrná dračí síň u zadní zdi s vjezdem 9 × 6 m uprostřed (není interiér, má zdi kolem sebe), rozhlednou na střeše a schody z obou stran na střechu (terasa na úrovni ochozu) a na hradby, louče (noc), nádvoří s dlážděnou cestou, žlabem a kupami sena, kvádr k sezení. Hra kreslí 5036 trojúhelníků (dnešní zřícenina 14 864), v souboru je každý modul jednou (2348), atlas 1024 px, kámen barvou číslem; glb z gltfpacku (-cc). Stejný průmysl jako draci_farma (bere FICR a STUD), stejné klíče seno, mista_draku a postavy_s_holkami; místa draků mají navíc kde (sin, nadvori, strecha)"
  },
  {
   "soubor": "les_zem.glb",
@@ -4392,6 +4392,23 @@
   },
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi; v noci tma), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10148 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 929 kB; glb z gltfpacku"
+  "poznamka": "paseka jako les_paseka se srubem hajného (dveře a dvě okna do paseky, okno do +y, komín, lavice u zdi; v noci tma), posedem, hromadou klád (dřevo, které les dává) a ohništěm se třemi kládami na sezení; jedno ze čtyř prostředních políček; do srubu se dá vejít (dveře dvere_00, interiér); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 10148 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 929 kB; glb z gltfpacku",
+  "vozidla": [
+   {
+    "zaznam": "special_kun_trampsky",
+    "objekt": "kun_trampsky",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     5.0,
+     13.7,
+     0.0
+    ],
+    "otoceni": 0,
+    "poznamka": "trampský kůň stojí na pasece u srubu hajného (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_trampsky balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  ]
  }
 ]

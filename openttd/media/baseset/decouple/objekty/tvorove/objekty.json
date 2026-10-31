@@ -123,31 +123,6 @@
   "poznamka": "počátek uprostřed těla, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 2474 trojúhelníků na snímek; barvy ledu naše (model odkazuje na Colors.png, která u něj není): modrý, světlé břicho a křídla, bílý zobák, žluté oči; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; drak_ledovy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
  },
  {
-  "soubor": "drak_kraci.glb",
-  "jmeno": "drak_kraci",
-  "druh": "tvor",
-  "rozmer_m": [
-   13.49,
-   5.49,
-   5.08
-  ],
-  "animace": {
-   "chuze": {
-    "uzly": "chuze_",
-    "snimku": 12,
-    "tiku": 10,
-    "smycka": true,
-    "krok_m": 2.88
-   }
-  },
-  "kostra": "drak_kraci_kostra.glb",
-  "poza": "kráčí (chuze), křídla složená na hřbetě",
-  "autor": "Animated 3D Dragon Model, Benjamin Marty (BlueMonkMN, OpenGameArt, CC BY 3.0); snímky z akce modelu (tvorove/draci.py), bez renderu",
-  "licence": "CC BY 3.0: uvést autora Benjamin Marty (BlueMonkMN)",
-  "zdroj": "https://opengameart.org/content/animated-3d-dragon-model",
-  "poznamka": "počátek na zemi pod tělem, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 4034 trojúhelníků na snímek; barvy naše (textura modelu je zkušební mřížka UV): zelený, žlutavé břicho, rudá křídla, žluté oči; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), krok_m je, o kolik hra posune draka za jeden cyklus; drak_kraci_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
- },
- {
   "soubor": "drak_cinsky.glb",
   "jmeno": "drak_cinsky",
   "druh": "tvor",
@@ -170,5 +145,53 @@
   "licence": "CC0 (volné dílo)",
   "zdroj": "https://opengameart.org/content/flying-dragon",
   "poznamka": "počátek v hlavě (prostředek kosti hlavy), tělo se táhne za ní, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 4999/5000 trojúhelníků na snímek; zlatý jako v modelu, rudý hřbet a ploutev ocasu (barvy naše, model má zlaté materiály s normálovými mapami); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_letajici.glb",
+  "jmeno": "drak_letajici",
+  "druh": "tvor",
+  "rozmer_m": [
+   16.23,
+   17.45,
+   13.41
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 10,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_letajici_kostra.glb",
+  "poza": "letí, pomalu mává křídly (let)",
+  "autor": "Dragon flying, dobbyisthegoat (Sketchfab, CC BY 4.0; poslal hráč 30. 10., par18); snímky z animace modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC BY 4.0: uvést autora dobbyisthegoat (změny: otočený, zvětšený na 12 m, snímky zjednodušené)",
+  "zdroj": "https://sketchfab.com/3d-models/dragon-flying-5c8c586da7ad450a8e58b56289a26739",
+  "poznamka": "počátek uprostřed těla; animace modelu jsou čtyři stejná mávnutí (13,1 s), snímky jedno z nich (3,3 s); kostra má celou, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 5999/6000 trojúhelníků na snímek; textura modelu (tmavě hnědošedý); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; drak_letajici_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "pterodaktyl.glb",
+  "jmeno": "pterodaktyl",
+  "druh": "tvor",
+  "rozmer_m": [
+   3.42,
+   8.13,
+   3.76
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 5,
+    "smycka": true
+   }
+  },
+  "kostra": "pterodaktyl_kostra.glb",
+  "poza": "letí, mává křídly (let)",
+  "autor": "Animated Flying Pteradactal Dinosaur Loop, LasquetiSpice (Sketchfab, CC BY 4.0; poslal hráč 30. 10., par18); snímky z animace modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC BY 4.0: uvést autora LasquetiSpice (změny: otočený, zvětšený na rozpětí 8 m, snímky zjednodušené)",
+  "zdroj": "https://sketchfab.com/3d-models/animated-flying-pteradactal-dinosaur-loop-09f6b1ff7bfd4a2d8d9c0b9827f2a708",
+  "poznamka": "počátek uprostřed těla; animace modelu třikrát mávne a pak plachtí (10,7 s), snímky jedno mávnutí (1,5 s); kostra má celou, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 5999/6000 trojúhelníků na snímek; textura modelu (hnědý); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; pterodaktyl_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
  }
 ]

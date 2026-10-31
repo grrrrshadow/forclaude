@@ -5201,11 +5201,8 @@ static void ForPastureAnimals(TileIndex tile, const ThreeDPasture &p, bool movin
 	for (size_t i = 0; i < n; i++) {
 		const uint32_t phase = (TileX(tile) * 7919 + TileY(tile) * 104729 + static_cast<uint32_t>(i) * 2654435761u) % PASTURE_ROUND_TICKS;
 		const uint64_t t = ((moving ? TimerGameTick::counter : 0) + phase) % PASTURE_ROUND_TICKS;
-		if (t < PASTURE_LOOK_TICKS) {
-			each(p.kinds[k] + "/kouka", 0, p.places[i]);
-			continue;
-		}
-		const std::string figure = p.kinds[k] + "/pase";
+		/* Looking up a pose of frames too (the colleague's cow on its bones: it looks about, nods, swishes its tail). */
+		const std::string figure = p.kinds[k] + (t < PASTURE_LOOK_TICKS ? "/kouka" : "/pase");
 		const ThreeDVehicleObject *f = GetThreeDFigure(figure);
 		const int frame = f == nullptr || f->frames < 2 ? 0 : static_cast<int>((t / std::max(1, f->frame_ticks)) % f->frames);
 		each(figure, frame, p.places[i]);

@@ -84,6 +84,52 @@
   "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
  },
  {
+  "soubor": "lady_pink.glb",
+  "jmeno": "lady_pink",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.6,
+  "vyska_kycli": 0.8364,
+  "trojuhelniku": 13851,
+  "autor": "Lady Pink, xervolt (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést xervolt)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)"
+ },
+ {
+  "soubor": "sestricka.glb",
+  "jmeno": "sestricka",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.68,
+  "vyska_kycli": 0.8829,
+  "trojuhelniku": 11678,
+  "autor": "Nurse, brndn (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést brndn)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)",
+  "nazev": {
+   "cs": "sestřička",
+   "en": "nurse"
+  },
+  "role": "sestricka",
+  "kde": "kostel"
+ },
+ {
+  "soubor": "samanka.glb",
+  "jmeno": "samanka",
+  "druh": "postava",
+  "kostra": "humanoid",
+  "vyska_m": 1.65,
+  "vyska_kycli": 0.8294,
+  "trojuhelniku": 11236,
+  "autor": "Chara Design 01, SheeroChana (Sketchfab, CC BY 4.0); kostra postavy/kostra_hry.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést SheeroChana)",
+  "poznamka": "kostra humanoid (22 kostí, jména Mixamo bez mixamorig:), T-póza, klouby v klidu bez rotace (jen odsazení od rodiče, rám postavy: glTF +x dopředu, +y nahoru, +z doprava); počátek mezi chodidly na zemi, čelem k +x, metry, skutečná výška; pózy a chůze z humanoid_pohyby (rotace podle jmen kostí, Hips krát poměr vyska_kycli)",
+  "nazev": {
+   "cs": "šamanka",
+   "en": "shaman girl"
+  }
+ },
+ {
   "soubor": "dzoint.glb",
   "jmeno": "dzoint",
   "druh": "predmet",
