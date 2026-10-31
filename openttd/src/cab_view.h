@@ -31,6 +31,7 @@
 #include "gfx_type.h"
 #include "tile_type.h"
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <string>
@@ -58,7 +59,20 @@ struct CabViewCamera {
 	int tiles = 0;        ///< rig: tiles drawn in the last picture
 	int billboards = 0;   ///< rig: billboards drawn in the last picture
 	double stage[7] = {}; ///< rig: the milliseconds of the stages of collecting the last picture (CollectEyeFrame())
+	bool msts = false;    ///< the desk of a cab of MSTS is drawn over the picture (simtrains_cab.h): the eye where its cab has it, as wide as MSTS sees, the model not drawn about it
 };
+
+/** The tangent of half the field of view up and down of a cab of MSTS: 45 degrees, as MSTS and Open Rails see (its desk of 640 by 480 fills it). */
+static constexpr double MSTS_CAB_TAN = 0.41421356;
+
+/**
+ * Pixels a unit across at a unit of depth in the view from a cab: 90 degrees across; a cab of MSTS 45 degrees up and down,
+ * not wider than 90 degrees across.
+ */
+inline double CabFocal(const CabViewCamera &camera, int width, int height)
+{
+	return camera.msts ? std::max((height / 2.0) / MSTS_CAB_TAN, width / 2.0) : width / 2.0;
+}
 
 /*
  * The pictures are collected under the lock of the game and drawn on a thread of their own, one frame behind

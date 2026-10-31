@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (65) – Simtrains 1: stanoviště MSTS v pohledu z kabiny
+
+- Podle odpovědí v (64): pohled náš (hlava pravým tlačítkem), obrázek stanoviště z kabiny MSTS přes něj.
+- **Čtení:** `.eng` má `CabView ( ../../common.cab/cab451/451.cvf )`, cesta je od složky CABVIEW mašiny, jako to čte
+  MSTS. `.cvf` dává tři obrázky stanoviště 451 (vpřed, vlevo −60°, vpravo +75°), oko strojvedoucího (−1; 2,4; 7,3 m)
+  a 23 ovladačů (na další kroky). V noci obrázky ze složky `noc` (u jiných kabin `night`).
+- **Kreslení:** s kamerou „interiér“ se obrázky kreslí přes pohled z kabiny. Každý je deska před okem tam, kam ho
+  dává MSTS, velká jako obrazovka MSTS (45° nahoru a dolů). Desky se otáčejí s vlakem, ne s hlavou. Okny je vidět
+  svět (z procesoru i z karty). Mezi deskami nejsou mezery: vzdálenější deska se roztáhne k bližší. Nad, pod a za
+  deskami je barva okraje kabiny. Oko je tam, kde ho má kabina MSTS, a model mašiny se kolem oka nekreslí.
+- Rig: 451 koupená v rigu (elektrická dostane koleje s trolejí), kabina přes celou obrazovku, hlava vpřed, 35° a
+  63° vpravo, 70° a 125° vlevo, noc. Přes kartu (llvmpipe) stejně. Smoke beze změny.
+- Další krok: řízení (kontroler, brzdič, revers), fyzika vlaku, projetí červené, přepínač dole v okně.
+
 ## 31. 10. (64) – Simtrains: hráčovy odpovědi; věty o šíření pryč
 
 - Hráč: *„1 my mame svuj lepši pohled , otačeni hlavou pravym čudlikem v cab view. informace o šíření chci pryč

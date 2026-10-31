@@ -468,6 +468,8 @@ add_files(
     signs_func.h
     simtrains.cpp
     simtrains.h
+    simtrains_cab.cpp
+    simtrains_cab.h
     signs_gui.cpp
     signs_type.h
     slider.cpp

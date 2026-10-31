@@ -57,6 +57,7 @@
 #include "three_d.h"
 #include "settings_type.h"
 #include "core/geometry_func.hpp"
+#include "simtrains_cab.h"
 #include "3rdparty/fmt/format.h"
 
 #include "table/strings.h"
@@ -575,6 +576,7 @@ struct CabViewWindow : Window {
 	bool full = false;                 ///< over the whole screen
 	Rect before_full{};                ///< where it was before that
 	mutable CabViewPicture picture{}; ///< the last picture
+	mutable SimtrainsCabDesk desk{};  ///< the desk of a cab of MSTS over it (simtrains_cab.h)
 
 	/* Drawn anew while the vehicle moves: about twenty-five times a second. */
 	IntervalTimer<TimerWindow> redraw{std::chrono::milliseconds(40), [this](auto) {
@@ -659,11 +661,15 @@ struct CabViewWindow : Window {
 			case WID_CV_CANVAS: {
 				int w = r.Width(), h = r.Height();
 				if (w <= 0 || h <= 0) return;
+				/* An engine of MSTS with its cab: in the cab (the camera Inside) its desk over the view (simtrains_cab.h). */
+				const SimtrainsCab *cab = CabCameraChosen() == CabCamera::Inside ? SimtrainsCabOf(v) : nullptr;
+				this->camera.msts = cab != nullptr;
 				if (!DrawCabView(v, w, h, this->camera, this->picture)) {
 					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
 					return;
 				}
 				BlitEyePicture(*this, this->picture, r.left, r.top);
+				if (cab != nullptr) DrawSimtrainsCabDesk(this->desk, *cab, this->camera, r.left, r.top, w, h);
 				break;
 			}
 			case WID_CV_PANEL:

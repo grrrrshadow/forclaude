@@ -73,6 +73,46 @@ std::string FindInFolder(const std::string &folder, const std::string &name)
 }
 
 /**
+ * A file named by a path of MSTS from a folder ("../../common.cab/cab451/451.cvf", "\\" or "/" between the names):
+ * ".." the folder above, each name whatever the case of its letters. A folder only passed through by ".." need not be
+ * there (an engine's CABVIEW, the folder MSTS reads its cab's path from).
+ * @param folder where the path starts, ending with the path separator
+ * @return the file, empty when it is not there
+ */
+std::string FindByMstsPath(const std::string &folder, const std::string &path)
+{
+	std::vector<std::string> names;
+	std::string name;
+	for (char c : path) {
+		if (c == '\\' || c == '/') {
+			if (!name.empty()) names.push_back(std::move(name));
+			name.clear();
+		} else {
+			name += c;
+		}
+	}
+	if (!name.empty()) names.push_back(std::move(name));
+	if (names.empty()) return {};
+	/* The folders of the start, so that ".." can go above it without asking the disk. */
+	std::string at = folder;
+	while (!at.empty() && at.back() == PATHSEPCHAR) at.pop_back();
+	size_t i = 0;
+	for (; i + 1 < names.size(); i++) {
+		if (names[i] == ".") continue;
+		if (names[i] == "..") {
+			const size_t cut = at.find_last_of(PATHSEPCHAR);
+			if (cut == std::string::npos) return {};
+			at.resize(cut);
+			continue;
+		}
+		const std::string found = FindInFolder(at + PATHSEP, names[i]);
+		if (found.empty()) return {};
+		at = found;
+	}
+	return FindInFolder(at + PATHSEP, names.back());
+}
+
+/**
  * The content of a file of MSTS past its header: unpacked when it is packed ("SIMISA@F").
  * @return false when it is packed and cannot be unpacked
  */
@@ -497,6 +537,166 @@ bool ReadSimtrainsTexture(const std::string &path, int &w, int &h, std::vector<u
 
 namespace {
 
+/**
+ * The picture of a cab by night: MSTS looks for it in the folder "night" beside the picture or its .cvf; the cabs of
+ * the Czech authors have "den" and "noc" side by side (451.cvf, cab_den.bat and cab_noc.bat copying one over).
+ * @return the night's, empty none
+ */
+std::string NightPictureOf(const std::string &picture, const std::string &cvf)
+{
+	const size_t slash = picture.find_last_of(PATHSEPCHAR);
+	if (slash == std::string::npos) return {};
+	const std::string folder = picture.substr(0, slash + 1), file = picture.substr(slash + 1);
+	for (const char *night : {"night", "noc"}) {
+		std::string found = FindByMstsPath(folder, std::string(night) + "/" + file);
+		if (!found.empty()) return found;
+		const size_t cvf_slash = cvf.find_last_of(PATHSEPCHAR);
+		if (cvf_slash != std::string::npos) {
+			found = FindByMstsPath(cvf.substr(0, cvf_slash + 1), std::string(night) + "/" + file);
+			if (!found.empty()) return found;
+		}
+	}
+	/* ".../den/x.ace" by day, ".../noc/x.ace" by night. */
+	const std::string above = folder.substr(0, folder.size() - 1);
+	const size_t up = above.find_last_of(PATHSEPCHAR);
+	if (up == std::string::npos) return {};
+	const std::string day = above.substr(up + 1);
+	if (StrEqualsIgnoreCase(day, "den") || StrEqualsIgnoreCase(day, "day")) {
+		for (const char *night : {"noc", "night"}) {
+			const std::string found = FindByMstsPath(above.substr(0, up + 1), std::string(night) + "/" + file);
+			if (!found.empty()) return found;
+		}
+	}
+	return {};
+}
+
+/** The figures of a name's values, as many as it has. */
+std::vector<float> FiguresOf(const TextNode *n)
+{
+	std::vector<float> out;
+	if (n == nullptr) return out;
+	for (const std::string &v : n->values) out.push_back(static_cast<float>(ParseFigure(v, {})));
+	return out;
+}
+
+} // namespace
+
+/**
+ * Read a cab of MSTS (SimtrainsCab).
+ * @param path its .cvf
+ * @return false when it cannot be read or has no picture
+ */
+bool ReadSimtrainsCab(const std::string &path, SimtrainsCab &cab)
+{
+	std::vector<uint8_t> data = ReadBytes(path);
+	if (data.empty() || !Unpack(data)) return false;
+	const std::vector<TextNode> top = ParseText(TextOf(data));
+	const TextNode *file = nullptr;
+	for (const TextNode &n : top) {
+		if (StrEqualsIgnoreCase(n.name, "Tr_CabViewFile")) file = &n;
+	}
+	if (file == nullptr) return false;
+	cab = {};
+	cab.path = path;
+	const size_t slash = path.find_last_of(PATHSEPCHAR);
+	const std::string folder = slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
+	/* The pictures and their places, one after the other: a "CabViewFile", then its "Position" and "Direction". */
+	for (const TextNode &n : file->children) {
+		if (StrEqualsIgnoreCase(n.name, "CabViewFile")) {
+			SimtrainsCab::View view;
+			view.image = FindByMstsPath(folder, n.Value());
+			if (view.image.empty()) Debug(grf, 1, "Simtrains: {}: its picture {} is not there", path, n.Value());
+			view.night = view.image.empty() ? std::string() : NightPictureOf(view.image, path);
+			cab.views.push_back(std::move(view));
+		} else if (StrEqualsIgnoreCase(n.name, "Position") && !cab.views.empty()) {
+			const std::vector<float> f = FiguresOf(&n);
+			if (f.size() >= 3) {
+				/* MSTS: x to the right, y up, z forward. */
+				SimtrainsCab::View &view = cab.views.back();
+				view.eye[0] = f[2];
+				view.eye[1] = -f[0];
+				view.eye[2] = f[1];
+			}
+		} else if (StrEqualsIgnoreCase(n.name, "Direction") && !cab.views.empty()) {
+			const std::vector<float> f = FiguresOf(&n);
+			if (f.size() >= 2) {
+				cab.views.back().pitch = f[0];
+				cab.views.back().yaw = f[1];
+			}
+		}
+	}
+	std::erase_if(cab.views, [](const SimtrainsCab::View &v) { return v.image.empty(); });
+	if (cab.views.empty()) return false;
+
+	const TextNode *controls = file->Child("CabViewControls");
+	if (controls == nullptr) return true;
+	for (const TextNode &n : controls->children) {
+		SimtrainsCab::Control c;
+		c.kind = n.name;
+		if (const TextNode *t = n.Child("Type"); t != nullptr) c.type = t->Value();
+		if (const std::vector<float> f = FiguresOf(n.Child("Position")); f.size() >= 4) {
+			c.x = static_cast<int>(f[0]);
+			c.y = static_cast<int>(f[1]);
+			c.w = static_cast<int>(f[2]);
+			c.h = static_cast<int>(f[3]);
+		}
+		if (const TextNode *g = n.Child("Graphic"); g != nullptr && !g->Value().empty()) {
+			c.graphic = FindByMstsPath(folder, g->Value());
+			if (!c.graphic.empty()) c.graphic_night = NightPictureOf(c.graphic, path);
+		}
+		if (const TextNode *t = n.Child("Style"); t != nullptr) c.style = t->Value();
+		if (const std::vector<float> f = FiguresOf(n.Child("ScaleRange")); f.size() >= 2) {
+			c.min = f[0];
+			c.max = f[1];
+		}
+		if (const std::vector<float> f = FiguresOf(n.Child("ScalePos")); f.size() >= 2) {
+			c.from = f[0];
+			c.to = f[1];
+		}
+		if (const std::vector<float> f = FiguresOf(n.Child("Pivot")); !f.empty()) c.pivot = static_cast<int>(f[0]);
+		if (const std::vector<float> f = FiguresOf(n.Child("DirIncrease")); !f.empty()) c.dir_increase = static_cast<int>(f[0]);
+		if (const std::vector<float> f = FiguresOf(n.Child("Orientation")); !f.empty()) c.orientation = static_cast<int>(f[0]);
+		if (const std::vector<float> f = FiguresOf(n.Child("Area")); f.size() >= 4) {
+			for (int k = 0; k < 4; k++) c.area[k] = static_cast<int>(f[k]);
+		}
+		if (const std::vector<float> f = FiguresOf(n.Child("NumFrames")); f.size() >= 3) {
+			c.frames = static_cast<int>(f[0]);
+			c.cols = static_cast<int>(f[1]);
+			c.rows = static_cast<int>(f[2]);
+		}
+		/* "NumPositions ( 8 0 1 2 ... )": the count first. */
+		if (const std::vector<float> f = FiguresOf(n.Child("NumPositions")); f.size() >= 2) {
+			for (size_t k = 1; k < f.size(); k++) c.positions.push_back(static_cast<int>(f[k]));
+		}
+		if (const std::vector<float> f = FiguresOf(n.Child("NumValues")); f.size() >= 2) c.values.assign(f.begin() + 1, f.end());
+		if (const std::vector<float> f = FiguresOf(n.Child("MouseControl")); !f.empty()) c.mouse = f[0] != 0;
+		const TextNode *colour = n.Child("ControlColour");
+		if (colour == nullptr) {
+			if (const TextNode *pos = n.Child("PositiveColour"); pos != nullptr) colour = pos->Child("ControlColour");
+		}
+		if (const std::vector<float> f = FiguresOf(colour); f.size() >= 3) {
+			c.colour = static_cast<uint32_t>(Clamp(static_cast<int>(f[0]), 0, 255)) << 16 | static_cast<uint32_t>(Clamp(static_cast<int>(f[1]), 0, 255)) << 8 | static_cast<uint32_t>(Clamp(static_cast<int>(f[2]), 0, 255));
+		}
+		cab.controls.push_back(std::move(c));
+	}
+	return true;
+}
+
+/**
+ * The driver's eye of a cab of MSTS: where its first picture is seen from.
+ * @param eye metres in the frame of the game's objects (x forward, y left, z up)
+ * @return false when the cab cannot be read
+ */
+bool ReadSimtrainsCabEye(const std::string &path, float eye[3])
+{
+	SimtrainsCab cab;
+	if (!ReadSimtrainsCab(path, cab)) return false;
+	std::copy(std::begin(cab.views[0].eye), std::end(cab.views[0].eye), eye);
+	return true;
+}
+
+namespace {
+
 /** The GRF's id of an engine: "ST" and a number of its .eng's name, the same on every computer. */
 uint32_t GrfIdOf(const std::string &eng)
 {
@@ -739,6 +939,12 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 			e.cab[2] = y;
 			e.has_cab = true;
 		}
+	}
+	if (const TextNode *cab = engine->Child("CabView"); cab != nullptr && !cab->Value().empty()) {
+		/* MSTS reads it from the folder CABVIEW of the engine's; a cab of several engines is in a folder above. */
+		e.cvf = FindByMstsPath(e.folder + "CABVIEW" PATHSEP, cab->Value());
+		if (e.cvf.empty()) e.cvf = FindByMstsPath(e.folder, cab->Value());
+		if (e.cvf.empty()) Debug(grf, 1, "Simtrains: {}: its cab {} is not there", path, cab->Value());
 	}
 	if (e.power_kw <= 0 || e.speed_kmh <= 0 || e.mass_t <= 0) {
 		Debug(grf, 0, "Simtrains: {}: no power, speed or mass", path);

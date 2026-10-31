@@ -12,6 +12,7 @@
 #ifndef SIMTRAINS_H
 #define SIMTRAINS_H
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -42,6 +43,7 @@ struct SimtrainsEngine {
 	int parts = 1;                ///< the vehicles of the game it is made of, an articulated one when longer than one (ReadSize())
 
 	std::string grf_path;         ///< where the GRF made of it is: newgrf/simtrains/ of the player's own folder
+	std::string cvf;              ///< an engine's cab, its "CabView" .cvf (simtrains_cab.h); empty none
 };
 
 /** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. Its
@@ -68,6 +70,48 @@ struct SimtrainsMesh {
 	std::vector<Texture> textures;
 };
 bool ReadSimtrainsShape(const std::string &path, SimtrainsMesh &mesh);
+
+/**
+ * The cab of an engine of MSTS, its .cvf (the player, 31. 10.: "the view from the cab, the realistic controls and the
+ * simulation of the driving and the cabs of the simtrains models"): pictures of the driver's desk with the windows left
+ * clear, each seen in one direction, and the controls drawn over them. Places are of a screen 640 by 480, as MSTS has
+ * them, whatever the size of the pictures.
+ */
+struct SimtrainsCab {
+	/** A picture of the desk ("CabViewFile"), and where it is seen. */
+	struct View {
+		std::string image;       ///< its .ace by day
+		std::string night;       ///< by night: the same in the folder "noc" or "night" beside, empty none
+		float yaw = 0;           ///< degrees it is turned from ahead, to the right positive ("Direction", the second)
+		float pitch = 0;         ///< and down ("Direction", the first)
+		float eye[3] = {};       ///< the driver's eye ("Position"), metres in the frame of the game's objects (x forward, y left, z up)
+	};
+	/** A control, a gauge or a lamp of the desk drawn over the first picture ("CabViewControls"). */
+	struct Control {
+		std::string kind;        ///< "Dial", "Gauge", "Lever", "TwoState", "TriState", "MultiStateDisplay", "CombinedControl", "Digital", "DigitalClock", "CabSignalDisplay", ...
+		std::string type;        ///< what it shows or does, the first word of "Type": "SPEEDOMETER", "TRAIN_BRAKE", "THROTTLE", ...
+		int x = 0, y = 0, w = 0, h = 0; ///< "Position", of the screen 640 by 480
+		std::string graphic;     ///< "Graphic": its .ace by day, empty none
+		std::string graphic_night; ///< by night
+		std::string style;       ///< "Style": "NEEDLE", "POINTER", "SPRUNG", "ONOFF", "PRESSED", "WHILE_PRESSED", ...
+		float min = 0, max = 1;  ///< "ScaleRange"
+		float from = 0, to = 0;  ///< a dial's "ScalePos": degrees of the needle at min and at max
+		int pivot = 0;           ///< a dial's "Pivot": pixels from the needle's top to its axis
+		int dir_increase = 0;    ///< "DirIncrease": 1 the other way round
+		int orientation = 0;     ///< "Orientation": a gauge's 1 upright
+		int area[4] = {};        ///< a gauge's "Area"
+		int frames = 0, cols = 0, rows = 0; ///< "NumFrames": how many frames, in how many columns and rows of its graphic
+		std::vector<int> positions;   ///< "NumPositions": the frame of each position (the count first is left out)
+		std::vector<float> values;    ///< "NumValues": the value of each position
+		bool mouse = false;      ///< "MouseControl": the mouse moves it
+		uint32_t colour = 0;     ///< the first "ControlColour" of a gauge or a figure, 0xRRGGBB
+	};
+	std::string path;            ///< the .cvf
+	std::vector<View> views;     ///< the first ahead
+	std::vector<Control> controls;
+};
+bool ReadSimtrainsCab(const std::string &path, SimtrainsCab &cab);
+bool ReadSimtrainsCabEye(const std::string &path, float eye[3]);
 bool ReadSimtrainsTexture(const std::string &path, int &w, int &h, std::vector<uint8_t> &rgba);
 
 #endif /* SIMTRAINS_H */

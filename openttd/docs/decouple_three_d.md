@@ -1407,6 +1407,32 @@ vehicle of the game:
 The GRF the game writes holds only the figures of the `.eng`; the model and
 its textures are read from the player's own files.
 
+### The cab of an engine of MSTS
+
+An `.eng` names its cab, `CabView ( ... .cvf )`, from the engine's folder
+`CABVIEW` (as MSTS reads it; a cab shared by several engines is in a folder
+above, `../../common.cab/cab451/451.cvf`). The `.cvf` (`ReadSimtrainsCab()`)
+has pictures of the driver's desk, each with its eye (`Position`, the eye of
+the cab view then) and where it is seen (`Direction`: down, to the right):
+the 451's ahead, 60 degrees to the left and 75 to the right. By night the
+same pictures from a folder `night` (or `noc` beside `den`). Its controls
+(`CabViewControls`: dials, levers, lamps, figures) are read for the next
+steps.
+
+In the cab view with the camera Inside (`simtrains_cab.cpp`) the pictures are
+drawn over the view: each a flat board before the eye where MSTS sees it, as
+big as MSTS's screen sees (45 degrees up and down, the cab view then as wide);
+they turn with the engine, not with the head (the right button). A board
+further from ahead is widened to meet the one nearer, so the desk goes round
+without a gap; above, below and past the last boards the colour of the edge.
+The clear windows show the world, drawn by the processor or by the graphics
+card under them. The window keeps which pixel of which picture each of its
+pixels shows, made anew only when the head turns or the window changes.
+
+The rig: `test3d obloukjizda 1 0 300 53542BB7` buys the 451 (an electric
+engine gets its track under the wires), `test3d kabina 0`, `test3d kabina
+klik cely`, `test3d kabina hlava <dx> <dy>`.
+
 The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
 buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of
 the other (`53544EE5`, the ČD B 598).

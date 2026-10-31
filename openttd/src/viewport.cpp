@@ -13336,13 +13336,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const ThreeDVehicleObject &m = *own_model.obj;
 		const ThreeDVehicleState *st = m.State(own_model.state);
 		const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0;
-		/* Looking out through the glass, or else from before the cab (CabEyeAhead()). */
-		const double go = CabEyeAhead(m, m.PartsOf(own_model.state), ta);
+		/* Looking out through the glass, or else from before the cab (CabEyeAhead()); in a cab of MSTS where it has the eye. */
+		const double go = camera.msts ? 0.0 : CabEyeAhead(m, m.PartsOf(own_model.state), ta);
 		const double kx = m.cab[0] + go * std::cos(ta), ky = m.cab[1] - go * std::sin(ta);
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
 		eye.x = own_model.x + cx * ahead * bfx - cy * across * bfy;
 		eye.y = own_model.y + cx * ahead * bfy + cy * across * bfx;
-		eye.z = own_model.z + CabEyeHeight(m) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
+		eye.z = own_model.z + (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
@@ -13396,7 +13396,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		eye.z = v->z_pos + camera.eye_dz;
 	}
-	eye.focal = (width / 2.0) / CAB_FOV_TAN;
+	eye.focal = walker != nullptr ? (width / 2.0) / CAB_FOV_TAN : CabFocal(camera, width, height);
 	eye.cx = width / 2.0;
 	eye.cy = height * 0.5;
 	/* Inside a model's cab its windscreen is a step from the eye: the near plane a few centimetres off. The walker
@@ -14155,7 +14155,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	int step = static_cast<int>(std::lround(yaw_deg / 45.0)) & 7;
 	const Vehicle *own = v != nullptr ? v->First() : nullptr;
 	/* The cab the eye is in, round it -- unless the player chose the view without it (CabCamera::Bare). */
-	if (in_model_cab && cab_camera == CabCamera::Inside) {
+	if (in_model_cab && cab_camera == CabCamera::Inside && !camera.msts) {
 		AddCabVehicle(own_model, false);
 		_cab_figures.back().own_cab = true;
 		/* (The eye sits in it level: its cab not tipped round the eye.) */

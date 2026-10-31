@@ -708,6 +708,7 @@ struct ThreeDVehicleObject {
 	bool states_of_anchor = false;  ///< its states name their piece ("clanek"): only the anchor's sets pick them (the colleague's wagons), else every piece's (StateStep())
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	float cab[3] = {};              ///< x, y, z, metres
+	std::string msts_cab;           ///< an engine of MSTS: its cab's .cvf (SimtrainsCab), empty none
 	ThreeDVehiclePaint paint;       ///< "lak"
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"

@@ -5079,6 +5079,9 @@ static void ReadThreeDVehicleObjects()
 			std::copy(std::begin(e.cab), std::end(e.cab), obj.cab);
 			obj.has_cab = true;
 		}
+		/* Its cab of MSTS: the driver's eye where the cab has it (simtrains_cab.h). */
+		obj.msts_cab = e.cvf;
+		if (!e.cvf.empty() && ReadSimtrainsCabEye(e.cvf, obj.cab)) obj.has_cab = true;
 		_vehicle_objects.push_back(std::move(obj));
 	}
 	/* The cars of the mods of BeamNG (beamng.h): each configuration the road vehicles of the GRF of its folder made of

@@ -11440,18 +11440,6 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d obloukjizda: no clear land of {} by {} tiles on the map.", W, H);
 			return true;
 		}
-		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + W - 1, y0 + H - 1), TileXY(x0, y0), false, LevelMode::Level);
-		int failed = 0;
-		auto lay = [&](uint x, uint y, Track tr) {
-			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x, y), RAILTYPE_RAIL, tr, false).Failed()) failed++;
-		};
-		const TileIndex depot = TileXY(x0, y0);
-		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW).Failed()) failed++;
-		for (uint i = 1; i <= L; i++) lay(x0 + i, y0, Track::X);
-		const uint a = x0 + L + 1, b = y0;
-		for (uint j = 0; j < D; j++) lay(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
-		const uint yx = a + (D - 1) / 2, yy = b + (D - 1) / 2;
-		for (uint i = 1; i <= LY; i++) lay(yx, yy + i, Track::Y);
 		/* The fastest engine for plain rail, and any wagon; or the engine asked for by its GRF's id ("53542680"). */
 		const Engine *engine = nullptr, *wagon = nullptr;
 		std::optional<uint32_t> want_grf, want_wagon_grf;
@@ -11464,7 +11452,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		want_grf = grf_arg(5);
 		want_wagon_grf = grf_arg(6);
 		for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
-			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company) || !HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) continue;
+			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company)) continue;
+			/* An engine asked for by its GRF on the rails it has power on (an electric one of MSTS under the wires), else plain rail. */
+			if (!want_grf.has_value() && !HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) continue;
 			if (e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon) {
 				if (want_wagon_grf.has_value() ? e->grf_prop.grfid == *want_wagon_grf : wagon == nullptr) wagon = e;
 			} else if (want_grf.has_value()) {
@@ -11473,6 +11463,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				engine = e;
 			}
 		}
+		RailType rt = RAILTYPE_RAIL;
+		if (engine != nullptr && !HasPowerOnRail(engine->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL)) rt = RAILTYPE_ELECTRIC;
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + W - 1, y0 + H - 1), TileXY(x0, y0), false, LevelMode::Level);
+		int failed = 0;
+		auto lay = [&](uint x, uint y, Track tr) {
+			if (Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(x, y), rt, tr, false).Failed()) failed++;
+		};
+		const TileIndex depot = TileXY(x0, y0);
+		if (Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, rt, DiagDirection::SW).Failed()) failed++;
+		for (uint i = 1; i <= L; i++) lay(x0 + i, y0, Track::X);
+		const uint a = x0 + L + 1, b = y0;
+		for (uint j = 0; j < D; j++) lay(a + j / 2, b + (j + 1) / 2, j % 2 == 0 ? Track::Right : Track::Left);
+		const uint yx = a + (D - 1) / 2, yy = b + (D - 1) / 2;
+		for (uint i = 1; i <= LY; i++) lay(yx, yy + i, Track::Y);
 		VehicleID train = VehicleID::Invalid();
 		if (engine != nullptr) {
 			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, engine->index, true, INVALID_CARGO, ClientID::Invalid);
