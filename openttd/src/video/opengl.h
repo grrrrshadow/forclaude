@@ -1,0 +1,211 @@
+/*
+ * This file is part of OpenTTD.
+ * OpenTTD is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, version 2.
+ * OpenTTD is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
+ * Changed for ottd Decouple by Karel Mácha: the changes Copyright (C) 2026 Karel Mácha.
+ */
+
+/** @file opengl.h OpenGL video driver support. */
+
+#ifndef VIDEO_OPENGL_H
+#define VIDEO_OPENGL_H
+
+#include "../core/geometry_type.hpp"
+#include "../gfx_type.h"
+#include "../spriteloader/spriteloader.hpp"
+#include "../misc/lrucache.hpp"
+#include "video_driver.hpp"
+
+#include <map>
+#include <mutex>
+#include <vector>
+
+typedef void (*OGLProc)();
+typedef OGLProc (*GetOGLProcAddressProc)(const char *proc);
+
+bool IsOpenGLVersionAtLeast(uint8_t major, uint8_t minor);
+bool HasStringInExtensionList(std::string_view string, std::string_view substring);
+
+class OpenGLSprite;
+
+using OpenGLSpriteLRUCache = LRUCache<SpriteID, std::unique_ptr<OpenGLSprite>>;
+
+/** Platform-independent back-end class for OpenGL video drivers. */
+class OpenGLBackend : public SpriteEncoder {
+private:
+	static OpenGLBackend *instance; ///< Singleton instance pointer.
+
+	bool persistent_mapping_supported = false; ///< Persistent pixel buffer mapping supported.
+	GLsync sync_vid_mapping{}; ///< Sync object for the persistently mapped video buffer.
+	GLsync sync_anim_mapping{}; ///< Sync object for the persistently mapped animation buffer.
+
+	void *vid_buffer = nullptr; ///< Pointer to the mapped video buffer.
+	GLuint vid_pbo = 0; ///< Pixel buffer object storing the memory used for the video driver to draw to.
+	GLuint vid_texture = 0; ///< Texture handle for the video buffer texture.
+	GLuint vid_program = 0; ///< Shader program for rendering a RGBA video buffer.
+	GLuint pal_program = 0; ///< Shader program for rendering a paletted video buffer.
+	GLuint vao_quad = 0; ///< Vertex array object storing the rendering state for the fullscreen quad.
+	GLuint vbo_quad = 0; ///< Vertex buffer with a fullscreen quad.
+	GLuint pal_texture = 0; ///< Palette lookup texture.
+
+	void *anim_buffer = nullptr; ///< Pointer to the mapped animation buffer.
+	GLuint anim_pbo = 0; ///< Pixel buffer object storing the memory used for the animation buffer.
+	GLuint anim_texture = 0; ///< Texture handle for the animation buffer texture.
+
+	std::vector<uint8_t> vid_pixels;  ///< What the video driver draws to: the game's own memory, its changes copied to vid_pbo (ReleaseVideoBuffer()).
+	std::vector<uint8_t> anim_pixels; ///< The same of the animation buffer, to anim_pbo; empty when the blitter needs none.
+
+	GLuint remap_program = 0; ///< Shader program for blending and rendering a RGBA + remap texture.
+	GLint  remap_sprite_loc = 0; ///< Uniform location for sprite parameters.
+	GLint  remap_screen_loc = 0; ///< Uniform location for screen size.
+	GLint  remap_zoom_loc = 0; ///< Uniform location for sprite zoom.
+	GLint  remap_rgb_loc = 0; ///< Uniform location for RGB mode flag.
+
+	GLuint sprite_program = 0; ///< Shader program for blending and rendering a sprite to the video buffer.
+	GLint  sprite_sprite_loc = 0; ///< Uniform location for sprite parameters.
+	GLint  sprite_screen_loc = 0; ///< Uniform location for screen size.
+	GLint  sprite_zoom_loc = 0; ///< Uniform location for sprite zoom.
+	GLint  sprite_rgb_loc = 0; ///< Uniform location for RGB mode flag.
+	GLint  sprite_crash_loc = 0; ///< Uniform location for crash remap mode flag.
+
+	OpenGLSpriteLRUCache cursor_cache; ///< Cache of encoded cursor sprites.
+	PaletteID last_sprite_pal = (PaletteID)-1; ///< Last uploaded remap palette.
+	bool clear_cursor_cache = false; ///< A clear of the cursor cache is pending.
+
+	Point cursor_pos{}; ///< Cursor position
+	bool cursor_in_window = false; ///< Cursor inside this window
+	std::vector<CursorSprite> cursor_sprites{}; ///< Sprites comprising cursor
+
+	/** A picture of the graphics card shown straight from it where a window's is (ShowThreeDPicture()). */
+	struct ThreeDPicture {
+		Rect r;           ///< where on the screen
+		GLuint texture;   ///< the card's, shared with this context
+		uint32_t tint;    ///< laid over it by its alpha (Colour::data), 0 none
+		bool under;       ///< shown under the others
+		uint32_t light;   ///< its colours multiplied by these, 256ths (Colour::data), 0 as they are
+		GLuint over = 0;     ///< the card's picture laid over it, its alpha multiplied in, 0 none
+		GLuint over_lit = 0; ///< which of over's pixels the light leaves as they are (its red), 0 none
+		std::array<float, 4> part = {0.0f, 0.0f, 1.0f, 1.0f}; ///< the part of the textures shown: left, top, width, height as parts of theirs
+	};
+	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
+	std::map<const void *, std::vector<VideoDriver::ThreeDGlow>> three_d_glows; ///< the glows over them (SetThreeDGlows()), by their owners
+	std::mutex three_d_mutex; ///< of three_d_pictures: set by the game, drawn by Paint()
+	GLuint three_d_program = 0; ///< Shader program for a picture of the graphics card where the screen's pixels are of alpha 0.
+	GLint  three_d_sprite_loc = 0; ///< Uniform location for its place.
+	GLint  three_d_screen_loc = 0; ///< Uniform location for screen size.
+	GLint  three_d_size_loc = 0; ///< Uniform location for screen size in the fragment shader.
+	GLint  three_d_tint_loc = 0; ///< Uniform location for its tint.
+	GLint  three_d_light_loc = -1; ///< Uniform location for its light (the night's).
+	GLint  three_d_over_loc = -1; ///< Uniform location for whether a picture is laid over it.
+	GLint  three_d_part_loc = -1; ///< Uniform location for the part of its textures shown.
+	GLuint three_d_glow_program = 0; ///< Shader program for the glows of the night over a picture of the graphics card (SetThreeDGlows()).
+	GLint  three_d_glow_sprite_loc = -1; ///< Uniform location for a glow's place.
+	GLint  three_d_glow_screen_loc = -1; ///< Uniform location for the screen size.
+	GLint  three_d_glow_size_loc = -1;   ///< Uniform location for the screen size in the fragment shader.
+	GLint  three_d_glow_colour_loc = -1; ///< Uniform location for its colour and strength.
+	GLint  three_d_glow_lit_loc = -1;    ///< Uniform location for its middle in the lit pixels and a pixel of them.
+
+	OpenGLBackend();
+	~OpenGLBackend() override;
+
+	std::optional<std::string_view> Init(const Dimension &screen_res);
+	bool InitShaders();
+
+	void InternalClearCursorCache();
+
+	void RenderOglSprite(const OpenGLSprite *gl_sprite, PaletteID pal, int x, int y, ZoomLevel zoom);
+
+	void *MapVideoBuffer();
+	uint8_t *MapAnimBuffer();
+
+public:
+	/**
+	 * Get singleton instance of this class.
+	 * @return Our instance.
+	 */
+	static inline OpenGLBackend *Get()
+	{
+		return OpenGLBackend::instance;
+	}
+
+	static std::optional<std::string_view> Create(GetOGLProcAddressProc get_proc, const Dimension &screen_res);
+	static void Destroy();
+
+	void PrepareContext();
+
+	std::string GetDriverName();
+
+	void UpdatePalette(const Colour *pal, uint first, uint length);
+	bool Resize(int w, int h, bool force = false);
+	void Paint();
+
+	void DrawMouseCursor();
+	void PopulateCursorCache();
+	void ClearCursorCache();
+
+	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f});
+	void HideThreeDPicture(const void *owner);
+	void SetThreeDGlows(const void *owner, std::vector<VideoDriver::ThreeDGlow> &&glows);
+	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
+
+	void *GetVideoBuffer();
+	uint8_t *GetAnimBuffer();
+	void ReleaseVideoBuffer(const Rect &update_rect);
+	void ReleaseAnimBuffer(const Rect &update_rect);
+
+	/* SpriteEncoder */
+
+	bool Is32BppSupported() override { return true; }
+	uint GetSpriteAlignment() override { return 1u << to_underlying(ZoomLevel::Max); }
+	/* The cursor sprites are textures with a mip level for every zoom level from 16x down, so the 16x
+	 * level must have its pixels even while 16x is off (ResizeSprites() gives it its size alone otherwise). */
+	bool NeedsRootPixels() const override { return true; }
+	Sprite *Encode(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite, SpriteAllocator &allocator) override;
+};
+
+
+/** Class that encapsulates a RGBA texture together with a paletted remap texture. */
+class OpenGLSprite {
+private:
+	/** Enum of all used OpenGL texture objects. */
+	enum class Texture : uint8_t {
+		RGBA, ///< RGBA texture part.
+		Remap, ///< Remap texture part.
+		End, ///< End marker.
+	};
+
+	Dimension dim{};
+	EnumIndexArray<GLuint, Texture, Texture::End> tex{}; ///< The texture objects.
+	int16_t x_offs = 0;  ///< Number of pixels to shift the sprite to the right.
+	int16_t y_offs = 0;  ///< Number of pixels to shift the sprite downwards.
+
+	static EnumIndexArray<GLuint, Texture, Texture::End> dummy_tex; ///< 1x1 dummy textures to substitute for unused sprite components.
+
+	static GLuint pal_identity; ///< Identity texture mapping.
+	static GLuint pal_tex;      ///< Texture for palette remap.
+	static GLuint pal_pbo;      ///< Pixel buffer object for remap upload.
+
+	static bool Create();
+	static void Destroy();
+
+	bool BindTextures() const;
+
+public:
+	OpenGLSprite(SpriteType sprite_type, const SpriteLoader::SpriteCollection &sprite);
+
+	/* No support for moving/copying the textures is implemented. */
+	OpenGLSprite(const OpenGLSprite&) = delete;
+	OpenGLSprite(OpenGLSprite&&) = delete;
+	OpenGLSprite& operator=(const OpenGLSprite&) = delete;
+	OpenGLSprite& operator=(OpenGLSprite&&) = delete;
+	~OpenGLSprite();
+
+	void Update(uint width, uint height, uint level, const SpriteLoader::CommonPixel *data);
+	Dimension GetSize(ZoomLevel level) const;
+
+	friend class OpenGLBackend;
+};
+
+#endif /* VIDEO_OPENGL_H */

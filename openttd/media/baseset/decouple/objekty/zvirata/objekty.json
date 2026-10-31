@@ -1,0 +1,1687 @@
+[
+ {
+  "soubor": "los.glb",
+  "jmeno": "los",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "los",
+   "en": "moose"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.96,
+   1.36,
+   2.4
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 6394,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "wapiti.glb",
+  "jmeno": "wapiti",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "wapiti",
+   "en": "elk"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.26,
+   1.4,
+   2.4
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 7886,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "jelen.glb",
+  "jmeno": "jelen",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "jelen",
+   "en": "deer"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.98,
+   0.88,
+   1.8
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 7948,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; od 31. 10. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py)",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.9464,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.7
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.27
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.13
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.13
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  }
+ },
+ {
+  "soubor": "lan.glb",
+  "jmeno": "lan",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "laň",
+   "en": "doe"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.83,
+   0.38,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5216,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; od 31. 10. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py)",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.8851,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.65
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.19
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.99
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.99
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  }
+ },
+ {
+  "soubor": "vidloroh.glb",
+  "jmeno": "vidloroh",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "vidloroh",
+   "en": "pronghorn"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.59,
+   0.38,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 4688,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; od 31. 10. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py)",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.7774,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.58
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.04
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.75
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.75
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  }
+ },
+ {
+  "soubor": "ovce_tlustoroha.glb",
+  "jmeno": "ovce_tlustoroha",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ovce tlustorohá",
+   "en": "bighorn sheep"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.46,
+   0.5,
+   1.2
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5518,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; od 31. 10. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py)",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.7878,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.58
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.06
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.77
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.77
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  }
+ },
+ {
+  "soubor": "medved.glb",
+  "jmeno": "medved",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "medvěd",
+   "en": "bear"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.94,
+   0.65,
+   1.3
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "vyprovokovat",
+  "trojuhelniku": 7508,
+  "autor": "Stylized Animals BIG PACK, WildMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-animals-big-pack-c861b2baefa54cc4b2deb64abc5afbf4), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést WildMesh 3D; změny: otočený, zmenšený na skutečnou velikost, vyříznutý z balíku)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "zirafa.glb",
+  "jmeno": "zirafa",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "žirafa",
+   "en": "giraffe"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   4.32,
+   1.48,
+   5.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "idle_02",
+    "snimku": 57,
+    "tiku": 5
+   },
+   "chuze": {
+    "animace": "walk",
+    "snimku": 49,
+    "tiku": 1,
+    "krok_m": 2.78
+   },
+   "beh": {
+    "animace": "run_fast",
+    "snimku": 25,
+    "tiku": 1,
+    "krok_m": 12.37
+   },
+   "dupe": {
+    "animace": "giraffestomp",
+    "snimku": 21,
+    "tiku": 1
+   },
+   "utok": {
+    "animace": "attack_02",
+    "snimku": 37,
+    "tiku": 2
+   }
+  },
+  "trojuhelniku": 1966,
+  "autor": "Giraffe, planeta-elefante (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/giraffe-2f389c12391f422e966c7f63b7813d31), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést planeta-elefante; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "slon.glb",
+  "jmeno": "slon",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "slon",
+   "en": "elephant"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   5.35,
+   2.62,
+   3.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "CINEMA_4D_Principal",
+    "snimku": 55,
+    "tiku": 6
+   }
+  },
+  "trojuhelniku": 5998,
+  "autor": "Elephant Animation Idle, GremorySaiyan (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/elephant-animation-idle-a8e7e10f005f4baab0a2f5079d759fcd), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést GremorySaiyan; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "lev.glb",
+  "jmeno": "lev",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "lev",
+   "en": "lion"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.59,
+   0.61,
+   1.2
+  ],
+  "kde": "okoli",
+  "klima": "poust",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "GltfAnimation 0",
+    "snimku": 55,
+    "tiku": 2
+   }
+  },
+  "trojuhelniku": 5497,
+  "autor": "Lion, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/lion-fc6eeed56f6e44048be4e6051a77c072), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "mamut.glb",
+  "jmeno": "mamut",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "mamut",
+   "en": "mammoth"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   5.94,
+   2.01,
+   3.5
+  ],
+  "kde": "okoli",
+  "klima": "subarkticke",
+  "povaha": "vyprovokovat",
+  "pozy": {
+   "klid": {
+    "animace": "idleLookAround",
+    "snimku": 53,
+    "tiku": 3
+   },
+   "zere": {
+    "animace": "idle_eat",
+    "snimku": 55,
+    "tiku": 4
+   }
+  },
+  "trojuhelniku": 2466,
+  "autor": "Manny the Mammoth, planeta-elefante (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/manny-the-mammoth-b4962af31e994a47b8b46fd4d0d13901), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést planeta-elefante; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)"
+ },
+ {
+  "soubor": "opice_madagaskar.glb",
+  "jmeno": "opice_madagaskar",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opice",
+   "en": "monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.29,
+   0.89,
+   0.65
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "klid",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 11709,
+  "autor": "Monkey (Madagascar), Guilherme Navarro (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-madagascar-ac75d17f2b464e49975d7b79a1f9d084), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést Guilherme Navarro; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); ruce spuštěné z pózy T modelu o 45° pod vodorovnou (póza klid o jednom snímku)"
+ },
+ {
+  "soubor": "opice_sergio.glb",
+  "jmeno": "opice_sergio",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opice Sergio",
+   "en": "monkey Sergio"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.31,
+   0.63,
+   0.6
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 28412,
+  "autor": "Monkey Sergio, FabianRetamal (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-sergio-42a1cfd5d17649f8ac4d6a835e21d6a7), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést FabianRetamal; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "opice_stylizovana.glb",
+  "jmeno": "opice_stylizovana",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "opička",
+   "en": "little monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.38,
+   0.33,
+   0.5
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "klid": {
+    "animace": "klid",
+    "snimku": 1,
+    "tiku": 1
+   }
+  },
+  "trojuhelniku": 11178,
+  "autor": "Stylized Monkey 3D Model (Free Download), ToonMesh 3D (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-monkey-3d-model-free-download-fb8322a7cd0d43fd894f2f7fef2deca1), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést ToonMesh 3D; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); ruce spuštěné z pózy T modelu o 70° pod vodorovnou (póza klid o jednom snímku)"
+ },
+ {
+  "soubor": "opice_hneda.glb",
+  "jmeno": "opice_hneda",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "hnědá opice",
+   "en": "brown monkey"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.21,
+   0.44,
+   0.6
+  ],
+  "kde": [
+   "ulice",
+   "strecha"
+  ],
+  "klima": "poust",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5392,
+  "autor": "JUST MONKEY BODY, HumAi Club (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/just-monkey-body-353a648db4034239b131b77c5d55186f), převod tvorove/par13_zvirata.py bez renderu",
+  "licence": "CC BY 4.0 (uvést HumAi Club; změny: otočený, zmenšený na skutečnou velikost)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_1.glb",
+  "jmeno": "krysa_kreslena_1",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_2.glb",
+  "jmeno": "krysa_kreslena_2",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "krysa_kreslena_3.glb",
+  "jmeno": "krysa_kreslena_3",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslená krysa",
+   "en": "cartoon rat"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.2,
+   0.35,
+   0.48
+  ],
+  "kde": "okoli",
+  "tema": "hlinene",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1373,
+  "autor": "Cartoon Low Poly Rat Pack, Overaction Game Studio (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/cartoon-low-poly-rat-pack-2c9b95f5b3094a789c4b23fca07d0bc9), převod tvorove/par14_psi.py bez renderu",
+  "licence": "SKETCHFAB Standard (jen ve hře, model sám dál nešířit; změny: vyříznutá z balíku, otočená, zmenšená na skutečnou velikost)",
+  "poznamka": "zvíře v houbovém lese kolem hliněných měst, neútočí; zvětšená, aby byla vidět (1.2 m i s ocasem), meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "dinosaurus.glb",
+  "jmeno": "dinosaurus",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "dinosaurus",
+   "en": "funny dinosaur"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.7,
+   0.77,
+   1.6
+  ],
+  "kde": "okoli",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 15058,
+  "autor": "Funny Dinosaur, emelyarules (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/funny-dinosaur-bb5cd2c390e0403885b6f9bf04daf2d6), převod tvorove/par15_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést emelyarules; změny: otočený, zmenšený na 1,6 m)",
+  "poznamka": "zvíře (hráč: „zvířata funny dinosaur“) kolem měst, neútočí; 1,6 m vysoký, meritko 2, čelem k +x, počátek na zemi; bez kostry, jedna póza; glb z gltfpacku"
+ },
+ {
+  "soubor": "zajic.glb",
+  "jmeno": "zajic",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "zajíc",
+   "en": "hare"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.54,
+   0.26,
+   0.65
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 3840,
+  "animace": {
+   "skok": {
+    "uzly": "skok_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.7
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: hnědý zajíc sedí na dlouhých zadních nohách, uši nahoru s černými špičkami, bílý ocásek; skáče; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků skok_00 až skok_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 60 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "veverka.glb",
+  "jmeno": "veverka",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "veverka",
+   "en": "red squirrel"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.33,
+   0.14,
+   0.35
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 5656,
+  "animace": {
+   "skok": {
+    "uzly": "skok_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.45
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: rezavá veverka sedí na zadních s tlapkami u sebe, štětičky na uších, huňatý ocas stočený po zádech; skáče; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků skok_00 až skok_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 86 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "jezek.glb",
+  "jmeno": "jezek",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ježek",
+   "en": "hedgehog"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.36,
+   0.23,
+   0.19
+  ],
+  "kde": "okoli",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 3712,
+  "animace": {
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 3,
+    "smycka": true,
+    "krok_m": 0.3
+   }
+  },
+  "autor": "grrrrf: vlastní model tvorove/lesni_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "lesní zvíře do průmyslu les (zvirata u les_zem a les_paseka) i kolem měst: ježek s bodlinami na hřbetě (hnědošedé se světlými špičkami), špičatý čumák s černým nosem; cupitá; skutečné metry, meritko 2 jako ostatní zvířata, čelem k +x, počátek na zemi pod tělem; 8 snímků chuze_00 až chuze_07: tělo jako instance jedné sítě, uzel snímku ho zvedá a naklání; krok_m za jedno kolo; bez kostry; 55 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "prase.glb",
+  "jmeno": "prase",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "prasátko",
+   "en": "pig"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.27,
+   0.51,
+   0.71
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 1012,
+  "animace": {
+   "pase": {
+    "uzly": "pase_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.0
+   },
+   "kouka": {
+    "uzly": "pase_00",
+    "snimku": 1,
+    "tiku": 240,
+    "smycka": false,
+    "krok_m": 0.0
+   }
+  },
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   1.35,
+   0.58,
+   0.71
+  ],
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    1.35,
+    0.58
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): růžové prasátko: kulaté tělo, plochý rypák, uši sklopené dopředu, zatočený ocásek, tmavá kopýtka; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 10 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "krava.glb",
+  "jmeno": "krava",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kravička",
+   "en": "cow"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   2.21,
+   0.88,
+   1.68
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 2616,
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   2.29,
+   0.95,
+   1.68
+  ],
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    2.29,
+    0.95
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "model cow (Star, 3D Warehouse, cow_3D_Star.zip), převod tvorove/farma_zvirata.py jako u nákladu Tater",
+  "licence": "3D Warehouse General Model License (společná licence balíčků)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): kravička z nákladu Tater (model cow, Star, 3D Warehouse, poslal hráč 7. 10.; hráč: „bude jedna krava naklad i na pastvu“): hlava zvednutá v pase_00 jako na korbě, při pasení skloněná; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; neplatí od 31. 10. (místo snímků je kostra): 8 snímků pase_00 až pase_07: krk se ohýbá plynule: tělo je jedna síť pro všechny snímky, přední část s krkem a hlavou má tři sítě (nahoře, jako v modelu, skloněná, u trávy) na osm snímků (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); od 31. 10. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py); uzel pase_00 je síť na kostře, v klidu (bez animace) stojí s hlavou nahoře jako dřív, na korbě se kreslí tak; kouka je stoji",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.1029,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.82
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.48
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.48
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.48
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "kouka": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   }
+  }
+ },
+ {
+  "soubor": "ovce.glb",
+  "jmeno": "ovce",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "ovečka",
+   "en": "sheep"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   1.05,
+   0.49,
+   0.74
+  ],
+  "kde": "farma",
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "trojuhelniku": 768,
+  "animace": {
+   "pase": {
+    "uzly": "pase_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.0
+   },
+   "kouka": {
+    "uzly": "pase_00",
+    "snimku": 1,
+    "tiku": 240,
+    "smycka": false,
+    "krok_m": 0.0
+   }
+  },
+  "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
+  "rozmer_nakladu": [
+   1.13,
+   0.56,
+   0.74
+  ],
+  "naklad": {
+   "sada": "naklady",
+   "rozmer_m": [
+    1.13,
+    0.56
+   ],
+   "uzel": "pase_00",
+   "meritko": 1
+  },
+  "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): ovečka jako na korbě V3S: jedno hladké krémové rouno, tmavá hlava, uši a nohy; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 9 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kun_trampsky.glb",
+  "jmeno": "kun_trampsky",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "trampský kůň",
+   "en": "tramp horse"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.76,
+   0.9,
+   2.3
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.5786,
+  "trojuhelniku": 6394,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 1.17
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 2.12
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.56
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.56
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Horse, LostBoyz2078 (Sketchfab, CC BY-NC 4.0, https://sketchfab.com/3d-models/horse-771b557e626e46eeb15ddd5f168498e7); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY-NC 4.0 (uvést LostBoyz2078; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "jezdec": {
+   "osob": 1,
+   "poznamka": "uveze 1 osobu, prázdný jde bez jezdce (hráč 28. 10.); sedlo: kost Spine1"
+  },
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku",
+  "sedlo": {
+   "uzel": "sedlo",
+   "kost": "Spine1",
+   "poloha": [
+    0.183,
+    1.666,
+    0.0
+   ],
+   "kotva": "sed",
+   "poza": "special_jizda",
+   "poznamka": "bod sedu jezdkyně (holka v póze special_jizda…_<holka> s počátkem v bodě sedu) na hřbetě nebo v sedle, nejníž mezi kostí Spine a kohoutkem; uzel sedlo jde s kostí Spine1; poloha v klidu, glTF (x dopředu, y nahoru, z doprava)"
+  },
+  "spojeni": {
+   "vzadu": [
+    0.931,
+    0.0,
+    1.322
+   ],
+   "poznamka": "vzadu: hrot ramene (přední hrana hrudi u ramenního kloubu), tam končí oje vozu (spojeni.vpredu vozu); rám vozidla jako vozy: x dopředu, y doleva, z nahoru, v klidu"
+  }
+ },
+ {
+  "soubor": "kun_obrneny.glb",
+  "jmeno": "kun_obrneny",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "obrněný kůň",
+   "en": "armored horse"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.73,
+   0.78,
+   2.4
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.6087,
+  "trojuhelniku": 44008,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 1.19
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 2.16
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.62
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.62
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Armored Horse, naminoff (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/armored-horse-98c3f1c40a6b422dba76bf5403e0a3d8); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést naminoff; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "jezdec": {
+   "osob": 1,
+   "poznamka": "uveze 1 osobu, prázdný jde bez jezdce (hráč 28. 10.); sedlo: kost Spine1"
+  },
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku",
+  "sedlo": {
+   "uzel": "sedlo",
+   "kost": "Spine1",
+   "poloha": [
+    0.113,
+    1.808,
+    0.0
+   ],
+   "kotva": "sed",
+   "poza": "special_jizda",
+   "poznamka": "bod sedu jezdkyně (holka v póze special_jizda…_<holka> s počátkem v bodě sedu) na hřbetě nebo v sedle, nejníž mezi kostí Spine a kohoutkem; uzel sedlo jde s kostí Spine1; poloha v klidu, glTF (x dopředu, y nahoru, z doprava)"
+  },
+  "spojeni": {
+   "vzadu": [
+    1.121,
+    0.0,
+    1.347
+   ],
+   "poznamka": "vzadu: hrot ramene (přední hrana hrudi u ramenního kloubu), tam končí oje vozu (spojeni.vpredu vozu); rám vozidla jako vozy: x dopředu, y doleva, z nahoru, v klidu"
+  }
+ },
+ {
+  "soubor": "kun_sedlo.glb",
+  "jmeno": "kun_sedlo",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kůň se sedlem",
+   "en": "saddled horse"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   3.12,
+   0.73,
+   2.3
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.5046,
+  "trojuhelniku": 7664,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 1.11
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 2.02
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.39
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.39
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Free to use - Low Poly Horse, chi3dmodel (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/free-to-use-low-poly-horse-527c570af430404ba8458d473db8cc20); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést chi3dmodel; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "jezdec": {
+   "osob": 1,
+   "poznamka": "uveze 1 osobu, prázdný jde bez jezdce (hráč 28. 10.); sedlo: kost Spine1"
+  },
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku",
+  "sedlo": {
+   "uzel": "sedlo",
+   "kost": "Spine1",
+   "poloha": [
+    -0.023,
+    1.673,
+    0.0
+   ],
+   "kotva": "sed",
+   "poza": "special_jizda",
+   "poznamka": "bod sedu jezdkyně (holka v póze special_jizda…_<holka> s počátkem v bodě sedu) na hřbetě nebo v sedle, nejníž mezi kostí Spine a kohoutkem; uzel sedlo jde s kostí Spine1; poloha v klidu, glTF (x dopředu, y nahoru, z doprava)"
+  },
+  "spojeni": {
+   "vzadu": [
+    0.784,
+    0.0,
+    1.26
+   ],
+   "poznamka": "vzadu: hrot ramene (přední hrana hrudi u ramenního kloubu), tam končí oje vozu (spojeni.vpredu vozu); rám vozidla jako vozy: x dopředu, y doleva, z nahoru, v klidu"
+  }
+ },
+ {
+  "soubor": "konik_spirit.glb",
+  "jmeno": "konik_spirit",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "kreslený koník (hříbě)",
+   "en": "cartoon foal"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   1.44,
+   0.38,
+   1.6
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.0094,
+  "trojuhelniku": 50484,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.75
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 1.36
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.27
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 2.27
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Horse - Foal - Character Spirit, clarissapinto (hříbě Spirit z filmu DreamWorks, fanouškovský model: jen do naší hry) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/horse-foal-character-spirit-7440d3f1150544fca9ebe25a4c5b4f07); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést clarissapinto; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku"
+ },
+ {
+  "soubor": "kun_belous.glb",
+  "jmeno": "kun_belous",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "bělouš",
+   "en": "grey horse"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   2.83,
+   0.65,
+   2.3
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.5218,
+  "trojuhelniku": 42631,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 1.13
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 2.04
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.43
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 3.43
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Horse, kenchoo (jeho stání je stoji všech čtyřnožců) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/horse-041e84c8a0c34944a38b948a2c58fc0f); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést kenchoo; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku; bělouš z koně, jehož stání je stoji všech čtyřnožců; při pastvě se vpředu skloní a rozkročí",
+  "sedlo": {
+   "uzel": "sedlo",
+   "kost": "Spine1",
+   "poloha": [
+    0.1,
+    1.699,
+    0.0
+   ],
+   "kotva": "sed",
+   "poza": "special_jizda",
+   "poznamka": "bod sedu jezdkyně (holka v póze special_jizda…_<holka> s počátkem v bodě sedu) na hřbetě nebo v sedle, nejníž mezi kostí Spine a kohoutkem; uzel sedlo jde s kostí Spine1; poloha v klidu, glTF (x dopředu, y nahoru, z doprava)"
+  },
+  "spojeni": {
+   "vzadu": [
+    0.935,
+    0.0,
+    1.274
+   ],
+   "poznamka": "vzadu: hrot ramene (přední hrana hrudi u ramenního kloubu), tam končí oje vozu (spojeni.vpredu vozu); rám vozidla jako vozy: x dopředu, y doleva, z nahoru, v klidu"
+  }
+ },
+ {
+  "soubor": "kun_tazny.glb",
+  "jmeno": "kun_tazny",
+  "druh": "zvire",
+  "nazev": {
+   "cs": "tažný kůň",
+   "en": "draft horse"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   3.57,
+   1.18,
+   2.6
+  ],
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.7559,
+  "trojuhelniku": 37239,
+  "kde": [
+   "farma",
+   "les",
+   "okoli"
+  ],
+  "klima": "mirne",
+  "povaha": "mirumilovne",
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 1.35
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 2.46
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 4.12
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 4.12
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   }
+  },
+  "autor": "Draft Horse Walk, honved444 (jeden kůň z páru v postroji) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/draft-horse-walk-0541f4f11cb44383bf32b906aac5288e); kostra a pohyby tvorove/ctyrnozec.py, bez renderu",
+  "licence": "CC BY 4.0 (uvést honved444; změny: otočený, na skutečnou velikost, kostra a pohyby naše)",
+  "k_vozu": true,
+  "poznamka": "kůň z par17 (28. 10.) na společné kostře čtyřnožců (kostra ctyrnozec, 28 kostí, klid bez otočení, rám glTF +x dopředu, +y nahoru, +z doprava); pohyby jsou animace v souboru (pozy) i společné v ctyrnozec_pohyby.glb (rotace podle jmen kostí, Hips krát poměr vyska_kycli); kopyta při došlapu stojí (krok_m = kolik ujde za cyklus); stoji je stání koně kuň_pohyby_horse (ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní); počátek mezi kopyty na zemi, čelem k +x, skutečná výška; glb z gltfpacku; tažný kůň k vozům (hráč: „kuň_chuze_draft_horse_walk.glb použijem k vozum“), jeden z páru, s chomoutem a postrojem (tuhé na hřbetě a krku); váhy z jeho vlastní kostry; při pastvě se vpředu skloní a rozkročí, krk má krátký",
+  "sedlo": {
+   "uzel": "sedlo",
+   "kost": "Spine1",
+   "poloha": [
+    0.237,
+    2.003,
+    0.0
+   ],
+   "kotva": "sed",
+   "poza": "special_jizda_siroky",
+   "poznamka": "bod sedu jezdkyně (holka v póze special_jizda…_<holka> s počátkem v bodě sedu) na hřbetě nebo v sedle, nejníž mezi kostí Spine a kohoutkem; uzel sedlo jde s kostí Spine1; poloha v klidu, glTF (x dopředu, y nahoru, z doprava)"
+  },
+  "spojeni": {
+   "vzadu": [
+    0.997,
+    0.0,
+    1.354
+   ],
+   "poznamka": "vzadu: hrot ramene (přední hrana hrudi u ramenního kloubu), tam končí oje vozu (spojeni.vpredu vozu); rám vozidla jako vozy: x dopředu, y doleva, z nahoru, v klidu"
+  }
+ },
+ {
+  "soubor": "ctyrnozec_pohyby.glb",
+  "jmeno": "ctyrnozec_pohyby",
+  "druh": "pohyby",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 1.5046,
+  "kosti": [
+   [
+    "Hips",
+    null
+   ],
+   [
+    "Spine",
+    "Hips"
+   ],
+   [
+    "Spine1",
+    "Spine"
+   ],
+   [
+    "Chest",
+    "Spine1"
+   ],
+   [
+    "Neck",
+    "Chest"
+   ],
+   [
+    "Neck1",
+    "Neck"
+   ],
+   [
+    "Head",
+    "Neck1"
+   ],
+   [
+    "Tail",
+    "Hips"
+   ],
+   [
+    "Tail1",
+    "Tail"
+   ],
+   [
+    "Tail2",
+    "Tail1"
+   ],
+   [
+    "LeftScapula",
+    "Chest"
+   ],
+   [
+    "LeftFrontUpper",
+    "LeftScapula"
+   ],
+   [
+    "LeftFrontLower",
+    "LeftFrontUpper"
+   ],
+   [
+    "LeftFrontCannon",
+    "LeftFrontLower"
+   ],
+   [
+    "LeftFrontHoof",
+    "LeftFrontCannon"
+   ],
+   [
+    "LeftBackUpper",
+    "Hips"
+   ],
+   [
+    "LeftBackLower",
+    "LeftBackUpper"
+   ],
+   [
+    "LeftBackCannon",
+    "LeftBackLower"
+   ],
+   [
+    "LeftBackHoof",
+    "LeftBackCannon"
+   ],
+   [
+    "RightScapula",
+    "Chest"
+   ],
+   [
+    "RightFrontUpper",
+    "RightScapula"
+   ],
+   [
+    "RightFrontLower",
+    "RightFrontUpper"
+   ],
+   [
+    "RightFrontCannon",
+    "RightFrontLower"
+   ],
+   [
+    "RightFrontHoof",
+    "RightFrontCannon"
+   ],
+   [
+    "RightBackUpper",
+    "Hips"
+   ],
+   [
+    "RightBackLower",
+    "RightBackUpper"
+   ],
+   [
+    "RightBackCannon",
+    "RightBackLower"
+   ],
+   [
+    "RightBackHoof",
+    "RightBackCannon"
+   ]
+  ],
+  "pohyby": {
+   "stoji": {
+    "doba_s": 10.4,
+    "smycka": true
+   },
+   "chuze": {
+    "doba_s": 1.1,
+    "smycka": true,
+    "krok_m": 1.11
+   },
+   "klus": {
+    "doba_s": 0.72,
+    "smycka": true,
+    "krok_m": 2.02
+   },
+   "cval": {
+    "doba_s": 0.46,
+    "smycka": true,
+    "krok_m": 3.39
+   },
+   "pase": {
+    "doba_s": 4.0,
+    "smycka": true
+   }
+  },
+  "autor": "grrrrf: tvorove/ctyrnozec.py (pohyby udělané na koni kun_sedlo; stoji podle stání koně Horse, kenchoo, Sketchfab, CC BY 4.0)",
+  "licence": "CC BY 4.0",
+  "poznamka": "jen kostra (uzly kostí s klidovým odsazením kun_sedlo) a animace: rotation všech kostí (lokální, vůči rodiči), translation kosti Hips; na zvíře se stejnou kostrou: rotace podle jmen kostí, translace kostí jeho vlastní, Hips z pohybu krát vyska_kycli zvířete / vyska_kycli pohybů. chuze: krok ve čtyřech dobách, klus: diagonální páry, cval: se vznosem, stoji: stání koně kuň_pohyby_horse (kenchoo), 10,4 s: ohlíží se, kývá hlavou, švihá ocasem, jednou hrabe levou zadní, pase: krk dolů, tlama u trávy"
+ }
+]

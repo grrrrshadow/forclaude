@@ -1,0 +1,7548 @@
+[
+ {
+  "soubor": "dum_1c_vysoky_0.glb",
+  "jmeno": "dum_1c_vysoky_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 28,
+  "varianty": [
+   0,
+   1
+  ],
+  "autor": "grrrrf (dum_glb.py z ruční tabulky objemů hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, nižší (sprite 0x5ff, 32 m); varianty 2 a 3 (0x60f, 36 m) zůstávají; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.71,
+     13.3,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (760 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "stisk": {
+   "x": [
+    1.0,
+    0.0
+   ],
+   "y": [
+    0.88038,
+    1.39413
+   ]
+  },
+  "okraje_poznamka": "zúženo pro uličky 3 m (domy/stisk_glb.py)"
+ },
+ {
+  "soubor": "dum_1c_vysoky_2.glb",
+  "jmeno": "dum_1c_vysoky_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 28,
+  "varianty": [
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů hra/3d-z-obrazku/modely, nové tabulky auto_tabulka.py), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, vyšší (sprite 0x60f), jeden kvádr; 14 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     13.3,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.33,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (576 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "stisk": {
+   "x": [
+    0.88589,
+    1.5
+   ],
+   "y": [
+    1.0,
+    -0.2975
+   ]
+  },
+  "okraje_poznamka": "zúženo pro uličky 3 m (domy/stisk_glb.py)"
+ },
+ {
+  "soubor": "dum_03_kostel.glb",
+  "jmeno": "dum_03_kostel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 3,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_03_kostel_maska_strecha.png",
+    "zacatek": 146,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_03_kostel_maska_omitka.png",
+    "zacatek": 233,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     7.38,
+     12.96,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.8
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     3.112,
+     3.112,
+     0.0
+    ],
+    "otoceni": 157.0,
+    "meritko": 0.5417
+   },
+   {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     11.686,
+     3.112,
+     0.0
+    ],
+    "otoceni": 223.0,
+    "meritko": 0.5417
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.795,
+     12.366,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     13.052,
+     11.967,
+     0.0
+    ],
+    "otoceni": 64.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     12.885,
+     7.48,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     5.585,
+     13.102,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     9.175,
+     13.102,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (144 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kostel s věží; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo u zdi, dvě lavičky u vchodu; 1018 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 22.14 m"
+ },
+ {
+  "soubor": "dum_06_mestske_0.glb",
+  "jmeno": "dum_06_mestske_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 6,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_06_mestske_0_maska_strecha.png",
+    "zacatek": 146,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_06_mestske_0_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_06_mestske_0_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.17,
+     5.19,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1
+   },
+   {
+    "poloha": [
+     11.17,
+     10.57,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.169,
+     2.394,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.169,
+     7.98,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.369,
+     12.536,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.394,
+     2.394,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     2.593,
+     11.97,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "kolo_7c9fe836",
+    "poloha": [
+     11.491,
+     3.89,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     11.77,
+     11.97,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "klepac_5c888211",
+    "poloha": [
+     1.556,
+     7.481,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kocarek_99914b93",
+    "poloha": [
+     12.369,
+     8.179,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     11.77,
+     5.19,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     11.67,
+     7.88,
+     3.24
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Městský dvojdům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dámské kolo s košíkem, popelnice, prádlo, klepač s kobercem, kočárek; 3052 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.07 m"
+ },
+ {
+  "soubor": "dum_06_mestske_2.glb",
+  "jmeno": "dum_06_mestske_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 6,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_06_mestske_2_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_06_mestske_2_maska_omitka.png",
+    "zacatek": 227,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_06_mestske_2_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.57,
+     8.78,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.995,
+     2.194,
+     0.0
+    ],
+    "otoceni": 220.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.967,
+     1.995,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     13.084,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     5.187,
+     3.142,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.536,
+     12.536,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     11.89,
+     4.489,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     12.169,
+     10.573,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kralikarna_99914b93",
+    "poloha": [
+     4.389,
+     6.035,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "konev_99914b93",
+    "poloha": [
+     12.768,
+     5.985,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     12.17,
+     8.78,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     4.39,
+     4.89,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u králíkárny"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (84 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Přízemní městský dům do L; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo, králíkárna, konev, okenice; 6072 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 7.08 m"
+ },
+ {
+  "soubor": "dum_0e_obchody.glb",
+  "jmeno": "dum_0e_obchody",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 14,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_0e_obchody_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_0e_obchody_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.93,
+     5.03,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.47
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     13.218,
+     10.543,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_19227a85",
+    "poloha": [
+     4.114,
+     13.218,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     6.134,
+     13.218,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     13.48,
+     5.03,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodním domem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 55,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (660 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní dům s výkladními skříněmi a mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u výloh; 12696 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.26 m"
+ },
+ {
+  "soubor": "dum_0f_obchody_kridlo.glb",
+  "jmeno": "dum_0f_obchody_kridlo",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 15,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_0f_obchody_kridlo_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_0f_obchody_kridlo_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.54,
+     10.39,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.25
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.051,
+     12.327,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "kolo_3a822c38",
+    "poloha": [
+     13.218,
+     2.622,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_b08bbfca",
+    "poloha": [
+     5.104,
+     13.218,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     8.667,
+     11.357,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     10.54,
+     10.97,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří pekařství"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 42,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (504 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kanceláře s pekařstvím v křídle; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice; 8100 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 17.17 m"
+ },
+ {
+  "soubor": "dum_10_obchody_vez.glb",
+  "jmeno": "dum_10_obchody_vez",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 16,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_10_obchody_vez_maska_strecha.png",
+    "zacatek": 146,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_10_obchody_vez_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.95,
+     8.28,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.8
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     8.076,
+     1.736,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     13.218,
+     4.987,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_7c9fe836",
+    "poloha": [
+     13.218,
+     11.571,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     13.47,
+     8.28,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před kancelářemi"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 59,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (708 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kanceláře, šestipatrový dům s mansardou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 10038 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
+ },
+ {
+  "soubor": "dum_18_stare_0.glb",
+  "jmeno": "dum_18_stare_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 24,
+  "varianty": [
+   0
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_18_stare_0_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_18_stare_0_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_18_stare_0_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.58,
+     4.93,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.99
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     12.382,
+     0.0
+    ],
+    "otoceni": 330.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.568,
+     11.985,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.374,
+     3.046,
+     0.0
+    ],
+    "otoceni": 300.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.369,
+     2.321,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     9.895,
+     7.019,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.78,
+     12.233,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "drivi_12825a67",
+    "poloha": [
+     5.386,
+     9.999,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     10.274,
+     1.846,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     10.17,
+     4.93,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     3.39,
+     6.52,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u prádla na zahradě"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 8,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (96 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Starý bílý dům s valbovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, lavička, prádlo, dříví, popelnice, trpaslík; 5958 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+ },
+ {
+  "soubor": "dum_18_stare_1.glb",
+  "jmeno": "dum_18_stare_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 24,
+  "varianty": [
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_18_stare_1_maska_strecha.png",
+    "zacatek": 127,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_18_stare_1_maska_plot.png",
+    "zacatek": 137,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.37,
+     6.98,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.995,
+     1.995,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.768,
+     12.369,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.484,
+     12.316,
+     0.0
+    ],
+    "otoceni": 160.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     7.182,
+     11.291,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "bouda_99914b93",
+    "poloha": [
+     12.568,
+     8.977,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "drivi_f294556a",
+    "poloha": [
+     3.591,
+     6.982,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "konev_99914b93",
+    "poloha": [
+     12.867,
+     3.79,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     10.97,
+     6.98,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     12.17,
+     3.89,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u studny"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 6,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (72 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Starý kamenný dům s okenicemi a studnou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, prádlo, psí bouda, dříví, konev, trpaslík, okenice; 6122 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.18 m"
+ },
+ {
+  "soubor": "dum_18_stare_2.glb",
+  "jmeno": "dum_18_stare_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 24,
+  "varianty": [
+   2
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_18_stare_2_maska_strecha.png",
+    "zacatek": 146,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_18_stare_2_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_18_stare_2_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.97,
+     7.38,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.995,
+     2.394,
+     0.0
+    ],
+    "otoceni": 190.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.568,
+     2.194,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     2.194,
+     12.967,
+     0.0
+    ],
+    "otoceni": 284.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.426,
+     12.426,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     10.294,
+     4.888,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_3a822c38",
+    "poloha": [
+     10.294,
+     9.675,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     10.573,
+     11.97,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "klepac_7ee4f811",
+    "poloha": [
+     7.182,
+     1.596,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     10.52,
+     7.38,
+     3.24
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     7.18,
+     2.29,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (156 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Starý cihlový dům s balkonem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, popelnice, prádlo, klepač s kobercem; 6508 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+ },
+ {
+  "soubor": "dum_18_stare_3.glb",
+  "jmeno": "dum_18_stare_3",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 24,
+  "varianty": [
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_18_stare_3_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_18_stare_3_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_18_stare_3_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     6.78,
+     10.37,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     11.072,
+     5.187,
+     0.0
+    ],
+    "otoceni": 163.0,
+    "meritko": 0.6429
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     11.072,
+     7.78,
+     0.0
+    ],
+    "otoceni": 304.0,
+    "meritko": 0.6429
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.795,
+     12.967,
+     0.0
+    ],
+    "otoceni": 300.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.768,
+     12.568,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.374,
+     2.374,
+     0.0
+    ],
+    "otoceni": 240.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.536,
+     2.264,
+     0.0
+    ],
+    "otoceni": 287.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_180d54e0",
+    "poloha": [
+     4.888,
+     10.693,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.568,
+     10.773,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kocarek_99914b93",
+    "poloha": [
+     8.778,
+     11.571,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_99914b93",
+    "poloha": [
+     9.376,
+     10.872,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     6.78,
+     10.97,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     9.87,
+     11.57,
+     0.0
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 6,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (72 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Starý bílý dům se zimní zahradou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dámské kolo, lavička, kočárek, sud na dešťovku, okenice; 5844 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.38 m"
+ },
+ {
+  "soubor": "dum_19_chatky.glb",
+  "jmeno": "dum_19_chatky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 25,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_19_chatky_maska_strecha.png",
+    "zacatek": 184,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_19_chatky_maska_omitka.png",
+    "zacatek": 231,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_19_chatky_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.17,
+     4.75,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.99
+   },
+   {
+    "poloha": [
+     6.98,
+     13.25,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.306,
+     10.288,
+     0.0
+    ],
+    "otoceni": 50.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     2.194,
+     2.376,
+     0.0
+    ],
+    "otoceni": 97.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.369,
+     2.574,
+     0.0
+    ],
+    "otoceni": 100.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.394,
+     12.431,
+     0.0
+    ],
+    "otoceni": 147.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     10.493,
+     6.53,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "drivi_bea240e1",
+    "poloha": [
+     5.586,
+     4.75,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kralikarna_99914b93",
+    "poloha": [
+     12.306,
+     12.562,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "bouda_99914b93",
+    "poloha": [
+     11.109,
+     8.508,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "konev_99914b93",
+    "poloha": [
+     12.931,
+     7.321,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_99914b93",
+    "poloha": [
+     9.775,
+     12.859,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     10.77,
+     4.75,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří první chalupy"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     7.88,
+     13.85,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří druhé chalupy"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (48 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Dvě vybílené chalupy s doškovou střechou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, dříví, králíkárna, prádlo, psí bouda, konev, trpaslík, sud, okenice; 6970 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.98 m"
+ },
+ {
+  "soubor": "dum_1a_domy_0.glb",
+  "jmeno": "dum_1a_domy_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 26,
+  "varianty": [
+   0
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1a_domy_0_maska_strecha.png",
+    "zacatek": 127,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1a_domy_0_maska_omitka.png",
+    "zacatek": 227,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1a_domy_0_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     3.79,
+     12.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 0.99
+   },
+   {
+    "poloha": [
+     8.4,
+     5.98,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     11.976,
+     1.995,
+     0.0
+    ],
+    "otoceni": 160.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     11.778,
+     12.169,
+     0.0
+    ],
+    "otoceni": 207.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     9.594,
+     11.571,
+     0.0
+    ],
+    "otoceni": 320.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     8.721,
+     8.279,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     8.999,
+     2.992,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     3.79,
+     13.16,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.0,
+     5.98,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří přístavku"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Krémový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, prádlo; 6568 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+ },
+ {
+  "soubor": "dum_1a_domy_1.glb",
+  "jmeno": "dum_1a_domy_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 26,
+  "varianty": [
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1a_domy_1_maska_strecha.png",
+    "zacatek": 96,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1a_domy_1_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1a_domy_1_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.38,
+     7.31,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.99
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.795,
+     12.77,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.768,
+     2.052,
+     0.0
+    ],
+    "otoceni": 317.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.426,
+     12.426,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     2.264,
+     2.449,
+     0.0
+    ],
+    "otoceni": 227.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_3a822c38",
+    "poloha": [
+     9.695,
+     9.495,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     9.296,
+     2.846,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kocarek_99914b93",
+    "poloha": [
+     10.573,
+     5.228,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.92,
+     7.31,
+     3.24
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na balkoně"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     10.57,
+     6.32,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 11,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (132 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Bílý dům s balkonem a okenicemi; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: balkon, dvě kola, kočárek, prádlo, okenice; 7796 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+ },
+ {
+  "soubor": "dum_1a_domy_2.glb",
+  "jmeno": "dum_1a_domy_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 26,
+  "varianty": [
+   2
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1a_domy_2_maska_strecha.png",
+    "zacatek": 145,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1a_domy_2_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.37,
+     5.69,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     2.394,
+     12.568,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.568,
+     12.768,
+     0.0
+    ],
+    "otoceni": 67.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.374,
+     2.374,
+     0.0
+    ],
+    "otoceni": 40.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     10.693,
+     3.99,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_75ba3225",
+    "poloha": [
+     10.693,
+     10.174,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     10.872,
+     1.795,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "klepac_7ee4f811",
+    "poloha": [
+     7.98,
+     13.167,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "matylda",
+    "poloha": [
+     10.97,
+     5.68,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     7.98,
+     12.47,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u klepače s kobercem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (108 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlový dům s přístavkem; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola, popelnice, prádlo, klepač; 5808 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.98 m"
+ },
+ {
+  "soubor": "dum_1a_domy_3.glb",
+  "jmeno": "dum_1a_domy_3",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 26,
+  "varianty": [
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1a_domy_3_maska_strecha.png",
+    "zacatek": 146,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1a_domy_3_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1a_domy_3_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A",
+     "EAEAF0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     8.58,
+     4.79,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.0
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     1.795,
+     12.768,
+     0.0
+    ],
+    "otoceni": 130.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.768,
+     12.568,
+     0.0
+    ],
+    "otoceni": 177.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     12.426,
+     2.374,
+     0.0
+    ],
+    "otoceni": 260.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     11.69,
+     8.478,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_53d21dfb",
+    "poloha": [
+     9.376,
+     2.394,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kocarek_99914b93",
+    "poloha": [
+     9.975,
+     5.985,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     9.18,
+     4.79,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří"
+   },
+   {
+    "postava": "college_girl_stoji",
+    "poloha": [
+     11.07,
+     5.98,
+     0.0
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; s kočárkem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (108 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Bílý dům s přístavkem a předzahrádkou; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: kolo, popelnice, kočárek, prádlo, žebřík; 6072 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.18 m"
+ },
+ {
+  "soubor": "dum_1d_obchody_0.glb",
+  "jmeno": "dum_1d_obchody_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 29,
+  "varianty": [
+   0,
+   1
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1d_obchody_0_maska_strecha.png",
+    "zacatek": 145,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1d_obchody_0_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.94,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.76
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     13.218,
+     3.495,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_19227a85",
+    "poloha": [
+     10.223,
+     13.101,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     13.48,
+     6.22,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 44,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (528 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchody a kanceláře se dvěma štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 5392 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 18.65 m"
+ },
+ {
+  "soubor": "dum_1d_obchody_2.glb",
+  "jmeno": "dum_1d_obchody_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 29,
+  "varianty": [
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1d_obchody_2_maska_strecha.png",
+    "zacatek": 143,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1d_obchody_2_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.94,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.49
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     13.218,
+     3.401,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     13.218,
+     11.204,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     13.39,
+     6.37,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; před obchodem"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 65,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (780 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchody a kanceláře s věží a štíty; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola; 9102 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.84 m"
+ },
+ {
+  "soubor": "dum_27_kino.glb",
+  "jmeno": "dum_27_kino",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 39,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_27_kino_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_27_kino_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.97,
+     5.99,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.06
+   },
+   {
+    "poloha": [
+     11.97,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.06
+   },
+   {
+    "poloha": [
+     11.97,
+     8.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.06
+   }
+  ],
+  "interier": {
+   "soubor": "dum_27_kino_interier.glb",
+   "postavy": [
+    {
+     "postava": "people_girl_stoji",
+     "poloha": [
+      10.257,
+      4.668,
+      0.0
+     ],
+     "otoceni": 90,
+     "meritko": 1.0,
+     "poznamka": "pokladní za pultem, čelem do vestibulu"
+    },
+    {
+     "postava": "college_girl_sedi",
+     "poloha": [
+      5.496,
+      7.4,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále, kouká na plátno"
+    },
+    {
+     "postava": "galaxia_sedi",
+     "poloha": [
+      4.639,
+      6.907,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále"
+    },
+    {
+     "postava": "people_girl_sedi",
+     "poloha": [
+      6.353,
+      10.431,
+      0.459
+     ],
+     "otoceni": 180,
+     "meritko": 1.0,
+     "poznamka": "sedí v sále"
+    }
+   ]
+  },
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.828,
+     1.937,
+     0.0
+    ],
+    "otoceni": 110.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.828,
+     12.863,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     4.543,
+     12.44,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_180d54e0",
+    "poloha": [
+     6.829,
+     12.44,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_b08bbfca",
+    "poloha": [
+     9.019,
+     12.44,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     12.92,
+     4.93,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou kina"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     13.02,
+     10.48,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u plakátu"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 15,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (180 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kino; bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: tři kola u zdi sálu; 2116 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.33 m"
+ },
+ {
+  "soubor": "dum_14_stadion_stary.glb",
+  "jmeno": "dum_14_stadion_stary",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 20,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_14_stadion_stary_maska_strecha.png",
+    "zacatek": 96,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_14_stadion_stary_maska_omitka.png",
+    "zacatek": 233,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [
+   {
+    "poloha": [
+     27.92,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.29
+   }
+  ],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     26.741,
+     3.052,
+     0.0
+    ],
+    "otoceni": 282.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     26.741,
+     26.548,
+     0.0
+    ],
+    "otoceni": 301.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "kolo_4b4adb95",
+    "poloha": [
+     27.359,
+     10.682,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_1f4ad4b6",
+    "poloha": [
+     27.359,
+     18.918,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "autor": "grrrrf: vlastní model domy/domy1950.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Starý stadion s krytou tribunou (2×2, HouseID 0x14–0x17); bílé domy kolem roku 1950 (hráč 15. 10.: „ja chci takovy bily domečky pro rok 1950“, „udělej je pěkný jako prvnich deset“), nahrazuje dům z tabulek; blbosti: dvě kola u zdi; 3588 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.38 m"
+ },
+ {
+  "soubor": "dum_1f_uv_ksc.glb",
+  "jmeno": "dum_1f_uv_ksc",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nazev": {
+   "cs": "ÚV KSČ",
+   "en": "ÚV KSČ (Central Committee)"
+  },
+  "nahrazuje_house": 31,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1f_uv_ksc_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1f_uv_ksc_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.51,
+     6.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.84
+   },
+   {
+    "poloha": [
+     9.51,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.84
+   },
+   {
+    "poloha": [
+     9.51,
+     8.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.84
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.044,
+     1.964,
+     0.0
+    ],
+    "otoceni": 210.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     13.044,
+     12.836,
+     0.0
+    ],
+    "otoceni": 101.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.852,
+     1.756,
+     0.0
+    ],
+    "otoceni": 329.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     1.852,
+     13.044,
+     0.0
+    ],
+    "otoceni": 220.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 47,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (660 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "stani": {
+   "poloha": [
+    12.87,
+    7.38,
+    0.0
+   ],
+   "otoceni": 90,
+   "poznamka": "tady zastaví Tatra 613 VB, která jezdí od jedné budovy ÚV KSČ k druhé (hráč: „bude jezdit jako mat, od uv ksč k jinemu uv ksč“)"
+  },
+  "autor": "grrrrf: vlastní model domy/uv_ksc.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Budova ÚV KSČ s rudou hvězdou na omítce a na střeše (domy/uv_ksc.py, hra/3d/PROSBA-UV-KSC.md); budova ÚV KSČ místo domu 0x1F (hráč 15. 10.: „budova napis uv ksč s rudou hvězdou na omítce a na střeše“); blbosti: tribuna nad vchodem s nápisem ÚV KSČ, rudé prapory, československá a rudá vlajka na stožárech, záhony s rudými květy, lípy, lampy, schody, asfaltové stání pro auto; 12136 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 20.26 m"
+ },
+ {
+  "soubor": "dum_00_vysoky_0.glb",
+  "jmeno": "dum_00_vysoky_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 0,
+  "varianty": [
+   0
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_00_vysoky_0_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_00_vysoky_0_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.71,
+     6.05,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.78
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     7.035,
+     3.474,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     7.035,
+     3.474,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     7.035,
+     7.233,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     7.035,
+     7.233,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     7.035,
+     10.992,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     7.035,
+     10.992,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_022d26bc",
+    "poloha": [
+     9.31,
+     5.354,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_022d26bc",
+    "poloha": [
+     9.31,
+     9.112,
+     25.764
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_241eb6f8",
+    "poloha": [
+     12.376,
+     2.683,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_dc02192d",
+    "poloha": [
+     12.376,
+     2.683,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_241eb6f8",
+    "poloha": [
+     12.376,
+     8.717,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_cfed3188",
+    "poloha": [
+     12.376,
+     8.717,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_241eb6f8",
+    "poloha": [
+     11.227,
+     10.799,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_dc02192d",
+    "poloha": [
+     11.227,
+     10.799,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     9.953,
+     4.068,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     2.683,
+     12.594,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_19227a85",
+    "poloha": [
+     5.65,
+     12.594,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_b08bbfca",
+    "poloha": [
+     8.024,
+     12.594,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     12.71,
+     13.074,
+     0.0
+    ],
+    "otoceni": 67.0,
+    "meritko": 0.7857
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     12.37,
+     3.3,
+     0.47
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     12.99,
+     8.72,
+     0.47
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí u stolku pod slunečníkem na terase kavárny"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.65,
+     7.23,
+     26.23
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na střešní terase"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.61,
+     11.58,
+     25.76
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     10.69,
+     6.64,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u dveří kavárny"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 17,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (204 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Vysoký kancelářský blok s kavárnou v přízemí a terasou na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna se třemi čtvercovými slunečníky v pruzích a stolky se židlemi a šálky, na střeše terasa s dřevěnou palubou, třemi kulatými slunečníky, stolky a lehátky, květináče, antény, stojan s deštníky u dveří, tabule s nabídkou, tři kola pod převisem, truhlíky s květinami, strom; 7440 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 32.22 m"
+ },
+ {
+  "soubor": "dum_00_vysoky_1.glb",
+  "jmeno": "dum_00_vysoky_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 0,
+  "varianty": [
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_00_vysoky_1_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_00_vysoky_1_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.2,
+     4.74,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.71
+   },
+   {
+    "poloha": [
+     5.09,
+     12.42,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.02
+   },
+   {
+    "poloha": [
+     8.99,
+     12.42,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.02
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_ctverec_c6ae6a64",
+    "poloha": [
+     3.401,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_dc02192d",
+    "poloha": [
+     3.401,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_c6ae6a64",
+    "poloha": [
+     6.448,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_dc02192d",
+    "poloha": [
+     6.448,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_c6ae6a64",
+    "poloha": [
+     9.495,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_dc122b33",
+    "poloha": [
+     9.495,
+     10.369,
+     13.496
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     12.5,
+     3.714,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.506,
+     7.127,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_3a822c38",
+    "poloha": [
+     12.474,
+     10.198,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     12.474,
+     11.734,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     6.45,
+     10.9,
+     13.96
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     9.49,
+     9.84,
+     13.96
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v bistru na střeše křídla"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     11.36,
+     11.9,
+     13.49
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše křídla"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.88,
+     5.42,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 65,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (1052 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Vysoký kancelářský blok s nižším křídlem, bistro na střeše křídla, neon DŮM SLUŽEB; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: bistro na střeše křídla se třemi čtvercovými slunečníky, stolky a girlandou žárovek, květináče, neon DŮM SLUŽEB, anténa, markýzy v pruzích nad lahůdkami a papírnictvím, stojan s deštníky, lavička a na ní zapomenutý otevřený deštník, dvě kola; 18272 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 28.88 m"
+ },
+ {
+  "soubor": "dum_01_kancelare.glb",
+  "jmeno": "dum_01_kancelare",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 1,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_01_kancelare_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_01_kancelare_maska_omitka.png",
+    "zacatek": 230,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     7.44,
+     11.03,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.19
+   },
+   {
+    "poloha": [
+     12.53,
+     9.13,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.99
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_6d676d72",
+    "poloha": [
+     10.667,
+     4.75,
+     19.301
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_01361913",
+    "poloha": [
+     11.686,
+     3.594,
+     19.301
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_ba85bfb9",
+    "poloha": [
+     11.686,
+     5.411,
+     19.301
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     3.704,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     3.704,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     5.742,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     5.742,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     9.818,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     9.818,
+     12.1,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "vozik_zmrzlina_43f0baaf",
+    "poloha": [
+     11.94,
+     12.05,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     12.832,
+     8.219,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     12.806,
+     10.531,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     1.751,
+     12.513,
+     0.0
+    ],
+    "otoceni": 177.0,
+    "meritko": 0.7143
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     4.23,
+     12.1,
+     0.47
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     9.29,
+     12.1,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na zahrádce cukrárny"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     11.09,
+     12.35,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kupuje zmrzlinu u vozíku"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.65,
+     6.4,
+     19.3
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u lehátek"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 20,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Panelová kancelářská věž s mozaikou, vpředu cukrárna se zahrádkou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: zahrádka cukrárny se třemi slunečníky v pruzích a stolky, vozík se zmrzlinou a slunečníkem, markýza v pruzích, mozaika na čele věže, na střeše plážový slunečník, dvě lehátka, ručník, nádrž na vodu, anténa, stojan s deštníky, kolo, květináče, strom; 7868 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 25.44 m"
+ },
+ {
+  "soubor": "dum_02_bytovky.glb",
+  "jmeno": "dum_02_bytovky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 2,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_02_bytovky_maska_strecha.png",
+    "zacatek": 97,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_02_bytovky_maska_omitka.png",
+    "zacatek": 197,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     6.98,
+     11.37,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.2
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "zidle_f3b274b6",
+    "poloha": [
+     10.582,
+     5.586,
+     3.441
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "susak_2303bdbe",
+    "poloha": [
+     11.122,
+     8.977,
+     3.441
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_64dbda57",
+    "poloha": [
+     10.732,
+     5.386,
+     6.234
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "zidle_f3b274b6",
+    "poloha": [
+     10.533,
+     5.386,
+     6.234
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f3a245cc",
+    "poloha": [
+     12.278,
+     4.289,
+     0.199
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "houpacka_43f0baaf",
+    "poloha": [
+     12.573,
+     9.376,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "klepac_7ee4f811",
+    "poloha": [
+     2.723,
+     13.244,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_905facf5",
+    "poloha": [
+     12.278,
+     12.278,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_f7126baf",
+    "poloha": [
+     12.278,
+     12.278,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "popelnice_6994da60",
+    "poloha": [
+     9.177,
+     12.568,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     4.718,
+     11.568,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_19227a85",
+    "poloha": [
+     5.716,
+     11.568,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kralikarna_99914b93",
+    "poloha": [
+     2.494,
+     1.945,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.867,
+     6.783,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     1.925,
+     12.446,
+     0.0
+    ],
+    "otoceni": 287.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.074,
+     1.726,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.7857
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.17,
+     5.58,
+     3.91
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí na balkoně u deštníku, co se suší"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.12,
+     5.39,
+     6.7
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na balkoně"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.37,
+     5.58,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u pískoviště"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.75,
+     12.96,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na dvorku"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (252 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Malá panelová bytovka s balkony a dvorkem s pískovištěm; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: balkony s oranžovými parapety: otevřené deštníky se suší, slunečník se židlí, sušák s prádlem; pískoviště se slunečníkem, kyblíkem a bábovkou, houpačka, prádlo, klepač, stolek se slunečníkem, popelnice, dvě kola, králíkárna, lavička, anténa, muškáty, dva stromy; 6864 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 12.27 m"
+ },
+ {
+  "soubor": "dum_04_velky.glb",
+  "jmeno": "dum_04_velky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 4,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_04_velky_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_04_velky_maska_omitka.png",
+    "zacatek": 231,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.32,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.93
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     8.103,
+     3.183,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     8.103,
+     3.183,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     11.266,
+     3.183,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_04e5f008",
+    "poloha": [
+     11.266,
+     3.183,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     8.103,
+     6.521,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     8.103,
+     6.521,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     11.266,
+     6.697,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_04e5f008",
+    "poloha": [
+     11.266,
+     6.697,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     4.062,
+     10.211,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     4.062,
+     10.211,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     7.576,
+     10.387,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_04e5f008",
+    "poloha": [
+     7.576,
+     10.387,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3f1eaf3c",
+    "poloha": [
+     11.09,
+     10.211,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     11.09,
+     10.211,
+     18.084
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     12.671,
+     8.806,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_caddeb0b",
+    "poloha": [
+     12.601,
+     3.534,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_2dbcdd4c",
+    "poloha": [
+     12.601,
+     4.589,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.715,
+     10.563,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.83,
+     6.99,
+     18.55
+    ],
+    "otoceni": 300,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.63,
+     10.21,
+     18.55
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně TERASA na střeše"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     12.58,
+     6.7,
+     18.08
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.8,
+     6.52,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u vchodu pod podloubím"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 21,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (252 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Velký kancelářský dům s prosklenou fasádou, podloubím a kavárnou TERASA na střeše; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna TERASA na střeše: pavilon, sedm velkých slunečníků v pruzích se stolky, stromky v květináčích, tři vlajky; v podloubí stojan s deštníky, dvě kola, lavička, truhlíky s květinami; 5800 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 23.07 m"
+ },
+ {
+  "soubor": "dum_0d_kancelare.glb",
+  "jmeno": "dum_0d_kancelare",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 13,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_0d_kancelare_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_0d_kancelare_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.06,
+     6.25,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.43
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_0b1bf186",
+    "poloha": [
+     8.837,
+     7.321,
+     13.216
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_d41af04c",
+    "poloha": [
+     4.817,
+     8.755,
+     13.216
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_fcc5460f",
+    "poloha": [
+     8.837,
+     9.114,
+     13.216
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_d2e98c0f",
+    "poloha": [
+     7.613,
+     9.293,
+     13.216
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lehatko_763dd1a8",
+    "poloha": [
+     3.943,
+     7.142,
+     13.216
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_b557592a",
+    "poloha": [
+     11.808,
+     9.114,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_398776c2",
+    "poloha": [
+     11.808,
+     9.114,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_b557592a",
+    "poloha": [
+     11.808,
+     11.802,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_a0ef44a9",
+    "poloha": [
+     11.808,
+     11.802,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     4.467,
+     12.295,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.438,
+     12.295,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_3a822c38",
+    "poloha": [
+     10.951,
+     9.293,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     10.41,
+     7.321,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.507,
+     6.246,
+     0.0
+    ],
+    "otoceni": 37.0,
+    "meritko": 0.7143
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     13.03,
+     2.66,
+     0.0
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u okénka stánku se zmrzlinou"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.81,
+     8.56,
+     0.47
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem před domem"
+   },
+   {
+    "postava": "pole_chill",
+    "poloha": [
+     5.86,
+     4.63,
+     13.21
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; klečí u bazénku na střeše s telefonem"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.36,
+     5.71,
+     13.21
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří na střeše u plážového slunečníku"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 10,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (120 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kanceláře se slunolamy, na střeše lehátka a bazének, dole stánek se zmrzlinou; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: stánek se zmrzlinou s markýzou v pruzích a velkým kornoutem na střeše, dva stolky se slunečníky, na střeše nafukovací bazének, dva plážové slunečníky, tři lehátka, ručník a tranzistorák, záhony, lavičky, kolo, stojan s deštníky, strom; 6710 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 16.47 m"
+ },
+ {
+  "soubor": "dum_12_skladiste.glb",
+  "jmeno": "dum_12_skladiste",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 18,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_12_skladiste_maska_strecha.png",
+    "zacatek": 147,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     9.52,
+     6.72,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.81
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "paleta_a8c4122a",
+    "poloha": [
+     3.666,
+     12.0,
+     1.097
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_a5134b92",
+    "poloha": [
+     8.37,
+     12.0,
+     1.097
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "rudl_43f0baaf",
+    "poloha": [
+     8.865,
+     11.588,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "vzv_8f502b22",
+    "poloha": [
+     11.34,
+     4.904,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_4f7517d6",
+    "poloha": [
+     12.33,
+     2.095,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_4f7517d6",
+    "poloha": [
+     12.33,
+     2.095,
+     0.14
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_4f7517d6",
+    "poloha": [
+     12.33,
+     2.095,
+     0.279
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_4f7517d6",
+    "poloha": [
+     12.33,
+     2.095,
+     0.419
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "paleta_b77a6775",
+    "poloha": [
+     10.35,
+     8.7,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_99914b93",
+    "poloha": [
+     12.495,
+     7.379,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_99914b93",
+    "poloha": [
+     12.825,
+     7.957,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "sud_99914b93",
+    "poloha": [
+     12.248,
+     8.122,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_4d617408",
+    "poloha": [
+     11.67,
+     10.515,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_b20d1261",
+    "poloha": [
+     11.67,
+     10.515,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     4.82,
+     12.33,
+     1.1
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; na rampě u beden s deštníky"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     11.16,
+     10.51,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.67,
+     10.0,
+     0.47
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; svačí pod slunečníkem na dvoře"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (116 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlové skladiště deštníků a slunečníků s rampou a vysokozdvižným vozíkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: nakládací rampa se stříškou, bedny a kartony deštníků na paletách, tři otevřené deštníky se suší na rampě, rudl, vysokozdvižný vozík, stoh palet, pytle, sudy, svačina pod velkým slunečníkem se stolkem a termoskou, drátěný plot, lampa; 10608 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 8.56 m"
+ },
+ {
+  "soubor": "dum_1e_obchody_vysoke.glb",
+  "jmeno": "dum_1e_obchody_vysoke",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 30,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1e_obchody_vysoke_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1e_obchody_vysoke_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     12.83,
+     7.58,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.15
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     5.941,
+     2.927,
+     20.657
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     5.941,
+     4.0,
+     20.657
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     5.941,
+     4.894,
+     20.657
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     8.403,
+     3.463,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_8347ab5e",
+    "poloha": [
+     8.403,
+     3.463,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     8.527,
+     3.374,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     11.236,
+     3.463,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_17c02871",
+    "poloha": [
+     11.236,
+     3.463,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     11.36,
+     3.374,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     8.403,
+     6.861,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_8347ab5e",
+    "poloha": [
+     8.403,
+     6.861,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     8.527,
+     6.771,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     11.236,
+     7.04,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_17c02871",
+    "poloha": [
+     11.236,
+     7.04,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     11.36,
+     6.95,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     3.621,
+     8.649,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_7434ee83",
+    "poloha": [
+     3.621,
+     8.649,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     3.745,
+     8.56,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_f6d29112",
+    "poloha": [
+     6.809,
+     10.974,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_8347ab5e",
+    "poloha": [
+     6.809,
+     10.974,
+     19.48
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_884a2ac1",
+    "poloha": [
+     6.933,
+     10.884,
+     20.288
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_50b40b50",
+    "poloha": [
+     10.59,
+     10.237,
+     21.276
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_b5ec556a",
+    "poloha": [
+     13.119,
+     9.185,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_766fab94",
+    "poloha": [
+     2.736,
+     13.218,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     7.85,
+     6.86,
+     19.95
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.23,
+     4.02,
+     19.95
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v baru na střeše"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.11,
+     12.22,
+     19.48
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u obřího koktejlu"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     13.54,
+     5.07,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; pod markýzou obchodního domu"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 18,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (524 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní dům s markýzami a vývěsním deštníkem, na střeše bar s obřím koktejlem s paraplíčkem; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: markýzy v pruzích nad výlohami, vývěsní deštník na konzole, stojan s deštníky; na střeše bar: pavilon s neonem BAR, pult s barovými stoličkami, koktejly s paraplíčky, šest slunečníků se stolky, obří koktejl s paraplíčkem, brčkem, višní a kolečkem pomeranče, květináče; kolo; 21036 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 24.37 m"
+ },
+ {
+  "soubor": "dum_20_stadion.glb",
+  "jmeno": "dum_20_stadion",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 32,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_20_stadion_maska_strecha.png",
+    "zacatek": 147,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_20_stadion_maska_omitka.png",
+    "zacatek": 234,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [
+   {
+    "poloha": [
+     7.96,
+     1.86,
+     0.0
+    ],
+    "smer": [
+     0,
+     -1
+    ],
+    "sirka": 2.19
+   },
+   {
+    "poloha": [
+     7.96,
+     27.49,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 2.19
+   }
+  ],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     18.387,
+     2.487,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     18.387,
+     2.487,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     20.582,
+     2.487,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     20.582,
+     2.487,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_ctverec_742f414c",
+    "poloha": [
+     12.077,
+     27.194,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     13.997,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     13.997,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     16.558,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     16.558,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_3d988364",
+    "poloha": [
+     19.119,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_efa2faa2",
+    "poloha": [
+     19.119,
+     27.132,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_6a2b2b03",
+    "poloha": [
+     20.765,
+     27.127,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_6a2b2b03",
+    "poloha": [
+     21.313,
+     27.127,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kolo_6a2b2b03",
+    "poloha": [
+     21.862,
+     27.127,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     4.89,
+     12.12,
+     2.41
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     4.36,
+     15.72,
+     2.91
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na hlavní tribuně"
+   },
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     24.46,
+     19.32,
+     1.86
+    ],
+    "otoceni": 180,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; fandí na přední tribuně mezi deštníky"
+   },
+   {
+    "postava": "people_girl_stoji",
+    "poloha": [
+     15.37,
+     3.12,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u stánku s občerstvením"
+   }
+  ],
+  "akce": {
+   "rozen": {
+    "poloha": [
+     16.0,
+     18.868,
+     1.01
+    ],
+    "otoceni": 0,
+    "meritko": 1.08,
+    "poznamka": "rožeň nad grilem uprostřed hřiště vedle hasičské Tatry (hráč 29. 10.: „chci mata s grilem do prostřed hřiště vedle tatry“; gril je doplněk akce), osa podél x ve výšce 1,01 m, měřítko 1,08 (hra 25. 10.: osa ve výřezu vidlice 0,99 m + poloměr tyče, tyč ±0,95 skrz vidlice ±0,98..1,02; hráč: „tyčka končí moc brzo před vidličkou“)"
+   },
+   "tatra": {
+    "poloha": [
+     12.17,
+     18.87,
+     0.0
+    ],
+    "otoceni": 90,
+    "zaznam": "nt_t148",
+    "objekt": "nt_t148",
+    "sada": [
+     "kabina 148 hasici",
+     "mrizka 148 nase",
+     "nastavba hasici"
+    ],
+    "poznamka": "hasičská Tatra 148 stojí prázdná na hřišti čelem ke stánku PIVO (hráč: „na hřišti stojí prázdná Tatra, bez řidiče“); červená kabina s bílou mřížkou chladiče (hráč 29. 10.: „dej třeba 148 červenou kabinu s bilou mřižkou chladiče a je hasičská“)"
+   },
+   "mat": {
+    "poloha": [
+     18.09,
+     18.864,
+     0.0
+    ],
+    "otoceni": 180,
+    "poza": "toci",
+    "meritko": 1.0,
+    "poznamka": "Mat točí pivo z pípy sudu u grilu s rožněm (hráč: „Mat nemůže sedět v hasičské Tatře, bude točit pivo u grilu“, „mat toci pivo, ma sud?“), čelem ke grilu; tělo pípy 0,30 m před ním, 0,06 m vpravo, 0,95 m"
+   },
+   "doplnky": [
+    {
+     "jmeno": "gril_090fce5f",
+     "poloha": [
+      16.0,
+      18.87,
+      0.0
+     ],
+     "otoceni": 0.0,
+     "meritko": 1.0,
+     "poznamka": "gril jen při akci, uprostřed hřiště vedle hasičské Tatry (hráč 29. 10.: „chci mata s grilem do prostřed hřiště vedle tatry“); celá skupina gril, rožeň, sud a Mat posunutá z rohu za přední tribunou beze změny vzájemné polohy"
+    },
+    {
+     "jmeno": "sud_s_pipou_99914b93",
+     "poloha": [
+      17.39,
+      18.924,
+      0.0
+     ],
+     "otoceni": 0.0,
+     "meritko": 1.0,
+     "poznamka": "sud piva s pípou jen při akci, u Mata (hráč 29. 10.: „a sud piva taky“)"
+    }
+   ],
+   "holky": [
+    {
+     "poloha": [
+      13.38,
+      27.13,
+      0.47
+     ],
+     "otoceni": 0,
+     "poza": "sedi",
+     "meritko": 1.0,
+     "poznamka": "holka z hospody sedí u stolku se slunečníkem"
+    },
+    {
+     "poloha": [
+      14.61,
+      27.13,
+      0.47
+     ],
+     "otoceni": 180,
+     "poza": "sedi",
+     "meritko": 1.0,
+     "poznamka": "holka z hospody sedí u stolku se slunečníkem"
+    },
+    {
+     "poloha": [
+      15.94,
+      27.13,
+      0.47
+     ],
+     "otoceni": 0,
+     "poza": "sedi",
+     "meritko": 1.0,
+     "poznamka": "holka z hospody sedí u stolku se slunečníkem"
+    },
+    {
+     "poloha": [
+      17.17,
+      27.13,
+      0.47
+     ],
+     "otoceni": 180,
+     "poza": "sedi",
+     "meritko": 1.0,
+     "poznamka": "holka z hospody sedí u stolku se slunečníkem"
+    }
+   ],
+   "poznamka": "hráč: hasiči s hasičskou Tatrou, prase na rožni, Mat točí pivo a holky z hospody si tam sednou (hra/3d/POSTAVY-MODULARNI-A-STADION.md); hasiči ne (hráč: „ne žádný hasič“)",
+   "kun": {
+    "zaznam": "special_kun_sedlo",
+    "objekt": "kun_sedlo",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     18.0,
+     18.87,
+     0.0
+    ],
+    "otoceni": 90,
+    "poznamka": "kůň se sedlem stojí na hřišti vedle hasičské Tatry (u města) (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_sedlo balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 60,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (720 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Nový stadion s krytou tribunou, stožáry světel a stánky (2×2, HouseID 0x20–0x23); domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: čtyři stožáry světel, reklamní tabule kolem hřiště, branky, rohové praporky, lavičky střídačů, světelná tabule DOMÁCÍ 1:0 HOSTÉ, deštníky fanoušků na přední tribuně, stánek OBČERSTVENÍ s markýzou, stánek PIVO se čtvercovým slunečníkem, pět stolků se slunečníky, tři kola; 19128 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 21.35 m"
+ },
+ {
+  "soubor": "dum_24_valec.glb",
+  "jmeno": "dum_24_valec",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 36,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_24_valec_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "50565E",
+     "6E4A3A",
+     "A03028",
+     "B8602A",
+     "3A3C40",
+     "7A5A44",
+     "4C6E4C",
+     "9A4A30"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_24_valec_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "F2E6C8",
+     "DCDAD4",
+     "F4D2C4",
+     "E0ECFF",
+     "E4F0D8",
+     "E8C890",
+     "F0C8B0"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.22,
+     5.99,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.42
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     8.952,
+     6.238,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_d3c6f580",
+    "poloha": [
+     8.952,
+     6.238,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     7.47,
+     8.456,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_3c93aa8c",
+    "poloha": [
+     7.47,
+     8.456,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     5.203,
+     8.74,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_d34c0817",
+    "poloha": [
+     5.203,
+     8.74,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     3.269,
+     4.786,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_3d216658",
+    "poloha": [
+     3.269,
+     4.786,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_0f12a3e3",
+    "poloha": [
+     5.203,
+     3.239,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_d3becd19",
+    "poloha": [
+     5.203,
+     3.239,
+     36.008
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_b557592a",
+    "poloha": [
+     11.95,
+     9.015,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_175b81c4",
+    "poloha": [
+     11.95,
+     9.015,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_b557592a",
+    "poloha": [
+     11.857,
+     11.661,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_d4a5015b",
+    "poloha": [
+     11.857,
+     11.661,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "slunecnik_b557592a",
+    "poloha": [
+     8.963,
+     11.773,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stolek_kavarna_bbbc6626",
+    "poloha": [
+     8.963,
+     11.773,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "stojan_destniku_a0180099",
+    "poloha": [
+     10.55,
+     7.413,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     2.294,
+     12.752,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.668,
+     11.328,
+     0.0
+    ],
+    "otoceni": 147.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.07,
+     13.084,
+     0.0
+    ],
+    "otoceni": 194.0,
+    "meritko": 0.7143
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_sedi",
+    "poloha": [
+     6.96,
+     8.73,
+     36.47
+    ],
+    "otoceni": 330,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem v kavárně na střeše věže"
+   },
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.37,
+     4.12,
+     36.0
+    ],
+    "otoceni": 330,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; kouří u zábradlí na střeše věže"
+   },
+   {
+    "postava": "people_girl_sedi",
+    "poloha": [
+     11.37,
+     9.01,
+     0.47
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; sedí pod slunečníkem na náměstíčku"
+   },
+   {
+    "postava": "matylda",
+    "poloha": [
+     12.14,
+     3.85,
+     0.0
+    ],
+    "otoceni": 270,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: „holky dej ať bydlej“; u kašny"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 12,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (3076 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/domy_moderni.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kulatá kancelářská věž s kavárnou na střeše a dvěma žlutými stožáry; domy po roce 1955 se slunečníky a deštníky (hráč 15. 10.: „tak udělej mirne klima a zase se tam vyblbni paraplička“), nahrazuje dům z tabulek; blbosti: kavárna na střeše věže: kulatý pavilon, pět slunečníků se stolky, dva žluté příhradové stožáry s červeným světlem; náměstíčko s kašnou, dvěma vlajkami, třemi stolky se slunečníky, stojanem s deštníky, lavičkou, lampami a stromy; 15804 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 44.14 m"
+ },
+ {
+  "soubor": "dum_07_hotel.glb",
+  "jmeno": "dum_07_hotel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 7,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_07_hotel_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_07_hotel_maska_omitka.png",
+    "zacatek": 198,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.15,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.89
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     13.009,
+     3.579,
+     0.0
+    ],
+    "otoceni": 141.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     13.009,
+     25.831,
+     0.0
+    ],
+    "otoceni": 142.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.18,
+     21.57,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.18,
+     7.84,
+     0.0
+    ],
+    "otoceni": 329.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "college_girl_kouri",
+    "poloha": [
+     9.14,
+     17.87,
+     15.71
+    ],
+    "otoceni": 90,
+    "meritko": 1.0,
+    "poznamka": "hráč 15. 10.: kouřící holka u slunečníků na střeše hotelu (terasa před bazénem, slunečníky x 9,9, y 20,4 až 25,8)"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 69,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (924 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Hotel (dům 0x07 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 10092 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 19.31 m"
+ },
+ {
+  "soubor": "dum_09_socha.glb",
+  "jmeno": "dum_09_socha",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 9,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.398,
+     3.676,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.398,
+     11.087,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     3.598,
+     7.399,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     11.161,
+     7.399,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kos_99914b93",
+    "poloha": [
+     12.853,
+     7.381,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py; socha College Girl, Rotmill (Sketchfab, CC BY 4.0)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); socha CC BY 4.0, uvést Rotmill",
+  "poznamka": "Socha (náměstí s jezdcem, College Girl v bronzu) (dům 0x09 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 16802 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 6.75 m"
+ },
+ {
+  "soubor": "dum_0a_fontana.glb",
+  "jmeno": "dum_0a_fontana",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 10,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.4,
+     1.696,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.4,
+     13.104,
+     0.0
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     1.756,
+     7.4,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     13.104,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.155,
+     7.381,
+     0.0
+    ],
+    "otoceni": 298.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.645,
+     9.576,
+     0.0
+    ],
+    "otoceni": 334.0,
+    "meritko": 0.8571
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (240 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Fontána (dům 0x0a původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 6388 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 4.89 m"
+ },
+ {
+  "soubor": "dum_0b_park_rybnik.glb",
+  "jmeno": "dum_0b_park_rybnik",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 11,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "plot",
+    "maska": "dum_0b_park_rybnik_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     8.379,
+     9.177,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kos_99914b93",
+    "poloha": [
+     6.982,
+     9.276,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "smrk_v1",
+    "poloha": [
+     4.369,
+     4.858,
+     0.0
+    ],
+    "otoceni": 235.0,
+    "meritko": 1.0417
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     4.169,
+     10.643,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 1.2143
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.369,
+     2.394,
+     0.0
+    ],
+    "otoceni": 314.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     7.561,
+     2.663,
+     0.0
+    ],
+    "otoceni": 80.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.374,
+     7.85,
+     0.0
+    ],
+    "otoceni": 127.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.536,
+     7.182,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     6.763,
+     7.351,
+     0.0
+    ],
+    "otoceni": 221.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.972,
+     12.536,
+     0.0
+    ],
+    "otoceni": 268.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.573,
+     2.264,
+     0.0
+    ],
+    "otoceni": 315.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (60 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s rybníčkem a smrkem (dům 0x0b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 8620 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 3.85 m"
+ },
+ {
+  "soubor": "dum_0c_park_kopec.glb",
+  "jmeno": "dum_0c_park_kopec",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 12,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [],
+  "dvere": [],
+  "interier": false,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     5.586,
+     7.78,
+     0.0
+    ],
+    "otoceni": 17.0,
+    "meritko": 1.5714
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     9.975,
+     2.394,
+     0.0
+    ],
+    "otoceni": 64.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     2.394,
+     12.369,
+     0.0
+    ],
+    "otoceni": 111.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     10.374,
+     10.573,
+     0.0
+    ],
+    "otoceni": 190.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     2.484,
+     2.593,
+     0.0
+    ],
+    "otoceni": 237.0,
+    "meritko": 1.2857
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     8.778,
+     12.536,
+     0.0
+    ],
+    "otoceni": 284.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     12.755,
+     5.985,
+     0.0
+    ],
+    "otoceni": 331.0,
+    "meritko": 0.7143
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     10.773,
+     7.581,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kos_99914b93",
+    "poloha": [
+     10.872,
+     9.177,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (60 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Park s kopečkem (dům 0x0c původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 4456 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 3.85 m"
+ },
+ {
+  "soubor": "dum_11_kancelare_moderni.glb",
+  "jmeno": "dum_11_kancelare_moderni",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 17,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_11_kancelare_moderni_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_11_kancelare_moderni_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     10.71,
+     6.39,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.3
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     12.857,
+     2.456,
+     0.0
+    ],
+    "otoceni": 110.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "strom_v3",
+    "poloha": [
+     12.857,
+     7.256,
+     0.0
+    ],
+    "otoceni": 157.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     12.857,
+     12.824,
+     0.0
+    ],
+    "otoceni": 204.0,
+    "meritko": 0.7857
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.767,
+     9.752,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     12.767,
+     4.952,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (1000 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Moderní kanceláře (bílá věž s komíny) (dům 0x11 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7248 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 37.85 m"
+ },
+ {
+  "soubor": "dum_13_kancelarsky_blok.glb",
+  "jmeno": "dum_13_kancelarsky_blok",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 19,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_13_kancelarsky_blok_maska_strecha.png",
+    "zacatek": 144,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_13_kancelarsky_blok_maska_omitka.png",
+    "zacatek": 237,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     11.6,
+     7.4,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.53
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     13.054,
+     2.48,
+     0.0
+    ],
+    "otoceni": 267.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     13.054,
+     12.32,
+     0.0
+    ],
+    "otoceni": 180.0,
+    "meritko": 0.9286
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 46,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (552 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Kancelářský blok s červenou střechou (dům 0x13 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7200 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 15.86 m"
+ },
+ {
+  "soubor": "dum_1b_byty_cihlove.glb",
+  "jmeno": "dum_1b_byty_cihlove",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "mirne",
+  "nahrazuje_house": 27,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_1b_byty_cihlove_maska_strecha.png",
+    "zacatek": 93,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_1b_byty_cihlove_maska_omitka.png",
+    "zacatek": 232,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   },
+   {
+    "cast": "plot",
+    "maska": "dum_1b_byty_cihlove_maska_plot.png",
+    "zacatek": 224,
+    "paleta": [
+     "E2DED2",
+     "8E6A4C",
+     "EAEAF0",
+     "5A7A4C",
+     "4A4A50",
+     "B4A890",
+     "A05A3C",
+     "7A8A9A"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     3.83,
+     10.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.23
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     10.25,
+     10.972,
+     0.0
+    ],
+    "otoceni": 347.0,
+    "meritko": 1.1429
+   },
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     11.923,
+     1.995,
+     0.0
+    ],
+    "otoceni": 34.0,
+    "meritko": 0.9286
+   },
+   {
+    "jmeno": "ker_v1",
+    "poloha": [
+     7.176,
+     11.571,
+     0.0
+    ],
+    "otoceni": 50.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "ker_v2",
+    "poloha": [
+     2.252,
+     12.169,
+     0.0
+    ],
+    "otoceni": 97.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "ker_v0",
+    "poloha": [
+     12.536,
+     8.179,
+     0.0
+    ],
+    "otoceni": 144.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     7.436,
+     12.967,
+     0.0
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kos_99914b93",
+    "poloha": [
+     6.472,
+     12.967,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (228 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Cihlové byty se zahradou (dům 0x1b původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 7848 trojúhelníků, atlas 1024×1024 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 10.23 m"
+ },
+ {
+  "soubor": "dum_28_obchodni_stredisko.glb",
+  "jmeno": "dum_28_obchodni_stredisko",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 2,
+  "klima": "mirne",
+  "nahrazuje_house": 40,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "barvy": [
+   {
+    "cast": "strecha",
+    "maska": "dum_28_obchodni_stredisko_maska_strecha.png",
+    "zacatek": 94,
+    "paleta": [
+     "8E3C28",
+     "6E4A3A",
+     "707478",
+     "A03028",
+     "4C6E4C",
+     "B8602A",
+     "3A3C40",
+     "8A3C5A",
+     "5A4A8A"
+    ]
+   },
+   {
+    "cast": "omitka",
+    "maska": "dum_28_obchodni_stredisko_maska_omitka.png",
+    "zacatek": 231,
+    "paleta": [
+     "E8E6DE",
+     "F0DCB0",
+     "E0ECFF",
+     "F4D2C4",
+     "E4F0D8",
+     "F2E6C8",
+     "E8DCF0",
+     "F0C8B0",
+     "D8E4EC"
+    ]
+   }
+  ],
+  "dvere": [
+   {
+    "poloha": [
+     27.09,
+     14.81,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 5.19
+   }
+  ],
+  "interier": true,
+  "pruchody": [],
+  "okraje_textur": 16,
+  "doplnky": [
+   {
+    "jmeno": "strom_v2",
+    "poloha": [
+     27.292,
+     5.985,
+     0.0
+    ],
+    "otoceni": 174.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     27.292,
+     10.972,
+     0.0
+    ],
+    "otoceni": 19.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     27.292,
+     18.453,
+     0.0
+    ],
+    "otoceni": 303.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "strom_v0",
+    "poloha": [
+     27.292,
+     23.44,
+     0.0
+    ],
+    "otoceni": 148.0,
+    "meritko": 0.8571
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     26.301,
+     8.977,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_99914b93",
+    "poloha": [
+     26.301,
+     20.448,
+     0.0
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   }
+  ],
+  "postavy": [],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 24,
+   "poznamka": "v noci ukaž uzel noc přes dům: svítící okna (asi 60 % skel podle domu) těsně před tmavými, lampy a svítící nápisy (740 trojúhelníků, stejný atlas); uzel den je prázdný, denní okna jsou v domě; prázdné uzly svetlo_NN jsou místa pro záři"
+  },
+  "autor": "grrrrf: vlastní model domy/render_dum.py (ten, co měl rendery z osmi směrů v budovy3d), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "Obchodní středisko s modrou střechou (dům 0x28 původní hry, nahrazuje budovy3d_{1,2,3,4} rendery); 11388 trojúhelníků, atlas 2048×2048 jen barva bez světla (světlo z normál), barva částí číslem z palety (barvy), výška 9.12 m"
+ }
+]

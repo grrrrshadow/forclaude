@@ -1,0 +1,5007 @@
+[
+ {
+  "soubor": "pv_banka.glb",
+  "jmeno": "pv_banka",
+  "druh": "dil",
+  "rozmer_m": [
+   23.94,
+   10.97,
+   12.97
+  ],
+  "poznamka": "banka přes dvě políčka: sloupy, štít, nápis BANKA; počátek uprostřed půdorysu na zemi, metry, 3188 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 11,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_budova_cihlova.glb",
+  "jmeno": "pv_budova_cihlova",
+  "druh": "dil",
+  "rozmer_m": [
+   12.28,
+   10.3,
+   16.36
+  ],
+  "poznamka": "cihlová tovární budova 12 × 10 m, tři patra, nádrž na střeše; počátek uprostřed půdorysu na zemi, metry, 3620 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 30,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_cerpadlo_ropy.glb",
+  "jmeno": "pv_cerpadlo_ropy",
+  "druh": "dil",
+  "rozmer_m": [
+   7.23,
+   2.4,
+   5.19
+  ],
+  "poznamka": "naftová pumpa (kůň); počátek uprostřed půdorysu na zemi, metry, 188 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_chladici_vez.glb",
+  "jmeno": "pv_chladici_vez",
+  "druh": "dil",
+  "rozmer_m": [
+   13.56,
+   13.52,
+   27.93
+  ],
+  "poznamka": "chladicí věž 28 m; počátek uprostřed půdorysu na zemi, metry, 1676 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami; zatím na žádném políčku, k půjčení",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_destilacni_vez.glb",
+  "jmeno": "pv_destilacni_vez",
+  "druh": "dil",
+  "rozmer_m": [
+   10.57,
+   6.66,
+   31.32
+  ],
+  "poznamka": "destilační kolony 30 m a 18 m s plošinami, fléra; počátek uprostřed půdorysu na zemi, metry, 3116 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dopravnik.glb",
+  "jmeno": "pv_dopravnik",
+  "druh": "dil",
+  "rozmer_m": [
+   14.88,
+   2.8,
+   10.47
+  ],
+  "poznamka": "šikmý krytý dopravník 14 m; počátek uprostřed půdorysu na zemi, metry, 96 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_asfalt.glb",
+  "jmeno": "pv_dvur_asfalt",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.06
+  ],
+  "poznamka": "podklad: asfalt se žlutými čarami; počátek v severním rohu políčka (podklad přes celé políčko), metry, 132 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_beton.glb",
+  "jmeno": "pv_dvur_beton",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.06
+  ],
+  "poznamka": "podklad: betonové panely přes políčko; počátek v severním rohu políčka (podklad přes celé políčko), metry, 12 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_hlina.glb",
+  "jmeno": "pv_dvur_hlina",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.05
+  ],
+  "poznamka": "podklad: udusaná hlína s kolejemi po kolech; počátek v severním rohu políčka (podklad přes celé políčko), metry, 36 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_ruda.glb",
+  "jmeno": "pv_dvur_ruda",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.05
+  ],
+  "poznamka": "podklad: rezavý prach rudy; počátek v severním rohu políčka (podklad přes celé políčko), metry, 12 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_sterk.glb",
+  "jmeno": "pv_dvur_sterk",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.05
+  ],
+  "poznamka": "podklad: štěrk; počátek v severním rohu políčka (podklad přes celé políčko), metry, 12 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_trava.glb",
+  "jmeno": "pv_dvur_trava",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.04
+  ],
+  "poznamka": "podklad: tráva se štěrkovou cestou; počátek v severním rohu políčka (podklad přes celé políčko), metry, 24 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_dvur_uhli.glb",
+  "jmeno": "pv_dvur_uhli",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.05
+  ],
+  "poznamka": "podklad: uhelný prach; počátek v severním rohu políčka (podklad přes celé políčko), metry, 12 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hala_mala.glb",
+  "jmeno": "pv_hala_mala",
+  "druh": "dil",
+  "rozmer_m": [
+   6.48,
+   5.48,
+   4.79
+  ],
+  "poznamka": "malá dílna 6 × 5 m; počátek uprostřed půdorysu na zemi, metry, 332 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 1,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hala_pilova.glb",
+  "jmeno": "pv_hala_pilova",
+  "druh": "dil",
+  "rozmer_m": [
+   13.24,
+   13.28,
+   9.38
+  ],
+  "poznamka": "cihlová hala 13 × 13 m s pilovou střechou; počátek uprostřed půdorysu na zemi, metry, 880 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 7,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hala_sedlova.glb",
+  "jmeno": "pv_hala_sedlova",
+  "druh": "dil",
+  "rozmer_m": [
+   12.56,
+   9.48,
+   8.18
+  ],
+  "poznamka": "plechová hala 12 × 8 m se sedlovou střechou, pás oken, vrata; počátek uprostřed půdorysu na zemi, metry, 908 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 6,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_diamant.glb",
+  "jmeno": "pv_hromada_diamant",
+  "druh": "dil",
+  "rozmer_m": [
+   8.33,
+   8.43,
+   3.21
+  ],
+  "poznamka": "hromada kimberlitu; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_kmeny.glb",
+  "jmeno": "pv_hromada_kmeny",
+  "druh": "dil",
+  "rozmer_m": [
+   9.02,
+   4.76,
+   1.99
+  ],
+  "poznamka": "hranice kmenů 9 × 4 m; počátek uprostřed půdorysu na zemi, metry, 3320 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_med.glb",
+  "jmeno": "pv_hromada_med",
+  "druh": "dil",
+  "rozmer_m": [
+   9.32,
+   11.4,
+   3.81
+  ],
+  "poznamka": "hromada měděné rudy; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_pisek.glb",
+  "jmeno": "pv_hromada_pisek",
+  "druh": "dil",
+  "rozmer_m": [
+   9.85,
+   11.11,
+   3.25
+  ],
+  "poznamka": "hromada písku; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami; zatím na žádném políčku, k půjčení",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_prkna.glb",
+  "jmeno": "pv_hromada_prkna",
+  "druh": "dil",
+  "rozmer_m": [
+   8.98,
+   7.58,
+   1.95
+  ],
+  "poznamka": "stohy prken; počátek uprostřed půdorysu na zemi, metry, 1152 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_ruda.glb",
+  "jmeno": "pv_hromada_ruda",
+  "druh": "dil",
+  "rozmer_m": [
+   11.05,
+   10.29,
+   3.85
+  ],
+  "poznamka": "hromada železné rudy; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_uhli.glb",
+  "jmeno": "pv_hromada_uhli",
+  "druh": "dil",
+  "rozmer_m": [
+   11.55,
+   9.2,
+   3.73
+  ],
+  "poznamka": "hromada uhlí; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_hromada_zlato.glb",
+  "jmeno": "pv_hromada_zlato",
+  "druh": "dil",
+  "rozmer_m": [
+   9.06,
+   8.42,
+   3.45
+  ],
+  "poznamka": "hromada zlaté rudy; počátek uprostřed půdorysu na zemi, metry, 2240 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_jerab.glb",
+  "jmeno": "pv_jerab",
+  "druh": "dil",
+  "rozmer_m": [
+   13.96,
+   5.98,
+   12.37
+  ],
+  "poznamka": "mostový jeřáb 14 m; počátek uprostřed půdorysu na zemi, metry, 120 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_kancelare.glb",
+  "jmeno": "pv_kancelare",
+  "druh": "dil",
+  "rozmer_m": [
+   10.3,
+   7.34,
+   7.54
+  ],
+  "poznamka": "kanceláře 10 × 6 m, dvě patra; počátek uprostřed půdorysu na zemi, metry, 1440 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_kaucukovnik.glb",
+  "jmeno": "pv_kaucukovnik",
+  "druh": "rostlina",
+  "vyska_m": 14.315,
+  "poznamka": "kaučukovník s miskou na latex; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 14.315 m), 1482 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_komin_cihlovy.glb",
+  "jmeno": "pv_komin_cihlovy",
+  "druh": "dil",
+  "rozmer_m": [
+   3.8,
+   3.8,
+   28.33
+  ],
+  "poznamka": "cihlový komín 28 m; počátek uprostřed půdorysu na zemi, metry, 276 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_komin_vysoky.glb",
+  "jmeno": "pv_komin_vysoky",
+  "druh": "dil",
+  "rozmer_m": [
+   5.18,
+   5.18,
+   60.25
+  ],
+  "poznamka": "betonový komín 60 m s červenými a bílými pruhy; počátek uprostřed půdorysu na zemi, metry, 992 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_kotelna.glb",
+  "jmeno": "pv_kotelna",
+  "druh": "dil",
+  "rozmer_m": [
+   8.38,
+   8.38,
+   11.37
+  ],
+  "poznamka": "kotelna 8 × 8 m s velkými okny a světlíkem; počátek uprostřed půdorysu na zemi, metry, 680 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_kravin.glb",
+  "jmeno": "pv_kravin",
+  "druh": "dil",
+  "rozmer_m": [
+   14.56,
+   6.58,
+   4.79
+  ],
+  "poznamka": "dlouhý kravín; počátek uprostřed půdorysu na zemi, metry, 1088 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 8,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_nadrz_koule.glb",
+  "jmeno": "pv_nadrz_koule",
+  "druh": "dil",
+  "rozmer_m": [
+   8.28,
+   8.28,
+   9.97
+  ],
+  "poznamka": "kulová nádrž 8 m na nohách; počátek uprostřed půdorysu na zemi, metry, 1768 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_nadrz_mala.glb",
+  "jmeno": "pv_nadrz_mala",
+  "druh": "dil",
+  "rozmer_m": [
+   7.38,
+   5.78,
+   6.89
+  ],
+  "poznamka": "malá stříbrná nádrž 5 m; počátek uprostřed půdorysu na zemi, metry, 596 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_nadrz_velka.glb",
+  "jmeno": "pv_nadrz_velka",
+  "druh": "dil",
+  "rozmer_m": [
+   11.78,
+   11.78,
+   9.87
+  ],
+  "poznamka": "velká nádrž 11 m, točité schodiště; počátek uprostřed půdorysu na zemi, metry, 1004 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_palma.glb",
+  "jmeno": "pv_palma",
+  "druh": "rostlina",
+  "vyska_m": 12.019,
+  "poznamka": "kokosová palma s kokosy; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 12.019 m), 1920 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_plosina.glb",
+  "jmeno": "pv_plosina",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   13.07
+  ],
+  "poznamka": "podklad vrtné plošiny: ocelová paluba 12 m nad mořem na čtyřech nohách; počátek v severním rohu políčka (podklad přes celé políčko), metry, 424 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_potrubi.glb",
+  "jmeno": "pv_potrubi",
+  "druh": "dil",
+  "rozmer_m": [
+   14.76,
+   2.8,
+   4.99
+  ],
+  "poznamka": "potrubní most 14 m; počátek uprostřed půdorysu na zemi, metry, 276 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_psenice_mlada.glb",
+  "jmeno": "pv_psenice_mlada",
+  "druh": "rostlina",
+  "vyska_m": 0.63,
+  "poznamka": "mladá zelená pšenice, čtverec 3,6 m; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 0.63 m), 1052 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_psenice_zrala.glb",
+  "jmeno": "pv_psenice_zrala",
+  "druh": "rostlina",
+  "vyska_m": 1.361,
+  "poznamka": "zralá pšenice, čtverec 3,6 m hustých stébel s klasy; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 1.361 m), 3852 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_silo.glb",
+  "jmeno": "pv_silo",
+  "druh": "dil",
+  "rozmer_m": [
+   7.48,
+   13.16,
+   21.74
+  ],
+  "poznamka": "tři sila 16 m s výtahovou věží; počátek uprostřed půdorysu na zemi, metry, 760 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_statek.glb",
+  "jmeno": "pv_statek",
+  "druh": "dil",
+  "rozmer_m": [
+   10.98,
+   8.68,
+   9.58
+  ],
+  "poznamka": "obytný dům statku; počátek uprostřed půdorysu na zemi, metry, 1136 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 9,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_stodola.glb",
+  "jmeno": "pv_stodola",
+  "druh": "dil",
+  "rozmer_m": [
+   12.76,
+   10.57,
+   8.58
+  ],
+  "poznamka": "dřevěná stodola s balíky sena; počátek uprostřed půdorysu na zemi, metry, 716 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_stozar_vn.glb",
+  "jmeno": "pv_stozar_vn",
+  "druh": "dil",
+  "rozmer_m": [
+   5.24,
+   12.2,
+   26.01
+  ],
+  "poznamka": "stožár vysokého napětí 26 m; počátek uprostřed půdorysu na zemi, metry, 1128 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami; zatím na žádném políčku, k půjčení",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_tezni_vez.glb",
+  "jmeno": "pv_tezni_vez",
+  "druh": "dil",
+  "rozmer_m": [
+   9.53,
+   4.78,
+   21.47
+  ],
+  "poznamka": "těžní věž 20 m se dvěma koly a strojovnou; počátek uprostřed půdorysu na zemi, metry, 3428 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_transformator.glb",
+  "jmeno": "pv_transformator",
+  "druh": "dil",
+  "rozmer_m": [
+   13.66,
+   13.66,
+   10.09
+  ],
+  "poznamka": "rozvodna: dva transformátory, portál, plot; počátek uprostřed půdorysu na zemi, metry, 4908 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_valcovna.glb",
+  "jmeno": "pv_valcovna",
+  "druh": "dil",
+  "rozmer_m": [
+   14.56,
+   9.58,
+   17.95
+  ],
+  "poznamka": "válcovna: dlouhá hala s komínem; počátek uprostřed půdorysu na zemi, metry, 1052 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 5,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_vodarna_nadrz.glb",
+  "jmeno": "pv_vodarna_nadrz",
+  "druh": "dil",
+  "rozmer_m": [
+   12.76,
+   12.76,
+   3.19
+  ],
+  "poznamka": "kruhová nádrž čistírny vody s mostem; počátek uprostřed půdorysu na zemi, metry, 668 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_vodojem.glb",
+  "jmeno": "pv_vodojem",
+  "druh": "dil",
+  "rozmer_m": [
+   12.8,
+   12.7,
+   27.53
+  ],
+  "poznamka": "vodojem 27 m; počátek uprostřed půdorysu na zemi, metry, 596 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 5,
+   "poznamka": "v noci ukaž uzel noc přes díl: svítící okna (asi 60 % skel) těsně před tmavými, stejný atlas"
+  },
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_vrtna_vez.glb",
+  "jmeno": "pv_vrtna_vez",
+  "druh": "dil",
+  "rozmer_m": [
+   7.98,
+   7.98,
+   31.12
+  ],
+  "poznamka": "vrtná věž 30 m; počátek uprostřed půdorysu na zemi, metry, 1204 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_vysoka_pec.glb",
+  "jmeno": "pv_vysoka_pec",
+  "druh": "dil",
+  "rozmer_m": [
+   12.67,
+   11.18,
+   24.94
+  ],
+  "poznamka": "vysoká pec s ohřívači větru a žhavou struskou; počátek uprostřed půdorysu na zemi, metry, 1280 trojúhelníků, atlas 1024 px jen barva bez světla, s normálami",
+  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_zem.glb",
+  "jmeno": "pv_pastvina_zem",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   14.8,
+   0.01
+  ],
+  "poznamka": "podklad pastviny: krátce spasená tráva, tmavší trsy, ušlapaná místa; textura navazuje přes okraje políček dokola; počátek v severním rohu políčka (jako pole_zem); metry, 2 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_plot.glb",
+  "jmeno": "pv_pastvina_plot",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   0.12,
+   1.2
+  ],
+  "poznamka": "plot jedné hrany políčka pastviny: 7 sloupků 1,2 m po 2,47 m a tři latě, od (0, 0) do (14,8, 0) podél x na čáře hrany; krajní sloupek je společný se sousedním kusem; metry, 120 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_plot_otvor.glb",
+  "jmeno": "pv_pastvina_plot_otvor",
+  "druh": "dil",
+  "rozmer_m": [
+   14.8,
+   0.12,
+   1.2
+  ],
+  "poznamka": "týž plot s otvorem 2 m uprostřed bez vrátek (hráč: „bez vratek jen otvory ať se tam da chodit“); metry, 168 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_koryto.glb",
+  "jmeno": "pv_pastvina_koryto",
+  "druh": "dil",
+  "rozmer_m": [
+   2.4,
+   0.6,
+   0.5
+  ],
+  "poznamka": "dřevěné koryto s vodou 2,4 m; počátek uprostřed na zemi; metry, 62 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "soubor": "pv_pastvina_pristresek.glb",
+  "jmeno": "pv_pastvina_pristresek",
+  "druh": "dil",
+  "rozmer_m": [
+   3.7,
+   4.8,
+   2.4
+  ],
+  "poznamka": "přístřešek 3,1 × 2,9 m se střechou spadající dozadu (+y), prkna vzadu a vpravo, před ním jesle se senem pod stříškou (−y); počátek uprostřed přístřešku na zemi; metry, 168 trojúhelníků, atlas barev, s normálami",
+  "autor": "grrrrf: vlastní model prumysl/farma_pastviny.py (stavebnice predmety/stavebnice3d.py)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)"
+ },
+ {
+  "jmeno": "pv_gfx_000",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   0,
+   1
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "těžní věž dolu (1 je táž věž v pohybu)"
+ },
+ {
+  "jmeno": "pv_gfx_002",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   2
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     6.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     7.4,
+     12.6,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   }
+  ],
+  "poznamka": "úpravna uhlí s dopravníkem"
+ },
+ {
+  "jmeno": "pv_gfx_003",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   3
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kotelna dolu"
+ },
+ {
+  "jmeno": "pv_gfx_004",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   4
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_hromada_uhli",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "hromada uhlí"
+ },
+ {
+  "jmeno": "pv_gfx_005",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   5
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_hromada_uhli",
+    "poloha": [
+     5.9,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     8.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.9
+   }
+  ],
+  "poznamka": "hromada uhlí pod jeřábem"
+ },
+ {
+  "jmeno": "pv_gfx_006",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   6
+  ],
+  "prumysl": [
+   "IT_COAL_MINE"
+  ],
+  "podklad": "pv_dvur_uhli",
+  "dily": [
+   {
+    "dil": "pv_hromada_uhli",
+    "poloha": [
+     4.2,
+     4.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.6
+   },
+   {
+    "dil": "pv_hromada_uhli",
+    "poloha": [
+     10.6,
+     10.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.6
+   }
+  ],
+  "poznamka": "dvě menší hromady uhlí"
+ },
+ {
+  "jmeno": "pv_gfx_007",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   7
+  ],
+  "prumysl": [
+   "IT_POWER_STATION"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.6
+   }
+  ],
+  "poznamka": "kotelna elektrárny"
+ },
+ {
+  "jmeno": "pv_gfx_008",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   8
+  ],
+  "prumysl": [
+   "IT_POWER_STATION"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_komin_vysoky",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "komín elektrárny"
+ },
+ {
+  "jmeno": "pv_gfx_009",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   9
+  ],
+  "prumysl": [
+   "IT_POWER_STATION"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_valcovna",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "strojovna s turbínami"
+ },
+ {
+  "jmeno": "pv_gfx_010",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   10
+  ],
+  "prumysl": [
+   "IT_POWER_STATION"
+  ],
+  "podklad": "pv_dvur_sterk",
+  "dily": [
+   {
+    "dil": "pv_transformator",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "rozvodna (ve hře jiskří)"
+ },
+ {
+  "jmeno": "pv_gfx_011",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   11
+  ],
+  "prumysl": [
+   "IT_SAWMILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     5.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     7.4,
+     12.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.7
+   }
+  ],
+  "poznamka": "pila: hala a kmeny"
+ },
+ {
+  "jmeno": "pv_gfx_012",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   12
+  ],
+  "prumysl": [
+   "IT_SAWMILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "pila: hala"
+ },
+ {
+  "jmeno": "pv_gfx_013",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   13
+  ],
+  "prumysl": [
+   "IT_SAWMILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     7.4,
+     4.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     7.4,
+     10.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kmeny"
+ },
+ {
+  "jmeno": "pv_gfx_014",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   14
+  ],
+  "prumysl": [
+   "IT_SAWMILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hromada_prkna",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "prkna"
+ },
+ {
+  "jmeno": "pv_gfx_015",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   15
+  ],
+  "prumysl": [
+   "IT_SAWMILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hala_mala",
+    "poloha": [
+     4.9,
+     4.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     8.4,
+     10.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.7
+   }
+  ],
+  "poznamka": "dílna a kmeny"
+ },
+ {
+  "jmeno": "pv_gfx_016",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   16
+  ],
+  "prumysl": [
+   "IT_FOREST"
+  ],
+  "podklad": "pole_zem",
+  "podklad_sada": "prumysl",
+  "poznamka": "les: čtyři lesní smrky s holým kmenem dole a jeden listnáč, asi 7 m od sebe, jako společné doplňky (smrk_les_v*, strom_v*); na poli",
+  "doplnky": [
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     3.42,
+     3.66,
+     0.0
+    ],
+    "otoceni": 160.8,
+    "meritko": 0.963
+   },
+   {
+    "jmeno": "smrk_les_v1",
+    "poloha": [
+     3.52,
+     11.42,
+     0.0
+    ],
+    "otoceni": 228.6,
+    "meritko": 0.92
+   },
+   {
+    "jmeno": "smrk_les_v1",
+    "poloha": [
+     10.12,
+     3.3,
+     0.0
+    ],
+    "otoceni": 51.1,
+    "meritko": 0.94
+   },
+   {
+    "jmeno": "smrk_les_v0",
+    "poloha": [
+     11.59,
+     10.72,
+     0.0
+    ],
+    "otoceni": 344.2,
+    "meritko": 1.063
+   },
+   {
+    "jmeno": "strom_v1",
+    "poloha": [
+     8.14,
+     7.8,
+     0.0
+    ],
+    "otoceni": 9.9,
+    "meritko": 1.376
+   }
+  ]
+ },
+ {
+  "jmeno": "pv_gfx_018",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   18
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     5.9,
+     5.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.9
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     11.9,
+     11.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   },
+   {
+    "dil": "pv_potrubi",
+    "poloha": [
+     7.4,
+     12.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   }
+  ],
+  "poznamka": "pec rafinerie s komínem a potrubím"
+ },
+ {
+  "jmeno": "pv_gfx_019",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   19
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     7.4,
+     4.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.9
+   },
+   {
+    "dil": "pv_potrubi",
+    "poloha": [
+     7.4,
+     11.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "řídicí budova a potrubí"
+ },
+ {
+  "jmeno": "pv_gfx_020",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   20
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_nadrz_velka",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "velká nádrž"
+ },
+ {
+  "jmeno": "pv_gfx_021",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   21
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_destilacni_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "destilační kolony"
+ },
+ {
+  "jmeno": "pv_gfx_022",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   22
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_nadrz_koule",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kulová nádrž"
+ },
+ {
+  "jmeno": "pv_gfx_023",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   23
+  ],
+  "prumysl": [
+   "IT_OIL_REFINERY"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "dily": [
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     4.2,
+     4.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     10.6,
+     10.6,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_potrubi",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 45,
+    "meritko": 0.6
+   }
+  ],
+  "poznamka": "dvě malé nádrže"
+ },
+ {
+  "jmeno": "pv_gfx_024",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   24
+  ],
+  "prumysl": [
+   "IT_OIL_RIG"
+  ],
+  "podklad": "pv_plosina",
+  "dily": [
+   {
+    "dil": "pv_vrtna_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     12.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   }
+  ],
+  "poznamka": "vrtná věž na plošině"
+ },
+ {
+  "jmeno": "pv_gfx_025",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   25
+  ],
+  "prumysl": [
+   "IT_OIL_RIG"
+  ],
+  "podklad": "pv_plosina",
+  "dily": [
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     7.4,
+     7.4,
+     12.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.9
+   }
+  ],
+  "poznamka": "obytný blok plošiny"
+ },
+ {
+  "jmeno": "pv_gfx_026",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   26
+  ],
+  "prumysl": [
+   "IT_OIL_RIG"
+  ],
+  "podklad": "pv_plosina",
+  "dily": [
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     7.4,
+     7.4,
+     12.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   }
+  ],
+  "poznamka": "jeřáb plošiny"
+ },
+ {
+  "jmeno": "pv_gfx_027",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   27
+  ],
+  "prumysl": [
+   "IT_OIL_RIG"
+  ],
+  "podklad": "pv_plosina",
+  "dily": [
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     4.4,
+     7.4,
+     12.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     10.4,
+     7.4,
+     12.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "nádrže plošiny"
+ },
+ {
+  "jmeno": "pv_gfx_028",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   28
+  ],
+  "prumysl": [
+   "IT_OIL_RIG"
+  ],
+  "podklad": "pv_plosina",
+  "poznamka": "přistávací plocha pro vrtulník"
+ },
+ {
+  "jmeno": "pv_gfx_029",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   29,
+   30,
+   31,
+   32
+  ],
+  "prumysl": [
+   "IT_OIL_WELL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_cerpadlo_ropy",
+    "poloha": [
+     6.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     11.9,
+     11.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.6
+   }
+  ],
+  "poznamka": "naftová pumpa (30–32 táž v pohybu)"
+ },
+ {
+  "jmeno": "pv_gfx_033",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   33
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_stodola",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "stodola",
+  "vozidla": [
+   {
+    "zaznam": "special_kun_tazny",
+    "objekt": "kun_tazny",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     7.4,
+     1.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "poznamka": "tažný kůň stojí u jižní zdi stodoly (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_tazny balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  ]
+ },
+ {
+  "jmeno": "pv_gfx_034",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   34
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_silo",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "sila"
+ },
+ {
+  "jmeno": "pv_gfx_035",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   35
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_statek",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "obytný dům statku",
+  "vozidla": [
+   {
+    "zaznam": "special_kun_belous",
+    "objekt": "kun_belous",
+    "sada_objektu": "zvirata",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poza": "stoji",
+    "poloha": [
+     7.4,
+     1.6,
+     0.0
+    ],
+    "otoceni": 0,
+    "poznamka": "bělouš stojí u jižní zdi statku (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_belous balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
+   }
+  ]
+ },
+ {
+  "jmeno": "pv_gfx_036",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   36
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_kravin",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kravín",
+  "vozidla": [
+   {
+    "zaznam": "special_kolecko",
+    "objekt": "special_kolecko",
+    "sada_objektu": "special",
+    "doplnky": {
+     "kolecko_ram.glb": "ram"
+    },
+    "bez_posadky": true,
+    "meritko": 0.5,
+    "otoceni": 270,
+    "naklon": 60,
+    "stred_naklonu": [
+     0.792,
+     -0.295,
+     0.183
+    ],
+    "poloha": [
+     3.0,
+     3.73,
+     0.183
+    ],
+    "poznamka": "stavební kolečko ze special (hráč: „kolečko tam opři ze special“), bez holky, opřené o jižní zeď kravína: meritko 0,5 (kolečko specialu je dvojnásobné jako holky), otoceni 270 (kolo k −y, rukojeti ke zdi), naklon 60° kolem osy kola (stred_naklonu v rámci kolečka po meritku): rukojeti nahoru ke zdi, kolo na zemi; poloha = kam přijde osa kola; barvy korby a rámu původní (bez stavu)"
+   }
+  ]
+ },
+ {
+  "jmeno": "pv_gfx_037",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   37
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pole_seno",
+    "poloha": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "sada": "prumysl"
+   }
+  ],
+  "poznamka": "stoh sena (díl pole)"
+ },
+ {
+  "jmeno": "pv_gfx_038",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   38
+  ],
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pole_bouda",
+    "poloha": [
+     0.0,
+     0.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "sada": "prumysl"
+   },
+   {
+    "dil": "pv_hala_mala",
+    "poloha": [
+     9.4,
+     10.4,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kůlna (díl pole) a dílna",
+  "vozidla": [
+   {
+    "zaznam": "zv_traktor_zts",
+    "objekt": "zv_traktor_zts",
+    "sada_objektu": "zvlastni_vozy",
+    "sada": [
+     "traktor"
+    ],
+    "poloha": [
+     3.4,
+     9.6,
+     0.0
+    ],
+    "otoceni": 90,
+    "jizda": {
+     "k": "pole",
+     "z": "farma",
+     "rychlost_kmh": 20,
+     "stoji_tiku": 600,
+     "poznamka": "z farmy na její pole a zpátky (hráč: „zetor postav na farmě na zrni ať jezdi na pole“): po cestě nebo po zemi na políčko pole farmy, tam pomalu přejede pole a vrátí se na své místo"
+    },
+    "poznamka": "traktor ZTS 16245 (Zetor) z balíčku Zvlastni_vozy_3D jako stojící hasičská Tatra na hřišti (hráč: „zetor veme z grf jako hasičskou tatru na hřiště“): záznam zv_traktor_zts, sada traktor (červený, bez přívěsu, s řidičkou záznamu); stojí u dílny v rohu políčka a jezdí na pole. Model se nekopíruje (hráč: „nic nemusí být dvakrát ve hře a v grf“), bez balíčku Zetor na farmě není"
+   }
+  ]
+ },
+ {
+  "jmeno": "pv_gfx_039",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   39
+  ],
+  "prumysl": [
+   "IT_FACTORY"
+  ],
+  "podklad": "pv_dvur_beton",
+  "blok": [
+   2,
+   2
+  ],
+  "dily": [
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     22.2,
+     6.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     20.7,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     26.7,
+     26.7,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "továrna: dvě haly s pilovou střechou, cihlová budova, kotelna, komín"
+ },
+ {
+  "jmeno": "pv_gfx_040",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   40
+  ],
+  "prumysl": [
+   "IT_FACTORY"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 39,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 39 (továrna: dvě haly s pilovou střechou, cihlová budova, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_041",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   41
+  ],
+  "prumysl": [
+   "IT_FACTORY"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 39,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 39 (továrna: dvě haly s pilovou střechou, cihlová budova, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_042",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   42
+  ],
+  "prumysl": [
+   "IT_FACTORY"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 39,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 39 (továrna: dvě haly s pilovou střechou, cihlová budova, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_043",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   43
+  ],
+  "prumysl": [
+   "IT_PRINTING_WORKS"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "blok": [
+   2,
+   2
+  ],
+  "dily": [
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     22.2,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     22.2,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "tiskárna: dvě cihlové budovy, sklad papíru, kanceláře"
+ },
+ {
+  "jmeno": "pv_gfx_044",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   44
+  ],
+  "prumysl": [
+   "IT_PRINTING_WORKS"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "soucast_bloku": {
+   "gfx": 43,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 43 (tiskárna: dvě cihlové budovy, sklad papíru, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_045",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   45
+  ],
+  "prumysl": [
+   "IT_PRINTING_WORKS"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "soucast_bloku": {
+   "gfx": 43,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 43 (tiskárna: dvě cihlové budovy, sklad papíru, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_046",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   46
+  ],
+  "prumysl": [
+   "IT_PRINTING_WORKS"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "soucast_bloku": {
+   "gfx": 43,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 43 (tiskárna: dvě cihlové budovy, sklad papíru, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_047",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   47,
+   48
+  ],
+  "prumysl": [
+   "IT_COPPER_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "těžní věž (48 v pohybu)"
+ },
+ {
+  "jmeno": "pv_gfx_049",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   49
+  ],
+  "prumysl": [
+   "IT_COPPER_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     5.9,
+     5.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     11.9,
+     11.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kotelna s komínem"
+ },
+ {
+  "jmeno": "pv_gfx_050",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   50
+  ],
+  "prumysl": [
+   "IT_COPPER_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hromada_med",
+    "poloha": [
+     6.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     7.4,
+     12.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.7
+   }
+  ],
+  "poznamka": "měděná ruda"
+ },
+ {
+  "jmeno": "pv_gfx_051",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   51
+  ],
+  "prumysl": [
+   "IT_COPPER_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "úpravna"
+ },
+ {
+  "jmeno": "pv_gfx_052",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   52
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "blok": [
+   2,
+   2
+  ],
+  "dily": [
+   {
+    "dil": "pv_vysoka_pec",
+    "poloha": [
+     8.4,
+     8.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_valcovna",
+    "poloha": [
+     22.2,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     26.2,
+     19.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     22.2,
+     19.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_ruda",
+    "poloha": [
+     20.2,
+     26.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.6
+   }
+  ],
+  "poznamka": "ocelárna: vysoká pec, válcovna, dva komíny, jeřáb, ruda"
+ },
+ {
+  "jmeno": "pv_gfx_053",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   53
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 52,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 52 (ocelárna: vysoká pec, válcovna, dva komíny, jeřáb, ruda)"
+ },
+ {
+  "jmeno": "pv_gfx_054",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   54
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 52,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 52 (ocelárna: vysoká pec, válcovna, dva komíny, jeřáb, ruda)"
+ },
+ {
+  "jmeno": "pv_gfx_055",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   55
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 52,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 52 (ocelárna: vysoká pec, válcovna, dva komíny, jeřáb, ruda)"
+ },
+ {
+  "jmeno": "pv_gfx_056",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   56
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "blok": [
+   2,
+   1
+  ],
+  "dily": [
+   {
+    "dil": "pv_valcovna",
+    "poloha": [
+     14.8,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_ruda",
+    "poloha": [
+     25.7,
+     3.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.4
+   }
+  ],
+  "poznamka": "ocelárna: válcovna přes dvě políčka"
+ },
+ {
+  "jmeno": "pv_gfx_057",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   57
+  ],
+  "prumysl": [
+   "IT_STEEL_MILL"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 56,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 56 (ocelárna: válcovna přes dvě políčka)"
+ },
+ {
+  "jmeno": "pv_gfx_058",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   58
+  ],
+  "prumysl": [
+   "IT_BANK_TEMP"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "blok": [
+   2,
+   1
+  ],
+  "dily": [
+   {
+    "dil": "pv_banka",
+    "poloha": [
+     14.8,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "banka"
+ },
+ {
+  "jmeno": "pv_gfx_059",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   59
+  ],
+  "prumysl": [
+   "IT_BANK_TEMP"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "soucast_bloku": {
+   "gfx": 58,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 58 (banka)"
+ },
+ {
+  "jmeno": "pv_gfx_060",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   60
+  ],
+  "prumysl": [
+   "IT_FOOD_PROCESS"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "výrobní hala"
+ },
+ {
+  "jmeno": "pv_gfx_061",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   61
+  ],
+  "prumysl": [
+   "IT_FOOD_PROCESS"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     4.2,
+     4.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     10.6,
+     4.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     7.4,
+     10.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_potrubi",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 0.7
+   }
+  ],
+  "poznamka": "nádrže"
+ },
+ {
+  "jmeno": "pv_gfx_062",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   62
+  ],
+  "prumysl": [
+   "IT_FOOD_PROCESS"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kanceláře"
+ },
+ {
+  "jmeno": "pv_gfx_063",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   63
+  ],
+  "prumysl": [
+   "IT_FOOD_PROCESS"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_silo",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "sila"
+ },
+ {
+  "jmeno": "pv_gfx_064",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   64
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "papírna: budova"
+ },
+ {
+  "jmeno": "pv_gfx_065",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   65
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     5.9,
+     5.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     11.9,
+     11.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kotelna s komínem"
+ },
+ {
+  "jmeno": "pv_gfx_066",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   66
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     7.4,
+     4.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     7.4,
+     10.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "dřevo"
+ },
+ {
+  "jmeno": "pv_gfx_067",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   67
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "papírenská hala"
+ },
+ {
+  "jmeno": "pv_gfx_068",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   68
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "kanceláře"
+ },
+ {
+  "jmeno": "pv_gfx_069",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   69
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_nadrz_velka",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "nádrž"
+ },
+ {
+  "jmeno": "pv_gfx_070",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   70
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "dily": [
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     5.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     8.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 0.9
+   }
+  ],
+  "poznamka": "dřevo pod jeřábem"
+ },
+ {
+  "jmeno": "pv_gfx_071",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   71
+  ],
+  "prumysl": [
+   "IT_PAPER_MILL"
+  ],
+  "podklad": "pv_dvur_beton",
+  "dily": [
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "sklad papíru"
+ },
+ {
+  "jmeno": "pv_gfx_072",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   72
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "blok": [
+   4,
+   4
+  ],
+  "dily": [
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     9.4,
+     9.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     24.2,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     37.0,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     49.8,
+     5.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_zlato",
+    "poloha": [
+     7.4,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     22.2,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     39.0,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     51.8,
+     51.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_zlato",
+    "poloha": [
+     7.4,
+     51.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.7
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     22.2,
+     51.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře"
+ },
+ {
+  "jmeno": "pv_gfx_073",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   73
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_074",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   74
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    0,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_075",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   75
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    0,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_076",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   76
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_077",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   77
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_078",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   78
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    1,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_079",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   79,
+   88
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    1,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_080",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   80
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    2,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_081",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   81
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    2,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_082",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   82
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    2,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_083",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   83
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    2,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_084",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   84
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    3,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_085",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   85
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    3,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_086",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   86
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    3,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_087",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   87
+  ],
+  "prumysl": [
+   "IT_GOLD_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 72,
+   "posun": [
+    3,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 72 (zlatý důl: těžní věž, úpravna, kotelna s komínem, ruda, dopravník, budova, kanceláře)"
+ },
+ {
+  "jmeno": "pv_gfx_089",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   89
+  ],
+  "prumysl": [
+   "IT_BANK_TROPIC_ARCTIC"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "blok": [
+   2,
+   1
+  ],
+  "dily": [
+   {
+    "dil": "pv_banka",
+    "poloha": [
+     14.8,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "banka (subarktické a subtropy, táž budova)"
+ },
+ {
+  "jmeno": "pv_gfx_090",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   90
+  ],
+  "prumysl": [
+   "IT_BANK_TROPIC_ARCTIC"
+  ],
+  "podklad": "pv_dvur_asfalt",
+  "soucast_bloku": {
+   "gfx": 89,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 89 (banka (subarktické a subtropy, táž budova))"
+ },
+ {
+  "jmeno": "pv_gfx_091",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   91
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "blok": [
+   3,
+   3
+  ],
+  "dily": [
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     22.2,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kancelare",
+    "poloha": [
+     37.0,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_diamant",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     22.2,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_diamant",
+    "poloha": [
+     37.0,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.7
+   },
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     7.4,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     22.2,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín"
+ },
+ {
+  "jmeno": "pv_gfx_092",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   92
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_093",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   93
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    0,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_094",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   94
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_095",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   95
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_096",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   96
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    1,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_097",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   97
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    2,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_098",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   98
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    2,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_099",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   99
+  ],
+  "prumysl": [
+   "IT_DIAMOND_MINE"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 91,
+   "posun": [
+    2,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 91 (diamantový důl: těžní věž, úpravna, kimberlit, dopravník, kotelna, komín)"
+ },
+ {
+  "jmeno": "pv_gfx_100",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   100
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "blok": [
+   4,
+   4
+  ],
+  "dily": [
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_tezni_vez",
+    "poloha": [
+     37.0,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     22.2,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     51.8,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     51.8,
+     19.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_ruda",
+    "poloha": [
+     7.4,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_ruda",
+    "poloha": [
+     37.0,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     22.2,
+     37.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_dopravnik",
+    "poloha": [
+     51.8,
+     37.0,
+     0.0
+    ],
+    "otoceni": 90,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     22.2,
+     51.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     51.8,
+     51.8,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb"
+ },
+ {
+  "jmeno": "pv_gfx_101",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   101
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_102",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   102
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    0,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_103",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   103
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    0,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_104",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   104
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_105",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   105
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_106",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   106
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    1,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_107",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   107
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    1,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_108",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   108
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    2,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_109",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   109
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    2,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_110",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   110
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    2,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_111",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   111
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    2,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_112",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   112
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    3,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_113",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   113
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    3,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_114",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   114
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    3,
+    2
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_115",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   115
+  ],
+  "prumysl": [
+   "IT_IRON_MINE"
+  ],
+  "podklad": "pv_dvur_ruda",
+  "soucast_bloku": {
+   "gfx": 100,
+   "posun": [
+    3,
+    3
+   ]
+  },
+  "poznamka": "součást bloku 100 (železný důl: dvě těžní věže, úpravna, kotelna s komínem, ruda, dopravníky, budova, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_116",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   116
+  ],
+  "prumysl": [
+   "IT_FRUIT_PLANTATION"
+  ],
+  "podklad": "pole_zem",
+  "podklad_sada": "prumysl",
+  "rostliny": [
+   {
+    "soubor": "pv_palma.glb",
+    "poloha": [
+     4.29,
+     3.88,
+     0.0
+    ],
+    "otoceni": 3.1,
+    "meritko": [
+     10.67,
+     10.67,
+     10.67
+    ]
+   },
+   {
+    "soubor": "pv_palma.glb",
+    "poloha": [
+     3.97,
+     11.54,
+     0.0
+    ],
+    "otoceni": 174.2,
+    "meritko": [
+     9.94,
+     9.94,
+     9.94
+    ]
+   },
+   {
+    "soubor": "pv_palma.glb",
+    "poloha": [
+     10.63,
+     3.53,
+     0.0
+    ],
+    "otoceni": 311.5,
+    "meritko": [
+     10.25,
+     10.25,
+     10.25
+    ]
+   },
+   {
+    "soubor": "pv_palma.glb",
+    "poloha": [
+     11.23,
+     11.01,
+     0.0
+    ],
+    "otoceni": 273.4,
+    "meritko": [
+     9.45,
+     9.45,
+     9.45
+    ]
+   }
+  ],
+  "poznamka": "ovocná plantáž: palmy s plody v řadách na poli (čtyři na políčko)"
+ },
+ {
+  "jmeno": "pv_gfx_117",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   117
+  ],
+  "prumysl": [
+   "IT_RUBBER_PLANTATION"
+  ],
+  "podklad": "pole_zem",
+  "podklad_sada": "prumysl",
+  "rostliny": [
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     2.15,
+     2.05,
+     0.0
+    ],
+    "otoceni": 57.1,
+    "meritko": [
+     14.55,
+     14.55,
+     14.55
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     2.35,
+     6.93,
+     0.0
+    ],
+    "otoceni": 203.9,
+    "meritko": [
+     15.12,
+     15.12,
+     15.12
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     2.28,
+     12.72,
+     0.0
+    ],
+    "otoceni": 351.1,
+    "meritko": [
+     12.89,
+     12.89,
+     12.89
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     7.32,
+     2.05,
+     0.0
+    ],
+    "otoceni": 152.2,
+    "meritko": [
+     14.49,
+     14.49,
+     14.49
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     6.79,
+     7.65,
+     0.0
+    ],
+    "otoceni": 213.3,
+    "meritko": [
+     15.63,
+     15.63,
+     15.63
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     7.57,
+     12.83,
+     0.0
+    ],
+    "otoceni": 198.1,
+    "meritko": [
+     14.93,
+     14.93,
+     14.93
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     12.88,
+     2.94,
+     0.0
+    ],
+    "otoceni": 40.5,
+    "meritko": [
+     13.53,
+     13.53,
+     13.53
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     12.83,
+     7.55,
+     0.0
+    ],
+    "otoceni": 75.6,
+    "meritko": [
+     12.85,
+     12.85,
+     12.85
+    ]
+   },
+   {
+    "soubor": "pv_kaucukovnik.glb",
+    "poloha": [
+     12.13,
+     12.22,
+     0.0
+    ],
+    "otoceni": 110.9,
+    "meritko": [
+     13.92,
+     13.92,
+     13.92
+    ]
+   }
+  ],
+  "poznamka": "kaučuková plantáž: kaučukovníky v řadách na poli"
+ },
+ {
+  "jmeno": "pv_gfx_118",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   118
+  ],
+  "prumysl": [
+   "IT_WATER_SUPPLY"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_vodarna_nadrz",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "nádrž čistírny vody"
+ },
+ {
+  "jmeno": "pv_gfx_119",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   119
+  ],
+  "prumysl": [
+   "IT_WATER_SUPPLY"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_hala_mala",
+    "poloha": [
+     5.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_nadrz_mala",
+    "poloha": [
+     11.4,
+     10.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 0.8
+   }
+  ],
+  "poznamka": "čerpací stanice"
+ },
+ {
+  "jmeno": "pv_gfx_120",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   120
+  ],
+  "prumysl": [
+   "IT_WATER_TOWER"
+  ],
+  "podklad": "pv_dvur_trava",
+  "dily": [
+   {
+    "dil": "pv_vodojem",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "vodojem"
+ },
+ {
+  "jmeno": "pv_gfx_121",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   121
+  ],
+  "prumysl": [
+   "IT_FACTORY_2"
+  ],
+  "podklad": "pv_dvur_beton",
+  "blok": [
+   2,
+   2
+  ],
+  "dily": [
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hala_pilova",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_budova_cihlova",
+    "poloha": [
+     22.2,
+     6.9,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_kotelna",
+    "poloha": [
+     20.7,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_komin_cihlovy",
+    "poloha": [
+     26.7,
+     26.7,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "továrna (subtropy, týž sestav jako v mírném klimatu)"
+ },
+ {
+  "jmeno": "pv_gfx_122",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   122
+  ],
+  "prumysl": [
+   "IT_FACTORY_2"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 121,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 121 (továrna (subtropy, týž sestav jako v mírném klimatu))"
+ },
+ {
+  "jmeno": "pv_gfx_123",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   123
+  ],
+  "prumysl": [
+   "IT_FACTORY_2"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 121,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 121 (továrna (subtropy, týž sestav jako v mírném klimatu))"
+ },
+ {
+  "jmeno": "pv_gfx_124",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   124
+  ],
+  "prumysl": [
+   "IT_FACTORY_2"
+  ],
+  "podklad": "pv_dvur_beton",
+  "soucast_bloku": {
+   "gfx": 121,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 121 (továrna (subtropy, týž sestav jako v mírném klimatu))"
+ },
+ {
+  "jmeno": "pv_gfx_125",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   125
+  ],
+  "prumysl": [
+   "IT_LUMBER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "blok": [
+   2,
+   2
+  ],
+  "dily": [
+   {
+    "dil": "pv_hala_sedlova",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     22.2,
+     4.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_kmeny",
+    "poloha": [
+     22.2,
+     10.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_hromada_prkna",
+    "poloha": [
+     7.4,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   },
+   {
+    "dil": "pv_jerab",
+    "poloha": [
+     22.2,
+     22.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka": "pila v tropech: hala, kmeny, prkna, jeřáb"
+ },
+ {
+  "jmeno": "pv_gfx_126",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   126
+  ],
+  "prumysl": [
+   "IT_LUMBER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 125,
+   "posun": [
+    0,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 125 (pila v tropech: hala, kmeny, prkna, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_127",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   127
+  ],
+  "prumysl": [
+   "IT_LUMBER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 125,
+   "posun": [
+    1,
+    0
+   ]
+  },
+  "poznamka": "součást bloku 125 (pila v tropech: hala, kmeny, prkna, jeřáb)"
+ },
+ {
+  "jmeno": "pv_gfx_128",
+  "druh": "prumysl_dlazdice",
+  "gfx": [
+   128
+  ],
+  "prumysl": [
+   "IT_LUMBER_MILL"
+  ],
+  "podklad": "pv_dvur_hlina",
+  "soucast_bloku": {
+   "gfx": 125,
+   "posun": [
+    1,
+    1
+   ]
+  },
+  "poznamka": "součást bloku 125 (pila v tropech: hala, kmeny, prkna, jeřáb)"
+ },
+ {
+  "jmeno": "pv_pole_psenice_mlada",
+  "druh": "pole",
+  "dil": "psenice_mlada",
+  "pole": "psenice",
+  "podklad": "pole_zem",
+  "podklad_sada": "prumysl",
+  "rostliny": [
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     1.899,
+     1.908,
+     -0.04
+    ],
+    "otoceni": 180,
+    "meritko": [
+     0.63,
+     0.63,
+     0.686
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     5.719,
+     1.737,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     0.63,
+     0.63,
+     0.649
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     9.41,
+     1.757,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     0.63,
+     0.63,
+     0.67
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     12.98,
+     1.733,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     0.63,
+     0.63,
+     0.613
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     1.956,
+     5.469,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     0.63,
+     0.63,
+     0.682
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     5.401,
+     5.431,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     0.63,
+     0.63,
+     0.572
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     9.442,
+     5.639,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     0.63,
+     0.63,
+     0.62
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     13.021,
+     5.479,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     0.63,
+     0.63,
+     0.578
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     2.007,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     0.63,
+     0.63,
+     0.574
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     5.376,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     0.63,
+     0.63,
+     0.686
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     9.185,
+     9.205,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     0.63,
+     0.63,
+     0.64
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     12.943,
+     9.299,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     0.63,
+     0.63,
+     0.573
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     1.95,
+     13.033,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     0.63,
+     0.63,
+     0.573
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     5.581,
+     12.832,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     0.63,
+     0.63,
+     0.603
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     9.129,
+     13.011,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     0.63,
+     0.63,
+     0.635
+    ]
+   },
+   {
+    "soubor": "pv_psenice_mlada.glb",
+    "poloha": [
+     12.892,
+     12.956,
+     -0.04
+    ],
+    "otoceni": 180,
+    "meritko": [
+     0.63,
+     0.63,
+     0.638
+    ]
+   }
+  ],
+  "poznamka": "mladá zelená pšenice na polích farmy (hráč: „pole už máš tak jen dáš pšenici jako že tam roste a holky nebudou v poli“): 16 čtverců na políčko na místech kytek pole marihuany (hustý porost 4 m se překrývá, natočení jen po 90°), podklad pole_zem ze sady prumysl; holky v poli nejsou, jen na cestě polem (díl pole_cesta ze sady prumysl, u_cesty)"
+ },
+ {
+  "jmeno": "pv_pole_psenice_zrala",
+  "druh": "pole",
+  "dil": "psenice_zrala",
+  "pole": "psenice",
+  "podklad": "pole_zem",
+  "podklad_sada": "prumysl",
+  "rostliny": [
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     1.899,
+     1.908,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     1.361,
+     1.361,
+     1.326
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     5.719,
+     1.737,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.259
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     9.41,
+     1.757,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     1.361,
+     1.361,
+     1.248
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     12.98,
+     1.733,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     1.361,
+     1.361,
+     1.446
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     1.956,
+     5.469,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     1.361,
+     1.361,
+     1.334
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     5.401,
+     5.431,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     1.361,
+     1.361,
+     1.35
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     9.442,
+     5.639,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.331
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     13.021,
+     5.479,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     1.361,
+     1.361,
+     1.469
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     2.007,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.249
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     5.376,
+     9.202,
+     -0.04
+    ],
+    "otoceni": 90,
+    "meritko": [
+     1.361,
+     1.361,
+     1.432
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     9.185,
+     9.205,
+     -0.04
+    ],
+    "otoceni": 180,
+    "meritko": [
+     1.361,
+     1.361,
+     1.366
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     12.943,
+     9.299,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.47
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     1.95,
+     13.033,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.423
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     5.581,
+     12.832,
+     -0.04
+    ],
+    "otoceni": 180,
+    "meritko": [
+     1.361,
+     1.361,
+     1.251
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     9.129,
+     13.011,
+     -0.04
+    ],
+    "otoceni": 0,
+    "meritko": [
+     1.361,
+     1.361,
+     1.33
+    ]
+   },
+   {
+    "soubor": "pv_psenice_zrala.glb",
+    "poloha": [
+     12.892,
+     12.956,
+     -0.04
+    ],
+    "otoceni": 270,
+    "meritko": [
+     1.361,
+     1.361,
+     1.254
+    ]
+   }
+  ],
+  "poznamka": "zralá pšenice s klasy na polích farmy (hráč: „pole už máš tak jen dáš pšenici jako že tam roste a holky nebudou v poli“): 16 čtverců na políčko na místech kytek pole marihuany (hustý porost 4 m se překrývá, natočení jen po 90°), podklad pole_zem ze sady prumysl; holky v poli nejsou, jen na cestě polem (díl pole_cesta ze sady prumysl, u_cesty)"
+ },
+ {
+  "jmeno": "pv_pole_pastvina",
+  "druh": "pole",
+  "pole": "pastvina",
+  "dil": "pastvina",
+  "prumysl": [
+   "IT_FARM",
+   "IT_FARM_2"
+  ],
+  "podklad": "pv_pastvina_zem",
+  "plot": {
+   "hrana": "pv_pastvina_plot",
+   "otvor": "pv_pastvina_plot_otvor",
+   "poznamka": "plot na každé hraně políčka, za kterou už pastvina není; na každé straně pastviny jeden kus s otvorem (políčko uprostřed strany), ostatní bez; díl leží podél x od severního rohu, na ostatní hrany otočit po 90°"
+  },
+  "doplnky_pole": [
+   {
+    "dil": "pv_pastvina_pristresek",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "kolik": 1
+   },
+   {
+    "dil": "pv_pastvina_koryto",
+    "poloha": [
+     7.4,
+     7.4,
+     0.0
+    ],
+    "otoceni": 0,
+    "kolik": 1
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     4.2,
+     4.6,
+     0.0
+    ],
+    "otoceni": 35
+   },
+   {
+    "poloha": [
+     10.4,
+     10.0,
+     0.0
+    ],
+    "otoceni": 215
+   },
+   {
+    "poloha": [
+     10.0,
+     3.8,
+     0.0
+    ],
+    "otoceni": 130
+   },
+   {
+    "poloha": [
+     4.4,
+     10.6,
+     0.0
+    ],
+    "otoceni": 300
+   }
+  ],
+  "druhy_zvirat": [
+   "krava",
+   "ovce",
+   "prase"
+  ],
+  "zvirat_na_policko": {
+   "krava": 2,
+   "ovce": 3,
+   "prase": 3
+  },
+  "meritko_zvirat": 1,
+  "animace_zvirat": [
+   "pase",
+   "kouka"
+  ],
+  "poznamka": "pastvina s dobytkem jako pole farmy (hráč 26. 10.: „ohradka se zviřatky muže byt jako pole zrní pšenice vickrat v okoli farmy. větši jako jsou pole“): hra ji položí kolem farmy jako pole s pšenicí, víckrát a přes víc políček; jedna pastvina = jeden druh zvířat (kravičky, ovečky nebo prasátka z objekty/zvirata, meritko 1; pasou se a občas zvednou hlavu a koukají: pase a kouka); na každém políčku podklad pv_pastvina_zem a prvních zvirat_na_policko[druh] míst ze zvirata (natočení po svém); kolem plot (plot.hrana) s otvorem uprostřed každé strany (plot.otvor); přístřešek s jeslemi a koryto jednou na pastvinu, každé na jiném políčku (doplnky_pole, poloha v políčku)"
+ }
+]

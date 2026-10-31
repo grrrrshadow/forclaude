@@ -1,0 +1,1141 @@
+[
+ {
+  "soubor": "paleta_cihly.glb",
+  "jmeno": "paleta_cihly",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "paleta cihel",
+   "en": "pallet of bricks"
+  },
+  "rozmer_m": [
+   1.2,
+   0.8,
+   0.864
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 152,
+  "barvy": [
+   {
+    "cast": "cihly",
+    "maska": "paleta_cihly_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "C0583A",
+     "A8A49C",
+     "D8D0BC",
+     "B87A4A"
+    ]
+   }
+  ],
+  "naklady": [
+   {
+    "naklad": "BRCK",
+    "popis": "červené cihly",
+    "barva": "C0583A"
+   },
+   {
+    "naklad": "BDMT",
+    "popis": "šedé cihly (stavebniny)",
+    "barva": "A8A49C"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "čtyři svazky plných cihel 290 × 140 × 65 na europaletě, bez malty, každá cihla trochu jiný odstín; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 29 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "paleta_pytle.glb",
+  "jmeno": "paleta_pytle",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "paleta pytlů",
+   "en": "pallet of sacks"
+  },
+  "rozmer_m": [
+   1.22,
+   0.82,
+   0.924
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 312,
+  "barvy": [
+   {
+    "cast": "pytle",
+    "maska": "paleta_pytle_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "E8E6DE",
+     "B4B2AA",
+     "9A7048",
+     "7C9A5A",
+     "D8C070"
+    ]
+   }
+  ],
+  "naklady": [
+   {
+    "naklad": "QLME",
+    "popis": "vápno",
+    "barva": "E8E6DE"
+   },
+   {
+    "naklad": "CMNT",
+    "popis": "cement",
+    "barva": "B4B2AA"
+   },
+   {
+    "naklad": "BAKE",
+    "popis": "mouka",
+    "barva": "F0EEE6"
+   },
+   {
+    "naklad": "SUGR",
+    "popis": "cukr",
+    "barva": "F0EEE6"
+   },
+   {
+    "naklad": "SALT",
+    "popis": "sůl",
+    "barva": "E8E6DE"
+   },
+   {
+    "naklad": "FERT",
+    "popis": "hnojivo",
+    "barva": "7C9A5A"
+   },
+   {
+    "naklad": "FMSP",
+    "popis": "zemědělské potřeby",
+    "barva": "7C9A5A"
+   },
+   {
+    "naklad": "JAVA",
+    "popis": "káva v jutě",
+    "barva": "9A7048"
+   },
+   {
+    "naklad": "BEAN",
+    "popis": "fazole v jutě",
+    "barva": "9A7048"
+   },
+   {
+    "naklad": "NUTS",
+    "popis": "ořechy v jutě",
+    "barva": "9A7048"
+   },
+   {
+    "naklad": "SULP",
+    "popis": "síra",
+    "barva": "D8C070"
+   },
+   {
+    "naklad": "RSGR",
+    "popis": "rafinovaný cukr",
+    "barva": "F0EEE6"
+   },
+   {
+    "naklad": "WOOL",
+    "popis": "vlna",
+    "barva": "E8E6DE"
+   },
+   {
+    "naklad": "KAOL",
+    "popis": "kaolín",
+    "barva": "E8E6DE"
+   },
+   {
+    "naklad": "SASH",
+    "popis": "soda",
+    "barva": "B4B2AA"
+   },
+   {
+    "naklad": "TATO",
+    "popis": "brambory v pytlích",
+    "barva": "9A7048"
+   },
+   {
+    "naklad": "BRAM",
+    "popis": "brambory v pytlích",
+    "barva": "9A7048"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "šest vrstev po čtyřech pytlích 59 × 39 cm na europaletě, každá druhá vrstva trochu posunutá, na pytlích potištěný pruh; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 22 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "paleta_barely.glb",
+  "jmeno": "paleta_barely",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "paleta barelů",
+   "en": "pallet of steel drums"
+  },
+  "rozmer_m": [
+   1.2,
+   0.8,
+   1.024
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 644,
+  "barvy": [
+   {
+    "cast": "barely",
+    "maska": "paleta_barely_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "2E2E30",
+     "F0F0EA",
+     "B03024",
+     "3C6A3C",
+     "D8B030",
+     "8A8C8E"
+    ]
+   }
+  ],
+  "naklady": [
+   {
+    "naklad": "OIL_",
+    "popis": "ropa",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "PETR",
+    "popis": "benzín",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "RFPR",
+    "popis": "rafinérské produkty",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "LUBR",
+    "popis": "maziva",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "CTAR",
+    "popis": "dehet",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "RUBR",
+    "popis": "kaučuk",
+    "barva": "2E2E30"
+   },
+   {
+    "naklad": "WATR",
+    "popis": "voda (bílé, ne modré)",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "ACID",
+    "popis": "kyselina",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "CHLO",
+    "popis": "chlór",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "NH3_",
+    "popis": "čpavek",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "LYE_",
+    "popis": "louh",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "PLAS",
+    "popis": "plasty",
+    "barva": "F0F0EA"
+   },
+   {
+    "naklad": "COAT",
+    "popis": "barvy a laky",
+    "barva": "B03024"
+   },
+   {
+    "naklad": "DYES",
+    "popis": "barviva",
+    "barva": "B03024"
+   },
+   {
+    "naklad": "EOIL",
+    "popis": "jedlý olej",
+    "barva": "D8B030"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dva plechové sudy 200 l nastojato na europaletě (průměr 0,58 m, výška 0,88 m, dva valivé prolisy, dvě zátky); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 30 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "paleta_sudy.glb",
+  "jmeno": "paleta_sudy",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "paleta dřevěných sudů",
+   "en": "pallet of wooden barrels"
+  },
+  "rozmer_m": [
+   1.2,
+   0.8,
+   0.944
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 424,
+  "naklady": [
+   {
+    "naklad": "BEER",
+    "popis": "pivo a alkohol"
+   },
+   {
+    "naklad": "WINE",
+    "popis": "víno"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dva dřevěné sudy s břichem a čtyřmi železnými obručemi nastojato na europaletě (výška 0,8 m), nebarví se; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 29 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "paleta_bedny.glb",
+  "jmeno": "paleta_bedny",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "paleta beden",
+   "en": "pallet of crates"
+  },
+  "rozmer_m": [
+   1.2,
+   0.8,
+   1.124
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 132,
+  "naklady": [
+   {
+    "naklad": "GOOD",
+    "popis": "zboží"
+   },
+   {
+    "naklad": "MNSP",
+    "popis": "výrobní potřeby"
+   },
+   {
+    "naklad": "ENSP",
+    "popis": "technické potřeby"
+   },
+   {
+    "naklad": "MPTS",
+    "popis": "strojní díly"
+   },
+   {
+    "naklad": "WELD",
+    "popis": "svářečské potřeby"
+   },
+   {
+    "naklad": "BOOM",
+    "popis": "výbušniny (vojenská)"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "velká bedna 1,18 × 0,78 × 0,6 m a na ní menší, prkna s rámem, na europaletě, nebarví se; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 29 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20.glb",
+  "jmeno": "kontejner_20",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner 20′",
+   "en": "20' container"
+  },
+  "rozmer_m": [
+   6.058,
+   2.438,
+   2.591
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 10,
+  "barvy": [
+   {
+    "cast": "kontejner",
+    "maska": "kontejner_20_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "3A6EA5",
+     "B03A2E",
+     "2E7D4F",
+     "D88A2A",
+     "8A8C8E",
+     "E8E4D8",
+     "6E4B3A",
+     "C8A040",
+     "5A3A6E",
+     "1E4E5E"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "ISO kontejner 20′ (6,058 × 2,438 × 2,591 m): vlnité boky, dveře se závorami vzadu (−x), čelo vpředu; barví se celý; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 16 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_40.glb",
+  "jmeno": "kontejner_40",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner 40′",
+   "en": "40' container"
+  },
+  "rozmer_m": [
+   12.192,
+   2.438,
+   2.591
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 10,
+  "barvy": [
+   {
+    "cast": "kontejner",
+    "maska": "kontejner_40_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "3A6EA5",
+     "B03A2E",
+     "2E7D4F",
+     "D88A2A",
+     "8A8C8E",
+     "E8E4D8",
+     "6E4B3A",
+     "C8A040",
+     "5A3A6E",
+     "1E4E5E"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "ISO kontejner 40′ (12,192 × 2,438 × 2,591 m), jinak jako 20′; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 24 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "klady.glb",
+  "jmeno": "klady",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "klády",
+   "en": "logs"
+  },
+  "rozmer_m": [
+   3.59,
+   1.025,
+   0.917
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 168,
+  "naklady": [
+   {
+    "naklad": "WOOD",
+    "popis": "dřevo"
+   },
+   {
+    "naklad": "TWOD",
+    "popis": "tropické dřevo"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "svazek šesti klád 3,6 m (3 + 2 + 1, průměr asi 0,34 m), kůra a letokruhy na čelech, bez palety; od 27. 10. kratší (dřív 4 m), aby se vešly na V3S, Autosan a Liaz MTS; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 11 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "prkna.glb",
+  "jmeno": "prkna",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "prkna",
+   "en": "planks"
+  },
+  "rozmer_m": [
+   3.6,
+   1.0,
+   0.64
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 130,
+  "naklady": [
+   {
+    "naklad": "WDPR",
+    "popis": "řezivo"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "svazek prken 3,6 × 1 m ve čtyřech vrstvách na prokladech, bez palety; od 27. 10. kratší (dřív 4 m); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 13 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "balik.glb",
+  "jmeno": "balik",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kulatý balík",
+   "en": "round bale"
+  },
+  "rozmer_m": [
+   1.5,
+   1.2,
+   1.462
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 2,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 56,
+  "barvy": [
+   {
+    "cast": "seno",
+    "maska": "balik_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "D8C070",
+     "7A9A3A",
+     "C8B080"
+    ]
+   }
+  ],
+  "naklady": [
+   {
+    "naklad": "FICR",
+    "popis": "seno",
+    "barva": "D8C070"
+   },
+   {
+    "naklad": "MARI",
+    "popis": "marihuanové seno",
+    "barva": "7A9A3A"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "kulatý balík 1,5 m široký 1,2 m, leží napříč (osa podél y), síťka; barví se celý; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 9 kB, glb z gltfpacku"
+ },
+ {
+  "jmeno": "dobytek_prase",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "prasátko",
+   "en": "prase"
+  },
+  "sada": "zvirata",
+  "objekt": "prase",
+  "uzel": "pase_00",
+  "meritko": 1,
+  "naklady": [
+   {
+    "naklad": "LVST",
+    "popis": "dobytek"
+   }
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    180
+   ],
+   "poznamka": "zvířata stojí vedle sebe s mezerou (rozmer_nakladu v záznamu zvířete), jen na plochách s bočnicemi"
+  },
+  "poznamka": "prasátko z objekty/zvirata (snímek pase_00: stojí s hlavou nahoře), náklad dobytka LVST; hra vybere druh (jeden na vůz, nebo podle podtypu z GRF)"
+ },
+ {
+  "jmeno": "dobytek_krava",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kravička",
+   "en": "krava"
+  },
+  "sada": "zvirata",
+  "objekt": "krava",
+  "uzel": "pase_00",
+  "meritko": 1,
+  "naklady": [
+   {
+    "naklad": "LVST",
+    "popis": "dobytek"
+   }
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    180
+   ],
+   "poznamka": "zvířata stojí vedle sebe s mezerou (rozmer_nakladu v záznamu zvířete), jen na plochách s bočnicemi"
+  },
+  "poznamka": "kravička z objekty/zvirata (snímek pase_00: stojí s hlavou nahoře), náklad dobytka LVST; hra vybere druh (jeden na vůz, nebo podle podtypu z GRF)"
+ },
+ {
+  "jmeno": "dobytek_ovce",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "ovečka",
+   "en": "ovce"
+  },
+  "sada": "zvirata",
+  "objekt": "ovce",
+  "uzel": "pase_00",
+  "meritko": 1,
+  "naklady": [
+   {
+    "naklad": "LVST",
+    "popis": "dobytek"
+   }
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    180
+   ],
+   "poznamka": "zvířata stojí vedle sebe s mezerou (rozmer_nakladu v záznamu zvířete), jen na plochách s bočnicemi"
+  },
+  "poznamka": "ovečka z objekty/zvirata (snímek pase_00: stojí s hlavou nahoře), náklad dobytka LVST; hra vybere druh (jeden na vůz, nebo podle podtypu z GRF)"
+ },
+ {
+  "soubor": "kontejner_20_cerveny.glb",
+  "jmeno": "kontejner_20_cerveny",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "červený kontejner 20′",
+   "en": "red 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7046,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "červený kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 787 px; 526 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_evergreen.glb",
+  "jmeno": "kontejner_20_evergreen",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner Evergreen 20′",
+   "en": "Evergreen 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 3064,
+  "autor": "natasha_homci (3D Warehouse)",
+  "licence": "3D Warehouse General Model License",
+  "poznamka": "kontejner Evergreen 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 228 × 718 px; 129 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_40_evergreen.glb",
+  "jmeno": "kontejner_40_evergreen",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "kontejner Evergreen 40′",
+   "en": "Evergreen 40' container"
+  },
+  "rozmer_m": [
+   12.12,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 12,
+  "autor": "Shipping Container Man (3D Warehouse)",
+  "licence": "3D Warehouse General Model License",
+  "poznamka": "kontejner Evergreen 40′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 932 × 372 px; 367 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_modry.glb",
+  "jmeno": "kontejner_20_modry",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "modrý kontejner 20′",
+   "en": "blue 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7044,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "modrý kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 788 px; 595 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "kontejner_20_zeleny.glb",
+  "jmeno": "kontejner_20_zeleny",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "zelený kontejner 20′",
+   "en": "green 20' container"
+  },
+  "rozmer_m": [
+   6.06,
+   2.44,
+   2.59
+  ],
+  "skladani": {
+   "zpusob": "misto",
+   "max_vrstev": 2,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "stav GRF říká, kam kontejner přijde (naklad.misto); jinak jako kontejner_20 a 40"
+  },
+  "trojuhelniku": 7046,
+  "autor": "Cargo Container, Satendra Saraswat (Sketchfab)",
+  "licence": "CC BY 4.0",
+  "poznamka": "zelený kontejner 20′ z Vagony_3D (dřív vg_kontejnery_a/b): barvy z textury, nic se nebarví; počátek uprostřed spodku, +x podél, skutečné metry; textura 796 × 788 px; 552 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "lavice_studentky.glb",
+  "jmeno": "lavice_studentky",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "lavice se studentkami (Tatra)",
+   "en": "students' benches (Tatra)"
+  },
+  "rozmer_m": [
+   5.34,
+   2.4,
+   0.94
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "celé lavice za sebou na loži, holky sedají od přední lavice v pořadí míst"
+  },
+  "posadka": [
+   {
+    "postava": "college_girl",
+    "poza": "sedi",
+    "poloha": [
+     2.27,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia",
+    "poza": "sedi",
+    "poloha": [
+     1.736,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "pubg_girl",
+    "poza": "sedi",
+    "poloha": [
+     0.935,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "char16",
+    "poza": "sedi",
+    "poloha": [
+     0.4,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "vivi",
+    "poza": "sedi",
+    "poloha": [
+     -0.4,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "cute_cartoon",
+    "poza": "sedi",
+    "poloha": [
+     -0.934,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "female_girl",
+    "poza": "sedi",
+    "poloha": [
+     -1.735,
+     -0.9,
+     0.94
+    ],
+    "otoceni": 90,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl",
+    "poza": "sedi",
+    "poloha": [
+     -2.269,
+     0.9,
+     0.94
+    ],
+    "otoceni": -90,
+    "meritko": 2.0
+   }
+  ],
+  "trojuhelniku": 96,
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou holky hry s kostrou (humanoidi, póza sedi)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dvě vysoké lavice podél bočnic valníku Tater (sedák 0,94 m nad podlahou), 4 + 4 místa naproti sobě; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.48 m); místa: bod sedu 0.9 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 370 × 562 px, 5 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "lavice_studentky_v3s.glb",
+  "jmeno": "lavice_studentky_v3s",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "lavice se studentkami (V3S)",
+   "en": "students' benches (V3S)"
+  },
+  "rozmer_m": [
+   3.92,
+   2.0,
+   0.94
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ],
+   "poznamka": "celé lavice za sebou na loži, holky sedají od přední lavice v pořadí míst"
+  },
+  "posadka": [
+   {
+    "postava": "college_girl",
+    "poza": "sedi",
+    "poloha": [
+     1.568,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -277.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia",
+    "poza": "sedi",
+    "poloha": [
+     1.045,
+     0.75,
+     0.94
+    ],
+    "otoceni": -80.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "pubg_girl",
+    "poza": "sedi",
+    "poloha": [
+     0.261,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -263.0,
+    "meritko": 2.0
+   },
+   {
+    "postava": "char16",
+    "poza": "sedi",
+    "poloha": [
+     -0.262,
+     0.75,
+     0.94
+    ],
+    "otoceni": -87.9,
+    "meritko": 2.0
+   },
+   {
+    "postava": "vivi",
+    "poza": "sedi",
+    "poloha": [
+     -1.046,
+     -0.75,
+     0.94
+    ],
+    "otoceni": -277.2,
+    "meritko": 2.0
+   },
+   {
+    "postava": "cute_cartoon",
+    "poza": "sedi",
+    "poloha": [
+     -1.568,
+     0.75,
+     0.94
+    ],
+    "otoceni": -98.4,
+    "meritko": 2.0
+   }
+  ],
+  "trojuhelniku": 96,
+  "autor": "grrrrf: lavice z dílů GRF (nakladaky3d_dily.py, render_v3s.py); holky jsou holky hry s kostrou (humanoidi, póza sedi)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "dvě vysoké lavice podél bočnic korby V3S (sedák 0,94 m nad podlahou), 3 + 3 místa naproti sobě; i na Autosan; počátek uprostřed spodku, +x podél, skutečné metry; rozmer_m je lože, na které se vejde (lavice sahá k bočnicím, 2.18 m); místa: bod sedu 0.75 m od osy (zády k bočnici), na sedáku 0.94 m, meritko 2, pořadí od předu; textura 482 × 482 px, 175 kB, glb z gltfpacku"
+ },
+ {
+  "jmeno": "studentky_stoji_v3s",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "studentky stojí (V3S)",
+   "en": "students standing (V3S)"
+  },
+  "rozmer_m": [
+   3.92,
+   2.0,
+   3.24
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0
+   ]
+  },
+  "posadka": [
+   {
+    "postava": "college_girl",
+    "poza": "stoji",
+    "poloha": [
+     1.539,
+     0.55,
+     0.0
+    ],
+    "otoceni": -9.1,
+    "meritko": 2.0
+   },
+   {
+    "postava": "galaxia",
+    "poza": "stoji",
+    "poloha": [
+     1.485,
+     -0.57,
+     0.0
+    ],
+    "otoceni": 61.1,
+    "meritko": 2.0
+   },
+   {
+    "postava": "pubg_girl",
+    "poza": "stoji",
+    "poloha": [
+     0.531,
+     -0.423,
+     0.0
+    ],
+    "otoceni": -7.5,
+    "meritko": 2.0
+   },
+   {
+    "postava": "char16",
+    "poza": "stoji",
+    "poloha": [
+     0.481,
+     0.543,
+     0.0
+    ],
+    "otoceni": -16.7,
+    "meritko": 2.0
+   },
+   {
+    "postava": "vivi",
+    "poza": "stoji",
+    "poloha": [
+     -0.494,
+     -0.55,
+     0.0
+    ],
+    "otoceni": 6.3,
+    "meritko": 2.0
+   },
+   {
+    "postava": "cute_cartoon",
+    "poza": "stoji",
+    "poloha": [
+     -0.562,
+     0.449,
+     0.0
+    ],
+    "otoceni": -17.3,
+    "meritko": 2.0
+   },
+   {
+    "postava": "female_girl",
+    "poza": "stoji",
+    "poloha": [
+     -1.413,
+     0.501,
+     0.0
+    ],
+    "otoceni": -20.6,
+    "meritko": 2.0
+   },
+   {
+    "postava": "college_girl",
+    "poza": "stoji",
+    "poloha": [
+     -1.446,
+     -0.428,
+     0.0
+    ],
+    "otoceni": -15.5,
+    "meritko": 2.0
+   }
+  ],
+  "autor": "grrrrf; holky jsou holky hry s kostrou (humanoidi, póza stoji)",
+  "licence": "GPL-2.0",
+  "poznamka": "8 studentek stojí na korbě V3S na zastávce (při nakládání a vykládání), bez lavic; kus bez souboru, jen místa (počátek uprostřed podlahy korby, meritko 2), pořadí od předu"
+ }
+]

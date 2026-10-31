@@ -1,0 +1,186 @@
+[
+ {
+  "soubor": "carodejnice_marisa.glb",
+  "jmeno": "carodejnice_marisa",
+  "druh": "carodejnice",
+  "nazev": {
+   "cs": "čarodějnice Marisa",
+   "en": "witch Marisa"
+  },
+  "kdy": "noc",
+  "meritko": 2,
+  "rozmer_m": [
+   1.95,
+   0.83,
+   1.52
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 6,
+    "smycka": true,
+    "krok_m": 10.0
+   }
+  },
+  "svetla": {
+   "lucerna": {
+    "barva": "FFB24A",
+    "dosah_m": 4
+   },
+   "svitilna": {
+    "barva": "F4F6FF",
+    "dosah_m": 18,
+    "uhel": 22
+   }
+  },
+  "trojuhelniku": 41210,
+  "poza": "sedí obkročmo na koštěti, klobouk; letí dopředu (koště po ose x, metla vzadu), vlasy, stuhy, špička klobouku a metla vlají",
+  "autor": "Marisa for Touhou Multi Scroll Shooting 2, skydash (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/marisa-for-touhou-multi-scroll-shooting-2-998e923e32bc4e29a8fa206b4e474945), převod tvorove/nocni_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést skydash; změny: otočená, let ze snímků, textury nejvýš 1024 px); lucerna Roblox Lantern, Luigi2013, CC BY 4.0; svítilna vlastní",
+  "poznamka": "létá jen v noci (kdy: noc); skutečné metry jako holky, meritko 2 (hra kreslí jako holky na zastávce, hra/3d/PROSBA-CARODEJNICE.md); rozmer_m největší ze všech snímků; čelem k +x, počátek uprostřed těla, s normálami; let ze 8 snímků let_00 až let_07: v každém nehybná část (19714 trojúhelníků) jako instance jedné sítě a vlastní kopie toho, co vlaje (19699 trojúhelníků), uzel snímku se houpe (±3 cm, ±2.0° a ±1.5°); krok_m za jedno kolo ve skutečných metrech modelu; glb z gltfpacku; světla: lucerna 0.28 m visí z předního konce koštěte a houpe se (místo lucerna_NN uprostřed plamene), ruční svítilna v pravé ruce svítí dopředu, šikmo dolů a trochu ven (svitilna_NN na skle, paprsek_NN 1 m dál po paprsku), skla a plamen pod noc_NN"
+ },
+ {
+  "soubor": "carodejnice_koste.glb",
+  "jmeno": "carodejnice_koste",
+  "druh": "carodejnice",
+  "nazev": {
+   "cs": "čarodějnice na koštěti",
+   "en": "witch on a broom"
+  },
+  "kdy": "noc",
+  "meritko": 2,
+  "rozmer_m": [
+   1.84,
+   0.81,
+   1.51
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 6,
+    "smycka": true,
+    "krok_m": 9.0
+   }
+  },
+  "svetla": {
+   "lucerna": {
+    "barva": "FFB24A",
+    "dosah_m": 4
+   },
+   "svitilna": {
+    "barva": "F4F6FF",
+    "dosah_m": 18,
+    "uhel": 22
+   }
+  },
+  "trojuhelniku": 2735,
+  "poza": "nízkopolygonová čarodějnice na koštěti, fialové šaty, oranžové vlasy; vlají špička klobouku, sukně s nohama a metla",
+  "autor": "Witch Roll, xinus22 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-roll-1aa67a75063a42cb8cfe273c04186021), převod tvorove/nocni_tvorove.py bez renderu (kostra modelu v jeho póze)",
+  "licence": "CC BY 4.0 (uvést xinus22; změny: otočená, zmenšená, let ze snímků); lucerna Roblox Lantern, Luigi2013, CC BY 4.0; svítilna vlastní",
+  "poznamka": "létá jen v noci (kdy: noc); skutečné metry jako holky, meritko 2 (hra kreslí jako holky na zastávce, hra/3d/PROSBA-CARODEJNICE.md); rozmer_m největší ze všech snímků; čelem k +x, počátek uprostřed těla, s normálami; let ze 8 snímků let_00 až let_07: v každém nehybná část (408 trojúhelníků) jako instance jedné sítě a vlastní kopie toho, co vlaje (530 trojúhelníků), uzel snímku se houpe (±3 cm, ±2.5° a ±2.0°); krok_m za jedno kolo ve skutečných metrech modelu; glb z gltfpacku; světla: lucerna 0.28 m visí z předního konce koštěte a houpe se (místo lucerna_NN uprostřed plamene), ruční svítilna v pravé ruce svítí dopředu, šikmo dolů a trochu ven (svitilna_NN na skle, paprsek_NN 1 m dál po paprsku), skla a plamen pod noc_NN"
+ },
+ {
+  "soubor": "carodejnice_koste_zelena.glb",
+  "jmeno": "carodejnice_koste_zelena",
+  "druh": "carodejnice",
+  "nazev": {
+   "cs": "čarodějnice v zeleném",
+   "en": "witch in green"
+  },
+  "kdy": "noc",
+  "meritko": 2,
+  "rozmer_m": [
+   1.84,
+   0.82,
+   1.52
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 5,
+    "smycka": true,
+    "krok_m": 9.0
+   }
+  },
+  "svetla": {
+   "lucerna": {
+    "barva": "FFB24A",
+    "dosah_m": 4
+   },
+   "svitilna": {
+    "barva": "F4F6FF",
+    "dosah_m": 18,
+    "uhel": 22
+   }
+  },
+  "trojuhelniku": 2735,
+  "poza": "tatáž čarodějnice v tmavě zelených šatech se stříbrnými vlasy (hra: pár různých, ne všechny stejné)",
+  "autor": "Witch Roll, xinus22 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/witch-roll-1aa67a75063a42cb8cfe273c04186021), převod a přebarvení tvorove/nocni_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést xinus22; změny: otočená, zmenšená, přebarvená, let ze snímků); lucerna Roblox Lantern, Luigi2013, CC BY 4.0; svítilna vlastní",
+  "poznamka": "létá jen v noci (kdy: noc); skutečné metry jako holky, meritko 2 (hra kreslí jako holky na zastávce, hra/3d/PROSBA-CARODEJNICE.md); rozmer_m největší ze všech snímků; čelem k +x, počátek uprostřed těla, s normálami; let ze 8 snímků let_00 až let_07: v každém nehybná část (408 trojúhelníků) jako instance jedné sítě a vlastní kopie toho, co vlaje (530 trojúhelníků), uzel snímku se houpe (±4 cm, ±3.0° a ±2.5°); krok_m za jedno kolo ve skutečných metrech modelu; glb z gltfpacku; světla: lucerna 0.28 m visí z předního konce koštěte a houpe se (místo lucerna_NN uprostřed plamene), ruční svítilna v pravé ruce svítí dopředu, šikmo dolů a trochu ven (svitilna_NN na skle, paprsek_NN 1 m dál po paprsku), skla a plamen pod noc_NN"
+ },
+ {
+  "soubor": "strasidlo.glb",
+  "jmeno": "strasidlo",
+  "druh": "carodejnice",
+  "nazev": {
+   "cs": "strašidlo",
+   "en": "ghost"
+  },
+  "kdy": "noc",
+  "meritko": 2,
+  "rozmer_m": [
+   0.62,
+   0.67,
+   2.03
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 4.0
+   }
+  },
+  "povaha": "vyprovokovat",
+  "trojuhelniku": 40800,
+  "poza": "bílé strašidlo s očima, vznáší se nahoru a dolů a kolébá se",
+  "autor": "ghost, remi136 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/ghost-1dd1cdac701b42e6ac41bdc194c03139), převod tvorove/nocni_tvorove.py bez renderu",
+  "licence": "CC BY 4.0 (uvést remi136; změny: otočené, zmenšené, poloprůhledné, svítí samo, vznášení ze snímků)",
+  "poznamka": "létá jen v noci (kdy: noc); skutečné metry jako holky, meritko 2 (hra kreslí jako holky na zastávce, hra/3d/PROSBA-CARODEJNICE.md); rozmer_m největší ze všech snímků; čelem k +x, počátek uprostřed těla, s normálami; let ze 8 snímků let_00 až let_07: v každém nehybná část (40800 trojúhelníků) jako instance jedné sítě a vlastní kopie toho, co vlaje (0 trojúhelníků), uzel snímku se houpe (±6 cm, ±1.5° a ±3.0°); krok_m za jedno kolo ve skutečných metrech modelu; glb z gltfpacku; bez lucerny a svítilny (svítí samo); poloprůhledné (alphaMode BLEND 0,7) a svítí samo (emissiveFactor)"
+ },
+ {
+  "soubor": "prizrak.glb",
+  "jmeno": "prizrak",
+  "druh": "carodejnice",
+  "nazev": {
+   "cs": "přízrak",
+   "en": "phantom"
+  },
+  "kdy": "noc",
+  "povaha": "vyprovokovat",
+  "meritko": 2,
+  "rozmer_m": [
+   3.12,
+   1.3,
+   2.08
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 5,
+    "smycka": true,
+    "krok_m": 6.0
+   }
+  },
+  "trojuhelniku": 14942,
+  "autor": "Devil Phantom, LostBoyz2078 (Sketchfab, CC BY NC 4.0, https://sketchfab.com/3d-models/devil-phantom-73c0c5f64d99478ba270348a49b0c6f7), převod tvorove/strasidla_par13.py bez renderu",
+  "licence": "CC BY NC 4.0 (uvést LostBoyz2078; nekomerčně; změny: otočený, zmenšený, let upečený do snímků)",
+  "poznamka": "létá v noci jako čarodějnice, mírumilovný, dokud ho hráč nezasáhne; skutečné metry (2 m), meritko 2, čelem k +x, počátek uprostřed těla; let z 12 snímků let_00 až let_11 upečených z animace modelu (od pětiny po konec, 1.57 s; model v ní vylétá zespodu a letí dál, každý snímek vystředěný, let dělá hra), bez lucerny a svítilny; glb z gltfpacku"
+ }
+]

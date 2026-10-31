@@ -1,0 +1,197 @@
+[
+ {
+  "soubor": "drak_hnedy.glb",
+  "jmeno": "drak_hnedy",
+  "druh": "tvor",
+  "rozmer_m": [
+   7.44,
+   7.01,
+   4.8
+  ],
+  "animace": {
+   "klid": {
+    "uzly": "klid_",
+    "snimku": 12,
+    "tiku": 13,
+    "smycka": true
+   },
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.96
+   },
+   "utok": {
+    "uzly": "utok_",
+    "snimku": 8,
+    "tiku": 9,
+    "smycka": false
+   },
+   "smrt": {
+    "uzly": "smrt_",
+    "snimku": 8,
+    "tiku": 13,
+    "smycka": false
+   },
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 3,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_hnedy_kostra.glb",
+  "poza": "chodí (chuze), stojí (klid), útočí (utok), padne a zůstane ležet (smrt), letí a mává křídly (let, od 24. 10.)",
+  "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); snímky z akcí modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
+  "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
+  "poznamka": "počátek na zemi pod tělem, u letu (let) tentýž, hra draka zvedne; let je náš (model žádný nemá, hra/3d/ODPOVED-DRACI-FARMA.md): křídla roztažená do stran a při letu 1,5× delší mávají (vnější kost se zpožďuje), nohy složené dozadu, krk dopředu, ocas se vlní, tělo se houpe; v kostře je jako animace let, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; textura modelu (hnědý drak); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_hnedy.glb",
+  "jmeno": "drak_cerny",
+  "druh": "tvor",
+  "textura": "drak_hnedy_cerny.png",
+  "rozmer_m": [
+   7.44,
+   7.01,
+   4.8
+  ],
+  "animace": {
+   "klid": {
+    "uzly": "klid_",
+    "snimku": 12,
+    "tiku": 13,
+    "smycka": true
+   },
+   "chuze": {
+    "uzly": "chuze_",
+    "snimku": 8,
+    "tiku": 8,
+    "smycka": true,
+    "krok_m": 0.96
+   },
+   "utok": {
+    "uzly": "utok_",
+    "snimku": 8,
+    "tiku": 9,
+    "smycka": false
+   },
+   "smrt": {
+    "uzly": "smrt_",
+    "snimku": 8,
+    "tiku": 13,
+    "smycka": false
+   },
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 3,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_hnedy_kostra.glb",
+  "poza": "totéž co drak_hnedy (i let), jiná textura",
+  "autor": "Cethiel's Dragon 3D, Drummyfish podle 2D draka Cethiela (OpenGameArt, obojí CC0); druhá textura modelu (dragon_black.png), snímky tvorove/draci.py, bez renderu",
+  "licence": "CC0 (volné dílo); autoři prosí nepovinně uvést Cethiela a Drummyfishe",
+  "zdroj": "https://opengameart.org/content/cethiels-dragon-3d",
+  "poznamka": "počátek na zemi pod tělem, u letu (let) tentýž, hra draka zvedne; let je náš (model žádný nemá, hra/3d/ODPOVED-DRACI-FARMA.md): křídla roztažená do stran a při letu 1,5× delší mávají (vnější kost se zpožďuje), nohy složené dozadu, krk dopředu, ocas se vlní, tělo se houpe; v kostře je jako animace let, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 1262 trojúhelníků na snímek; druhá textura modelu (černý drak), stejný glb jako drak_hnedy; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; drak_hnedy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_ledovy.glb",
+  "jmeno": "drak_ledovy",
+  "druh": "tvor",
+  "rozmer_m": [
+   16.48,
+   12.87,
+   9.63
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 10,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_ledovy_kostra.glb",
+  "poza": "letí, mává křídly (let)",
+  "autor": "Low Poly Ice Dragon, xTerryx (OpenGameArt, CC0); snímky z akce modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo)",
+  "zdroj": "https://opengameart.org/content/low-poly-ice-dragon",
+  "poznamka": "počátek uprostřed těla, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 2474 trojúhelníků na snímek; barvy ledu naše (model odkazuje na Colors.png, která u něj není): modrý, světlé břicho a křídla, bílý zobák, žluté oči; s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; drak_ledovy_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_cinsky.glb",
+  "jmeno": "drak_cinsky",
+  "druh": "tvor",
+  "rozmer_m": [
+   24.75,
+   3.51,
+   5.67
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 16,
+    "tiku": 6,
+    "smycka": true,
+    "krok_m": 13.0
+   }
+  },
+  "poza": "letí jako had, tělem běží vlna od hlavy k ocasu (let)",
+  "autor": "Flying Dragon, peaznchips (OpenGameArt, CC0); model létá po smyčkách dráhy, tělo napózované po naší vlně (tvorove/draci.py), bez renderu",
+  "licence": "CC0 (volné dílo)",
+  "zdroj": "https://opengameart.org/content/flying-dragon",
+  "poznamka": "počátek v hlavě (prostředek kosti hlavy), tělo se táhne za ní, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 4999/5000 trojúhelníků na snímek; zlatý jako v modelu, rudý hřbet a ploutev ocasu (barvy naše, model má zlaté materiály s normálovými mapami); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; krok_m je, o kolik hra posune draka za jeden cyklus; nikdy nebledne"
+ },
+ {
+  "soubor": "drak_letajici.glb",
+  "jmeno": "drak_letajici",
+  "druh": "tvor",
+  "rozmer_m": [
+   16.23,
+   17.45,
+   13.41
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 10,
+    "smycka": true
+   }
+  },
+  "kostra": "drak_letajici_kostra.glb",
+  "poza": "letí, pomalu mává křídly (let)",
+  "autor": "Dragon flying, dobbyisthegoat (Sketchfab, CC BY 4.0; poslal hráč 30. 10., par18); snímky z animace modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC BY 4.0: uvést autora dobbyisthegoat (změny: otočený, zvětšený na 12 m, snímky zjednodušené)",
+  "zdroj": "https://sketchfab.com/3d-models/dragon-flying-5c8c586da7ad450a8e58b56289a26739",
+  "poznamka": "počátek uprostřed těla; animace modelu jsou čtyři stejná mávnutí (13,1 s), snímky jedno z nich (3,3 s); kostra má celou, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 5999/6000 trojúhelníků na snímek; textura modelu (tmavě hnědošedý); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; drak_letajici_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ },
+ {
+  "soubor": "pterodaktyl.glb",
+  "jmeno": "pterodaktyl",
+  "druh": "tvor",
+  "rozmer_m": [
+   3.42,
+   8.13,
+   3.76
+  ],
+  "animace": {
+   "let": {
+    "uzly": "let_",
+    "snimku": 12,
+    "tiku": 5,
+    "smycka": true
+   }
+  },
+  "kostra": "pterodaktyl_kostra.glb",
+  "poza": "letí, mává křídly (let)",
+  "autor": "Animated Flying Pteradactal Dinosaur Loop, LasquetiSpice (Sketchfab, CC BY 4.0; poslal hráč 30. 10., par18); snímky z animace modelu (tvorove/draci.py), bez renderu",
+  "licence": "CC BY 4.0: uvést autora LasquetiSpice (změny: otočený, zvětšený na rozpětí 8 m, snímky zjednodušené)",
+  "zdroj": "https://sketchfab.com/3d-models/animated-flying-pteradactal-dinosaur-loop-09f6b1ff7bfd4a2d8d9c0b9827f2a708",
+  "poznamka": "počátek uprostřed těla; animace modelu třikrát mávne a pak plachtí (10,7 s), snímky jedno mávnutí (1,5 s); kostra má celou, čelem k +x, metry; rozměr je největší ze všech snímků (délka, šířka, výška); 5999/6000 trojúhelníků na snímek; textura modelu (hnědý); s normálami, bez upečeného světla; snímky jsou uzly <animace>_NN (klíč animace), výšku letu volí hra; pterodaktyl_kostra.glb: síť s kostrou a animacemi pod stejnými jmény pro později; nikdy nebledne"
+ }
+]
