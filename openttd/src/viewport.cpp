@@ -5055,10 +5055,10 @@ static void AddIndustryObjects(size_t first_parent, bool north)
 	const Industry *ind = Industry::GetByTile(_cur_ti.tile);
 	if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(_cur_ti.tile); forest != nullptr) {
 		/* The forest with a clearing, a part of it on each tile (ThreeDGameForestPartAt()): its ground and trees at once,
-		 * being built or not; its girls after a delivery of studentky. */
+		 * being built or not; its vehicles (the horse by the cabin), its girls after a delivery of studentky. */
 		LeaveOutTileSprites(first_parent, north);
-		std::span<const ThreeDObjectFigure> girls;
-		if (built && HasGirls(ind)) girls = forest->girls;
+		std::span<const ThreeDObjectFigure> girls = forest->vehicles;
+		if (built && HasGirls(ind)) girls = forest->with_girls;
 		if (forest->ground != nullptr) _turned_objects.push_back({forest->ground, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile), nullptr, girls});
 		/* The grill over its fire with the animal the walker chose on the spit (SetThreeDForestGrill()). */
 		if (const int animal = ThreeDForestGrill(_cur_ti.tile); animal >= 0) {
@@ -13613,11 +13613,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		if (const ThreeDForestPart *forest = tile_type == TileType::Industry ? ThreeDGameForestPartAt(_cur_ti.tile) : nullptr; forest != nullptr) {
 			/* The forest with a clearing as in the turned view (AddIndustryObjects()): its ground and trees at once, its
-			 * girls after a delivery of studentky. */
+			 * vehicles, its girls after a delivery of studentky. */
 			kind = 5;
 			const int z = GetTileMaxPixelZ(_cur_ti.tile);
-			std::span<const ThreeDObjectFigure> girls;
-			if (IsIndustryCompleted(_cur_ti.tile) && HasGirls(Industry::GetByTile(_cur_ti.tile))) girls = forest->girls;
+			std::span<const ThreeDObjectFigure> girls = forest->vehicles;
+			if (IsIndustryCompleted(_cur_ti.tile) && HasGirls(Industry::GetByTile(_cur_ti.tile))) girls = forest->with_girls;
 			if (const ThreeDObject *obj = forest->ground; obj != nullptr) {
 				/* The forester's cabin with its interior: near, as a house's (the colleague's les_paseka_srub). */
 				const ThreeDObject *in = GetThreeDInterior(obj);

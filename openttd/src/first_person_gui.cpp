@@ -164,6 +164,8 @@ static constexpr double FIRST_PERSON_PICK_M = 1.5;
 static constexpr double FIRST_PERSON_DOOR_M = 1.6;
 /** How near a vehicle of the sets standing in an industry's yard the walker takes one like it with E (the farm's Zetor, its wheelbarrow), metres. */
 static constexpr double FIRST_PERSON_YARD_VEHICLE_M = 2.5;
+/** How many tiles from the walker's the north tile of a building whose event's vehicle it takes so may be: a building of the game is 2×2 tiles at most, the vehicle on one of them. */
+static constexpr int FIRST_PERSON_HOUSE_EVENT_TILES = 2;
 /** Farther than this from where the walker last stood (put somewhere else, not walked there), it stands on the ground storey again, metres. */
 static constexpr double FIRST_PERSON_SETTLE_M = 2.0;
 
@@ -708,7 +710,11 @@ struct FirstPersonWindow : Window {
 		uint8_t yaw;     ///< the way it faces, 128ths of a turn
 	};
 
-	/** The vehicle of a yard nearest the walker within reach (ThreeDIndustryTileParts::vehicles), shown and of an engine of the game. */
+	/**
+	 * The vehicle of a yard nearest the walker within reach, shown and of an engine of the game: of an industry's yard
+	 * (ThreeDIndustryTileParts::vehicles), of the forest's clearing (ThreeDForestPart::vehicles: the horse by the cabin),
+	 * or of a building's event on its days (the horse on the new stadium's pitch, GetThreeDHouseEvent()).
+	 */
 	std::optional<YardVehicle> YardVehicleToTake() const
 	{
 		if (!Company::IsValidID(_local_company)) return std::nullopt;
@@ -716,27 +722,53 @@ struct FirstPersonWindow : Window {
 		std::optional<YardVehicle> best;
 		double best_d = FIRST_PERSON_YARD_VEHICLE_M * OBJECT_UNITS_PER_METRE;
 		std::vector<TileIndex> seen;
-		for (int dy = -1; dy <= 1; dy++) {
-			for (int dx = -1; dx <= 1; dx++) {
+		/* The vehicles standing about a place: the one nearest so far. A building's is given on its tile it stands on. */
+		auto consider = [&](TileIndex origin, std::span<const ThreeDObjectFigure> vehicles, bool on_own_tile) {
+			for (const ThreeDObjectFigure &f : vehicles) {
+				const double x = TileX(origin) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE, y = TileY(origin) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE;
+				const double d = std::hypot(x - this->walker.x, y - this->walker.y);
+				if (d >= best_d) continue;
+				const EngineID engine = YardVehicleEngine(f.figure);
+				if (engine == EngineID::Invalid()) continue;
+				TileIndex given = origin;
+				if (on_own_tile) {
+					if (x < 0 || y < 0) continue;
+					given = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+					if (!IsValidTile(given) || !IsTileType(given, TileType::House)) continue;
+				}
+				best_d = d;
+				const int yaw = static_cast<int>(std::lround(f.facing * CAB_YAW_TURN / 360.0));
+				best = YardVehicle{given, engine, static_cast<int32_t>(std::lround(x * CAB_SUBUNIT)), static_cast<int32_t>(std::lround(y * CAB_SUBUNIT)), static_cast<uint8_t>(yaw & (CAB_YAW_TURN - 1))};
+			}
+		};
+		/* The buildings by their north tiles, farther: the stadium's pitch a tile from its north tile. */
+		const int reach = FIRST_PERSON_HOUSE_EVENT_TILES;
+		for (int dy = -reach; dy <= reach; dy++) {
+			for (int dx = -reach; dx <= reach; dx++) {
 				if (tx + dx < 1 || ty + dy < 1 || tx + dx >= static_cast<int>(Map::MaxX()) || ty + dy >= static_cast<int>(Map::MaxY())) continue;
 				const TileIndex tile = TileXY(tx + dx, ty + dy);
-				if (!IsTileType(tile, TileType::Industry)) continue;
+				const bool close = std::abs(dx) <= 1 && std::abs(dy) <= 1;
+				if (IsTileType(tile, TileType::House)) {
+					if (!IsHouseCompleted(tile)) continue;
+					HouseID north = GetHouseType(tile);
+					const TileIndex origin = tile + GetHouseNorthPart(north);
+					if (std::ranges::find(seen, origin) != seen.end()) continue;
+					seen.push_back(origin);
+					consider(origin, GetThreeDHouseEvent(GetThreeDHouseObjectAt(north, origin), origin), true);
+					continue;
+				}
+				if (!close || !IsTileType(tile, TileType::Industry)) continue;
+				if (const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile); forest != nullptr) {
+					consider(tile, forest->vehicles, false);
+					continue;
+				}
 				const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTileAt(tile);
 				if (parts == nullptr || !ThreeDOriginalIndustryTileStands(tile, *parts)) continue;
 				/* The block's vehicles stand with its anchor, once whichever of its tiles is near. */
 				const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, parts);
 				if (anchor == INVALID_TILE || std::ranges::find(seen, anchor) != seen.end()) continue;
 				seen.push_back(anchor);
-				for (const ThreeDObjectFigure &f : parts->vehicles) {
-					const double x = TileX(anchor) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE, y = TileY(anchor) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE;
-					const double d = std::hypot(x - this->walker.x, y - this->walker.y);
-					if (d >= best_d) continue;
-					const EngineID engine = YardVehicleEngine(f.figure);
-					if (engine == EngineID::Invalid()) continue;
-					best_d = d;
-					const int yaw = static_cast<int>(std::lround(f.facing * CAB_YAW_TURN / 360.0));
-					best = YardVehicle{anchor, engine, static_cast<int32_t>(std::lround(x * CAB_SUBUNIT)), static_cast<int32_t>(std::lround(y * CAB_SUBUNIT)), static_cast<uint8_t>(yaw & (CAB_YAW_TURN - 1))};
-				}
+				consider(anchor, parts->vehicles, false);
 			}
 		}
 		return best;

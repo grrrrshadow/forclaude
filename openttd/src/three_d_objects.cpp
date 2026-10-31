@@ -2742,9 +2742,11 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 		/* The Tatra standing on the pitch (the colleague's "tatra": its record "zaznam", its set "sada" or the sets of its
 		 * layers -- the cab, the grille, the body), empty -- the player, 18. 10.: "on the pitch stands an empty Tatra,
 		 * without a driver" --, drawn as a figure of its own name "vozidlo:<record>|<set>|<set>..."
-		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. */
-		if (event.contains("tatra") && event.at("tatra").is_object()) {
-			const auto &t = event.at("tatra");
+		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. The horse beside it the
+		 * same ("kun", the colleague's hra/3d/KONE-SPECIAL-V4-PRO-HRU.md: a horse of the Special 3D v4, without a rider). */
+		for (const char *key : {"tatra", "kun"}) {
+			if (!event.contains(key) || !event.at(key).is_object()) continue;
+			const auto &t = event.at(key);
 			const std::string record = t.value("zaznam", t.value("objekt", std::string()));
 			if (!record.empty()) {
 				nlohmann::json f = t;
@@ -3135,6 +3137,57 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 }
 
 /**
+ * The vehicles of the sets standing on a tile ("vozidla"; the colleague's hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md, point 4:
+ * the Zetor by the workshop of the farm, the wheelbarrow of the Special leaning on the cowshed; KONE-SPECIAL-V4-PRO-HRU.md:
+ * the horses by the farm's house and barn and on the forest's clearing): each its record ("zaznam") in the state of its
+ * sets ("sada") and add-ons ("doplnky", file: node), empty, as the fire Tatra on the pitch -- a figure
+ * "vozidlo:<record>|<set>|+<file>=<node>|^<pitch>" (GetThreeDStandingVehicle()). Leaning ("naklon", degrees about the
+ * axle "stred_naklonu" of its frame, its handles up): its front down so much, the axle where "poloha" says.
+ */
+static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObjectFigure> &into)
+{
+	if (!e.contains("vozidla") || !e.at("vozidla").is_array()) return;
+	for (const auto &v : e.at("vozidla")) {
+		if (!v.is_object() || !v.contains("poloha") || !v.at("poloha").is_array() || v.at("poloha").size() != 3) continue;
+		const std::string record = v.value("zaznam", v.value("objekt", std::string()));
+		if (record.empty()) continue;
+		std::string figure = "vozidlo:" + record;
+		if (v.contains("sada") && v.at("sada").is_string()) figure += "|" + v.at("sada").get<std::string>();
+		if (v.contains("sada") && v.at("sada").is_array()) {
+			for (const auto &set : v.at("sada")) {
+				if (set.is_string()) figure += "|" + set.get<std::string>();
+			}
+		}
+		if (v.contains("doplnky") && v.at("doplnky").is_object()) {
+			for (const auto &[file, node] : v.at("doplnky").items()) {
+				if (node.is_string()) figure += "|+" + file + "=" + node.get<std::string>();
+			}
+		}
+		ThreeDObjectFigure f;
+		for (int k = 0; k < 3; k++) f.at[k] = v.at("poloha").at(k).get<float>();
+		f.facing = v.value("otoceni", 0.0f);
+		f.scale = std::clamp(v.value("meritko", 1.0f), 0.05f, 20.0f);
+		/* At most as far as a picture of the map tips an object (ObjectPicture()), the same seen from the eyes. */
+		const float lean = std::clamp(v.value("naklon", 0.0f), -60.0f, 60.0f);
+		if (lean != 0) {
+			const double pitch = -lean * M_PI / 180.0;
+			figure += fmt::format("|^{}", static_cast<int>(std::lround(-lean)));
+			if (v.contains("stred_naklonu") && v.at("stred_naklonu").is_array() && v.at("stred_naklonu").size() == 3) {
+				/* The origin such that the axle, turned with it, comes where "poloha" says. */
+				const double sx = v.at("stred_naklonu").at(0).get<double>(), sy = v.at("stred_naklonu").at(1).get<double>(), sz = v.at("stred_naklonu").at(2).get<double>();
+				const double px = sx * std::cos(pitch) - sz * std::sin(pitch), pz = sx * std::sin(pitch) + sz * std::cos(pitch);
+				const double a = f.facing * M_PI / 180.0;
+				f.at[0] -= static_cast<float>(px * std::cos(a) - sy * std::sin(a));
+				f.at[1] -= static_cast<float>(px * std::sin(a) + sy * std::cos(a));
+				f.at[2] -= static_cast<float>(pz);
+			}
+		}
+		f.figure = std::move(figure);
+		into.push_back(std::move(f));
+	}
+}
+
+/**
  * A part of the forest with a clearing ("druh": "les", the colleague's hra/3d/LES-PRO-HRU.md): one tile, its origin
  * in the north corner, laid by the game turned by quarter turns about the tile's middle (the clearing's four tiles
  * each with its north corner out of the clearing; the path from the side of the road): an object of its whole scene
@@ -3183,6 +3236,7 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 	figures("houby", as_read.mushrooms);
 	places("zvirata", "druhy", as_read.animals);
 	places("noc_postavy", "postavy", as_read.ghosts);
+	ReadStandingVehicles(e, as_read.vehicles);
 	ThreeDObject trees_read;
 	ReadBuildingFigures(e, trees_read);
 	/* Its fire, where the embers glow at night ("svetlo_00" of its night, the colleague's forester's cabin): a spit
@@ -3231,6 +3285,7 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 		r.rest = as_read;
 		for (ThreeDObjectFigure &f : r.rest.girls) turn(f);
 		for (ThreeDObjectFigure &f : r.rest.mushrooms) turn(f);
+		for (ThreeDObjectFigure &f : r.rest.vehicles) turn(f);
 		for (ThreeDForestPlace &p : r.rest.animals) turn(p.at);
 		for (ThreeDForestPlace &p : r.rest.ghosts) turn(p.at);
 		if (fire.size() >= 3) {
@@ -3281,6 +3336,8 @@ static const ThreeDForestPart *GetThreeDForestPart(std::string_view part, int tu
 				p = turns[k].rest;
 				p.ground = turns[k].ground != SIZE_MAX ? &_three_d_objects[turns[k].ground] : nullptr;
 				p.grill = turns[k].grill != SIZE_MAX ? &_three_d_objects[turns[k].grill] : nullptr;
+				p.with_girls = p.girls;
+				p.with_girls.insert(p.with_girls.end(), p.vehicles.begin(), p.vehicles.end());
 			}
 		}
 	}
@@ -3448,51 +3505,7 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 			_three_d_objects.push_back(std::move(addons));
 		}
 	}
-	/* Its vehicles of the sets (the colleague's hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md, point 4: the Zetor by the workshop
-	 * of the farm, the wheelbarrow of the Special leaning on the cowshed): each its record ("zaznam") in the state of its
-	 * sets ("sada") and add-ons ("doplnky", file: node), empty, as the fire Tatra on the pitch -- a figure
-	 * "vozidlo:<record>|<set>|+<file>=<node>|^<pitch>" (GetThreeDStandingVehicle()). Leaning ("naklon", degrees about the
-	 * axle "stred_naklonu" of its frame, its handles up): its front down so much, the axle where "poloha" says. */
-	if (e.contains("vozidla") && e.at("vozidla").is_array()) {
-		for (const auto &v : e.at("vozidla")) {
-			if (!v.is_object() || !v.contains("poloha") || !v.at("poloha").is_array() || v.at("poloha").size() != 3) continue;
-			const std::string record = v.value("zaznam", v.value("objekt", std::string()));
-			if (record.empty()) continue;
-			std::string figure = "vozidlo:" + record;
-			if (v.contains("sada") && v.at("sada").is_string()) figure += "|" + v.at("sada").get<std::string>();
-			if (v.contains("sada") && v.at("sada").is_array()) {
-				for (const auto &set : v.at("sada")) {
-					if (set.is_string()) figure += "|" + set.get<std::string>();
-				}
-			}
-			if (v.contains("doplnky") && v.at("doplnky").is_object()) {
-				for (const auto &[file, node] : v.at("doplnky").items()) {
-					if (node.is_string()) figure += "|+" + file + "=" + node.get<std::string>();
-				}
-			}
-			ThreeDObjectFigure f;
-			for (int k = 0; k < 3; k++) f.at[k] = v.at("poloha").at(k).get<float>();
-			f.facing = v.value("otoceni", 0.0f);
-			f.scale = std::clamp(v.value("meritko", 1.0f), 0.05f, 20.0f);
-			/* At most as far as a picture of the map tips an object (ObjectPicture()), the same seen from the eyes. */
-			const float lean = std::clamp(v.value("naklon", 0.0f), -60.0f, 60.0f);
-			if (lean != 0) {
-				const double pitch = -lean * M_PI / 180.0;
-				figure += fmt::format("|^{}", static_cast<int>(std::lround(-lean)));
-				if (v.contains("stred_naklonu") && v.at("stred_naklonu").is_array() && v.at("stred_naklonu").size() == 3) {
-					/* The origin such that the axle, turned with it, comes where "poloha" says. */
-					const double sx = v.at("stred_naklonu").at(0).get<double>(), sy = v.at("stred_naklonu").at(1).get<double>(), sz = v.at("stred_naklonu").at(2).get<double>();
-					const double px = sx * std::cos(pitch) - sz * std::sin(pitch), pz = sx * std::sin(pitch) + sz * std::cos(pitch);
-					const double a = f.facing * M_PI / 180.0;
-					f.at[0] -= static_cast<float>(px * std::cos(a) - sy * std::sin(a));
-					f.at[1] -= static_cast<float>(px * std::sin(a) + sy * std::cos(a));
-					f.at[2] -= static_cast<float>(pz);
-				}
-			}
-			f.figure = std::move(figure);
-			tile.vehicles.push_back(std::move(f));
-		}
-	}
+	ReadStandingVehicles(e, tile.vehicles);
 	ThreeDObject plants;
 	plants.name = name + "/rostliny";
 	plants.variants = 0; // no house's

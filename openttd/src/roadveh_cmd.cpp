@@ -2079,12 +2079,13 @@ static void RoadVehFreeController(RoadVehicle *v)
 
 /**
  * A road vehicle like one of the sets standing in an industry's yard (the farm's Zetor and its wheelbarrow,
- * ThreeDIndustryTileParts::vehicles), the company's for nothing (the player, 26. 10.: "with E I take the wheelbarrow
+ * ThreeDIndustryTileParts::vehicles; the horse by the forest's cabin) or by a building on its event's days (the horse on
+ * the stadium's pitch), the company's for nothing (the player, 26. 10.: "with E I take the wheelbarrow
  * and drive; the Zetor a vehicle by E too"): it stands where that one stands, the way it faces, off the road and
  * driven from its cab already (cab_drive.h), stopped till it is driven off; its trailers behind it. The one of the
  * yard stays there (the player: "the wheelbarrow may spawn again").
  * @param flags operation to perform
- * @param tile a tile of the industry it stands at
+ * @param tile a tile of the industry it stands at, or the building's tile it stands on
  * @param eid the engine of the vehicle
  * @param px where it stands, x, CAB_SUBUNIT of a unit
  * @param py and y
@@ -2093,8 +2094,8 @@ static void RoadVehFreeController(RoadVehicle *v)
  */
 std::tuple<CommandCost, VehicleID> CmdBuildYardRoadVehicle(DoCommandFlags flags, TileIndex tile, EngineID eid, int32_t px, int32_t py, uint8_t yaw)
 {
-	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Industry) || yaw >= CAB_YAW_TURN || !Company::IsValidID(_current_company)) return { CMD_ERROR, VehicleID::Invalid() };
-	/* On the industry's tile or by it, not on the outer tiles of the map. */
+	if (!IsValidTile(tile) || !(IsTileType(tile, TileType::Industry) || IsTileType(tile, TileType::House)) || yaw >= CAB_YAW_TURN || !Company::IsValidID(_current_company)) return { CMD_ERROR, VehicleID::Invalid() };
+	/* On the industry's tile or by it (a building's: the horse on the stadium's pitch), not on the outer tiles of the map. */
 	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
 			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {

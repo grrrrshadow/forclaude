@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (57) – Koně jako dekorace: statek, stodola, srub na pasece, hřiště stadionu; E na ně nasedne
+
+- Kolega (`KONE-SPECIAL-V4-PRO-HRU.md`) podle hráče: koně jako dekorace *„jako hasičská Tatra, kolečko a Zetor“*,
+  na farmě, u lesa, nedaleko měst; nasedne se E jako na kolečko.
+- **Statek a stodola** (`pv_gfx_035`, `pv_gfx_033`, `vozidla`): kreslily se už cestou Zetoru. Na snímku z 0° je
+  kůň za domem, z 90° a 180° je vidět.
+- **Srub na pasece** (`les_paseka_srub`, `vozidla`): díly lesa `vozidla` nečetly. Teď je čtou stejně jako dlaždice
+  průmyslu (jedna funkce `ReadStandingVehicles()`), otáčejí je s dílem a kreslí na mapě, z očí i v náhledu u okna lesa.
+- **Hřiště stadionu** (`dum_20_stadion`, `akce.kun`): akce domu zná vedle `tatra` i `kun`. Kůň stojí jen ve dny
+  akce, jako hasičská Tatra.
+- **E:** nasednutí bere i koně u srubu a koně na hřišti ve dny akce. Dostane ho firma jako kolečko a hráč sedí
+  v sedle. Ověřeno v rigu na stadionu i u srubu (z boku u okna srubu E otevře okenici, okno má přednost).
+- **Stojící kůň přešlapuje** v chodu `stoji` podle času, každý jinak. Dlaždice se překreslí, když se snímek změní,
+  stejně jako u postav s animací. Z očí také.
+
 ## 31. 10. (56) – Koně Special 3D v4 jako tahače: kůň ze sady zvířat, chůze podle rychlosti, jezdkyně v sedle
 
 - Hráč: *„grrrrf ma hotovo.“*, *„jestli jede 2km/h ten kuň tak to trvá než vyjede z depa“*.

@@ -1098,6 +1098,8 @@ struct ThreeDForestPart {
 	std::vector<ThreeDObjectFigure> mushrooms; ///< "houby": where they grow, all the time (the kind drawn by the place)
 	std::vector<ThreeDForestPlace> animals;   ///< "zvirata"
 	std::vector<ThreeDForestPlace> ghosts;    ///< "noc_postavy", at night
+	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla": vehicles of the sets standing on it, as figures "vozidlo:..." (GetThreeDStandingVehicle(): the horse by the cabin); none without their package
+	std::vector<ThreeDObjectFigure> with_girls; ///< its girls and its vehicles, the figures drawn after a delivery of studentky
 	/* The spit over its fire (the forester's cabin's fireplace, where its embers glow, "svetlo_00" of its night). */
 	const ThreeDObject *grill = nullptr;      ///< the trestles of the pitch's grill (an add-on, without its bricks) over the fire; nullptr no fire
 	std::array<ThreeDObjectFigure, THREE_D_GRILL_ANIMALS> spit; ///< the spit on it, each with an animal of its own (ThreeDObjectFigure::frame)

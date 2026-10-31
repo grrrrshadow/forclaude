@@ -496,9 +496,10 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
  * walking its "krok_m", as big as it is drawn -- is nearest its speed, its frame by the way gone.
  * @param walked the way gone as drawn (EyeTrail::walked), world units
  * @param scale the object's metres to the game's
- * @param v the vehicle, nullptr none (the purchase list: standing)
+ * @param v the vehicle, nullptr none (the purchase list, one standing as a figure: standing)
+ * @param phase how far its standing frames are from those of the others (a figure's number, phase)
  */
-static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float scale, const Vehicle *v)
+static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float scale, const Vehicle *v, uint32_t phase = 0)
 {
 	auto gait_of = [&obj](size_t k) { return GetThreeDFigure(obj.body + "/" + std::string(BODY_GAITS[k]), obj.package); };
 	const double kmh = v != nullptr ? v->GetDisplaySpeed() : 0.0;
@@ -522,7 +523,7 @@ static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float sc
 	if (f == nullptr || f->frames < 2) return static_cast<uint64_t>(gait) * per_gait;
 	int frame = 0;
 	if (gait == 0) {
-		frame = static_cast<int>((TimerGameTick::counter / std::max(1, f->frame_ticks)) % f->frames);
+		frame = static_cast<int>((TimerGameTick::counter / std::max(1, f->frame_ticks) + phase) % f->frames);
 	} else if (const double step = f->walk_step * scale * UNITS_PER_METRE; step > 0) {
 		const double rounds = walked / step;
 		frame = std::clamp(static_cast<int>((rounds - std::floor(rounds)) * f->frames), 0, f->frames - 1);
@@ -4185,11 +4186,54 @@ bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 	}
 	ev.obj = obj;
 	ev.state = obj->EmptyStateOf(state);
+	/* An animal that is the vehicle stands in its frames (BodyCode()). */
+	ev.walk = obj->body.empty() ? 0 : BodyCode(*obj, 0, 1.0f, nullptr);
 	if (_debug_misc_level >= 2) {
 		const ThreeDParts parts = obj->PartsOf(ev.state);
 		Debug(misc, 2, "3D standing vehicle {}: {} sets found, state {}, parts {:x}.{:x}", obj->name, steps.size(), ev.state, parts.bits[1], parts.bits[0]);
 	}
 	return true;
+}
+
+/**
+ * A figure drawn on its tile in a frame of the game's tick: its tile drawn again when the frame changes
+ * (_moving_figures_timer), as far as it reaches about.
+ * @param ticks the ticks a frame of it is held
+ * @param tall how tall it is, units of height
+ * @param x,y where it stands, world units, when z is known
+ * @param z the height it stands at, units, INT_MIN not known: its tile drawn again as high as a building may be
+ */
+static void NoteMovingFigure(TileIndex tile, int ticks, const ThreeDVehicleShape &shape, float scale, int tall, int x, int y, int z)
+{
+	const uint64_t step = TimerGameTick::counter / ticks;
+	bool known = false;
+	/* Where it stands, as far as it reaches about (drawn bigger on the map than it is, its scale), a little below
+	 * its feet and above its head: where it reaches over as it moves. */
+	const double rx = std::max(std::abs(shape.x0), std::abs(shape.x1)), ry = std::max(std::abs(shape.y0), std::abs(shape.y1));
+	const double reach = std::hypot(rx, ry) * scale * OBJECT_UNITS_PER_METRE + 2;
+	MovingFigure f{tile, ticks, step, INT_MIN, INT_MIN, x - reach, y - reach, x + reach, y + reach};
+	if (z != INT_MIN) {
+		f.z0 = z - TILE_HEIGHT;
+		f.z1 = z + tall + TILE_HEIGHT;
+	}
+	for (MovingFigure &m : _moving_figures) {
+		if (m.tile != tile) continue;
+		if (m.ticks != ticks) continue;
+		m.step = step;
+		/* Two figures on one tile: the box of both, or the tile as high as a building when one is not known. */
+		if (m.z0 == INT_MIN || f.z0 == INT_MIN) {
+			m.z0 = INT_MIN;
+		} else {
+			m.z0 = std::min(m.z0, f.z0);
+			m.z1 = std::max(m.z1, f.z1);
+			m.x0 = std::min(m.x0, f.x0);
+			m.y0 = std::min(m.y0, f.y0);
+			m.x1 = std::max(m.x1, f.x1);
+			m.y1 = std::max(m.y1, f.y1);
+		}
+		known = true;
+	}
+	if (!known) _moving_figures.push_back(f);
 }
 
 /**
@@ -4214,8 +4258,17 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 		const float world_az = facing - 135.0f;
 		later = for_eye;
-		if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
-		return PictureRequest(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state, 0, -1, 1.0f, 0, static_cast<int>(std::lround(ev.pitch)), 0, 0, 0.0f, 0);
+		const int tall = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
+		if (height != nullptr) *height = tall;
+		/* An animal that is the vehicle (the horses of the Special 3D v4 by the farm's house, the colleague's "stoji"):
+		 * standing in its frames, its tile drawn again as they change. */
+		uint64_t walk = 0;
+		if (!ev.obj->body.empty()) {
+			walk = BodyCode(*ev.obj, 0, scale, nullptr, phase);
+			const ThreeDVehicleObject *standing = GetThreeDFigure(ev.obj->body + "/" + std::string(BODY_GAITS[0]), ev.obj->package);
+			if (standing != nullptr && standing->frames > 1 && tile != INVALID_TILE) NoteMovingFigure(tile, std::max(1, standing->frame_ticks), *shape, scale, tall, x, y, z);
+		}
+		return PictureRequest(ev.obj, scale, zoom, world_az + yaw, world_az, false, ev.state, 0, -1, 1.0f, 0, static_cast<int>(std::lround(ev.pitch)), 0, 0, 0.0f, walk);
 	}
 	const ThreeDVehicleObject *fig = GetThreeDFigure(name);
 	if (fig == nullptr) return std::nullopt;
@@ -4239,35 +4292,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		/* Its tile is drawn again as the picture changes: a frame, or a step of a turn (with a frame of its own too, the
 		 * spit over the forest's fire with the animal chosen). */
 		const int ticks = fig->spin_ticks > 0 ? std::max(1, fig->spin_ticks / SPIN_STEPS) : fig->frame_ticks;
-		uint64_t step = TimerGameTick::counter / ticks;
-		bool known = false;
-		/* Where it stands, as far as it reaches about (drawn bigger on the map than it is, its scale), a little below
-		 * its feet and above its head: where it reaches over as it moves. */
-		const double rx = std::max(std::abs(shape->x0), std::abs(shape->x1)), ry = std::max(std::abs(shape->y0), std::abs(shape->y1));
-		const double reach = std::hypot(rx, ry) * scale * OBJECT_UNITS_PER_METRE + 2;
-		MovingFigure f{tile, ticks, step, INT_MIN, INT_MIN, x - reach, y - reach, x + reach, y + reach};
-		if (z != INT_MIN) {
-			f.z0 = z - TILE_HEIGHT;
-			f.z1 = z + tall + TILE_HEIGHT;
-		}
-		for (MovingFigure &m : _moving_figures) {
-			if (m.tile != tile) continue;
-			if (m.ticks != ticks) continue;
-			m.step = step;
-			/* Two figures on one tile: the box of both, or the tile as high as a building when one is not known. */
-			if (m.z0 == INT_MIN || f.z0 == INT_MIN) {
-				m.z0 = INT_MIN;
-			} else {
-				m.z0 = std::min(m.z0, f.z0);
-				m.z1 = std::max(m.z1, f.z1);
-				m.x0 = std::min(m.x0, f.x0);
-				m.y0 = std::min(m.y0, f.y0);
-				m.x1 = std::max(m.x1, f.x1);
-				m.y1 = std::max(m.y1, f.y1);
-			}
-			known = true;
-		}
-		if (!known) _moving_figures.push_back(f);
+		NoteMovingFigure(tile, ticks, *shape, scale, tall, x, y, z);
 	}
 	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step, 0, 0, 0, 0.0f, 0);
 }
