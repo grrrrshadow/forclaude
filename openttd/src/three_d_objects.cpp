@@ -2677,12 +2677,17 @@ static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> 
 {
 	if (!list.is_array()) return;
 	for (const auto &c : list) {
-		if (!c.is_object() || !c.contains("postava") || !c.contains("poloha")) continue;
+		if (!c.is_object() || !c.contains("postava")) continue;
 		ThreeDVehicleCrew crew;
 		crew.figure = FigureNamed(c);
-		const auto &at = c.at("poloha");
-		if (!at.is_array() || at.size() != 3) continue;
-		for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+		/* On the seat of a body (the colleague's riders of the horses, "uzel": "sedlo"): where it is in each pose. */
+		crew.on_seat = c.value("uzel", std::string()) == "sedlo";
+		if (!crew.on_seat) {
+			if (!c.contains("poloha")) continue;
+			const auto &at = c.at("poloha");
+			if (!at.is_array() || at.size() != 3) continue;
+			for (int k = 0; k < 3; k++) crew.at[k] = at.at(k).get<float>();
+		}
 		crew.turn = c.value("otoceni", 0.0f);
 		crew.scale = std::clamp(c.value("meritko", 1.0f), 0.1f, 10.0f);
 		crew.driver_seat = c.value("misto_ridicky", false);
@@ -4626,9 +4631,18 @@ static void ReadThreeDVehicleObjects()
 				if (kind != "vozidlo" && !(kind == "auto" && e.contains("grf")) && !driving) continue;
 				ThreeDVehicleObject obj;
 				obj.package = package;
-				obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
-				obj.file = folder + e.at("soubor").get<std::string>();
-				NoteMarginsFilled(e, obj.file, MarginsOf::Vehicles);
+				if (e.contains("soubor") && e.at("soubor").is_string()) {
+					obj.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					obj.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, obj.file, MarginsOf::Vehicles);
+				} else if (e.contains("objekt") && e.at("objekt").is_string() && e.contains("jmeno") && e.at("jmeno").is_string()) {
+					/* An animal of a set as it is (the colleague's horses of the Special 3D v4: "sada_objektu" "zvirata",
+					 * "objekt" "kun_sedlo"): its figure in its gaits, its file the figure's once all are read. */
+					obj.name = e.at("jmeno").get<std::string>();
+					obj.body = e.at("objekt").get<std::string>();
+				} else {
+					continue;
+				}
 				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : "vlak")));
 				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
 				if (obj.type == VehicleType::Invalid || (!grfid.has_value() && !driving)) {
@@ -4667,6 +4681,7 @@ static void ReadThreeDVehicleObjects()
 					for (const auto &l : e.at("delky_clanku_grf")) obj.grf_lengths.push_back(l.is_number_integer() ? std::clamp(l.get<int>(), 1, static_cast<int>(VEHICLE_LENGTH)) : static_cast<int>(VEHICLE_LENGTH));
 				}
 				if (e.contains("rozmer_m") && e.at("rozmer_m").is_object()) obj.length_m = std::clamp(e.at("rozmer_m").value("delka", 0.0f), 0.0f, 200.0f);
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && !e.at("rozmer_m").empty() && e.at("rozmer_m").at(0).is_number()) obj.length_m = std::clamp(e.at("rozmer_m").at(0).get<float>(), 0.0f, 200.0f);
 				/* The piece it hangs from: the middle one, the first, or the one named. The middle of an even count of
 				 * pieces is the one the middle of its length is in (a lorry: its snout 4, itself 8 -- the lorry). */
 				std::string anchor = e.contains("kotva") && e.at("kotva").is_string() ? e.at("kotva").get<std::string>() : "stred";
@@ -5190,6 +5205,18 @@ static void ReadThreeDVehicleObjects()
 		}
 	}
 	MakeHumanoidFigures();
+	/* The vehicles that are animals of a set: the file of their figure (its textures, its margins). */
+	for (ThreeDVehicleObject &o : _vehicle_objects) {
+		if (o.body.empty()) continue;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(o.body, o.package);
+		if (fig == nullptr) {
+			Debug(misc, 0, "3D vehicle {}: no figure {} in the sets", o.name, o.body);
+			continue;
+		}
+		o.file = fig->file;
+		/* Its shape a frame of a gait (GetShape(int)): BODY_GAITS of BODY_GAIT_FRAMES each. */
+		o.frames = static_cast<int>(BODY_GAITS.size()) * ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
 }
 
@@ -5794,7 +5821,7 @@ static std::vector<std::shared_ptr<const ThreeDVehicleShape>> _shapes_replaced;
 void ThreeDVehicleObject::AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const
 {
 	const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-	if (fig != nullptr && fig->Walks()) return; // drawn on its own, a frame by the way gone (WalkingCrew())
+	if (c.on_seat || (fig != nullptr && fig->Walks())) return; // drawn on its own, a frame by the way gone or on the body's seat (WalkingCrew())
 	const ThreeDVehicleShape *fs = fig != nullptr ? fig->GetShape() : nullptr;
 	if (fs == nullptr) {
 		Debug(misc, 0, "3D vehicle {}: the figure {} is not there", this->name, c.figure);
@@ -6234,6 +6261,14 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 	}
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	sk->Skin(pose, made->pos, made->nrm);
+	/* Its seat (the colleague's horses: the node "sedlo" under the bone Spine1) where it is in the pose, the game's axes. */
+	if (const int seat = sk->NodeNamed("sedlo"); seat >= 0) {
+		const BoneMatrix m = sk->Globals(pose)[seat];
+		made->has_seat = true;
+		made->seat[0] = static_cast<float>(m[12]);
+		made->seat[1] = static_cast<float>(-m[14]);
+		made->seat[2] = static_cast<float>(m[13]);
+	}
 	made->uv.assign(sk->uv.begin(), sk->uv.end());
 	made->tri = sk->tri;
 	made->tri_tex = sk->tri_tex;
@@ -6272,6 +6307,13 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 {
 	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
+	if (!this->body.empty()) {
+		/* An animal of a set: its figure in the gait (BODY_GAITS) at the frame (WalkCode() of three_d_vehicle_object.cpp). */
+		const size_t gait = std::min<size_t>(static_cast<size_t>(std::max(frame, 0)) / BODY_GAIT_FRAMES, BODY_GAITS.size() - 1);
+		const ThreeDVehicleObject *fig = GetThreeDFigure(this->body + "/" + std::string(BODY_GAITS[gait]), this->package);
+		if (fig == nullptr) fig = GetThreeDFigure(this->body, this->package);
+		return fig != nullptr ? fig->MakeShape(std::max(frame, 0) % BODY_GAIT_FRAMES, ThreeDParts{}) : nullptr;
+	}
 	const auto started = std::chrono::steady_clock::now();
 	std::string key = this->file;
 	if (!this->frame_prefix.empty()) key += fmt::format("#{}{}", this->frame_prefix, frame);
@@ -7245,13 +7287,14 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 		std::vector<ThreeDWalkingCrew> found;
 		auto add = [&](const ThreeDVehicleCrew &c, uint8_t part) {
 			const ThreeDVehicleObject *fig = GetThreeDFigure(c.figure, this->package);
-			if (fig == nullptr || !fig->Walks()) return;
+			if (fig == nullptr || (!fig->Walks() && !c.on_seat)) return;
 			ThreeDWalkingCrew w;
 			w.figure = fig;
 			std::copy(std::begin(c.at), std::end(c.at), w.at);
 			w.turn = c.turn;
 			w.scale = c.scale;
 			w.part = part;
+			w.on_seat = c.on_seat;
 			found.push_back(w);
 		};
 		for (const ThreeDVehicleCrew &c : this->crew) add(c, static_cast<uint8_t>(this->crew_record_part));

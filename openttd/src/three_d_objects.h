@@ -393,6 +393,8 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> tex_alpha;     ///< for each texture, how much of what is behind it hides (a material "BLEND", times its texels' alpha), 255 all
 	float x0 = 0, x1 = 0, y0 = 0, y1 = 0, z0 = 0, z1 = 0; ///< its extent, metres
 	float all[6] = {};          ///< the extent of all its corners, what the states show among them: x0, x1, y0, y1, z0, z1, metres; all 0 not known
+	bool has_seat = false;      ///< a figure posed by its bones with a node "sedlo" (the colleague's horses): where it is in this pose
+	float seat[3] = {};         ///< x, y, z, metres
 	/* Its lights at night (the colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md): the glass of the node "noc" of its
 	 * file, never drawn by day, and the places "svetlo_predni_NN" and "svetlo_zadni_NN" the light shines from. */
 	std::vector<float> night_pos;       ///< x, y, z of each corner of the glass, metres
@@ -614,7 +616,11 @@ struct ThreeDVehicleCrew {
 	float turn = 0;             ///< "otoceni": degrees about z, 0 facing forward as the vehicle
 	float scale = 1.0f;         ///< "meritko": its size against its true one (the girls on a lorry's back twice, as at a stop)
 	bool driver_seat = false;   ///< "misto_ridicky": of a group, sitting at the driver's seat -- the record's driver not drawn where its state shows it
+	bool on_seat = false;       ///< "uzel": "sedlo" in place of "poloha": sitting where the body's seat is in its pose (a rider on a horse of the Special)
 };
+
+/** The gaits of a vehicle that is an animal (ThreeDVehicleObject::body), slowest first: standing, then each faster. */
+inline constexpr std::array<std::string_view, 4> BODY_GAITS = {"stoji", "chuze", "klus", "cval"};
 
 /**
  * A figure of the crew that walks as the vehicle goes (its figure's "animace" with "chuze", the colleague's
@@ -627,6 +633,7 @@ struct ThreeDWalkingCrew {
 	float turn = 0;             ///< "otoceni": degrees about z
 	float scale = 1.0f;         ///< "meritko"
 	uint8_t part = 0;           ///< the part that shows it: 0 always ("posadka"), else its group of the crew ("posadky")
+	bool on_seat = false;       ///< sitting on the body's seat (ThreeDVehicleCrew::on_seat): there in each pose, not at "poloha"; it does not walk
 };
 
 /**
@@ -768,6 +775,7 @@ struct ThreeDVehicleObject {
 	std::vector<int> grf_lengths;   ///< "delky_clanku_grf": its pieces' lengths in its set the object's length is for, eighths of a tile; empty: as the set says now
 	float length_m = 0;             ///< "rozmer_m" "delka": its length, metres; 0 from its shape (Length())
 	std::string detail_file;        ///< "maska_podrobnosti": the mask of details of its body's texture (ThreeDDetailMask), its path; empty none
+	std::string body;               ///< a vehicle that is an animal of a set ("sada_objektu", "objekt": the colleague's horses of the Special): its figure, drawn in a gait ("<body>/stoji", "chuze", "klus", "cval") at its frame (ShapeFrame())
 
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
@@ -787,6 +795,17 @@ struct ThreeDVehicleObject {
 	bool HasDetails() const;
 	float Length() const;
 	ThreeDParts PartsOf(int state) const;
+	/** The frame its shape is drawn at: a body's (body) of the frames of its crew that walks (WalkCode()), else the frame given. */
+	int ShapeFrame(int frame, uint64_t walk) const { return this->body.empty() ? frame : static_cast<int>(walk & BODY_FRAME_MASK); }
+	/** The frame of the k-th of its crew that walks shown (WalkCode()): eight bits each, after a body's. */
+	int CrewFrame(uint64_t walk, size_t k) const
+	{
+		const size_t bit = (this->body.empty() ? 0 : BODY_FRAME_BITS) + 8 * k;
+		return bit + 8 <= 64 ? static_cast<int>((walk >> bit) & 0xFF) : 0;
+	}
+	static constexpr int BODY_FRAME_BITS = 8;      ///< a body's gait and frame in the frames of the crew (WalkCode()): its gait times BODY_GAIT_FRAMES and its frame
+	static constexpr uint64_t BODY_FRAME_MASK = 0xFF;
+	static constexpr int BODY_GAIT_FRAMES = 64;    ///< the frames of a gait at most (a pose's "snimku")
 	const ThreeDVehicleState *State(int step) const;
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;

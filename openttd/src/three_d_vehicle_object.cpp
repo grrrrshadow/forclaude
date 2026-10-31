@@ -490,6 +490,47 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
 }
 
 /**
+ * The gait and the frame of a vehicle that is an animal (ThreeDVehicleObject::body, the colleague's horses of the Special
+ * 3D v4: "the game makes them move by the way gone"): its gait times BODY_GAIT_FRAMES and its frame. Standing
+ * still it stands ("stoji"), its frames as the game's ticks go; moving, the gait whose own pace -- a round of its frames
+ * walking its "krok_m", as big as it is drawn -- is nearest its speed, its frame by the way gone.
+ * @param walked the way gone as drawn (EyeTrail::walked), world units
+ * @param scale the object's metres to the game's
+ * @param v the vehicle, nullptr none (the purchase list: standing)
+ */
+static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float scale, const Vehicle *v)
+{
+	auto gait_of = [&obj](size_t k) { return GetThreeDFigure(obj.body + "/" + std::string(BODY_GAITS[k]), obj.package); };
+	const double kmh = v != nullptr ? v->GetDisplaySpeed() : 0.0;
+	size_t gait = 0;
+	if (kmh > 0) {
+		double best = std::numeric_limits<double>::infinity();
+		for (size_t k = 1; k < BODY_GAITS.size(); k++) {
+			const ThreeDVehicleObject *f = gait_of(k);
+			if (f == nullptr || f->walk_step <= 0 || f->frames < 2) continue;
+			const double seconds = f->frames * f->frame_ticks * MILLISECONDS_PER_TICK / 1000.0;
+			const double pace_kmh = f->walk_step * scale / seconds * 3.6;
+			const double off = std::abs(std::log(kmh / pace_kmh));
+			if (off < best) {
+				best = off;
+				gait = k;
+			}
+		}
+	}
+	constexpr int per_gait = ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	const ThreeDVehicleObject *f = gait_of(gait);
+	if (f == nullptr || f->frames < 2) return static_cast<uint64_t>(gait) * per_gait;
+	int frame = 0;
+	if (gait == 0) {
+		frame = static_cast<int>((TimerGameTick::counter / std::max(1, f->frame_ticks)) % f->frames);
+	} else if (const double step = f->walk_step * scale * UNITS_PER_METRE; step > 0) {
+		const double rounds = walked / step;
+		frame = std::clamp(static_cast<int>((rounds - std::floor(rounds)) * f->frames), 0, f->frames - 1);
+	}
+	return static_cast<uint64_t>(gait) * per_gait + static_cast<uint64_t>(std::min(frame, per_gait - 1));
+}
+
+/**
  * The frames of the crew that walks (ThreeDVehicleObject::WalkingCrew()) the state shows, the way gone so far (the
  * colleague's hra/3d/PROSBA-SPECIAL-3D.md): a round of a figure's frames each "krok_m" of its own as big as it is drawn,
  * forward as it faces; the frame of the k-th of those the state shows in the bits 8k to 8k + 7, of the first eight (of
@@ -497,26 +538,28 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
  * stays in its step.
  * @param walked the way gone as drawn (EyeTrail::walked), world units
  * @param scale the object's metres to the game's
+ * @param v the vehicle (its speed, for the gait of an animal that is the vehicle, BodyCode()); nullptr none
  */
-static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walked, float scale)
+static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walked, float scale, const Vehicle *v = nullptr)
 {
+	uint64_t code = obj->body.empty() ? 0 : BodyCode(*obj, walked, scale, v);
 	const std::vector<ThreeDWalkingCrew> &walking = obj->WalkingCrew();
-	if (walking.empty() || walked == 0) return 0;
+	if (walking.empty() || walked == 0) return code;
 	const ThreeDParts parts = obj->PartsOf(state);
 	const float turn = StateTurn(obj, state);
-	uint64_t code = 0;
+	const size_t slots = obj->body.empty() ? 8 : (64 - ThreeDVehicleObject::BODY_FRAME_BITS) / 8;
 	size_t slot = 0;
-	for (size_t k = 0; k < walking.size() && slot < 8; k++) {
+	for (size_t k = 0; k < walking.size() && slot < slots; k++) {
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
 		const ThreeDVehicleObject &f = *w.figure;
 		const double step = f.walk_step * scale * w.scale * UNITS_PER_METRE;
-		if (step <= 0 || f.frames < 2) continue;
+		if (w.on_seat || step <= 0 || f.frames < 2) continue;
 		/* Facing back as it goes (turned round in the vehicle, or the vehicle turned round), it walks back. */
 		const double rounds = (std::cos((turn + w.turn) * M_PI / 180.0) < 0 ? -walked : walked) / step;
 		const int frame = std::clamp(static_cast<int>((rounds - std::floor(rounds)) * f.frames), 0, f.frames - 1);
-		code |= static_cast<uint64_t>(std::min(frame, 255)) << (8 * shown);
+		code |= static_cast<uint64_t>(std::min(frame, 255)) << ((obj->body.empty() ? 0 : ThreeDVehicleObject::BODY_FRAME_BITS) + 8 * shown);
 	}
 	return code;
 }
@@ -524,7 +567,7 @@ static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walke
 /** How far a vehicle drawn from its object has gone as drawn (EyeTrail::walked), for its crew that walks; 0 none (the purchase list). */
 static double WalkedOf(const Vehicle *v, const ThreeDVehicleObject *obj)
 {
-	if (v == nullptr || obj->WalkingCrew().empty()) return 0;
+	if (v == nullptr || (obj->WalkingCrew().empty() && obj->body.empty())) return 0;
 	bool reversed = false;
 	if (v->type == VehicleType::Train) {
 		const Train *t = Train::From(v);
@@ -865,7 +908,7 @@ bool GetThreeDVehicleObjectSprite(EngineID engine, const Vehicle *v, Direction d
 	if (piece == from) {
 		const int state = StateStep(obj, engine, v, image_type);
 		/* Its crew that walks at its step of the way gone (on the map, as it moves). */
-		const uint64_t walk = image_type == EngineImageType::OnMap ? WalkCode(obj, state, WalkedOf(v, obj), ObjectScale(obj)) : 0;
+		const uint64_t walk = image_type == EngineImageType::OnMap ? WalkCode(obj, state, WalkedOf(v, obj), ObjectScale(obj), v) : 0;
 		const int d = to_underlying(direction) & 7;
 		/* Hung from the middle of its pieces as they are, or where its coupling puts it (an article of a train of
 		 * lorries on the map); alone from its first piece as its set's lengths make it. */
@@ -1287,7 +1330,7 @@ static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const
  */
 static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, int frame = 0, float rust_time = 0, uint32_t tint = 0, uint32_t paint_colour = 0, float stretch = 1.0f, float spin = 0.0f, float pitch = 0.0f, float roll = 0.0f, int lights = 0, int state = 0, uint64_t walk = 0)
 {
-	const ThreeDVehicleShape *whole = obj.GetShape(frame, obj.PartsOf(state));
+	const ThreeDVehicleShape *whole = obj.GetShape(obj.ShapeFrame(frame, walk), obj.PartsOf(state));
 	if (whole == nullptr) return false;
 	/* On the graphics card where there is one (three_d_gpu.h); what it cannot draw the processor draws. */
 	if (ThreeDGpuAvailable()) {
@@ -1381,8 +1424,8 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(shown < 8 ? static_cast<int>((walk >> (8 * shown)) & 0xFF) : 0);
-		if (fs != nullptr) add_piece(w.figure, fs, w.at, w.turn, w.scale, 0);
+		const ThreeDVehicleShape *fs = w.figure->GetShape(obj.CrewFrame(walk, shown));
+		if (fs != nullptr) add_piece(w.figure, fs, w.on_seat && whole->has_seat ? whole->seat : w.at, w.turn, w.scale, 0);
 	}
 	/* The pieces of the shared loads on its bed (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): each where it
 	 * lies in the vehicle's frame, then as the vehicle; in the colour of the cargo. */
@@ -1941,11 +1984,12 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(shown < 8 ? static_cast<int>((walk >> (8 * shown)) & 0xFF) : 0);
+		const ThreeDVehicleShape *fs = w.figure->GetShape(obj.CrewFrame(walk, shown));
 		if (fs == nullptr) continue;
 		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
-		auto crew_to = [&cam, &w, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
-			cam.Place(w.at[0] + (fx0 * wc - fy0 * ws) * w.scale, w.at[1] + (fx0 * ws + fy0 * wc) * w.scale, w.at[2] + fz0 * w.scale, ox, oy, od);
+		const float *at = w.on_seat && whole.has_seat ? whole.seat : w.at;
+		auto crew_to = [&cam, &w, at, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
+			cam.Place(at[0] + (fx0 * wc - fy0 * ws) * w.scale, at[1] + (fx0 * ws + fy0 * wc) * w.scale, at[2] + fz0 * w.scale, ox, oy, od);
 		};
 		ThreeDGpuMesh &m = pic.meshes.emplace_back();
 		m.shape = fs;
@@ -2490,7 +2534,7 @@ static void RasterObjectsOnCard(std::span<const PictureToMake> ps, std::span<Obj
 	for (size_t i = 0; i < ps.size(); i++) {
 		const PictureToMake &p = ps[i];
 		result[i] = 0;
-		const ThreeDVehicleShape *whole = p.obj->GetShape(p.frame, p.obj->PartsOf(p.state));
+		const ThreeDVehicleShape *whole = p.obj->GetShape(p.obj->ShapeFrame(p.frame, p.walk), p.obj->PartsOf(p.state));
 		if (whole == nullptr || !PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gps[i])) continue;
 		result[i] = -1;
 		pics.push_back(&gps[i].pic);
@@ -2972,7 +3016,7 @@ static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuS
 	bool drawn = false;
 	{
 		ThreeDLazyNoWait no_wait;
-		const ThreeDVehicleShape *whole = p.obj->GetShape(p.frame, p.obj->PartsOf(p.state));
+		const ThreeDVehicleShape *whole = p.obj->GetShape(p.obj->ShapeFrame(p.frame, p.walk), p.obj->PartsOf(p.state));
 		if (no_wait.Missed()) return false;
 		drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp);
 		if (no_wait.Missed()) return false;
@@ -3088,7 +3132,7 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	}
 	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
 	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
-	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale);
+	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
 	/* Drawn by the card from what is made of it (CardVehicle()); else, or till that is made, its picture. */
 	if (on_card) place.on_card = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights);
 	if (!place.on_card) {
@@ -3400,7 +3444,7 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);
 	out.pitch = VehicleSlopePitch(obj, v, x, y, facing);
 	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
-	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale);
+	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale, v);
 	out.lights = VehicleObjectLightsOn(obj, front, last, reversed, ZoomLevel::Normal);
 	/* A car of BeamNG into its diary (beamng.log) the first time it is seen from the eyes: which object, how big. */
 	if (obj->file.starts_with("beamng:")) {

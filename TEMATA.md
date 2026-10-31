@@ -31,6 +31,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (56) – Koně Special 3D v4 jako tahače: kůň ze sady zvířat, chůze podle rychlosti, jezdkyně v sedle
+
+- Hráč: *„grrrrf ma hotovo.“*, *„jestli jede 2km/h ten kuň tak to trvá než vyjede z depa“*.
+- **Kůň jako vozidlo** (záznam bez `soubor`, s `sada_objektu` a `objekt`): tvar vozidla je kůň ze sady `zvirata`
+  v chodu `stoji`, `chuze`, `klus` nebo `cval`. Chod vybere hra podle rychlosti vozidla: ten, jehož vlastní tempo
+  (`krok_m` za kolo snímků, krát velikost) je rychlosti nejblíž. Snímek jde podle ujeté dráhy, kopyta neklouzají.
+  Stojící kůň přešlapuje podle času. Dřív záznam bez `soubor` shodil čtení zbytku indexu Special v4.
+- **Jezdkyně v sedle** (`"uzel": "sedlo"`): sedí v bodě uzlu `sedlo` v póze koně, jde s ním i v klusu. Mapa,
+  karta i pohled z očí. Prázdný kůň jde bez jezdce, jak kolega psal.
+- **2 km/h:** realistické zrychlení s 10 hp na koni a půl tuny vozu nestačí, hra pak jede nejmenší rychlostí. Je to
+  ladění GRF, patří kolegovi. Hra ho neobchází.
+- **Vůz se v GRF v4 neukáže:** článek vozu `0x0120` má vlastnost kapacita 0, OpenTTD ho proto při přestavbě koně
+  přeskočí (`Engine::CanCarryCargo()` bere jen vlastnost, ne callback). Vůz zůstane v podtypu 0: prázdný, kapacita
+  0, bez obrázku. Koně se žebřiňákem nebo valníkem tak nic nevezou. Oprava je v GRF (kapacita vozu nenulová,
+  callback 0x15 dá 0/6/8). Ověřeno v rigu s podtypem vozu nastaveným ručně: žebřiňák s kočí na kraji, valník
+  s kočím na kozlíku, kůň vpředu v ojích.
+- Rig: obrázek vozidla na mapě se dělá na vlákně a je hotový až po snímku. Postup pro snímek: `snimek pryc`,
+  `dokresli`, `snimek <jmeno>`.
+
 ## 31. 10. (55) – Převzato z grrrrf 27.–31. 10.: draci par18, holky, sestřičky, zvířata na kostře čtyřnožců, koně
 
 - Hráč: *„grrrrf ma hotovo.“*, *„mame humanoidní kostru unifikovanou pro všechny stejnou aby měli stejné pohyby

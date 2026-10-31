@@ -11600,6 +11600,7 @@ struct CabFigureModel {
 		const ThreeDWalkingCrew *w;
 		const ThreeDVehicleShape *shape; ///< as simple as its distance allows
 		std::vector<const ThreeDObjectTexture *> texs;
+		std::array<float, 3> at{};       ///< where it stands in the model's frame: its place, or the body's seat in this pose
 	};
 	std::vector<Crew> crew;
 	/** The pieces of its load on its bed (GetThreeDLoadPieces()), a kind each, each piece where it lies in its frame. */
@@ -11634,7 +11635,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 {
 	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
-	const ThreeDVehicleShape *whole = fig->TryGetShape(fg.frame, fig->PartsOf(fg.state));
+	const ThreeDVehicleShape *whole = fig->TryGetShape(fig->ShapeFrame(fg.frame, fg.walk), fig->PartsOf(fg.state));
 	if (whole == nullptr || whole->tri.empty()) return false;
 	const double across = fg.size * OBJECT_UNITS_PER_METRE;
 	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()); the cab the eye
@@ -11682,10 +11683,12 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, model.parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(shown < 8 ? static_cast<int>((fg.walk >> (8 * shown)) & 0xFF) : 0);
+		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(fig->CrewFrame(fg.walk, shown));
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
 		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}};
+		const float *at = w.on_seat && whole->has_seat ? whole->seat : w.at;
+		crew.at = {at[0], at[1], at[2]};
 		crew.texs.assign(std::max<size_t>(1, frame_shape->pngs.size()), nullptr);
 		bool ready = true;
 		for (size_t i = 0; i < crew.texs.size() && ready; i++) {
@@ -11930,9 +11933,9 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 		const bool crew_lit = cs.nrm.size() == cs.pos.size();
 		auto crew_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
 			const double fx0 = cs.pos[i * 3], fy0 = cs.pos[i * 3 + 1];
-			px = w.at[0] + (fx0 * wc - fy0 * ws) * w.scale;
-			py = w.at[1] + (fx0 * ws + fy0 * wc) * w.scale;
-			pz = w.at[2] + cs.pos[i * 3 + 2] * w.scale;
+			px = crew.at[0] + (fx0 * wc - fy0 * ws) * w.scale;
+			py = crew.at[1] + (fx0 * ws + fy0 * wc) * w.scale;
+			pz = crew.at[2] + cs.pos[i * 3 + 2] * w.scale;
 			if (crew_lit) {
 				const double n0 = cs.nrm[i * 3], n1 = cs.nrm[i * 3 + 1];
 				nx = n0 * wc - n1 * ws;
@@ -12062,7 +12065,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		const ThreeDWalkingCrew &w = *crew.w;
 		const M3 wt = about_z(w.turn);
 		const M3 local = mul(wt, M3{w.scale, 0, 0, 0, w.scale, 0, 0, 0, w.scale});
-		mesh(*crew.shape, crew.texs, {}, local, {w.at[0], w.at[1], w.at[2]}, wt);
+		mesh(*crew.shape, crew.texs, {}, local, {crew.at[0], crew.at[1], crew.at[2]}, wt);
 	}
 	for (const CabFigureModel::Load &load : model.loads) {
 		for (const ThreeDLoadPlace &at : load.places) {
