@@ -126,10 +126,10 @@ struct ThreeDGpuPicture {
 };
 
 /**
- * A building's triangles drawn into a picture on the card, as DrawObjectInto() of viewport.cpp draws them for the
- * turned view (the player, 18. 10.: the houses on the card): each pixel its texture's texel -- a hole filled from the
- * nearest within three texels, as the processor fills it --, shaded by the light of the corners about it; the side
- * facing away left out; the nearer kept. What comes is its pixels and how near each is, for the figures standing on it.
+ * A building's triangles drawn by the card among what stands on the turned view (ThreeDGpuStanding), as DrawObjectInto()
+ * of viewport.cpp draws them (the player, 18. 10.: the houses on the card): each pixel its texture's texel -- a hole
+ * filled from the nearest within three texels, as the processor fills it --, shaded by the light of the corners about
+ * it; the side facing away left out; the nearer kept.
  */
 struct ThreeDGpuBuilding {
 	uint64_t uid = 0;                     ///< its shape's number (ThreeDObjectShapeView::uid)
@@ -141,17 +141,6 @@ struct ThreeDGpuBuilding {
 	std::span<const uint8_t> tri_tex;     ///< each triangle's texture; empty: all the first
 	std::vector<const ThreeDObjectTexture *> textures;
 	bool cull = true;                     ///< the sides facing away left out (the rig: test3d zadni 0 draws them)
-};
-
-/** A picture of a building to draw on the card, and what comes of it. */
-struct ThreeDGpuBuildingPicture {
-	int width = 0, height = 0;            ///< pixels
-	ThreeDGpuMatrix matrix{};             ///< a corner to the picture: x, y pixels, z how near (the turned view's depth, the larger nearer)
-	float depth_near = 0, depth_far = 1;  ///< the depths of all its corners lie between these
-	ThreeDGpuBuilding building;
-	std::vector<uint32_t> pixels;         ///< what comes: its colours (Colour::data), 0 where it is not; top row first
-	std::vector<float> depth;             ///< and how near each pixel is, -infinity where it is not
-	bool drawn = false;                   ///< whether the card drew it (ThreeDGpuRenderBuildings()); not, the processor draws it
 };
 
 /**
@@ -447,7 +436,6 @@ bool ThreeDGpuAvailable(bool wait = false);
 bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
-bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics);
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
 uint32_t ThreeDGpuViewGround(uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);

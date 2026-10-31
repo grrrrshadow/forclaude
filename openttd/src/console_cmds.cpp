@@ -10211,12 +10211,6 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * setting gui.eye_shadows, off unless he turns it on). */
 		_settings_client.gui.eye_shadows = argv.size() < 3 || argv[2] != "0";
 		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _settings_client.gui.eye_shadows ? "zapnute" : "vypnute");
-	} else if (what == "mezipamet") {
-		/* 'mezipamet <0|1>': the buildings of the turned view drawn once and kept (1, as the game draws), or drawn each time. */
-		extern bool _turned_object_pictures_on;
-		_turned_object_pictures_on = argv.size() < 3 || argv[2] != "0";
-		MarkWholeScreenDirty();
-		IConsolePrint(CC_DEFAULT, "test3d: mezipamet domu {}", _turned_object_pictures_on ? "zapnuta" : "vypnuta");
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {
@@ -10252,8 +10246,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		AdvanceTitleDayAndNight(std::max(0, number(2).value_or(0)));
 		IConsolePrint(CC_DEFAULT, "test3d: titulnoc {:.2f} uhel {:.1f}", _title_night, GetViewYaw());
 	} else if (what == "snimek" && argv.size() > 2) {
-		/* A picture is of the moment: what the card's batch would bring a frame later is drawn now, waited for
-		 * (MakeTurnedObjectPicturesOnCard()), so the same scene gives the same picture. */
+		/* A picture is of the moment: what the thread would bring a frame later is made now, waited for, so the same
+		 * scene gives the same picture. */
 		AutoRestoreBackup at_once(_three_d_load_at_once, true);
 		/* The world generation progress window is still up at the first tick of a new game, and the last screenshot's message too. */
 		CloseWindowByClass(WindowClass::ModalProgress);

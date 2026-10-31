@@ -446,7 +446,6 @@ struct GpuJob {
 	ThreeDGpuEyePicture *eye = nullptr; ///< the view from the eyes (DrawEyeOnCard())
 	ThreeDGpuEyeFrame *frame = nullptr; ///< else the view from the eyes whole (DrawEyeFrameOnCard())
 	struct ShownRead *read = nullptr;   ///< else a picture shown straight from the card read back (ReadShownOnCard())
-	std::span<ThreeDGpuBuildingPicture *const> buildings; ///< else the buildings of the turned map (DrawBuildingsOnCard())
 	ThreeDGpuGround *ground = nullptr;  ///< else the ground of a block of the turned map (DrawGroundOnCard())
 	ThreeDGpuStanding *standing = nullptr; ///< else what stands on a block of the turned map (DrawStandingOnCard())
 	bool done = false;
@@ -558,7 +557,7 @@ constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.
  */
 constexpr size_t GPU_BYTES_KEPT_SHARED = 384u * 1024 * 1024;
 size_t _card_budget = GPU_BYTES_KEPT; ///< what the card keeps at most (GPU_BYTES_KEPT, GPU_BYTES_KEPT_SHARED), set at its start
-/* The rows of a frame of pictures drawn and read back at once (DrawPicturesOnCard(), DrawBuildingsOnCard()): more of
+/* The rows of a frame of pictures drawn and read back at once (DrawPicturesOnCard()): more of
  * them in more frames -- one picture taller has a frame of its own. A batch on 2048 x 10378 at once (the rig zoomed in
  * by the town, zink), its frame some 190 MB on the card and its 85 MB read back in one go, the player's phone sharing
  * its memory with its card (24. 10.: Winlator gone in the middle of reading pictures back, no crash log of the game). */
@@ -582,11 +581,8 @@ struct GpuProgram {
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
 };
-GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _map_building_program, _ground_program, _standing_program;
+GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _ground_program, _standing_program;
 GpuProgram _standing_building_program; ///< the buildings among what stands on the turned map (DrawStandingOnCard())
-/* The buildings of the turned map drawn into (DrawBuildingsOnCard()): their colours, their nearness as floats, depths. */
-GLuint _bfbo = 0, _b_colour_rb = 0, _b_near_rb = 0, _b_depth_rb = 0;
-int _bfbo_w = 0, _bfbo_h = 0;
 GLuint _fbo = 0, _colour_rb = 0, _lit_rb = 0, _depth_rb = 0;
 int _fbo_w = 0, _fbo_h = 0;
 /* The view from the eyes drawn into: its colours, and its depth as floats (near / how far ahead, the larger nearer). */
@@ -860,10 +856,8 @@ void main()
 }
 )";
 
-/* The buildings of the turned map (DrawBuildingsOnCard()), as the processor draws them into their pictures
- * (DrawObjectInto(), DrawTexturedTriangle() of viewport.cpp): each pixel at its middle the texel under it -- one the
- * texture has nothing for (0) takes the nearest drawn within three, in the processor's order --, shaded by the light of
- * the corners across the triangle (256 as it is) to whole numbers; the nearer kept, and how near written out. */
+/* The corners of a building among what stands on the turned map (DrawStandingOnCard()), as the processor projects them
+ * (DrawObjectInto() of viewport.cpp): its corner to the block, its uv and its light across the triangle, how near. */
 const char *const MAP_BUILDING_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
@@ -879,39 +873,6 @@ void main()
 	v_uv = a_uv;
 	v_light = a_light;
 	v_near = u_depth_range.x + (gl_Position.z + 1.0) * 0.5 * (u_depth_range.y - u_depth_range.x);
-}
-)";
-
-const char *const MAP_BUILDING_FRAGMENT = R"(#version 330 core
-uniform sampler2D u_tex;
-noperspective in vec2 v_uv;
-noperspective in float v_light;
-noperspective in float v_near;
-layout(location = 0) out vec4 o_colour;
-layout(location = 1) out vec4 o_near;
-const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
-		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
-		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
-void main()
-{
-	ivec2 size = textureSize(u_tex, 0);
-	ivec2 at = ivec2(floor(v_uv * vec2(size)));
-	if (at.x < 0 || at.y < 0 || at.x >= size.x || at.y >= size.y) discard;
-	vec4 t = texelFetch(u_tex, at, 0);
-	if (t == vec4(0.0)) {
-		for (int k = 0; k < 24; k++) {
-			ivec2 n = at + NEAR[k];
-			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
-			t = texelFetch(u_tex, n, 0);
-			if (t != vec4(0.0)) break;
-		}
-		if (t == vec4(0.0)) discard;
-	}
-	vec3 c = floor(t.rgb * 255.0 + 0.5);
-	float l = floor(max(0.0, v_light));
-	c = min(vec3(255.0), floor(c * l / 256.0));
-	o_colour = vec4(c / 255.0, t.a);
-	o_near = vec4(v_near, 0.0, 0.0, 1.0);
 }
 )";
 
@@ -1083,8 +1044,9 @@ void main()
 }
 )";
 
-/* A building among what stands on the turned map (DrawStandingOnCard()), with MAP_BUILDING_VERTEX: as the buildings'
- * pictures (MAP_BUILDING_FRAGMENT), as see-through as its texel (a yard's grass with the paths of the ground through it,
+/* A building among what stands on the turned map (DrawStandingOnCard()), with MAP_BUILDING_VERTEX: each pixel at its
+ * middle the texel under it -- one the texture has nothing for (0) takes the nearest drawn within three, as the
+ * processor (DrawTexturedTriangle() of viewport.cpp) --, as see-through as its texel (a yard's grass with the paths of the ground through it,
  * the colleague's pv_dvur_trava), not lit; or its lit glass at night (u_night), each pixel its texel as it is where the
  * texture has one, whole, marked lit. */
 const char *const STANDING_BUILDING_FRAGMENT = R"(#version 330 core
@@ -2035,8 +1997,6 @@ bool StartCard(std::string &why, std::string &describe)
 	if (!MakeProgram(_night_program, NIGHT_VERTEX, NIGHT_FRAGMENT, why)) return false;
 	Step("preklad programu budov z oci (shader)");
 	if (!MakeProgram(_eye_building_program, EYE_BUILDING_VERTEX, EYE_BUILDING_FRAGMENT, why)) return false;
-	Step("preklad programu budov plochy (shader)");
-	if (!MakeProgram(_map_building_program, MAP_BUILDING_VERTEX, MAP_BUILDING_FRAGMENT, why)) return false;
 	Step("preklad programu zeme plochy (shader)");
 	{
 		std::string ground_why;
@@ -2064,10 +2024,6 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glGenRenderbuffers(1, &_colour_rb);
 	gl.glGenRenderbuffers(1, &_lit_rb);
 	gl.glGenRenderbuffers(1, &_depth_rb);
-	gl.glGenFramebuffers(1, &_bfbo);
-	gl.glGenRenderbuffers(1, &_b_colour_rb);
-	gl.glGenRenderbuffers(1, &_b_near_rb);
-	gl.glGenRenderbuffers(1, &_b_depth_rb);
 	gl.glGenFramebuffers(1, &_eye_fbo);
 	gl.glGenRenderbuffers(1, &_eye_colour_rb);
 	gl.glGenRenderbuffers(1, &_eye_glow_rb);
@@ -2207,7 +2163,6 @@ void EndCard()
 		ForgetCard();
 		if (_fbo != 0) gl.glDeleteFramebuffers(1, &_fbo);
 		if (_eye_fbo != 0) gl.glDeleteFramebuffers(1, &_eye_fbo);
-		if (_bfbo != 0) gl.glDeleteFramebuffers(1, &_bfbo);
 		if (_gfbo != 0) gl.glDeleteFramebuffers(1, &_gfbo);
 		if (_g_move_fbo[0] != 0) gl.glDeleteFramebuffers(2, _g_move_fbo);
 		if (_view_ground_fbo != 0) gl.glDeleteFramebuffers(1, &_view_ground_fbo);
@@ -2228,7 +2183,7 @@ void EndCard()
 		if (_standing_faces_vao != 0) gl.glDeleteVertexArrays(1, &_standing_faces_vao);
 		if (_sv_fbo != 0) gl.glDeleteFramebuffers(1, &_sv_fbo);
 		if (_standing_atlas_fbo != 0) gl.glDeleteFramebuffers(1, &_standing_atlas_fbo);
-		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _b_colour_rb, _b_near_rb, _b_depth_rb, _g_colour_rb};
+		const GLuint rbs[] = {_colour_rb, _lit_rb, _depth_rb, _eye_colour_rb, _eye_glow_rb, _eye_depth_rb, _g_colour_rb};
 		for (GLuint rb : rbs) if (rb != 0) gl.glDeleteRenderbuffers(1, &rb);
 		if (_night_vbo != 0) gl.glDeleteBuffers(1, &_night_vbo);
 		if (_night_vao != 0) gl.glDeleteVertexArrays(1, &_night_vao);
@@ -2236,7 +2191,6 @@ void EndCard()
 		if (_night_program.program != 0) gl.glDeleteProgram(_night_program.program);
 		if (_eye_building_program.program != 0) gl.glDeleteProgram(_eye_building_program.program);
 		if (_eye_mesh_program.program != 0) gl.glDeleteProgram(_eye_mesh_program.program);
-		if (_map_building_program.program != 0) gl.glDeleteProgram(_map_building_program.program);
 		EndEyeFrame();
 	}
 	EndContext();
@@ -2813,33 +2767,6 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 	TrimCard();
 }
 
-/** The buildings of the turned map drawn into, at least as big as asked (grown in steps; DrawBuildingsOnCard()). */
-bool BuildingTargetOfSize(int w, int h)
-{
-	/* Shrunk again after a very big one, as TargetOfSize(). */
-	const bool too_big = static_cast<int64_t>(_bfbo_w) * _bfbo_h > 16 * 1024 * 1024 && static_cast<int64_t>(w) * h * 4 < static_cast<int64_t>(_bfbo_w) * _bfbo_h;
-	if (w <= _bfbo_w && h <= _bfbo_h && !too_big) return true;
-	_bfbo_w = std::min(_max_target, ((too_big ? w : std::max(_bfbo_w, w)) + 255) / 256 * 256);
-	_bfbo_h = std::min(_max_target, ((too_big ? h : std::max(_bfbo_h, h)) + 255) / 256 * 256);
-	Step(fmt::format("ramec budov plochy {}x{} (glRenderbufferStorage, glCheckFramebufferStatus)", _bfbo_w, _bfbo_h));
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, _b_colour_rb);
-	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, _bfbo_w, _bfbo_h);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, _b_near_rb);
-	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_R32F, _bfbo_w, _bfbo_h);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, _b_depth_rb);
-	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, _bfbo_w, _bfbo_h);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _bfbo);
-	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, _b_colour_rb);
-	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_RENDERBUFFER, _b_near_rb);
-	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _b_depth_rb);
-	if (gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-		_bfbo_w = _bfbo_h = 0;
-		return false;
-	}
-	return w <= _bfbo_w && h <= _bfbo_h;
-}
-
 /**
  * A building of the turned map on the card, put there the first time (GpuBuilding, by its shape's number with the top
  * bit set: the view from the eyes keeps the same shape its own way): each corner its own light, as the processor
@@ -2929,148 +2856,6 @@ const GpuBuilding *MapBuildingOnCard(const ThreeDGpuBuilding &b)
 	_card_sent_of[3] += g.bytes;
 	_card_sent += g.bytes;
 	return &_card_buildings.emplace(key, std::move(g)).first->second;
-}
-
-/**
- * The pictures of the buildings of the turned map drawn by the card all at once (ThreeDGpuRenderBuildings(); the
- * player, 21. 10.: as the map turns, the processor projected and sorted every building's triangles every frame, again
- * for every part of the screen it is in): side by side in rows in one frame, its colours and nearness read back once.
- * Each picture's ThreeDGpuBuildingPicture::drawn tells whether it was drawn; one not drawn the processor draws.
- */
-void DrawBuildingsOnCard(std::span<ThreeDGpuBuildingPicture *const> pics)
-{
-	_card_clock++;
-	struct Placed {
-		ThreeDGpuBuildingPicture *pic;
-		const GpuBuilding *on;
-		std::vector<GLuint> textures;
-		int x = 0, y = 0;
-	};
-	std::vector<Placed> placed;
-	for (ThreeDGpuBuildingPicture *pic : pics) {
-		pic->drawn = false;
-		if (pic->width <= 0 || pic->height <= 0 || pic->width > _max_target || pic->height > _max_target) continue;
-		const GpuBuilding *on = MapBuildingOnCard(pic->building);
-		if (on == nullptr) continue;
-		Placed p{pic, on, {}};
-		bool ok = true;
-		for (const ThreeDObjectTexture *t : pic->building.textures) {
-			const GpuTexture *g = t != nullptr ? TextureOnCard(*t) : nullptr;
-			p.textures.push_back(g != nullptr ? g->name : 0);
-			if (t != nullptr && g == nullptr) ok = false;
-		}
-		if (ok) placed.push_back(std::move(p));
-	}
-	std::ranges::stable_sort(placed, [](const Placed &a, const Placed &b) { return a.pic->height > b.pic->height; });
-	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	std::vector<uint32_t> colours;
-	std::vector<float> nearness;
-	for (size_t at = 0; at < placed.size();) {
-		int frame_w = 2048;
-		for (size_t k = at; k < placed.size(); k++) frame_w = std::max(frame_w, placed[k].pic->width);
-		frame_w = std::min(frame_w, _max_target);
-		int x = 0, y = 0, row = 0;
-		size_t end = at;
-		for (; end < placed.size(); end++) {
-			const ThreeDGpuBuildingPicture &pic = *placed[end].pic;
-			if (x + pic.width > frame_w) {
-				y += row;
-				x = 0;
-				row = 0;
-			}
-			if (y + pic.height > (end > at ? FRAME_ROWS : _max_target)) break;
-			placed[end].x = x;
-			placed[end].y = y;
-			x += pic.width;
-			row = std::max(row, pic.height);
-		}
-		const int frame_h = y + row;
-		Step(fmt::format("budovy plochy {}: {}x{}", end - at, frame_w, frame_h));
-		if (!BuildingTargetOfSize(frame_w, frame_h)) return;
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, _bfbo);
-		gl.glDrawBuffers(2, both);
-		gl.glDisable(GL_DITHER);
-		gl.glDisable(GL_BLEND);
-		gl.glEnable(GL_SCISSOR_TEST);
-		gl.glScissor(0, 0, frame_w, frame_h);
-		gl.glDepthMask(GL_TRUE);
-		gl.glClearColor(0, 0, 0, 0);
-		gl.glClearDepth(0.0);
-		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		gl.glDisable(GL_SCISSOR_TEST);
-		/* The nearer kept: the larger nearness, its depth the larger. */
-		gl.glEnable(GL_DEPTH_TEST);
-		gl.glDepthFunc(GL_GEQUAL);
-		gl.glFrontFace(GL_CCW);
-		gl.glUseProgram(_map_building_program.program);
-		gl.glUniform1i(_map_building_program.tex, 0);
-		gl.glActiveTexture(GL_TEXTURE0);
-		for (size_t k = at; k < end; k++) {
-			const Placed &p = placed[k];
-			const ThreeDGpuBuildingPicture &pic = *p.pic;
-			const int w = pic.width, h = pic.height;
-			gl.glViewport(p.x, p.y, w, h);
-			/* A pixel x, y of the picture is the card's x, y of its place, its rows from the bottom: the rows read back
-			 * are the picture's from the top. */
-			const float dn = pic.depth_near, df = pic.depth_far;
-			const float dz = df > dn ? 2.0f / (df - dn) : 1.0f;
-			const ThreeDGpuMatrix to_card = {
-				2.0f / w, 0, 0, -1,
-				0, 2.0f / h, 0, -1,
-				0, 0, dz, -1 - dn * dz,
-				0, 0, 0, 1,
-			};
-			const ThreeDGpuMatrix m = Multiply(to_card, pic.matrix);
-			gl.glUniformMatrix4fv(_map_building_program.matrix, 1, GL_TRUE, m.data());
-			gl.glUniform2f(_map_building_program.depth_range, dn, df);
-			gl.glBindVertexArray(p.on->vao);
-			for (const GpuBuilding::Run &r : p.on->runs) {
-				if (r.texture >= p.textures.size() || p.textures[r.texture] == 0) continue;
-				/* The side turned away left out, as the processor: a triangle seen from outside goes round clockwise
-				 * on the picture (rows down), counter-clockwise on the card's (rows up, the same numbers). */
-				if (!pic.building.cull || r.facing == 0) {
-					gl.glDisable(GL_CULL_FACE);
-				} else {
-					gl.glEnable(GL_CULL_FACE);
-					gl.glCullFace(r.facing > 0 ? GL_FRONT : GL_BACK);
-				}
-				gl.glBindTexture(GL_TEXTURE_2D, p.textures[r.texture]);
-				gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
-			}
-		}
-		gl.glDisable(GL_CULL_FACE);
-		gl.glDisable(GL_DEPTH_TEST);
-		gl.glBindVertexArray(0);
-		Step(fmt::format("cteni budov plochy zpet (glReadPixels), {}x{}, {}", frame_w, frame_h, MemoryNow()));
-		colours.resize(static_cast<size_t>(frame_w) * frame_h);
-		nearness.resize(static_cast<size_t>(frame_w) * frame_h);
-		gl.glPixelStorei(GL_PACK_ALIGNMENT, 4);
-		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
-		gl.glReadPixels(0, 0, frame_w, frame_h, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, colours.data());
-		gl.glReadBuffer(GL_COLOR_ATTACHMENT1);
-		gl.glReadPixels(0, 0, frame_w, frame_h, GL_RED, GL_FLOAT, nearness.data());
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-		const GLenum error = gl.glGetError();
-		if (error != 0) {
-			Debug(misc, 1, "3D on the graphics card: OpenGL error {:#x}, the processor draws the buildings", error);
-			if (error == GL_OUT_OF_MEMORY) ForgetCard();
-			return;
-		}
-		for (size_t k = at; k < end; k++) {
-			ThreeDGpuBuildingPicture &pic = *placed[k].pic;
-			const int w = pic.width, h = pic.height, px = placed[k].x, py = placed[k].y;
-			pic.pixels.resize(static_cast<size_t>(w) * h);
-			pic.depth.resize(static_cast<size_t>(w) * h);
-			for (int r = 0; r < h; r++) {
-				const size_t from = static_cast<size_t>(py + r) * frame_w + px, to = static_cast<size_t>(r) * w;
-				std::copy_n(colours.begin() + from, w, pic.pixels.begin() + to);
-				for (int c = 0; c < w; c++) pic.depth[to + c] = pic.pixels[to + c] == 0 ? -std::numeric_limits<float>::infinity() : nearness[from + c];
-			}
-			pic.drawn = true;
-		}
-		at = end;
-	}
-	TrimCard();
 }
 
 /** The block of the ground drawn into, at least as big as asked (grown in steps). */
@@ -3699,7 +3484,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 			_gpu_standing_triangles[1] += static_cast<uint64_t>(r.count / 3);
 			if (firsts.empty()) continue;
-			/* The side turned away left out, as the pictures of the buildings (DrawBuildingsOnCard()). */
+			/* The side turned away left out, as the processor: a triangle seen from outside goes round clockwise on the
+			 * block (rows down), counter-clockwise on the card's (rows up, the same numbers). */
 			if (!b.building.cull || r.facing == 0) {
 				gl.glDisable(GL_CULL_FACE);
 			} else {
@@ -5003,9 +4789,6 @@ void GpuThreadMain()
 				drawn = DrawGroundOnCard(*job->ground);
 			} else if (job->standing != nullptr) {
 				drawn = DrawStandingOnCard(*job->standing);
-			} else if (!job->buildings.empty()) {
-				DrawBuildingsOnCard(job->buildings);
-				drawn = std::ranges::any_of(job->buildings, [](const ThreeDGpuBuildingPicture *p) { return p->drawn; });
 			} else {
 				DrawPicturesOnCard(job->pics);
 				drawn = std::ranges::any_of(job->pics, [](const ThreeDGpuPicture *p) { return p->drawn; });
@@ -5100,24 +4883,6 @@ bool ThreeDGpuAvailable(bool wait)
  * Draw a picture on the card, on whichever thread asks (it waits): its pixels and the lit ones read back.
  * @return false: not drawn (no card, or a picture it cannot hold): the processor draws it
  */
-/**
- * Draw the pictures of buildings of the turned map on the card, all at once, on whichever thread asks (it waits).
- * @return false: none drawn (no card); each ThreeDGpuBuildingPicture::drawn tells
- */
-bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const> pics)
-{
-	for (ThreeDGpuBuildingPicture *pic : pics) pic->drawn = false;
-	if (pics.empty() || !ThreeDGpuAvailable()) return false;
-	GpuJob job{};
-	job.buildings = pics;
-	std::unique_lock lock(_gpu_mutex);
-	if (_gpu_state != GpuState::Ready) return false;
-	QueueGpuJob(job);
-	_gpu_wake.notify_one();
-	_gpu_done.wait(lock, [&job] { return job.done; });
-	return job.ok;
-}
-
 /**
  * Lay the ground of a block of the turned map on the card, on whichever thread asks (it waits): read back into the
  * block's pixels.
@@ -5433,7 +5198,6 @@ std::atomic<bool> _gpu_building_cells_on = true; ///< Rig: a building among what
 bool ThreeDGpuReady() { return false; }
 bool ThreeDGpuReadShown(uint32_t, int, int, std::vector<uint32_t> &) { return false; }
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const>) { return false; }
-bool ThreeDGpuRenderBuildings(std::span<ThreeDGpuBuildingPicture *const>) { return false; }
 bool ThreeDGpuDrawGround(ThreeDGpuGround &) { return false; }
 void ThreeDGpuStop() {}
 std::string ThreeDGpuDescribe() { return "the processor (no card on this system)"; }

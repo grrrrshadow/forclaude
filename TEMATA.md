@@ -31,6 +31,23 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (71) – GPU #123: domy už nikdy obrázky, mezipaměť obrázků domů zrušená
+
+- Hráč: *„jo nejdřiv domy gpu. falclora zařidim.“* (Falkora řeší hráč sám.)
+- Změřeno v GPU rigu (město, otáčení 30° → 60°, zoom 2× → 1×, posun, noc, 0°, 4×): **0 obrázků domů**. Domy
+  na hlavní mapě kreslí karta z trojúhelníků (`AddTurnedStandingObject()`), obrázek se nedělal.
+- Obrázky domů (`TurnedObjectPicture`, až 256 MB) zbývaly jen tam, kde vrstva karty pod pohledem není: hra bez
+  karty, malé pohledy na 0°, snímek obrazovky, chvíle po startu, než je karta připravená. Tam je karta kreslila
+  v dávkách na vlastním vlákně a **četla zpátky** (`glReadPixels`), nebo je dělal procesor.
+- **Zrušeno celé** (rozhodnutí hráče 17. 10.: „domy nikdy obrázky“): mezipaměť obrázků domů, kladení posledního
+  obrázku při otáčení, dávky domů na kartu s jejich vláknem (`ottd:3d-mapa`), kreslení domů do obrázků na kartě
+  (program, rámeček a čtení zpět) a rig `test3d mezipamet`. Tam, kde karta pohled nekreslí, kreslí procesor dům
+  trojúhelníky pokaždé. Měřeno 17. 10.: průměrný snímek bez karty 4,0 → 6,8 ms. Hlavní mapy s kartou se to netýká.
+- Rig bez karty (město, 30°, zoom 2×): snímek proti staré binárce z 28. 10. se liší v 937 pixelech ze 700 000
+  (0,13 %). GPU rig: obrazovky ve dne, na 0° i v noci jsou v pořádku. `test3d snimek` v GPU rigu je černý stejně
+  jako se starou binárkou (snímek z karty nečte, v GPU rigu se fotí `test3d obrazovka`). Smoke beze změny.
+- Další bod GPU: sběr pohledu z očí (#221). Malá okna vozidel (#127) až potom.
+
 ## 31. 10. (70) – Kůň pryč z grilování na hřišti, lesní vlk pryč, vlk OLEKSO zpátky; Falkor bez malby
 
 - Hráč: *„na hřišti je kuň u mata, tam nema bejt u grilovani. falckor neni nabarvený, on má být bílý ale tohle

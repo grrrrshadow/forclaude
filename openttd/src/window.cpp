@@ -3321,10 +3321,6 @@ void UpdateWindows()
 	 * But still empty the invalidation queues above. */
 	if (_network_dedicated) return;
 
-	/* The batches of the turned map's buildings the card has drawn on its thread: taken back before the drawing,
-	 * so the screen that stood still is drawn again from them (DrainTurnedObjectBatches()). */
-	DrainTurnedObjectBatches();
-
 	const auto blocks_started = std::chrono::steady_clock::now();
 	DrawDirtyBlocks();
 	FrameDiaryWindowsBlocks(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blocks_started).count());

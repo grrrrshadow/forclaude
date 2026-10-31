@@ -4745,12 +4745,10 @@ std::string DescribeThreeDPictureMemory()
 	}
 	extern size_t GetThreeDObjectSpriteBytes(size_t &count);
 	extern size_t GetSpriteCacheBytesUsed();
-	extern size_t GetTurnedObjectPictureBytes(size_t &count);
-	size_t sprite_count = 0, house_count = 0;
+	size_t sprite_count = 0;
 	const size_t sprites = GetThreeDObjectSpriteBytes(sprite_count);
-	const size_t houses = GetTurnedObjectPictureBytes(house_count);
-	return fmt::format("obrazky: domy otoceneho pohledu {:.1f} MB ({}), otoceny pohled {:.1f} MB ({} obrazku), lakovane textury pohledu z oci {:.1f} MB ({}), sprity 8 smeru v cache spritu {:.1f} MB ({} nactenych z {} pozadanych), cache spritu celkem {:.1f} MB z {} MB",
-			mb(houses), house_count, mb(turned), _object_pictures.size(), mb(painted), _eye_painted.size(), mb(sprites), sprite_count, _object_sprites.size(), mb(GetSpriteCacheBytesUsed()), _settings_client.gui.sprite_cache_size_mb);
+	return fmt::format("obrazky: otoceny pohled {:.1f} MB ({} obrazku), lakovane textury pohledu z oci {:.1f} MB ({}), sprity 8 smeru v cache spritu {:.1f} MB ({} nactenych z {} pozadanych), cache spritu celkem {:.1f} MB z {} MB",
+			mb(turned), _object_pictures.size(), mb(painted), _eye_painted.size(), mb(sprites), sprite_count, _object_sprites.size(), mb(GetSpriteCacheBytesUsed()), _settings_client.gui.sprite_cache_size_mb);
 }
 
 /**

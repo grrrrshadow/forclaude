@@ -8942,7 +8942,7 @@ static int LazyHousePaint(int level, uint32_t paint)
  */
 static void DropPaintedTextures()
 {
-	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing() || TurnedObjectBatchBusy() || !_three_d_objects_read) return;
+	if (_painted_bytes <= PAINTED_BUDGET || EyeFrameDrawing() || !_three_d_objects_read) return;
 	std::lock_guard lock(_lazy_mutex);
 	for (const ThreeDObject &o : _three_d_objects) o.painted.clear();
 	_painted_bytes = 0;
@@ -9317,7 +9317,7 @@ static void ForgetUnusedThreeDObjects()
 	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
 	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; the next time, a
 	 * quarter of a minute on. */
-	if (ThreeDPicturesBeingMade() || EyeFrameDrawing() || TurnedObjectBatchBusy()) return;
+	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) return;
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
 	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
