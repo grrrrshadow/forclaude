@@ -770,7 +770,7 @@ std::vector<uint8_t> MakeGrf(const SimtrainsEngine &e)
 		dword(a8, e.grfid);
 		text(a8, "Simtrains: " + e.name);
 		text(a8, std::string(e.wagon ? "Vůz" : "Vlak") + " z Microsoft Train Simulatoru (" + e.eng + (e.wagon ? ".wag" : ".eng") +
-				"). Model a textury patří jejich autorům a zůstávají ve své složce: jen pro tvou hru, nešířit.");
+				").");
 		sprites.push_back(std::move(a8));
 	}
 

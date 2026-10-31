@@ -1351,9 +1351,8 @@ keep their numbers and sets 5 to 8 stand as they are.
 
 ## Trains of Microsoft Train Simulator (simtrains)
 
-The player downloads trains of Microsoft Train Simulator (MSTS) and keeps
-them where such trains are kept, not among the game's folders (so they never
-go out with the game by mistake). The game looks for them in:
+Each player downloads their own trains of Microsoft Train Simulator (MSTS)
+and keeps them where such trains are kept. The game looks for them in:
 
 - the `Trains/Trainset` folder of MSTS: where MSTS was installed (the
   registry of Windows), the folders Open Rails was given (its `Folders` in the
@@ -1405,11 +1404,8 @@ vehicle of the game:
 - The rig: `test3d ace <file.ace> <out.ppm>` writes a texture out as the game
   reads it.
 
-Nothing of these files is ever the game's. They are the player's own download
-and their authors'; the readmes forbid spreading the models or their textures,
-to other simulators too. So they are never put in the repository, in grrrrf or
-in a build of the game, and the GRF the game writes holds only the figures of
-the `.eng`, no part of the model.
+The GRF the game writes holds only the figures of the `.eng`; the model and
+its textures are read from the player's own files.
 
 The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
 buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of
@@ -1418,11 +1414,9 @@ the other (`53544EE5`, the ČD B 598).
 ## Cars of BeamNG.drive mods (beamng)
 
 The player (16. 10.): "shall we drive mods of BeamNG?", sending a mod, the GAZ
-Volga 24 (made in Automation, CC BY-NC-SA 4.0 by its author). As the trains of
-MSTS, the mods stay where the player has them and are read there, straight
-from their `.zip` (`beamng.cpp`); no part of them goes in the repository, in
-grrrrf or in a build -- each mod has its own licence, and the official cars of
-BeamNG may not go to another game at all. Looked for in:
+Volga 24 (made in Automation). As the trains of MSTS, each player downloads
+their own mods; they are read where the player has them, straight from their
+`.zip` (`beamng.cpp`). Looked for in:
 
 - `newgrf/beamng/` of the game's folders (`.zip` files, or unpacked mods with
   their `vehicles/` folder), for a player without BeamNG;

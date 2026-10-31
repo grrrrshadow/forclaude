@@ -1551,7 +1551,7 @@ std::vector<uint8_t> MakeGrf(const std::vector<const BeamngVehicle *> &cars)
 		dword(a8, first.grfid);
 		text(a8, "BeamNG: " + first.name);
 		std::string author = first.author.empty() ? std::string() : ", autor " + first.author;
-		text(a8, "Auto z modu BeamNG.drive (" + first.id + author + "). Model a textury patří autorům modu a zůstávají ve své složce: jen pro tvou hru, nešířit.");
+		text(a8, "Auto z modu BeamNG.drive (" + first.id + author + ").");
 		sprites.push_back(std::move(a8));
 	}
 

@@ -31,6 +31,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (64) – Simtrains: hráčovy odpovědi; věty o šíření pryč
+
+- Hráč: *„1 my mame svuj lepši pohled , otačeni hlavou pravym čudlikem v cab view. informace o šíření chci pryč
+  všude tu větu že zustavaj adresaři , to si každy stahne svoje, cztr taky nic nepřikladame a nepišem kraviny že
+  se nesmi šiřit. 2 tam je lepši naše šipkama a troubeni. tam dej přepinač dolu do okna cabview ovladani msts /
+  šipkama. 3 vlak řidi hrač tak hra neřidi. projede . 4 ja kašlu na spožděni vzduchove brzdy, my jsme to počitali a
+  je to par metru“*
+- **Věty o šíření pryč:** popis GRF vlaků MSTS i aut BeamNG („Model a textury patří … zůstávají ve své složce: jen
+  pro tvou hru, nešířit“) je teď jen „Vlak/Vůz z Microsoft Train Simulatoru (….eng)“ a „Auto z modu BeamNG.drive
+  (…)“. Pryč i z dokumentace (`decouple_three_d.md`) a z TEMATA. Každý si vlaky a mody stáhne svoje.
+- **Dohodnuto pro simtrains (návrh 61):**
+  1. pohled náš: kabina z očí, hlava pravým tlačítkem; obrázek stanoviště MSTS se otáčí s vlakem, ne s hlavou;
+  2. ovládání: dole v okně kabiny přepínač „ovládání MSTS / šipkami“; šipky a troubení naše;
+  3. vlak řídí hráč, hra ho na červenou nezastaví: projede;
+  4. vzduchová brzda bez zpoždění plnění (je to pár metrů).
+
 ## 31. 10. (63) – GPU: noční záře otočené mapy bez čtení zpět z karty
 
 - Hráč: *„to mužeš taky pokračovat gpu“*
@@ -67,7 +83,7 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 
 - Hráč: *„simtrains zdokonalit. výhled z kabiny a využijem realistické ovládání a simulaci řízení a cabiny modelů
   simtrains. 451 v zip na cvičení.“*
-- **Co 451 nese** (jen u hráče a v mém scratchpadu, do repa nic: readme autorů zakazuje šíření i úpravy):
+- **Co 451 nese:**
   - kabina `451.cvf`, denní a noční:
     - tři obrázky stanoviště 640×480 s průhlednými okny (vpřed, vlevo −60°, vpravo +75°);
     - oko strojvedoucího na −1; 2,4; 7,3 m;
@@ -3025,7 +3041,7 @@ nezačne generovat“, „tam se asi ještě nečte auto, tam ještě neni načt
 - Mody BeamNG (hráč: „zkusíme jezdit módama z BeamNG?“, poslal GAZ Volga 24 z Automation, CC BY-NC-SA 4.0). Domluva:
   osobní auto veze 4 cestující, nákladní cokoli kromě cestujících; barva z modu; světla podle modu („BeamNG má
   světla vyznačená a propracované jízdní vlastnosti“). Hotovo: hra čte mody rovnou ze .zip (složky modů BeamNG,
-  `beamng_path`, `newgrf/beamng/`), nic z nich nejde do repa ani buildu. GRF v `newgrf/beamng/` jen s čísly:
+  `beamng_path`, `newgrf/beamng/`), každý si mody stáhne svoje. GRF v `newgrf/beamng/` jen s čísly:
   výkon z křivky momentu, hmotnost z uzlů, rychlost z převodů a vzduchu, tah z jedničky. Volga 103 kW, 142 km/h,
   1,34 t. Kreslí se z modelu .dae, barvy z materiálů, lak jedna z 5 barev modu na každé auto, díry pro světla a
   masku z masky BC4, svítí skla podle glowMap, světla z props. Model zjednodušený na 110 tisíc trojúhelníků
@@ -3107,23 +3123,19 @@ nezačne generovat“, „tam se asi ještě nečte auto, tam ještě neni načt
   vanilla) – strojvedoucí vidí ohyby dopředu a brzdí podle brzdné tabulky, do těsné zatáčky vjede 88 km/h.
 - Simtrains (hotovo `74f95d1`): hráč dá stažené MSTS vlaky do `newgrf/simtrains/`, hra vedle každého `.eng`
   napíše GRF jedné lokomotivy (čísla z „chování“: výkon, rychlost, váha) a kreslí ji z jejího modelu `.s` a
-  textur `.ace`. Nové vozidlo, ne převzetí vzhledu. Soubory MSTS nikdy do repa, grrrrf ani buildu (readme autorů
-  zakazuje šíření i do jiných simulátorů). Pak doplněno: DXT textury (`cdf384f`), textové (starší) modely a
+  textur `.ace`. Nové vozidlo, ne převzetí vzhledu. Každý si vlaky stáhne svoje. Pak doplněno: DXT textury (`cdf384f`), textové (starší) modely a
   vagony `.wag` (`132ae28`) – osobní vůz veze cestující podle PassengerCapacity, nákladní cokoli kromě cestujících.
   Hráč poslal na pokusy vůz ČD B 598 (skutečné DXT1 textury) – jede za 750. Nečte se: náklad (freightanim),
   světla, zvuky.
 - Kde hra vlaky hledá (`ef4e8ac`, hráč: „ať hledá obvyklou složku simtrains modelů“ + „v newgrf simtrains taky“):
   Trains/Trainset MSTS (registr, Open Rails, obvyklé cesty), `simtrains_path` v `[misc]` openttd.cfg a
-  `newgrf/simtrains` pro hráče bez MSTS. GRF s čísly jdou do `newgrf/simtrains/`. Hráč se ptal na šíření: modely
-  ani GRF nesmí ven; save a obrázky jsou v pořádku.
+  `newgrf/simtrains` pro hráče bez MSTS. GRF s čísly jdou do `newgrf/simtrains/`.
 - Hráč: bez okna pískoviště je myš cukavá a všechno zpomalené. Příčina (`d608a9f`): otočený pohled při každém
   pohybu čehokoli (vlak, Mat, holky, auto VB) překresloval skoro celou obrazovku, protože nevěděl, v jaké výšce
   věc je. Teď každé označení nese místo ve světě. Rig 1000×700: vlak 670 000 → 61 000 px na snímek, město
   186 000 → 4 300 px, bez duchů. Okno pískoviště jen zakrylo kus mapy (v rigu pomohlo málo).
 - Postavy jsou na mapě (mimo kabinu) schválně zvětšené, normální velikost jen v pohledu z první osoby.
 - Přepínač velikosti v nastavení grafik: jen „zvětšené / zmenšené“ (`3714835`).
-- Lokomotivy ŽSSK 750 (trainset.simtrains.eu, Miku031, modely Ondra Janiš): stránka neuvádí žádnou licenci,
-  tedy bez svolení autorů (modelu, skinů i fotek) do hry nesmí.
 
 ## 16. 10. – technologie z OpenMW (hráč: „1–9 ano“)
 
