@@ -18,6 +18,7 @@
 #define FRAME_DIARY_H
 
 #include <cstddef>
+#include <cstdint>
 
 /** The parts of a frame of the drawing (VideoDriver::Tick()), milliseconds. */
 struct FrameDiaryParts {
@@ -27,6 +28,9 @@ struct FrameDiaryParts {
 	double windows = 0; ///< the windows updated and drawn (UpdateWindows())
 	double paint = 0;  ///< the picture to the screen (the video driver's Paint())
 	double total = 0;
+	double messages_ms = 0;    ///< of the input, the system's messages handled (VideoDriver::PollEvent())
+	uint32_t messages = 0;     ///< how many
+	uint32_t messages_cut = 0; ///< frames whose messages were left for the next frame, their time up
 };
 
 void FrameDiaryDraw(const FrameDiaryParts &parts);

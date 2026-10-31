@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (58) – Posun mapy na 0° cukal: snímek čekal na zprávy myši, dokud se hýbala ruka
+
+- Hráč (snimky.log, 3d_karta.log): *„a cukalo se pohled 0 posun po mapě , otačeni svižné . first person dobrý.“*
+- Z deníku snímků: při tahu mapy pravým měl snímek „klavesy“ 2–3,5 s (jednou 10 s), průměr až 484 ms a 1,7 snímku/s;
+  okna a obraz normální. Jindy klávesy kolem 2 ms.
+- **Příčina:** snímek bral zprávy systému `while (PollEvent()) {}`, dokud nějaká byla. Při tahu našeho režimu hra
+  vrací ukazatel na místo stisku (`SetCursorPos`) a pod Wine každé vrácení přinese další zprávu o pohybu. Dokud se
+  prst hýbal, fronta se nevyprázdnila. Mapa se posouvala jen v paměti, nic se nekreslilo a po puštění skočila.
+  Otáčení je svižné, protože jde bez té smyčky.
+- **Oprava (`video_driver.cpp`):** zprávy mají v každém snímku nejvýš jeden interval kreslení. Co zbude, vezme další
+  snímek. Pohyby myši systém slévá do jednoho, takže se nic nehromadí a mapa jde za rukou po snímcích.
+- Deník snímků píše nově `zpravy`: kolik zpráv na snímek a za kolik ms, nejvíc za snímek, kolik jich měl nejdelší
+  snímek a kolikrát se zbytek odložil. Další log z telefonu ukáže, jestli to byla celá příčina.
+
 ## 31. 10. (57) – Koně jako dekorace: statek, stodola, srub na pasece, hřiště stadionu; E na ně nasedne
 
 - Kolega (`KONE-SPECIAL-V4-PRO-HRU.md`) podle hráče: koně jako dekorace *„jako hasičská Tatra, kolečko a Zetor“*,

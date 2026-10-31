@@ -152,7 +152,24 @@ void VideoDriver::Tick()
 
 			this->DrainCommandQueue();
 
-			while (this->PollEvent()) {}
+			/* The system's messages, until none are left or a frame's worth of time has gone on them. Under Wine
+			 * a held pointer the game puts back (SetCursorPos, the pin of the map's drag) brings a message of its
+			 * own for each one handled, so a hand that kept moving kept the frame here for as long as it moved:
+			 * nothing drawn meanwhile, then the map a long way further (the player's snimky.log of 31. 10.:
+			 * "klavesy" 2 to 10 s a frame while dragging the map). What is left waits for the next frame; the
+			 * moves wait merged into one, as the system keeps them. */
+			{
+				const auto messages_started = std::chrono::steady_clock::now();
+				const auto messages_until = messages_started + this->GetDrawInterval();
+				while (this->PollEvent()) {
+					parts.messages++;
+					if (std::chrono::steady_clock::now() >= messages_until) {
+						parts.messages_cut = 1;
+						break;
+					}
+				}
+				parts.messages_ms = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - messages_started).count();
+			}
 			this->InputLoop();
 
 			/* Check if the fast-forward button is still pressed. */

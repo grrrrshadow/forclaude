@@ -100,6 +100,7 @@ std::atomic<uint32_t> _eye_by_cpu{0};    ///< frames the processor drew (no card
 
 /* The frames of the drawing since the last line (the main thread only). */
 int _frames = 0;
+uint32_t _most_messages = 0; ///< the most system's messages a frame handled
 FrameDiaryParts _sum{};
 FrameDiaryParts _longest{};
 std::chrono::steady_clock::time_point _since{};
@@ -126,6 +127,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 		}
 		fmt::print(*_diary, "OpenTTD Decouple: denik snimku (kazdych 5 s). snimky/s = jak casto hra kresli a cte klavesy; nejdelsi snimek a z ceho byl:"
 				" buffer = cekani na obrazovku, zamek = cekani na tik hry, klavesy, okna = okna a jejich kresleni (i sber pohledu z oci), obraz = predani obrazu karte;"
+				" zpravy = zpravy systemu (mys, klavesy) v klavesach: kolik na snimek a za kolik ms, odlozeno = snimky, ktere zbytek zprav nechaly dalsimu (jejich cas vyprsel);"
 				" rozpad okna: hodiny = hodiny oken (i krok chodce z oci se sberem), bloky = spinave kusy obrazovky kreslene, mapa = bloky herni plochy,"
 				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy;"
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
@@ -140,9 +142,10 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {}\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | zpravy {:.1f} na snimek {:.1f} ms, nejvic {}, nejdelsi snimek {} za {:.0f} ms, odlozeno {}x | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {}\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
+			static_cast<double>(_sum.messages) / n, _sum.messages_ms / n, _most_messages, _longest.messages, _longest.messages_ms, _sum.messages_cut,
 			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(),
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
 			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary());
@@ -206,12 +209,17 @@ void FrameDiaryDraw(const FrameDiaryParts &parts)
 	_sum.windows += parts.windows;
 	_sum.paint += parts.paint;
 	_sum.total += parts.total;
+	_sum.messages_ms += parts.messages_ms;
+	_sum.messages += parts.messages;
+	_sum.messages_cut += parts.messages_cut;
+	_most_messages = std::max(_most_messages, parts.messages);
 	if (parts.total > _longest.total) _longest = parts;
 	if (now - _since < DIARY_EVERY) return;
 	WriteLine(now);
 	_frames = 0;
 	_sum = {};
 	_longest = {};
+	_most_messages = 0;
 	_since = now;
 }
 
