@@ -2577,8 +2577,15 @@ static std::thread _pictures_thread;
 static bool _pictures_thread_failed = false; ///< it could not be started: the pictures are made at once, as before
 /** The pictures asked of the thread and not kept yet (the main thread's own). */
 static std::set<ObjectPictureKey> _pictures_asked;
-/** The vehicles drawn with a picture not their own: drawn again when pictures come. */
+/** The vehicles drawn with a picture not their own, or as nothing while the card had not all it needs of them: drawn again when pictures or loads come. */
 static std::set<VehicleID> _vehicles_owed_pictures;
+/** What the card drew of each vehicle last: its key and size, not its shapes (they may be gone by the next frame). */
+struct CardDrawnOf {
+	const ThreeDVehicleObject *obj = nullptr;
+	std::shared_ptr<const ThreeDGpuStandingVehicle> card;
+};
+static std::map<VehicleID, CardDrawnOf> _cards_drawn_of;
+
 /** Loads done by the thread since the places owed them were drawn again (TakePicturesMade()); how many since it was told. */
 static std::atomic<bool> _loads_came = false;
 static int _loads_since_came = 0;
@@ -2594,8 +2601,10 @@ static void MakePicturesInBackground()
 		static bool load_turn = true;
 		load_turn = !load_turn;
 		if (!_loads_to_do.empty() && (load_turn || _pictures_to_make.empty())) {
-			std::function<void()> load = std::move(_loads_to_do.front());
-			_loads_to_do.pop_front();
+			/* The newest asked for first, as the pictures: what is on the screen now (a horse coming into view waited
+			 * behind the loads of a whole town asked before it). */
+			std::function<void()> load = std::move(_loads_to_do.back());
+			_loads_to_do.pop_back();
 			_picture_in_hand = true;
 			lock.unlock();
 			load();
@@ -2712,7 +2721,7 @@ void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int
 /**
  * Keep the pictures the thread has made (the main thread); the places drawn with pictures standing in, or without what
  * the card needed (CardMade::NotYet), drawn again when pictures or loads came.
- * @return whether there were pictures
+ * @return whether pictures or loads came
  */
 static bool TakePicturesMade()
 {
@@ -2737,7 +2746,7 @@ static bool TakePicturesMade()
 	owed.swap(_boxes_owed_pictures);
 	if (!done.empty()) _stand_in_pictures.clear();
 	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]));
-	return !done.empty();
+	return true;
 }
 
 /** The rig ('test3d dokresli'): the pictures the thread made kept now, not at the next round of the window's timer. */
@@ -2782,6 +2791,7 @@ void StopThreeDPictureThread()
 	_picture_in_hand = false;
 	_pictures_asked.clear();
 	_vehicles_owed_pictures.clear();
+	_cards_drawn_of.clear();
 }
 
 /** Whether the picture asked for now may wait for the thread (a vehicle on the map), and whether it waited: the nearest made was given. */
@@ -3117,6 +3127,37 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
 }
 
+/** Keep what the card drew of a vehicle: laid again by its key while its next look is not made yet (CardDrawnBefore()). */
+static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+{
+	if (card == nullptr) {
+		_cards_drawn_of.erase(v->index);
+		return;
+	}
+	CardDrawnOf &kept = _cards_drawn_of[v->index];
+	if (kept.card != nullptr && kept.card->key == card->key) return;
+	auto drawn = std::make_shared<ThreeDGpuStandingVehicle>();
+	drawn->key = card->key;
+	drawn->supersample = card->supersample;
+	drawn->left = card->left;
+	drawn->top = card->top;
+	drawn->width = card->width;
+	drawn->height = card->height;
+	kept = {obj, std::move(drawn)};
+}
+
+/**
+ * What the card drew of a vehicle last, to stand in while its look now is not made yet (CardMade::NotYet: a frame of a
+ * horse's walk, a finer texture after a zoom): laid by its key as the card keeps it, nothing drawn when the card does
+ * not keep it any more -- no shapes, so nothing of the object is touched; nullptr when the card drew none of it.
+ */
+static std::shared_ptr<const ThreeDGpuStandingVehicle> CardDrawnBefore(const Vehicle *v, const ThreeDVehicleObject *obj)
+{
+	auto it = _cards_drawn_of.find(v->index);
+	if (it == _cards_drawn_of.end() || it->second.obj != obj) return nullptr;
+	return it->second.card;
+}
+
 static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, VehicleObjectPlace &place, bool on_card = false)
 {
 	int piece = 0;
@@ -3166,8 +3207,19 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	/* Up or down a hill leaning so, in steps of 2 degrees: a few pictures for the slopes of the map. */
 	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
 	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
-	/* Drawn by the card from what is made of it (CardVehicle()); else, or till that is made, its picture. */
-	if (on_card) place.on_card = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights) == CardMade::Drawn;
+	/* Drawn by the card from what is made of it (CardVehicle()); while something of it is not made yet, what the card
+	 * drew of it last (CardDrawnBefore()), the vehicle drawn again when it comes -- no picture of it made (the player,
+	 * 31. 10.: "go on with the GPU"; the walking horses of the Special 3D made their pictures on the thread, read back
+	 * from the card, a hundred in five seconds). Bigger than the card draws one, or without the card, its picture. */
+	if (on_card) {
+		const CardMade made = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights);
+		place.on_card = made != CardMade::TooBig;
+		if (made == CardMade::Drawn) KeepCardDrawn(v, obj, place.card);
+		if (made == CardMade::NotYet) {
+			place.card = CardDrawnBefore(v, obj);
+			_vehicles_owed_pictures.insert(v->index);
+		}
+	}
 	if (!place.on_card) {
 		_object_picture_may_wait = true;
 		_object_picture_waited = false;

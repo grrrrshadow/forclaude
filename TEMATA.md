@@ -31,6 +31,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (68) – GPU: vozidla na mapě bez obrázků, když kartě něco chybí; fronta načítání od nejnovějšího
+
+- Hráč: „pokračuješ s gpu? dalši body?“
+- V #316 bylo od 16:23 až 150 obrázků vozidel za 5 s na vlákně na pozadí a karta je četla zpátky (koně Special 3D:
+  každý krok chůze je jiný snímek). Část z toho opravila už (67): chybějící zjednodušený tvar snímku.
+- **Vozidla:** když kartě chybí textura nebo snímek, nedělá se už obrázek na vlákně. Karta položí poslední obrázek,
+  který z vozidla nakreslila (jen podle klíče, bez trojúhelníků). Vozidlo se překreslí, až to vlákno načte. Obrázek
+  zůstává jen pro vozidlo větší, než karta kreslí, a bez karty (depo a nákup podle #127 dál).
+- **Fronta načítání:** vlákno na pozadí bralo úlohy od nejstarší. Kůň, který přišel do pohledu, čekal za
+  načítáním celého města asi 100 tiků. Teď bere od nejnovější, jako to už dělá u obrázků (co je teď na obrazovce).
+- Rig (Special 3D v4, 4 koně se sedlem, zoom 8×): obrázky na vlákně 49 → 4, čtení zpět z karty 26 → 1. Kůň při
+  prvním objevení bez obrázku 1–2 tiky (s frontou od nejstarší ~100), potom za něj zaskočí jeho poslední obrázek
+  z karty. Snímky obrazovky stejné až na tvora, který je v každém běhu jinde. Město z (67) dál 0 obrázků.
+  Smoke beze změny.
+- Další body GPU: vozidla v oknech vozidel a depa (#127), domy bez obrázků (#123), sběr pohledu z očí (#221).
+
 ## 31. 10. (67) – GPU: figury otočené mapy bez obrázků na hlavním vlákně; cukání zblízka; koně a náklady
 
 - Hráč (31. 10., po #316): „koničci jezdí, ještě doladime náklady. není mari a dřevo grafika na vozech. když bude kuň
