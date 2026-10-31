@@ -48,6 +48,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   (růžovobílá 232/207/203, 99,8 % pixelů) a gltfpack dal všem bodům jedno místo textury (`KHR_texture_transform`
   scale 0, už v kolegově prvním souboru `0d13035`). Hra kreslí přesně to, co v modelu je. Aby byl bílý, chce to
   barvu v záznamu (pro zvířata zatím není) nebo jiný model. Domluvit s hráčem.
+- **GPU #127, co zbývá:** na hlavní mapě kreslí vozidla karta. Malé pohledy (okno vozidla, další pohledy) kreslí
+  pořád stará cesta se sprity vozidel z procesoru. Rig (4 koně Special 3D v4, okno vozidla 1): bez okna 0 obrázků,
+  s oknem asi 35 obrázků za 400 tiků (každý krok koně je nový obrázek, 150×250 px na vlákně na pozadí). Auto bez
+  chodící posádky má 8 směrů jednou. Oprava: malé pohledy kreslit kartou jako hlavní pohled. Vrstva karty je teď
+  jedna pro hlavní pohled, malé okno nad ní potřebuje svůj kus. Domluvit, jestli dřív #123 (domy bez obrázků).
 
 ## 31. 10. (69) – Simtrains: nástup přes E má pult a ovládání MSTS jako kabina z okna vlaku; projetí červené; oko 750
 
