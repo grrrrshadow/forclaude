@@ -1896,10 +1896,9 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	const int ss = SUPERSAMPLE;
 	const float p = pxm * ss;
 	const ObjectCamera cam(obj, st, scale, cam_az, world_az, along, p, stretch, spin, pitch, roll);
-	/* Its corners joined about one and a half pixels apart, as RasterObject() draws it (Simpler()). */
+	/* Its corners joined about one and a half pixels apart, as RasterObject() draws it (Simpler()); not made yet, not
+	 * waited for (ThreeDLazyNoWait, CardVehicle()), the whole shape meanwhile. */
 	const ThreeDVehicleShape &shape = *whole.Simpler(1.5 / (pxm * SUPERSAMPLE * std::max(scale, 0.1f)));
-	/* Not made yet, not waited for (ThreeDLazyNoWait, CardVehicle()): not the whole shape's triangles meanwhile. */
-	if (ThreeDLazyMissedNow()) return false;
 	const bool lit = !shape.nrm.empty();
 
 	ThreeDGpuPicture &pic = gp.pic;
@@ -2580,6 +2579,9 @@ static bool _pictures_thread_failed = false; ///< it could not be started: the p
 static std::set<ObjectPictureKey> _pictures_asked;
 /** The vehicles drawn with a picture not their own: drawn again when pictures come. */
 static std::set<VehicleID> _vehicles_owed_pictures;
+/** Loads done by the thread since the places owed them were drawn again (TakePicturesMade()); how many since it was told. */
+static std::atomic<bool> _loads_came = false;
+static int _loads_since_came = 0;
 
 /** The thread: the loads first, then the pictures, the newest asked for first (what is on the screen now), each into _pictures_done. */
 static void MakePicturesInBackground()
@@ -2599,6 +2601,12 @@ static void MakePicturesInBackground()
 			load();
 			lock.lock();
 			_picture_in_hand = false;
+			/* The places drawn without what it made drawn again (OweThreeDPictureBox()): when the loads asked are done, or
+			 * every few of a town's hundred. */
+			if (_loads_to_do.empty() || ++_loads_since_came >= 8) {
+				_loads_since_came = 0;
+				_loads_came = true;
+			}
 			continue;
 		}
 		/* With the card as many as it draws at once (RasterObjectsOnCard()), else one. */
@@ -2702,8 +2710,9 @@ void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int
 }
 
 /**
- * Keep the pictures the thread has made (the main thread).
- * @return whether there were any
+ * Keep the pictures the thread has made (the main thread); the places drawn with pictures standing in, or without what
+ * the card needed (CardMade::NotYet), drawn again when pictures or loads came.
+ * @return whether there were pictures
  */
 static bool TakePicturesMade()
 {
@@ -2721,13 +2730,14 @@ static bool TakePicturesMade()
 		e.used = ++_object_pictures_clock;
 		e.picture = std::move(made.picture);
 	}
-	if (done.empty()) return false;
+	const bool loads = _loads_came.exchange(false);
+	if (done.empty() && !loads) return false;
 	/* The places drawn with pictures standing in drawn again: with these, or with the nearest again till theirs come. */
 	std::vector<std::array<double, 6>> owed;
 	owed.swap(_boxes_owed_pictures);
-	_stand_in_pictures.clear();
+	if (!done.empty()) _stand_in_pictures.clear();
 	for (const auto &b : owed) MarkWorldBoxDirty(b[0], b[1], b[2], b[3], static_cast<int>(b[4]), static_cast<int>(b[5]));
-	return true;
+	return !done.empty();
 }
 
 /** The rig ('test3d dokresli'): the pictures the thread made kept now, not at the next round of the window's timer. */
@@ -2983,16 +2993,25 @@ struct VehicleObjectPlace {
 	std::vector<ThreeDPictureLight> card_lights; ///< and its lights on at night, as its picture's
 };
 
+/** What the card makes of a thing of the map it draws (CardVehicle()). */
+enum class CardMade : uint8_t {
+	Drawn,  ///< its shapes for the card (nullptr: not a pixel of it seen)
+	NotYet, ///< something of it not made yet: made in the background; a stand-in given (ThreeDStandInsGiven()), its place drawn again when it comes
+	TooBig, ///< bigger than the card draws one: its picture
+};
+
 /**
- * A vehicle of the map drawn by the card among what stands on the turned view (ThreeDGpuStandingVehicle; the player,
+ * A thing of the map drawn by the card among what stands on the turned view (ThreeDGpuStandingVehicle; the player,
  * 25. 10.: "finish the move to the GPU"): its shapes as its picture would have them (PrepareGpuObject()), prepared now
  * from what is made of its object -- nothing waited for (ThreeDLazyNoWait): what is not made yet is made in the
- * background, and the vehicle is its picture meanwhile.
+ * background. Meanwhile a vehicle is its picture made on the thread; a figure, a plant, an effect nothing, its place
+ * drawn again when what it needs comes (OweThreeDPictureBox()) -- no picture of it made on the main thread (the
+ * player, 31. 10.: "go on with the GPU"; the map at 8x made the pictures of its figures there, a second and more of
+ * every five).
  * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
  * @param[out] lights its lights on at night, as its picture's (ThreeDModelPicture::lights)
- * @return false: something of it not made yet
  */
-static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::vector<ThreeDPictureLight> &lights)
+static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, std::vector<ThreeDPictureLight> &lights)
 {
 	/* What it looks like, as its picture is kept by (ObjectPictureKey), and of which reading of the objects. */
 	uint64_t key = 14695981039346656037ull;
@@ -3018,13 +3037,15 @@ static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuS
 	{
 		ThreeDLazyNoWait no_wait;
 		const ThreeDVehicleShape *whole = p.obj->GetShape(p.obj->ShapeFrame(p.frame, p.walk), p.obj->PartsOf(p.state));
-		if (no_wait.Missed()) return false;
-		drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp);
-		if (no_wait.Missed()) return false;
+		if (!no_wait.Missed()) drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp);
+		if (no_wait.Missed()) {
+			_stand_ins_given++;
+			return CardMade::NotYet;
+		}
 	}
-	if (!drawn) return true;
+	if (!drawn) return CardMade::Drawn;
 	/* Bigger than the card draws one (a dragon zoomed in): its picture instead. */
-	if (gp.pic.width > THREE_D_GPU_VEHICLE_FRAME || gp.pic.height > THREE_D_GPU_VEHICLE_FRAME) return false;
+	if (gp.pic.width > THREE_D_GPU_VEHICLE_FRAME || gp.pic.height > THREE_D_GPU_VEHICLE_FRAME) return CardMade::TooBig;
 	auto v = std::make_shared<ThreeDGpuStandingVehicle>();
 	v->key = key;
 	v->supersample = SUPERSAMPLE;
@@ -3036,7 +3057,18 @@ static bool CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeDGpuS
 	v->held = std::move(gp.held);
 	lights = std::move(gp.lights);
 	card = std::move(v);
-	return true;
+	return CardMade::Drawn;
+}
+
+/**
+ * The place of a thing of the map the card has not got all it needs of yet (CardMade::NotYet): drawn again when that
+ * comes, as far as the thing reaches about where it stands.
+ * @param reach how far it reaches aside, world units
+ * @param height how tall it is, units of height
+ */
+static void OweCardPlace(int x, int y, int z, int reach, int height)
+{
+	OweThreeDPictureBox(x - reach, y - reach, x + reach, y + reach, z - TILE_HEIGHT, z + height + reach);
 }
 
 /**
@@ -3135,7 +3167,7 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	const int pitch = static_cast<int>(std::lround(VehicleSlopePitch(obj, v, ox, oy, (world_az + 135.0f) * M_PI / 180.0) / 2.0f)) * 2;
 	const uint64_t walk = WalkCode(obj, state, WalkedOf(v, obj), scale, v);
 	/* Drawn by the card from what is made of it (CardVehicle()); else, or till that is made, its picture. */
-	if (on_card) place.on_card = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights);
+	if (on_card) place.on_card = CardVehicle(PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, along == 0.0f && SqueezedType(obj->type), state, 0, -1, 1.0f, 0, pitch, 0, lights, along, walk), place.card, place.card_lights) == CardMade::Drawn;
 	if (!place.on_card) {
 		_object_picture_may_wait = true;
 		_object_picture_waited = false;
@@ -3998,14 +4030,14 @@ void AddThreeDEffectsToViewport(ZoomLevel zoom)
 		int x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2, y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2, z = GetTileMaxPixelZ(tile);
 		int height = std::max(1, static_cast<int>(std::lround(shape->z1 * 8.0 / 3.0)));
 		const PictureToMake p = PictureRequest(fx, 1.0f, zoom, GetViewYaw(), 0.0f, false, 0, frame, tint, 1.0f, 0, 0, 0, 0, 0.0f, 0);
-		/* Drawn by the card with the block's vehicles (CardVehicle()); till that is made, its picture. */
+		/* Drawn by the card with the block's vehicles (CardVehicle()); bigger than it draws one, its picture. */
 		if (ViewportVehiclesOnCard()) {
 			std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 			std::vector<ThreeDPictureLight> lights;
-			if (CardVehicle(p, card, lights)) {
-				if (card != nullptr) AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
-				continue;
-			}
+			const CardMade made = CardVehicle(p, card, lights);
+			if (made == CardMade::Drawn && card != nullptr) AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height);
+			if (made == CardMade::NotYet) OweCardPlace(x, y, z, height + TILE_SIZE / 2, height);
+			if (made != CardMade::TooBig) continue;
 		}
 		const ThreeDModelPicture *pic = ObjectPictureOf(p);
 		if (pic == nullptr) continue;
@@ -4055,14 +4087,20 @@ bool AddThreeDObjectToViewport(const ThreeDVehicleObject *obj, float scale, int 
 	const PictureToMake p = PictureRequest(obj, scale, zoom, world_az + GetViewYaw(), world_az, false, 0, 0, -1, 1.0f, 0, 0, 0, lights, 0.0f, 0);
 	int half = std::max(1, static_cast<int>(std::lround(std::max(shape->x1 - shape->x0, shape->y1 - shape->y0) * scale * OBJECT_UNITS_PER_METRE / 2)));
 	int height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * 8.0 / 3.0)));
-	/* Drawn by the card with the block's vehicles (CardVehicle()); till that is made, its picture. */
+	/* Drawn by the card with the block's vehicles (CardVehicle()); bigger than it draws one, its picture. */
 	if (ViewportVehiclesOnCard()) {
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 		std::vector<ThreeDPictureLight> on;
-		if (CardVehicle(p, card, on)) {
-			if (card == nullptr) return false;
-			AddTurnedVehicleOnCard(std::move(card), x, y, z, x - half, y - half, z, x + half, y + half, z + height);
-			return true;
+		switch (CardVehicle(p, card, on)) {
+			case CardMade::Drawn:
+				if (card == nullptr) return false;
+				AddTurnedVehicleOnCard(std::move(card), x, y, z, x - half, y - half, z, x + half, y + half, z + height);
+				return true;
+			case CardMade::NotYet:
+				OweCardPlace(x, y, z, half + TILE_SIZE / 2, height);
+				return true;
+			case CardMade::TooBig:
+				break;
 		}
 	}
 	const ThreeDModelPicture *pic = ObjectPictureOf(p);
@@ -4085,7 +4123,7 @@ const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const ThreeDVehicle
 	if (ViewportVehiclesOnCard()) {
 		static std::vector<ThreeDPictureLight> on_card;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-		if (CardVehicle(p, card, on_card)) return card != nullptr ? &on_card : nullptr;
+		if (CardVehicle(p, card, on_card) != CardMade::TooBig) return card != nullptr ? &on_card : nullptr;
 	}
 	const ThreeDModelPicture *pic = ObjectPictureOf(p);
 	return pic != nullptr ? &pic->lights : nullptr;
@@ -4317,8 +4355,9 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
  * A figure of the turned map drawn by the card where the block's vehicles are (ViewportVehiclesOnCard(); the player,
  * 29. 10.: "go on with the GPU"): as GetThreeDFigurePicture() would have its picture, its shapes drawn there, no
  * picture made.
- * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
- * @return nothing: the figure is not there; false: something of it not made yet (its picture meanwhile)
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen, or something of it is not made yet
+ *                  (a stand-in given, ThreeDStandInsGiven(): its place to be drawn again when it comes)
+ * @return nothing: the figure is not there; false: bigger than the card draws one (its picture)
  */
 std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
@@ -4326,14 +4365,15 @@ std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, fl
 	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later);
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
-	return CardVehicle(*p, card, lights);
+	return CardVehicle(*p, card, lights) != CardMade::TooBig;
 }
 
 /**
  * A figure standing on the turned map (the girls at a bus stop): drawn from its object at the angle of the view,
  * lit as the vehicles, hung from where its feet stand, sorted by a small box about them. A figure that moves
  * ("animace") is drawn in its frame of the game's tick, and its tile is drawn again when the frame changes. Where the
- * card draws the block's vehicles it draws the figure too, from its shapes (GetThreeDFigureOnCard()).
+ * card draws the block's vehicles it draws the figure too, from its shapes (CardVehicle()): what of it is not made yet
+ * made in the background, nothing of it drawn till then, no picture.
  * @param name the figure's name in the index ("druh": "postava")
  * @param scale its size against true metres (the girls of a stop are drawn twice theirs, as their sprites are)
  * @param x,y,z where its feet stand, world units
@@ -4348,16 +4388,23 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 	int height = 0, up = 0;
 	bool later = false;
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
-	 * picture so that it is within what the card draws one in; till that is made, its picture. */
+	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
 		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f);
 		if (!p.has_value()) return false;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 		std::vector<ThreeDPictureLight> lights;
-		if (CardVehicle(*p, card, lights)) {
-			if (card == nullptr) return false;
-			AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
-			return true;
+		switch (CardVehicle(*p, card, lights)) {
+			case CardMade::Drawn:
+				if (card == nullptr) return false;
+				AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+				return true;
+			case CardMade::NotYet:
+				/* A dragon's wings reach aside further than it is tall. */
+				OweCardPlace(x, y, z, 2 * height + TILE_SIZE / 2, height);
+				return true;
+			case CardMade::TooBig:
+				break;
 		}
 	}
 	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later);
@@ -4405,8 +4452,9 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
 /**
  * A plant of the turned map drawn by the card (ViewportVehiclesOnCard()), as GetThreeDPlantPicture() would have its
  * picture: the hundreds of a field share a few, kept on the card by what they look like.
- * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen
- * @return nothing: the plant is not there; false: something of it not made yet (its picture meanwhile)
+ * @param[out] card its shapes for the card; nullptr when not a pixel of it is seen, or something of it is not made yet
+ *                  (a stand-in given, ThreeDStandInsGiven(): its place to be drawn again when it comes)
+ * @return nothing: the plant is not there; false: bigger than the card draws one (its picture)
  */
 std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
@@ -4414,7 +4462,7 @@ std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, flo
 	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later);
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
-	return CardVehicle(*p, card, lights);
+	return CardVehicle(*p, card, lights) != CardMade::TooBig;
 }
 
 /**

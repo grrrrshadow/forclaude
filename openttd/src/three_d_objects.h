@@ -1183,7 +1183,6 @@ public:
 	~ThreeDLazyNoWait();
 	bool Missed() const;
 };
-bool ThreeDLazyMissedNow();
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();

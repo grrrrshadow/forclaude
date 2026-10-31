@@ -5736,12 +5736,6 @@ bool ThreeDLazyNoWait::Missed() const
 	return _lazy_missed;
 }
 
-/** Whether a ThreeDLazyNoWait stands on this thread and a getter missed something since: what is being made of it may stop. */
-bool ThreeDLazyMissedNow()
-{
-	return _lazy_no_wait > 0 && _lazy_missed;
-}
-
 template <typename Made, typename Make, typename Store>
 static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
 {
@@ -6193,10 +6187,14 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 {
 	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
+	/* Not waited for (ThreeDLazyNoWait; the card drawing the map's figures): the shape itself meanwhile, the simpler one
+	 * made in the background -- nothing of it missing (Missed()), drawn whole it looks the same (the player, 31. 10.:
+	 * "go on with the GPU"; the card gave the walking Mat up for a picture made on the main thread till each frame's
+	 * simpler shape came). */
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m);
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
 	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
-	/* Not made yet, not waited for (ThreeDLazyNoWait): the shape itself meanwhile. */
 	return made != nullptr ? made.get() : this;
 }
 

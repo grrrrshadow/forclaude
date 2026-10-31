@@ -4966,8 +4966,12 @@ static void AddTurnedObjectsToDraw(bool pictures = true)
 	if (pictures) MakeTurnedObjectPicturesOnCard();
 	/* The pictures of the figures and plants standing on them made before they are drawn, all at once: by the card in
 	 * one go (MakeThreeDPicturesAtOnce()), not one at a time as each building is drawn -- a turn of the map a new one of
-	 * each at every degree. Asked as DrawObjectInto() will ask. */
-	MakeThreeDPicturesAtOnce([] {
+	 * each at every degree. Asked as DrawObjectInto() will ask. None when the card draws them from their shapes
+	 * (ViewportVehiclesOnCard(), AddTurnedStandingObject()): the player, 31. 10.: "with a big zoom in the moving about
+	 * the map stutters more, and the turning, brisk otherwise, stutters zoomed in" -- the girls on the balconies are
+	 * seen only zoomed in (BuildingFiguresSeen()), and their pictures were made and read back from the card at every
+	 * degree of a turn, though the card drew them itself. */
+	if (!ViewportVehiclesOnCard()) MakeThreeDPicturesAtOnce([] {
 		ObjectLay lay;
 		lay.yaw = GetViewYaw();
 		lay.zoom = _vd.dpi.zoom;
@@ -6473,13 +6477,14 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			auto stand = [&](const ThreeDObjectFigure &f, bool plant) {
 				const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 				int height = 0;
-				/* Drawn by the card with the block's vehicles, no picture of it; till that is made, its picture. */
+				/* Drawn by the card with the block's vehicles, no picture of it; nothing while something of it is not made
+				 * yet (a stand-in given: the building drawn again when it comes); bigger than the card draws one, its picture. */
 				std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 				const ThreeDModelPicture *pic = nullptr;
 				if (ViewportVehiclesOnCard()) {
 					const std::optional<bool> on_card = StandingFigureOnCard(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height, card);
-					if (on_card == true && card == nullptr) return;
-					if (on_card != true) card = nullptr;
+					if (!on_card.has_value() || (*on_card && card == nullptr)) return;
+					if (!*on_card) card = nullptr;
 				}
 				if (card == nullptr) pic = StandingFigurePicture(f, plant, lay, ox, oy, oz, to.origin, p.figures.size(), height);
 				if (pic == nullptr && card == nullptr) return;
@@ -7176,11 +7181,21 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	ForWalkerPlantParts([zoom](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) {
 		int height = 0;
 		const int ix = static_cast<int>(std::lround(x)), iy = static_cast<int>(std::lround(y)), iz = static_cast<int>(std::lround(z));
-		/* Drawn by the card with the block's vehicles; till that is made, its picture. */
+		/* Drawn by the card with the block's vehicles; nothing while something of it is not made yet (drawn again when it
+		 * comes); bigger than the card draws one, its picture. */
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
-		if (ViewportVehiclesOnCard() && GetThreeDPlantOnCard(name, scale, stretch, facing, zoom, &height, NAN, card) == true) {
-			AddTurnedVehicleOnCard(std::move(card), ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
-			return;
+		if (ViewportVehiclesOnCard()) {
+			const uint64_t stood_in = ThreeDStandInsGiven();
+			const std::optional<bool> on_card = GetThreeDPlantOnCard(name, scale, stretch, facing, zoom, &height, NAN, card);
+			if (!on_card.has_value()) return;
+			if (*on_card) {
+				if (card != nullptr) {
+					AddTurnedVehicleOnCard(std::move(card), ix, iy, iz, ix - 1, iy - 1, iz, ix + 1, iy + 1, iz + height);
+				} else if (ThreeDStandInsGiven() != stood_in) {
+					OweThreeDPictureBox(ix - TILE_SIZE / 2, iy - TILE_SIZE / 2, ix + TILE_SIZE / 2, iy + TILE_SIZE / 2, iz - TILE_HEIGHT, iz + height + TILE_HEIGHT);
+				}
+				return;
+			}
 		}
 		const ThreeDModelPicture *pic = GetThreeDPlantPicture(name, scale, stretch, facing, zoom, &height);
 		if (pic == nullptr) return;

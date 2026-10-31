@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (67) – GPU: figury otočené mapy bez obrázků na hlavním vlákně; cukání zblízka; koně a náklady
+
+- Hráč (31. 10., po #316): „koničci jezdí, ještě doladime náklady. není mari a dřevo grafika na vozech. když bude kuň
+  přestavěn bez vozu na dobytek kravičku prasatko nebo ovečku tak pujdou zakoněm 🙂 prasatka ve voze seděly ale pytlů
+  cementu bylo mnoho vepředu vozu. pytle byly až k holce ktera řidi vuz s koněm  pokračuj gpu, ja du ještě koukat
+  #316. všechno duležité je v tematech."
+- Hráč potom: „s velkym zoom in přibližením se zvyšuje cukáni posunu po mapě a i otáčení jindy svižné při přiblížení
+  cuká. jsou to extremní přiblížení 16x a 8x není to moc důležité . ale je záhada že 20x20 velká plocha cuká míň než
+  3x3 přiblížená"
+- **#316:** „obrázky objektů“ 1,2–2,5 s z každých 5 s, nejdelší snímek mapy ~1,8 s, v deníku karty 30 čtení
+  obrázků zpět. Noční záře z (63) už bez čtení zpět (0 „svítící“).
+- **Příčina 1 (Mat, draci, houby, kouřící holky, sestřička, Matylda):** karta je kreslí z trojúhelníků, ale chyběl
+  jí zjednodušený tvar snímku (dělá se na pozadí). Mezitím se vzdala a figura se kreslila obrázkem procesorem na
+  hlavním vlákně, který si ten tvar stejně udělal sám. Teď karta nakreslí mezitím celý tvar. Vypadá stejně, karta si
+  ho podrží podle klíče. Když chybí něco jiného (textura, maska), nekreslí se zatím nic a místo se překreslí, až to
+  vlákno na pozadí načte. Obrázek na hlavním vlákně už nevzniká.
+- **Příčina 2 (záhada se zoomem):** holky na balkonech a střechách jsou vidět jen zblízka (4× a víc). Mapa jim před
+  kreslením dělala obrázky na kartě se čtením zpět, při otáčení za každý stupeň nové. Přitom je karta pak kreslila
+  sama z trojúhelníků. Oddálená plocha 20×20 je nemá, proto cukala míň. Teď se obrázky dělají jen bez karty.
+- Rig (město, 8× a 16×, otáčení po 3°): obrázky na hlavním vlákně 26 → 0, na vlákně 48 → 0, čtení zpět z karty 36 →
+  0, paměť karty 33 → 18 MB. Nejdelší kreslení mapy 777 → 418 ms (llvmpipe). Snímky staré a nové verze stejné
+  (figury, houby). Smoke beze změny.
+- **Koně a náklady Special 3D (doladit, nejdřív domluvit):** chybí grafika MARI a dřeva na vozech. Pytlů cementu je
+  moc a jdou až k holce, která řídí. Prasátka ve voze dobře. Nápad: kůň přestavěný bez vozu na dobytek → kravička,
+  prasátko nebo ovečka jdou za koněm.
+
 ## 31. 10. (66) – Simtrains 2: vlak řídí hráč z pultu (šipky nebo klávesy MSTS)
 
 - Podle (64): šipky a houkačka naše, dole v okně kabiny přepínač „Ovládání: šipkami / MSTS“; vlak řídí hráč, na
