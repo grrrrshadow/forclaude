@@ -199,6 +199,18 @@ enum class DepotHold : uint8_t {
 /**
  * 'Train' is either a loco or a wagon.
  */
+/** A control of the desk of a train driven from its cab (CmdTrainCabControl(), Train::cab_driven). */
+enum class TrainCabControl : uint8_t {
+	Driven,      ///< 1 the player takes the train over, 0 lets go of it: the game drives it again
+	Power,       ///< the throttle, of 255
+	Dynamic,     ///< the electric brake, of 255
+	Brake,       ///< the train's brake, of 255
+	EngineBrake, ///< the engines' own brake, of 255
+	Emergency,   ///< 1 the emergency brake on, 0 off
+	Reverser,    ///< 0 in the middle, 1 ahead
+	End,
+};
+
 struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	VehicleRailFlags flags{}; ///< Which flags has this train currently set. @see VehicleRailFlag for more details.
 	uint16_t crash_anim_pos = 0; ///< Crash animation counter.
@@ -264,6 +276,17 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	bool overran_red = false; ///< Ran past a red signal too fast to be stopped at it, and has not come to a stand since; a crash meanwhile is that overrun's doing.
 	bool overran_on_stop = false; ///< ... and it was the player's stop button that was bringing it to a stand, so the crash is the player's.
 	bool stop_crash_news = false; ///< A wreck made by the player's stop; the papers write about it again when a tow sets out for it.
+
+	/* Driven from its cab by the player (the player, 31. 10.: "the train is driven by the player, so the game does not
+	 * drive it: it runs past"; CmdTrainCabControl()): the controls of the desk, and the train's way by them
+	 * (CabAcceleration()). Only ever set on the head of a consist. */
+	bool cab_driven = false;      ///< the player drives it: no red stops it, no platform slows it, the controls move it
+	uint8_t cab_power = 0;        ///< the throttle, of 255 full
+	uint8_t cab_dynamic = 0;      ///< the electric brake, of 255 full
+	uint8_t cab_brake = 0;        ///< the train's brake, of 255 full service (the game's braking curve, BrakeDecelNow())
+	uint8_t cab_engine_brake = 0; ///< the engines' own brake, of 255
+	bool cab_emergency = false;   ///< the emergency brake: the power off, half as hard again as full service
+	uint8_t cab_reverser = 1;     ///< the reverser: 0 in the middle, no power; 1 ahead
 
 	/**
 	 * How many wagons this train keeps when it finishes the decoupling its
@@ -384,6 +407,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	void ConsistChanged(ConsistChangeFlags allowed_changes);
 
 	int UpdateSpeed();
+	int CabAcceleration() const;
 
 	void UpdateAcceleration();
 

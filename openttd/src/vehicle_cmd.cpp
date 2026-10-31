@@ -1409,6 +1409,48 @@ CommandCost CmdCabCargo(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 }
 
 /**
+ * A control of the desk of a train driven from its cab (Train::cab_driven; the player, 31. 10.: "the realistic controls
+ * and the simulation of the driving"): the player takes it over or lets go, moves the throttle, a brake, the reverser.
+ * Let go, the controls go back to rest and the game drives the train again by its orders and the signals.
+ * @param flags type of operation
+ * @param veh_id the train
+ * @param control which (TrainCabControl)
+ * @param value its new value
+ */
+CommandCost CmdTrainCabControl(DoCommandFlags flags, VehicleID veh_id, uint8_t control, uint8_t value)
+{
+	Train *t = Train::GetIfValid(veh_id);
+	if (t == nullptr || !t->IsFrontEngine()) return CMD_ERROR;
+	if (control >= to_underlying(TrainCabControl::End)) return CMD_ERROR;
+	CommandCost ret = CheckOwnership(t->owner);
+	if (ret.Failed()) return ret;
+
+	if (flags.Test(DoCommandFlag::Execute)) {
+		switch (static_cast<TrainCabControl>(control)) {
+			case TrainCabControl::Driven:
+				t->cab_driven = value != 0;
+				if (!t->cab_driven) {
+					t->cab_power = t->cab_dynamic = t->cab_brake = t->cab_engine_brake = 0;
+					t->cab_emergency = false;
+					t->cab_reverser = 1;
+					if (t->force_proceed == TFP_SIGNAL) t->force_proceed = TFP_NONE;
+				}
+				break;
+			case TrainCabControl::Power: t->cab_power = value; break;
+			case TrainCabControl::Dynamic: t->cab_dynamic = value; break;
+			case TrainCabControl::Brake: t->cab_brake = value; break;
+			case TrainCabControl::EngineBrake: t->cab_engine_brake = value; break;
+			case TrainCabControl::Emergency: t->cab_emergency = value != 0; break;
+			case TrainCabControl::Reverser: t->cab_reverser = std::min<uint8_t>(value, 1); break;
+			default: NOT_REACHED();
+		}
+		SetWindowDirty(WindowClass::CabView, t->index);
+		SetWindowDirty(WindowClass::VehicleView, t->index);
+	}
+	return CommandCost();
+}
+
+/**
  * Drive a vehicle freely from its cab (cab_drive.h): a road vehicle off the road, a ship anywhere on the water and an
  * aircraft anywhere in the air, at any angle, a step left or right at a time (an aircraft a step higher or lower too);
  * asked back to its orders it goes on as usual from the next tile it can (an aircraft at once, to its airport).

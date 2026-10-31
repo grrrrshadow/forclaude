@@ -10645,6 +10645,36 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			return true;
 		}
+		if (argv.size() > 2 && argv[2] == "zavri") {
+			/* 'kabina zavri': the cab view open closed, as the player closes it (whoever drives from it lets go). */
+			Window *cw = FindWindowByClass(WindowClass::CabView);
+			if (cw != nullptr) {
+				AutoRestoreBackup cur_company(_current_company, _local_company);
+				cw->Close();
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", cw != nullptr ? "zavrena" : "neni");
+			return true;
+		}
+		if (argv.size() > 4 && argv[2] == "pult") {
+			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer> <0-255>': a control of the desk of the train
+			 * of the cab view open, as the player at it moves it (CmdTrainCabControl()). */
+			static const std::pair<std::string_view, TrainCabControl> controls[] = {
+				{"rizen", TrainCabControl::Driven}, {"vykon", TrainCabControl::Power}, {"edb", TrainCabControl::Dynamic}, {"brzda", TrainCabControl::Brake},
+				{"primocinna", TrainCabControl::EngineBrake}, {"rychlobrzda", TrainCabControl::Emergency}, {"smer", TrainCabControl::Reverser},
+			};
+			Window *cw = FindWindowByClass(WindowClass::CabView);
+			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			std::optional<TrainCabControl> which;
+			for (const auto &[name, c] : controls) if (argv[3] == name) which = c;
+			if (cv == nullptr || cv->type != VehicleType::Train || !which.has_value()) {
+				IConsolePrint(CC_ERROR, "test3d kabina pult: no train's cab view open, or no such control.");
+				return true;
+			}
+			AutoRestoreBackup cur_company(_current_company, _local_company);
+			const CommandCost r = Command<Commands::TrainCabControl>::Do(DoCommandFlag::Execute, cv->First()->index, to_underlying(*which), static_cast<uint8_t>(number(4).value_or(0)));
+			IConsolePrint(CC_DEFAULT, "test3d: kabina pult {} {}: {}", argv[3], number(4).value_or(0), r.Succeeded() ? "ano" : "NE");
+			return true;
+		}
 		if (argv.size() > 4 && argv[2] == "hlava") {
 			/* The right button held down on the picture of the cab view open and the hand moved so many pixels right and
 			 * down, as the player looks about (the player, 27. 10.: "look out of the right window"); 'hlava 0 0' twice

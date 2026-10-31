@@ -2261,6 +2261,8 @@ STR_CONFIG_SETTING_EYE_SHADOWS                                  :Shadows in the 
 STR_CONFIG_SETTING_EYE_SHADOWS_HELPTEXT                         :By day the buildings cast the sun's shadows in the views from the eyes and from the cab. The map of the shadows is made anew whenever other buildings are about, which can stutter on a slow machine as the walker goes through a town. The lights at night are their own thing and stay either way
 STR_CONFIG_SETTING_CAB_CAMERA                                   :Camera of the cab: {STRING2}
 STR_CONFIG_SETTING_CAB_CAMERA_HELPTEXT                          :What the view from a vehicle's cab shows, and the view from a vehicle boarded with E: the eye in the driver's head with the interior of the vehicle's 3D model about it, the same eye without the model, or the eye over the roof, looking at the vehicle from above and behind. The button Camera of the window goes round them and looks ahead again
+STR_CONFIG_SETTING_CAB_MSTS_KEYS                                :Drive the trains of MSTS by the keys of MSTS: {STRING2}
+STR_CONFIG_SETTING_CAB_MSTS_KEYS_HELPTEXT                       :How a train of MSTS is driven from its cab: off by the arrows (up more power, down the electric brake and the brake, held down at the end the emergency brake; I the horn), on by the keys of MSTS (D and A the throttle, ' and ; the brake, ] and [ the engine brake, . and , the electric brake, W and S the reverser, Backspace the emergency brake, Space the horn). The button at the bottom of the cab view window switches it too
 STR_CONFIG_SETTING_CAB_CAMERA_INSIDE                            :interior
 STR_CONFIG_SETTING_CAB_CAMERA_BARE                              :without the interior
 STR_CONFIG_SETTING_CAB_CAMERA_ROOF                              :over the roof
@@ -2392,6 +2394,17 @@ STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}back to
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view over the whole screen, and back
 STR_CAB_VIEW_CAMERA                                             :{BLACK}Camera: {STRING}
 STR_CAB_VIEW_CAMERA_TOOLTIP                                     :{BLACK}The next camera: the interior about the eye, without the interior, over the roof; the head looks ahead again. The key C does the same
+STR_CAB_VIEW_CONTROLS                                           :{BLACK}Controls: {STRING}
+STR_CAB_VIEW_CONTROLS_ARROWS                                    :arrows
+STR_CAB_VIEW_CONTROLS_MSTS                                      :MSTS
+STR_CAB_VIEW_CONTROLS_TOOLTIP                                   :{BLACK}How the train is driven from its cab: by the arrows (up more power, down the electric brake and the brake, held down at the end the emergency brake; I the horn) or by the keys of MSTS (D/A the throttle, '/; the brake, ]/[ the engine brake, ./, the electric brake, W/S the reverser, Backspace the emergency brake, Space the horn)
+STR_CAB_VIEW_DESK_POWER                                         :{GREEN}Throttle {NUM}/{NUM}
+STR_CAB_VIEW_DESK_IDLE                                          :{SILVER}Throttle 0
+STR_CAB_VIEW_DESK_DYNAMIC                                       :{ORANGE}Electric brake {NUM}/{NUM}
+STR_CAB_VIEW_DESK_BRAKE                                         :{ORANGE}Brake {NUM}%
+STR_CAB_VIEW_DESK_ENGINE_BRAKE                                  :{ORANGE}Engine brake {NUM}%
+STR_CAB_VIEW_DESK_EMERGENCY                                     :{RED}Emergency brake
+STR_CAB_VIEW_DESK_NEUTRAL                                       :{SILVER}Reverser 0
 STR_CAB_VIEW_AUTO                                               :{BLACK}Go your route
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; the arrows take the wheel again, driving freely
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Drive

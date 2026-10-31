@@ -2369,6 +2369,8 @@ STR_CONFIG_SETTING_EYE_SHADOWS                                  :Stíny v pohled
 STR_CONFIG_SETTING_EYE_SHADOWS_HELPTEXT                         :Ve dne vrhají budovy sluneční stíny v pohledu z očí a z kabiny. Mapa stínů se přepočítává, kdykoli jsou kolem jiné budovy, což na pomalém stroji při chůzi městem trhá. Noční světla jsou samostatná a zůstávají tak i tak
 STR_CONFIG_SETTING_CAB_CAMERA                                   :Kamera kabiny: {STRING}
 STR_CONFIG_SETTING_CAB_CAMERA_HELPTEXT                          :Co ukazuje pohled z kabiny vozidla i z vozidla, do kterého nastoupíš klávesou E: oko v hlavě řidiče s interiérem 3D modelu vozidla okolo, totéž oko bez modelu, nebo oko nad střechou, které se dívá na vozidlo shora a zezadu. Čudlík Kamera v okně je střídá a srovná hlavu dopředu
+STR_CONFIG_SETTING_CAB_MSTS_KEYS                                :Vlaky MSTS řídit klávesami MSTS: {STRING}
+STR_CONFIG_SETTING_CAB_MSTS_KEYS_HELPTEXT                       :Jak se vlak MSTS řídí z kabiny: vypnuto šipkami (nahoru víc výkonu, dolů elektrodynamická brzda a brzda, dole podržet rychlobrzda; I houkačka), zapnuto klávesami MSTS (D a A kontrolér, ' a ; brzda, ] a [ přímočinná brzda, . a , elektrodynamická brzda, W a S směr, Backspace rychlobrzda, mezerník houkačka). Přepíná se i tlačítkem dole v okně kabiny
 STR_CONFIG_SETTING_CAB_CAMERA_INSIDE                            :interiér
 STR_CONFIG_SETTING_CAB_CAMERA_BARE                              :bez interiéru
 STR_CONFIG_SETTING_CAB_CAMERA_ROOF                              :nad střechou
@@ -2500,6 +2502,17 @@ STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}zpět k
 STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled přes celou obrazovku, a zpět
 STR_CAB_VIEW_CAMERA                                             :{BLACK}Kamera: {STRING}
 STR_CAB_VIEW_CAMERA_TOOLTIP                                     :{BLACK}Další kamera: interiér okolo oka, bez interiéru, nad střechou; hlava se srovná dopředu. Totéž dělá klávesa C
+STR_CAB_VIEW_CONTROLS                                           :{BLACK}Ovládání: {STRING}
+STR_CAB_VIEW_CONTROLS_ARROWS                                    :šipkami
+STR_CAB_VIEW_CONTROLS_MSTS                                      :MSTS
+STR_CAB_VIEW_CONTROLS_TOOLTIP                                   :{BLACK}Jak se vlak řídí z kabiny: šipkami (nahoru víc výkonu, dolů elektrodynamická brzda a brzda, dole podržet rychlobrzda; I houkačka), nebo klávesami MSTS (D/A kontrolér, '/; brzda, ]/[ přímočinná brzda, ./, elektrodynamická brzda, W/S směr, Backspace rychlobrzda, mezerník houkačka)
+STR_CAB_VIEW_DESK_POWER                                         :{GREEN}Kontrolér {NUM}/{NUM}
+STR_CAB_VIEW_DESK_IDLE                                          :{SILVER}Kontrolér 0
+STR_CAB_VIEW_DESK_DYNAMIC                                       :{ORANGE}EDB {NUM}/{NUM}
+STR_CAB_VIEW_DESK_BRAKE                                         :{ORANGE}Brzda {NUM} %
+STR_CAB_VIEW_DESK_ENGINE_BRAKE                                  :{ORANGE}Přímočinná {NUM} %
+STR_CAB_VIEW_DESK_EMERGENCY                                     :{RED}Rychlobrzda
+STR_CAB_VIEW_DESK_NEUTRAL                                       :{SILVER}Směr 0
 STR_CAB_VIEW_AUTO                                               :{BLACK}Jeď svou trasu
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; šipky ho zase převezmou a jede se volně
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Řídit

@@ -940,6 +940,20 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 			e.has_cab = true;
 		}
 	}
+	/* The notches of its throttle and whether it brakes electrically: the desk's controls (simtrains_cab.h). */
+	if (const TextNode *controllers = engine->Child("EngineControllers"); controllers != nullptr) {
+		if (const TextNode *throttle = controllers->Child("Throttle"); throttle != nullptr) {
+			if (const TextNode *notches = throttle->Child("NumNotches"); notches != nullptr) {
+				for (const TextNode &n : notches->children) {
+					if (!StrEqualsIgnoreCase(n.name, "Notch")) continue;
+					const float f = static_cast<float>(ParseFigure(n.Value(), {}));
+					if (f > 0.001f) e.notches.push_back(std::min(f, 1.0f));
+				}
+			}
+		}
+		if (controllers->Child("Brake_Dynamic") != nullptr) e.dynamic = true;
+	}
+	if (const TextNode *t = engine->Child("DynamicBrakesMaximumForce"); t != nullptr && ParseFigure(t->Value(), {{"kN", 1}, {"N", 0.001}}, 0.001) > 0) e.dynamic = true;
 	if (const TextNode *cab = engine->Child("CabView"); cab != nullptr && !cab->Value().empty()) {
 		/* MSTS reads it from the folder CABVIEW of the engine's; a cab of several engines is in a folder above. */
 		e.cvf = FindByMstsPath(e.folder + "CABVIEW" PATHSEP, cab->Value());
@@ -1158,6 +1172,19 @@ const std::vector<SimtrainsEngine> &FindSimtrainsEngines()
 		_simtrains_engines.push_back(std::move(*e));
 	}
 	return _simtrains_engines;
+}
+
+/**
+ * The engine of MSTS a GRF made of it is (PrepareSimtrainsGrfs()).
+ * @param grfid the GRF's id, as the game keeps it
+ * @return nullptr none
+ */
+const SimtrainsEngine *SimtrainsEngineOf(uint32_t grfid)
+{
+	for (const SimtrainsEngine &e : FindSimtrainsEngines()) {
+		if (e.grfid == grfid) return &e;
+	}
+	return nullptr;
 }
 
 /**

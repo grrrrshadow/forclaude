@@ -20,6 +20,13 @@
 #include "gfx_func.h"
 #include "blitter/factory.hpp"
 #include "debug.h"
+#include "train.h"
+#include "command_func.h"
+#include "vehicle_cmd.h"
+#include "company_func.h"
+#include "strings_func.h"
+#include "core/backup_type.hpp"
+#include "table/strings.h"
 
 #include <algorithm>
 #include <cmath>
@@ -237,4 +244,208 @@ bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const
 		}
 	}
 	return true;
+}
+
+/* ---- The player at the desk (SimtrainsCabDriver) ---- */
+
+/** Whether a vehicle is a train whose head is an engine of MSTS: it is driven from its desk (SimtrainsCabDriver). */
+bool IsSimtrainsTrain(const Vehicle *v)
+{
+	return v != nullptr && v->type == VehicleType::Train && SimtrainsEngineOf(v->First()->GetGRFID()) != nullptr;
+}
+
+/** A control of the desk to the game, as the player at it (CmdTrainCabControl()). */
+static void SendControl(const Train *t, TrainCabControl control, uint8_t value)
+{
+	Command<Commands::TrainCabControl>::Post(t->tile, t->index, to_underlying(control), value);
+}
+
+/** The train taken over by the player, if not yet; started, if it stood stopped. */
+static void TakeOver(const Train *t)
+{
+	if (t->cab_driven) return;
+	SendControl(t, TrainCabControl::Driven, 1);
+	if (t->vehstatus.Test(VehState::Stopped)) Command<Commands::StartStopVehicle>::Post(t->tile, t->index, false);
+}
+
+/** How many notches its throttle has past nought: the .eng's, else eight. */
+static int NotchCount(const SimtrainsEngine *e)
+{
+	return e != nullptr && !e->notches.empty() ? static_cast<int>(e->notches.size()) : 8;
+}
+
+/** The throttle at a notch (1 the first), of 255. */
+static uint8_t NotchPower(const SimtrainsEngine *e, int notch)
+{
+	if (notch <= 0) return 0;
+	const int n = NotchCount(e);
+	const float share = e != nullptr && !e->notches.empty() ? e->notches[std::min(notch, n) - 1] : std::min(notch, n) / static_cast<float>(n);
+	return static_cast<uint8_t>(std::clamp(static_cast<int>(std::lround(share * 255)), 1, 255));
+}
+
+/** The notch the throttle stands nearest to. */
+static int NotchOf(const SimtrainsEngine *e, uint8_t power)
+{
+	if (power == 0) return 0;
+	int best = 1;
+	for (int n = 1; n <= NotchCount(e); n++) {
+		if (std::abs(NotchPower(e, n) - power) < std::abs(NotchPower(e, best) - power)) best = n;
+	}
+	return best;
+}
+
+static int DynamicSteps(const SimtrainsEngine *e)
+{
+	return e != nullptr && e->dynamic ? SimtrainsCabDriver::DYNAMIC_STEPS : 0;
+}
+
+/** The arrows' combined lever where the train's controls stand. */
+static int LeverOf(const Train *t, const SimtrainsEngine *e)
+{
+	const int dyn = DynamicSteps(e);
+	if (t->cab_power > 0) return NotchOf(e, t->cab_power);
+	if (t->cab_brake > 0) return -(dyn + std::max(1, static_cast<int>(std::lround(t->cab_brake * SimtrainsCabDriver::BRAKE_STEPS / 255.0))));
+	if (t->cab_dynamic > 0 && dyn > 0) return -std::max(1, static_cast<int>(std::lround(t->cab_dynamic * dyn / 255.0)));
+	return 0;
+}
+
+/** The controls the combined lever stands for, sent where they differ from the train's. */
+static void ApplyLever(const Train *t, const SimtrainsEngine *e, int lever)
+{
+	const int dyn = DynamicSteps(e);
+	uint8_t power = 0, dynamic = 0, brake = 0;
+	if (lever > 0) {
+		power = NotchPower(e, lever);
+	} else if (lever < 0) {
+		const int down = -lever;
+		if (down <= dyn) {
+			dynamic = static_cast<uint8_t>(down * 255 / dyn);
+		} else {
+			dynamic = dyn > 0 ? 255 : 0;
+			brake = static_cast<uint8_t>((down - dyn) * 255 / SimtrainsCabDriver::BRAKE_STEPS);
+		}
+	}
+	if (t->cab_power != power) SendControl(t, TrainCabControl::Power, power);
+	if (t->cab_dynamic != dynamic) SendControl(t, TrainCabControl::Dynamic, dynamic);
+	if (t->cab_brake != brake) SendControl(t, TrainCabControl::Brake, brake);
+}
+
+/**
+ * The arrows at the desk, looked at every so often: up and down move the combined lever a step, held again every
+ * REPEAT_MS; Down held with the lever at its end the emergency brake, Up lets it off.
+ * @param now the arrows held now
+ * @param ms milliseconds since the last look
+ */
+void SimtrainsCabDriver::Drive(const Vehicle *v, DirectionKeys now, int ms)
+{
+	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	const Train *t = Train::From(v->First());
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	if (!this->read) {
+		this->lever = LeverOf(t, e);
+		this->read = true;
+	}
+	const bool up = now.Test(DirectionKey::Up), down = now.Test(DirectionKey::Down);
+	const int bottom = -(DynamicSteps(e) + BRAKE_STEPS), top = NotchCount(e);
+	if (up != down) {
+		const bool fresh = up ? !this->held.Test(DirectionKey::Up) : !this->held.Test(DirectionKey::Down);
+		if (fresh || (this->repeat_ms -= ms) <= 0) {
+			this->repeat_ms = fresh ? REPEAT_MS * 2 : REPEAT_MS;
+			const int was = this->lever;
+			this->lever = std::clamp(this->lever + (up ? 1 : -1), bottom, top);
+			TakeOver(t);
+			if (up && t->cab_emergency) SendControl(t, TrainCabControl::Emergency, 0);
+			if (this->lever != was) ApplyLever(t, e, this->lever);
+			this->done = fmt::format("paka {}", this->lever);
+		}
+		if (down && this->lever == bottom) {
+			if ((this->bottom_ms += ms) >= EMERGENCY_MS && !t->cab_emergency) {
+				SendControl(t, TrainCabControl::Emergency, 1);
+				this->done = "rychlobrzda";
+			}
+		} else {
+			this->bottom_ms = 0;
+		}
+	} else {
+		this->repeat_ms = 0;
+		this->bottom_ms = 0;
+	}
+	this->held = now;
+}
+
+/**
+ * A key of MSTS at the desk (the setting gui.cab_msts_keys).
+ * @return whether the key is one of the desk's
+ */
+bool SimtrainsCabDriver::Key(const Vehicle *v, char32_t key, uint16_t keycode)
+{
+	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return false;
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	const Train *t = Train::From(v->First());
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	const uint16_t code = keycode & ~WKC_SPECIAL_KEYS;
+	if (key == ' ' || code == WKC_SPACE) {
+		CabHorn(v);
+		return true;
+	}
+	auto step = [&](TrainCabControl control, uint8_t now, int by) {
+		TakeOver(t);
+		SendControl(t, control, static_cast<uint8_t>(std::clamp(now + by, 0, 255)));
+	};
+	switch (key) {
+		case 'd': case 'D': TakeOver(t); SendControl(t, TrainCabControl::Power, NotchPower(e, std::min(NotchOf(e, t->cab_power) + 1, NotchCount(e)))); break;
+		case 'a': case 'A': TakeOver(t); SendControl(t, TrainCabControl::Power, NotchPower(e, NotchOf(e, t->cab_power) - 1)); break;
+		case '\'': step(TrainCabControl::Brake, t->cab_brake, 255 / BRAKE_STEPS + 1); break;
+		case ';': step(TrainCabControl::Brake, t->cab_brake, -(255 / BRAKE_STEPS + 1)); break;
+		case ']': step(TrainCabControl::EngineBrake, t->cab_engine_brake, 64); break;
+		case '[': step(TrainCabControl::EngineBrake, t->cab_engine_brake, -64); break;
+		case '.': step(TrainCabControl::Dynamic, t->cab_dynamic, 255 / DYNAMIC_STEPS + 1); break;
+		case ',': step(TrainCabControl::Dynamic, t->cab_dynamic, -(255 / DYNAMIC_STEPS + 1)); break;
+		case 'w': case 'W': TakeOver(t); SendControl(t, TrainCabControl::Reverser, 1); break;
+		case 's': case 'S': TakeOver(t); SendControl(t, TrainCabControl::Reverser, 0); break;
+		default:
+			if (code != WKC_BACKSPACE) return false;
+			TakeOver(t);
+			SendControl(t, TrainCabControl::Emergency, t->cab_emergency ? 0 : 1);
+			break;
+	}
+	this->read = false;
+	this->done = fmt::format("klavesa {}", static_cast<char>(key != 0 ? key : '?'));
+	return true;
+}
+
+/** The player leaves the desk of a train driven from its cab: the game drives it again (CabLetGo()). */
+void SimtrainsCabLetGo(const Vehicle *v)
+{
+	if (v == nullptr || v->type != VehicleType::Train || v->owner != _local_company) return;
+	const Train *t = Train::From(v->First());
+	if (!t->cab_driven) return;
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	SendControl(t, TrainCabControl::Driven, 0);
+}
+
+/** What the desk of a train driven from its cab stands at, for the panel of the cab view; empty when the game drives it. */
+std::string SimtrainsDeskText(const Vehicle *v)
+{
+	if (v == nullptr || v->type != VehicleType::Train) return {};
+	const Train *t = Train::From(v->First());
+	if (!t->cab_driven) return {};
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	std::string s;
+	auto add = [&s](std::string part) {
+		if (!s.empty()) s += "  ";
+		s += part;
+	};
+	if (t->cab_emergency) add(GetString(STR_CAB_VIEW_DESK_EMERGENCY));
+	if (t->cab_reverser == 0) add(GetString(STR_CAB_VIEW_DESK_NEUTRAL));
+	if (t->cab_power > 0) {
+		add(GetString(STR_CAB_VIEW_DESK_POWER, NotchOf(e, t->cab_power), NotchCount(e)));
+	} else if (t->cab_dynamic == 0 && t->cab_brake == 0) {
+		add(GetString(STR_CAB_VIEW_DESK_IDLE));
+	}
+	if (t->cab_dynamic > 0) add(GetString(STR_CAB_VIEW_DESK_DYNAMIC, std::max(1, static_cast<int>(std::lround(t->cab_dynamic * SimtrainsCabDriver::DYNAMIC_STEPS / 255.0))), SimtrainsCabDriver::DYNAMIC_STEPS));
+	if (t->cab_brake > 0) add(GetString(STR_CAB_VIEW_DESK_BRAKE, t->cab_brake * 100 / 255));
+	if (t->cab_engine_brake > 0) add(GetString(STR_CAB_VIEW_DESK_ENGINE_BRAKE, t->cab_engine_brake * 100 / 255));
+	return s;
 }

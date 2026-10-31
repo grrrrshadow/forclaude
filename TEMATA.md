@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (66) – Simtrains 2: vlak řídí hráč z pultu (šipky nebo klávesy MSTS)
+
+- Podle (64): šipky a houkačka naše, dole v okně kabiny přepínač „Ovládání: šipkami / MSTS“; vlak řídí hráč, na
+  červenou projede; vzduchová brzda bez zpoždění.
+- **Převzetí:** první dotyk ovládání v kabině vlak převezme. Zavřené okno nebo „Jeď svou trasu“ (T) ho pustí a hra
+  ho zase řídí podle rozkazů. Ovladače jsou ve vlaku (uloží se do savu) a mění se příkazem, takže to funguje i v síti.
+- **Řízený hráčem:** projede každou červenou. Stanice ho nezpomaluje a rychlost z rozkazu ho nedrží. Když ho hráč
+  zastaví na nástupišti stanice z rozkazu, vlak tam přijede a nakládá. Oblouky, mosty a depa ho dál drží na své
+  rychlosti.
+- **Fyzika (síly):** tah motorů podle kontroléru, jak ho hra počítá (výkon při rychlosti, nejvýš tažná síla), minus
+  odpory trati (do kopce víc, z kopce tlačí), minus brzdy:
+  - provozní brzda 0,9 m/s²;
+  - rychlobrzda 1,3 m/s² a vypne výkon;
+  - přímočinná brzda jen na váhu mašin;
+  - EDB tři čtvrtiny tahu, pod 8 km/h slábne.
+  Nejdřív jsem brzdil podle brzdné křivky hry: brzda byla 7× slabší než rozjezd (0→99 na 3 políčkách, 99→0 na 7).
+- **Šipky:** jedna kombinovaná páka. Nahoru stupně kontroléru z .eng (451: 0,44 / 0,65 / 0,85 / 1,0), dolů EDB
+  (3 stupně, má-li ji mašina), pak brzda v 5 stupních. Dole podržet 1 s je rychlobrzda, nahoru ji povolí.
+- **Klávesy MSTS:** D/A kontrolér, '/; brzda, ]/[ přímočinná, ./, EDB, W/S směr, Backspace rychlobrzda, mezerník
+  houkačka. Panel pod pohledem ukazuje, kde ovladače stojí („Kontrolér 2/4  Brzda 40 %“).
+- Rig (451 sama): plná brzda z 65 km/h zastaví do 40 tiků, rychlobrzda z 99 na 1–2 políčkách, rozjezd 0→99 na
+  3 políčkách. Stojící vlak se s brzdou nerozjede. Po zavření kabiny jede zase hra. Projetí červené v rigu
+  vyzkoušené nemám, je to `force_proceed` hry obnovovaný každý tik. Smoke beze změny.
+- Další krok: ručičky, páky a kontrolky stanoviště podle stavu, opakovač návěstí, myší za páky, zvuky.
+
 ## 31. 10. (65) – Simtrains 1: stanoviště MSTS v pohledu z kabiny
 
 - Podle odpovědí v (64): pohled náš (hlava pravým tlačítkem), obrázek stanoviště z kabiny MSTS přes něj.

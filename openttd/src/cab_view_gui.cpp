@@ -46,6 +46,7 @@
 #include "aircraft.h"
 #include "airport.h"
 #include "ship.h"
+#include "train.h"
 #include "engine_base.h"
 #include "sound_func.h"
 #include "newgrf_sound.h"
@@ -93,6 +94,11 @@ static constexpr NWidgetPart _nested_cab_view_widgets[] = {
 		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CAMERA), SetStringTip(STR_CAB_VIEW_CAMERA, STR_CAB_VIEW_CAMERA_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		/* A train of MSTS: driven by the arrows or by the keys of MSTS (the player, 31. 10.: "put a switch at the bottom
+		 * of the cab view window: controls MSTS / arrows"). */
+		NWidget(NWID_SELECTION, Colours::Invalid, WID_CV_CONTROLS_SEL),
+			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CONTROLS), SetStringTip(STR_CAB_VIEW_CONTROLS, STR_CAB_VIEW_CONTROLS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		EndContainer(),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -224,6 +230,8 @@ void CabToggleRoute(const Vehicle *v, CabArrows &arrows)
 	arrows.route = true;
 	if (v->owner != _local_company) return;
 	AutoRestoreBackup cur_company(_current_company, _local_company);
+	/* A train driven from its desk goes its route again: the game drives it (simtrains_cab.h). */
+	SimtrainsCabLetGo(v);
 	if (v->cab_free) {
 		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
 	} else if (v->cab_heading != Direction::Invalid) {
@@ -249,7 +257,13 @@ void CabCargo(const Vehicle *v, bool unload)
  */
 void CabLetGo(const Vehicle *v)
 {
-	if (_game_mode != GameMode::Normal || _exit_game || _switch_mode != SwitchMode::None || v == nullptr || v->owner != _local_company || !v->IsCabSteered()) return;
+	if (_game_mode != GameMode::Normal || _exit_game || _switch_mode != SwitchMode::None || v == nullptr || v->owner != _local_company) return;
+	/* A train driven from its desk: the game drives it again (simtrains_cab.h). */
+	if (v->type == VehicleType::Train) {
+		SimtrainsCabLetGo(v);
+		return;
+	}
+	if (!v->IsCabSteered()) return;
 	if (v->cab_free) {
 		if (!v->cab_rejoin) Command<Commands::CabDrive>::Post(v->tile, v->index, to_underlying(CabDriveOp::Rejoin));
 		if (v->type == VehicleType::Road && !IsTileType(v->tile, TileType::Road) && !v->vehstatus.Test(VehState::Stopped)) {
@@ -589,15 +603,24 @@ struct CabViewWindow : Window {
 
 	/* The arrows drive (CabArrows), looked at this often. */
 	CabArrows arrows{};
+	SimtrainsCabDriver desk_driver{}; ///< a train of MSTS: the player at its desk (simtrains_cab.h)
 	static constexpr int DRIVE_MS = 30;
 	IntervalTimer<TimerWindow> drive{std::chrono::milliseconds(DRIVE_MS), [this](auto) {
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v != nullptr) this->arrows.Drive(v, ArrowsWindow() == this ? _dirkeys : DirectionKeys{}, DRIVE_MS);
+		if (v == nullptr) return;
+		const DirectionKeys keys = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
+		if (IsSimtrainsTrain(v)) {
+			/* The arrows move its combined lever; with the keys of MSTS they do nothing (OnKeyPress()). */
+			if (!_settings_client.gui.cab_msts_keys) this->desk_driver.Drive(v, keys, DRIVE_MS);
+		} else {
+			this->arrows.Drive(v, keys, DRIVE_MS);
+		}
 	}};
 
 	CabViewWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
 		this->CreateNestedTree();
+		this->GetWidget<NWidgetStacked>(WID_CV_CONTROLS_SEL)->SetDisplayedPlane(IsSimtrainsTrain(Vehicle::GetIfValid(number)) ? 0 : SZSP_NONE);
 		this->FinishInitNested(number);
 		const Vehicle *v = Vehicle::GetIfValid(number);
 		if (v != nullptr) this->owner = v->owner;
@@ -632,6 +655,8 @@ struct CabViewWindow : Window {
 				return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
 			case WID_CV_CAMERA:
 				return CabCameraText();
+			case WID_CV_CONTROLS:
+				return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
 			default:
 				return this->Window::GetWidgetString(widget, stringid);
 		}
@@ -758,6 +783,10 @@ struct CabViewWindow : Window {
 			DrawString(note_x, sright, state_y, limit, TextColour::FromString);
 			note_x += GetStringBoundingBox(limit).width + 8;
 		}
+		/* A train driven from its desk: where its controls stand (simtrains_cab.h). */
+		if (const std::string desk = SimtrainsDeskText(v); !desk.empty()) {
+			DrawString(note_x, sright, state_y, desk, TextColour::FromString);
+		}
 		if (v->cab_free) {
 			/* Driven freely: so, or on the way back to the orders. */
 			DrawString(note_x, sright, state_y, GetString(v->cab_rejoin ? STR_CAB_VIEW_FREE_BACK : STR_CAB_VIEW_FREE), TextColour::FromString);
@@ -784,6 +813,11 @@ struct CabViewWindow : Window {
 		}
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
 		if (v == nullptr) return EventState::NotHandled;
+		/* A train of MSTS driven by the keys of MSTS (simtrains_cab.h). */
+		if (_settings_client.gui.cab_msts_keys && IsSimtrainsTrain(v) && this->desk_driver.Key(v, key, keycode)) {
+			this->SetWidgetDirty(WID_CV_PANEL);
+			return EventState::Handled;
+		}
 		/* I: the horn; F: the lights; T: its route, or the wheel again; C: the next camera. */
 		if (key == 'i' || key == 'I') {
 			CabHorn(v);
@@ -859,6 +893,12 @@ struct CabViewWindow : Window {
 			case WID_CV_CAMERA:
 				CabNextCamera(this->camera);
 				break;
+			case WID_CV_CONTROLS:
+				/* The arrows or the keys of MSTS at the desk of a train of MSTS. */
+				_settings_client.gui.cab_msts_keys = !_settings_client.gui.cab_msts_keys;
+				this->desk_driver.read = false;
+				this->SetDirty();
+				break;
 			case WID_CV_LOAD:
 			case WID_CV_UNLOAD:
 				CabCargo(v, widget == WID_CV_UNLOAD);
@@ -913,6 +953,12 @@ std::string DescribeCabViews()
 		if (v != nullptr) {
 			s += fmt::format(", volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
 			if (v->type == VehicleType::Aircraft) s += fmt::format(" vyska {} cil {} stav {} na {},{}", v->z_pos, v->cab_altitude, Aircraft::From(v)->state, v->x_pos, v->y_pos);
+			if (v->type == VehicleType::Train) {
+				const Train *t = Train::From(v->First());
+				s += fmt::format(" cur {} pult MSTS {} rizen {} vykon {} edb {} brzda {} primocinna {} rychlobrzda {} smer {} tfp {} na {},{} rozkaz {} ({})", t->cur_speed, IsSimtrainsTrain(v) ? "ano" : "ne",
+						t->cab_driven, t->cab_power, t->cab_dynamic, t->cab_brake, t->cab_engine_brake, t->cab_emergency, t->cab_reverser, to_underlying(t->force_proceed),
+						TileX(t->tile), TileY(t->tile), to_underlying(t->current_order.GetType()), cw->desk_driver.done);
+			}
 		}
 		s += "; ";
 	}

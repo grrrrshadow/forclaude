@@ -25,6 +25,8 @@ enum CabViewWidgets : WidgetID {
 	WID_CV_LOAD,    ///< Load at the stop it stands on (CmdCabCargo()).
 	WID_CV_UNLOAD,  ///< Unload there.
 	WID_CV_CAMERA,  ///< The next camera: the interior, without it, over the roof (CabCamera).
+	WID_CV_CONTROLS_SEL, ///< The switch of the controls, shown for a train of MSTS only.
+	WID_CV_CONTROLS, ///< The controls of a train of MSTS: the arrows or the keys of MSTS (gui.cab_msts_keys).
 };
 
 #endif /* WIDGETS_CAB_VIEW_WIDGET_H */

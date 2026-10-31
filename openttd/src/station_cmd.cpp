@@ -3947,6 +3947,8 @@ static VehicleEnterTileStates VehicleEnterTile_Station(Vehicle *v, TileIndex til
 		if (!IsRailStation(tile) || !v->IsMovingFront()) return {};
 		Vehicle *consist = v->First();
 		if (!consist->current_order.ShouldStopAtStation(consist, station_id)) return {};
+		/* Driven from its cab, the player stops it on the platform: then it arrives (TrainLocoHandler()). */
+		if (Train::From(consist)->cab_driven) return {};
 
 		/* Sent here to couple, the train has one platform to arrive at: the
 		 * one its partner is standing on. Its route there can run through

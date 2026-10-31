@@ -1660,7 +1660,7 @@ int Train::GetCurrentMaxSpeed() const
 
 	/* Nobody drives a train the player has stopped, with the setting on: no
 	 * easing down for the platform either. See IsBrakingOnPlayersStop(). */
-	bool driven = !IsBrakingOnPlayersStop(this);
+	bool driven = !IsBrakingOnPlayersStop(this) && !this->cab_driven;
 	this->driver_ceiling = INT32_MAX;
 
 	if (driven && _settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic && IsRailStationTile(moving_front->tile)) {
@@ -1718,7 +1718,7 @@ int Train::GetCurrentMaxSpeed() const
 	 * itself is still the game's own -- a ceiling below the current speed is what
 	 * makes a train brake. Once its leading end is on the crossing there is
 	 * nothing ahead to slow for and it opens up again. */
-	if (_settings_game.vehicle.train_slow_for_level_crossing &&
+	if (_settings_game.vehicle.train_slow_for_level_crossing && !this->cab_driven &&
 			_settings_game.vehicle.train_acceleration_model == AccelerationModel::Realistic) {
 		constexpr int CROSSING_LOOK_AHEAD = 2;
 		/* Two thirds of what the train can do, but never below this: a slow
@@ -1741,7 +1741,8 @@ int Train::GetCurrentMaxSpeed() const
 		max_speed = std::min(max_speed, this->driver_ceiling);
 	}
 
-	max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
+	/* Driven from its cab, the player keeps to the speeds: no order, no limit of the arrows holds it. */
+	if (!this->cab_driven) max_speed = std::min<int>(max_speed, this->current_order.GetMaxSpeed());
 
 	/* If the train is going backwards, without a leading cab, restrict its speed. */
 	if (!moving_front->CanLeadTrain()) {
@@ -1749,7 +1750,7 @@ int Train::GetCurrentMaxSpeed() const
 		max_speed = std::min<int>(max_speed, BACKWARDS_NO_CAB_SPEED_LIMIT);
 	}
 
-	return std::min<int>({max_speed, static_cast<int>(this->gcache.cached_max_track_speed), this->CabSpeedLimitInternal()});
+	return std::min<int>({max_speed, static_cast<int>(this->gcache.cached_max_track_speed), this->cab_driven ? INT32_MAX : this->CabSpeedLimitInternal()});
 }
 
 /** Update acceleration of the train from the cached power and weight. */
@@ -6711,6 +6712,19 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	to->force_proceed = from->force_proceed;
 	from->wait_counter = 0;
 	from->force_proceed = TFP_NONE;
+
+	/* Driven from its cab: the desk goes with the head. */
+	to->cab_driven = from->cab_driven;
+	to->cab_power = from->cab_power;
+	to->cab_dynamic = from->cab_dynamic;
+	to->cab_brake = from->cab_brake;
+	to->cab_engine_brake = from->cab_engine_brake;
+	to->cab_emergency = from->cab_emergency;
+	to->cab_reverser = from->cab_reverser;
+	from->cab_driven = false;
+	from->cab_power = from->cab_dynamic = from->cab_brake = from->cab_engine_brake = 0;
+	from->cab_emergency = false;
+	from->cab_reverser = 1;
 
 	/* And everything on the screen that follows the train by the index of
 	 * its head: its windows, the news about it, the viewports centred on it.
@@ -13059,6 +13073,9 @@ void Train::MarkDirty()
  */
 int Train::UpdateSpeed()
 {
+	/* Driven from its cab (cab_driven): its controls move it, not the game. */
+	if (this->cab_driven && !this->vehstatus.Test(VehState::Stopped)) return this->DoUpdateSpeed(this->CabAcceleration(), 0, this->GetCurrentMaxSpeed());
+
 	switch (_settings_game.vehicle.train_acceleration_model) {
 		default: NOT_REACHED();
 		case AccelerationModel::Original:
@@ -13111,6 +13128,65 @@ int Train::UpdateSpeed()
 			return distance;
 		}
 	}
+}
+
+/**
+ * How a train driven from its cab (cab_driven; the player, 31. 10.: "the realistic controls and the simulation of the
+ * driving") gains or loses speed this tick, in 1/256ths of a speed unit a tick (what DoUpdateSpeed() takes). The pull
+ * of its engines by the throttle, as the game counts a pull (GetAcceleration(): the power at the speed, no more than the
+ * tractive effort), less what holds it back: the way's resistance as the game counts it (up a hill more, down a hill
+ * it pushes) and the brakes, as forces too (the train's brake, the electric brake, the engines' own brake, the
+ * emergency brake and the power off). Standing, it moves off only when the pull is more than the resistance and the
+ * brakes.
+ */
+int Train::CabAcceleration() const
+{
+	const int64_t speed = this->GetCurrentSpeed();
+	const int64_t mass = std::max<int64_t>(1, this->gcache.cached_weight);
+	const int64_t power = static_cast<int64_t>(this->gcache.cached_power) * 746;
+	const int64_t max_te = this->gcache.cached_max_te;
+	/* The engines pulling with a share of what they can, of 255, newtons. */
+	auto pull = [&](int64_t share) {
+		const int64_t te = max_te * share / 255;
+		if (speed <= 0) return te;
+		return std::min<int64_t>(te, power * share / 255 * 18 / (speed * 5));
+	};
+	int64_t resistance = this->gcache.cached_axle_resistance + mass * this->GetRollingFriction();
+	resistance += static_cast<int64_t>(this->GetAirDragArea()) * this->gcache.cached_air_drag * speed * speed / 1000;
+	resistance += this->GetSlopeResistance();
+
+	int64_t force = 0;
+	if (!this->cab_emergency && this->cab_reverser != 0 && this->cab_power > 0) force = pull(this->cab_power);
+	int64_t accel = (force - resistance) / (mass * 4);
+
+	/* The brakes as forces, as the pull is (the game's units: a newton on a tonne is a quarter of a unit): the train's
+	 * brake at full service 0.9 m/s2 of the whole train, the emergency brake 1.3 m/s2 and the power off, the engines'
+	 * own brake 0.9 m/s2 of their weight only, the electric brake the motors pulling the other way at three quarters of
+	 * their pull, fading out at a walking pace; all together no harder than the emergency brake. No delay of the air
+	 * (the player, 31. 10.: "it is a few metres"). */
+	constexpr int64_t SERVICE = 900, EMERGENCY = 1300; // newtons a tonne: m/s2 times 1000
+	int64_t brake;
+	if (this->cab_emergency) {
+		brake = EMERGENCY * mass / (mass * 4);
+	} else {
+		int64_t newtons = SERVICE * mass * this->cab_brake / 255;
+		if (this->cab_dynamic > 0 && speed > 0) {
+			constexpr int64_t DYNAMIC_FULL = 20, DYNAMIC_NONE = 5; // speed units: full from 32 km/h, none below 8
+			int64_t dynamic = pull(this->cab_dynamic) * 3 / 4;
+			if (speed < DYNAMIC_FULL) dynamic = speed <= DYNAMIC_NONE ? 0 : dynamic * (speed - DYNAMIC_NONE) / (DYNAMIC_FULL - DYNAMIC_NONE);
+			newtons += dynamic;
+		}
+		if (this->cab_engine_brake > 0) {
+			int64_t engines = 0;
+			for (const Train *u = this; u != nullptr; u = u->Next()) {
+				if (u->IsEngine()) engines += u->GetWeight();
+			}
+			newtons += SERVICE * engines * this->cab_engine_brake / 255;
+		}
+		brake = std::min(newtons, EMERGENCY * mass) / (mass * 4);
+	}
+	if (speed == 0) return accel > brake ? ClampTo<int32_t>(accel - brake) : 0;
+	return ClampTo<int32_t>(accel - brake);
 }
 
 /**
@@ -14754,6 +14830,18 @@ static bool TrainLocoHandler(Train *consist, bool mode)
 	/* train has crashed? */
 	if (consist->vehstatus.Test(VehState::Crashed)) {
 		return mode ? true : HandleCrashedTrain(consist); // 'this' can be deleted here
+	}
+
+	/* Driven from its cab: past every red (the player, 31. 10.: "the train is driven by the player, so the game does
+	 * not drive it: it runs past"); and stopped by the player on a platform of the station its order is for, it
+	 * arrives there as a train the game stops would (TrainEnterStation()). */
+	if (consist->cab_driven && !mode) {
+		consist->force_proceed = TFP_SIGNAL;
+		const Train *at = consist->GetMovingFront();
+		if (consist->cur_speed == 0 && !consist->current_order.IsType(OT_LOADING) && IsRailStationTile(at->tile) &&
+				consist->current_order.ShouldStopAtStation(consist, GetStationIndex(at->tile))) {
+			TrainEnterStation(consist, GetStationIndex(at->tile));
+		}
 	}
 
 	if (consist->force_proceed != TFP_NONE) {

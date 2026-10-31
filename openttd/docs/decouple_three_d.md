@@ -1433,6 +1433,40 @@ The rig: `test3d obloukjizda 1 0 300 53542BB7` buys the 451 (an electric
 engine gets its track under the wires), `test3d kabina 0`, `test3d kabina
 klik cely`, `test3d kabina hlava <dx> <dy>`.
 
+### Driving a train of MSTS from its desk
+
+The player drives it, the game does not (`Train::cab_driven`): the first
+touch of a control in its cab view takes it over, the window closed (or the
+button Drive / T, its route) lets it go, and the game drives it again by its
+orders. Driven, it runs past every red (`force_proceed`, renewed each tick),
+no platform slows it and no order's speed holds it; stopped by the player on
+a platform of the station its order is for, it arrives there and loads.
+The curves, the bridges and the depots still hold it to their speeds.
+
+The controls (`CmdTrainCabControl()`, saved with the train): the throttle,
+the electric brake, the train's brake, the engines' own brake, the emergency
+brake and the reverser. `Train::CabAcceleration()` moves the train by them
+as forces: the pull as the game counts it (the power at the speed, no more
+than the tractive effort, by the throttle), less the way's resistance, less
+the brakes -- full service 0.9 m/s2 of the train, the emergency brake
+1.3 m/s2 and the power off, the engines' own brake on their weight, the
+electric brake three quarters of the motors' pull, fading out below 8 km/h.
+No delay of the air brake (the player: "it is a few metres").
+
+At the desk (`SimtrainsCabDriver`, a switch at the bottom of the cab view,
+`gui.cab_msts_keys`): the arrows move one combined lever -- up the notches of
+the `.eng`'s throttle, down from nought the electric brake (three steps, if
+the engine has one) and then the train's brake in five steps, held down at
+the end the emergency brake; or the keys of MSTS: D/A the throttle, '/; the
+brake, ]/[ the engines' brake, ./, the electric brake, W/S the reverser,
+Backspace the emergency brake, Space the horn. The panel under the view says
+where the controls stand.
+
+The rig: `test3d kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer>
+<0-255>`, `test3d kabina zavri`; `test3d kabina cas` shows the desk. The 451
+alone: full service from 65 km/h stands within the tile, the emergency brake
+from 99 km/h within two; 0 to 99 km/h in three tiles.
+
 The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
 buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of
 the other (`53544EE5`, the ČD B 598).

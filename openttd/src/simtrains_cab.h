@@ -22,6 +22,7 @@
 #define SIMTRAINS_CAB_H
 
 #include "simtrains.h"
+#include "gfx_type.h"
 
 #include <cstdint>
 #include <string>
@@ -49,6 +50,39 @@ struct SimtrainsCabDesk {
 	int width = 0, height = 0;   ///< the window's picture it was made for
 	double head = 1e9, pitch = 1e9; ///< and the head turned so
 };
+
+/**
+ * The player at the desk of a train of MSTS (the player, 31. 10.: "our arrows and horn are better there; put a switch at
+ * the bottom of the cab view window: controls MSTS / arrows"; "the train is driven by the player, so the game does not
+ * drive it"). What the arrows or the keys move goes to the game as commands (CmdTrainCabControl()); the first touch
+ * takes the train over (Train::cab_driven), the window closed lets it go.
+ *
+ * The arrows move one combined lever, as the desks of the electric units have it: up the notches of the throttle
+ * (the .eng's), down from nought the electric brake (if the engine has one, three steps), then the train's brake in
+ * five steps to full service with the electric brake still on; held down at the end a second, the emergency brake.
+ * The keys are those of MSTS: D and A the throttle, ' and ; the brake, ] and [ the engines' own brake, . and , the
+ * electric brake, W and S the reverser, Backspace the emergency brake, Space the horn.
+ */
+struct SimtrainsCabDriver {
+	int lever = 0;          ///< the arrows' combined lever: above nought a notch, below the electric brake, then the brake
+	bool read = false;      ///< the lever read from the train (when the window opened onto a train driven already)
+	DirectionKeys held{};   ///< the arrows held at the last look
+	int repeat_ms = 0;      ///< milliseconds till the lever moves again while an arrow is held
+	int bottom_ms = 0;      ///< milliseconds Down has been held with the lever at its end
+	std::string done;       ///< what was done last, for the rig
+
+	static constexpr int BRAKE_STEPS = 5;
+	static constexpr int DYNAMIC_STEPS = 3;
+	static constexpr int REPEAT_MS = 250;
+	static constexpr int EMERGENCY_MS = 1000;
+
+	void Drive(const Vehicle *v, DirectionKeys now, int ms);
+	bool Key(const Vehicle *v, char32_t key, uint16_t keycode);
+};
+
+bool IsSimtrainsTrain(const Vehicle *v);
+void SimtrainsCabLetGo(const Vehicle *v);
+std::string SimtrainsDeskText(const Vehicle *v);
 
 const SimtrainsCab *SimtrainsCabOf(const Vehicle *v);
 bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const CabViewCamera &camera, int left, int top, int width, int height);

@@ -44,6 +44,8 @@ struct SimtrainsEngine {
 
 	std::string grf_path;         ///< where the GRF made of it is: newgrf/simtrains/ of the player's own folder
 	std::string cvf;              ///< an engine's cab, its "CabView" .cvf (simtrains_cab.h); empty none
+	std::vector<float> notches;   ///< the notches of its throttle past 0 ("EngineControllers", "Throttle"), of full; empty none given
+	bool dynamic = false;         ///< it has an electric brake ("DynamicBrakesMaximumForce", "Brake_Dynamic")
 };
 
 /** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. Its
@@ -52,6 +54,7 @@ static constexpr uint16_t SIMTRAINS_ENGINE_ID = 200;
 
 extern std::string _simtrains_path;
 const std::vector<SimtrainsEngine> &FindSimtrainsEngines();
+const SimtrainsEngine *SimtrainsEngineOf(uint32_t grfid);
 void PrepareSimtrainsGrfs();
 
 /** A model of MSTS read for drawing, in the frame of the game's vehicle objects (three_d_objects.h): metres, x forward, y left, z up. */
