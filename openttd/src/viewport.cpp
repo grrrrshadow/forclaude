@@ -2181,6 +2181,7 @@ struct TurnedTimes {
 	int standing_faces = 0;    ///< and the boxes it drew (ThreeDGpuStandingFaces)
 	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
+	int standing_processor[2] = {}; ///< blocks whose standing things the processor drew: no ground of the card under them, the card gave them back
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -2430,8 +2431,9 @@ std::string TakeTurnedTimesForDiary(int frames)
 	const int blocks = _turned_ground_times.card_blocks + _turned_ground_times.processor_blocks + _turned_ground_times.view_blocks;
 	/* Of "plakaty" (what stands on the map) the card's part, waited for; whole views laid and views only moved. */
 	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2];
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}",
-			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0]);
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0],
+			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
 	_turned_card_view_passes = 0;
 	_turned_card_view_moves = 0;
 	_turned_card_band_passes = 0;
@@ -6799,6 +6801,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		}
 	}
 	if (!standing_on_card) {
+		if (!standing.empty()) _turned_times.standing_processor[_turned_card_standing_on && ground_on_card && _turned_card_ground.vp != nullptr ? 1 : 0]++;
 		for (const TurnedSprite &s : standing) DrawTurnedStandingByProcessor(frame, *s.ps);
 	}
 	if (ground_on_card) TurnedCardStandingLaid(ground_laying.view_x, ground_laying.view_y, fw, fh, standing_on_card);

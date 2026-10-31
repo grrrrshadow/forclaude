@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (72) – Log #317 pod zátěží: mapa 2–5 snímků/s, domy procesorem v blocích, které karta vrátila
+
+- Hráč poslal logy #317 (3d_karta, 3d_domy, snimky, log) a *„dělej dál gpu.“*, pak *„do auta jsem nestih cab
+  view“* a *„teď byla vysoká zátěž, v ulicích mnoho aut a koňů“*.
+- **Co log ukazuje (mapa, hodně aut a koní):**
+  - 2–5 snímků/s;
+  - 20–25 bloků mapy na snímek kreslených znovu (pohybují se vozidla), každý asi 10 ms;
+  - karta pokládá to, co stojí, asi 90 ms na snímek;
+  - zem z drženého pohledu 1 s za 5 s;
+  - obrázky figur a vozidel na kartě 1,3 s za 5 s.
+- **Regrese z (71):** `modely` (domy kreslené procesorem) dřív 1 ms na snímek, v #317 v obdobích 30–160 ms.
+  Procesor kreslí domy jen v blocích, kde karta to, co stojí, nepoloží: buď nemá zem bloku, nebo blok vrátí, když
+  jednu věc položit nemůže (`DrawStandingOnCard()`: krabice, tvar nebo textura domu, obrázek). Dřív procesor kopíroval
+  hotový obrázek domu, teď dům kreslí trojúhelníky. Proč karta bloky vrací, log neříká. Rig (llvmpipe, město,
+  16 koní, zoom tam a zpět, noc) nevrátil ani jeden.
+- **Doplněno do deníků:** `snimky.log` → `otocena … stojici procesorem N bloku (bez zeme karty, karta vratila)`;
+  `obrazky … what stands on N blocks left to the processor (a box, a building's shape, a building's texture, a
+  picture)`; `3d_karta.log` → prvních 40 vrácení s důvodem (rozměry textury a počet pixelů, tvar, obrázek).
+- **Další krok:** podle nového logu pod zátěží opravit příčinu vracení. Pak zlevnit kreslení bloků, kterými jedou
+  vozidla: každý blok teď na kartě kreslí znovu i domy kolem.
+
 ## 31. 10. (71) – GPU #123: domy už nikdy obrázky, mezipaměť obrázků domů zrušená
 
 - Hráč: *„jo nejdřiv domy gpu. falclora zařidim.“* (Falkora řeší hráč sám.)

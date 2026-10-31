@@ -488,6 +488,13 @@ uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the pro
 uint64_t _gpu_standing_vehicles = 0;      ///< the vehicles of the turned map it drew and shrunk since the last ThreeDGpuTimes() (ThreeDGpuStandingVehicle)
 uint64_t _gpu_standing_vehicles_kept = 0; ///< and those it laid as they were kept
 uint64_t _gpu_standing_triangles[2] = {}; ///< the triangles of the buildings among what stands it drew, and of all of them those in the blocks (GpuBuilding::Cell)
+/**
+ * The blocks of the turned map whose standing things the card gave back to the processor since the last ThreeDGpuTimes()
+ * (DrawStandingOnCard(): one thing it cannot lay, the processor draws the whole block -- the buildings by their
+ * triangles), by what it could not lay: a box's faces, a building's shape, a building's texture, a picture.
+ */
+uint64_t _gpu_standing_failed[4] = {};
+int _gpu_standing_failed_told = 0; ///< how many of those the card's diary told what of (at most 40)
 double _gpu_ground_ms = 0;          ///< the time the card took laying the ground of the turned map since the last ThreeDGpuTimes()
 uint64_t _gpu_grounds = 0;          ///< and how many blocks
 uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the processor did)
@@ -3403,13 +3410,28 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	std::vector<uint8_t> cell_in;
 	std::vector<GLint> firsts;
 	std::vector<GLsizei> counts;
+	int building_failed = 0; ///< why the last building could not be laid: 1 its shape, 2 a texture of it
 	auto draw_building = [&](const ThreeDGpuStandingBuilding &b) {
 		const GpuBuilding *on = MapBuildingOnCard(b.building);
-		if (on == nullptr) return false;
+		if (on == nullptr) {
+			building_failed = 1;
+			if (_gpu_standing_failed_told < 40) {
+				_gpu_standing_failed_told++;
+				Diary(fmt::format("budova plochy procesorem: tvar {} rohu, {} uv, cislo {}", b.building.pos.size() / 3, b.building.uv.size() / 2, b.building.uid), true);
+			}
+			return false;
+		}
 		textures.clear();
 		for (const ThreeDObjectTexture *t : b.building.textures) {
 			const GpuTexture *g = t != nullptr ? TextureOnCard(*t) : nullptr;
-			if (t != nullptr && g == nullptr) return false;
+			if (t != nullptr && g == nullptr) {
+				building_failed = 2;
+				if (_gpu_standing_failed_told < 40) {
+					_gpu_standing_failed_told++;
+					Diary(fmt::format("budova plochy procesorem: textura {} z {}, {}x{}, pixelu {}, karta nejvic {}", textures.size(), b.building.textures.size(), t->w, t->h, t->px.size(), _max_texture), true);
+				}
+				return false;
+			}
 			textures.push_back(g != nullptr ? g->name : 0);
 		}
 		if (b.clear) {
@@ -3682,6 +3704,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (item.faces >= 0) {
 			flush();
 			if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces])) {
+				_gpu_standing_failed[0]++;
+				if (_gpu_standing_failed_told < 40) {
+					_gpu_standing_failed_told++;
+					const ThreeDGpuStandingFaces *f = static_cast<size_t>(item.faces) < s.faces.size() ? &s.faces[item.faces] : nullptr;
+					Diary(fmt::format("krabice plochy procesorem: program {}, obrazek {}x{}, atlas {}", _standing_faces_ok ? "ano" : "ne",
+							f != nullptr && f->texture != nullptr ? f->texture->width : 0, f != nullptr && f->texture != nullptr ? f->texture->height : 0, _standing_atlas_size), true);
+				}
 				all = false;
 				break;
 			}
@@ -3725,6 +3754,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (item.building >= 0) {
 			flush();
 			if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
+				_gpu_standing_failed[building_failed == 2 ? 2 : 1]++;
 				all = false;
 				break;
 			}
@@ -3736,6 +3766,11 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		GLuint texture = 0;
 		std::array<int, 2> place;
 		if (!StandingPlace(item, texture, place, flush)) {
+			_gpu_standing_failed[3]++;
+			if (_gpu_standing_failed_told < 40) {
+				_gpu_standing_failed_told++;
+				Diary(fmt::format("obrazek plochy procesorem: {}x{}, pixelu {}, atlas {}", item.picture->width, item.picture->height, item.picture->pixels.size(), _standing_atlas_size), true);
+			}
 			all = false;
 			break;
 		}
@@ -5166,6 +5201,12 @@ std::string ThreeDGpuTimes()
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_standing_triangles[1] > 0) s += fmt::format("; of the buildings' {} triangles in the blocks {} drawn, in the cells there", _gpu_standing_triangles[1], _gpu_standing_triangles[0]);
+	const uint64_t standing_failed = _gpu_standing_failed[0] + _gpu_standing_failed[1] + _gpu_standing_failed[2] + _gpu_standing_failed[3];
+	if (standing_failed > 0) {
+		s += fmt::format("; what stands on {} blocks left to the processor (a box {}, a building's shape {}, a building's texture {}, a picture {})",
+				standing_failed, _gpu_standing_failed[0], _gpu_standing_failed[1], _gpu_standing_failed[2], _gpu_standing_failed[3]);
+	}
+	for (uint64_t &f : _gpu_standing_failed) f = 0;
 	_gpu_standing_vehicles = 0;
 	_gpu_standing_vehicles_kept = 0;
 	_gpu_standing_triangles[0] = _gpu_standing_triangles[1] = 0;
