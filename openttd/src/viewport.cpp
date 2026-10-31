@@ -12338,6 +12338,13 @@ struct EyeGlow {
 	Colour colour;
 	double strength, squash;
 	bool lamp = false; ///< a lamp's (a headlight, a red light): not over what is nearer than it (AddEyeNightLight()); else a pool of light, all of it
+	double before = 0; ///< a lamp's: how far before its middle towards the eye it still lights what is there, world units (a pool on the ground: its near half)
+
+	/** How much nearer than its middle (1 / how far) what it does not light is: as a lamp's, and so far before it. */
+	double HiddenBy(double ahead) const
+	{
+		return 1.05 * ahead / std::max(ahead - this->before, ahead * 0.2);
+	}
 };
 
 /**
@@ -12348,8 +12355,8 @@ struct EyeGlow {
 static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicle *own)
 {
 	std::vector<EyeGlow> glows;
-	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash, bool lamp = false) {
-		glows.push_back({wx, wy, wz, radius, colour, strength, squash, lamp});
+	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash, bool lamp = false, double before = 0) {
+		glows.push_back({wx, wy, wz, radius, colour, strength, squash, lamp, before});
 	};
 	/*
 	 * A lamp shining one way (a headlight ahead, a red light back) is seen from before it and from its side, not from
@@ -12442,21 +12449,24 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		}
 	}
 	/* The witches' lanterns and torches (three_d_witches.h): the flame and its light all round, the torch's glass, its
-	 * beam as a row of glows widening along it, and its pool where it falls on the ground. */
+	 * beam as a row of glows widening along it, and its pool where it falls on the ground. Lamps all: none of it over
+	 * what is drawn nearer than the light -- a wall, a tree between (the player, 31. 10.: "the witches' lights are seen
+	 * through the walls and through the trees"); their light all round reaches a little before them, the pool before
+	 * its middle as far as it is wide. */
 	const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
 	for (const ThreeDWitchLight &l : GetThreeDWitchLights(true)) {
 		if (!l.torch) {
-			glow(l.x, l.y, l.z, l.reach, l.colour, 0.35, 1.0);
-			glow(l.x, l.y, l.z, std::max(0.15, l.reach * 0.1), l.colour, 1.0, 1.0);
+			glow(l.x, l.y, l.z, l.reach, l.colour, 0.35, 1.0, true, l.reach * 0.25);
+			glow(l.x, l.y, l.z, std::max(0.15, l.reach * 0.1), l.colour, 1.0, 1.0, true);
 			continue;
 		}
-		glow(l.x, l.y, l.z, 0.25, l.colour, 1.0, 1.0);
+		glow(l.x, l.y, l.z, 0.25, l.colour, 1.0, 1.0, true);
 		const double len = l.ground > 0 ? l.ground : l.reach, spread = std::tan(l.half_angle);
 		for (int k = 1; k <= 16; k++) {
-			const double s = len * k / 16;
-			glow(l.x + l.dx * s, l.y + l.dy * s, l.z + l.dz * s * up, std::max(0.2, s * spread), l.colour, 0.1 * (1.0 - k / 18.0), 1.0);
+			const double s = len * k / 16, r = std::max(0.2, s * spread);
+			glow(l.x + l.dx * s, l.y + l.dy * s, l.z + l.dz * s * up, r, l.colour, 0.1 * (1.0 - k / 18.0), 1.0, true, r);
 		}
-		if (l.ground > 0) glow(l.x + l.dx * len, l.y + l.dy * len, l.z + l.dz * len * up, len * spread * 1.2, l.colour, 0.45, 0.4);
+		if (l.ground > 0) glow(l.x + l.dx * len, l.y + l.dy * len, l.z + l.dz * len * up, len * spread * 1.2, l.colour, 0.45, 0.4, true, len * spread * 1.2);
 	}
 	return glows;
 }
@@ -12479,13 +12489,15 @@ static void DrawEyeNight(const CabEye &eye, int width, int height, uint32_t *dst
 		if (p.f < CAB_NEAR) continue;
 		CabVertex v = CabProject(eye, p);
 		const int px = static_cast<int>(v.sx), py = static_cast<int>(v.sy);
+		/* What it does not light, nearer than its middle (a lamp's, so far before it). */
+		const double hidden_by = g.HiddenBy(p.f);
 		if (px >= 0 && py >= 0 && px < width && py < height) {
 			/* Behind something nearer: not seen. */
-			if (zb[static_cast<size_t>(py) * width + px] > v.iw * 1.05f) continue;
+			if (zb[static_cast<size_t>(py) * width + px] > v.iw * hidden_by) continue;
 		}
 		const double r = std::max(1.0, g.radius * eye.focal / p.f);
 		if (g.lamp) {
-			AddEyeNightLight(dst, zb, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength, static_cast<float>(v.iw));
+			AddEyeNightLight(dst, zb, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength, static_cast<float>(v.iw * hidden_by / 1.05));
 		} else {
 			AddNightLight(dst, width, width, height, v.sx, v.sy, r, r * g.squash, g.colour, g.strength);
 		}
@@ -14486,7 +14498,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const CabVertex v = CabProject(eye, p);
 				const double r = std::max(1.0, g.radius * eye.focal / p.f);
 				st.glows.push_back({static_cast<float>(v.sx), static_cast<float>(v.sy), static_cast<float>(r), static_cast<float>(r * g.squash),
-						static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), static_cast<float>(g.strength), static_cast<float>(v.iw), 1.05f, g.lamp ? 1.0f : 0.0f});
+						static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), static_cast<float>(g.strength), static_cast<float>(v.iw), static_cast<float>(g.HiddenBy(p.f)), g.lamp ? 1.0f : 0.0f});
 			}
 			return true;
 		});

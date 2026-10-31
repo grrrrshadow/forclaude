@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (62) – Světla čarodějnic prosvítala zdmi a stromy (z očí)
+
+- Hráč: *„světla čarodějnic jsou vidět skrz zdi a skrz stromy“*
+- **Příčina:** záře lucerny, paprsek svítilny a jeho kaluž na zemi se v pohledu z očí kreslily jako kaluž světla.
+  Celá záře se skryla jen tehdy, když bylo zakryté její střed. Když byl střed vidět (mezerou v listí, nad hranou
+  střechy), záře o poloměru několika metrů se rozlila i přes bližší dům a strom. Stejně na procesoru i na kartě.
+- **Oprava:** světla čarodějnic (a UFO, mají stejný seznam) se zkouší po bodech jako lampy: nic z nich nepadne na
+  to, co je blíž než světlo. Záře kolem lucerny smí svítit čtvrtinu svého dosahu před lucernu (čarodějnice a koště).
+  Kaluž na zemi před svůj střed, jak je široká, aby se neusekla její bližší polovina. Paprsek po kouscích, každý
+  podle své šíře (`EyeGlow::before`, `HiddenBy()`).
+- Rig (z očí v noci, čarodějnice za domy, stará a nová verze ve stejném tiku): stará kreslila záři přes bližší dům a
+  strom, nová ne. Záře kolem lucerny nad střechou zůstala jen na obloze.
+- Na otočené mapě se světla čarodějnic dál kreslí bez zakrývání: létají vysoko, hra tam hloubku nemá. Uvidí se, jestli
+  vadí.
+
 ## 31. 10. (61) – Simtrains: kabina, ovládání a simulace z modelů MSTS (návrh, čeká na odsouhlasení)
 
 - Hráč: *„simtrains zdokonalit. výhled z kabiny a využijem realistické ovládání a simulaci řízení a cabiny modelů
