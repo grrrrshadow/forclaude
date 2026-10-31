@@ -31,6 +31,23 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (63) – GPU: noční záře otočené mapy bez čtení zpět z karty
+
+- Hráč: *„to mužeš taky pokračovat gpu“*
+- **Proč:** záře oken a světel aut se na otočené mapě kreslí jen tam, kde je vidět svítící pixel (záře domu za
+  rohem se nekreslí). Při kartě to znamenalo po každém bloku mapy přečíst z karty masku svítících pixelů zpět
+  (`glReadPixels`). V hráčově 3d_karta.log to bylo 1943× „svitici body plochy zpet“. Na telefonu je každé čtení
+  zpět čekání, než karta dokreslí.
+- **Teď:** blok si záře jen poznamená (kde, jak velká, jaká barva). Ovladač videa je přidá při skládání obrazovky
+  přímo z masky, která na kartě zůstává (`SetThreeDGlows`, shader `_frag_shader_three_d_glow`). Zkouška „svítí
+  pixel poblíž“ je stejná jako dřív (5×5 bodů kolem středu), jen ji dělá karta. Bez karty (procesor) se kreslí
+  postaru.
+- Záře je teď celá i přes hranu bloku: dřív ji hrana bloku usekla (ostrá rovná čára přes záři okna).
+- Rig (noc, město u kostela, 4 pohledy: 30° a 200°, posun, přiblížení, vypnutí noci; stará a nová verze ve stejném
+  tiku): čtení zpět 26 / 289 / 72 / 272 → 0. Obraz se liší jen v 275–660 bodech z 1,44 milionu, a to jsou ty
+  useknuté hrany. Po vypnutí noci žádná záře nezůstane. Smoke beze změny.
+- První verze měla záře o kus větší (obdélník zaokrouhlený na celé pixely). Opraveno, teď přesně jako procesor.
+
 ## 31. 10. (62) – Světla čarodějnic prosvítala zdmi a stromy (z očí)
 
 - Hráč: *„světla čarodějnic jsou vidět skrz zdi a skrz stromy“*

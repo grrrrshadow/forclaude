@@ -15,6 +15,7 @@
 #include "../gfx_type.h"
 #include "../spriteloader/spriteloader.hpp"
 #include "../misc/lrucache.hpp"
+#include "video_driver.hpp"
 
 #include <map>
 #include <mutex>
@@ -88,6 +89,7 @@ private:
 		std::array<float, 4> part = {0.0f, 0.0f, 1.0f, 1.0f}; ///< the part of the textures shown: left, top, width, height as parts of theirs
 	};
 	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
+	std::map<const void *, std::vector<VideoDriver::ThreeDGlow>> three_d_glows; ///< the glows over them (SetThreeDGlows()), by their owners
 	std::mutex three_d_mutex; ///< of three_d_pictures: set by the game, drawn by Paint()
 	GLuint three_d_program = 0; ///< Shader program for a picture of the graphics card where the screen's pixels are of alpha 0.
 	GLint  three_d_sprite_loc = 0; ///< Uniform location for its place.
@@ -97,6 +99,12 @@ private:
 	GLint  three_d_light_loc = -1; ///< Uniform location for its light (the night's).
 	GLint  three_d_over_loc = -1; ///< Uniform location for whether a picture is laid over it.
 	GLint  three_d_part_loc = -1; ///< Uniform location for the part of its textures shown.
+	GLuint three_d_glow_program = 0; ///< Shader program for the glows of the night over a picture of the graphics card (SetThreeDGlows()).
+	GLint  three_d_glow_sprite_loc = -1; ///< Uniform location for a glow's place.
+	GLint  three_d_glow_screen_loc = -1; ///< Uniform location for the screen size.
+	GLint  three_d_glow_size_loc = -1;   ///< Uniform location for the screen size in the fragment shader.
+	GLint  three_d_glow_colour_loc = -1; ///< Uniform location for its colour and strength.
+	GLint  three_d_glow_lit_loc = -1;    ///< Uniform location for its middle in the lit pixels and a pixel of them.
 
 	OpenGLBackend();
 	~OpenGLBackend() override;
@@ -139,6 +147,7 @@ public:
 	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
 	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f});
 	void HideThreeDPicture(const void *owner);
+	void SetThreeDGlows(const void *owner, std::vector<VideoDriver::ThreeDGlow> &&glows);
 	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
 
 	void *GetVideoBuffer();

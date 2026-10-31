@@ -2049,8 +2049,23 @@ static inline uint32_t ShadedPixel(uint32_t p, uint light)
 static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 4>> _night_glows;
-/** Which pixels of the block the card left lit (ThreeDGpuStanding::lit), a byte a pixel: where the glows of the lights are seen as by _night_lit; empty none. */
-static std::vector<uint8_t> _night_lit_card;
+/**
+ * What stands on the block being drawn was laid by the card at night: the glows that are seen only by a lit pixel near
+ * them go to the video driver (TurnedCardGlow), which tells that from the card's lit pixels where they are -- not read
+ * back from the card (the player's 3d_karta.log of 31. 10.: 1943 reads of them, the processor waiting for the card at
+ * each, block by block, all night).
+ */
+static bool _night_card_lit = false;
+
+/** A glow of the night over the picture of the turned main view on the card (_night_card_lit): where, unscaled virtual pixels of the view. */
+struct TurnedCardGlow {
+	float x, y;
+	float rx, ry;
+	Colour colour;
+	float strength;
+};
+static std::vector<TurnedCardGlow> _turned_card_glows; ///< of all the blocks the card laid at night, each where its block put it
+static ZoomLevel _turned_card_glows_zoom = ZoomLevel::Normal; ///< the zoom they are of
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
 static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
@@ -7221,7 +7236,8 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		on_card.height = UnScaleByZoom(frame.height, frame.zoom);
 		on_card.view_w = _turned_card_ground.w;
 		on_card.view_h = _turned_card_ground.h;
-		on_card.read_lit = _night_windows_now;
+		/* Its lit pixels stay on the card: the glows by them are the video driver's (_night_card_lit). */
+		on_card.read_lit = false;
 		const size_t glows_before = _night_glows.size();
 		for (const TurnedSprite &s : standing) AddTurnedStandingThing(on_card, frame, *s.ps);
 		const double tc0 = TurnedNow();
@@ -7230,7 +7246,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		if (standing_on_card) {
 			_turned_times.standing_card++;
 			ShowTurnedCardGround();
-			_night_lit_card = std::move(on_card.lit);
+			_night_card_lit = _night_windows_now;
 		} else {
 			/* Drawn again by the processor, its glows told again. */
 			_night_glows.resize(glows_before);
@@ -7402,6 +7418,28 @@ static void AddNightBeam(uint32_t *dst, int pitch, int w, int h, double ax, doub
 }
 
 /**
+ * The glows of the night over the picture of the turned main view on the card (TurnedCardGlow) told to the video driver,
+ * where they are on the screen now; none by day, or when the card's picture is not shown.
+ * @param vp the turned main view
+ */
+static void TurnedCardGlowsShow(const Viewport &vp)
+{
+	static bool told = false;
+	if (_turned_card_ground.vp != &vp || !_turned_card_ground.shown || !_night_windows_now || _turned_card_glows_zoom != vp.zoom) _turned_card_glows.clear();
+	if (_turned_card_glows.empty() && !told) return;
+	std::vector<VideoDriver::ThreeDGlow> glows;
+	glows.reserve(_turned_card_glows.size());
+	const int ox = vp.left - UnScaleByZoomLower(vp.virtual_left, vp.zoom), oy = vp.top - UnScaleByZoomLower(vp.virtual_top, vp.zoom);
+	for (const TurnedCardGlow &g : _turned_card_glows) {
+		const float x = g.x + ox, y = g.y + oy;
+		if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
+		glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength});
+	}
+	told = !glows.empty();
+	VideoDriver::GetInstance()->SetThreeDGlows(&_turned_card_ground, std::move(glows));
+}
+
+/**
  * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
  * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
  * the front of a road vehicle, a train or a ship, with the pool of their light on the way ahead; the red lights at
@@ -7450,9 +7488,6 @@ static void DrawNight(bool turned)
 				const int x = static_cast<int>(i % dpi.pitch), y = static_cast<int>(i / dpi.pitch);
 				if (x < w && y < h) seen[static_cast<size_t>(y) * w + x] = 1;
 			}
-			if (_night_lit_card.size() == seen.size()) {
-				for (size_t i = 0; i < seen.size(); i++) seen[i] |= _night_lit_card[i] != 0;
-			}
 		}
 		for (int y = std::max(0, cy - 2); y <= std::min(h - 1, cy + 2); y++) {
 			for (int x = std::max(0, cx - 2); x <= std::min(w - 1, cx + 2); x++) {
@@ -7461,14 +7496,30 @@ static void DrawNight(bool turned)
 		}
 		return false;
 	};
+	/* The block's glows of the card before (TurnedCardGlow) go: those of now are told below. */
+	const int vs = ScaleByZoom(1, dpi.zoom), bl = dpi.left / vs, bt = dpi.top / vs;
+	if (turned) {
+		if (_turned_card_glows_zoom != dpi.zoom) {
+			_turned_card_glows.clear();
+			_turned_card_glows_zoom = dpi.zoom;
+		}
+		std::erase_if(_turned_card_glows, [&](const TurnedCardGlow &g) { return g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
+	}
+	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
+	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength) {
+		if (turned && _night_card_lit) {
+			if (px >= 0 && py >= 0 && px < w && py < h) _turned_card_glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength)});
+			return;
+		}
+		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
+	};
 	/* The glows of the houses' lights (their "svetlo_NN"): small and warm. */
 	const Colour window(255, 200, 110);
 	for (const auto &g : _night_glows) {
 		double px, py;
 		project(g[0], g[1], g[2], px, py);
 		if (px < 0 || py < 0 || px >= w || py >= h) continue;
-		if (!lit_near(static_cast<int>(px), static_cast<int>(py))) continue;
-		AddNightLight(dst, dpi.pitch, w, h, px, py, 1.4 * unit * g[3], 1.4 * unit * g[3], window, 0.35);
+		lit_glow(px, py, 1.4 * unit * g[3], 1.4 * unit * g[3], window, 0.35);
 	}
 	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block; braking,
 	 * its red lights glow more (VehicleBrakeLightsOn()). */
@@ -7476,14 +7527,13 @@ static void DrawNight(bool turned)
 		const double px = hx + l.x, py = hy + l.y;
 		switch (l.kind) {
 			case ThreeDPictureLight::Kind::Front:
-				if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
+				lit_glow(px, py, 1.2 * unit, 1.2 * unit, lamp, 0.55);
 				break;
 			case ThreeDPictureLight::Kind::Back:
-				if (!lit_near(static_cast<int>(px), static_cast<int>(py))) break;
 				if (braking) {
-					AddNightLight(dst, dpi.pitch, w, h, px, py, 1.3 * unit, 1.3 * unit, tail, 0.9);
+					lit_glow(px, py, 1.3 * unit, 1.3 * unit, tail, 0.9);
 				} else {
-					AddNightLight(dst, dpi.pitch, w, h, px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
+					lit_glow(px, py, 0.7 * unit, 0.7 * unit, tail, 0.6);
 				}
 				break;
 			case ThreeDPictureLight::Kind::PoolNear:
@@ -7614,7 +7664,6 @@ struct TurnedCardView {
 	ZoomLevel zoom = ZoomLevel::Normal;
 	int left = 0, top = 0, width = 0, height = 0; ///< the view, virtual coordinates (whole pixels of its zoom)
 	std::vector<std::array<double, 4>> glows;    ///< the glows of the lights it told (_night_glows)
-	std::vector<uint8_t> lit;                     ///< which of its pixels the card left lit (_night_lit_card), a row its width
 	std::vector<uint32_t> scratch;                ///< where the processor's part of the pass goes: nowhere seen
 };
 static TurnedCardView _turned_card_view;
@@ -7628,10 +7677,9 @@ bool _turned_card_view_on = true; ///< the rig: the whole view laid at once when
  * @param left,top,width,height the piece, virtual coordinates (whole pixels of the zoom)
  * @param scratch where the processor's part of the pass goes: nowhere seen
  * @param[out] glows the glows of the lights it told (_night_glows), nullptr not wanted
- * @param[out] lit which of its pixels the card left lit (_night_lit_card), nullptr not wanted
  * @return whether the card laid what stands on it
  */
-static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, int height, std::vector<uint32_t> &scratch, std::vector<std::array<double, 4>> *glows, std::vector<uint8_t> *lit)
+static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, int height, std::vector<uint32_t> &scratch, std::vector<std::array<double, 4>> *glows)
 {
 	const int fw = UnScaleByZoom(width, vp.zoom), fh = UnScaleByZoom(height, vp.zoom);
 	if (fw <= 0 || fh <= 0) return false;
@@ -7658,15 +7706,12 @@ static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, i
 	_vd.combine_sprites = SpriteCombineMode::None;
 	_vd.last_child = LAST_CHILD_NONE;
 	_night_lit.clear();
-	_night_lit_card.clear();
 	_night_glows.clear();
 	const int laid = _turned_times.standing_card;
 	ViewportDoDrawTurned();
 	const bool ok = _turned_times.standing_card > laid;
 	if (glows != nullptr) *glows = std::move(_night_glows);
-	if (lit != nullptr) *lit = std::move(_night_lit_card);
 	_night_lit.clear();
-	_night_lit_card.clear();
 	_night_glows.clear();
 	_vd.string_sprites_to_draw.clear();
 	_vd.tile_sprites_to_draw.clear();
@@ -7722,7 +7767,7 @@ static bool TurnedViewWholeOnCard(const Viewport &vp)
 	cv.height = height;
 	cv.pass = _dirty_blocks_pass;
 	cv.ok = false;
-	cv.ok = TurnedPassOnCard(vp, left, top, width, height, cv.scratch, &cv.glows, &cv.lit);
+	cv.ok = TurnedPassOnCard(vp, left, top, width, height, cv.scratch, &cv.glows);
 	if (cv.ok) _turned_card_view_passes++;
 	return cv.ok;
 }
@@ -7747,7 +7792,7 @@ static bool TurnedCardRectOnCard(const Viewport &vp, int x0, int y0, int x1, int
 	KeepThreeDPicturesOfBlock();
 	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
 	static std::vector<uint32_t> scratch;
-	const bool ok = TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch, nullptr, nullptr);
+	const bool ok = TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch, nullptr);
 	if (ok) _turned_card_band_passes++;
 	return ok;
 }
@@ -7821,8 +7866,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.top = top & mask;
 	/* The lit windows of the houses, when the night is drawn on 32 bpp (DrawNight()). */
 	_night_lit.clear();
-	_night_lit_card.clear();
 	_night_glows.clear();
+	_night_card_lit = false;
 	_night_windows_now = IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 	_vd.dpi.pitch = _cur_dpi->pitch;
 	_vd.last_child = LAST_CHILD_NONE;
@@ -7834,19 +7879,11 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
 
 	if (whole_on_card) {
-		/* The night of the block as the card's pass told it: the glows of its lights, its lit pixels. */
+		/* The night of the block as the card's pass told it: the glows of its lights, seen by the card's lit pixels
+		 * (_night_card_lit) -- the pass laid what stands on it. */
 		const TurnedCardView &cv = _turned_card_view;
 		_night_glows = cv.glows;
-		const int vs = ScaleByZoom(1, vp.zoom), cw = UnScaleByZoom(cv.width, vp.zoom), ch = UnScaleByZoom(cv.height, vp.zoom);
-		const int bx = (_vd.dpi.left - cv.left) / vs, by = (_vd.dpi.top - cv.top) / vs;
-		const int bw = UnScaleByZoom(_vd.dpi.width, vp.zoom), bh = UnScaleByZoom(_vd.dpi.height, vp.zoom);
-		if (cv.lit.size() == static_cast<size_t>(cw) * ch && bw > 0 && bh > 0) {
-			_night_lit_card.assign(static_cast<size_t>(bw) * bh, 0);
-			for (int y = std::max(0, -by); y < bh && by + y < ch; y++) {
-				const int x0 = std::max(0, -bx), x1 = std::min(bw, cw - bx);
-				if (x0 < x1) std::copy_n(&cv.lit[static_cast<size_t>(by + y) * cw + bx + x0], x1 - x0, &_night_lit_card[static_cast<size_t>(y) * bw + x0]);
-			}
-		}
+		_night_card_lit = _night_windows_now;
 	}
 	if (IsViewportTurned(vp)) {
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
@@ -7894,9 +7931,9 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 
 	/* The night over it all but the signs (gui.night). */
 	if (IsNightNow()) DrawNight(IsViewportTurned(vp));
+	if (IsViewportTurned(vp)) TurnedCardGlowsShow(vp);
 	_turned_vehicles_on_card = false;
 	_night_lit.clear();
-	_night_lit_card.clear();
 	_night_glows.clear();
 	_night_windows_now = false;
 

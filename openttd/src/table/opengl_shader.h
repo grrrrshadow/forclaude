@@ -259,3 +259,54 @@ static const char *_frag_shader_three_d_150[] = {
 	"  colour = vec4(s.rgb + (1.0 - s.a) * mix(c, tint.rgb, tint.a), 1.0);",
 	"}",
 };
+
+/**
+ * Fragment shader of a glow of the night over a picture of the graphics card (OpenGLBackend::SetThreeDGlows()): added
+ * where the screen leaves the picture seen, a soft spot as the processor's (AddNightLight()), only when the picture over
+ * it has a lit pixel near its middle (two pixels about it, as the processor's night looked).
+ */
+static const char *_frag_shader_three_d_glow[] = {
+	"#version 110\n",
+	"uniform sampler2D screen_tex;",
+	"uniform sampler2D over_lit_tex;",
+	"uniform vec2 screen_size;",
+	"uniform vec4 glow;",
+	"uniform vec4 lit_at;",
+	"varying vec2 colour_tex_uv;",
+	"void main() {",
+	"  vec4 s = texture2D(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
+	"  if (s.a > 0.998) discard;",
+	"  vec2 d = colour_tex_uv * 2.0 - 1.0;",
+	"  float d2 = dot(d, d);",
+	"  if (d2 >= 1.0) discard;",
+	"  float lit = 0.0;",
+	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture2D(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
+	"  if (lit < 0.002) discard;",
+	"  float f = glow.a * (1.0 - d2) * (1.0 - d2);",
+	"  gl_FragData[0] = vec4(glow.rgb * f, 1.0);",
+	"}",
+};
+
+/** GLSL 1.50 fragment shader of a glow of the night over a picture of the graphics card. */
+static const char *_frag_shader_three_d_glow_150[] = {
+	"#version 150\n",
+	"uniform sampler2D screen_tex;",
+	"uniform sampler2D over_lit_tex;",
+	"uniform vec2 screen_size;",
+	"uniform vec4 glow;",
+	"uniform vec4 lit_at;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"void main() {",
+	"  vec4 s = texture(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
+	"  if (s.a > 0.998) discard;",
+	"  vec2 d = colour_tex_uv * 2.0 - 1.0;",
+	"  float d2 = dot(d, d);",
+	"  if (d2 >= 1.0) discard;",
+	"  float lit = 0.0;",
+	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
+	"  if (lit < 0.002) discard;",
+	"  float f = glow.a * (1.0 - d2) * (1.0 - d2);",
+	"  colour = vec4(glow.rgb * f, 1.0);",
+	"}",
+};

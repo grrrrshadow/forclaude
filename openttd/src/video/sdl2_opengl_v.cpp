@@ -153,6 +153,11 @@ void VideoDriver_SDL_OpenGL::HideThreeDPicture(const void *owner)
 	if (OpenGLBackend::Get() != nullptr) OpenGLBackend::Get()->HideThreeDPicture(owner);
 }
 
+void VideoDriver_SDL_OpenGL::SetThreeDGlows(const void *owner, std::vector<ThreeDGlow> &&glows)
+{
+	if (OpenGLBackend::Get() != nullptr) OpenGLBackend::Get()->SetThreeDGlows(owner, std::move(glows));
+}
+
 std::vector<std::pair<Rect, uint32_t>> VideoDriver_SDL_OpenGL::GetThreeDPictures()
 {
 	return OpenGLBackend::Get() != nullptr ? OpenGLBackend::Get()->GetThreeDPictures() : std::vector<std::pair<Rect, uint32_t>>{};

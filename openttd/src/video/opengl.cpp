@@ -533,6 +533,8 @@ OpenGLBackend::~OpenGLBackend()
 		_glDeleteProgram(this->vid_program);
 		_glDeleteProgram(this->pal_program);
 		_glDeleteProgram(this->sprite_program);
+		if (this->three_d_program != 0) _glDeleteProgram(this->three_d_program);
+		if (this->three_d_glow_program != 0) _glDeleteProgram(this->three_d_glow_program);
 	}
 	if (_glDeleteVertexArrays != nullptr) _glDeleteVertexArrays(1, &this->vao_quad);
 	if (_glDeleteBuffers != nullptr) {
@@ -744,6 +746,16 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 		_glUniform1i(over_tex_location, 2);      // Texture unit 2.
 		_glUniform1i(over_lit_tex_location, 3);  // Texture unit 3.
 	}
+	if (this->three_d_glow_program != 0) {
+		this->three_d_glow_sprite_loc = _glGetUniformLocation(this->three_d_glow_program, "sprite");
+		this->three_d_glow_screen_loc = _glGetUniformLocation(this->three_d_glow_program, "screen");
+		this->three_d_glow_size_loc = _glGetUniformLocation(this->three_d_glow_program, "screen_size");
+		this->three_d_glow_colour_loc = _glGetUniformLocation(this->three_d_glow_program, "glow");
+		this->three_d_glow_lit_loc = _glGetUniformLocation(this->three_d_glow_program, "lit_at");
+		_glUseProgram(this->three_d_glow_program);
+		_glUniform1i(_glGetUniformLocation(this->three_d_glow_program, "screen_tex"), 1);   // Texture unit 1.
+		_glUniform1i(_glGetUniformLocation(this->three_d_glow_program, "over_lit_tex"), 3); // Texture unit 3.
+	}
 	(void)_glGetError(); // Clear errors.
 
 	/* Create pixel buffer object as video buffer storage. */
@@ -950,6 +962,25 @@ bool OpenGLBackend::InitShaders()
 		}
 	}
 	_glDeleteShader(three_d_shader);
+
+	/* The glows of the night over them (SetThreeDGlows()). */
+	if (this->three_d_program != 0) {
+		GLuint glow_shader = _glCreateShader(GL_FRAGMENT_SHADER);
+		_glShaderSource(glow_shader, glsl_150 ? lengthof(_frag_shader_three_d_glow_150) : lengthof(_frag_shader_three_d_glow), glsl_150 ? _frag_shader_three_d_glow_150 : _frag_shader_three_d_glow, nullptr);
+		_glCompileShader(glow_shader);
+		if (VerifyShader(glow_shader)) {
+			this->three_d_glow_program = _glCreateProgram();
+			_glAttachShader(this->three_d_glow_program, vert_shader);
+			_glAttachShader(this->three_d_glow_program, glow_shader);
+			if (glsl_150) _glBindFragDataLocation(this->three_d_glow_program, 0, "colour");
+			_glLinkProgram(this->three_d_glow_program);
+			if (!VerifyProgram(this->three_d_glow_program)) {
+				_glDeleteProgram(this->three_d_glow_program);
+				this->three_d_glow_program = 0;
+			}
+		}
+		_glDeleteShader(glow_shader);
+	}
 
 	_glDeleteShader(vert_shader);
 	_glDeleteShader(frag_shader_rgb);
@@ -1171,6 +1202,41 @@ void OpenGLBackend::Paint()
 				_glBindTexture(GL_TEXTURE_2D, pic.texture);
 				_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 			}
+			/* The glows of the night over them, added, each where its picture is lit near its middle (SetThreeDGlows()). */
+			if (this->three_d_glow_program != 0) {
+				bool using_glows = false;
+				for (const auto &[owner, glows] : this->three_d_glows) {
+					auto it = this->three_d_pictures.find(owner);
+					if (glows.empty() || it == this->three_d_pictures.end() || it->second.over_lit == 0) continue;
+					const ThreeDPicture &pic = it->second;
+					if (!using_glows) {
+						using_glows = true;
+						_glUseProgram(this->three_d_glow_program);
+						_glUniform2f(this->three_d_glow_screen_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+						_glUniform2f(this->three_d_glow_size_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+						_glEnable(GL_BLEND);
+						_glBlendFunc(GL_ONE, GL_ONE);
+					}
+					_glActiveTexture(GL_TEXTURE3);
+					_glBindTexture(GL_TEXTURE_2D, pic.over_lit);
+					_glActiveTexture(GL_TEXTURE0);
+					const float rw = static_cast<float>(pic.r.right - pic.r.left + 1), rh = static_cast<float>(pic.r.bottom - pic.r.top + 1);
+					for (const VideoDriver::ThreeDGlow &g : glows) {
+						if (g.rx < 0.5f || g.ry < 0.5f) continue;
+						/* Its middle in the picture's lit pixels, and one of them, as the picture is laid over the window (part). */
+						const float u = pic.part[0] + (g.x - pic.r.left) / rw * pic.part[2], v = pic.part[1] + (g.y - pic.r.top) / rh * pic.part[3];
+						_glUniform4f(this->three_d_glow_lit_loc, u, v, pic.part[2] / rw, pic.part[3] / rh);
+						_glUniform4f(this->three_d_glow_colour_loc, g.r / 255.0f, g.g / 255.0f, g.b / 255.0f, g.strength);
+						/* Exactly its ellipse: the pixels whose middles are in it, as the processor's (AddNightLight()). */
+						_glUniform4f(this->three_d_glow_sprite_loc, g.x - g.rx, g.y - g.ry, 2.0f * g.rx, 2.0f * g.ry);
+						_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+					}
+				}
+				if (using_glows) {
+					_glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+					_glDisable(GL_BLEND);
+				}
+			}
 			for (GLenum unit : {GL_TEXTURE2, GL_TEXTURE3}) {
 				_glActiveTexture(unit);
 				_glBindTexture(GL_TEXTURE_2D, 0);
@@ -1227,6 +1293,22 @@ void OpenGLBackend::HideThreeDPicture(const void *owner)
 {
 	std::lock_guard lock(this->three_d_mutex);
 	this->three_d_pictures.erase(owner);
+	this->three_d_glows.erase(owner);
+}
+
+/**
+ * The glows of the night over a window's picture of the graphics card, instead of those it had (VideoDriver::SetThreeDGlows()).
+ * @param owner whose picture
+ * @param glows the glows, in pixels of the screen
+ */
+void OpenGLBackend::SetThreeDGlows(const void *owner, std::vector<VideoDriver::ThreeDGlow> &&glows)
+{
+	std::lock_guard lock(this->three_d_mutex);
+	if (glows.empty()) {
+		this->three_d_glows.erase(owner);
+	} else {
+		this->three_d_glows[owner] = std::move(glows);
+	}
 }
 
 /** The pictures of the graphics card shown now: where on the screen, and their textures. */

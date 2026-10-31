@@ -134,6 +134,26 @@ public:
 	virtual void HideThreeDPicture([[maybe_unused]] const void *owner) {}
 
 	/**
+	 * A glow of the night over a picture shown straight from the graphics card (SetThreeDGlows()): a soft spot of
+	 * light added where the screen leaves the picture seen, as the processor's night adds it (AddNightLight()).
+	 */
+	struct ThreeDGlow {
+		float x, y;      ///< its middle, pixels of the screen
+		float rx, ry;    ///< half its width and its height, pixels
+		float r, g, b;   ///< its colour, 0-255
+		float strength;  ///< how much of it is added in its middle
+	};
+
+	/**
+	 * The glows over a window's picture of the graphics card (ShowThreeDPicture()), instead of those it had: each shown
+	 * only where the picture over it has a lit pixel near its middle (its over_lit), so the processor does not read the
+	 * lit pixels back from the card to tell (the night of the turned map, viewport.cpp TurnedCardGlows).
+	 * @param owner whose picture
+	 * @param glows the glows
+	 */
+	virtual void SetThreeDGlows([[maybe_unused]] const void *owner, [[maybe_unused]] std::vector<ThreeDGlow> &&glows) {}
+
+	/**
 	 * The pictures shown straight from the graphics card now (ShowThreeDPicture()), for a screenshot of the screen.
 	 * @return where each is on the screen, and its texture
 	 */
