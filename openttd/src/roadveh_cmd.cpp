@@ -2095,7 +2095,7 @@ static void RoadVehFreeController(RoadVehicle *v)
 std::tuple<CommandCost, VehicleID> CmdBuildYardRoadVehicle(DoCommandFlags flags, TileIndex tile, EngineID eid, int32_t px, int32_t py, uint8_t yaw)
 {
 	if (!IsValidTile(tile) || !(IsTileType(tile, TileType::Industry) || IsTileType(tile, TileType::House)) || yaw >= CAB_YAW_TURN || !Company::IsValidID(_current_company)) return { CMD_ERROR, VehicleID::Invalid() };
-	/* On the industry's tile or by it (a building's: the horse on the stadium's pitch), not on the outer tiles of the map. */
+	/* On the industry's tile or by it (a building's: on the ground of its event), not on the outer tiles of the map. */
 	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 	if (px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
 			x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE)) {

@@ -31,6 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (70) – Kůň pryč z grilování na hřišti, lesní vlk pryč, vlk OLEKSO zpátky; Falkor bez malby
+
+- Hráč: *„na hřišti je kuň u mata, tam nema bejt u grilovani. falckor neni nabarvený, on má být bílý ale tohle
+  není bílá asi , to vypadá bez barvy. ktereho vlka jsme odebrali? vlk je tam pořád. má špatnou hubu , dáme ho
+  pryč . nakonec bež na to gpu .“*, pak *„vlk ktereho davaš pryč ma červene oči, ten špatny vlk ma modre
+  oči“*, *„tak ten starý vlk odebraný předtím byl odebraný omylem asi? olekso“* a *„olekso je dobrej, nech ho“*.
+- **Kůň na hřišti:** stadion (`mirne`, `dum_20_stadion`) měl v `akce` klíč `kun` (od kolegy, grrrrf `7d0888a`).
+  Ze sady hry je pryč a hra klíč `kun` v akci domu už nečte (jen `tatra`). Koně u statku, stodoly a srubu zůstávají.
+- **Vlk ze snímku je `vlk_lesni`** (modrošedý, AX-7YK): z lesa. Pryč je záznam v `psi`, `vlk_lesni.glb`,
+  ze všech 9 seznamů `druhy` zvířat lesa v `prumysl` a autor v README. `vlk_stylizovany` (modrý, červené oči) zůstává.
+- **Vlk OLEKSO (`vlk`) je zpátky** v sadě hry (záznam a `vlk.glb` stejné jako v grrrrf před `835c090`, na prodej).
+  Kolega ho 30. 10. vzal pryč podle věty *„vlk kterymu si upravil hubu ten pryč“*. Měl to být ten z lesa.
+  Koupený vlk z uložené hry se zase ukáže.
+- **Falkor:** model je socha pro 3D tisk (`Falkor-Sitting.stl`), bez malby. Textura je celá jedna barva
+  (růžovobílá 232/207/203, 99,8 % pixelů) a gltfpack dal všem bodům jedno místo textury (`KHR_texture_transform`
+  scale 0, už v kolegově prvním souboru `0d13035`). Hra kreslí přesně to, co v modelu je. Aby byl bílý, chce to
+  barvu v záznamu (pro zvířata zatím není) nebo jiný model. Domluvit s hráčem.
+
 ## 31. 10. (69) – Simtrains: nástup přes E má pult a ovládání MSTS jako kabina z okna vlaku; projetí červené; oko 750
 
 - Hráč (s `zssk_750031_2015_chovani.zip` a `..._model.zip`): „neprojedu červenou, vyhled z kabiny simtrains se

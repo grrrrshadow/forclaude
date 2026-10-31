@@ -722,7 +722,7 @@ struct FirstPersonWindow : Window {
 	/**
 	 * The vehicle of a yard nearest the walker within reach, shown and of an engine of the game: of an industry's yard
 	 * (ThreeDIndustryTileParts::vehicles), of the forest's clearing (ThreeDForestPart::vehicles: the horse by the cabin),
-	 * or of a building's event on its days (the horse on the new stadium's pitch, GetThreeDHouseEvent()).
+	 * or of a building's event on its days (the stadium's pitch, GetThreeDHouseEvent()).
 	 */
 	std::optional<YardVehicle> YardVehicleToTake() const
 	{

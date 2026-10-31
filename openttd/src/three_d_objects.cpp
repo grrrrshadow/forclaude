@@ -2796,11 +2796,10 @@ static void ReadBuildingFigures(const nlohmann::json &e, ThreeDObject &obj)
 		/* The Tatra standing on the pitch (the colleague's "tatra": its record "zaznam", its set "sada" or the sets of its
 		 * layers -- the cab, the grille, the body), empty -- the player, 18. 10.: "on the pitch stands an empty Tatra,
 		 * without a driver" --, drawn as a figure of its own name "vozidlo:<record>|<set>|<set>..."
-		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. The horse beside it the
-		 * same ("kun", the colleague's hra/3d/KONE-SPECIAL-V4-PRO-HRU.md: a horse of the Special 3D v4, without a rider). */
-		for (const char *key : {"tatra", "kun"}) {
-			if (!event.contains(key) || !event.at(key).is_object()) continue;
-			const auto &t = event.at(key);
+		 * (GetThreeDStandingVehicle() of three_d_vehicle_object.cpp); none without its package. No horse beside it (the
+		 * player, 31. 10.: "the horse on the pitch by Mat ... has no place at the grilling"). */
+		if (event.contains("tatra") && event.at("tatra").is_object()) {
+			const auto &t = event.at("tatra");
 			const std::string record = t.value("zaznam", t.value("objekt", std::string()));
 			if (!record.empty()) {
 				nlohmann::json f = t;
