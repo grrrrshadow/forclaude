@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (60) – Lady Pink a šamanka jako holky hry všude
+
+- Hráč: *„4 když ma lady pink kostru společnou tak to je ingame holka a bude všude .“*
+- **Holky hry** jsou postavy na kostře `humanoid` ze sad hry (`druh: postava`, bez `role`). Teď jich je 9: char16,
+  college_girl, cute_cartoon, female_girl, galaxia, lady_pink, pubg_girl, samanka, vivi. Sestřička má roli, proto mezi
+  ně nepatří. Seznam si hra přečte sama z indexů, takže každá další holka na kostře se přidá bez kódu.
+- **Rozdávání:** kde index jmenuje holku hry (lavice a stání na náklaďácích, posádky, postavy průmyslu), hra tam dá
+  holku o tolik dál v seznamu, kolik dá posun seznamu (z jeho textu, pokaždé stejný). Holky jedné lavice tak zůstanou
+  různé a každá holka se dostane všude.
+- Šamanka je na stejné kostře, takže chodí taky všude.
+- Platí i pro posádky z balíčků GRF, které jmenují holky hry.
+- Rig: z 302 míst každá holka 29–43×, Lady Pink 35×, šamanka 33×.
+
 ## 31. 10. (59) – Sestřičky: pojištění u kostela, sestřička chodí s chodcem a léčí
 
 - Hráč na moje otázky (cena, léčení, vozidlo): *„1 mně je to jedno. 2 třeba jo 3 jako pes zase bude až vystoupim“*.

@@ -2661,9 +2661,62 @@ static void ReadBuildingTitle(const nlohmann::json &e, ThreeDObject &obj)
  * The figure a place names: "postava", and of a figure of poses the pose it is in ("poza", the player, 18. 10.: "one
  * figure object everywhere, with what it has to do"), "<postava>/<poza>". Without a pose the figure as it is named.
  */
-static std::string FigureNamed(const nlohmann::json &f)
+/**
+ * The girls of the game (the player, 31. 10.: "when Lady Pink has the shared skeleton, she is a girl of the game and will
+ * be everywhere"): the figures on the humanoid bones of the game's own sets ("druh" "postava", "kostra" "humanoid"),
+ * without a "role" (the nurse walks with the walker), by name. Read once from the indices, by whichever reader asks
+ * first (the houses' or the vehicles', on their threads).
+ */
+static const std::vector<std::string> &GameGirls()
+{
+	static std::vector<std::string> girls;
+	static std::once_flag once;
+	std::call_once(once, [] {
+		for (const std::string &index : FindObjectIndices()) {
+			/* The game's own sets only (baseset/decouple/objekty/<set>/), not the packages of the GRFs. */
+			if (index.find(PATHSEP "decouple" PATHSEP "objekty" PATHSEP) == std::string::npos) continue;
+			std::vector<uint8_t> text = ReadWholeFile(index);
+			if (std::string_view(reinterpret_cast<const char *>(text.data()), text.size()).find("\"humanoid\"") == std::string_view::npos) continue;
+			try {
+				const nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
+				for (const auto &e : list) {
+					if (!e.is_object() || e.value("druh", std::string()) != "postava" || e.value("kostra", std::string()) != "humanoid") continue;
+					if (e.contains("role") || !e.contains("soubor") || !e.contains("jmeno")) continue;
+					girls.push_back(e.at("jmeno").get<std::string>());
+				}
+			} catch (const nlohmann::json::exception &) {
+			}
+		}
+		std::sort(girls.begin(), girls.end());
+		girls.erase(std::unique(girls.begin(), girls.end()), girls.end());
+		std::string names;
+		for (const std::string &g : girls) names += " " + g;
+		Debug(misc, 1, "3D objects: the girls of the game:{}", names);
+	});
+	return girls;
+}
+
+/** A shift of the girls dealt to a list of figures (GameGirls()): of the list's text, the same each time it is read. */
+static uint32_t GirlsShift(const nlohmann::json &list)
+{
+	uint32_t h = 2166136261u;
+	for (char c : list.dump()) h = (h ^ static_cast<uint8_t>(c)) * 16777619u;
+	return h;
+}
+
+/**
+ * A figure of a list ("postava", "poza"): "<postava>/<poza>". A girl of the game there is dealt from all of them: the
+ * one so many further on (the shift of the list), so the girls named differently in a list stay different and every
+ * girl of the game takes her turn everywhere one sits or stands -- Lady Pink and the shaman girl, and any after them.
+ */
+static std::string FigureNamed(const nlohmann::json &f, uint32_t shift)
 {
 	std::string name = f.at("postava").get<std::string>();
+	const std::vector<std::string> &girls = GameGirls();
+	if (auto it = std::ranges::find(girls, name); it != girls.end() && girls.size() > 1) {
+		name = girls[(static_cast<size_t>(it - girls.begin()) + shift) % girls.size()];
+		Debug(misc, 3, "3D objects: the girl {} of a list is {}", *it, name);
+	}
 	if (f.contains("poza") && f.at("poza").is_string() && !f.at("poza").get<std::string>().empty()) name += "/" + f.at("poza").get<std::string>();
 	return name;
 }
@@ -2676,10 +2729,11 @@ static std::string FigureNamed(const nlohmann::json &f)
 static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out)
 {
 	if (!list.is_array()) return;
+	const uint32_t shift = GirlsShift(list);
 	for (const auto &c : list) {
 		if (!c.is_object() || !c.contains("postava")) continue;
 		ThreeDVehicleCrew crew;
-		crew.figure = FigureNamed(c);
+		crew.figure = FigureNamed(c, shift);
 		/* On the seat of a body (the colleague's riders of the horses, "uzel": "sedlo"): where it is in each pose. */
 		crew.on_seat = c.value("uzel", std::string()) == "sedlo";
 		if (!crew.on_seat) {
@@ -2702,7 +2756,7 @@ static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
 	if (!f.is_object() || !f.contains("postava") || !f.contains("poloha")) return false;
 	const auto &at = f.at("poloha");
 	if (!at.is_array() || at.size() != 3) return false;
-	fig.figure = FigureNamed(f);
+	fig.figure = FigureNamed(f, GirlsShift(f));
 	for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
 	fig.facing = f.value("otoceni", 0.0f);
 	fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
