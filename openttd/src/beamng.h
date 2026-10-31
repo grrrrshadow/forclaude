@@ -36,10 +36,8 @@ struct BeamngModel {
  * in a folder the player names ("beamng_path"), or in newgrf/beamng/ of the game's folders (the player, 16. 10.:
  * "shall we drive mods of BeamNG?"). Its folder vehicles/<name>/ read, the game makes of it a NewGRF of road vehicles,
  * one for each of its configurations (PrepareBeamngGrfs()), in newgrf/beamng/, drawn from its model.
- *
- * Nothing of it is ever the game's: the mods are the player's own downloads and their authors', each under its own
- * licence (the official cars of BeamNG may not go to another game at all). So the game only reads them where they
- * are, and the GRF it writes holds the figures of the mod and no part of the model.
+ * Each player downloads their own mods; the GRF holds the figures of the mod, the model is read from the player's
+ * files.
  */
 struct BeamngVehicle {
 	std::string zip;              ///< the .zip it is in, or empty for an unpacked mod

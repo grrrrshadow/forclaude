@@ -18,13 +18,9 @@
 /**
  * A vehicle of Microsoft Train Simulator (MSTS) as the player downloaded it, where such trains are kept: the
  * Trains/Trainset folder of MSTS (or of Open Rails, or the folder the player names, "simtrains_path"; the player,
- * 16. 10.: "let the game look for the simtrains models in their usual folder" -- so they are never among the game's
- * own folders, to go out with the game by mistake). Its .eng or .wag read, the game makes of it a NewGRF of one
- * vehicle (PrepareSimtrainsGrfs()) in newgrf/simtrains/, drawn from its model.
- *
- * Nothing of it is ever the game's: the files are the player's own download and the authors'. Their readmes forbid
- * spreading the models or their textures to other simulators, so the game only reads them where they are, and the
- * GRF it writes holds the figures of the .eng and no part of the model.
+ * 16. 10.: "let the game look for the simtrains models in their usual folder"). Its .eng or .wag read, the game makes
+ * of it a NewGRF of one vehicle (PrepareSimtrainsGrfs()) in newgrf/simtrains/, drawn from its model. Each player
+ * downloads their own trains; the GRF holds the figures of the .eng, the model is read from the player's files.
  */
 struct SimtrainsEngine {
 	std::string folder;           ///< the folder of its .eng, ending with the path separator
