@@ -31,6 +31,38 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (61) – Simtrains: kabina, ovládání a simulace z modelů MSTS (návrh, čeká na odsouhlasení)
+
+- Hráč: *„simtrains zdokonalit. výhled z kabiny a využijem realistické ovládání a simulaci řízení a cabiny modelů
+  simtrains. 451 v zip na cvičení.“*
+- **Co 451 nese** (jen u hráče a v mém scratchpadu, do repa nic: readme autorů zakazuje šíření i úpravy):
+  - kabina `451.cvf`, denní a noční:
+    - tři obrázky stanoviště 640×480 s průhlednými okny (vpřed, vlevo −60°, vpravo +75°);
+    - oko strojvedoucího na −1; 2,4; 7,3 m;
+    - 23 ovladačů: rychloměr LS90 (ručička i číslice), manometry válce, potrubí a hlavní jímky, voltmetr,
+      ampérmetr, opakovač návěstí, kontroler B2–B1–0–M–S–P–Sh (8 snímků), brzdič DAKO (8 poloh, 25 snímků),
+      přímočinná brzda, reverz, sběrač, světla, píšťala, živák, nouzová brzda, hodiny;
+  - `.eng`:
+    - 65 t, 660 kW, 70 kN, 100 km/h;
+    - adheze, odpory, stupně kontroleru, EDB 13–54 km/h;
+    - vzduchová brzda: tlaky a rychlosti plnění a vypouštění, kompresor;
+    - živák 20 s + 10 s, hlídání rychlosti;
+  - zvuky `.sms` + wav.
+- Dnes hra z `.eng` bere jen výkon, sílu, rychlost a hmotnost do GRF. Kabina je náš 3D pohled z očí a vlak jede
+  podle zrychlení OpenTTD.
+- **Návrh kroků:**
+  1. **Obrázek kabiny MSTS** přes náš 3D svět; okny je vidět svět. Ručičky, páky a kontrolky se hýbou podle stavu.
+  2. **Ovládání:** myší za páky a klávesy jako v MSTS.
+  3. **Simulace vlaku řízeného z kabiny** (deterministicky v tiku, ovládání příkazy):
+     - tažná síla podle stupně, adheze a prokluz, odpory, EDB;
+     - vzduchová brzda: potrubí, válce, jímka, kompresor;
+     - živák a nouzová brzda.
+     Po opuštění kabiny řídí zase hra.
+  4. **Opakovač** ukazuje další návěstidlo.
+  5. **Zvuky** nakonec.
+- Otázky hráči: tři pevné směry pohledu nebo volný pohled, klávesy MSTS nebo šipky, co při červené, jak plná
+  vzduchová brzda.
+
 ## 31. 10. (60) – Lady Pink a šamanka jako holky hry všude
 
 - Hráč: *„4 když ma lady pink kostru společnou tak to je ingame holka a bude všude .“*
