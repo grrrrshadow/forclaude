@@ -337,6 +337,61 @@ CommandCost CmdBuyWalkerPet(DoCommandFlags flags, const std::string &name)
 	return cost;
 }
 
+/** What a month of the walker's health insurance costs, inflated as the dogs. */
+Money WalkerNursePrice()
+{
+	return Money(WALKER_NURSE_PRICE * static_cast<int64_t>(_economy.inflation_prices) >> 16);
+}
+
+/** Whether the walker is insured today: a nurse of a church walks with it and heals it. */
+bool WalkerInsured(const CompanyProperties &c)
+{
+	return c.walker_nurse_until >= TimerGameEconomy::date;
+}
+
+/**
+ * A month of the walker's health insurance bought of a nurse before a church (the player, 28. 10.: "the nurses will
+ * sell a monthly health insurance before the church; when I pay, they will walk with me a month and heal the wounds of
+ * the bogeymen"), paid with the company's money: a nurse walks with the walker so long and heals it
+ * (CmdHealWalkerByNurse()). Bought again while it runs, it runs so much longer.
+ * @param flags operation to perform
+ * @param months how many months of it (the inventory buys one)
+ * @return the cost or an error
+ */
+CommandCost CmdBuyWalkerNurse(DoCommandFlags flags, uint8_t months)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || months == 0 || months > 12) return CMD_ERROR;
+	CommandCost cost(ExpensesType::Other);
+	cost.AddCost(WalkerNursePrice() * months);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		const TimerGameEconomy::Date from = WalkerInsured(*c) ? c->walker_nurse_until : TimerGameEconomy::date;
+		c->walker_nurse_until = from + WALKER_NURSE_DAYS * months;
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return cost;
+}
+
+/**
+ * The walker's nurse heals it a little, while it is insured and has health to gain; the view from the first person asks
+ * it every few seconds while she is with the walker (WALKER_NURSE_HEAL_TICKS).
+ * @param flags operation to perform
+ * @param health how much health she gives back, WALKER_NURSE_HEAL at most
+ * @return nothing, or an error when it is not insured, has no health left (gone back to the map) or all of it
+ */
+CommandCost CmdHealWalkerByNurse(DoCommandFlags flags, uint8_t health)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || health == 0 || !WalkerInsured(*c) || c->walker_health == 0 || c->walker_health >= WALKER_HEALTH_MAX) return CMD_ERROR;
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_health = static_cast<uint8_t>(std::min<uint>(WALKER_HEALTH_MAX, c->walker_health + std::min(health, WALKER_NURSE_HEAL)));
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
 /**
  * A thing the walker picks up where it is (the player, 18. 10.: "the mushrooms will be picked about the clay towns"):
  * one more of it in the inventory. Only the mushrooms are picked so.

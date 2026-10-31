@@ -4345,7 +4345,11 @@ static void ReadThreeDVehicleObjects()
 					_ufos.push_back(std::move(u));
 					continue;
 				}
-				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac"));
+				/* A nurse of a church ("role" "sestricka", the player 28. 10.: "the nurses will sell a monthly health
+				 * insurance before the church; when I pay, they will walk with me a month and heal the wounds of the
+				 * bogeymen"): one of the animals, as the sellers of dogs are; the one on the bones a humanoid besides. */
+				const bool nurse = figure_kind == "postava" && e.value("role", std::string()) == "sestricka";
+				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac")) || nurse;
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
@@ -4370,7 +4374,7 @@ static void ReadThreeDVehicleObjects()
 						if (!animal) return;
 						ThreeDAnimal a;
 						a.name = fig.name;
-						a.kind = figure_kind == "pes" ? ThreeDAnimal::Kind::Dog : figure_kind == "zvire" ? ThreeDAnimal::Kind::Animal : figure_kind == "strasidlo" ? ThreeDAnimal::Kind::Ghost : ThreeDAnimal::Kind::Seller;
+						a.kind = nurse ? ThreeDAnimal::Kind::Nurse : figure_kind == "pes" ? ThreeDAnimal::Kind::Dog : figure_kind == "zvire" ? ThreeDAnimal::Kind::Animal : figure_kind == "strasidlo" ? ThreeDAnimal::Kind::Ghost : ThreeDAnimal::Kind::Seller;
 						const std::string temper = e.value("povaha", std::string());
 						a.temper = temper == "utoci" ? ThreeDAnimal::Temper::Attacks : temper == "vyprovokovat" ? ThreeDAnimal::Temper::Provoked : ThreeDAnimal::Temper::Peaceful;
 						auto place = [&](std::string_view where) {
@@ -4380,6 +4384,7 @@ static void ReadThreeDVehicleObjects()
 							if (where == "strecha") a.places |= ThreeDAnimal::ROOF;
 							if (where == "koleje") a.places |= ThreeDAnimal::RAIL;
 							if (where == "les") a.places |= ThreeDAnimal::FOREST;
+							if (where == "kostel") a.places |= ThreeDAnimal::CHURCH;
 						};
 						if (e.contains("kde") && e.at("kde").is_string()) place(e.at("kde").get<std::string>());
 						if (e.contains("kde") && e.at("kde").is_array()) {
@@ -4415,8 +4420,9 @@ static void ReadThreeDVehicleObjects()
 						}
 						a.scale = std::clamp(e.value("meritko", 2.0f), 0.1f, 20.0f);
 						/* How high its origin floats over the ground, true metres: "vznaseni_m" (the colleague's ghost and
-						 * phantom of the forest, hra/3d/STRASIDLA-LES-ROZEN-PRO-HRU.md), before it "vyska_m". */
-						a.hover_m = std::clamp(e.value("vznaseni_m", e.value("vyska_m", 0.0f)), 0.0f, 50.0f);
+						 * phantom of the forest, hra/3d/STRASIDLA-LES-ROZEN-PRO-HRU.md), before it "vyska_m" of a ghost. Of
+						 * the people "vyska_m" is how tall they are (the nurses floated 1.7 m over the church's steps). */
+						a.hover_m = std::clamp(e.value("vznaseni_m", a.kind == ThreeDAnimal::Kind::Ghost ? e.value("vyska_m", 0.0f) : 0.0f), 0.0f, 50.0f);
 						/* In place of a night flyer of the indices (the player, 22. 10.: "the ghost in the bedsheet should not
 						 * attack, it should float along the street like the walkers"): that one out of the sky. */
 						if (e.contains("nahrazuje") && e.at("nahrazuje").is_string()) {
@@ -4465,8 +4471,10 @@ static void ReadThreeDVehicleObjects()
 					}
 					/* A figure of a kind of bones ("kostra" its name, not a file: the colleague's humanoids), posed by the
 					 * motions of its kind once all the indices are read (MakeHumanoidFigures()). */
-					if (figure_kind == "postava" && !animal && !e.contains("pozy") && e.contains("kostra") && e.at("kostra").is_string()) {
+					if (figure_kind == "postava" && (!animal || nurse) && !e.contains("pozy") && e.contains("kostra") && e.at("kostra").is_string()) {
 						fig.skeleton_file = fig.file;
+						/* The nurse on the bones walks and stands as the motions of her kind ("chuze", "stoji"). */
+						if (nurse) note_animal({"chuze", "stoji"});
 						_humanoids.push_back({std::move(fig), e.at("kostra").get<std::string>(), std::clamp(e.value("vyska_kycli", 1.0f), 0.1f, 10.0f)});
 						continue;
 					}

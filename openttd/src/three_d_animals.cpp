@@ -46,6 +46,7 @@
 #include "settings_type.h"
 #include "company_base.h"
 #include "company_func.h"
+#include "walker_cmd.h"
 #include "core/random_func.hpp"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
@@ -106,6 +107,14 @@ constexpr double WANDER_TILES = 2.5;       ///< one wandering keeps this near it
 constexpr double FOLLOW_M = 2.0;           ///< the walker's dog keeps this far beside it
 constexpr double AHEAD_M = 5.0;            ///< and this far before it, the walker walking (PAR14-PRO-HRU.md: 4-6 m, to be seen)
 constexpr double NEAR_REST_M = 10.0;       ///< resting, it stays where it is this near the walker standing
+/* The nurses (the player, 28. and 31. 10.: "the nurses will sell a monthly health insurance before the church; when I
+ * pay, they will walk with me a month and heal the wounds of the bogeymen"; "in a vehicle, as the dog: back when I get
+ * out"; "+10 every 3 s, yes"). */
+constexpr double NURSE_SIDE_M = 1.8;       ///< those of a church stand so far either side of its door ...
+constexpr double NURSE_OUT_M = 1.0;        ///< ... and so much further out before it, metres
+constexpr double CARER_BEHIND_M = 2.0;     ///< the walker's nurse walks so far behind it ...
+constexpr double CARER_SIDE_M = 1.0;       ///< ... and so far beside it, metres
+constexpr double CARER_HEALS_M = 15.0;     ///< and heals it this near, metres
 constexpr uint64_t STILL_TICKS = 20;       ///< the walker not moving so long: standing
 constexpr double PAVEMENT = 5.5;           ///< the pavement from the middle of a road tile, world units (as Mat's)
 constexpr float EYE_OF_MAP = 0.5f;         ///< the eye sees them at their true size, the map at "meritko" (2 as the girls)
@@ -125,6 +134,8 @@ enum class Place : uint8_t {
 	Church, ///< the ghost in its sheet of a church, about it and in it (CHURCH_GHOST)
 	Farm,   ///< a dog of a farm, about its yard (FARM_DOGS)
 	Pasture, ///< a dog of a farm by the fence of a pasture, guarding its animals (FARM_DOGS)
+	Nurse,  ///< a nurse standing before a church's door, selling the walker's health insurance (ThreeDAnimal::Kind::Nurse)
+	Carer,  ///< the nurse walking with the walker insured, healing it
 };
 
 enum class State : uint8_t {
@@ -624,6 +635,39 @@ void ChurchDoor(TileIndex church, double &x, double &y)
 	NavNearestWalkable(x, y, 1);
 }
 
+/**
+ * Before a church, where its nurses stand (the player: "before the church"): before its door when the door looks onto
+ * a road; else before the middle of its side to a road -- the town does not turn its houses, a church's door may look
+ * onto the next house's garden --; else before the door all the same.
+ * @param[out] x,y the point, world units
+ * @param[out] out the way out from the church there, radians
+ */
+void ChurchFront(TileIndex church, double &x, double &y, double &out)
+{
+	double mx, my, radius, dx, dy;
+	ChurchMiddle(church, mx, my, radius);
+	ChurchDoor(church, dx, dy);
+	out = std::atan2(dy - my, dx - mx);
+	/* A road on the tile a little further out that way. */
+	auto road_beyond = [](double px, double py, double angle) {
+		const double bx = px + std::cos(angle) * TILE_SIZE * 0.6, by = py + std::sin(angle) * TILE_SIZE * 0.6;
+		return OnMap(bx, by) && IsTileType(TileVirtXY(static_cast<int>(bx), static_cast<int>(by)), TileType::Road);
+	};
+	x = dx;
+	y = dy;
+	if (road_beyond(dx, dy, out)) return;
+	static const int8_t DX[4] = {1, 0, -1, 0}, DY[4] = {0, 1, 0, -1};
+	for (int k = 0; k < 4; k++) {
+		const double sx = mx + DX[k] * (radius * 0.75 + 0.1 * TILE_SIZE), sy = my + DY[k] * (radius * 0.75 + 0.1 * TILE_SIZE);
+		const double a = std::atan2(static_cast<double>(DY[k]), static_cast<double>(DX[k]));
+		if (!road_beyond(sx, sy, a)) continue;
+		x = sx;
+		y = sy;
+		out = a;
+		return;
+	}
+}
+
 /** A place about the church, a little out from its walls, where it can stand. @return whether there is one */
 bool PickAboutChurch(TileIndex church, double &x, double &y)
 {
@@ -728,7 +772,7 @@ bool RidesRails(const Beast &b, const ThreeDAnimal &a)
 bool Fights(const Beast &b, const ThreeDAnimal &a)
 {
 	/* Billy rides past (the player, 24. 10.: "he is not to come after me to attack"). */
-	if (b.place == Place::Pet || b.place == Place::Seller || RidesRails(b, a)) return false;
+	if (b.place == Place::Pet || b.place == Place::Seller || b.place == Place::Nurse || b.place == Place::Carer || RidesRails(b, a)) return false;
 	return a.temper == ThreeDAnimal::Temper::Attacks || b.angry;
 }
 
@@ -746,7 +790,7 @@ bool Down(std::string_view pose)
  * dogs), sitting down and getting up as its poses "sedani", "lehani", "vstavani", "vstavani_lezi" show; setting off, it
  * gets up first. A dog without those poses stands.
  */
-void Follow(Beast &b, const ThreeDAnimal &a, uint64_t now, double wx, double wy, double dist_m, std::string_view walk)
+void Follow(Beast &b, const ThreeDAnimal &a, uint64_t now, double wx, double wy, double dist_m, std::string_view walk, double ahead_m, double side_m)
 {
 	if (dist_m > 60.0) {
 		/* Left far behind (the walker got into a vehicle, went off): it comes along. */
@@ -774,8 +818,9 @@ void Follow(Beast &b, const ThreeDAnimal &a, uint64_t now, double wx, double wy,
 		}
 	}
 	if (go) {
-		/* Before the walker, the way it faces; standing, before it too, where it is seen. */
-		const double gx = wx + std::cos(_walker_heading) * AHEAD_M * OBJECT_UNITS_PER_METRE, gy = wy + std::sin(_walker_heading) * AHEAD_M * OBJECT_UNITS_PER_METRE;
+		/* Before the walker, the way it faces (the dog; the nurse behind it and beside); standing, there too. */
+		const double c = std::cos(_walker_heading), sn = std::sin(_walker_heading);
+		const double gx = wx + (c * ahead_m - sn * side_m) * OBJECT_UNITS_PER_METRE, gy = wy + (sn * ahead_m + c * side_m) * OBJECT_UNITS_PER_METRE;
 		const double gap_m = std::hypot(gx - b.x, gy - b.y) / OBJECT_UNITS_PER_METRE;
 		if (gap_m < 0.6) {
 			/* There: along with the walker, the way it goes. */
@@ -910,7 +955,7 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 		case State::Idle:
 			SetPose(b, RestPose(b, a), now);
 			/* A seller and the dog before the door look at the walker coming; the dog growls ("vrci") near. */
-			if ((b.place == Place::Seller || b.place == Place::Door) && dist_m < 8.0) b.heading = std::atan2(wy - b.y, wx - b.x);
+			if ((b.place == Place::Seller || b.place == Place::Door || b.place == Place::Nurse) && dist_m < 8.0) b.heading = std::atan2(wy - b.y, wx - b.x);
 			if (b.place == Place::Door && dist_m < 4.0 && a.Has("vrci")) SetPose(b, "vrci", now);
 			if (Fights(b, a) && dist_m < CHASE_M) {
 				b.state = State::Chase;
@@ -998,7 +1043,12 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 		}
 
 		case State::Follow:
-			if (walker) Follow(b, a, now, wx, wy, dist_m, walk);
+			if (!walker) break;
+			if (b.place == Place::Carer) {
+				Follow(b, a, now, wx, wy, dist_m, walk, -CARER_BEHIND_M, CARER_SIDE_M);
+			} else {
+				Follow(b, a, now, wx, wy, dist_m, walk, AHEAD_M, 0.0);
+			}
 			break;
 
 		case State::Dying:
@@ -1413,7 +1463,47 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			}
 			return false;
 		}
+		case Place::Nurse: {
+			/* The nurses standing at a church about the middle, those it has not yet: before it (ChurchFront()),
+			 * either side, a little out, looking away from it. */
+			std::vector<const ThreeDAnimal *> nurses;
+			for (const ThreeDAnimal &a : GetThreeDAnimals()) {
+				if (a.kind == ThreeDAnimal::Kind::Nurse && (a.places & ThreeDAnimal::CHURCH) && !a.Has("chuze")) nurses.push_back(&a);
+			}
+			if (nurses.empty()) return false;
+			const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+			uint churches = 0;
+			for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r) && churches < CHURCHES_KEPT; ty++) {
+				for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r) && churches < CHURCHES_KEPT; tx++) {
+					const TileIndex church = TileXY(tx, ty);
+					if (!IsChurchNorthTile(church)) continue;
+					churches++;
+					for (size_t k = 0; k < nurses.size(); k++) {
+						const ThreeDAnimal &a = *nurses[k];
+						if (std::ranges::any_of(_beasts, [&](const Beast &o) { return o.place == Place::Nurse && o.church == church && o.kind == a.name; })) continue;
+						double dx, dy, out;
+						ChurchFront(church, dx, dy, out);
+						/* The first on the left of the door, the next on the right, then further out each. */
+						const double side = (k % 2 == 0 ? -1.0 : 1.0) * NURSE_SIDE_M * OBJECT_UNITS_PER_METRE, ahead = (NURSE_OUT_M + (k / 2) * 1.2) * OBJECT_UNITS_PER_METRE;
+						x = dx + std::cos(out) * ahead - std::sin(out) * side;
+						y = dy + std::sin(out) * ahead + std::cos(out) * side;
+						/* Where the walker can stand (the steps, the pavement), else at the door itself: not to the
+						 * middle of the next tile, as the way finding would put her (NavNearestWalkable()). */
+						if (!OnMap(x, y) || !FirstPersonGroundWalkable(x, y)) {
+							x = dx;
+							y = dy;
+						}
+						if (!OnMap(x, y)) continue;
+						Beast &b = Put(a, place, x, y, 0, out, now);
+						b.church = church;
+						return true;
+					}
+				}
+			}
+			return false;
+		}
 		case Place::Pet:
+		case Place::Carer:
 			return false;
 	}
 	return false;
@@ -1430,6 +1520,15 @@ uint ChurchesNear(TileIndex middle)
 		}
 	}
 	return n;
+}
+
+/** How many nurses stand at the churches about the middle: those standing of the indices at each church (CHURCHES_KEPT at most). */
+uint NursesNear(TileIndex middle)
+{
+	const uint kinds = static_cast<uint>(std::ranges::count_if(GetThreeDAnimals(), [](const ThreeDAnimal &a) {
+		return a.kind == ThreeDAnimal::Kind::Nurse && (a.places & ThreeDAnimal::CHURCH) && !a.Has("chuze");
+	}));
+	return kinds == 0 ? 0 : ChurchesNear(middle) * kinds;
 }
 
 /** How many of a place are about the middle. */
@@ -1463,6 +1562,35 @@ void KeepPet(bool walker, double wx, double wy, uint64_t now)
 	b.state = State::Follow;
 }
 
+/** The nurse who walks with the walker: the first nurse of the indices on the bones (one who walks); nullptr none. */
+const ThreeDAnimal *CarerKind()
+{
+	for (const ThreeDAnimal &a : GetThreeDAnimals()) {
+		if (a.kind == ThreeDAnimal::Kind::Nurse && a.Has("chuze")) return &a;
+	}
+	return nullptr;
+}
+
+/** The walker's nurse as she should be: with the walker out and insured (WalkerInsured()), behind it; gone without, as the dog (in a vehicle, back when it gets out). */
+void KeepCarer(bool walker, double wx, double wy, uint64_t now)
+{
+	auto it = std::ranges::find(_beasts, Place::Carer, &Beast::place);
+	const Company *c = Company::GetIfValid(_local_company);
+	const ThreeDAnimal *a = c != nullptr && WalkerInsured(*c) ? CarerKind() : nullptr;
+	if (!walker || a == nullptr) {
+		if (it != _beasts.end()) {
+			if (const ThreeDAnimal *k = KindOf(*it); k != nullptr) MarkDirty(*it, *k);
+			_beasts.erase(it);
+		}
+		return;
+	}
+	if (it != _beasts.end()) return;
+	double x = wx - std::cos(_walker_heading) * CARER_BEHIND_M * OBJECT_UNITS_PER_METRE, y = wy - std::sin(_walker_heading) * CARER_BEHIND_M * OBJECT_UNITS_PER_METRE;
+	NavNearestWalkable(x, y, 1);
+	Beast &b = Put(*a, Place::Carer, x, y, 0, _walker_heading, now);
+	b.state = State::Follow;
+}
+
 /** Every tick: they live on; those left far behind go; now and then one more where a place has fewer than it keeps. */
 const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None, 1}, [](auto) {
 	const TileIndex middle = _game_mode == GameMode::Normal ? ThreeDLifeMiddle() : INVALID_TILE;
@@ -1486,14 +1614,15 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		_walker_heading = FirstPersonWalkerHeading();
 	}
 	KeepPet(walker, wx, wy, now);
+	KeepCarer(walker, wx, wy, now);
 
 	for (auto it = _beasts.begin(); it != _beasts.end();) {
 		Beast &b = *it;
 		const ThreeDAnimal *a = KindOf(b);
 		const TileIndex at = TileVirtXY(static_cast<int>(std::clamp(b.x, 0.0, (Map::SizeX() - 1.0) * TILE_SIZE)), static_cast<int>(std::clamp(b.y, 0.0, (Map::SizeY() - 1.0) * TILE_SIZE)));
-		const bool gone = a == nullptr || (b.place != Place::Pet && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
+		const bool gone = a == nullptr || (b.place != Place::Pet && b.place != Place::Carer && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
 				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight || b.place == Place::Church) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle) ||
-				(b.place == Place::Church && !IsChurchNorthTile(b.church));
+				(b.place == Place::Church && !IsChurchNorthTile(b.church)) || (b.place == Place::Nurse && b.church != INVALID_TILE && !IsChurchNorthTile(b.church));
 		if (gone) {
 			if (a != nullptr) MarkDirty(b, *a);
 			if (b.place == Place::Seller) _next_seller = now + SELLER_AWAY_TICKS / 2 + InteractiveRandomRange(SELLER_AWAY_TICKS);
@@ -1526,14 +1655,14 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
 		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u}, {Place::Church, CHURCHES_KEPT},
-		{Place::Farm, FARM_DOGS_KEPT}, {Place::Pasture, 1},
+		{Place::Farm, FARM_DOGS_KEPT}, {Place::Pasture, 1}, {Place::Nurse, 1},
 	};
 	/* One a time, the place picked in turn. The forests' game and ghosts are there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
 	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight && w.place != Place::Farm && w.place != Place::Pasture) return;
 	/* A church's ghost to each church about the middle; the dogs to each farm. */
 	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.place == Place::Farm ? static_cast<uint>(FarmsNear(middle).size()) * w.kept :
-			w.place == Place::Pasture ? static_cast<uint>(PasturesNear(middle).size()) * w.kept : w.kept;
+			w.place == Place::Pasture ? static_cast<uint>(PasturesNear(middle).size()) * w.kept : w.place == Place::Nurse ? NursesNear(middle) : w.kept;
 	if (Count(w.place) < kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
 
@@ -1557,10 +1686,10 @@ float Facing(const Beast &b)
 	return static_cast<float>(std::round(b.heading * 180.0 / M_PI / 10.0) * 10.0);
 }
 
-/** Whether one can be hit: not the walker's dog or a seller, not falling or dead. */
+/** Whether one can be hit: not the walker's dog, a seller or a nurse, not falling or dead. */
 bool Hittable(const Beast &b)
 {
-	return b.place != Place::Pet && b.place != Place::Seller && !b.inside && b.state != State::Dying && b.state != State::Dead;
+	return b.place != Place::Pet && b.place != Place::Seller && b.place != Place::Nurse && b.place != Place::Carer && !b.inside && b.state != State::Dying && b.state != State::Dead;
 }
 
 /** One hit: so much less health; it falls after its last; one provoked fights from now on, a peaceful one runs. */
@@ -1623,7 +1752,7 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 		const std::string figure = FigureIn(b, b.pose);
 		/* The dogs of a farm as big as the cows and the sheep of its pastures, their true size ("meritko_zvirat"). */
 		const bool farm = b.place == Place::Farm || b.place == Place::Pasture;
-		const float scale = farm ? 1.0f : a->scale * (a->kind == ThreeDAnimal::Kind::Seller ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
+		const float scale = farm ? 1.0f : a->scale * (a->People() ? 1.0f : THREE_D_MAP_CREATURE_SCALE);
 		const int z = b.z + static_cast<int>(std::lround(a->hover_m * OBJECT_HEIGHT_PER_METRE * (scale - 1.0f)));
 		AddThreeDFigureToViewport(figure, scale, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), z, Facing(b), zoom, INVALID_TILE, 0, ThreeDMapPose(figure, b.frame));
 	}
@@ -1637,7 +1766,7 @@ void AddThreeDAnimalsToEye()
 		if (a == nullptr || b.inside) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
-		const float people = a->kind == ThreeDAnimal::Kind::Seller ? THREE_D_EYE_PEOPLE_SCALE : 1.0f;
+		const float people = a->People() ? THREE_D_EYE_PEOPLE_SCALE : 1.0f;
 		AddCabFigure(figure, a->scale * EYE_OF_MAP * people, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
 	}
 }
@@ -1775,6 +1904,28 @@ const ThreeDDogSeller *ThreeDDogSellerNear(double x, double y, double reach_m)
 }
 
 /**
+ * Whether a nurse of a church stands within reach of a point (the walker): she sells the health insurance (the
+ * inventory, CmdBuyWalkerNurse()).
+ * @param reach_m metres
+ */
+bool ThreeDNurseNear(double x, double y, double reach_m)
+{
+	return std::ranges::any_of(_beasts, [&](const Beast &b) {
+		return b.place == Place::Nurse && std::hypot(b.x - x, b.y - y) <= reach_m * OBJECT_UNITS_PER_METRE;
+	});
+}
+
+/** Whether the walker's nurse is with it, near enough to heal it (CmdHealWalkerByNurse()). */
+bool ThreeDNurseHealsWalker()
+{
+	double wx = 0, wy = 0;
+	if (!FirstPersonWalkerAt(wx, wy)) return false;
+	return std::ranges::any_of(_beasts, [&](const Beast &b) {
+		return b.place == Place::Carer && std::hypot(b.x - wx, b.y - wy) <= CARER_HEALS_M * OBJECT_UNITS_PER_METRE;
+	});
+}
+
+/**
  * The rig: one of a kind put at a place now (where it lives by its kind: a seller with its offer, a ghost as a
  * ghost, the others in a street); with an empty name one of each place's.
  * @return whether one came
@@ -1785,7 +1936,7 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 	const uint64_t now = TimerGameTick::counter;
 	const ThreeDAnimal *a = GetThreeDAnimal(name);
 	if (a == nullptr) return false;
-	const Place place = a->kind == ThreeDAnimal::Kind::Seller ? Place::Seller : a->kind == ThreeDAnimal::Kind::Ghost ? Place::Ghost : (a->places & ThreeDAnimal::DOOR) ? Place::Door : (a->places & ThreeDAnimal::ROUND) ? Place::Round : Place::Street;
+	const Place place = a->kind == ThreeDAnimal::Kind::Seller ? Place::Seller : a->kind == ThreeDAnimal::Kind::Nurse ? Place::Nurse : a->kind == ThreeDAnimal::Kind::Ghost ? Place::Ghost : (a->places & ThreeDAnimal::DOOR) ? Place::Door : (a->places & ThreeDAnimal::ROUND) ? Place::Round : Place::Street;
 	if (!a->flies) NavNearestWalkable(x, y, 4);
 	double wx = 0, wy = 0;
 	const double facing = FirstPersonWalkerAt(wx, wy) ? std::atan2(wy - y, wx - x) : InteractiveRandomRange(360) * M_PI / 180.0;
@@ -1800,7 +1951,7 @@ bool SendThreeDAnimal(std::string_view name, double x, double y)
 }
 
 /** The names of the places (Place), to the rig. */
-static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci", "kostel", "farma", "pastvina"};
+static const char *const PLACES[] = {"ulice", "dvere", "strecha", "okoli", "strasidlo", "koleje", "prodavac", "pes chodce", "les", "les v noci", "kostel", "farma", "pastvina", "sestricka u kostela", "sestricka chodce"};
 
 /** The rig: where the first of a place (its name, PLACES) is, world units; false none. */
 bool ThreeDAnimalOfPlace(std::string_view place, double &x, double &y)
@@ -1818,7 +1969,9 @@ bool ThreeDAnimalOfPlace(std::string_view place, double &x, double &y)
 std::string DescribeThreeDAnimals()
 {
 	static const char *const STATES[] = {"stoji", "chodi", "honi", "utoci", "utika", "jde za chodcem", "pada", "lezi"};
-	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName());
+	const Company *c = Company::GetIfValid(_local_company);
+	const std::string insured = c != nullptr && WalkerInsured(*c) ? fmt::format("do {}", c->walker_nurse_until.base()) : std::string("-");
+	std::string out = fmt::format("{} zvirat (druhu v indexech {}), pes chodce: {}, pojisteni chodce: {}", _beasts.size(), GetThreeDAnimals().size(), PetName().empty() ? std::string_view("-") : PetName(), insured);
 	for (const Beast &b : _beasts) {
 		out += fmt::format("\n  {} ({}) {} na {:.1f},{:.1f} vyska {:.1f} m, smer {:.0f}, poza {} snimek {}, zdravi {}{}{}", b.kind, PLACES[static_cast<int>(b.place)], STATES[static_cast<int>(b.state)],
 				b.x / TILE_SIZE, b.y / TILE_SIZE, b.up / OBJECT_HEIGHT_PER_METRE, b.heading * 180.0 / M_PI, b.pose.empty() ? "-" : b.pose, b.frame, b.health, b.angry ? ", vyprovokovany" : "",

@@ -2287,6 +2287,7 @@ STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}What the
 STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: press I
 STR_FIRST_PERSON_SELLER_HERE                                    :Dog seller: press I
 STR_FIRST_PERSON_MAT_HERE                                       :Mat sells marijuana: press I
+STR_FIRST_PERSON_NURSE_HERE                                     :Nurse, health insurance: press I
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marijuana growing: harvest in {NUM} day{P "" s}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the marijuana
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
@@ -2331,6 +2332,9 @@ STR_WALKER_YOUR_DOG                                             :Your dog: {RAW_
 STR_WALKER_LET_DOG_GO                                           :[let go]
 STR_WALKER_PLANT                                                :[plant in front of you]
 STR_WALKER_MAT_SELLS                                            :Mat sells:
+STR_WALKER_NURSE_SELLS                                          :A nurse of the church sells:
+STR_WALKER_NURSE_INSURANCE                                      :Health insurance for {COMMA} days: a nurse walks with you and heals you
+STR_WALKER_INSURED                                              :Health insurance: {COMMA} day{P "" s} left
 STR_WALKER_MATYLDA_SELLS                                        :Matylda sells:
 STR_WALKER_ITEM_HAMMER                                          :Big hammer
 STR_WALKER_ITEM_ARMOUR                                          :Armour

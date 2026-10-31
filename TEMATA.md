@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (59) – Sestřičky: pojištění u kostela, sestřička chodí s chodcem a léčí
+
+- Hráč na moje otázky (cena, léčení, vozidlo): *„1 mně je to jedno. 2 třeba jo 3 jako pes zase bude až vystoupim“*.
+  Dřív (28. 10.): *„sestřičky budou před kostelem prodavat měsični předplatne zdravotni pojištěni , když zaplatim tak
+  budou měsic chodit se mnou a lečit zranění od bubáků“*.
+- **Stojící sestřičky** (`postavy`: `sestricka_kouri`, `sestricka_cervena`, `"role": "sestricka"`, `"kde": "kostel"`):
+  - stojí u každého kostela v okolí, po stranách kousek od zdi, čelem ven;
+  - stojí před dveřmi, když vedou na silnici, jinak na straně kostela u silnice (`ChurchFront()`). Hra domy
+    neotáčí, takže dveře kostela v rigu vedly do zahrady sousedního domu.
+- **U nich klávesa I** otevře inventář, kde se koupí **zdravotní pojištění na 30 dní hry za 1 000 £** (cena s inflací
+  jako psi). Další nákup ho prodlouží. Inventář ukazuje, kolik dní pojištění zbývá. Ukládá se do savu
+  (`walker_nurse_until`, verze savu 384).
+- **Sestřička na kostře** (`humanoidi/sestricka`) chodí s pojištěným chodcem 2 m za ním a 1 m vedle (stejný kód jako
+  pes, `Place::Carer`). Ve vozidle zmizí jako pes a po vystoupení zase přijde.
+- **Léčení:** dokud je do 15 m od chodce, přidá každé 3 s hry (111 tiků) 10 zdraví až do 100 (`CmdHealWalkerByNurse`).
+  Odpočet začne, až je co léčit. Při pauze neléčí.
+- Opravená chyba: `vyska_m` u postav (jejich výška) hra brala jako vznášení, sestřičky visely 1,7 m nad zemí. Výšku
+  vznášení teď bere z `vyska_m` jen u strašidel, jinak jen z `vznaseni_m`.
+- Rig: `test3d zvirata pojisteni`, `test3d chodec stoj <kroky>`. U kostela 83,54 léčení 40 → 50 → 60 → 70.
+
 ## 31. 10. (58) – Posun mapy na 0° cukal: snímek čekal na zprávy myši, dokud se hýbala ruka
 
 - Hráč (snimky.log, 3d_karta.log): *„a cukalo se pohled 0 posun po mapě , otačeni svižné . first person dobrý.“*

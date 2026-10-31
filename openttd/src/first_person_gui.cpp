@@ -51,6 +51,7 @@
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
+#include "timer/timer_game_tick.h"
 #include "three_d_walkers.h"
 #include "three_d_witches.h"
 #include "vehicle_base.h"
@@ -581,6 +582,7 @@ struct FirstPersonWindow : Window {
 	std::vector<FirstPersonBlast> blasts;  ///< the rockets' smoke and blasts
 	std::vector<FirstPersonFeeding> feedings; ///< the farms' dragons fed, smoking or breathing fire
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
+	uint64_t nurse_healed = 0;            ///< the tick of the game the walker's nurse last healed it (or began to be able to)
 	int light = -1;                       ///< the light asked for in the left hand (_first_person_lights), -1 none: the one held put out first
 	int light_held = -1;                  ///< the light in the left hand or being put out, -1 none
 	double light_time = 0;                ///< seconds it burns, for its flame's frames
@@ -875,6 +877,16 @@ struct FirstPersonWindow : Window {
 		if (damage > 0 && c != nullptr) {
 			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)));
 			this->hurt_steps = 6;
+		}
+		/* The walker's nurse with it, insured (three_d_animals.h): a little health back every few seconds of the game,
+		 * counted from when there is any to give back (the player, 31. 10.: "+10 every 3 s, yes"). */
+		if (c != nullptr && c->walker_health < WALKER_HEALTH_MAX && WalkerInsured(*c) && ThreeDNurseHealsWalker()) {
+			if (TimerGameTick::counter - this->nurse_healed >= WALKER_NURSE_HEAL_TICKS) {
+				this->nurse_healed = TimerGameTick::counter;
+				Command<Commands::HealWalkerByNurse>::Post(WALKER_NURSE_HEAL);
+			}
+		} else {
+			this->nurse_healed = TimerGameTick::counter;
 		}
 		/* The look ahead: on its thread the picture made now is seen a frame late (EyeView()), so a steady turn of
 		 * the head -- the right button dragged, an arrow held -- was always shown where the hand had already been,
@@ -1903,6 +1915,9 @@ struct FirstPersonWindow : Window {
 				} else if (ThreeDDogSellerNear(this->walker.x, this->walker.y, THREE_D_SELLER_REACH_M) != nullptr) {
 					/* At a seller of dogs: I opens the inventory, where its dogs are bought. */
 					hint = GetString(STR_FIRST_PERSON_SELLER_HERE);
+				} else if (ThreeDNurseNear(this->walker.x, this->walker.y, THREE_D_SELLER_REACH_M)) {
+					/* At a nurse before a church: I opens the inventory, where the health insurance is bought. */
+					hint = GetString(STR_FIRST_PERSON_NURSE_HERE);
 				} else if (const Vehicle *near = this->VehicleToBoard(); near != nullptr) {
 					/* Beside a vehicle: E gets into it. */
 					hint = GetString(STR_FIRST_PERSON_BOARD_HERE, near->index);
@@ -2730,6 +2745,13 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 	}
 	w->MakePicture();
 	w->SetDirty();
+}
+
+/** The rig: so many steps of the view's timer with no key held, as the walker stands (FirstPersonWindow::Step()). */
+void RigFirstPersonStand(uint steps)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w != nullptr && steps > 0) w->Step(steps);
 }
 
 /**

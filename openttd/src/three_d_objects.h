@@ -960,6 +960,7 @@ struct ThreeDAnimal {
 		Animal, ///< "zvire": about the towns, in the desert towns' streets and on their roofs
 		Ghost,  ///< "strasidlo": out at night
 		Seller, ///< a seller of dogs ("prodavac": "psi")
+		Nurse,  ///< a nurse ("postava" with "role" "sestricka", the colleague's hra/3d/SESTRICKY-STRASIDLA-SAMANKA-PRO-HRU.md): those standing sell the walker's health insurance before a church, the one on the bones walks with the walker insured and heals it
 	};
 	enum class Temper : uint8_t {
 		Peaceful, ///< "mirumilovne": never fights, runs from a blow
@@ -973,6 +974,7 @@ struct ThreeDAnimal {
 	static constexpr uint8_t ROOF = 8;   ///< "strecha": on the flat roofs ("strechy")
 	static constexpr uint8_t RAIL = 16;  ///< "koleje": along the railway lines (where the game puts any ghost too)
 	static constexpr uint8_t FOREST = 32; ///< "les": at the places of the forests with a clearing, with the kinds they name
+	static constexpr uint8_t CHURCH = 64; ///< "kostel": before the doors of the churches (the nurses)
 	/* The towns it is found at ("klima", one or a list): bits, 0 any. */
 	static constexpr uint8_t TEMPERATE = 1; ///< "mirne"
 	static constexpr uint8_t DESERT = 2;    ///< "poust": the desert towns
@@ -1000,6 +1002,8 @@ struct ThreeDAnimal {
 	std::vector<std::string> poses; ///< its poses ("klid", "chuze", "beh", "utok", "smrt", "lezi"...)
 
 	bool Has(std::string_view pose) const { return std::ranges::find(this->poses, pose) != this->poses.end(); }
+	/** Whether it is one of the people (a seller of dogs, a nurse): a head taller in the view from the eyes as the girls, not bigger on the map as the creatures. */
+	bool People() const { return this->kind == Kind::Seller || this->kind == Kind::Nurse; }
 	std::string Figure(std::string_view pose) const { return pose.empty() || !this->Has(pose) ? this->name : this->name + "/" + std::string(pose); }
 	const std::string &Title() const;
 };

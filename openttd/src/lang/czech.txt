@@ -2395,6 +2395,7 @@ STR_FIRST_PERSON_INVENTORY_TOOLTIP                              :{BLACK}Co chode
 STR_FIRST_PERSON_SHOP_HERE                                      :{STRING}: zmáčkni I
 STR_FIRST_PERSON_SELLER_HERE                                    :Prodavač psů: zmáčkni I
 STR_FIRST_PERSON_MAT_HERE                                       :Mat prodává mari: zmáčkni I
+STR_FIRST_PERSON_NURSE_HERE                                     :Sestřička, zdravotní pojištění: zmáčkni I
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marihuana roste: sklizeň za {NUM} d{P en ny ní}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: sklidit marihuanu
 STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit marihuanové seno
@@ -2439,6 +2440,9 @@ STR_WALKER_YOUR_DOG                                             :Tvůj pes: {RAW
 STR_WALKER_LET_DOG_GO                                           :[pustit]
 STR_WALKER_PLANT                                                :[zasadit před sebe]
 STR_WALKER_MAT_SELLS                                            :Mat prodává:
+STR_WALKER_NURSE_SELLS                                          :Sestřička od kostela prodává:
+STR_WALKER_NURSE_INSURANCE                                      :Zdravotní pojištění na {COMMA} dní: sestřička chodí s tebou a léčí tě
+STR_WALKER_INSURED                                              :Zdravotní pojištění: ještě {COMMA} {P den dny dní}
 STR_WALKER_MATYLDA_SELLS                                        :Matylda prodává:
 STR_WALKER_ITEM_HAMMER                                          :Velké kladivo
 STR_WALKER_ITEM_ARMOUR                                          :Zbroj

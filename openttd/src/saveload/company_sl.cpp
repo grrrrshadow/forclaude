@@ -577,6 +577,7 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, walker_health, VarTypes::U8, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
 	SLE_CONDSSTR(CompanyProperties, walker_pet, VarTypes::STR, SaveLoadVersion::WalkerPet, SaveLoadVersion::MaxVersion),
 	SLE_CONDARR(CompanyProperties, walker_quick, VarTypes::U8, WALKER_QUICK_KEYS, SaveLoadVersion::WalkerQuickKeys, SaveLoadVersion::MaxVersion),
+	SLE_CONDVAR(CompanyProperties, walker_nurse_until, VarTypes::I32, SaveLoadVersion::WalkerNurse, SaveLoadVersion::MaxVersion),
 	SLEG_STRUCT("settings", SlCompanySettings),
 	SLEG_CONDSTRUCT("old_ai", SlCompanyOldAI, SaveLoadVersion::MinVersion, SaveLoadVersion::NoAI),
 	SLEG_STRUCT("cur_economy", SlCompanyEconomy),

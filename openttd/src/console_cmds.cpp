@@ -9115,7 +9115,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (!thread_chosen) _eye_synchronous = true;
-		if (argv.size() > 4 && argv[2] == "drzeni") {
+		if (argv.size() > 3 && argv[2] == "stoj") {
+			/* 'chodec stoj <steps>': the view's timer so many steps, no key held (the nurse heals there, CmdHealWalkerByNurse()). */
+			extern void RigFirstPersonStand(uint steps);
+			RigFirstPersonStand(static_cast<uint>(std::clamp(number(3).value_or(1), 1, 1000)));
+			IConsolePrint(CC_DEFAULT, "test3d: chodec stoj {} kroku", number(3).value_or(1));
+		} else if (argv.size() > 4 && argv[2] == "drzeni") {
 			/* 'chodec drzeni <frame ms> <frames>': W held so many frames of the game so long each; how far it walked. */
 			const int frame_ms = number(3).value_or(40), frames = number(4).value_or(25);
 			const double metres = RigFirstPersonHoldW(frame_ms, frames);
@@ -9354,6 +9359,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const Money before = c != nullptr ? c->money : Money(0);
 			const bool ok = Command<Commands::BuyWalkerPet>::Post(argv.size() > 3 ? std::string(argv[3]) : std::string());
 			IConsolePrint(CC_DEFAULT, "test3d: koupit {} (penize {} -> {})", ok ? "ano" : "NE", before, c != nullptr ? c->money : Money(0));
+		} else if (argv.size() > 2 && argv[2] == "pojisteni") {
+			/* 'zvirata pojisteni': a month of the walker's health insurance through the command (a nurse walks with it). */
+			const Company *c = Company::GetIfValid(_local_company);
+			const Money before = c != nullptr ? c->money : Money(0);
+			const bool ok = Command<Commands::BuyWalkerNurse>::Post(1);
+			IConsolePrint(CC_DEFAULT, "test3d: pojisteni {} (penize {} -> {})", ok ? "ano" : "NE", before, c != nullptr ? c->money : Money(0));
 		} else if (argv.size() <= 2) {
 			std::string kinds;
 			for (const ThreeDAnimal &a : GetThreeDAnimals()) kinds += fmt::format(" {}({}{})", a.name, a.poses.size(), a.sold ? fmt::format(", {} L", a.price) : std::string());

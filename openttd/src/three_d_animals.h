@@ -36,6 +36,8 @@ struct ThreeDDogSeller {
 const ThreeDDogSeller *ThreeDDogSellerNear(double x, double y, double reach_m);
 /** How near a seller of dogs the walker sells from it (the inventory) and is told so (the line of the first person view), metres. */
 static constexpr double THREE_D_SELLER_REACH_M = 6.0;
+bool ThreeDNurseNear(double x, double y, double reach_m);
+bool ThreeDNurseHealsWalker();
 
 struct ThreeDMushroom;
 void AddThreeDMushroomsToEye();

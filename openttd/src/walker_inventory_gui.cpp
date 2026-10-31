@@ -27,6 +27,7 @@
 #include "three_d_objects.h"
 #include "town.h"
 #include "tile_map.h"
+#include "timer/timer_game_economy.h"
 #include "widgets/walker_inventory_widget.h"
 
 #include "table/strings.h"
@@ -94,6 +95,7 @@ struct WalkerInventoryWindow : Window {
 		LetDogGo, ///< let the walker's dog go
 		Plant, ///< plant a seedling in front of the walker
 		BuyOfMat, ///< buy one of Mat walking by
+		BuyNurse, ///< buy a month of the health insurance of a nurse before a church
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
@@ -111,6 +113,7 @@ struct WalkerInventoryWindow : Window {
 	mutable std::string where;       ///< where the walker is (WalkerWhere()), as last drawn
 	mutable std::string seller;      ///< the seller of dogs near the walker, as last seen; empty none
 	mutable bool mat = false;        ///< Mat near the walker, as last seen (he sells marijuana)
+	mutable bool nurse = false;      ///< a nurse of a church near the walker, as last seen (she sells the health insurance)
 	mutable std::vector<std::string> dogs; ///< and the dogs it sells
 
 	/** Whether Mat walks near the walker now; whether that changed. */
@@ -120,6 +123,16 @@ struct WalkerInventoryWindow : Window {
 		const bool near = FirstPersonWalkerAt(x, y) && ThreeDMatNear(x, y, THREE_D_SELLER_REACH_M);
 		if (near == this->mat) return false;
 		this->mat = near;
+		return true;
+	}
+
+	/** Whether a nurse of a church stands near the walker now; whether that changed. */
+	bool SeeNurse() const
+	{
+		double x = 0, y = 0;
+		const bool near = FirstPersonWalkerAt(x, y) && ThreeDNurseNear(x, y, THREE_D_SELLER_REACH_M);
+		if (near == this->nurse) return false;
+		this->nurse = near;
 		return true;
 	}
 
@@ -152,7 +165,7 @@ struct WalkerInventoryWindow : Window {
 		TileIndex now = FirstPersonShopNearby();
 		const WalkerItem hand = FirstPersonWeaponInHand();
 		std::string where = WalkerWhere();
-		if (this->SeeSeller() || this->SeeMat() || now != this->shop || hand != this->in_hand || where != this->where) {
+		if (this->SeeSeller() || this->SeeMat() || this->SeeNurse() || now != this->shop || hand != this->in_hand || where != this->where) {
 			this->shop = now;
 			this->in_hand = hand;
 			this->where = std::move(where);
@@ -268,6 +281,11 @@ struct WalkerInventoryWindow : Window {
 			this->lines.push_back({y, y + lh, WalkerItem::End, LineDoes::LetDogGo});
 			y += lh;
 		}
+		/* The walker's health insurance, so many days of it left (CmdBuyWalkerNurse()). */
+		if (WalkerInsured(*c)) {
+			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_INSURED, (c->walker_nurse_until - TimerGameEconomy::date).base()), TextColour::White);
+			y += lh;
+		}
 		y += 4;
 
 		/* The dogs of a seller near; bought with a click (the walker's dog then, instead of the one it had). */
@@ -298,10 +316,21 @@ struct WalkerInventoryWindow : Window {
 			y += lh + 4;
 		}
 
+		/* A nurse before a church: the health insurance, a month of it with a click (the player, 28. 10.). */
+		this->SeeNurse();
+		if (this->nurse) {
+			DrawString(ir.left, ir.right, y, STR_WALKER_NURSE_SELLS, TextColour::Yellow);
+			y += lh;
+			DrawString(ir.left + 8, ir.right, y, GetString(STR_WALKER_NURSE_INSURANCE, WALKER_NURSE_DAYS), TextColour::White);
+			DrawString(ir.left, ir.right, y, GetString(STR_WALKER_BUY, WalkerNursePrice()), TextColour::Green, AlignmentH::End);
+			this->lines.push_back({y, y + lh, WalkerItem::End, LineDoes::BuyNurse});
+			y += lh + 4;
+		}
+
 		/* What is sold here; bought with a click. Matylda's seedlings at the pub under her name. */
 		const StringID place = WalkerShopName(this->shop);
 		if (place == INVALID_STRING_ID) {
-			if (seller == nullptr && !this->mat) y = DrawStringMultiLine(ir.left, ir.right, y, INT32_MAX, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
+			if (seller == nullptr && !this->mat && !this->nurse) y = DrawStringMultiLine(ir.left, ir.right, y, INT32_MAX, STR_WALKER_NOTHING_FOR_SALE, TextColour::Silver);
 			return;
 		}
 		auto sale = [&](WalkerItem item) {
@@ -402,6 +431,9 @@ struct WalkerInventoryWindow : Window {
 				}
 				case LineDoes::BuyOfMat:
 					Command<Commands::BuyWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, WALKER_SOLD_BY_MAT, l.item);
+					break;
+				case LineDoes::BuyNurse:
+					Command<Commands::BuyWalkerNurse>::Post(STR_ERROR_WALKER_CAN_T_BUY, 1);
 					break;
 			}
 			return;

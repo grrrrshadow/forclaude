@@ -261,6 +261,8 @@ enum class Commands : uint8_t {
 	SetWalkerQuickKey, ///< a thing put under a quick key of the walker (walker_inventory.h)
 	PlantWalkerSeedling, ///< the walker plants a seedling of marijuana in front of it (WalkerPlant, walker_inventory.h)
 	HarvestWalkerPlant, ///< the walker harvests its plant: marijuana, or hay (WalkerPlant)
+	BuyWalkerNurse, ///< the walker's health insurance bought of a nurse before a church: she walks with it and heals it (three_d_animals.h)
+	HealWalkerByNurse, ///< the walker's nurse heals it a little
 	ConfigureVehicle, ///< choose one of the details a vehicle's set offers -- who pulls the hand cart, pushed or pulled, a stripe, a colour (vehicle_config.h)
 	SendVehicleToDepot, ///< send a vehicle to a depot
 	SetVehicleVisibility, ///< hide or unhide a vehicle in the build vehicle and autoreplace GUIs
