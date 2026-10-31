@@ -31,6 +31,21 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (54) – Koně a vozy ve Special 3D: velikost přepínačem, vozy dva
+
+- Hráč ke kolegovu návrhu (`grrrrf hra/3d/VOZY-KONE-SPECIAL-PRO-HRU.md`, vozy a koně ve 2× jako zbytek Specialu, tři
+  vozy): *„ja nevim co tam vymejšli s velikostí vozů a koňů, to je normálně přepínačem zvětšené zmenšené. jsou jen
+  2 vozy tak budou dva.“*
+- Kolegovi `hra/3d/ODPOVED-VOZY-KONE-SPECIAL.md` (grrrrf `a7d25de`):
+  - koně a vozy ve skutečné velikosti, bez 2× a bez kopií koní;
+  - velikost dává přepínač (`velikost` jako u ostatních 3D sad);
+  - koně rovnou ze `zvirata`, vozy přepočítat;
+  - holka v sedle a na kozlíku je řidička, takže `meritko` 1 jako holky za volantem;
+  - vozy jen dva, žebřiňák a valník;
+  - body 2–5 návrhu (sedlo, vůz jako přestavba = druhý článek jako návěs Tater, pózy, dekorace) odsouhlasené podle
+    hráčových odpovědí.
+- Pohyb koně podle ujeté dráhy dodělá hra, až přijde Special v4.
+
 ## 30. 10. (53) – Zprávy o pádu na Discord při startu hry, autosave každé 3 minuty
 
 - Hráč: *„ať nam pošlou crashreporty z adresaře save při startu hry. je crashreport je problem tak bez ptani
