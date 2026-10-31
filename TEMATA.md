@@ -31,6 +31,31 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 31. 10. (69) – Simtrains: nástup přes E má pult a ovládání MSTS jako kabina z okna vlaku; projetí červené; oko 750
+
+- Hráč (s `zssk_750031_2015_chovani.zip` a `..._model.zip`): „neprojedu červenou, vyhled z kabiny simtrains se
+  nezlepšil. v těch modelech simtrains jsou určitě body pro kameru pohled z očí. nemužu řidit když neuvidim pult.
+  541 jsem na chodbě před řidici kabinou a koukam do zadu . zssk 750 koukam jak z parni lokomotivy z bočniho okenka.
+  s pořadim souhlasim gpu"
+- Hráč: „E nastoupit nema čudlik ovladani msts jako cab view z okna vlaku“
+- Hráč: „ja tam nechci tachometr. sjednoť ty okna. přidej k E msts ovladani a hotovo.“
+- **Příčina všeho kromě 750:** nástup přes E kreslil kabinu sám v okně první osoby. Pult MSTS, oko z kabiny MSTS,
+  ovládání pultu (šipky i klávesy MSTS) a přepínač měla jen kabina z okna vlaku. Přes E se vlak řídil šipkami jako
+  ostatní vozidla, hráč ho nepřevzal a hra ho dál zastavovala na červené.
+- **Sjednoceno:** jedno místo u pultu (`SimtrainsCabSeat`) pro obě okna. Má oko kabiny MSTS, pult přes pohled,
+  ovládání šipkami nebo klávesami MSTS, přepínač „Ovládání: šipkami / MSTS“ dole a text ovladačů. Přes E jsou
+  klávesy MSTS W/S/A/D pultu, ne chůze. Tachometr se nepřidává.
+- **Červená:** převzatý vlak ji projel, ale hra ho před každou červenou srazila na 15 km/h (kontrola konce trati).
+  Řízený vlak to teď nemá. Rig `testnedobrzdil blok`, zadní vlak převzatý na plný výkon: červenou projel v 64 km/h
+  a narazil do vlaku na nástupišti za ní.
+- **750:** zip nemá kabinu (`.eng` chce `../../common.cab/cab750/750.cvf`), takže pult ani oko strojvedoucího není.
+  Oko se bralo z `Inside` → `PassengerCabinHeadPos` (−1,7; 3,2; 6,45), což je místo cestujícího u bočního okna.
+  Teď je z `HeadOut` (hlava u bočního okna strojvedoucího), posunuté dovnitř skříně a s pohledem dopředu. V rigu
+  je vidět trať před lokomotivou místo boku. Má-li hráč `common.cab/cab750`, pult se ukáže sám.
+- **541:** soubory nemám. Nejspíš totéž: chodba = `PassengerCabinHeadPos` (místo cestujícího), protože se kabina
+  `.cvf` nenašla, nebo jízda přes E bez pultu. Po téhle verzi zkusit znovu, případně poslat její `.eng` a kabinu.
+- Rig: 451 přes E ukazuje pult a tlačítko ovládání (snímek stejný jako kabina z okna vlaku). Smoke beze změny.
+
 ## 31. 10. (68) – GPU: vozidla na mapě bez obrázků, když kartě něco chybí; fronta načítání od nejnovějšího
 
 - Hráč: „pokračuješ s gpu? dalši body?“

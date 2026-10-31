@@ -36,7 +36,7 @@ struct SimtrainsEngine {
 	bool wagon = false;           ///< a wagon (a .wag): no power, carries
 	bool passengers = false;      ///< a wagon's "Type ( Carriage )": passengers, else goods of any kind
 	int capacity = 0;             ///< a wagon's: "PassengerCapacity", or a goods wagon's own
-	bool has_cab = false;         ///< "PassengerCabinHeadPos" given
+	bool has_cab = false;         ///< "HeadOut" given: the driver's eye by its side window, drawn in (cab)
 	float cab[3] = {};            ///< the eye in the cab, metres in the frame of the game's vehicle objects (x forward, y left, z up)
 	uint32_t grfid = 0;           ///< the GRF's id, of its .eng's name
 	double length_m = 0;          ///< the length of its "Size", 0 when not given

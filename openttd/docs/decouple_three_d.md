@@ -1417,7 +1417,11 @@ the cab view then) and where it is seen (`Direction`: down, to the right):
 the 451's ahead, 60 degrees to the left and 75 to the right. By night the
 same pictures from a folder `night` (or `noc` beside `den`). Its controls
 (`CabViewControls`: dials, levers, lamps, figures) are read for the next
-steps.
+steps. An engine whose cab is not there (the ŽSSK 750 comes without
+`common.cab/cab750`) has its driver's eye by the side window its `HeadOut`
+gives, drawn in inside the body to the seat, looking ahead -- not the
+passenger's place of its `Inside` (`PassengerCabinHeadPos`), which looks out
+to the side.
 
 In the cab view with the camera Inside (`simtrains_cab.cpp`) the pictures are
 drawn over the view: each a flat board before the eye where MSTS sees it, as
@@ -1429,17 +1433,24 @@ The clear windows show the world, drawn by the processor or by the graphics
 card under them. The window keeps which pixel of which picture each of its
 pixels shows, made anew only when the head turns or the window changes.
 
+The cab view from the train's window and the walker who boards the train
+with E (`first_person_gui.cpp`) are one seat (`SimtrainsCabSeat`): the same
+eye, the desk over the view, the controls and their switch at the bottom.
+
 The rig: `test3d obloukjizda 1 0 300 53542BB7` buys the 451 (an electric
 engine gets its track under the wires), `test3d kabina 0`, `test3d kabina
-klik cely`, `test3d kabina hlava <dx> <dy>`.
+klik cely`, `test3d kabina hlava <dx> <dy>`; boarded with E: `test3d
+chodec`, `test3d chodec u 0`, `test3d chodec e`.
 
 ### Driving a train of MSTS from its desk
 
 The player drives it, the game does not (`Train::cab_driven`): the first
 touch of a control in its cab view takes it over, the window closed (or the
 button Drive / T, its route) lets it go, and the game drives it again by its
-orders. Driven, it runs past every red (`force_proceed`, renewed each tick),
-no platform slows it and no order's speed holds it; stopped by the player on
+orders. Driven, it runs past every red (`force_proceed`, renewed each tick)
+at the speed it is driven -- not slowed before it as a train the game drives
+is (`TrainCheckIfLineEnds()`) --, no platform slows it and no order's speed
+holds it; stopped by the player on
 a platform of the station its order is for, it arrives there and loads.
 The curves, the bridges and the depots still hold it to their speeds.
 
@@ -1465,7 +1476,9 @@ where the controls stand.
 The rig: `test3d kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer>
 <0-255>`, `test3d kabina zavri`; `test3d kabina cas` shows the desk. The 451
 alone: full service from 65 km/h stands within the tile, the emergency brake
-from 99 km/h within two; 0 to 99 km/h in three tiles.
+from 99 km/h within two; 0 to 99 km/h in three tiles. Past the red of
+`testnedobrzdil blok` (the train behind taken over, full power): through at
+64 km/h, into the train standing on the platform beyond.
 
 The rig: `test3d obloukjizda <n> <wagons> <ticks> <grfid> [<wagon grfid>]`
 buys the engine of that GRF (`53542680`, the ŽSSK 750 031) and the wagons of

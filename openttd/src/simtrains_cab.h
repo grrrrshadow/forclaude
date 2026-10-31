@@ -80,6 +80,23 @@ struct SimtrainsCabDriver {
 	bool Key(const Vehicle *v, char32_t key, uint16_t keycode);
 };
 
+/**
+ * The player in the cab of a train of MSTS, in whichever window shows it: the cab view from the train's window, or the
+ * walker who boarded it with E (first_person_gui.cpp) -- one seat for both (the player, 31. 10.: "boarding with E has
+ * no button controls MSTS as the cab view from the train's window"; "unify the windows, add the controls MSTS to E and
+ * done"). The desk over the view with the eye where the cab has it, the arrows or the keys of MSTS driving it.
+ */
+struct SimtrainsCabSeat {
+	SimtrainsCabDesk desk;     ///< the pictures of its desk shown
+	SimtrainsCabDriver driver; ///< the player at it
+
+	const SimtrainsCab *Prepare(const Vehicle *v, CabViewCamera &camera);
+	void Draw(const Vehicle *v, const CabViewCamera &camera, int left, int top, int width, int height);
+	bool Drive(const Vehicle *v, DirectionKeys keys, int ms);
+	bool Key(const Vehicle *v, char32_t key, uint16_t keycode);
+	void ToggleControls();
+};
+
 bool IsSimtrainsTrain(const Vehicle *v);
 void SimtrainsCabLetGo(const Vehicle *v);
 std::string SimtrainsDeskText(const Vehicle *v);

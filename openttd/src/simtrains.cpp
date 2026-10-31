@@ -930,15 +930,24 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 	if (const TextNode *t = engine->Child("MaxForce"); t != nullptr) e.force_kn = ParseFigure(t->Value(), {{"kN", 1}, {"N", 0.001}, {"lbf", 0.004448}}, 0.001);
 	if (const TextNode *t = engine->Child("MaxVelocity"); t != nullptr) e.speed_kmh = ParseFigure(t->Value(), {{"mph", 1.609344}, {"kmh", 1}, {"km/h", 1}, {"kph", 1}, {"m/s", 3.6}}, 3.6);
 	if (const TextNode *t = wagon->Child("Mass"); t != nullptr) e.mass_t = ParseFigure(t->Value(), {{"t", 1}, {"kg", 0.001}, {"t-uk", 1.016}, {"t-us", 0.907}, {"lb", 0.000454}}, 0.001);
-	if (const TextNode *inside = wagon->Child("Inside"); inside != nullptr) {
-		if (const TextNode *head = inside->Child("PassengerCabinHeadPos"); head != nullptr && head->values.size() >= 3) {
-			const float x = static_cast<float>(ParseFigure(head->Value(0), {})), y = static_cast<float>(ParseFigure(head->Value(1), {})), z = static_cast<float>(ParseFigure(head->Value(2), {}));
-			/* MSTS: x to the right, y up, z forward. */
-			e.cab[0] = z;
-			e.cab[1] = -x;
-			e.cab[2] = y;
-			e.has_cab = true;
+	/* The driver's eye when the engine's cab of MSTS is not there (its .cvf has the eye, three_d_objects.cpp): where the
+	 * driver's head looks out of the side window ("HeadOut"), drawn in inside the body to the seat by that window,
+	 * looking ahead. Not "Inside" with its PassengerCabinHeadPos: that is a passenger's place, looking out to the side
+	 * (the ZSSK 750's is its side window; the player, 31. 10.: "the 750: I look as from a steam engine's side window"). */
+	if (const TextNode *head = engine->Child("HeadOut"); head != nullptr && head->values.size() >= 3) {
+		float x = static_cast<float>(ParseFigure(head->Value(0), {})), y = static_cast<float>(ParseFigure(head->Value(1), {})), z = static_cast<float>(ParseFigure(head->Value(2), {}));
+		double width_m = 3.0;
+		if (const TextNode *size = wagon->Child("Size"); size != nullptr && size->values.size() >= 3) {
+			width_m = ParseFigure(size->Value(0), {{"m", 1}, {"cm", 0.01}, {"mm", 0.001}, {"ft", 0.3048}, {"in", 0.0254}});
 		}
+		/* The seat's middle 0.8 m in from the side of the body. */
+		const float in = static_cast<float>(std::max(0.0, width_m / 2 - 0.8));
+		x = std::clamp(x, -in, in);
+		/* MSTS: x to the right, y up, z forward. */
+		e.cab[0] = z;
+		e.cab[1] = -x;
+		e.cab[2] = y;
+		e.has_cab = true;
 	}
 	/* The notches of its throttle and whether it brakes electrically: the desk's controls (simtrains_cab.h). */
 	if (const TextNode *controllers = engine->Child("EngineControllers"); controllers != nullptr) {

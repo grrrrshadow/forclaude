@@ -590,7 +590,7 @@ struct CabViewWindow : Window {
 	bool full = false;                 ///< over the whole screen
 	Rect before_full{};                ///< where it was before that
 	mutable CabViewPicture picture{}; ///< the last picture
-	mutable SimtrainsCabDesk desk{};  ///< the desk of a cab of MSTS over it (simtrains_cab.h)
+	mutable SimtrainsCabSeat seat{};  ///< a train of MSTS: the player at its desk, the desk over the view (simtrains_cab.h)
 
 	/* Drawn anew while the vehicle moves: about twenty-five times a second. */
 	IntervalTimer<TimerWindow> redraw{std::chrono::milliseconds(40), [this](auto) {
@@ -603,18 +603,13 @@ struct CabViewWindow : Window {
 
 	/* The arrows drive (CabArrows), looked at this often. */
 	CabArrows arrows{};
-	SimtrainsCabDriver desk_driver{}; ///< a train of MSTS: the player at its desk (simtrains_cab.h)
 	static constexpr int DRIVE_MS = 30;
 	IntervalTimer<TimerWindow> drive{std::chrono::milliseconds(DRIVE_MS), [this](auto) {
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
 		if (v == nullptr) return;
 		const DirectionKeys keys = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
-		if (IsSimtrainsTrain(v)) {
-			/* The arrows move its combined lever; with the keys of MSTS they do nothing (OnKeyPress()). */
-			if (!_settings_client.gui.cab_msts_keys) this->desk_driver.Drive(v, keys, DRIVE_MS);
-		} else {
-			this->arrows.Drive(v, keys, DRIVE_MS);
-		}
+		/* A train of MSTS: the arrows move its combined lever, with the keys of MSTS nothing (OnKeyPress()). */
+		if (!this->seat.Drive(v, keys, DRIVE_MS)) this->arrows.Drive(v, keys, DRIVE_MS);
 	}};
 
 	CabViewWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
@@ -687,14 +682,13 @@ struct CabViewWindow : Window {
 				int w = r.Width(), h = r.Height();
 				if (w <= 0 || h <= 0) return;
 				/* An engine of MSTS with its cab: in the cab (the camera Inside) its desk over the view (simtrains_cab.h). */
-				const SimtrainsCab *cab = CabCameraChosen() == CabCamera::Inside ? SimtrainsCabOf(v) : nullptr;
-				this->camera.msts = cab != nullptr;
+				this->seat.Prepare(v, this->camera);
 				if (!DrawCabView(v, w, h, this->camera, this->picture)) {
 					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
 					return;
 				}
 				BlitEyePicture(*this, this->picture, r.left, r.top);
-				if (cab != nullptr) DrawSimtrainsCabDesk(this->desk, *cab, this->camera, r.left, r.top, w, h);
+				this->seat.Draw(v, this->camera, r.left, r.top, w, h);
 				break;
 			}
 			case WID_CV_PANEL:
@@ -814,7 +808,7 @@ struct CabViewWindow : Window {
 		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
 		if (v == nullptr) return EventState::NotHandled;
 		/* A train of MSTS driven by the keys of MSTS (simtrains_cab.h). */
-		if (_settings_client.gui.cab_msts_keys && IsSimtrainsTrain(v) && this->desk_driver.Key(v, key, keycode)) {
+		if (this->seat.Key(v, key, keycode)) {
 			this->SetWidgetDirty(WID_CV_PANEL);
 			return EventState::Handled;
 		}
@@ -895,8 +889,7 @@ struct CabViewWindow : Window {
 				break;
 			case WID_CV_CONTROLS:
 				/* The arrows or the keys of MSTS at the desk of a train of MSTS. */
-				_settings_client.gui.cab_msts_keys = !_settings_client.gui.cab_msts_keys;
-				this->desk_driver.read = false;
+				this->seat.ToggleControls();
 				this->SetDirty();
 				break;
 			case WID_CV_LOAD:
@@ -957,7 +950,7 @@ std::string DescribeCabViews()
 				const Train *t = Train::From(v->First());
 				s += fmt::format(" cur {} pult MSTS {} rizen {} vykon {} edb {} brzda {} primocinna {} rychlobrzda {} smer {} tfp {} na {},{} rozkaz {} ({})", t->cur_speed, IsSimtrainsTrain(v) ? "ano" : "ne",
 						t->cab_driven, t->cab_power, t->cab_dynamic, t->cab_brake, t->cab_engine_brake, t->cab_emergency, t->cab_reverser, to_underlying(t->force_proceed),
-						TileX(t->tile), TileY(t->tile), to_underlying(t->current_order.GetType()), cw->desk_driver.done);
+						TileX(t->tile), TileY(t->tile), to_underlying(t->current_order.GetType()), cw->seat.driver.done);
 			}
 		}
 		s += "; ";

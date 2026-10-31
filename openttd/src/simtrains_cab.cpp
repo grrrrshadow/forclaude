@@ -26,6 +26,7 @@
 #include "company_func.h"
 #include "strings_func.h"
 #include "core/backup_type.hpp"
+#include "settings_type.h"
 #include "table/strings.h"
 
 #include <algorithm>
@@ -249,6 +250,50 @@ bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const
 /* ---- The player at the desk (SimtrainsCabDriver) ---- */
 
 /** Whether a vehicle is a train whose head is an engine of MSTS: it is driven from its desk (SimtrainsCabDriver). */
+/**
+ * Ready the eye for a picture of the cab: in the cab of MSTS (the camera Inside, the engine's cab read) where that cab
+ * has its eye, the desk to go over the picture (CabViewCamera::msts).
+ * @return the cab, nullptr when the picture is not of one
+ */
+const SimtrainsCab *SimtrainsCabSeat::Prepare(const Vehicle *v, CabViewCamera &camera)
+{
+	const SimtrainsCab *cab = v != nullptr && CabCameraChosen() == CabCamera::Inside ? SimtrainsCabOf(v) : nullptr;
+	camera.msts = cab != nullptr;
+	return cab;
+}
+
+/** The desk over the picture of the cab made with the eye readied (Prepare()). */
+void SimtrainsCabSeat::Draw(const Vehicle *v, const CabViewCamera &camera, int left, int top, int width, int height)
+{
+	if (!camera.msts) return;
+	if (const SimtrainsCab *cab = SimtrainsCabOf(v); cab != nullptr) DrawSimtrainsCabDesk(this->desk, *cab, camera, left, top, width, height);
+}
+
+/**
+ * The arrows held drive a train of MSTS by its desk's combined lever (SimtrainsCabDriver::Drive()); with the keys of
+ * MSTS chosen they do nothing.
+ * @return whether it is a train of MSTS: its arrows are the desk's, not those of the other vehicles (CabArrows)
+ */
+bool SimtrainsCabSeat::Drive(const Vehicle *v, DirectionKeys keys, int ms)
+{
+	if (!IsSimtrainsTrain(v)) return false;
+	if (!_settings_client.gui.cab_msts_keys) this->driver.Drive(v, keys, ms);
+	return true;
+}
+
+/** A key of MSTS pressed at the desk of a train of MSTS, when they are chosen. @return whether it was one */
+bool SimtrainsCabSeat::Key(const Vehicle *v, char32_t key, uint16_t keycode)
+{
+	return _settings_client.gui.cab_msts_keys && IsSimtrainsTrain(v) && this->driver.Key(v, key, keycode);
+}
+
+/** The arrows, or the keys of MSTS (the button "controls" of the cab). */
+void SimtrainsCabSeat::ToggleControls()
+{
+	_settings_client.gui.cab_msts_keys = !_settings_client.gui.cab_msts_keys;
+	this->driver.read = false;
+}
+
 bool IsSimtrainsTrain(const Vehicle *v)
 {
 	return v != nullptr && v->type == VehicleType::Train && SimtrainsEngineOf(v->First()->GetGRFID()) != nullptr;

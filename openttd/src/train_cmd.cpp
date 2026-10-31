@@ -14810,8 +14810,10 @@ static bool TrainCheckIfLineEnds(Train *moving_front, bool reverse)
 		return TrainApproachingLineEnd(moving_front, false, reverse);
 	}
 
-	/* approaching red signal */
-	if (trackdirbits.Any(red_signals)) return TrainApproachingLineEnd(moving_front, true, reverse);
+	/* approaching red signal; not one driven from its cab, which runs past at the speed it is driven (the player, 31. 10.:
+	 * "the train is driven by the player, so the game does not drive it: it runs past" -- it was brought down to 15 km/h
+	 * before every red) */
+	if (trackdirbits.Any(red_signals) && !consist->cab_driven) return TrainApproachingLineEnd(moving_front, true, reverse);
 
 	/* approaching a rail/road crossing? then make it red */
 	if (IsLevelCrossingTile(tile)) MaybeBarCrossingWithSound(tile);

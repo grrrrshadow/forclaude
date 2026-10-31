@@ -56,6 +56,7 @@
 #include "three_d_witches.h"
 #include "vehicle_base.h"
 #include "cab_drive.h"
+#include "simtrains_cab.h"
 #include "engine_base.h"
 #include "engine_func.h"
 #include "road_func.h"
@@ -309,6 +310,11 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 				NWidget(WWT_TEXTBTN, Colours::Grey, WID_FP_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 				/* And the camera, as the cab view's (the player, 28. 10.: "give a button camera"). */
 				NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CAMERA), SetStringTip(STR_CAB_VIEW_CAMERA, STR_CAB_VIEW_CAMERA_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+				/* And in a train of MSTS the switch of its controls, as the cab view's (the player, 31. 10.: "add the
+				 * controls MSTS to E"). */
+				NWidget(NWID_SELECTION, Colours::Invalid, WID_FP_CONTROLS_SEL),
+					NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_FP_CONTROLS), SetStringTip(STR_CAB_VIEW_CONTROLS, STR_CAB_VIEW_CONTROLS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+				EndContainer(),
 			EndContainer(),
 		EndContainer(),
 		NWidget(WWT_PUSHTXTBTN, Colours::Brown, WID_FP_INVENTORY), SetStringTip(STR_FIRST_PERSON_INVENTORY, STR_FIRST_PERSON_INVENTORY_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
@@ -597,6 +603,7 @@ struct FirstPersonWindow : Window {
 	 */
 	VehicleID riding = VehicleID::Invalid(); ///< the vehicle the walker is in, Invalid on foot
 	CabArrows arrows{};                      ///< the arrows driving it
+	mutable SimtrainsCabSeat seat{};         ///< a train of MSTS: the player at its desk, as in the cab view (simtrains_cab.h)
 	CabLook cab_look{};                      ///< the head turned in it with the right button, as in the cab view
 
 	/** The vehicle the walker is in, nullptr on foot. */
@@ -860,11 +867,16 @@ struct FirstPersonWindow : Window {
 			this->walker.x = rv->x_pos;
 			this->walker.y = rv->y_pos;
 			const bool route = this->arrows.route;
-			this->arrows.Drive(rv, ArrowsWindow() == this ? _dirkeys : DirectionKeys{}, static_cast<int>(steps) * FIRST_PERSON_TICK_MS);
+			/* A train of MSTS by its desk's lever (simtrains_cab.h), the others as the cab view drives them. */
+			const DirectionKeys keys = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
+			const int ms = static_cast<int>(steps) * FIRST_PERSON_TICK_MS;
+			if (!this->seat.Drive(rv, keys, ms)) this->arrows.Drive(rv, keys, ms);
 			if (this->arrows.route != route) this->SetWidgetDirty(WID_FP_ROUTE);
 		}
 		/* The button of the route in a vehicle, of running on foot. */
-		if (this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0)) this->ReInit();
+		bool changed = this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0);
+		changed |= this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(IsSimtrainsTrain(rv) ? 0 : SZSP_NONE);
+		if (changed) this->ReInit();
 		/* No health left: the walker is gone, back to the map (the player, 15. 10.). */
 		const Company *c = Company::GetIfValid(_local_company);
 		if (c != nullptr && c->walker_health == 0) {
@@ -916,6 +928,7 @@ struct FirstPersonWindow : Window {
 	FirstPersonWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
 	{
 		this->CreateNestedTree();
+		this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(SZSP_NONE);
 		this->FinishInitNested(number);
 		this->walker.eye_z = FIRST_PERSON_EYES_M * OBJECT_HEIGHT_PER_METRE;
 		this->walker.heading = std::atan2(1.0, 1.0); // looking south-east, down the screen of the map facing north
@@ -944,6 +957,12 @@ struct FirstPersonWindow : Window {
 		FirstPersonEye eye = this->walker;
 		eye.heading = std::remainder(eye.heading + this->look_ahead_heading, 2 * M_PI);
 		eye.pitch = std::clamp(eye.pitch + this->look_ahead_pitch, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
+		/* In a train of MSTS with its cab: the eye where the cab has it, its desk over the view (as the cab view's). */
+		if (rv != nullptr) {
+			this->seat.Prepare(rv, this->camera);
+		} else {
+			this->camera.msts = false;
+		}
 		this->picture_ok = rv != nullptr ? DrawCabView(rv, w, h, this->camera, this->picture) : DrawFirstPersonView(eye, w, h, this->camera, this->picture);
 	}
 
@@ -1686,6 +1705,12 @@ struct FirstPersonWindow : Window {
 			this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
 			return EventState::Handled;
 		}
+		/* In a train of MSTS with the keys of MSTS chosen: its desk's keys first -- W and S its reverser, A and D its
+		 * throttle, not the walker's (simtrains_cab.h). */
+		if (const Vehicle *rv = this->Riding(); rv != nullptr && this->seat.Key(rv, key, keycode)) {
+			this->SetWidgetDirty(WID_FP_CANVAS);
+			return EventState::Handled;
+		}
 		/* The walking keys are the walker's, not the toolbar's (they are read as held, Walk()). */
 		switch (keycode & ~WKC_SPECIAL_KEYS) {
 			case 'W': case 'A': case 'S': case 'D':
@@ -1821,6 +1846,7 @@ struct FirstPersonWindow : Window {
 		/* Its route, or the wheel again (as the cab view's). */
 		if (widget == WID_FP_ROUTE) return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
 		if (widget == WID_FP_CAMERA) return CabCameraText();
+		if (widget == WID_FP_CONTROLS) return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
 		return this->Window::GetWidgetString(widget, stringid);
 	}
 
@@ -1851,6 +1877,8 @@ struct FirstPersonWindow : Window {
 				}
 				/* Hurt: red over the picture, fading. */
 				BlitEyePicture(*this, this->picture, r.left, r.top, this->hurt_steps > 0 ? Colour(220, 0, 0, static_cast<uint8_t>(30 + this->hurt_steps * 18)).data : 0);
+				/* In the cab of a train of MSTS its desk over the view (as the cab view's). */
+				if (const Vehicle *rv = this->Riding(); rv != nullptr) this->seat.Draw(rv, this->camera, r.left, r.top, w, h);
 				/* A dot in the middle, where it looks. */
 				const int cx = r.left + w / 2, cy = r.top + h / 2;
 				GfxFillRect(cx - 1, cy - 1, cx + 1, cy + 1, GetColourGradient(Colours::White, Shade::Lightest));
@@ -1880,6 +1908,8 @@ struct FirstPersonWindow : Window {
 				bool riding = false;
 				if (const Vehicle *rv = this->Riding(); rv != nullptr) {
 					hint = GetString(this->arrows.route || rv->owner != _local_company ? STR_FIRST_PERSON_RIDING_ROUTE : STR_FIRST_PERSON_RIDING, rv->index, PackVelocity(rv->GetDisplaySpeed(), rv->type));
+					/* A train driven from its desk: where its controls stand (as the cab view's panel). */
+					if (const std::string desk = SimtrainsDeskText(rv); !desk.empty()) hint += "   " + desk;
 					riding = true;
 				} else if (const WalkerPlant *plant = WalkerPlantNear(this->walker.x, this->walker.y, WALKER_PLANT_REACH_M); plant != nullptr) {
 					/* By the walker's plant: how long till the harvest, or E harvests it. */
@@ -1977,6 +2007,11 @@ struct FirstPersonWindow : Window {
 				break;
 			case WID_FP_CAMERA:
 				if (this->Riding() != nullptr) CabNextCamera(this->camera);
+				break;
+			case WID_FP_CONTROLS:
+				/* The arrows or the keys of MSTS at the desk of a train of MSTS (as the cab view's). */
+				this->seat.ToggleControls();
+				this->SetDirty();
 				break;
 			case WID_FP_INVENTORY:
 				ShowWalkerInventoryWindow();
