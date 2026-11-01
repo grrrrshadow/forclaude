@@ -10041,6 +10041,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: obrazovka {} po {} kresleni{}", _rig_screen_picture, _rig_screen_paints, _rig_screen_quit ? ", pak konec" : "");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "mazani") {
+		/* 'gpu mazani 0|1': the rects of the card's pictures cleared by drawing over them (1), as where the card's
+		 * glClear() does not keep to the scissor (TestScissoredClear() of three_d_gpu.cpp), or as the card clears (0). */
+		extern bool _clear_by_drawing;
+		_clear_by_drawing = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: gpu mazani {}", _clear_by_drawing ? "kreslenim" : "jak karta umi");
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "snimek") {
 		/* 'gpu snimek 0|1': the frames of the view from the eyes drawn whole by the graphics card (1), or by the
 		 * processor with only the objects on the card (0). */

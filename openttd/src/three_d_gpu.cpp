@@ -227,6 +227,9 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 	return _triangles_kept.at(key).first;
 }
 
+/** The rig ('test3d gpu mazani 1'): the rects of the card's pictures cleared by drawing over them whatever its glClear() does (ClearInScissor()). */
+bool _clear_by_drawing = false;
+
 #if defined(THREE_D_GPU_WGL) || defined(THREE_D_GPU_EGL)
 
 namespace {
@@ -257,6 +260,7 @@ constexpr GLbitfield GL_COLOR_BUFFER_BIT = 0x4000;
 constexpr GLenum GL_LESS = 0x0201;
 constexpr GLenum GL_GREATER = 0x0204;
 constexpr GLenum GL_GEQUAL = 0x0206;
+constexpr GLenum GL_ALWAYS = 0x0207;
 constexpr GLenum GL_BACK = 0x0405;
 constexpr GLenum GL_FRONT = 0x0404;
 constexpr GLenum GL_CW = 0x0900;
@@ -268,6 +272,9 @@ constexpr GLenum GL_CULL_FACE = 0x0B44;
 constexpr GLenum GL_DEPTH_TEST = 0x0B71;
 constexpr GLenum GL_DITHER = 0x0BD0;
 constexpr GLenum GL_BLEND = 0x0BE2;
+constexpr GLenum GL_VIEWPORT = 0x0BA2;
+constexpr GLenum GL_DEPTH_WRITEMASK = 0x0B72;
+constexpr GLenum GL_DEPTH_FUNC = 0x0B74;
 constexpr GLenum GL_SCISSOR_TEST = 0x0C11;
 constexpr GLenum GL_UNPACK_ROW_LENGTH = 0x0CF2;
 constexpr GLenum GL_UNPACK_ALIGNMENT = 0x0CF5;
@@ -304,6 +311,9 @@ constexpr GLenum GL_TEXTURE3 = 0x84C3;
 constexpr GLenum GL_MAX_RENDERBUFFER_SIZE = 0x84E8;
 constexpr GLenum GL_RGBA32F = 0x8814;
 constexpr GLenum GL_ARRAY_BUFFER = 0x8892;
+constexpr GLenum GL_ARRAY_BUFFER_BINDING = 0x8894;
+constexpr GLenum GL_CURRENT_PROGRAM = 0x8B8D;
+constexpr GLenum GL_VERTEX_ARRAY_BINDING = 0x85B5;
 constexpr GLenum GL_ELEMENT_ARRAY_BUFFER = 0x8893;
 constexpr GLenum GL_STREAM_DRAW = 0x88E0;
 constexpr GLenum GL_STATIC_DRAW = 0x88E4;
@@ -340,6 +350,7 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glDisable, (GLenum cap)) \
 	X(void, glDepthFunc, (GLenum func)) \
 	X(void, glDepthMask, (GLboolean flag)) \
+	X(void, glColorMask, (GLboolean r, GLboolean g, GLboolean b, GLboolean a)) \
 	X(void, glFrontFace, (GLenum mode)) \
 	X(void, glCullFace, (GLenum mode)) \
 	X(void, glBlendFunc, (GLenum sfactor, GLenum dfactor)) \
@@ -693,6 +704,10 @@ constexpr uint64_t STANDING_FACES_KEY = uint64_t{1} << 60;
 constexpr uint64_t STANDING_VEHICLE_KEY = uint64_t{1} << 61;
 GpuProgram _standing_shrink_program;
 bool _standing_shrink_ok = false;
+GpuProgram _clear_program;
+bool _clear_program_ok = false;
+/** Whether the card's glClear() keeps to the scissor's rect (TestScissoredClear()); else ClearInScissor() draws over it. */
+static bool _scissored_clear_ok = true;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
@@ -1037,6 +1052,18 @@ void main()
 	/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
 	if (abs(c.a * 255.0 - 254.0) < 0.5) c = vec4(c.rgb / c.a, 1.0);
 	o_colour = c;
+}
+)";
+
+/* A rect of a picture on the card cleared by drawing over it (ClearInScissor()), with STANDING_VERTEX: its colours to
+ * nothing; the depth that of the corners (the depth test passing always). */
+const char *const CLEAR_FRAGMENT = R"(#version 330 core
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_lit;
+void main()
+{
+	o_colour = vec4(0.0);
+	o_lit = vec4(0.0);
 }
 )";
 
@@ -1958,6 +1985,60 @@ GLuint CompileShader(GLenum type, const char *source, std::string &why)
 	return shader;
 }
 
+/**
+ * Whether the card's glClear() keeps to the scissor's rect in a picture of two colours, as the pictures of the turned
+ * map are cleared block by block (DrawStandingOnCard(); the player's phone, 1. 11.: behind the cars of the map rows of
+ * their pictures, gone when the map moved -- which clears the pictures whole): a picture cleared whole to white, a
+ * rect in it cleared under the scissor, a pixel read back inside it and one outside, in both colours. Told in the
+ * card's diary; where it does not keep to it, ClearInScissor() draws over the rect.
+ */
+static void TestScissoredClear()
+{
+	const int w = 256, h = 192;
+	GLuint tex[2] = {}, fbo = 0;
+	gl.glGenTextures(2, tex);
+	for (GLuint name : tex) {
+		gl.glBindTexture(GL_TEXTURE_2D, name);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+	}
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	gl.glGenFramebuffers(1, &fbo);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex[0], 0);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, tex[1], 0);
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+	gl.glDrawBuffers(2, both);
+	if (gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE) {
+		gl.glDisable(GL_SCISSOR_TEST);
+		gl.glViewport(0, 0, w, h);
+		gl.glClearColor(1, 1, 1, 1);
+		gl.glClear(GL_COLOR_BUFFER_BIT);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glScissor(70, 50, 64, 48);
+		gl.glClearColor(0, 0, 0, 0);
+		gl.glClear(GL_COLOR_BUFFER_BIT);
+		gl.glDisable(GL_SCISSOR_TEST);
+		uint8_t in[2][4] = {}, out[2][4] = {};
+		for (int k = 0; k < 2; k++) {
+			gl.glReadBuffer(k == 0 ? GL_COLOR_ATTACHMENT0 : GL_COLOR_ATTACHMENT1);
+			gl.glReadPixels(100, 70, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, in[k]);
+			gl.glReadPixels(20, 20, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out[k]);
+		}
+		const bool inside = in[0][3] == 0 && in[1][3] == 0, outside = out[0][3] == 255 && out[1][3] == 255;
+		_scissored_clear_ok = inside && outside;
+		const std::string line = fmt::format("cisteni s nuzkami: uvnitr {} ({} {}), venku {} ({} {}){}", inside ? "smazano" : "NESMAZANO", in[0][3], in[1][3],
+				outside ? "zustalo" : "SMAZANO", out[0][3], out[1][3], _scissored_clear_ok ? "" : "; karta maze kreslenim");
+		Diary(line, true);
+		Debug(misc, 1, "3D on the graphics card: {}", line);
+	}
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gl.glDeleteFramebuffers(1, &fbo);
+	gl.glDeleteTextures(2, tex);
+	gl.glGetError();
+}
+
 bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::string &why)
 {
 	GLuint vs = CompileShader(GL_VERTEX_SHADER, vertex, why);
@@ -2054,6 +2135,9 @@ bool StartCard(std::string &why, std::string &describe)
 		std::string shrink_why;
 		_standing_shrink_ok = _standing_program_ok && MakeProgram(_standing_shrink_program, STANDING_VERTEX, STANDING_SHRINK_FRAGMENT, shrink_why);
 		if (_standing_program_ok && !_standing_shrink_ok) Diary("vozidla plochy jako obrazky: " + shrink_why, true);
+		std::string clear_why;
+		_clear_program_ok = MakeProgram(_clear_program, STANDING_VERTEX, CLEAR_FRAGMENT, clear_why);
+		if (!_clear_program_ok) Diary("mazani kreslenim nejde: " + clear_why, true);
 	}
 	Step("preklad programu postav z oci (shader)");
 	const std::string eye_vertex = EyeMeshSource(MESH_VERTEX, false), eye_fragment = EyeMeshSource(MESH_FRAGMENT, true);
@@ -2128,6 +2212,8 @@ bool StartCard(std::string &why, std::string &describe)
 		why = "OpenGL failed at the start";
 		return false;
 	}
+	Step("zkouska cisteni s nuzkami");
+	TestScissoredClear();
 	Step("preklad programu snimku z oci (shader)");
 	StartEyeFrame();
 	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
@@ -3367,6 +3453,65 @@ bool StandingVehiclesTargetOfSize(int w, int h)
 }
 
 /**
+ * Clear the bound picture within the scissor's rect: by glClear() where the card keeps it to the scissor; else
+ * (TestScissoredClear()) by drawing over the rect -- the colours to nothing, the depth to the given one -- as the
+ * pictures are drawn, which the scissor holds. What it changed of the card's state is put back.
+ * @param mask GL_COLOR_BUFFER_BIT and GL_DEPTH_BUFFER_BIT, as glClear() takes them
+ * @param x,y,w,h the scissor's rect, pixels of the picture
+ * @param depth the depth cleared to, that of glClearDepth()
+ */
+static void ClearInScissor(GLbitfield mask, int x, int y, int w, int h, float depth)
+{
+	if ((_scissored_clear_ok && !_clear_by_drawing) || !_clear_program_ok) {
+		gl.glClear(mask);
+		return;
+	}
+	if (w <= 0 || h <= 0) return;
+	const bool colour = (mask & GL_COLOR_BUFFER_BIT) != 0, deep = (mask & GL_DEPTH_BUFFER_BIT) != 0;
+	GLint program = 0, vao = 0, buffer = 0, viewport[4] = {}, blend = 0, depth_test = 0, depth_func = 0, depth_write = 0;
+	gl.glGetIntegerv(GL_CURRENT_PROGRAM, &program);
+	gl.glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &vao);
+	gl.glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &buffer);
+	gl.glGetIntegerv(GL_VIEWPORT, viewport);
+	gl.glGetIntegerv(GL_BLEND, &blend);
+	gl.glGetIntegerv(GL_DEPTH_TEST, &depth_test);
+	gl.glGetIntegerv(GL_DEPTH_FUNC, &depth_func);
+	gl.glGetIntegerv(GL_DEPTH_WRITEMASK, &depth_write);
+	gl.glViewport(x, y, w, h);
+	gl.glDisable(GL_BLEND);
+	if (deep) {
+		gl.glEnable(GL_DEPTH_TEST);
+		gl.glDepthFunc(GL_ALWAYS);
+		gl.glDepthMask(GL_TRUE);
+	} else {
+		gl.glDisable(GL_DEPTH_TEST);
+	}
+	if (!colour) gl.glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+	const GLuint cp = _clear_program.program;
+	gl.glUseProgram(cp);
+	gl.glUniform2f(gl.glGetUniformLocation(cp, "u_size"), 1.0f, 1.0f);
+	gl.glBindVertexArray(_standing_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+	const float d = std::clamp(depth, 0.0f, 1.0f);
+	const float quad[] = {0, 0, d, 0, 0, 1, 0, d, 0, 0, 1, 1, d, 0, 0, 0, 0, d, 0, 0, 1, 1, d, 0, 0, 0, 1, d, 0, 0};
+	gl.glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STREAM_DRAW);
+	gl.glDrawArrays(GL_TRIANGLES, 0, 6);
+	if (!colour) gl.glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+	gl.glDepthFunc(static_cast<GLenum>(depth_func));
+	gl.glDepthMask(depth_write != 0 ? GL_TRUE : GL_FALSE);
+	if (depth_test != 0) {
+		gl.glEnable(GL_DEPTH_TEST);
+	} else {
+		gl.glDisable(GL_DEPTH_TEST);
+	}
+	if (blend != 0) gl.glEnable(GL_BLEND);
+	gl.glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	gl.glBindVertexArray(static_cast<GLuint>(vao));
+	gl.glBindBuffer(GL_ARRAY_BUFFER, static_cast<GLuint>(buffer));
+	gl.glUseProgram(static_cast<GLuint>(program));
+}
+
+/**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
  * (ThreeDGpuStanding): the block cleared, each picture laid over those before it, far first; a building drawn through
  * a depth of its own (ThreeDGpuStandingBuilding), the figures on it in its depth. Not all laid (one bigger than the
@@ -3400,7 +3545,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glScissor(s.view_x, s.view_y, s.width, s.height);
 	gl.glEnable(GL_SCISSOR_TEST);
 	gl.glClearColor(0, 0, 0, 0);
-	gl.glClear(GL_COLOR_BUFFER_BIT);
+	ClearInScissor(GL_COLOR_BUFFER_BIT, s.view_x, s.view_y, s.width, s.height, 0.0f);
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	gl.glDepthFunc(GL_GEQUAL);
@@ -3475,7 +3620,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			const int x1 = std::min(s.width, b.clear_x + b.clear_w), y1 = std::min(s.height, b.clear_y + b.clear_h);
 			if (x1 > x0 && y1 > y0) {
 				gl.glScissor(s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0);
-				gl.glClear(GL_DEPTH_BUFFER_BIT);
+				ClearInScissor(GL_DEPTH_BUFFER_BIT, s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0, 0.0f);
 				gl.glScissor(s.view_x, s.view_y, s.width, s.height);
 			}
 		}
@@ -3635,7 +3780,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glClearColor(0, 0, 0, 0);
 		gl.glClearDepth(1.0);
 		gl.glDepthMask(GL_TRUE);
-		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		ClearInScissor(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, 0, 0, frame_w, frame_h, 1.0f);
 		gl.glDisable(GL_SCISSOR_TEST);
 		for (const Placed &p : placed) DrawPictureAt(s.items[p.item].vehicle->pic, p.draws, vehicle_at[p.item][0], vehicle_at[p.item][1]);
 		/* Back to what stands on the view, as it was. */
@@ -3827,7 +3972,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	gl.glDisable(GL_BLEND);
 	gl.glDisable(GL_DEPTH_TEST);
-	if (!all) gl.glClear(GL_COLOR_BUFFER_BIT);
+	if (!all) {
+		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+		ClearInScissor(GL_COLOR_BUFFER_BIT, s.view_x, s.view_y, s.width, s.height, 0.0f);
+	}
 	gl.glDisable(GL_SCISSOR_TEST);
 	/* At night which of its pixels are lit, for the glows by them. */
 	if (s.read_lit && all) {
