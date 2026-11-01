@@ -31,6 +31,43 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (82) – Čára za auty na mapě shora: zkouška mazání karty s nůžkami, náhradní mazání kreslením
+
+- Hráč (zip #320): *„pohled ze zhora je vše rychlejší ale za autama bývá čára někdy, několik obrázků dvacet za sebou
+  tam zustane. pohnu plochou tak se to za auty smaže ale udělá se to zas.“* Pak: *„přibliženo někdy vic někdy miň, to
+  se nic nezměni, furt tam je čára. auta byly tatry nakladni a osobni v3s a jen jedna 1203 z beamng.“*
+- V rigu (llvmpipe) se čára neukáže: Tatry 148 a 1203 na silnici při 0°, různá přiblížení.
+- **Podezření:** karta maže blok obrázku toho, co stojí na mapě (auta, domy), `glClear` s nůžkami (scissor), než ho
+  znovu položí. Posun mapy maže celý obrázek bez nůžek, a právě ten čáru smaže. Když ovladač telefonu (zink, Vortek,
+  Mali) mazání s nůžkami neprovede, zůstanou staré obrázky aut. Auta, která se kreslí, nůžky drží.
+- **Teď:** karta při startu jednou zkusí smazat obdélník s nůžkami v obrázku o dvou barvách. Výsledek zapíše do
+  `3d_karta.log` (řádek `cisteni s nuzkami: uvnitr ..., venku ...`). Když mazání nesedí, maže karta bloky kreslením
+  průhledného obdélníku (barvy i hloubka), stejně jako kreslí auta. Rig: `test3d gpu mazani 1` vynutí mazání
+  kreslením.
+- Rig: na llvmpipe zkouška prošla (`uvnitr smazano (0 0), venku zustalo (255 255)`), hra maže jako dosud.
+  Mazání kreslením (`test3d gpu mazani 1`) dává stejný obraz jako `glClear`, liší se jen auta a kouř, které se mezi
+  oběma běhy posunuly.
+- Další log z telefonu ukáže, jestli to byla příčina. Když zkouška projde i na telefonu, příčina je jinde.
+
+## 1. 11. (81) – Tropické stromy: palmy, banánovníky, monstery, kaktusy, podrost (grrrrf 0847d67)
+
+- Hráč: *„mame stromy pro tropical“*. Kolega (`TROPY-PLANTAZ-PRO-HRU.md`, `KAKTUSY-PRO-HRU.md`): 3 palmy,
+  2 banánovníky, 4 monstery, 6 kapradin, 3 kaktusy v `objekty/doplnky`; 13 lesních stromů přebalených gltfpackem
+  (menší). Převzato do sady hry s indexem `doplnky`.
+- **Stromy mapy:** `stromy_mapy` a nový seznam `stromy_mapy_dalsi`. Záznam má klima a druhy (OpenTTD `TreeType`:
+  mírné 0x00–0x0B, subtropické 0x14–0x1F), `meritko` a `podrost`. Záznam s `tema` platí pro území tematického
+  města.
+  - Subtropická mapa: deštný les (0x14–0x1A) banánovníky a monstery 2,5× a palmy, kaktus (0x1B) tři kaktusy,
+    palmy (0x1C–0x1E), 0x1F listnáč.
+  - Podrost pod stromy deštného lesa: kapradí, banánovníky a monstery ve skutečné velikosti, 1–2 na dlaždici. Z očí
+    vždy, na mapě jen při přiblížení Normal a blíž (kapradí má tisíce trojúhelníků a dál je to pár pixelů).
+  - Hliněná města: k houbám palmy, banánovníky a monstery, kapradí jako podrost.
+  - Pouštní tematická města mají dál sprity palem a kaktusů. Subarktické a hračkové klima mají dál sprity.
+- Oprava: stromy mapy se při novém čtení indexů nemazaly (zdvojily by se).
+- Rig GPU (subtropická mapa seed 7, les): palmy, banánovníky, velké monstery a kapradí shora, otočené o 30° i z očí.
+- **Nepřevzato, čeká na domluvu s hráčem:** palmová plantáž jako les (díly `plantaz_*` v `objekty/prumysl`), holky,
+  aby plantáž vyráběla, holky v lese déle, rostliny u domů hliněných a subtropických měst.
+
 ## 1. 11. (80) – Stromy mapy z Low Poly Forest Tree Pack (společné stromy z grrrrf)
 
 - Hráč: *„stromečky společný jsou v grrrf“*.

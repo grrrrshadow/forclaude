@@ -145,7 +145,10 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   (LostBoyz2078). Odkazy na modely jsou v `objekty.json` u každého záznamu (`autor`, `licence`).
 - `doplnky/` – stromy u domů, u průmyslu a v lese a stromy mapy v mírném klimatu (`stromy_mapy`): Low Poly Forest
   Tree Pack (99.Miles, Sketchfab, **CC BY 4.0**; od kolegy, grrrrf `hra/3d/STROMY-LES-PACK-PRO-HRU.md`: stromy
-  zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map).
+  zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map). Tropické rostliny
+  subtropické mapy a hliněných měst (palmy, banánovníky, monstery, kapradí): Tropical Plants Pack M02P (MozzarellaARC,
+  Sketchfab, **CC BY 4.0**; grrrrf `hra/3d/TROPY-PLANTAZ-PRO-HRU.md`). Kaktusy (saguáro, opuncie, kulatý): Cacti
+  (evolveduk, Sketchfab, licence Free Standard; kolegou vyříznuté a zjednodušené, `hra/3d/KAKTUSY-PRO-HRU.md`).
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.

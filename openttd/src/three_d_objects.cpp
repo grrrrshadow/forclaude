@@ -35,6 +35,7 @@
 #include "three_d.h"
 #include "town.h"
 #include "town_map.h"
+#include "tree_map.h"
 #include "tile_map.h"
 #include "viewport_func.h"
 #include "slope_func.h"
@@ -97,9 +98,15 @@ static std::set<std::string, std::less<>> _witches_replaced;
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 /** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees_night;
-/** The trees of the temperate map by the kind of tree on a tile (0x00-0x0B, TREE_COUNT_TEMPERATE): the add-ons that
- * stand for it ("stromy_mapy" "druhy", the colleague's trees of 1. 11.), their figures' names. */
-static std::array<std::vector<std::string>, 12> _three_d_map_trees;
+/** The kinds of trees of the maps of all climates (TreeType 0x00-0x28). */
+static constexpr size_t MAP_TREE_KINDS = TREE_TOYLAND + TREE_COUNT_TOYLAND;
+/** The trees of the map by the kind of tree on a tile (TreeType): the add-ons that stand for it ("stromy_mapy" and
+ * "stromy_mapy_dalsi" "druhy", the colleague's trees and tropical plants of 1. 11.), each so many times bigger. */
+static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_trees;
+/** And the plants under them ("podrost": the ferns, banana plants and monsteras under the rainforest's trees). */
+static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_undergrowth;
+/** The plants under the trees of each town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost": the clay town's ferns). */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_undergrowth;
 /** The dogs, the animals, the ghosts and the sellers of dogs of the indices (ThreeDAnimal). */
 static std::vector<ThreeDAnimal> _animals;
 /** The mushrooms to pick of the indices (ThreeDMushroom). */
@@ -111,6 +118,58 @@ static uint8_t ParseIndexTheme(const nlohmann::json &e)
 	const std::string theme = e.value("tema", std::string());
 	if (theme == "hlinene") return to_underlying(TownTheme::Clay);
 	return 0;
+}
+
+/**
+ * One record of the trees of the map an add-on stands for ("stromy_mapy", or one of "stromy_mapy_dalsi", the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md): the kinds of trees of a climate ("klima", "druhy" as TreeType), drawn so many times
+ * bigger than it is ("meritko": the banana plants and monsteras standing for the rainforest's broad trees), or under
+ * them ("podrost"); or with "tema" among the trees of that town theme's land, or under them.
+ * @param m the record
+ * @param name the add-on's figure
+ */
+static void ReadMapTrees(const nlohmann::json &m, const std::string &name)
+{
+	if (!m.is_object()) return;
+	const bool under = m.value("podrost", false);
+	auto add = [&name](std::vector<std::string> &list) {
+		if (std::ranges::find(list, name) == list.end()) list.push_back(name);
+	};
+	if (m.contains("tema")) {
+		const uint8_t theme = ParseIndexTheme(m);
+		if (theme == 0) return;
+		if (under) {
+			add(_three_d_theme_undergrowth[theme]);
+		} else {
+			add(_three_d_theme_trees[theme]);
+			add(_three_d_theme_trees_night[theme]);
+		}
+		return;
+	}
+	const std::string climate = m.value("klima", std::string("mirne"));
+	uint first = 0, count = 0;
+	if (climate == "mirne") {
+		first = TREE_TEMPERATE;
+		count = TREE_COUNT_TEMPERATE;
+	} else if (climate == "subarkticke") {
+		first = TREE_SUB_ARCTIC;
+		count = TREE_COUNT_SUB_ARCTIC;
+	} else if (climate == "subtropicke") {
+		first = TREE_RAINFOREST;
+		count = TREE_TOYLAND - TREE_RAINFOREST;
+	} else {
+		return;
+	}
+	if (!m.contains("druhy") || !m.at("druhy").is_array()) return;
+	const float scale = m.contains("meritko") && m.at("meritko").is_number() ? std::clamp(m.at("meritko").get<float>(), 0.1f, 10.0f) : 1.0f;
+	auto &kinds = under ? _three_d_map_undergrowth : _three_d_map_trees;
+	for (const auto &kind : m.at("druhy")) {
+		if (!kind.is_number_integer()) continue;
+		const int k = kind.get<int>();
+		if (k < static_cast<int>(first) || k >= static_cast<int>(first + count)) continue;
+		auto &trees = kinds[k];
+		if (std::ranges::find_if(trees, [&name](const ThreeDMapTree &t) { return t.name == name; }) == trees.end()) trees.push_back({name, scale});
+	}
 }
 /** The objects of the houses of sets (NewGRF): by the set's id, the house's number in the set and the colour slot. */
 static std::map<std::tuple<uint32_t, uint16_t, uint>, size_t> _three_d_grf_house_objects;
@@ -4246,19 +4305,12 @@ static void ReadThreeDVehicleObjects()
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = true;
 					/* A tree of the map (the player, 1. 11.: "the trees replace all the trees of the game ... the forest,
-					 * about the houses and about the towns"): it stands for the kinds of trees of the temperate map its
-					 * "stromy_mapy" names ("druhy", 0x00-0x0B), drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
-					if (e.contains("stromy_mapy") && e.at("stromy_mapy").is_object()) {
-						const auto &map_trees = e.at("stromy_mapy");
-						if (map_trees.value("klima", std::string("mirne")) == "mirne" && map_trees.contains("druhy") && map_trees.at("druhy").is_array()) {
-							for (const auto &kind : map_trees.at("druhy")) {
-								if (!kind.is_number_integer()) continue;
-								const int k = kind.get<int>();
-								if (k < 0 || k >= static_cast<int>(_three_d_map_trees.size())) continue;
-								auto &trees = _three_d_map_trees[k];
-								if (std::ranges::find(trees, fig.name) == trees.end()) trees.push_back(fig.name);
-							}
-						}
+					 * about the houses and about the towns"; "tropical plants in the clay towns and the towns of the
+					 * sub-tropical climate"): it stands for the kinds of trees its "stromy_mapy" names, and those of
+					 * "stromy_mapy_dalsi", drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
+					if (e.contains("stromy_mapy")) ReadMapTrees(e.at("stromy_mapy"), fig.name);
+					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
+						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
 					_figure_objects.push_back(std::move(fig));
 					continue;
@@ -5534,6 +5586,9 @@ void ResetThreeDVehicleObjects()
 	_vehicle_object_shared_pieces.clear();
 	_three_d_theme_trees.clear();
 	_three_d_theme_trees_night.clear();
+	_three_d_theme_undergrowth.clear();
+	for (auto &trees : _three_d_map_trees) trees.clear();
+	for (auto &plants : _three_d_map_undergrowth) plants.clear();
 	_creatures.clear();
 	_witches.clear();
 	_witches_replaced.clear();
@@ -8001,12 +8056,26 @@ std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night)
 	return it->second;
 }
 
-/** The trees standing for a kind of tree of the temperate map (0x00-0x0B, "stromy_mapy"): the names of their figures, none for another kind. */
-std::span<const std::string> GetThreeDMapTrees(uint8_t kind)
+/**
+ * The trees standing for a kind of tree of the map ("stromy_mapy"), or the plants under them ("podrost").
+ * @param kind the kind of tree on the tile (TreeType)
+ * @param undergrowth the plants under them, not the trees
+ * @return their figures and sizes, none for a kind without them
+ */
+std::span<const ThreeDMapTree> GetThreeDMapTrees(uint8_t kind, bool undergrowth)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
-	if (kind >= _three_d_map_trees.size()) return {};
-	return _three_d_map_trees[kind];
+	if (kind >= MAP_TREE_KINDS) return {};
+	return undergrowth ? _three_d_map_undergrowth[kind] : _three_d_map_trees[kind];
+}
+
+/** The plants under the trees of a town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost"): their figures. */
+std::span<const std::string> GetThreeDThemeUndergrowth(uint8_t theme)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_theme_undergrowth.find(theme);
+	if (it == _three_d_theme_undergrowth.end()) return {};
+	return it->second;
 }
 
 /** The creatures of the indices ("druh": "tvor", the colleague's dragons), read the first time they are asked for. */

@@ -4237,16 +4237,16 @@
   "kmen_r": 0.29,
   "vyska_m": 6.93,
   "polomer_m": 2.0,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4274,17 +4274,17 @@
   "kmen_r": 0.36,
   "vyska_m": 12.37,
   "polomer_m": 3.59,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8,
     11
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4312,16 +4312,16 @@
   "kmen_r": 0.45,
   "vyska_m": 17.03,
   "polomer_m": 2.96,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4349,6 +4349,9 @@
   "kmen_r": 0.21,
   "vyska_m": 7.95,
   "polomer_m": 2.79,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4356,12 +4359,17 @@
     1,
     7,
     10
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     31
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4389,17 +4397,17 @@
   "kmen_r": 0.26,
   "vyska_m": 17.27,
   "polomer_m": 2.13,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     6,
     8
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4427,16 +4435,16 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.29,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     5
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4464,16 +4472,16 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.49,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     11
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4501,17 +4509,17 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.53,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8,
     11
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4539,17 +4547,17 @@
   "kmen_r": 0.33,
   "vyska_m": 22.29,
   "polomer_m": 3.15,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     5,
     6
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4577,16 +4585,16 @@
   "kmen_r": 0.18,
   "vyska_m": 12.21,
   "polomer_m": 2.51,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4614,6 +4622,9 @@
   "kmen_r": 0.25,
   "vyska_m": 16.44,
   "polomer_m": 3.82,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4621,12 +4632,9 @@
     2,
     4,
     9
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4654,17 +4662,17 @@
   "kmen_r": 0.29,
   "vyska_m": 19.61,
   "polomer_m": 3.9,
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     2,
     3
-   ],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+   ]
   },
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
  },
  {
   "druh": "doplnek",
@@ -4692,13 +4700,889 @@
   "kmen_r": 0.08,
   "vyska_m": 3.69,
   "polomer_m": 1.21,
-  "stromy_mapy": {
-   "klima": "mirne",
-   "druhy": [],
-   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
-  },
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": []
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_0",
+  "soubor": "palma_0.glb",
+  "nazev": {
+   "cs": "palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.66,
+    2.08
+   ],
+   "y": [
+    -2.09,
+    1.41
+   ],
+   "z": [
+    0.0,
+    5.01
+   ]
+  },
+  "trojuhelniku": 1631,
+  "kmen_r": 0.07,
+  "vyska_m": 5.01,
+  "polomer_m": 2.31,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 5 m, koruna dole široká; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    28,
+    29,
+    30
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_1",
+  "soubor": "palma_1.glb",
+  "nazev": {
+   "cs": "vysoká palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.93,
+    2.5
+   ],
+   "y": [
+    -1.81,
+    2.19
+   ],
+   "z": [
+    0.0,
+    6.98
+   ]
+  },
+  "trojuhelniku": 1631,
+  "kmen_r": 0.08,
+  "vyska_m": 6.98,
+  "polomer_m": 2.7,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 7 m, štíhlý kmen; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    23,
+    24,
+    30
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "palma_2",
+  "soubor": "palma_2.glb",
+  "nazev": {
+   "cs": "palma"
+  },
+  "strom": "palma",
+  "rozmer_m": {
+   "x": [
+    -1.48,
+    1.59
+   ],
+   "y": [
+    -1.55,
+    1.92
+   ],
+   "z": [
+    0.0,
+    5.71
+   ]
+  },
+  "trojuhelniku": 1630,
+  "kmen_r": 0.06,
+  "vyska_m": 5.71,
+  "polomer_m": 1.94,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "palma 5,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    23,
+    26,
+    29
+   ]
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "banan_0",
+  "soubor": "banan_0.glb",
+  "nazev": {
+   "cs": "banánovník"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.09,
+    1.77
+   ],
+   "y": [
+    -1.11,
+    1.55
+   ],
+   "z": [
+    0.0,
+    2.72
+   ]
+  },
+  "trojuhelniku": 1080,
+  "vyska_m": 2.72,
+  "polomer_m": 1.88,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "banánovník 2,7 m, velké listy; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    22
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "banan_1",
+  "soubor": "banan_1.glb",
+  "nazev": {
+   "cs": "banánovník"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.5,
+    1.42
+   ],
+   "y": [
+    -1.16,
+    1.46
+   ],
+   "z": [
+    0.0,
+    2.77
+   ]
+  },
+  "trojuhelniku": 1144,
+  "vyska_m": 2.77,
+  "polomer_m": 1.55,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "banánovník 2,8 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    22
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_0",
+  "soubor": "monstera_0.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -2.06,
+    1.41
+   ],
+   "y": [
+    -1.64,
+    1.63
+   ],
+   "z": [
+    0.0,
+    2.47
+   ]
+  },
+  "trojuhelniku": 2389,
+  "vyska_m": 2.47,
+  "polomer_m": 2.15,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,5 m, děrované listy; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    21
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_1",
+  "soubor": "monstera_1.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.88,
+    1.28
+   ],
+   "y": [
+    -1.48,
+    1.61
+   ],
+   "z": [
+    0.0,
+    2.79
+   ]
+  },
+  "trojuhelniku": 2607,
+  "vyska_m": 2.79,
+  "polomer_m": 1.96,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,8 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    21,
+    25
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_2",
+  "soubor": "monstera_2.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.85,
+    1.6
+   ],
+   "y": [
+    -1.81,
+    1.42
+   ],
+   "z": [
+    0.0,
+    2.37
+   ]
+  },
+  "trojuhelniku": 1257,
+  "vyska_m": 2.37,
+  "polomer_m": 2.16,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,4 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    22,
+    25
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "monstera_3",
+  "soubor": "monstera_3.glb",
+  "nazev": {
+   "cs": "monstera"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.74,
+    1.53
+   ],
+   "y": [
+    -1.89,
+    2.12
+   ],
+   "z": [
+    0.0,
+    2.37
+   ]
+  },
+  "trojuhelniku": 1257,
+  "vyska_m": 2.37,
+  "polomer_m": 2.45,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "monstera 2,4 m, široká; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    25,
+    21
+   ],
+   "meritko": 2.5
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subtropicke",
+    "druhy": [
+     20,
+     21,
+     22,
+     23,
+     24,
+     25,
+     26
+    ],
+    "podrost": true
+   },
+   {
+    "tema": "hlinene"
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_0",
+  "soubor": "kapradi_0.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.89,
+    0.89
+   ],
+   "y": [
+    -0.87,
+    0.87
+   ],
+   "z": [
+    0.0,
+    0.69
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.69,
+  "polomer_m": 0.99,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_1",
+  "soubor": "kapradi_1.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.97,
+    0.97
+   ],
+   "y": [
+    -0.95,
+    0.95
+   ],
+   "z": [
+    0.0,
+    0.71
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.71,
+  "polomer_m": 1.04,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_2",
+  "soubor": "kapradi_2.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -0.96,
+    0.96
+   ],
+   "y": [
+    -0.93,
+    0.93
+   ],
+   "z": [
+    0.0,
+    0.69
+   ]
+  },
+  "trojuhelniku": 1152,
+  "kmen_r": 0.0,
+  "vyska_m": 0.69,
+  "polomer_m": 1.0,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "nízké kapradí 0,7 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_3",
+  "soubor": "kapradi_3.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.58,
+    1.18
+   ],
+   "y": [
+    -1.35,
+    1.42
+   ],
+   "z": [
+    0.0,
+    1.52
+   ]
+  },
+  "trojuhelniku": 1446,
+  "kmen_r": 0.0,
+  "vyska_m": 1.52,
+  "polomer_m": 1.58,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,5 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_4",
+  "soubor": "kapradi_4.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.49,
+    1.28
+   ],
+   "y": [
+    -1.36,
+    1.42
+   ],
+   "z": [
+    0.0,
+    1.43
+   ]
+  },
+  "trojuhelniku": 1452,
+  "kmen_r": 0.0,
+  "vyska_m": 1.43,
+  "polomer_m": 1.49,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,4 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kapradi_5",
+  "soubor": "kapradi_5.glb",
+  "nazev": {
+   "cs": "kapradí"
+  },
+  "strom": "podrost",
+  "rozmer_m": {
+   "x": [
+    -1.55,
+    1.14
+   ],
+   "y": [
+    -1.41,
+    1.33
+   ],
+   "z": [
+    0.0,
+    1.56
+   ]
+  },
+  "trojuhelniku": 1290,
+  "kmen_r": 0.0,
+  "vyska_m": 1.56,
+  "polomer_m": 1.6,
+  "autor": "Tropical Plants Pack M02P, MozzarellaARC (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tropical-plants-pack-m02p-2f093afb792742438f0f7ba7eaab90f0); převod domy/rostliny_tropy.py",
+  "licence": "CC BY 4.0 (uvést MozzarellaARC; změny: rostliny zvlášť, zjednodušené, textury 512 px, průhlednost MASK, bez normálových map)",
+  "poznamka": "kapradí 1,6 m; tropická rostlina (hráč 1. 11.: „tropical plants, budou v hliněnych městech a v městech subtropickeho klimatu a v jejich okoli“, palmová plantáž): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; podrost (stromy_mapy podrost) stojí pod stromy, ne místo nich",
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26
+   ],
+   "podrost": true
+  },
+  "stromy_mapy_dalsi": [
+   {
+    "tema": "hlinene",
+    "podrost": true
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_bily",
+  "soubor": "kaktus_bily.glb",
+  "nazev": {
+   "cs": "kvetoucí kaktus"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.5
+   ],
+   "y": [
+    -0.48,
+    0.46
+   ],
+   "z": [
+    0.0,
+    3.92
+   ]
+  },
+  "trojuhelniku": 2065,
+  "kmen_r": 0.29,
+  "vyska_m": 3.92,
+  "polomer_m": 0.5,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "saguáro s bílými květy, 3,8 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_zluty",
+  "soubor": "kaktus_zluty.glb",
+  "nazev": {
+   "cs": "kvetoucí opuncie"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.44,
+    0.44
+   ],
+   "y": [
+    -0.48,
+    0.43
+   ],
+   "z": [
+    0.0,
+    0.92
+   ]
+  },
+  "trojuhelniku": 1806,
+  "vyska_m": 0.92,
+  "polomer_m": 0.64,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "opuncie se žlutooranžovými květy, 0,9 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "kaktus_kulaty",
+  "soubor": "kaktus_kulaty.glb",
+  "nazev": {
+   "cs": "kulatý kaktus"
+  },
+  "strom": "kaktus",
+  "rozmer_m": {
+   "x": [
+    -0.26,
+    0.26
+   ],
+   "y": [
+    -0.26,
+    0.26
+   ],
+   "z": [
+    0.0,
+    0.55
+   ]
+  },
+  "trojuhelniku": 891,
+  "vyska_m": 0.55,
+  "polomer_m": 0.26,
+  "stromy_mapy": {
+   "klima": "subtropicke",
+   "druhy": [
+    27
+   ]
+  },
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
+  "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
+  "poznamka": "kulatý kaktus, 0,5 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
  }
 ]

@@ -649,10 +649,12 @@ struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
 /**
  * The trees of a tile as 3D figures, in the turned view, from the eyes and facing north among the houses drawn as
  * objects: on the land of a themed town (GetTownThemeAt(); the clay town's giant mushrooms, the colleague's
- * hra/3d/PROSBA-MESTO-HLINENE.md) the theme's trees; elsewhere on a temperate map the trees standing for the tile's
- * kind of tree (GetThreeDMapTrees(), the colleague's hra/3d/STROMY-LES-PACK-PRO-HRU.md; the player, 1. 11.: "the trees
- * replace all the trees of the game ... about the towns"). One where each tree stands, its kind by the tile and the
- * tree, as big as the tree has grown.
+ * hra/3d/PROSBA-MESTO-HLINENE.md, and with them palms, banana plants and monsteras) the theme's trees; elsewhere the
+ * trees standing for the tile's kind of tree (GetThreeDMapTrees(): the temperate forest of the colleague's
+ * hra/3d/STROMY-LES-PACK-PRO-HRU.md, the palms, cacti and rainforest of hra/3d/TROPY-PLANTAZ-PRO-HRU.md; the player,
+ * 1. 11.: "the trees replace all the trees of the game ... about the towns"). One where each tree stands, its kind by
+ * the tile and the tree, as big as the tree has grown; under the rainforest's and the clay town's trees one or two
+ * plants of their undergrowth (ferns), from the eyes and on the map zoomed in, where they are more than a few pixels.
  * @param ti the tile
  * @return whether they were drawn so, the tree sprites then left out
  */
@@ -661,24 +663,37 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	const bool eye = ViewportDrawingEye();
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	const TownTheme theme = GetTownThemeAt(ti->tile);
-	std::span<const std::string> kinds;
+	const TreeType type = GetTreeType(ti->tile);
+	/* The trees and the plants under them: by name and how many times bigger each is drawn. */
+	std::vector<ThreeDMapTree> trees_of, under_of;
 	if (theme != TownTheme::None) {
 		/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
-		kinds = GetThreeDThemeTrees(to_underlying(theme), IsNightNow());
-	} else if (_settings_game.game_creation.landscape == LandscapeType::Temperate && GetTreeType(ti->tile) < TREE_COUNT_TEMPERATE &&
-			GetThemedLand(ti->tile) != ThemedLand::Desert) {
+		for (const std::string &name : GetThreeDThemeTrees(to_underlying(theme), IsNightNow())) trees_of.push_back({name, 1.0f});
+		for (const std::string &name : GetThreeDThemeUndergrowth(to_underlying(theme))) under_of.push_back({name, 1.0f});
+	} else if (GetThemedLand(ti->tile) != ThemedLand::Desert) {
 		/* The desert towns' land keeps its palms and cacti (DrawTile_Trees()). */
-		kinds = GetThreeDMapTrees(static_cast<uint8_t>(GetTreeType(ti->tile)));
+		const auto trees = GetThreeDMapTrees(static_cast<uint8_t>(type));
+		const auto under = GetThreeDMapTrees(static_cast<uint8_t>(type), true);
+		trees_of.assign(trees.begin(), trees.end());
+		under_of.assign(under.begin(), under.end());
 	}
-	if (kinds.empty()) return false;
+	if (trees_of.empty()) return false;
 
 	const uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
 	const Coord2D<uint8_t> *d = _tree_layout_xy[GB(tmp, 2, 2)];
 	const uint trees = GetTreeCount(ti->tile);
 	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
 	bool drawn = false;
+	auto place = [&](const ThreeDMapTree &kind, float size, int x, int y, float facing) {
+		if (eye) {
+			AddCabFigure(kind.name, size * kind.scale, x, y, z, facing);
+			drawn = true;
+		} else {
+			drawn |= AddThreeDFigureToViewport(kind.name, size * kind.scale, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+		}
+	};
 	for (uint i = 0; i < trees; i++, d++) {
-		const uint32_t hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 40503u) ^ (i * 2246822519u) ^ GetTreeType(ti->tile);
+		const uint32_t hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 40503u) ^ (i * 2246822519u) ^ type;
 		/* The last tree of a tile is the one growing (or dying), the others are grown. */
 		const TreeGrowthStage growth = i == trees - 1 ? GetTreeGrowth(ti->tile) : TreeGrowthStage::Grown;
 		float size = 1.0f;
@@ -692,12 +707,18 @@ static bool DrawThemedTrees(const TileInfo *ti)
 		/* A few sizes and turns, so that the trees of the map share a few pictures. */
 		size = std::round(size * (0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
 		const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
-		const std::string &kind = kinds[GB(hash, 0, 8) % kinds.size()];
-		if (eye) {
-			AddCabFigure(kind, size, ti->x + d->x, ti->y + d->y, z, facing);
-			drawn = true;
-		} else {
-			drawn |= AddThreeDFigureToViewport(kind, size, ti->x + d->x, ti->y + d->y, z, facing, _cur_dpi->zoom, ti->tile);
+		place(trees_of[GB(hash, 0, 8) % trees_of.size()], size, ti->x + d->x, ti->y + d->y, facing);
+	}
+	/* The undergrowth: one or two plants, as they are, where the tile puts them; on the map only zoomed in (a fern of
+	 * 0.7 m is a few pixels further out, thousands of triangles each). */
+	if (!under_of.empty() && trees > 0 && (eye || _cur_dpi->zoom <= ZoomLevel::Normal)) {
+		const uint32_t tile_hash = (TileX(ti->tile) * 2246822519u) ^ (TileY(ti->tile) * 3266489917u) ^ 0x9E3779B9u;
+		const uint plants = 1 + GB(tile_hash, 30, 1);
+		for (uint i = 0; i < plants; i++) {
+			const uint32_t hash = tile_hash * (i + 1) * 668265263u;
+			const float size = std::round((0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
+			const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
+			place(under_of[GB(hash, 0, 8) % under_of.size()], size, ti->x + 2 + static_cast<int>(GB(hash, 25, 3)) * 12 / 7, ti->y + 2 + static_cast<int>(GB(hash, 28, 3)) * 12 / 7, facing);
 		}
 	}
 	return drawn;
