@@ -6721,10 +6721,12 @@ static void TransferTrainIdentity(Train *from, Train *to)
 	to->cab_engine_brake = from->cab_engine_brake;
 	to->cab_emergency = from->cab_emergency;
 	to->cab_reverser = from->cab_reverser;
+	to->cab_pantograph_down = from->cab_pantograph_down;
 	from->cab_driven = false;
 	from->cab_power = from->cab_dynamic = from->cab_brake = from->cab_engine_brake = 0;
 	from->cab_emergency = false;
 	from->cab_reverser = 1;
+	from->cab_pantograph_down = false;
 
 	/* And everything on the screen that follows the train by the index of
 	 * its head: its windows, the news about it, the viewports centred on it.
@@ -13156,7 +13158,7 @@ int Train::CabAcceleration() const
 	resistance += this->GetSlopeResistance();
 
 	int64_t force = 0;
-	if (!this->cab_emergency && this->cab_reverser != 0 && this->cab_power > 0) force = pull(this->cab_power);
+	if (!this->cab_emergency && this->cab_reverser != 0 && !this->cab_pantograph_down && this->cab_power > 0) force = pull(this->cab_power);
 	int64_t accel = (force - resistance) / (mass * 4);
 
 	/* The brakes as forces, as the pull is (the game's units: a newton on a tonne is a quarter of a unit): the train's

@@ -208,6 +208,7 @@ enum class TrainCabControl : uint8_t {
 	EngineBrake, ///< the engines' own brake, of 255
 	Emergency,   ///< 1 the emergency brake on, 0 off
 	Reverser,    ///< 0 in the middle, 1 ahead
+	Pantograph,  ///< 1 the pantograph down: no power from the wire (the key P of MSTS), 0 up
 	End,
 };
 
@@ -287,6 +288,7 @@ struct Train final : public GroundVehicle<Train, VehicleType::Train> {
 	uint8_t cab_engine_brake = 0; ///< the engines' own brake, of 255
 	bool cab_emergency = false;   ///< the emergency brake: the power off, half as hard again as full service
 	uint8_t cab_reverser = 1;     ///< the reverser: 0 in the middle, no power; 1 ahead
+	bool cab_pantograph_down = false; ///< the pantograph lowered from the desk (the key P; the player, 1. 11.): no power, the desk without voltage
 
 	/**
 	 * How many wagons this train keeps when it finishes the decoupling its

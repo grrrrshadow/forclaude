@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (77) – Simtrains 3: ručičky, páky, kontrolky a opakovač na pultu MSTS; živák, sběrač, hodiny
+
+- Hráč (odpovědi na otázky): *„1 zmačkne jednou živak tak bude mačkat furt , tim že ho zmačkne ho aktivuje u
+  ovladani msts, my živak nebudem mit vubec u ovladani šipkama. 2 jo 3 klavesa p bude stop asi že jo zastaveno .
+  4 jo z telefonu“*
+- **Ovladače pultu** (všechny druhy z `.cvf`) se kreslí do předního obrázku stanoviště podle stavu vlaku
+  (`SimtrainsDeskState`, `DrawDeskControls()`):
+  - ručičky (`Dial`) se točí od `ScalePos` podle `DirIncrease`; ukazatele (`Gauge`) jako ukazatel nebo pruh;
+  - páky a přepínače po snímcích (`Lever`, `TwoState`, `TriState`, `CombinedControl`, `MultiStateDisplay`);
+    mezi polohami s více snímky (rozsah brzdiče) se snímek bere poměrem;
+  - číslice rychloměru a hodiny jako LCD (sedm segmentů);
+  - opakovač (`CabSignalDisplay`): snímky v pořadí MSTS, stůj 0, výstraha 3, volno 7.
+- **Hodnoty:** rychlost; kontrolér (u 451 páka 0–M–S–P–Sh, EDB B1/B2); brzdič podle stupňů `Brake_Train` z `.eng`
+  (jízdní poloha, rozsah provozního brzdění, rychlobrzda); válec, potrubí a jímka bez zpoždění (3,8 / 5 / 9 bar);
+  napětí 3 kV se zdviženým sběračem; proud nahoru při tahu, dolů při EDB; světla; houkačka (tlačítko svítí 1,2 s);
+  hodiny z telefonu.
+- **Opakovač:** příští návěstidlo ve směru jízdy po rezervované cestě: červená = stůj, zelená a za ní červená (nebo
+  konec trati) = výstraha, zelená a zelená = volno; nic do 48 dlaždic = zhasnutý.
+- **Živák** jen s ovládáním MSTS: Z ho jednou zmáčkne a pak se mačká sám (každých 20 s krátce modré světlo a
+  tlačítko), nikdy nebrzdí. Se šipkami žádný.
+- **Sběrač:** P (klávesy MSTS, elektrická mašina) ho stáhne nebo zvedne. Dole: žádný tah, napětí 0, svítí „hlavní
+  porucha“, v panelu „Sběrač dole“. Uloží se do savu (`cab_pantograph_down`), puštěním vlaku zpět nahoře.
+- V vypne opakovač (jak píše readme 451).
+- Rig: `test3d kabina pult sberac 0|1`, `test3d kabina pult stav` (vypíše, co pult ukazuje).
+- MinGW a clang čisté. Rig (snímky pultu za jízdy, s EDB, brzdou a rychlobrzdou) běží po tomto zápisu.
+
 ## 1. 11. (76) – GPU #127: malá okna (okno vozidla, další pohled) kreslí karta jako hlavní pohled
 
 - Hráč: *„pak běž dělat gpu ještě co je potřeba“*. Z logu #319: okno vozidla natočené na sever stálo 150–260 ms

@@ -950,6 +950,7 @@ public:
 		     SLE_VAR(Train, cab_engine_brake,  VarTypes::U8),
 		     SLE_VAR(Train, cab_emergency,     VarTypes::BOOL),
 		     SLE_VAR(Train, cab_reverser,      VarTypes::U8),
+		     SLE_VAR(Train, cab_pantograph_down, VarTypes::BOOL),
 		     SLE_VAR(Train, depot_hold,        VarTypes::U8),
 		     SLE_VAR(Train, tiles_past_signal, VarTypes::U8),
 		     SLE_VAR(Train, driver_sight,      VarTypes::U8),

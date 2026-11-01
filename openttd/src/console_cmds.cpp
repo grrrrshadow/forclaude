@@ -140,6 +140,7 @@
 #include "three_d_navigation.h"
 #include "round_track.h"
 #include "simtrains.h"
+#include "simtrains_cab.h"
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
@@ -10686,12 +10687,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", cw != nullptr ? "zavrena" : "neni");
 			return true;
 		}
+		if (argv.size() == 4 && argv[2] == "pult" && argv[3] == "stav") {
+			/* 'kabina pult stav': what the desk of the train of the cab view open shows (SimtrainsDeskState). */
+			Window *cw = FindWindowByClass(WindowClass::CabView);
+			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			if (cv == nullptr || cv->type != VehicleType::Train) {
+				IConsolePrint(CC_ERROR, "test3d kabina pult stav: no train's cab view open.");
+				return true;
+			}
+			const SimtrainsDeskState d = SimtrainsDeskStateOf(cv);
+			IConsolePrint(CC_DEFAULT, "test3d: pult rychlost {:.0f} kontroler {:.2f} paka {:.2f} edb {:.2f} brzdic {:.2f} primocinna {:.2f} rychlobrzda {} smer {} sberac {} napeti {:.1f} proud {:.0f} valec {:.2f} potrubi {:.2f} jimka {:.1f} svetla {} houkacka {} zivak {}/{} opakovac {}{} hodiny {:02}:{:02}",
+					d.speed_kmh, d.throttle, d.handle, d.dynamic, d.train_brake, d.engine_brake, d.emergency ? "ano" : "ne", d.direction, d.pantograph ? "nahore" : "dole",
+					d.line_kv, d.amps, d.brake_cylinder, d.brake_pipe, d.main_reservoir, d.lights, d.horn ? "ano" : "ne", d.alerter_lamp ? "sviti" : "-", d.alerter_pressed ? "zmacknut" : "-",
+					d.aspect, d.repeater_off ? " vypnuty" : "", d.hour, d.minute);
+			return true;
+		}
 		if (argv.size() > 4 && argv[2] == "pult") {
-			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer> <0-255>': a control of the desk of the train
-			 * of the cab view open, as the player at it moves it (CmdTrainCabControl()). */
+			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer|sberac> <0-255>': a control of the desk of the
+			 * train of the cab view open, as the player at it moves it (CmdTrainCabControl()); sberac 1 the pantograph down. */
 			static const std::pair<std::string_view, TrainCabControl> controls[] = {
 				{"rizen", TrainCabControl::Driven}, {"vykon", TrainCabControl::Power}, {"edb", TrainCabControl::Dynamic}, {"brzda", TrainCabControl::Brake},
 				{"primocinna", TrainCabControl::EngineBrake}, {"rychlobrzda", TrainCabControl::Emergency}, {"smer", TrainCabControl::Reverser},
+				{"sberac", TrainCabControl::Pantograph},
 			};
 			Window *cw = FindWindowByClass(WindowClass::CabView);
 			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;

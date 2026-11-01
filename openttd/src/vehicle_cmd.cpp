@@ -1433,6 +1433,7 @@ CommandCost CmdTrainCabControl(DoCommandFlags flags, VehicleID veh_id, uint8_t c
 					t->cab_power = t->cab_dynamic = t->cab_brake = t->cab_engine_brake = 0;
 					t->cab_emergency = false;
 					t->cab_reverser = 1;
+					t->cab_pantograph_down = false;
 					if (t->force_proceed == TFP_SIGNAL) t->force_proceed = TFP_NONE;
 				}
 				break;
@@ -1442,6 +1443,7 @@ CommandCost CmdTrainCabControl(DoCommandFlags flags, VehicleID veh_id, uint8_t c
 			case TrainCabControl::EngineBrake: t->cab_engine_brake = value; break;
 			case TrainCabControl::Emergency: t->cab_emergency = value != 0; break;
 			case TrainCabControl::Reverser: t->cab_reverser = std::min<uint8_t>(value, 1); break;
+			case TrainCabControl::Pantograph: t->cab_pantograph_down = value != 0; break;
 			default: NOT_REACHED();
 		}
 		SetWindowDirty(WindowClass::CabView, t->index);

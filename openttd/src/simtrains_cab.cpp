@@ -28,8 +28,16 @@
 #include "core/backup_type.hpp"
 #include "settings_type.h"
 #include "table/strings.h"
+#include "pathfinder/follow_track.hpp"
+#include "pbs.h"
+#include "rail_map.h"
+#include "track_func.h"
+#include "3rdparty/fmt/chrono.h"
 
 #include <algorithm>
+#include <array>
+#include <chrono>
+#include <ctime>
 #include <cmath>
 #include <map>
 #include <memory>
@@ -73,6 +81,9 @@ static void ReadDeskPictures(SimtrainsCabDesk &desk, const SimtrainsCab &cab, bo
 	desk.fills.clear();
 	desk.look_up.clear();
 	desk.width = desk.height = 0;
+	desk.base.clear();
+	desk.drawn.clear();
+	desk.shown_valid = false;
 	for (const SimtrainsCab::View &view : cab.views) {
 		SimtrainsCabDesk::Picture pic;
 		std::vector<uint8_t> rgba;
@@ -202,6 +213,366 @@ static void MakeDeskLookUp(SimtrainsCabDesk &desk, const SimtrainsCab &cab, cons
 	}
 }
 
+/* ---- The controls of the desk drawn over its first picture (SimtrainsCab::Control, SimtrainsDeskState) ---- */
+
+namespace {
+
+/** A picture of a control (its "Graphic"), premultiplied (Colour::data), read once. */
+struct ControlGraphic {
+	int w = 0, h = 0;
+	std::vector<uint32_t> px;
+};
+
+const ControlGraphic *ControlGraphicOf(const std::string &path)
+{
+	if (path.empty()) return nullptr;
+	static std::map<std::string, ControlGraphic> read;
+	auto [it, added] = read.try_emplace(path);
+	if (added) {
+		ControlGraphic &g = it->second;
+		std::vector<uint8_t> rgba;
+		if (!ReadSimtrainsTexture(path, g.w, g.h, rgba) || g.w <= 0 || g.h <= 0) {
+			Debug(grf, 1, "Simtrains: control picture {} cannot be read", path);
+			g = {};
+		} else {
+			g.px.resize(static_cast<size_t>(g.w) * g.h);
+			for (size_t i = 0; i < g.px.size(); i++) {
+				const uint a = rgba[i * 4 + 3];
+				g.px[i] = Colour(static_cast<uint8_t>(rgba[i * 4] * a / 255), static_cast<uint8_t>(rgba[i * 4 + 1] * a / 255), static_cast<uint8_t>(rgba[i * 4 + 2] * a / 255), static_cast<uint8_t>(a)).data;
+			}
+		}
+	}
+	return it->second.w > 0 ? &it->second : nullptr;
+}
+
+/** A premultiplied pixel over another. */
+inline uint32_t Over(uint32_t src, uint32_t dst)
+{
+	const Colour s(src);
+	if (s.a == 255) return src;
+	if (s.a == 0) return dst;
+	const Colour d(dst);
+	const uint k = 255 - s.a;
+	return Colour(static_cast<uint8_t>(s.r + d.r * k / 255), static_cast<uint8_t>(s.g + d.g * k / 255), static_cast<uint8_t>(s.b + d.b * k / 255), static_cast<uint8_t>(s.a + d.a * k / 255)).data;
+}
+
+/**
+ * A pixel of a part of a graphic, between its pixels as far as it lies between them; nothing outside the part.
+ * @param u,v where, pixels of the part from its top left
+ * @param x0,y0,w,h the part
+ */
+uint32_t Sample(const ControlGraphic &g, float u, float v, int x0, int y0, int w, int h)
+{
+	const float fu = u - 0.5f, fv = v - 0.5f;
+	const int iu = static_cast<int>(std::floor(fu)), iv = static_cast<int>(std::floor(fv));
+	const float au = fu - iu, av = fv - iv;
+	float r = 0, gr = 0, b = 0, a = 0;
+	for (int k = 0; k < 4; k++) {
+		const int x = iu + (k & 1), y = iv + (k >> 1);
+		if (x < 0 || y < 0 || x >= w || y >= h) continue;
+		const float wt = ((k & 1) != 0 ? au : 1 - au) * ((k >> 1) != 0 ? av : 1 - av);
+		const Colour c(g.px[static_cast<size_t>(y0 + y) * g.w + x0 + x]);
+		r += c.r * wt;
+		gr += c.g * wt;
+		b += c.b * wt;
+		a += c.a * wt;
+	}
+	auto byte = [](float f) { return static_cast<uint8_t>(std::clamp(static_cast<int>(f + 0.5f), 0, 255)); };
+	return Colour(byte(r), byte(gr), byte(b), byte(a)).data;
+}
+
+/** Draws the controls into the first picture of the desk, its places those of MSTS's screen of 640 by 480 (SimtrainsCab). */
+struct DeskPainter {
+	SimtrainsCabDesk::Picture &pic;
+	std::vector<std::array<int, 4>> &drawn; ///< what was drawn over, to be put back from the picture as read
+	float sx, sy; ///< the picture's pixels a pixel of MSTS's screen
+
+	/** A rect of MSTS's screen to the picture's pixels, within it, told drawn over: left, top, right, bottom. */
+	std::array<int, 4> Mark(float x, float y, float w, float h)
+	{
+		const std::array<int, 4> r = {
+			std::clamp(static_cast<int>(std::floor(x * this->sx)), 0, this->pic.w), std::clamp(static_cast<int>(std::floor(y * this->sy)), 0, this->pic.h),
+			std::clamp(static_cast<int>(std::ceil((x + w) * this->sx)), 0, this->pic.w), std::clamp(static_cast<int>(std::ceil((y + h) * this->sy)), 0, this->pic.h)};
+		if (r[2] > r[0] && r[3] > r[1]) this->drawn.push_back(r);
+		return r;
+	}
+
+	/** A part of a graphic (fx, fy, fw, fh, its pixels) laid stretched over a rect of MSTS's screen. */
+	void Lay(const ControlGraphic &g, int fx, int fy, int fw, int fh, float x, float y, float w, float h)
+	{
+		if (fw <= 0 || fh <= 0 || w <= 0 || h <= 0) return;
+		const std::array<int, 4> r = this->Mark(x, y, w, h);
+		const float x0 = x * this->sx, y0 = y * this->sy, pw = w * this->sx, ph = h * this->sy;
+		for (int py = r[1]; py < r[3]; py++) {
+			const float v = (py + 0.5f - y0) / ph * fh;
+			uint32_t *row = &this->pic.px[static_cast<size_t>(py) * this->pic.w];
+			for (int px = r[0]; px < r[2]; px++) {
+				const float u = (px + 0.5f - x0) / pw * fw;
+				row[px] = Over(Sample(g, u, v, fx, fy, fw, fh), row[px]);
+			}
+		}
+	}
+
+	/** A rect of MSTS's screen filled with a colour (0xRRGGBB). */
+	void Fill(float x, float y, float w, float h, uint32_t colour)
+	{
+		const std::array<int, 4> r = this->Mark(x, y, w, h);
+		const uint32_t c = Colour(static_cast<uint8_t>(colour >> 16), static_cast<uint8_t>(colour >> 8), static_cast<uint8_t>(colour)).data;
+		for (int py = r[1]; py < r[3]; py++) std::fill(&this->pic.px[static_cast<size_t>(py) * this->pic.w + r[0]], &this->pic.px[static_cast<size_t>(py) * this->pic.w + r[2]], c);
+	}
+
+	/**
+	 * A dial's needle (MSTS's "Dial"): pointing up it lies over x, y, w, h of MSTS's screen; it turns about the point
+	 * pivot below its top in the middle of its width.
+	 * @param degrees turned from up, clockwise
+	 */
+	void Needle(const ControlGraphic &g, float x, float y, float w, float h, float pivot, float degrees)
+	{
+		if (w <= 0 || h <= 0) return;
+		const float cx = x + w / 2, cy = y + pivot;
+		const float reach = std::max(pivot, h - pivot) + w;
+		const std::array<int, 4> r = this->Mark(cx - reach, cy - reach, 2 * reach, 2 * reach);
+		const float a = degrees * static_cast<float>(M_PI) / 180.0f, c = std::cos(a), s = std::sin(a);
+		for (int py = r[1]; py < r[3]; py++) {
+			const float dy = (py + 0.5f) / this->sy - cy;
+			uint32_t *row = &this->pic.px[static_cast<size_t>(py) * this->pic.w];
+			for (int px = r[0]; px < r[2]; px++) {
+				const float dx = (px + 0.5f) / this->sx - cx;
+				/* Back to the needle pointing up: across it, and down it from the pivot. */
+				const float lx = dx * c + dy * s, ly = -dx * s + dy * c;
+				const float u = (lx + w / 2) / w * g.w, v = (ly + pivot) / h * g.h;
+				if (u < -1 || v < -1 || u > g.w + 1 || v > g.h + 1) continue;
+				row[px] = Over(Sample(g, u, v, 0, 0, g.w, g.h), row[px]);
+			}
+		}
+	}
+
+	/**
+	 * Figures as an LCD shows them, seven segments each, within a rect of MSTS's screen.
+	 * @param justification 1 left, 2 in the middle, 3 right
+	 */
+	void Figures(std::string_view text, float x, float y, float w, float h, int justification, uint32_t colour)
+	{
+		if (text.empty() || w <= 0 || h <= 0) return;
+		/* Segments of 0-9: a top, b top right, c bottom right, d bottom, e bottom left, f top left, g middle. */
+		static constexpr uint8_t SEGMENTS[10] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F};
+		float ch = h, cw = ch * 0.55f, gap = cw * 0.3f;
+		auto width_of = [&]() {
+			float total = 0;
+			for (char c : text) total += (c == ':' || c == '.' ? cw * 0.4f : cw) + gap;
+			return total - gap;
+		};
+		if (width_of() > w) {
+			const float k = w / width_of();
+			ch *= k;
+			cw *= k;
+			gap *= k;
+		}
+		const float total = width_of();
+		float at = justification == 1 ? x : justification == 2 ? x + (w - total) / 2 : x + w - total;
+		const float top = y + (h - ch) / 2, t = std::max(ch / 8, 1.0f / this->sy);
+		for (char c : text) {
+			if (c == ':' || c == '.') {
+				const float d = cw * 0.4f;
+				if (c == ':') this->Fill(at + (d - t) / 2, top + ch * 0.3f, t, t, colour);
+				this->Fill(at + (d - t) / 2, top + (c == ':' ? ch * 0.65f : ch - t), t, t, colour);
+				at += d + gap;
+				continue;
+			}
+			if (c >= '0' && c <= '9') {
+				const uint8_t s = SEGMENTS[c - '0'];
+				const float mid = top + (ch - t) / 2;
+				if (s & 0x01) this->Fill(at, top, cw, t, colour);
+				if (s & 0x02) this->Fill(at + cw - t, top, t, ch / 2, colour);
+				if (s & 0x04) this->Fill(at + cw - t, top + ch / 2, t, ch / 2, colour);
+				if (s & 0x08) this->Fill(at, top + ch - t, cw, t, colour);
+				if (s & 0x10) this->Fill(at, top + ch / 2, t, ch / 2, colour);
+				if (s & 0x20) this->Fill(at, top, t, ch / 2, colour);
+				if (s & 0x40) this->Fill(at, mid, cw, t, colour);
+			} else if (c == '-') {
+				this->Fill(at, top + (ch - t) / 2, cw, t, colour);
+			}
+			at += cw + gap;
+		}
+	}
+};
+
+/** A figure of the desk in a control's units ("Units"): speeds from km/h, pressures from bar, voltages from kV, currents from A. */
+float InUnits(const SimtrainsCab::Control &c, float value)
+{
+	const std::string &u = c.units;
+	if (StrEqualsIgnoreCase(u, "MILES_PER_HOUR")) return value / 1.609344f;
+	if (StrEqualsIgnoreCase(u, "METRES_PER_SEC")) return value / 3.6f;
+	if (StrEqualsIgnoreCase(u, "PSI")) return value * 14.5038f;
+	if (StrEqualsIgnoreCase(u, "KPA")) return value * 100;
+	if (StrEqualsIgnoreCase(u, "INCHES_OF_MERCURY")) return value * 29.53f;
+	if (StrEqualsIgnoreCase(u, "KGS_PER_SQUARE_CM")) return value * 1.0197f;
+	if (StrEqualsIgnoreCase(u, "VOLTS")) return value * 1000;
+	if (StrEqualsIgnoreCase(u, "KILO_AMPS")) return value / 1000;
+	return value;
+}
+
+/** What a control shows of the desk (its "Type"), in its units. */
+float ValueOf(const SimtrainsCab::Control &c, const SimtrainsDeskState &s)
+{
+	const std::string &t = c.type;
+	auto is = [&t](std::string_view what) { return StrEqualsIgnoreCase(t, what); };
+	if (is("SPEEDOMETER")) return InUnits(c, s.speed_kmh);
+	if (is("BRAKE_CYL")) return InUnits(c, s.brake_cylinder);
+	if (is("BRAKE_PIPE") || is("EQ_RES")) return InUnits(c, s.brake_pipe);
+	if (is("MAIN_RES")) return InUnits(c, s.main_reservoir);
+	if (is("LINE_VOLTAGE")) {
+		/* A desk of the alternating current reads its tens of kilovolts. */
+		if (!s.pantograph) return 0;
+		const float kv = InUnits(c, 1) > 1 ? c.max / 1000 : c.max;
+		return InUnits(c, kv > 10 ? 25.0f : s.line_kv);
+	}
+	if (is("AMMETER")) return InUnits(c, s.amps);
+	if (is("THROTTLE") || is("THROTTLE_DISPLAY")) return s.throttle;
+	if (is("TRAIN_BRAKE")) return s.train_brake;
+	if (is("ENGINE_BRAKE")) return s.engine_brake;
+	if (is("DYNAMIC_BRAKE") || is("DYNAMIC_BRAKE_DISPLAY")) return s.dynamic;
+	if (is("CP_HANDLE")) return s.handle;
+	if (is("DIRECTION") || is("DIRECTION_DISPLAY")) return static_cast<float>(s.direction);
+	if (is("PANTOGRAPH") || is("PANTOGRAPH2") || is("PANTO_DISPLAY")) return s.pantograph ? 1.0f : 0.0f;
+	if (is("FRONT_HLIGHT")) return static_cast<float>(s.lights);
+	if (is("HORN") || is("BELL") || is("WHISTLE")) return s.horn ? 1.0f : 0.0f;
+	if (is("RESET")) return s.alerter_pressed ? 1.0f : 0.0f;
+	if (is("ALERTER_DISPLAY") || is("VIGILANCE")) return s.alerter_lamp ? 1.0f : 0.0f;
+	if (is("EMERGENCY_BRAKE")) return s.emergency ? 1.0f : 0.0f;
+	if (is("WIPERS")) return s.repeater_off ? 1.0f : 0.0f;
+	return 0;
+}
+
+/**
+ * The frame of a control drawn by its frames (a lever, a switch, a lamp): a two-state one off or on, a three-state one
+ * its state, a display by the values its states show from; one with positions the position whose value the control
+ * has reached -- between two positions of frames between them, the frame as far between them (a brake's range);
+ * without, its range spread over its frames.
+ */
+int FrameOf(const SimtrainsCab::Control &c, float v)
+{
+	const int frames = std::max(1, c.frames);
+	int f = 0;
+	if (StrEqualsIgnoreCase(c.kind, "TwoState")) {
+		f = v > 0 ? 1 : 0;
+	} else if (StrEqualsIgnoreCase(c.kind, "TriState")) {
+		f = static_cast<int>(std::lround(v));
+	} else if (!c.switch_values.empty()) {
+		for (size_t i = 0; i < c.switch_values.size(); i++) {
+			if (v >= c.switch_values[i]) f = static_cast<int>(i);
+		}
+	} else if (c.values.size() >= 2 && c.values.size() == c.positions.size()) {
+		size_t i = 0;
+		while (i + 1 < c.values.size() && v >= c.values[i + 1]) i++;
+		f = c.positions[i];
+		if (i + 1 < c.values.size() && std::abs(c.positions[i + 1] - c.positions[i]) > 1 && c.values[i + 1] > c.values[i] && v > c.values[i]) {
+			const float k = (v - c.values[i]) / (c.values[i + 1] - c.values[i]);
+			f = c.positions[i] + static_cast<int>(std::lround(k * (c.positions[i + 1] - c.positions[i])));
+		}
+	} else if (c.max > c.min) {
+		f = static_cast<int>(std::lround(std::clamp((v - c.min) / (c.max - c.min), 0.0f, 1.0f) * (frames - 1)));
+	}
+	return std::clamp(f, 0, frames - 1);
+}
+
+/** One control drawn over the desk's first picture as the train stands (SimtrainsDeskState). */
+void DrawControl(DeskPainter &p, const SimtrainsCab::Control &c, const SimtrainsDeskState &s, bool night)
+{
+	const std::string &graphic_path = night && !c.graphic_night.empty() ? c.graphic_night : c.graphic;
+	const ControlGraphic *g = ControlGraphicOf(graphic_path);
+	const float v = ValueOf(c, s);
+	const float range = c.max - c.min;
+	const float share = range != 0 ? std::clamp((v - c.min) / range, 0.0f, 1.0f) : 0.0f;
+	if (StrEqualsIgnoreCase(c.kind, "Dial")) {
+		/* Turned from "ScalePos"'s first to its second, clockwise (DirIncrease 0) or the other way round. */
+		if (g == nullptr || c.w <= 0 || c.h <= 0) return;
+		const int way = c.dir_increase != 0 ? -1 : 1;
+		float sweep = way * (c.to - c.from);
+		while (sweep <= 0) sweep += 360;
+		p.Needle(*g, static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.w), static_cast<float>(c.h), static_cast<float>(c.pivot), c.from + way * sweep * share);
+		return;
+	}
+	if (StrEqualsIgnoreCase(c.kind, "Gauge")) {
+		/* Along its length: up (Orientation 1) or across, from the end its "DirIncrease" says; a pointer of the size
+		 * of its "Area" moving along it, or a bar of its colour growing. */
+		const bool upright = c.orientation == 1;
+		const float len = upright ? static_cast<float>(c.h) : static_cast<float>(c.w);
+		const float aw = c.area[2] > 0 ? static_cast<float>(c.area[2]) : static_cast<float>(c.w), ah = c.area[3] > 0 ? static_cast<float>(c.area[3]) : static_cast<float>(c.h);
+		const bool backwards = upright ? c.dir_increase != 0 : c.dir_increase != 0;
+		if (StrEqualsIgnoreCase(c.style, "POINTER")) {
+			const float along = (upright ? len - ah : len - aw) * (backwards ? 1 - share : share);
+			const float x = upright ? static_cast<float>(c.x) : c.x + along, y = upright ? c.y + along : static_cast<float>(c.y);
+			if (g != nullptr) {
+				p.Lay(*g, 0, 0, g->w, g->h, x, y, aw, ah);
+			} else {
+				p.Fill(x, y, aw, ah, c.colour);
+			}
+		} else {
+			const float filled = len * share;
+			if (upright) {
+				p.Fill(static_cast<float>(c.x), backwards ? c.y + len - filled : static_cast<float>(c.y), static_cast<float>(c.w), filled, c.colour);
+			} else {
+				p.Fill(backwards ? c.x + len - filled : static_cast<float>(c.x), static_cast<float>(c.y), filled, static_cast<float>(c.h), c.colour);
+			}
+		}
+		return;
+	}
+	if (StrEqualsIgnoreCase(c.kind, "Digital")) {
+		/* The figure as MSTS writes it: its places after the point, noughts before it. */
+		const float figure = std::abs(v);
+		std::string text = fmt::format("{:.{}f}", figure, std::clamp(c.accuracy, 0, 3));
+		const size_t point = text.find('.');
+		const size_t before = point == std::string::npos ? text.size() : point;
+		if (c.leading_zeros > 0 && before < static_cast<size_t>(c.leading_zeros)) text.insert(0, c.leading_zeros - before, '0');
+		if (v < 0 && !StrEqualsIgnoreCase(c.type, "SPEEDOMETER")) text.insert(0, "-");
+		p.Figures(text, static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.w), static_cast<float>(c.h), c.justification, c.colour);
+		return;
+	}
+	if (StrEqualsIgnoreCase(c.kind, "DigitalClock")) {
+		const std::string text = c.accuracy > 0 ? fmt::format("{:02}:{:02}:{:02}", s.hour, s.minute, s.second) : fmt::format("{:02}:{:02}", s.hour, s.minute);
+		p.Figures(text, static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.w), static_cast<float>(c.h), 2, c.colour);
+		return;
+	}
+	if (g == nullptr || c.w <= 0 || c.h <= 0) return;
+	int frame = 0, cols = std::max(1, c.cols), rows = std::max(1, c.rows);
+	if (StrEqualsIgnoreCase(c.kind, "CabSignalDisplay")) {
+		/* The repeater: MSTS's aspects in their order, eight frames four across (stop 0, approach 3, clear 7); dark
+		 * with nothing to show or switched off. */
+		if (s.aspect < 0 || s.repeater_off) return;
+		cols = c.cols > 0 ? c.cols : 4;
+		rows = c.rows > 0 ? c.rows : 2;
+		frame = s.aspect == 0 ? 0 : s.aspect == 1 ? 3 : 7;
+		frame = std::min(frame, cols * rows - 1);
+	} else {
+		frame = FrameOf(c, v);
+	}
+	const int fw = g->w / cols, fh = g->h / rows;
+	p.Lay(*g, frame % cols * fw, frame / cols * fh, fw, fh, static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.w), static_cast<float>(c.h));
+}
+
+} // namespace
+
+/**
+ * The controls of the desk drawn into its first picture as the train stands: what they were drawn over put back from
+ * the picture as read first, then each in its order.
+ */
+static void DrawDeskControls(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const SimtrainsDeskState &state)
+{
+	if (desk.pictures.empty() || desk.pictures[0].w == 0) return;
+	SimtrainsCabDesk::Picture &pic = desk.pictures[0];
+	if (desk.base.size() != pic.px.size()) desk.base = pic.px;
+	for (const std::array<int, 4> &r : desk.drawn) {
+		for (int y = r[1]; y < r[3]; y++) {
+			const size_t at = static_cast<size_t>(y) * pic.w;
+			std::copy(&desk.base[at + r[0]], &desk.base[at + r[2]], &pic.px[at + r[0]]);
+		}
+	}
+	desk.drawn.clear();
+	DeskPainter painter{pic, desk.drawn, pic.w / 640.0f, pic.h / 480.0f};
+	for (const SimtrainsCab::Control &c : cab.controls) DrawControl(painter, c, state, desk.night);
+}
+
 /**
  * Draw the desk of a cab of MSTS over the view from the cab just drawn into the window (BlitEyePicture()): over its
  * pixels, or into the hole the graphics card's picture shows through, premultiplied so that the video driver lays the
@@ -209,13 +580,19 @@ static void MakeDeskLookUp(SimtrainsCabDesk &desk, const SimtrainsCab &cab, cons
  * @param left where the picture is in the window
  * @return false when there is nothing to draw
  */
-bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const CabViewCamera &camera, int left, int top, int width, int height)
+bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const CabViewCamera &camera, int left, int top, int width, int height, const SimtrainsDeskState *state)
 {
 	if (width <= 0 || height <= 0 || cab.views.empty()) return false;
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return false;
 	const bool night = IsNightNow();
 	if (desk.path != cab.path || desk.night != night || desk.pictures.size() != cab.views.size()) ReadDeskPictures(desk, cab, night);
 	if (desk.width != width || desk.height != height || desk.head != camera.head || desk.pitch != camera.pitch) MakeDeskLookUp(desk, cab, camera, width, height);
+	/* Its controls as the train stands, drawn again when that changed. */
+	if (state != nullptr && (!desk.shown_valid || !(desk.shown == *state))) {
+		DrawDeskControls(desk, cab, *state);
+		desk.shown = *state;
+		desk.shown_valid = true;
+	}
 
 	const DrawPixelInfo *dpi = _cur_dpi;
 	Blitter *blitter = BlitterFactory::GetCurrentBlitter();
@@ -266,7 +643,10 @@ const SimtrainsCab *SimtrainsCabSeat::Prepare(const Vehicle *v, CabViewCamera &c
 void SimtrainsCabSeat::Draw(const Vehicle *v, const CabViewCamera &camera, int left, int top, int width, int height)
 {
 	if (!camera.msts) return;
-	if (const SimtrainsCab *cab = SimtrainsCabOf(v); cab != nullptr) DrawSimtrainsCabDesk(this->desk, *cab, camera, left, top, width, height);
+	if (const SimtrainsCab *cab = SimtrainsCabOf(v); cab != nullptr) {
+		const SimtrainsDeskState state = SimtrainsDeskStateOf(v);
+		DrawSimtrainsCabDesk(this->desk, *cab, camera, left, top, width, height, &state);
+	}
 }
 
 /**
@@ -311,6 +691,30 @@ static void TakeOver(const Train *t)
 	if (t->cab_driven) return;
 	SendControl(t, TrainCabControl::Driven, 1);
 	if (t->vehstatus.Test(VehState::Stopped)) Command<Commands::StartStopVehicle>::Post(t->tile, t->index, false);
+}
+
+/**
+ * What the desk keeps of its own, on this computer alone, by the train (the player, 1. 11.): the vigilance device of
+ * the keys of MSTS -- pressed once (Z) it presses itself from then on, it never brakes (with the arrows there is none
+ * at all) --, the repeater switched off (V, as the 451's readme has it), and when the horn sounded.
+ */
+struct DeskOwn {
+	bool alerter = false;
+	std::chrono::steady_clock::time_point alerter_since{};
+	bool repeater_off = false;
+	std::chrono::steady_clock::time_point horn{};
+};
+static std::map<uint32_t, DeskOwn> _desk_own;
+
+static DeskOwn &DeskOwnOf(const Vehicle *v)
+{
+	return _desk_own[v->First()->index.base()];
+}
+
+/** The horn sounded from a cab (CabHorn()): its button on the desk pressed a moment. */
+void NoteCabHorn(const Vehicle *v)
+{
+	if (v != nullptr && v->type == VehicleType::Train) DeskOwnOf(v).horn = std::chrono::steady_clock::now();
 }
 
 /** How many notches its throttle has past nought: the .eng's, else eight. */
@@ -449,6 +853,22 @@ bool SimtrainsCabDriver::Key(const Vehicle *v, char32_t key, uint16_t keycode)
 		case ',': step(TrainCabControl::Dynamic, t->cab_dynamic, -(255 / DYNAMIC_STEPS + 1)); break;
 		case 'w': case 'W': TakeOver(t); SendControl(t, TrainCabControl::Reverser, 1); break;
 		case 's': case 'S': TakeOver(t); SendControl(t, TrainCabControl::Reverser, 0); break;
+		case 'p': case 'P':
+			/* The pantograph of an electric engine up or down: down, no power and the desk without voltage. */
+			if (e == nullptr || e->traction != SimtrainsEngine::Traction::Electric) return false;
+			TakeOver(t);
+			SendControl(t, TrainCabControl::Pantograph, t->cab_pantograph_down ? 0 : 1);
+			break;
+		case 'z': case 'Z': {
+			/* The vigilance device pressed: from then on it presses itself. */
+			DeskOwn &own = DeskOwnOf(t);
+			if (!own.alerter) {
+				own.alerter = true;
+				own.alerter_since = std::chrono::steady_clock::now();
+			}
+			break;
+		}
+		case 'v': case 'V': DeskOwnOf(t).repeater_off = !DeskOwnOf(t).repeater_off; break;
 		default:
 			if (code != WKC_BACKSPACE) return false;
 			TakeOver(t);
@@ -484,6 +904,7 @@ std::string SimtrainsDeskText(const Vehicle *v)
 	};
 	if (t->cab_emergency) add(GetString(STR_CAB_VIEW_DESK_EMERGENCY));
 	if (t->cab_reverser == 0) add(GetString(STR_CAB_VIEW_DESK_NEUTRAL));
+	if (t->cab_pantograph_down) add(GetString(STR_CAB_VIEW_DESK_PANTOGRAPH_DOWN));
 	if (t->cab_power > 0) {
 		add(GetString(STR_CAB_VIEW_DESK_POWER, NotchOf(e, t->cab_power), NotchCount(e)));
 	} else if (t->cab_dynamic == 0 && t->cab_brake == 0) {
@@ -492,5 +913,96 @@ std::string SimtrainsDeskText(const Vehicle *v)
 	if (t->cab_dynamic > 0) add(GetString(STR_CAB_VIEW_DESK_DYNAMIC, std::max(1, static_cast<int>(std::lround(t->cab_dynamic * SimtrainsCabDriver::DYNAMIC_STEPS / 255.0))), SimtrainsCabDriver::DYNAMIC_STEPS));
 	if (t->cab_brake > 0) add(GetString(STR_CAB_VIEW_DESK_BRAKE, t->cab_brake * 100 / 255));
 	if (t->cab_engine_brake > 0) add(GetString(STR_CAB_VIEW_DESK_ENGINE_BRAKE, t->cab_engine_brake * 100 / 255));
+	return s;
+}
+
+/**
+ * The aspect the repeater of a train shows (the player, 1. 11.: green, yellow, red): the next signal ahead facing it
+ * along its booked way (else the first way on), and the one after it when that one is green. Red the stop, green with
+ * a red after it (or the end of the line) the approach, green with a green after it, or none within reach, the clear.
+ * @return -1 no signal within reach ahead (the repeater dark), 0 stop, 1 approach, 2 clear
+ */
+static int RepeaterAspect(const Train *t)
+{
+	if (t->track == Track::Depot || t->track == Track::Wormhole) return -1;
+	Trackdir td = t->GetVehicleTrackdir();
+	if (td == Trackdir::Invalid) return -1;
+	TileIndex tile = t->tile;
+	CFollowTrackRail ft(t, GetAllCompatibleRailTypes(t->railtypes));
+	bool green_seen = false;
+	for (int step = 0; step < 48; step++) {
+		if (!ft.Follow(tile, td)) return green_seen ? 1 : -1;
+		const TrackdirBits reserved = ft.new_td_bits & TrackBitsToTrackdirBits(GetReservedTrackbits(ft.new_tile));
+		const TrackdirBits onward = reserved.Any() ? reserved : ft.new_td_bits;
+		tile = ft.new_tile;
+		td = FindFirstTrackdir(onward);
+		if (td == Trackdir::Invalid) break;
+		if (!IsTileType(tile, TileType::Railway) || !HasSignals(tile) || !HasSignalOnTrackdir(tile, td)) continue;
+		const bool green = GetSignalStateByTrackdir(tile, td) == SignalState::Green;
+		if (green_seen) return green ? 2 : 1;
+		if (!green) return 0;
+		green_seen = true;
+	}
+	return green_seen ? 2 : -1;
+}
+
+/**
+ * What the desk of a train shows as it stands (SimtrainsDeskState): its speed, its controls where they are, the
+ * pressures of its air without delay as its brake is (the player, 31. 10.), the wire's voltage with the pantograph up,
+ * the motors' current as they pull or brake, the lights, the horn, the vigilance device and the repeater, the phone's
+ * clock.
+ */
+SimtrainsDeskState SimtrainsDeskStateOf(const Vehicle *v)
+{
+	SimtrainsDeskState s;
+	if (v == nullptr || v->type != VehicleType::Train) return s;
+	const Train *t = Train::From(v->First());
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	s.speed_kmh = static_cast<float>(t->GetDisplaySpeed());
+	const int notch = NotchOf(e, t->cab_power), notches = NotchCount(e);
+	s.throttle = notch == 0 ? 0.0f : e != nullptr && !e->notches.empty() ? e->notches[std::min(notch, notches) - 1] : notch / static_cast<float>(notches);
+	s.dynamic = t->cab_dynamic / 255.0f;
+	s.handle = t->cab_dynamic > 0 ? 1.0f + s.dynamic : notch / static_cast<float>(notches);
+	const float f = t->cab_brake / 255.0f;
+	if (t->cab_emergency) {
+		s.train_brake = e != nullptr && e->brake_emergency >= 0 ? e->brake_emergency : 1.0f;
+	} else if (t->cab_brake == 0) {
+		s.train_brake = e != nullptr && e->brake_running >= 0 ? e->brake_running : 0.0f;
+	} else if (e != nullptr && e->brake_service_from >= 0) {
+		s.train_brake = e->brake_service_from + f * (e->brake_service_to - e->brake_service_from);
+	} else {
+		s.train_brake = f;
+	}
+	s.engine_brake = t->cab_engine_brake / 255.0f;
+	s.emergency = t->cab_emergency;
+	s.direction = t->cab_reverser == 0 ? 1 : 2;
+	s.pantograph = !t->cab_pantograph_down;
+	const bool electric = e != nullptr && e->traction == SimtrainsEngine::Traction::Electric;
+	s.line_kv = electric && s.pantograph ? 3.0f : 0.0f;
+	/* The motors: up as they pull, down as they brake electrically (the 451's readme), at most 400 A. */
+	if (s.pantograph && !t->cab_emergency && t->cab_reverser != 0 && t->cab_power > 0) s.amps = 400.0f * t->cab_power / 255;
+	if (t->cab_dynamic > 0 && s.speed_kmh > 8) s.amps = -300.0f * s.dynamic;
+	constexpr float CYLINDER = 3.8f, PIPE = 5.0f, PIPE_SERVICE = 1.5f, RESERVOIR = 9.0f;
+	s.brake_cylinder = t->cab_emergency ? CYLINDER : std::max(f, s.engine_brake) * CYLINDER;
+	s.brake_pipe = t->cab_emergency ? 0.0f : PIPE - f * PIPE_SERVICE;
+	s.main_reservoir = RESERVOIR;
+	s.lights = VehicleLightsOn(t) ? 2 : 0;
+	const auto now = std::chrono::steady_clock::now();
+	auto own = _desk_own.find(t->index.base());
+	if (own != _desk_own.end()) {
+		s.horn = now - own->second.horn < std::chrono::milliseconds(1200);
+		s.repeater_off = own->second.repeater_off;
+		/* Pressed once, every 20 s its lamp lights and it presses itself a moment later. */
+		if (_settings_client.gui.cab_msts_keys && own->second.alerter) {
+			const int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - own->second.alerter_since).count() % 20000;
+			s.alerter_lamp = ms >= 18800 && ms < 19600;
+			s.alerter_pressed = ms >= 19300 && ms < 19800;
+		}
+	}
+	s.aspect = RepeaterAspect(t);
+	const std::tm clock = fmt::localtime(std::time(nullptr));
+	s.hour = clock.tm_hour;
+	s.minute = clock.tm_min;
+	s.second = clock.tm_sec;
 	return s;
 }

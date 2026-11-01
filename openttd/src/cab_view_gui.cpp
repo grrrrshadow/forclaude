@@ -187,6 +187,7 @@ static std::optional<SoundID> CarHornSound()
  */
 void CabHorn(const Vehicle *v)
 {
+	NoteCabHorn(v);
 	switch (v->type) {
 		case VehicleType::Train: {
 			static const SoundFx whistle[] = {SND_04_DEPARTURE_STEAM, SND_0A_DEPARTURE_TRAIN, SND_0A_DEPARTURE_TRAIN, SND_47_DEPARTURE_MONORAIL, SND_41_DEPARTURE_MAGLEV};

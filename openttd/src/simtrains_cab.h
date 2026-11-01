@@ -24,12 +24,40 @@
 #include "simtrains.h"
 #include "gfx_type.h"
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 struct Vehicle;
 struct CabViewCamera;
+
+/**
+ * What the controls of a desk show (SimtrainsCab::Control; the player, 1. 11., step 3 of the simtrains: the needles,
+ * the levers and the lamps of the desk as the train stands), read from the train each time the desk is drawn.
+ */
+struct SimtrainsDeskState {
+	float speed_kmh = 0;
+	float throttle = 0;        ///< the throttle as the .eng's notches have it (THROTTLE), 0 to 1
+	float handle = 0;          ///< the combined handle (CP_HANDLE): notch k of n at k / n, the electric brake from 1 to 2
+	float dynamic = 0;         ///< the electric brake, 0 to 1
+	float train_brake = 0;     ///< the train brake's handle as the .eng's notches have it (SimtrainsEngine::brake_running ...)
+	float engine_brake = 0;    ///< 0 to 1
+	bool emergency = false;
+	int direction = 2;         ///< 0 backwards, 1 in the middle, 2 ahead
+	bool pantograph = true;    ///< up
+	float line_kv = 0;         ///< the wire's voltage seen
+	float amps = 0;            ///< the motors' current: up pulling, down braking electrically
+	float brake_cylinder = 0, brake_pipe = 0, main_reservoir = 0; ///< bar
+	int lights = 0;            ///< 0 off, 2 on
+	bool horn = false;         ///< sounding just now
+	bool alerter_lamp = false, alerter_pressed = false; ///< the vigilance device's (with the keys of MSTS only)
+	int aspect = -1;           ///< the repeater: -1 dark, 0 stop, 1 approach, 2 clear
+	bool repeater_off = false; ///< the repeater switched off (the key V)
+	int hour = 0, minute = 0, second = 0; ///< the phone's clock
+
+	bool operator==(const SimtrainsDeskState &) const = default;
+};
 
 /** The desk of a cab drawn in a window, kept between frames: its pictures, and which of their pixels each of the window's shows. */
 struct SimtrainsCabDesk {
@@ -49,6 +77,11 @@ struct SimtrainsCabDesk {
 	std::vector<uint32_t> look_up;
 	int width = 0, height = 0;   ///< the window's picture it was made for
 	double head = 1e9, pitch = 1e9; ///< and the head turned so
+	/* The first picture as read, its controls drawn over a copy of it (DrawDeskControls()): where they were drawn, and as what. */
+	std::vector<uint32_t> base;
+	std::vector<std::array<int, 4>> drawn; ///< left, top, right, bottom of the first picture's pixels
+	SimtrainsDeskState shown;
+	bool shown_valid = false;
 };
 
 /**
@@ -102,6 +135,8 @@ void SimtrainsCabLetGo(const Vehicle *v);
 std::string SimtrainsDeskText(const Vehicle *v);
 
 const SimtrainsCab *SimtrainsCabOf(const Vehicle *v);
-bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const CabViewCamera &camera, int left, int top, int width, int height);
+bool DrawSimtrainsCabDesk(SimtrainsCabDesk &desk, const SimtrainsCab &cab, const CabViewCamera &camera, int left, int top, int width, int height, const SimtrainsDeskState *state = nullptr);
+SimtrainsDeskState SimtrainsDeskStateOf(const Vehicle *v);
+void NoteCabHorn(const Vehicle *v);
 
 #endif /* SIMTRAINS_CAB_H */

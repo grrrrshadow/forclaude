@@ -2405,6 +2405,7 @@ STR_CAB_VIEW_DESK_BRAKE                                         :{ORANGE}Brake {
 STR_CAB_VIEW_DESK_ENGINE_BRAKE                                  :{ORANGE}Engine brake {NUM}%
 STR_CAB_VIEW_DESK_EMERGENCY                                     :{RED}Emergency brake
 STR_CAB_VIEW_DESK_NEUTRAL                                       :{SILVER}Reverser 0
+STR_CAB_VIEW_DESK_PANTOGRAPH_DOWN                               :{ORANGE}Pantograph down
 STR_CAB_VIEW_AUTO                                               :{BLACK}Go your route
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Let the vehicle go its route as its orders say (key T): it finds its way back to them, off the road from the next road it comes onto; the arrows take the wheel again, driving freely
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Drive

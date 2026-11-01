@@ -46,6 +46,9 @@ struct SimtrainsEngine {
 	std::string cvf;              ///< an engine's cab, its "CabView" .cvf (simtrains_cab.h); empty none
 	std::vector<float> notches;   ///< the notches of its throttle past 0 ("EngineControllers", "Throttle"), of full; empty none given
 	bool dynamic = false;         ///< it has an electric brake ("DynamicBrakesMaximumForce", "Brake_Dynamic")
+	/** Its train brake's handle ("EngineControllers", "Brake_Train" and its notches), as the desk shows it: where it
+	 * stands driving (released), the range of service braking, and the emergency brake; -1 not given. */
+	float brake_running = -1, brake_service_from = -1, brake_service_to = -1, brake_emergency = -1;
 };
 
 /** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. Its
@@ -108,6 +111,11 @@ struct SimtrainsCab {
 		std::vector<float> values;    ///< "NumValues": the value of each position
 		bool mouse = false;      ///< "MouseControl": the mouse moves it
 		uint32_t colour = 0;     ///< the first "ControlColour" of a gauge or a figure, 0xRRGGBB
+		std::vector<float> switch_values; ///< a "MultiStateDisplay"'s "States": the value from which each frame shows
+		std::string units;       ///< "Units": "KM_PER_HOUR", "BAR", "KILOVOLTS", "AMPS", ...
+		int justification = 3;   ///< a figure's "Justification": 1 left, 2 in the middle, 3 right
+		int accuracy = 0;        ///< "Accuracy": a figure's places after the point; a clock's seconds shown when 1
+		int leading_zeros = 0;   ///< "LeadingZeros": a figure's places before the point, filled with noughts
 	};
 	std::string path;            ///< the .cvf
 	std::vector<View> views;     ///< the first ahead

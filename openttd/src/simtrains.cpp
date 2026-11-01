@@ -670,6 +670,24 @@ bool ReadSimtrainsCab(const std::string &path, SimtrainsCab &cab)
 		}
 		if (const std::vector<float> f = FiguresOf(n.Child("NumValues")); f.size() >= 2) c.values.assign(f.begin() + 1, f.end());
 		if (const std::vector<float> f = FiguresOf(n.Child("MouseControl")); !f.empty()) c.mouse = f[0] != 0;
+		/* "States ( 2 2 1  State ( Style ( 0 ) SwitchVal ( 0 ) ) ... )": its frames, and the value from which each shows. */
+		if (const TextNode *states = n.Child("States"); states != nullptr) {
+			const std::vector<float> f = FiguresOf(states);
+			if (f.size() >= 3) {
+				c.frames = static_cast<int>(f[0]);
+				c.cols = static_cast<int>(f[1]);
+				c.rows = static_cast<int>(f[2]);
+			}
+			for (const TextNode &s : states->children) {
+				if (!StrEqualsIgnoreCase(s.name, "State")) continue;
+				const std::vector<float> v = FiguresOf(s.Child("SwitchVal"));
+				c.switch_values.push_back(v.empty() ? 0.0f : v[0]);
+			}
+		}
+		if (const TextNode *t = n.Child("Units"); t != nullptr) c.units = t->Value();
+		if (const std::vector<float> f = FiguresOf(n.Child("Justification")); !f.empty()) c.justification = static_cast<int>(f[0]);
+		if (const std::vector<float> f = FiguresOf(n.Child("Accuracy")); !f.empty()) c.accuracy = static_cast<int>(f[0]);
+		if (const std::vector<float> f = FiguresOf(n.Child("LeadingZeros")); !f.empty()) c.leading_zeros = static_cast<int>(f[0]);
 		const TextNode *colour = n.Child("ControlColour");
 		if (colour == nullptr) {
 			if (const TextNode *pos = n.Child("PositiveColour"); pos != nullptr) colour = pos->Child("ControlColour");
@@ -961,6 +979,26 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 			}
 		}
 		if (controllers->Child("Brake_Dynamic") != nullptr) e.dynamic = true;
+		/* The train brake's handle by the kinds of its notches ("TrainBrakesController...Start"): driving with it
+		 * released, the range of service braking (from the first that applies, to the next notch), the emergency. */
+		if (const TextNode *brake = controllers->Child("Brake_Train"); brake != nullptr) {
+			if (const TextNode *notches = brake->Child("NumNotches"); notches != nullptr) {
+				std::vector<std::pair<float, std::string>> list;
+				for (const TextNode &n : notches->children) {
+					if (StrEqualsIgnoreCase(n.name, "Notch")) list.emplace_back(static_cast<float>(ParseFigure(n.Value(), {})), n.Value(2));
+				}
+				auto has = [](const std::string &kind, std::string_view what) { return StrContainsIgnoreCase(kind, what); };
+				for (size_t k = 0; k < list.size(); k++) {
+					const std::string &kind = list[k].second;
+					if (e.brake_running < 0 && (has(kind, "Running") || (has(kind, "Release") && !has(kind, "Quick") && !has(kind, "Full")))) e.brake_running = list[k].first;
+					if (e.brake_service_from < 0 && (has(kind, "Graduated") || has(kind, "Apply") || has(kind, "SelfLap")) && !has(kind, "Emergency")) {
+						e.brake_service_from = list[k].first;
+						e.brake_service_to = k + 1 < list.size() ? list[k + 1].first : 1.0f;
+					}
+					if (has(kind, "Emergency")) e.brake_emergency = list[k].first;
+				}
+			}
+		}
 	}
 	if (const TextNode *t = engine->Child("DynamicBrakesMaximumForce"); t != nullptr && ParseFigure(t->Value(), {{"kN", 1}, {"N", 0.001}}, 0.001) > 0) e.dynamic = true;
 	if (const TextNode *cab = engine->Child("CabView"); cab != nullptr && !cab->Value().empty()) {

@@ -2513,6 +2513,7 @@ STR_CAB_VIEW_DESK_BRAKE                                         :{ORANGE}Brzda {
 STR_CAB_VIEW_DESK_ENGINE_BRAKE                                  :{ORANGE}Přímočinná {NUM} %
 STR_CAB_VIEW_DESK_EMERGENCY                                     :{RED}Rychlobrzda
 STR_CAB_VIEW_DESK_NEUTRAL                                       :{SILVER}Směr 0
+STR_CAB_VIEW_DESK_PANTOGRAPH_DOWN                               :{ORANGE}Sběrač dole
 STR_CAB_VIEW_AUTO                                               :{BLACK}Jeď svou trasu
 STR_CAB_VIEW_AUTO_TOOLTIP                                       :{BLACK}Nechat vozidlo jet svou trasu podle rozkazů (klávesa T): samo si k nim najde cestu, mimo silnici z příští silnice, na kterou najede; šipky ho zase převezmou a jede se volně
 STR_CAB_VIEW_DRIVE                                              :{BLACK}Řídit
