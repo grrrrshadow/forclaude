@@ -10687,6 +10687,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", cw != nullptr ? "zavrena" : "neni");
 			return true;
 		}
+		if (argv.size() > 2 && argv[2] == "zivak") {
+			/* 'kabina zivak [posun <s>]': the vigilance device of the train of the cab view open, the game's time gone on
+			 * so many seconds for it first (simtrains_cab.cpp). */
+			Window *cw = FindWindowByClass(WindowClass::CabView);
+			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			extern std::string RigDeskVigilance(const Vehicle *v, int seconds);
+			const int seconds = argv.size() > 4 && argv[3] == "posun" ? number(4).value_or(0) : 0;
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigDeskVigilance(cv, seconds));
+			return true;
+		}
 		if (argv.size() == 4 && argv[2] == "pult" && argv[3] == "stav") {
 			/* 'kabina pult stav': what the desk of the train of the cab view open shows (SimtrainsDeskState). */
 			Window *cw = FindWindowByClass(WindowClass::CabView);
@@ -10696,9 +10706,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				return true;
 			}
 			const SimtrainsDeskState d = SimtrainsDeskStateOf(cv);
-			IConsolePrint(CC_DEFAULT, "test3d: pult na {},{} rychlost {:.0f} kontroler {:.2f} paka {:.2f} edb {:.2f} brzdic {:.2f} primocinna {:.2f} rychlobrzda {} smer {} sberac {} napeti {:.1f} proud {:.0f} valec {:.2f} potrubi {:.2f} jimka {:.1f} svetla {} houkacka {} zivak {}/{} opakovac {}{} hodiny {:02}:{:02}",
+			IConsolePrint(CC_DEFAULT, "test3d: pult na {},{} rychlost {:.0f} kontroler {:.2f} paka {:.2f} edb {:.2f} brzdic {:.2f} primocinna {:.2f} rychlobrzda {} smer {} sberac {} napeti {:.1f} proud {:.0f} valec {:.2f} potrubi {:.2f} jimka {:.1f} svetla {} houkacka {} zivak {} {}/{} opakovac {}{} hodiny {:02}:{:02}",
 					TileX(cv->First()->tile), TileY(cv->First()->tile), d.speed_kmh, d.throttle, d.handle, d.dynamic, d.train_brake, d.engine_brake, d.emergency ? "ano" : "ne", d.direction, d.pantograph ? "nahore" : "dole",
-					d.line_kv, d.amps, d.brake_cylinder, d.brake_pipe, d.main_reservoir, d.lights, d.horn ? "ano" : "ne", d.alerter_lamp ? "sviti" : "-", d.alerter_pressed ? "zmacknut" : "-",
+					d.line_kv, d.amps, d.brake_cylinder, d.brake_pipe, d.main_reservoir, d.lights, d.horn ? "ano" : "ne", d.alerter, d.alerter_lamp ? "sviti" : "-", d.alerter_pressed ? "zmacknut" : "-",
 					d.aspect, d.repeater_off ? " vypnuty" : "", d.hour, d.minute);
 			return true;
 		}

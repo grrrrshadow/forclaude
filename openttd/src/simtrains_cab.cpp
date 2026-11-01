@@ -32,6 +32,8 @@
 #include "pbs.h"
 #include "rail_map.h"
 #include "track_func.h"
+#include "sound_func.h"
+#include "timer/timer_game_tick.h"
 #include "3rdparty/fmt/chrono.h"
 
 #include <algorithm>
@@ -657,7 +659,11 @@ void SimtrainsCabSeat::Draw(const Vehicle *v, const CabViewCamera &camera, int l
 bool SimtrainsCabSeat::Drive(const Vehicle *v, DirectionKeys keys, int ms)
 {
 	if (!IsSimtrainsTrain(v)) return false;
-	if (!_settings_client.gui.cab_msts_keys) this->driver.Drive(v, keys, ms);
+	if (!_settings_client.gui.cab_msts_keys) {
+		this->driver.Drive(v, keys, ms);
+	} else {
+		this->driver.Watch(v);
+	}
 	return true;
 }
 
@@ -694,13 +700,24 @@ static void TakeOver(const Train *t)
 }
 
 /**
- * What the desk keeps of its own, on this computer alone, by the train (the player, 1. 11.): the vigilance device of
- * the keys of MSTS -- pressed once (Z) it presses itself from then on, it never brakes (with the arrows there is none
- * at all) --, the repeater switched off (V, as the 451's readme has it), and when the horn sounded.
+ * What the desk keeps of its own, on this computer alone, by the train: its vigilance device with the keys of MSTS,
+ * the repeater switched off (V, as the 451's readme has it), and when the horn sounded.
+ *
+ * The vigilance device is as MSTS has it (the player, 1. 11.: "as the vigilance device is in MSTS, so it will be with
+ * us with the controls of MSTS"), its times the model's own (SimtrainsEngine::Vigilance; "an American one's differs
+ * from a Czech engine's"). It watches from the first Z (the player: from the first Z, so the phone without keys never
+ * meets it), then Z or any control moved starts its time again; standing, the train keeps it at nought. Its time out,
+ * its lamp lights and it beeps; its warning out too, it brakes and cuts the power, till its penalty time is over and
+ * Z is pressed or the train stands. Counted in the game's ticks: a paused game stops it.
  */
 struct DeskOwn {
-	bool alerter = false;
-	std::chrono::steady_clock::time_point alerter_since{};
+	bool watching = false;     ///< Z pressed once: the vigilance device watches
+	uint64_t reset_at = 0;     ///< the tick it was last set back to nought
+	uint64_t seen_at = 0;      ///< the tick it was last looked at (SimtrainsCabDriver::Watch())
+	bool penalty = false;      ///< it braked
+	uint64_t penalty_at = 0;   ///< the tick it braked
+	uint64_t pressed_at = 0;   ///< the tick Z was last pressed: the desk's button pressed a moment
+	uint64_t beeped_at = 0;    ///< the tick it last beeped warning
 	bool repeater_off = false;
 	std::chrono::steady_clock::time_point horn{};
 };
@@ -711,10 +728,31 @@ static DeskOwn &DeskOwnOf(const Vehicle *v)
 	return _desk_own[v->First()->index.base()];
 }
 
-/** The horn sounded from a cab (CabHorn()): its button on the desk pressed a moment. */
+/** Seconds of the game since a tick. */
+static float SecondsSince(uint64_t tick)
+{
+	return TimerGameTick::counter < tick ? 0.0f : static_cast<float>(TimerGameTick::counter - tick) * MILLISECONDS_PER_TICK / 1000.0f;
+}
+
+/** The ticks the button of the vigilance device shows pressed, and between the beeps of its warning. */
+static constexpr uint64_t ALERTER_PRESSED_TICKS = 15;
+static constexpr uint64_t ALERTER_BEEP_TICKS = 18;
+
+/** What the vigilance device of a train does now (SimtrainsDeskState::alerter): 0 none, 1 watching, 2 warning, 3 braked. */
+static int AlerterStage(const Train *t, const DeskOwn &own, const SimtrainsEngine *e)
+{
+	if (!_settings_client.gui.cab_msts_keys || !t->cab_driven || e == nullptr || !e->vigilance.present || !own.watching) return 0;
+	if (own.penalty) return 3;
+	return SecondsSince(own.reset_at) >= e->vigilance.time_limit ? 2 : 1;
+}
+
+/** The horn sounded from a cab (CabHorn()): its button on the desk pressed a moment; a control moved, for the vigilance device. */
 void NoteCabHorn(const Vehicle *v)
 {
-	if (v != nullptr && v->type == VehicleType::Train) DeskOwnOf(v).horn = std::chrono::steady_clock::now();
+	if (v == nullptr || v->type != VehicleType::Train) return;
+	DeskOwn &own = DeskOwnOf(v);
+	own.horn = std::chrono::steady_clock::now();
+	own.reset_at = TimerGameTick::counter;
 }
 
 /** How many notches its throttle has past nought: the .eng's, else eight. */
@@ -777,6 +815,106 @@ static void ApplyLever(const Train *t, const SimtrainsEngine *e, int lever)
 	if (t->cab_power != power) SendControl(t, TrainCabControl::Power, power);
 	if (t->cab_dynamic != dynamic) SendControl(t, TrainCabControl::Dynamic, dynamic);
 	if (t->cab_brake != brake) SendControl(t, TrainCabControl::Brake, brake);
+}
+
+/** The vigilance device's braking let off (SimtrainsCabDriver::Watch(), Z): its emergency brake released, its time from nought. */
+static void LetOffVigilance(const Train *t, const SimtrainsEngine *e, DeskOwn &own)
+{
+	own.penalty = false;
+	own.reset_at = TimerGameTick::counter;
+	if (e->vigilance.emergency_brake && t->cab_emergency) SendControl(t, TrainCabControl::Emergency, 0);
+}
+
+/** The vigilance device's braking held: the power off and the brake on, as its .eng says. */
+static void HoldVigilanceBrake(const Train *t, const SimtrainsEngine *e)
+{
+	const SimtrainsEngine::Vigilance &vm = e->vigilance;
+	if (vm.cuts_power && t->cab_power > 0) SendControl(t, TrainCabControl::Power, 0);
+	if (vm.emergency_brake && !t->cab_emergency) SendControl(t, TrainCabControl::Emergency, 1);
+	if (vm.full_brake && t->cab_brake < 255) SendControl(t, TrainCabControl::Brake, 255);
+}
+
+/** Not looked at for this many ticks (the desk left a while), the vigilance device's time starts from then. */
+static constexpr uint64_t ALERTER_GAP_TICKS = 200;
+
+/**
+ * The vigilance device of a train driven from its desk with the keys of MSTS, looked at every so often (DeskOwn): it
+ * warns when its time is out, brakes when its warning is out too, and lets off when it may.
+ */
+void SimtrainsCabDriver::Watch(const Vehicle *v)
+{
+	if (!IsSimtrainsTrain(v) || v->owner != _local_company || v->vehstatus.Test(VehState::Crashed)) return;
+	const Train *t = Train::From(v->First());
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	if (e == nullptr || !e->vigilance.present) return;
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	DeskOwn &own = DeskOwnOf(t);
+	const uint64_t now = TimerGameTick::counter;
+	if (now < own.seen_at) {
+		/* Another game since, its ticks from nought again: nothing of the old one's device. */
+		const bool off = own.repeater_off;
+		own = DeskOwn{};
+		own.repeater_off = off;
+	}
+	const bool gap = now - own.seen_at > ALERTER_GAP_TICKS;
+	own.seen_at = now;
+	if (!own.watching) return;
+	if (!t->cab_driven) {
+		/* The game drives it: nothing to watch. */
+		own.penalty = false;
+		own.reset_at = now;
+		return;
+	}
+	const SimtrainsEngine::Vigilance &vm = e->vigilance;
+	const bool standing = t->cur_speed == 0;
+	if (own.penalty) {
+		if (standing && vm.reset_on_zero_speed && SecondsSince(own.penalty_at) >= vm.penalty_limit) {
+			LetOffVigilance(t, e, own);
+			this->done = "zivak pustil";
+		} else {
+			HoldVigilanceBrake(t, e);
+		}
+		return;
+	}
+	if (gap || (standing && vm.reset_on_zero_speed)) {
+		own.reset_at = now;
+		return;
+	}
+	const float out = SecondsSince(own.reset_at);
+	if (out >= vm.time_limit + vm.alarm_limit) {
+		own.penalty = true;
+		own.penalty_at = now;
+		HoldVigilanceBrake(t, e);
+		this->done = "zivak zabrzdil";
+	} else if (out >= vm.time_limit && now - own.beeped_at >= ALERTER_BEEP_TICKS) {
+		/* Its warning: the lamp, and a beep for now, till the sounds of the cab (the player: "the sounds at the end"). */
+		own.beeped_at = now;
+		SndPlayFx(SND_15_BEEP);
+	}
+}
+
+/**
+ * The rig: the game's time gone on so many seconds for the vigilance device of a train (its time, its braking),
+ * without running the ticks.
+ * @return what it does then
+ */
+std::string RigDeskVigilance(const Vehicle *v, int seconds)
+{
+	if (v == nullptr || v->type != VehicleType::Train) return "neni vlak";
+	const Train *t = Train::From(v->First());
+	const SimtrainsEngine *e = SimtrainsEngineOf(t->GetGRFID());
+	if (e == nullptr || !e->vigilance.present) return "mašina živák nemá";
+	DeskOwn &own = DeskOwnOf(t);
+	const uint64_t ticks = static_cast<uint64_t>(std::max(seconds, 0)) * 1000 / MILLISECONDS_PER_TICK;
+	auto back = [ticks](uint64_t &at) { at = at > ticks ? at - ticks : 0; };
+	back(own.reset_at);
+	if (own.penalty) back(own.penalty_at);
+	static const char *const STAGES[] = {"neni", "hlida", "varuje", "zabrzdil"};
+	const SimtrainsEngine::Vigilance &vm = e->vigilance;
+	return fmt::format("zivak {}, od nuly {:.1f} s, brzdi {:.1f} s (casy {:.0f}/{:.0f}/{:.0f} s, rychlobrzda {} plna {} tah {} stani {} tlacitko {})",
+			STAGES[AlerterStage(t, own, e)], SecondsSince(own.reset_at), own.penalty ? SecondsSince(own.penalty_at) : 0.0f,
+			vm.time_limit, vm.alarm_limit, vm.penalty_limit, vm.emergency_brake ? 1 : 0, vm.full_brake ? 1 : 0, vm.cuts_power ? 1 : 0,
+			vm.reset_on_zero_speed ? 1 : 0, vm.reset_on_button ? 1 : 0);
 }
 
 /**
@@ -842,11 +980,21 @@ bool SimtrainsCabDriver::Key(const Vehicle *v, char32_t key, uint16_t keycode)
 		TakeOver(t);
 		SendControl(t, control, static_cast<uint8_t>(std::clamp(now + by, 0, 255)));
 	};
+	/* The vigilance device braking: no power, and its brake not let off, till it lets off itself (Watch(), Z). */
+	DeskOwn &own = DeskOwnOf(t);
+	const bool braked = AlerterStage(t, own, e) == 3;
 	switch (key) {
-		case 'd': case 'D': TakeOver(t); SendControl(t, TrainCabControl::Power, NotchPower(e, std::min(NotchOf(e, t->cab_power) + 1, NotchCount(e)))); break;
+		case 'd': case 'D':
+			if (braked && e->vigilance.cuts_power) break;
+			TakeOver(t);
+			SendControl(t, TrainCabControl::Power, NotchPower(e, std::min(NotchOf(e, t->cab_power) + 1, NotchCount(e))));
+			break;
 		case 'a': case 'A': TakeOver(t); SendControl(t, TrainCabControl::Power, NotchPower(e, NotchOf(e, t->cab_power) - 1)); break;
 		case '\'': step(TrainCabControl::Brake, t->cab_brake, 255 / BRAKE_STEPS + 1); break;
-		case ';': step(TrainCabControl::Brake, t->cab_brake, -(255 / BRAKE_STEPS + 1)); break;
+		case ';':
+			if (braked && e->vigilance.full_brake) break;
+			step(TrainCabControl::Brake, t->cab_brake, -(255 / BRAKE_STEPS + 1));
+			break;
 		case ']': step(TrainCabControl::EngineBrake, t->cab_engine_brake, 64); break;
 		case '[': step(TrainCabControl::EngineBrake, t->cab_engine_brake, -64); break;
 		case '.': step(TrainCabControl::Dynamic, t->cab_dynamic, 255 / DYNAMIC_STEPS + 1); break;
@@ -859,22 +1007,27 @@ bool SimtrainsCabDriver::Key(const Vehicle *v, char32_t key, uint16_t keycode)
 			TakeOver(t);
 			SendControl(t, TrainCabControl::Pantograph, t->cab_pantograph_down ? 0 : 1);
 			break;
-		case 'z': case 'Z': {
-			/* The vigilance device pressed: from then on it presses itself. */
-			DeskOwn &own = DeskOwnOf(t);
-			if (!own.alerter) {
-				own.alerter = true;
-				own.alerter_since = std::chrono::steady_clock::now();
+		case 'z': case 'Z':
+			/* The vigilance device's button: the first press sets it watching (the player, 1. 11.); its braking let off
+			 * by it once its penalty time is over, where its .eng says so. */
+			own.pressed_at = TimerGameTick::counter;
+			if (!e->vigilance.present) break;
+			if (!own.watching) {
+				own.watching = true;
+				own.seen_at = TimerGameTick::counter;
 			}
+			if (own.penalty && e->vigilance.reset_on_button && SecondsSince(own.penalty_at) >= e->vigilance.penalty_limit) LetOffVigilance(t, e, own);
 			break;
-		}
-		case 'v': case 'V': DeskOwnOf(t).repeater_off = !DeskOwnOf(t).repeater_off; break;
+		case 'v': case 'V': own.repeater_off = !own.repeater_off; break;
 		default:
 			if (code != WKC_BACKSPACE) return false;
+			if (braked && t->cab_emergency && e->vigilance.emergency_brake) break;
 			TakeOver(t);
 			SendControl(t, TrainCabControl::Emergency, t->cab_emergency ? 0 : 1);
 			break;
 	}
+	/* Any control of the desk moved, Z too: the vigilance device's time from nought (its braking stays). */
+	own.reset_at = TimerGameTick::counter;
 	this->read = false;
 	this->done = fmt::format("klavesa {}", static_cast<char>(key != 0 ? key : '?'));
 	return true;
@@ -888,6 +1041,8 @@ void SimtrainsCabLetGo(const Vehicle *v)
 	if (!t->cab_driven) return;
 	AutoRestoreBackup cur_company(_current_company, _local_company);
 	SendControl(t, TrainCabControl::Driven, 0);
+	/* The game drives it: the vigilance device's braking is over with the player's driving. */
+	if (auto own = _desk_own.find(t->index.base()); own != _desk_own.end()) own->second.penalty = false;
 }
 
 /** What the desk of a train driven from its cab stands at, for the panel of the cab view; empty when the game drives it. */
@@ -902,6 +1057,11 @@ std::string SimtrainsDeskText(const Vehicle *v)
 		if (!s.empty()) s += "  ";
 		s += part;
 	};
+	if (auto own = _desk_own.find(t->index.base()); own != _desk_own.end()) {
+		const int stage = AlerterStage(t, own->second, e);
+		if (stage == 2) add(GetString(STR_CAB_VIEW_DESK_ALERTER));
+		if (stage == 3) add(GetString(STR_CAB_VIEW_DESK_ALERTER_BRAKED));
+	}
 	if (t->cab_emergency) add(GetString(STR_CAB_VIEW_DESK_EMERGENCY));
 	if (t->cab_reverser == 0) add(GetString(STR_CAB_VIEW_DESK_NEUTRAL));
 	if (t->cab_pantograph_down) add(GetString(STR_CAB_VIEW_DESK_PANTOGRAPH_DOWN));
@@ -992,12 +1152,11 @@ SimtrainsDeskState SimtrainsDeskStateOf(const Vehicle *v)
 	if (own != _desk_own.end()) {
 		s.horn = now - own->second.horn < std::chrono::milliseconds(1200);
 		s.repeater_off = own->second.repeater_off;
-		/* Pressed once, every 20 s its lamp lights and it presses itself a moment later. */
-		if (_settings_client.gui.cab_msts_keys && own->second.alerter) {
-			const int64_t ms = std::chrono::duration_cast<std::chrono::milliseconds>(now - own->second.alerter_since).count() % 20000;
-			s.alerter_lamp = ms >= 18800 && ms < 19600;
-			s.alerter_pressed = ms >= 19300 && ms < 19800;
-		}
+		/* The vigilance device: its lamp while it warns, its button pressed a moment after Z. */
+		s.alerter = AlerterStage(t, own->second, e);
+		s.alerter_lamp = s.alerter == 2;
+		const uint64_t pressed = own->second.pressed_at;
+		s.alerter_pressed = pressed != 0 && TimerGameTick::counter >= pressed && TimerGameTick::counter - pressed < ALERTER_PRESSED_TICKS;
 	}
 	s.aspect = RepeaterAspect(t);
 	const std::tm clock = fmt::localtime(std::time(nullptr));

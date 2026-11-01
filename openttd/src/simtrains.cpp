@@ -1001,6 +1001,24 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 		}
 	}
 	if (const TextNode *t = engine->Child("DynamicBrakesMaximumForce"); t != nullptr && ParseFigure(t->Value(), {{"kN", 1}, {"N", 0.001}}, 0.001) > 0) e.dynamic = true;
+	/* Its vigilance device as MSTS has it: the "MonitoringDevice..." figures of its "VigilanceMonitor"; none without
+	 * the block or with no time to watch. */
+	if (const TextNode *vm = engine->Child("VigilanceMonitor"); vm != nullptr) {
+		auto figure = [vm](std::string_view what) {
+			const TextNode *n = vm->Child(fmt::format("MonitoringDevice{}", what));
+			return n != nullptr ? static_cast<float>(ParseFigure(n->Value(), {})) : 0.0f;
+		};
+		SimtrainsEngine::Vigilance &v = e.vigilance;
+		v.time_limit = figure("MonitorTimeLimit");
+		v.alarm_limit = std::max(0.0f, figure("AlarmTimeLimit"));
+		v.penalty_limit = std::max(0.0f, figure("PenaltyTimeLimit"));
+		v.full_brake = figure("AppliesFullBrake") != 0;
+		v.emergency_brake = figure("AppliesEmergencyBrake") != 0;
+		v.cuts_power = figure("AppliesCutsPower") != 0;
+		v.reset_on_zero_speed = figure("ResetOnZeroSpeed") != 0;
+		v.reset_on_button = figure("ResetOnResetButton") != 0;
+		v.present = v.time_limit > 0;
+	}
 	if (const TextNode *cab = engine->Child("CabView"); cab != nullptr && !cab->Value().empty()) {
 		/* MSTS reads it from the folder CABVIEW of the engine's; a cab of several engines is in a folder above. */
 		e.cvf = FindByMstsPath(e.folder + "CABVIEW" PATHSEP, cab->Value());

@@ -49,6 +49,16 @@ struct SimtrainsEngine {
 	/** Its train brake's handle ("EngineControllers", "Brake_Train" and its notches), as the desk shows it: where it
 	 * stands driving (released), the range of service braking, and the emergency brake; -1 not given. */
 	float brake_running = -1, brake_service_from = -1, brake_service_to = -1, brake_emergency = -1;
+	/** Its vigilance device ("VigilanceMonitor", each model its own; the player, 1. 11.: "the timing of the vigilance
+	 * device is the model's, an American one's differs from a Czech engine's"): seconds without a reset till it warns,
+	 * the warning till it brakes, the braking till it can be let off; what it does; what lets it off. Without the
+	 * block in the .eng the engine has none. */
+	struct Vigilance {
+		bool present = false;
+		float time_limit = 0, alarm_limit = 0, penalty_limit = 0;
+		bool full_brake = false, emergency_brake = false, cuts_power = false;
+		bool reset_on_zero_speed = false, reset_on_button = false;
+	} vigilance;
 };
 
 /** The engine's number in the GRF made of it: past the original engines, so a new one and not a copy of one. Its

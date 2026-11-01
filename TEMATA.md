@@ -31,6 +31,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (78) – Simtrains: živák jako v MSTS, časy z `.eng` modelu
+
+- Hráč: *„sem řek že bude mačkat furt když jednou zmačkne živak 1 zeptaš se, řeknu ti to a živak nebrzdi vlak jak
+  to“*, *„jak je živak v msts tak bude u nas v ovladani msts“*, *„to je asi u modelu časovani živku protože v usa
+  bude jiny než u česky lokomotivy“*. Odpovědi na otázky: hlídá **až od prvního Z**; 20 s nuluje **Z i pohyb
+  ovladačů**.
+- Chyba z (77): odpověď 1 jsem pochopil jako „mačká se sám a nikdy nebrzdí“. Správně je to živák jako v MSTS.
+- **Časy a chování z `.eng`** každého modelu (blok `VigilanceMonitor`, `MonitoringDevice…`): u 451 je to 20 s do
+  varování, 10 s varování, rychlobrzda a vypnutý tah, uvolnit až po 90 s, a to Z nebo stáním. Model bez bloku
+  (nebo s časem 0) živák nemá.
+- **Jak běží** (jen u ovládání MSTS, u šipek žádný):
+  - hlídá od prvního Z;
+  - Z i každá klávesa pultu (kontrolér, brzdič, přímočinná, EDB, reverz, sběrač, houkačka, rychlobrzda, V) čas
+    vynuluje;
+  - ve stojícím vlaku se čas drží na nule (`ResetOnZeroSpeed`);
+  - po vypršení času svítí kontrolka živáku a pípá (zatím zvuk tlačítka, pravé zvuky až nakonec). V panelu je
+    červeně „Živák! Zmáčkni Z“;
+  - po vypršení varování: rychlobrzda (`AppliesEmergencyBrake`), plná brzda (`AppliesFullBrake`), tah na 0
+    (`AppliesCutsPower`). V panelu „Zabrzdil živák“. Tah (D) ani uvolnění rychlobrzdy nejde;
+  - po `PenaltyTimeLimit` ho pustí Z (`ResetOnResetButton`) nebo stání (`ResetOnZeroSpeed`), rychlobrzda se uvolní.
+- Čas běží v ticích hry: pauza živák zastaví, zrychlení zrychlí. Pustí-li hráč vlak (hra řídí), živák nebrzdí.
+- Rig: `test3d kabina zivak [posun <s>]` (stav živáku, posune jeho čas o tolik sekund), `kabina pult stav` vypíše
+  stav živáku (0 není, 1 hlídá, 2 varuje, 3 zabrzdil).
+
 ## 1. 11. (77) – Simtrains 3: ručičky, páky, kontrolky a opakovač na pultu MSTS; živák, sběrač, hodiny
 
 - Hráč (odpovědi na otázky): *„1 zmačkne jednou živak tak bude mačkat furt , tim že ho zmačkne ho aktivuje u

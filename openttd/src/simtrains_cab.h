@@ -52,6 +52,7 @@ struct SimtrainsDeskState {
 	int lights = 0;            ///< 0 off, 2 on
 	bool horn = false;         ///< sounding just now
 	bool alerter_lamp = false, alerter_pressed = false; ///< the vigilance device's (with the keys of MSTS only)
+	int alerter = 0;           ///< the vigilance device: 0 none, 1 watching, 2 warning, 3 braked
 	int aspect = -1;           ///< the repeater: -1 dark, 0 stop, 1 approach, 2 clear
 	bool repeater_off = false; ///< the repeater switched off (the key V)
 	int hour = 0, minute = 0, second = 0; ///< the phone's clock
@@ -111,6 +112,7 @@ struct SimtrainsCabDriver {
 
 	void Drive(const Vehicle *v, DirectionKeys now, int ms);
 	bool Key(const Vehicle *v, char32_t key, uint16_t keycode);
+	void Watch(const Vehicle *v);
 };
 
 /**
