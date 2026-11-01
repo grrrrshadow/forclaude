@@ -489,7 +489,7 @@ void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, 
 	 * cota PRO-HRU.md section 7: reading them cost the phone the most of 207 ms a frame). */
 	blitter->ClearAnimation(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y0 - dpi->top), x1 - x0, y1 - y0);
 	const Rect on_screen{w.left + px, w.top + py, w.left + px + pic.width - 1, w.top + py + pic.height - 1};
-	if (pic.shown != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&w, on_screen, pic.shown, tint)) {
+	if (pic.shown != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&w, on_screen, pic.shown, tint, false, 0, 0, 0, {0.0f, 0.0f, 1.0f, 1.0f}, WindowPlaceFromBack(&w))) {
 		for (int y = y0; y < y1; y++) {
 			uint32_t *dst = static_cast<uint32_t *>(blitter->MoveTo(dpi->dst_ptr, x0 - dpi->left, y - dpi->top));
 			std::fill(dst, dst + (x1 - x0), 0u);

@@ -20,6 +20,7 @@
 Window *FindWindowById(WindowClass cls, WindowNumber number);
 Window *FindWindowByClass(WindowClass cls);
 Window *GetMainWindow();
+int WindowPlaceFromBack(const Window *w);
 bool MaybeBringWindowToFront(Window *w);
 void ChangeWindowOwner(Owner old_owner, Owner new_owner);
 

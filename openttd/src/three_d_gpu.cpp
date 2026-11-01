@@ -618,21 +618,56 @@ int _ground_atlas_size = 0, _ground_shelf_x = 0, _ground_shelf_y = 0, _ground_sh
 GLuint _gfbo = 0, _g_colour_rb = 0;
 GLuint _g_move_fbo[2] = {0, 0}; ///< the kept picture of the ground moved on the card (GroundTextureOf()): from, to
 int _gfbo_w = 0, _gfbo_h = 0;
-/* The ground of the turned main view laid by the card into a picture of the view's size (ThreeDGpuGround::into_view),
- * shown straight from it under the screen; and one of its size it is moved through when the view moves. */
-GLuint _view_ground = 0, _view_ground_tmp = 0;
-GLuint _view_ground_fbo = 0, _view_ground_tmp_fbo = 0;
-int _view_ground_w = 0, _view_ground_h = 0;
-std::atomic<uint32_t> _view_ground_name = 0; ///< _view_ground for the other threads, 0 none (ThreeDGpuViewGround())
-std::atomic<uint64_t> _view_ground_made = 0; ///< counts the times it was made anew or let go: what it held is gone
 GLuint _ground_vao = 0, _ground_vbo = 0;
 bool _ground_program_ok = false;
-/* What stands on the turned main view laid by the card into two pictures of the view's size (ThreeDGpuStanding; the
- * player, 26. 10.: "the card to compose the turned map", step 2): their colours with their alpha multiplied in, and
- * which of them are lit at night. Made with the picture of the view's ground, moved with it, shown over it. */
-GLuint _view_standing = 0, _view_standing_lit = 0, _view_standing_fbo = 0;
-GLuint _view_standing_depth = 0; ///< the depth of the building being drawn among them (ThreeDGpuStandingBuilding)
-std::atomic<uint32_t> _view_standing_name = 0, _view_standing_lit_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
+/**
+ * The pictures of a view shown straight from the card (ThreeDGpuGround::view): the turned main view's (0), and the small
+ * views' facing north -- the extra viewports, the vehicle windows (the player, 1. 11.: "go do the GPU, what is still
+ * needed"; a small view drew the houses by the processor, 150-260 ms a frame on the phone) --, each as the main view's.
+ * Its ground laid by the card into a picture of the view's size (ThreeDGpuGround::into_view), shown straight from it
+ * under the screen, and one of its size it is moved through when the view moves. What stands on it laid into two
+ * pictures of the view's size (ThreeDGpuStanding; the player, 26. 10.: "the card to compose the turned map", step 2):
+ * their colours with their alpha multiplied in, and which of them are lit at night; made with the picture of the
+ * view's ground, moved with it, shown over it.
+ */
+struct ViewPictures {
+	GLuint ground = 0, ground_tmp = 0;
+	GLuint ground_fbo = 0, ground_tmp_fbo = 0;
+	int w = 0, h = 0;
+	std::atomic<uint32_t> ground_name = 0; ///< ground for the other threads, 0 none (ThreeDGpuViewGround())
+	std::atomic<uint64_t> made = 0;        ///< counts the times it was made anew or let go: what it held is gone
+	GLuint standing = 0, standing_lit = 0, standing_fbo = 0;
+	GLuint standing_depth = 0;             ///< the depth of the building being drawn among them (ThreeDGpuStandingBuilding)
+	std::atomic<uint32_t> standing_name = 0, standing_lit_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
+};
+static std::array<ViewPictures, THREE_D_GPU_VIEWS> _views;
+
+/** A view's pictures by its number (ThreeDGpuGround::view), the main view's for one there is not. */
+static ViewPictures &ViewPicturesOf(int view)
+{
+	return _views[view >= 0 && view < THREE_D_GPU_VIEWS ? view : 0];
+}
+
+/** A view's pictures let go of (ForgetCard(), ThreeDGpuForgetView()): what they held is gone. */
+static void ForgetViewPictures(ViewPictures &v)
+{
+	if (v.ground != 0) {
+		gl.glDeleteTextures(1, &v.ground);
+		gl.glDeleteTextures(1, &v.ground_tmp);
+	}
+	v.ground = v.ground_tmp = 0;
+	v.w = v.h = 0;
+	v.ground_name = 0;
+	v.made++;
+	if (v.standing != 0) {
+		gl.glDeleteTextures(1, &v.standing);
+		gl.glDeleteTextures(1, &v.standing_lit);
+	}
+	v.standing = v.standing_lit = 0;
+	v.standing_name = v.standing_lit_name = 0;
+	if (v.standing_depth != 0) gl.glDeleteRenderbuffers(1, &v.standing_depth);
+	v.standing_depth = 0;
+}
 /* The pictures laid: a sprite's kept by its key in the atlas, the block's others in the stream; started over when full. */
 GLuint _standing_atlas = 0, _standing_stream = 0;
 int _standing_atlas_size = 0;
@@ -2131,22 +2166,7 @@ void ForgetCard()
 	_ground_atlas = 0;
 	_ground_atlas_size = 0;
 	_ground_atlas_places.clear();
-	if (_view_ground != 0) {
-		gl.glDeleteTextures(1, &_view_ground);
-		gl.glDeleteTextures(1, &_view_ground_tmp);
-	}
-	_view_ground = _view_ground_tmp = 0;
-	_view_ground_w = _view_ground_h = 0;
-	_view_ground_name = 0;
-	_view_ground_made++;
-	if (_view_standing != 0) {
-		gl.glDeleteTextures(1, &_view_standing);
-		gl.glDeleteTextures(1, &_view_standing_lit);
-	}
-	_view_standing = _view_standing_lit = 0;
-	_view_standing_name = _view_standing_lit_name = 0;
-	if (_view_standing_depth != 0) gl.glDeleteRenderbuffers(1, &_view_standing_depth);
-	_view_standing_depth = 0;
+	for (ViewPictures &v : _views) ForgetViewPictures(v);
 	if (_standing_atlas != 0) {
 		gl.glDeleteTextures(1, &_standing_atlas);
 		gl.glDeleteTextures(1, &_standing_stream);
@@ -2172,12 +2192,15 @@ void EndCard()
 		if (_eye_fbo != 0) gl.glDeleteFramebuffers(1, &_eye_fbo);
 		if (_gfbo != 0) gl.glDeleteFramebuffers(1, &_gfbo);
 		if (_g_move_fbo[0] != 0) gl.glDeleteFramebuffers(2, _g_move_fbo);
-		if (_view_ground_fbo != 0) gl.glDeleteFramebuffers(1, &_view_ground_fbo);
-		if (_view_ground_tmp_fbo != 0) gl.glDeleteFramebuffers(1, &_view_ground_tmp_fbo);
+		for (ViewPictures &v : _views) {
+			for (GLuint *fbo : {&v.ground_fbo, &v.ground_tmp_fbo, &v.standing_fbo}) {
+				if (*fbo != 0) gl.glDeleteFramebuffers(1, fbo);
+				*fbo = 0;
+			}
+		}
 		if (_ground_vbo != 0) gl.glDeleteBuffers(1, &_ground_vbo);
 		if (_ground_vao != 0) gl.glDeleteVertexArrays(1, &_ground_vao);
 		if (_ground_program.program != 0) gl.glDeleteProgram(_ground_program.program);
-		if (_view_standing_fbo != 0) gl.glDeleteFramebuffers(1, &_view_standing_fbo);
 		if (_standing_vbo != 0) gl.glDeleteBuffers(1, &_standing_vbo);
 		if (_standing_vao != 0) gl.glDeleteVertexArrays(1, &_standing_vao);
 		if (_standing_tri_vbo != 0) gl.glDeleteBuffers(1, &_standing_tri_vbo);
@@ -3011,29 +3034,29 @@ bool GroundAtlasPlace(const ThreeDGpuGroundTexture &t, std::array<int, 4> &place
 }
 
 /** The picture of the view's ground (ThreeDGpuGround::into_view) of a size: made anew all black when another, what it held gone. */
-bool ViewGroundOfSize(int w, int h)
+bool ViewGroundOfSize(ViewPictures &v, int w, int h)
 {
 	if (w <= 0 || h <= 0 || w > _max_target || h > _max_target) return false;
-	if (_view_ground != 0 && _view_ground_w == w && _view_ground_h == h) return true;
-	Step(fmt::format("zem pohledu na karte {}x{}", w, h));
-	if (_view_ground_fbo == 0) gl.glGenFramebuffers(1, &_view_ground_fbo);
-	if (_view_ground_tmp_fbo == 0) gl.glGenFramebuffers(1, &_view_ground_tmp_fbo);
-	if (_view_ground != 0) {
-		gl.glDeleteTextures(1, &_view_ground);
-		gl.glDeleteTextures(1, &_view_ground_tmp);
+	if (v.ground != 0 && v.w == w && v.h == h) return true;
+	Step(fmt::format("zem pohledu {} na karte {}x{}", &v - _views.data(), w, h));
+	if (v.ground_fbo == 0) gl.glGenFramebuffers(1, &v.ground_fbo);
+	if (v.ground_tmp_fbo == 0) gl.glGenFramebuffers(1, &v.ground_tmp_fbo);
+	if (v.ground != 0) {
+		gl.glDeleteTextures(1, &v.ground);
+		gl.glDeleteTextures(1, &v.ground_tmp);
 	}
-	if (_view_standing != 0) {
-		gl.glDeleteTextures(1, &_view_standing);
-		gl.glDeleteTextures(1, &_view_standing_lit);
+	if (v.standing != 0) {
+		gl.glDeleteTextures(1, &v.standing);
+		gl.glDeleteTextures(1, &v.standing_lit);
 	}
-	_view_ground = NewGroundTexture(w, h);
-	_view_ground_tmp = NewGroundTexture(w, h);
-	_view_standing = NewGroundTexture(w, h);
-	_view_standing_lit = NewGroundTexture(w, h);
+	v.ground = NewGroundTexture(w, h);
+	v.ground_tmp = NewGroundTexture(w, h);
+	v.standing = NewGroundTexture(w, h);
+	v.standing_lit = NewGroundTexture(w, h);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
 	bool complete = true;
-	for (auto [fbo, tex] : {std::pair{_view_ground_fbo, _view_ground}, std::pair{_view_ground_tmp_fbo, _view_ground_tmp}}) {
+	for (auto [fbo, tex] : {std::pair{v.ground_fbo, v.ground}, std::pair{v.ground_tmp_fbo, v.ground_tmp}}) {
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo);
 		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, tex, 0);
 		gl.glDrawBuffers(1, colour_only);
@@ -3043,73 +3066,73 @@ bool ViewGroundOfSize(int w, int h)
 		gl.glClear(GL_COLOR_BUFFER_BIT);
 	}
 	/* What stands on it: nothing yet; the depth of a building drawn among it. */
-	if (_view_standing_fbo == 0) gl.glGenFramebuffers(1, &_view_standing_fbo);
-	if (_view_standing_depth == 0) gl.glGenRenderbuffers(1, &_view_standing_depth);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, _view_standing_depth);
+	if (v.standing_fbo == 0) gl.glGenFramebuffers(1, &v.standing_fbo);
+	if (v.standing_depth == 0) gl.glGenRenderbuffers(1, &v.standing_depth);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, v.standing_depth);
 	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, w, h);
 	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
-	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _view_standing, 0);
-	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _view_standing_lit, 0);
-	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _view_standing_depth);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, v.standing_fbo);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v.standing, 0);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, v.standing_lit, 0);
+	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, v.standing_depth);
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glDrawBuffers(2, colour_and_lit);
 	const bool standing_complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 	gl.glClearColor(0, 0, 0, 0);
 	gl.glClear(GL_COLOR_BUFFER_BIT);
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
-	_view_standing_name = standing_complete ? _view_standing : 0;
-	_view_standing_lit_name = standing_complete ? _view_standing_lit : 0;
-	_view_ground_made++;
+	v.standing_name = standing_complete ? v.standing : 0;
+	v.standing_lit_name = standing_complete ? v.standing_lit : 0;
+	v.made++;
 	if (!complete) {
-		gl.glDeleteTextures(1, &_view_ground);
-		gl.glDeleteTextures(1, &_view_ground_tmp);
-		_view_ground = _view_ground_tmp = 0;
-		_view_ground_w = _view_ground_h = 0;
-		_view_ground_name = 0;
+		gl.glDeleteTextures(1, &v.ground);
+		gl.glDeleteTextures(1, &v.ground_tmp);
+		v.ground = v.ground_tmp = 0;
+		v.w = v.h = 0;
+		v.ground_name = 0;
 		return false;
 	}
-	_view_ground_w = w;
-	_view_ground_h = h;
-	_view_ground_name = _view_ground;
+	v.w = w;
+	v.h = h;
+	v.ground_name = v.ground;
 	return true;
 }
 
 /** What the picture of the view's ground holds moved by so many pixels (the view moved; its rows down), black where nothing comes. */
-void MoveViewGround(int dx, int dy)
+void MoveViewGround(ViewPictures &v, int dx, int dy)
 {
-	const int w = _view_ground_w, h = _view_ground_h;
+	const int w = v.w, h = v.h;
 	Step(fmt::format("zem pohledu na karte posunuta o {},{}", dx, dy));
 	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
 	gl.glDisable(GL_SCISSOR_TEST);
-	gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _view_ground_fbo);
+	gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.ground_fbo);
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
-	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _view_ground_tmp_fbo);
+	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.ground_tmp_fbo);
 	gl.glDrawBuffers(1, colour_only);
 	gl.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _view_ground_fbo);
+	gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.ground_fbo);
 	gl.glDrawBuffers(1, colour_only);
 	gl.glClearColor(0, 0, 0, 1);
 	gl.glClear(GL_COLOR_BUFFER_BIT);
-	gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _view_ground_tmp_fbo);
+	gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.ground_tmp_fbo);
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 	const int x0 = std::max(0, dx), y0 = std::max(0, dy), x1 = std::min(w, w + dx), y1 = std::min(h, h + dy);
 	if (x0 < x1 && y0 < y1) gl.glBlitFramebuffer(x0 - dx, y0 - dy, x1 - dx, y1 - dy, x0, y0, x1, y1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 	/* And what stands on it, its colours and which are lit, each through the same picture; nothing where nothing comes. */
-	if (_view_standing_name != 0) {
+	if (v.standing_name != 0) {
 		for (int k = 0; k < 2; k++) {
 			const GLenum attachment = k == 0 ? GL_COLOR_ATTACHMENT0 : GL_COLOR_ATTACHMENT1;
 			const GLenum only[2] = {k == 0 ? GL_COLOR_ATTACHMENT0 : GL_NONE, k == 0 ? GL_NONE : GL_COLOR_ATTACHMENT1};
-			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _view_standing_fbo);
+			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.standing_fbo);
 			gl.glReadBuffer(attachment);
-			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _view_ground_tmp_fbo);
+			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.ground_tmp_fbo);
 			gl.glDrawBuffers(1, colour_only);
 			gl.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _view_standing_fbo);
+			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.standing_fbo);
 			gl.glDrawBuffers(2, only);
 			gl.glClearColor(0, 0, 0, 0);
 			gl.glClear(GL_COLOR_BUFFER_BIT);
-			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _view_ground_tmp_fbo);
+			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.ground_tmp_fbo);
 			gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 			if (x0 < x1 && y0 < y1) gl.glBlitFramebuffer(x0 - dx, y0 - dy, x1 - dx, y1 - dy, x0, y0, x1, y1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 		}
@@ -3124,9 +3147,21 @@ void MoveViewGround(int dx, int dy)
  */
 bool DrawGroundOnCard(ThreeDGpuGround &g)
 {
+	ViewPictures &v = ViewPicturesOf(g.view);
+	if (g.forget) {
+		/* The small view closed (ThreeDGpuForgetView()): its pictures and its kept ground let go of. */
+		Step(fmt::format("obrazky pohledu {} z karty pryc", g.view));
+		ForgetViewPictures(v);
+		auto it = g.forget_key != 0 ? _ground_textures.find(g.forget_key) : _ground_textures.end();
+		if (it != _ground_textures.end()) {
+			gl.glDeleteTextures(1, &it->second.name);
+			_ground_textures.erase(it);
+		}
+		return true;
+	}
 	if (g.into_view) {
-		if (!ViewGroundOfSize(g.view_w, g.view_h)) return false;
-		if (g.move_x != 0 || g.move_y != 0) MoveViewGround(g.move_x, g.move_y);
+		if (!ViewGroundOfSize(v, g.view_w, g.view_h)) return false;
+		if (g.move_x != 0 || g.move_y != 0) MoveViewGround(v, g.move_x, g.move_y);
 		if (g.width <= 0 || g.height <= 0) {
 			ViewPicturesLaid();
 			const GLenum error = gl.glGetError();
@@ -3172,7 +3207,7 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 	Step(fmt::format("zem plochy {}x{}{}: {} trojuhelniku", g.width, g.height, g.into_view ? " do pohledu" : "", corners.size() / 27));
 	if (!g.into_view && !GroundTargetOfSize(g.width, g.height)) return false;
 	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, g.into_view ? _view_ground_fbo : _gfbo);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, g.into_view ? v.ground_fbo : _gfbo);
 	gl.glDrawBuffers(1, colour_only);
 	gl.glDisable(GL_DITHER);
 	gl.glDisable(GL_BLEND);
@@ -3339,7 +3374,8 @@ bool StandingVehiclesTargetOfSize(int w, int h)
  */
 bool DrawStandingOnCard(ThreeDGpuStanding &s)
 {
-	if (!_standing_program_ok || !ViewGroundOfSize(s.view_w, s.view_h) || _view_standing_name == 0) return false;
+	ViewPictures &pics = ViewPicturesOf(s.view);
+	if (!_standing_program_ok || !ViewGroundOfSize(pics, s.view_w, s.view_h) || pics.standing_name == 0) return false;
 	if (s.width <= 0 || s.height <= 0) return false;
 	_card_clock++;
 	if (_standing_atlas == 0) {
@@ -3354,7 +3390,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	_standing_stream_shelf = {};
 	Step(fmt::format("co stoji na plose {}x{}: {} obrazku, {} budov", s.width, s.height, s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
 	gl.glDrawBuffers(2, colour_and_lit);
 	gl.glDisable(GL_DITHER);
 	gl.glDisable(GL_DEPTH_TEST);
@@ -3603,7 +3639,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDisable(GL_SCISSOR_TEST);
 		for (const Placed &p : placed) DrawPictureAt(s.items[p.item].vehicle->pic, p.draws, vehicle_at[p.item][0], vehicle_at[p.item][1]);
 		/* Back to what stands on the view, as it was. */
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
 		gl.glDrawBuffers(2, colour_and_lit);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
@@ -3655,7 +3691,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		/* Back to what stands on the view, as it was. */
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, _view_standing_fbo);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
 		gl.glDrawBuffers(2, colour_and_lit);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
@@ -4937,7 +4973,8 @@ bool ThreeDGpuDrawGround(ThreeDGpuGround &ground)
 	GpuJob job{};
 	job.ground = &ground;
 	std::unique_lock lock(_gpu_mutex);
-	if (_gpu_state != GpuState::Ready) return false;
+	/* Its thread ended (ThreeDGpuStop()): nobody would take the job (the windows closed at the end, ThreeDGpuForgetView()). */
+	if (_gpu_state != GpuState::Ready || _gpu_stop) return false;
 	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
@@ -4968,7 +5005,7 @@ bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing)
 	GpuJob job{};
 	job.standing = &standing;
 	std::unique_lock lock(_gpu_mutex);
-	if (_gpu_state != GpuState::Ready) return false;
+	if (_gpu_state != GpuState::Ready || _gpu_stop) return false;
 	QueueGpuJob(job);
 	_gpu_wake.notify_one();
 	_gpu_done.wait(lock, [&job] { return job.done; });
@@ -5156,17 +5193,35 @@ bool ThreeDGpuShows()
  * @param made how many times it was made anew or let go: another than before, it holds nothing laid before
  * @return 0: none
  */
-uint32_t ThreeDGpuViewGround(uint64_t *made)
+uint32_t ThreeDGpuViewGround(int view, uint64_t *made)
 {
-	if (made != nullptr) *made = _view_ground_made;
-	return _view_ground_name;
+	const ViewPictures &v = ViewPicturesOf(view);
+	if (made != nullptr) *made = v.made;
+	return v.ground_name;
 }
 
-/** The picture of what stands on the turned main view on the card (ThreeDGpuStanding), the card's texture, 0 none; and which of its pixels are lit. */
-uint32_t ThreeDGpuViewStanding(uint32_t *lit)
+/** The picture of what stands on a view on the card (ThreeDGpuStanding), the card's texture, 0 none; and which of its pixels are lit. */
+uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit)
 {
-	if (lit != nullptr) *lit = _view_standing_lit_name;
-	return _view_standing_name;
+	const ViewPictures &v = ViewPicturesOf(view);
+	if (lit != nullptr) *lit = v.standing_lit_name;
+	return v.standing_name;
+}
+
+/**
+ * A small view's pictures let go of on the card (it closed, or another view takes its number), with its kept
+ * ground's texture; it waits. The video driver shows them no more before (VideoDriver::HideThreeDPicture()).
+ * @param view its number (ThreeDGpuGround::view)
+ * @param ground_key its kept ground's texture (ThreeDGpuGroundTexture::key), 0 none
+ */
+void ThreeDGpuForgetView(int view, uint64_t ground_key)
+{
+	if (view <= 0 || view >= THREE_D_GPU_VIEWS) return;
+	ThreeDGpuGround forget{};
+	forget.view = view;
+	forget.forget = true;
+	forget.forget_key = ground_key;
+	ThreeDGpuDrawGround(forget);
 }
 
 /** The card's thread ended, at the end of the game (after the threads asking it, ShutdownGame()). */
@@ -5238,8 +5293,9 @@ void ThreeDGpuVideoContext(void *, void *, bool) {}
 void ThreeDGpuVideoContextGone() {}
 void *ThreeDGpuOwnContext() { return nullptr; }
 bool ThreeDGpuShows() { return false; }
-uint32_t ThreeDGpuViewGround(uint64_t *made) { if (made != nullptr) *made = 0; return 0; }
-uint32_t ThreeDGpuViewStanding(uint32_t *lit) { if (lit != nullptr) *lit = 0; return 0; }
+uint32_t ThreeDGpuViewGround(int, uint64_t *made) { if (made != nullptr) *made = 0; return 0; }
+uint32_t ThreeDGpuViewStanding(int, uint32_t *lit) { if (lit != nullptr) *lit = 0; return 0; }
+void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}
 std::atomic<bool> _three_d_gpu_driver_waits = false;

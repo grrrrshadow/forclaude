@@ -5879,8 +5879,16 @@ static bool ConTestDemolishDepot(std::span<std::string_view> argv)
  */
 static bool ConTestOpenWindow(std::span<std::string_view> argv)
 {
+	if (argv.size() == 4 && argv[1] == "pohled") {
+		/* 'testokno pohled <x> <y>': an extra viewport on the tile (a small view facing north, as the vehicle's window has). */
+		auto x = ParseInteger(argv[2]), y = ParseInteger(argv[3]);
+		if (!x.has_value() || !y.has_value()) return false;
+		ShowExtraViewportWindow(TileXY(*x, *y));
+		IConsolePrint(CC_DEFAULT, "testokno: dalsi pohled na {},{} otevren", *x, *y);
+		return true;
+	}
 	if (argv.size() != 2 && !(argv.size() == 3 && (argv[1] == "smer" || argv[1] == "letadlo" || argv[1] == "rozkazy" || argv[1] == "vozidlo"))) {
-		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|auto|<unit number>]', 'testokno vozidlo <unit number>', 'testokno jetdo' or 'testokno smer <waypoint index>'.");
+		IConsolePrint(CC_HELP, "Open a train's window, an industry's, or a waypoint's. Usage: 'testokno <unit number>', 'testokno prumysl', 'testokno rozkazy [letadlo|lod|auto|<unit number>]', 'testokno vozidlo <unit number>', 'testokno pohled <x> <y>', 'testokno jetdo' or 'testokno smer <waypoint index>'.");
 		return true;
 	}
 	if (argv.size() == 3 && argv[1] == "smer") {
@@ -10124,6 +10132,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _turned_card_dirty_on;
 		_turned_card_dirty_on = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: stojici naraz {}", _turned_card_dirty_on ? "ano" : "ne");
+	} else if (what == "male") {
+		/* 'male [0|1]': the small views facing north (the extra viewports, the vehicle windows) drawn by the card as the
+		 * main view, each its own pictures on it (1; SmallViewOnCard), or as the game drew them (0); all drawn again. */
+		extern bool _small_views_on_card_on;
+		if (argv.size() > 2) {
+			_small_views_on_card_on = number(2).value_or(1) != 0;
+			MarkWholeScreenDirty();
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: male pohledy {}", _small_views_on_card_on ? "kartou" : "postaru");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.

@@ -31,6 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (76) – GPU #127: malá okna (okno vozidla, další pohled) kreslí karta jako hlavní pohled
+
+- Hráč: *„pak běž dělat gpu ještě co je potřeba“*. Z logu #319: okno vozidla natočené na sever stálo 150–260 ms
+  na snímek (`modely`), protože domy v malém okně kreslil procesor trojúhelník po trojúhelníku při každém
+  překreslení.
+- **Karta:** obrázky pohledu (zem, co stojí, svítící pixely) už nejsou na kartě jen jedny. Má je hlavní pohled
+  (číslo 0) a až 7 malých oken (1–7), každé své (`ViewPictures`, `ThreeDGpuGround::view`). Zavřené okno svoje
+  obrázky i drženou zem z karty uvolní (`ThreeDGpuForgetView()`, z `~ViewportData()`).
+- **Mapa:** malé okno kreslí stejná cesta jako hlavní pohled (`ViewportDoDrawTurned()`), jen se svým záznamem
+  (`SmallViewOnCard`): svůj obrázek na kartě, svoje držená zem (max 4 Mpx), svoje počítadlo změn země. Platí,
+  když je hlavní pohled na sever (úhel 0), karta umí ukazovat a je 40bpp blitter. Jinak se kreslí postaru.
+  Okraj za pohledem (pás 192 px) a „změny najednou“ má dál jen hlavní pohled.
+- **Ovladač obrazu:** obrázky karty se ukazují podle pořadí oken (`z`): malé okno nad jiným malým oknem ukáže
+  svoje, ne to pod ním. Pohled z očí v okně dostal svoje pořadí taky.
+- Konec hry: karta po `ThreeDGpuStop()` už úlohu nebere (okna se zavírají až potom; dřív by čekání viselo).
+- Rig: `test3d male 0|1` (malá okna kartou / postaru, vše se překreslí), `testokno pohled <x> <y>` otevře další
+  pohled na dlaždici.
+
 ## 1. 11. (75) – Rána ve voze nejdřív porouchá vůz; kabina aut bez oka zevnitř; logy #319
 
 - Hráč: *„když něco zautoči na mně v trabantu tak tam bude nejdřiv porouchanej trabant a pak při další ráně to

@@ -1319,6 +1319,22 @@ static inline bool IsVitalWindow(const Window *w)
 }
 
 /**
+ * A window's place among the windows from the back (the pictures of the graphics card shown in their holes,
+ * VideoDriver::ShowThreeDPicture(): the front one's over the others).
+ * @param w the window
+ * @return 0 the back one, more further front; -1 not open
+ */
+int WindowPlaceFromBack(const Window *w)
+{
+	int place = 0;
+	for (const Window *v : Window::IterateFromBack()) {
+		if (v == w) return place;
+		place++;
+	}
+	return -1;
+}
+
+/**
  * Get the z-priority for a given window. This is used in comparison with other z-priority values;
  * a window with a given z-priority will appear above other windows with a lower value, and below
  * those with a higher one (the ordering within z-priorities is arbitrary).

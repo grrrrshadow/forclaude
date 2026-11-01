@@ -2059,15 +2059,13 @@ static std::vector<std::array<double, 4>> _night_glows;
  */
 static bool _night_card_lit = false;
 
-/** A glow of the night over the picture of the turned main view on the card (_night_card_lit): where, unscaled virtual pixels of the view. */
+/** A glow of the night over the picture of a view on the card (_night_card_lit, TurnedCardGround::glows): where, unscaled virtual pixels of the view. */
 struct TurnedCardGlow {
 	float x, y;
 	float rx, ry;
 	Colour colour;
 	float strength;
 };
-static std::vector<TurnedCardGlow> _turned_card_glows; ///< of all the blocks the card laid at night, each where its block put it
-static ZoomLevel _turned_card_glows_zoom = ZoomLevel::Normal; ///< the zoom they are of
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
 static void ParallelBands(int rows, const std::function<void(int, int)> &work, bool worth);
@@ -2365,10 +2363,15 @@ static constexpr uint64_t EYE_GROUND_CARD_KEY = 2; ///< its name among the card'
 static uint64_t _turned_ground_generations = 0;
 /** Counts the changes of the ground of the turned view: of the kept picture, of the tiles with a foundation (TurnedGroundOfView). */
 static uint64_t _turned_ground_version = 0;
+static TurnedGround *_tg = &_turned_ground; ///< the kept ground of the view being drawn: the main view's, or a small view's (SmallViewOnCard)
+static uint64_t *_tg_version = &_turned_ground_version; ///< and the count of its changes
+static uint64_t *TurnedGroundVersionOf(const TurnedGround *g);
+static void TurnedGroundChangedForAllViews();
+static void ForgetSmallViewGrounds();
 
 void TurnedGround::ChangedForCard(const GroundRect &r)
 {
-	if (this == &_turned_ground && !r.Within(this->at).Empty()) _turned_ground_version++;
+	if (uint64_t *version = TurnedGroundVersionOf(this); version != nullptr && !r.Within(this->at).Empty()) (*version)++;
 	if (this->card_whole || r.Within(this->at).Empty()) return;
 	if (this->card_changed.size() >= 1024) {
 		this->generation = ++_turned_ground_generations;
@@ -2409,6 +2412,7 @@ void ResetTurnedGround()
 	ForgetTurnedSpritePictures();
 	_turned_ground = TurnedGround();
 	_turned_ground_version++;
+	ForgetSmallViewGrounds();
 	/* The view from the eyes' too, once its frame on the way is drawn from it no more. */
 	if (_eye_ground.valid) {
 		WaitEyeFrame();
@@ -2504,7 +2508,7 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 	n.at = at;
 	n.generation = ++_turned_ground_generations;
 	const bool map = &g == &_turned_ground;
-	if (map) _turned_ground_version++;
+	if (uint64_t *version = TurnedGroundVersionOf(&g); version != nullptr) (*version)++;
 	n.px.assign(at.Pixels(), 0);
 	n.cw = (at.r - at.l + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
 	n.ch = (at.b - at.t + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
@@ -2843,7 +2847,7 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 	auto [had, first_time] = foundation_of_tile.try_emplace(static_cast<uint32_t>(x0 / TILE_SIZE) | static_cast<uint32_t>(y0 / TILE_SIZE) << 16, key.key);
 	if (first_time || had->second != key.key) {
 		had->second = key.key;
-		_turned_ground_version++;
+		TurnedGroundChangedForAllViews();
 	}
 	auto [kept, made] = _turned_foundations.try_emplace(key.key);
 	TurnedFoundationTexture &ft = kept->second;
@@ -5143,7 +5147,7 @@ void ForgetTurnedFoundations()
 {
 	_turned_foundations.clear();
 	_turned_foundation_pixels = 0;
-	_turned_ground_version++;
+	TurnedGroundChangedForAllViews();
 }
 
 static const Viewport *_turned_vp = nullptr; ///< the viewport whose block is being drawn turned (ViewportDoDraw())
@@ -5174,8 +5178,57 @@ struct TurnedCardGround {
 	int l = 0, t = 0, w = 0, h = 0; ///< its pixels (unscaled virtual coordinates): the view's and the band about it
 	std::vector<uint8_t> have;     ///< each pixel: its ground laid
 	std::vector<uint8_t> stood;    ///< each pixel: what stands on it laid by day, nothing there changed since
+	int view = 0;                  ///< its pictures on the card (ThreeDGpuGround::view): 0 the main view's, another a small view's
+	uint64_t ground_key = 1;       ///< its kept ground's texture on the card (ThreeDGpuGroundTexture::key)
+	std::vector<TurnedCardGlow> glows; ///< at night: of all the blocks the card laid, each where its block put it
+	ZoomLevel glows_zoom = ZoomLevel::Normal; ///< the zoom they are of
+	bool glows_told = false;       ///< the video driver has some of them (VideoDriver::SetThreeDGlows())
 };
 static TurnedCardGround _turned_card_ground;
+/** The picture on the card of the view being drawn (ViewportDoDraw()): the main view's, or a small view's (SmallViewOnCard). */
+static TurnedCardGround *_tcg = &_turned_card_ground;
+
+/**
+ * A small view drawn by the card as the main view is (the player, 1. 11.: "go do the GPU, what is still needed"; the
+ * small views were to be drawn by the card as the main one): an extra viewport, a vehicle window, facing north while
+ * the main view is. It drew the houses that are 3D objects by the processor at every redraw -- a vehicle window
+ * following a car in a town 150-260 ms a frame on the phone. It has a picture of its own on the card (THREE_D_GPU_VIEWS),
+ * its own kept ground there, shown straight from the card in the holes of its window.
+ */
+struct SmallViewOnCard {
+	TurnedCardGround card;  ///< its picture on the card
+	TurnedGround ground;    ///< its kept ground (_turned_ground the main view's)
+	uint64_t version = 0;   ///< the changes of its ground (_turned_ground_version the main view's)
+};
+static std::map<const Viewport *, std::unique_ptr<SmallViewOnCard>> _small_views_on_card;
+bool _small_views_on_card_on = true; ///< Rig: the small views facing north drawn by the card (test3d male); else as the game drew them
+static constexpr size_t SMALL_VIEW_GROUND_PIXELS = static_cast<size_t>(4) << 20; ///< a small view's kept ground at most so many pixels (16 MB)
+static constexpr uint64_t SMALL_VIEW_GROUND_KEY = 0x100; ///< its texture on the card by this key and the number of its pictures
+
+static uint64_t *TurnedGroundVersionOf(const TurnedGround *g)
+{
+	if (g == &_turned_ground) return &_turned_ground_version;
+	for (auto &[vp, small] : _small_views_on_card) {
+		if (&small->ground == g) return &small->version;
+	}
+	return nullptr;
+}
+
+/** The ground of every view changed (the tiles with a foundation, TurnedGroundOfView): laid again. */
+static void TurnedGroundChangedForAllViews()
+{
+	_turned_ground_version++;
+	for (auto &[vp, small] : _small_views_on_card) small->version++;
+}
+
+/** The small views' kept grounds forgotten with the main view's (ResetTurnedGround()). */
+static void ForgetSmallViewGrounds()
+{
+	for (auto &[vp, small] : _small_views_on_card) {
+		small->ground = TurnedGround();
+		small->version++;
+	}
+}
 /** The whole turned main view being drawn for the card (TurnedViewWholeOnCard()): into a picture of its own, not the screen. */
 static bool _turned_whole_view_pass = false;
 bool _turned_card_band_on = true; ///< Rig: the picture of the turned main view on the card reaches past it (test3d stojici okraj); else just the view
@@ -5205,10 +5258,10 @@ bool _standing_vehicles_on_card = true;
 /** The picture of the view's ground shown no more: the blocks of holes are drawn again with their ground. */
 static void HideTurnedCardGround()
 {
-	TurnedCardGround &g = _turned_card_ground;
+	TurnedCardGround &g = *_tcg;
 	if (g.shown) {
-		Debug(misc, 1, "3D: the turned map's ground read back from the graphics card again");
-		VideoDriver::GetInstance()->HideThreeDPicture(&_turned_card_ground);
+		Debug(misc, 1, "3D: the turned map's ground read back from the graphics card again (view {})", g.view);
+		VideoDriver::GetInstance()->HideThreeDPicture(&g);
 		g.shown = false;
 		MarkWholeScreenDirty();
 	}
@@ -5222,8 +5275,10 @@ static bool TurnedCardGroundUsable(const DrawPixelInfo &frame)
 	if (!_turned_card_ground_on || _turned_vp == nullptr || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return false;
 	/* Not into a screenshot; but the whole view drawn for the card (TurnedViewWholeOnCard()), drawn nowhere else. */
 	if ((_screen_disable_anim && !_turned_whole_view_pass) || frame.dst_ptr == nullptr) return false;
-	const Window *main = GetMainWindow();
-	if (main == nullptr || main->viewport == nullptr || static_cast<const Viewport *>(main->viewport.get()) != _turned_vp) return false;
+	if (_tcg == &_turned_card_ground) {
+		const Window *main = GetMainWindow();
+		if (main == nullptr || main->viewport == nullptr || static_cast<const Viewport *>(main->viewport.get()) != _turned_vp) return false;
+	}
 	/* The blitter that draws over a hole as over what shows through it (Blitter_40bppAnim::ComposeOver()). */
 	if (BlitterFactory::GetCurrentBlitter()->GetName() != "40bpp-anim") return false;
 	return ThreeDGpuShows() && ThreeDGpuReady();
@@ -5243,7 +5298,7 @@ static void ShiftTurnedCardMap(std::vector<uint8_t> &m, int w, int h, int dx, in
 /** Whether a map of the pixels of the picture of the view on the card (TurnedCardGround) has all of a rect of them. */
 static bool TurnedCardMapHas(const std::vector<uint8_t> &m, int x, int y, int w, int h)
 {
-	const TurnedCardGround &g = _turned_card_ground;
+	const TurnedCardGround &g = *_tcg;
 	if (x < 0 || y < 0 || x + w > g.w || y + h > g.h || m.size() != static_cast<size_t>(g.w) * g.h) return false;
 	for (int r = 0; r < h; r++) {
 		const uint8_t *row = &m[static_cast<size_t>(y + r) * g.w + x];
@@ -5255,7 +5310,7 @@ static bool TurnedCardMapHas(const std::vector<uint8_t> &m, int x, int y, int w,
 /** How many of a rect of the pixels of the picture of the view on the card (TurnedCardGround) a map of them has. */
 static size_t TurnedCardMapCount(const std::vector<uint8_t> &m, int x, int y, int w, int h)
 {
-	const TurnedCardGround &g = _turned_card_ground;
+	const TurnedCardGround &g = *_tcg;
 	if (m.size() != static_cast<size_t>(g.w) * g.h) return 0;
 	const int x0 = std::max(0, x), x1 = std::min(g.w, x + w);
 	size_t n = 0;
@@ -5269,7 +5324,7 @@ static size_t TurnedCardMapCount(const std::vector<uint8_t> &m, int x, int y, in
 /** Tell a rect of the pixels of a map of the picture of the view on the card (TurnedCardGround) as having it or not. */
 static void TurnedCardMapSet(std::vector<uint8_t> &m, int x, int y, int w, int h, bool has)
 {
-	const TurnedCardGround &g = _turned_card_ground;
+	const TurnedCardGround &g = *_tcg;
 	if (m.size() != static_cast<size_t>(g.w) * g.h) return;
 	const int x0 = std::max(0, x), x1 = std::min(g.w, x + w);
 	for (int r = std::max(0, y); r < std::min(g.h, y + h) && x0 < x1; r++) std::fill_n(&m[static_cast<size_t>(r) * g.w + x0], x1 - x0, has ? 1 : 0);
@@ -5283,14 +5338,14 @@ static void TurnedCardMapSet(std::vector<uint8_t> &m, int x, int y, int w, int h
  */
 static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 {
-	TurnedCardGround &g = _turned_card_ground;
+	TurnedCardGround &g = *_tcg;
 	const int vs = ScaleByZoom(1, zoom), mask = ScaleByZoom(-1, zoom);
-	const int band = TurnedCardBand(vp);
+	const int band = &g == &_turned_card_ground ? TurnedCardBand(vp) : 0;
 	const int vl = (vp.virtual_left & mask) / vs - band, vt = (vp.virtual_top & mask) / vs - band;
 	double c, s, px, py;
 	GetViewTurn(c, s, px, py);
 	uint64_t made = 0;
-	ThreeDGpuViewGround(&made);
+	ThreeDGpuViewGround(g.view, &made);
 	const bool same_camera = g.vp == &vp && g.yaw == GetViewYaw() && g.pivot_x == px && g.pivot_y == py && g.zoom == zoom &&
 			g.band == band && g.w == vp.width + 2 * band && g.h == vp.height + 2 * band && g.made == made;
 	if (!same_camera) {
@@ -5299,7 +5354,7 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 		g.pivot_x = px;
 		g.pivot_y = py;
 		g.zoom = zoom;
-		g.version = _turned_ground_version;
+		g.version = *_tg_version;
 		g.made = made;
 		g.band = band;
 		g.l = vl;
@@ -5321,21 +5376,22 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 		g.t = vt;
 		ThreeDGpuGround move{};
 		move.into_view = true;
+		move.view = g.view;
 		move.view_w = g.w;
 		move.view_h = g.h;
 		move.move_x = dx;
 		move.move_y = dy;
 		uint64_t now = 0;
-		if (!ThreeDGpuDrawGround(move) || (ThreeDGpuViewGround(&now), now != g.made)) {
+		if (!ThreeDGpuDrawGround(move) || (ThreeDGpuViewGround(g.view, &now), now != g.made)) {
 			std::fill(g.have.begin(), g.have.end(), 0);
 			std::fill(g.stood.begin(), g.stood.end(), 0);
 			g.made = now;
 		}
 	}
-	if (g.version != _turned_ground_version) {
+	if (g.version != *_tg_version) {
 		/* Its ground changed (the tiles it uncovered drawn into the kept picture): laid again block by block. */
 		std::fill(g.have.begin(), g.have.end(), 0);
-		g.version = _turned_ground_version;
+		g.version = *_tg_version;
 	}
 	return true;
 }
@@ -5350,7 +5406,7 @@ static bool TurnedCardGroundFollow(const Viewport &vp, ZoomLevel zoom)
 static bool TurnedCardGroundHas(const DrawPixelInfo &frame, int &bx, int &by)
 {
 	TurnedCardGroundFollow(*_turned_vp, frame.zoom);
-	const TurnedCardGround &g = _turned_card_ground;
+	const TurnedCardGround &g = *_tcg;
 	const int vs = ScaleByZoom(1, frame.zoom);
 	bx = frame.left / vs - g.l;
 	by = frame.top / vs - g.t;
@@ -5360,9 +5416,9 @@ static bool TurnedCardGroundHas(const DrawPixelInfo &frame, int &bx, int &by)
 /** The ground of a block laid into the picture of the view's ground (TurnedCardGround), at bx, by of it. */
 static void TurnedCardGroundLaid(int bx, int by, int fw, int fh)
 {
-	TurnedCardGround &g = _turned_card_ground;
+	TurnedCardGround &g = *_tcg;
 	uint64_t made = 0;
-	ThreeDGpuViewGround(&made);
+	ThreeDGpuViewGround(g.view, &made);
 	if (made != g.made) {
 		/* Made anew for this block: what it held before is gone. */
 		std::fill(g.have.begin(), g.have.end(), 0);
@@ -5377,7 +5433,7 @@ static void TurnedCardGroundLaid(int bx, int by, int fw, int fh)
  */
 static void TurnedCardStandingLaid(int bx, int by, int fw, int fh, bool laid)
 {
-	TurnedCardMapSet(_turned_card_ground.stood, bx, by, fw, fh, laid && !_night_windows_now);
+	TurnedCardMapSet(_tcg->stood, bx, by, fw, fh, laid && !_night_windows_now);
 }
 
 /**
@@ -5407,21 +5463,30 @@ static uint32_t NightLightOfCard();
 /** The picture of the view's ground shown by the video driver (TurnedCardGround), in the night's light when it is night. */
 static void ShowTurnedCardGround()
 {
-	TurnedCardGround &g = _turned_card_ground;
-	const uint32_t name = ThreeDGpuViewGround();
+	TurnedCardGround &g = *_tcg;
+	const uint32_t name = ThreeDGpuViewGround(g.view);
 	if (g.vp == nullptr) return;
 	const Viewport &vp = *g.vp;
 	const bool was = g.shown;
 	/* What stands on it, laid by the card over it (ThreeDGpuStanding). */
 	uint32_t over_lit = 0;
-	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(&over_lit) : 0;
+	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(g.view, &over_lit) : 0;
 	/* The view in its middle: it reaches past it every way (band). */
 	const std::array<float, 4> part = g.w > 0 && g.h > 0 ? std::array<float, 4>{static_cast<float>(g.band) / g.w, static_cast<float>(g.band) / g.h, static_cast<float>(vp.width) / g.w, static_cast<float>(vp.height) / g.h} : std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f};
-	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&_turned_card_ground, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, true, NightLightOfCard(), over, over != 0 ? over_lit : 0, part);
+	/* The main view under all the other pictures; a small view's in its window's place among the windows. */
+	const bool main = &g == &_turned_card_ground;
+	int z = 0;
+	if (!main) {
+		for (const Window *w : Window::IterateFromBack()) {
+			if (w->viewport != nullptr && static_cast<const Viewport *>(w->viewport.get()) == &vp) break;
+			z++;
+		}
+	}
+	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&g, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, main, NightLightOfCard(), over, over != 0 ? over_lit : 0, part, z);
 	/* Shown first now: the blocks drawn before it are drawn again as holes. */
 	if (g.shown && !was) {
-		Debug(misc, 1, "3D: the turned map's ground shown straight from the graphics card ({}x{})", vp.width, vp.height);
-		MarkWholeScreenDirty();
+		Debug(misc, 1, "3D: the turned map's ground shown straight from the graphics card ({}x{}, view {})", vp.width, vp.height, g.view);
+		if (main) MarkWholeScreenDirty();
 	}
 }
 
@@ -5437,7 +5502,7 @@ static void PunchTurnedCardGround(const DrawPixelInfo &frame)
 /** The ground of a block laid by the processor while the picture of the view's ground is shown: whole, nothing of the picture through it. */
 static void MakeTurnedBlockWhole(const DrawPixelInfo &frame)
 {
-	if (!_turned_card_ground.shown) return;
+	if (!_tcg->shown) return;
 	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
 	uint32_t *dst = static_cast<uint32_t *>(frame.dst_ptr);
 	for (int y = 0; y < fh; y++) {
@@ -5496,8 +5561,9 @@ static void LayTurnedGround(TurnedGroundLaying &lay)
 			g.into_view = true;
 			g.view_x = lay.view_x;
 			g.view_y = lay.view_y;
-			g.view_w = _turned_card_ground.w;
-			g.view_h = _turned_card_ground.h;
+			g.view = _tcg->view;
+			g.view_w = _tcg->w;
+			g.view_h = _tcg->h;
 			g.out = nullptr;
 		} else if (_turned_ground_check) {
 			lay.card_pixels.assign(static_cast<size_t>(fw) * fh, g.clear);
@@ -5509,7 +5575,7 @@ static void LayTurnedGround(TurnedGroundLaying &lay)
 			g.out_pitch = lay.frame.pitch;
 		}
 		ThreeDGpuGroundTexture &whole = g.textures.emplace_back();
-		whole.key = 1;
+		whole.key = _tcg->ground_key;
 		whole.generation = kept->generation;
 		whole.from_generation = kept->card_whole ? 0 : kept->card_generation;
 		whole.from_x = kept->card_x;
@@ -5634,7 +5700,7 @@ static bool TurnedGroundOfViewFits(const TurnedGroundOfView &g, ZoomLevel zoom)
 static bool TakeTurnedGroundOfView(const DrawPixelInfo &frame)
 {
 	TurnedGroundOfView &g = _turned_view_ground;
-	if (!_turned_view_ground_on || _turned_ground_check || !TurnedGroundOfViewFits(g, frame.zoom)) return false;
+	if (!_turned_view_ground_on || _turned_ground_check || _tcg != &_turned_card_ground || !TurnedGroundOfViewFits(g, frame.zoom)) return false;
 	const int vs = ScaleByZoom(1, frame.zoom);
 	const int bl = frame.left / vs - g.l, bt = frame.top / vs - g.t;
 	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
@@ -5654,7 +5720,7 @@ static bool TakeTurnedGroundOfView(const DrawPixelInfo &frame)
  */
 static void KeepTurnedGroundOfView(const DrawPixelInfo &frame)
 {
-	if (!_turned_view_ground_on || _turned_ground_check || _turned_vp == nullptr) return;
+	if (!_turned_view_ground_on || _turned_ground_check || _turned_vp == nullptr || _tcg != &_turned_card_ground) return;
 	/* A piece drawn for the card only, its rows not as the blitters stepped them (TurnedPassOnCard()): nothing to keep. */
 	if (frame.pitch != _screen.pitch) return;
 	TurnedGroundOfView &g = _turned_view_ground;
@@ -6737,14 +6803,15 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	/* The ground's picture kept from frame to frame (TurnedGround), where it can be: only what changed is drawn again. */
 	const uint32_t *ground = nullptr;
 	const int vs = ScaleByZoom(1, zoom);
+	const bool small_view = _tg != &_turned_ground;
 	if (bw > 0 && bh > 0 && _turned_ground_kept &&
-			PlaceTurnedGround(_turned_ground, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh})) {
+			PlaceTurnedGround(*_tg, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, small_view ? SMALL_VIEW_GROUND_PIXELS : TURNED_GROUND_PIXELS, small_view ? 4096 : INT32_MAX)) {
 		if (!_turned_big.empty()) {
 			_turned_big.clear();
 			_turned_big.shrink_to_fit();
 		}
-		UpdateTurnedGround(_turned_ground, ground_tiles);
-		const TurnedGround &g = _turned_ground;
+		UpdateTurnedGround(*_tg, ground_tiles);
+		const TurnedGround &g = *_tg;
 		bigdpi.left = g.at.l * vs;
 		bigdpi.top = g.at.t * vs;
 		bw = g.at.r - g.at.l;
@@ -6801,11 +6868,11 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			AddTurnedTileFromBlock(ground_laying.pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
 		}
 	}
-	ground_laying.kept = ground != nullptr && ground == _turned_ground.px.data() ? &_turned_ground : nullptr;
+	ground_laying.kept = ground != nullptr && ground == _tg->px.data() ? _tg : nullptr;
 	/* The main view's ground laid by the card into its picture of the view, shown straight from it: the block a hole
 	 * for it, laid only where the picture has it not yet (TurnedCardGround). */
 	const bool card_usable = TurnedCardGroundUsable(frame);
-	if (!card_usable && _turned_card_ground.vp != nullptr && _turned_card_ground.vp == _turned_vp) HideTurnedCardGround();
+	if (!card_usable && _tcg->vp != nullptr && _tcg->vp == _turned_vp) HideTurnedCardGround();
 	bool card_has = false;
 	if (card_usable && ground_laying.kept != nullptr) {
 		int bx = 0, by = 0;
@@ -6893,14 +6960,15 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	double tb0 = TurnedNow();
 	/* Laid by the card over its ground, the block a hole; else drawn into the block. */
 	bool standing_on_card = false;
-	if (_turned_card_standing_on && ground_on_card && _turned_card_ground.vp != nullptr) {
+	if (_turned_card_standing_on && ground_on_card && _tcg->vp != nullptr) {
 		ThreeDGpuStanding on_card;
 		on_card.view_x = ground_laying.view_x;
 		on_card.view_y = ground_laying.view_y;
 		on_card.width = UnScaleByZoom(frame.width, frame.zoom);
 		on_card.height = UnScaleByZoom(frame.height, frame.zoom);
-		on_card.view_w = _turned_card_ground.w;
-		on_card.view_h = _turned_card_ground.h;
+		on_card.view = _tcg->view;
+		on_card.view_w = _tcg->w;
+		on_card.view_h = _tcg->h;
 		/* Its lit pixels stay on the card: the glows by them are the video driver's (_night_card_lit). */
 		on_card.read_lit = false;
 		const size_t glows_before = _night_glows.size();
@@ -6918,7 +6986,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		}
 	}
 	if (!standing_on_card) {
-		if (!standing.empty()) _turned_times.standing_processor[_turned_card_standing_on && ground_on_card && _turned_card_ground.vp != nullptr ? 1 : 0]++;
+		if (!standing.empty()) _turned_times.standing_processor[_turned_card_standing_on && ground_on_card && _tcg->vp != nullptr ? 1 : 0]++;
 		for (const TurnedSprite &s : standing) DrawTurnedStandingByProcessor(frame, *s.ps);
 	}
 	if (ground_on_card) TurnedCardStandingLaid(ground_laying.view_x, ground_laying.view_y, fw, fh, standing_on_card);
@@ -7090,19 +7158,19 @@ static void AddNightBeam(uint32_t *dst, int pitch, int w, int h, double ax, doub
  */
 static void TurnedCardGlowsShow(const Viewport &vp)
 {
-	static bool told = false;
-	if (_turned_card_ground.vp != &vp || !_turned_card_ground.shown || !_night_windows_now || _turned_card_glows_zoom != vp.zoom) _turned_card_glows.clear();
-	if (_turned_card_glows.empty() && !told) return;
+	TurnedCardGround &card = *_tcg;
+	if (card.vp != &vp || !card.shown || !_night_windows_now || card.glows_zoom != vp.zoom) card.glows.clear();
+	if (card.glows.empty() && !card.glows_told) return;
 	std::vector<VideoDriver::ThreeDGlow> glows;
-	glows.reserve(_turned_card_glows.size());
+	glows.reserve(card.glows.size());
 	const int ox = vp.left - UnScaleByZoomLower(vp.virtual_left, vp.zoom), oy = vp.top - UnScaleByZoomLower(vp.virtual_top, vp.zoom);
-	for (const TurnedCardGlow &g : _turned_card_glows) {
+	for (const TurnedCardGlow &g : card.glows) {
 		const float x = g.x + ox, y = g.y + oy;
 		if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
 		glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength});
 	}
-	told = !glows.empty();
-	VideoDriver::GetInstance()->SetThreeDGlows(&_turned_card_ground, std::move(glows));
+	card.glows_told = !glows.empty();
+	VideoDriver::GetInstance()->SetThreeDGlows(&card, std::move(glows));
 }
 
 /**
@@ -7165,16 +7233,16 @@ static void DrawNight(bool turned)
 	/* The block's glows of the card before (TurnedCardGlow) go: those of now are told below. */
 	const int vs = ScaleByZoom(1, dpi.zoom), bl = dpi.left / vs, bt = dpi.top / vs;
 	if (turned) {
-		if (_turned_card_glows_zoom != dpi.zoom) {
-			_turned_card_glows.clear();
-			_turned_card_glows_zoom = dpi.zoom;
+		if (_tcg->glows_zoom != dpi.zoom) {
+			_tcg->glows.clear();
+			_tcg->glows_zoom = dpi.zoom;
 		}
-		std::erase_if(_turned_card_glows, [&](const TurnedCardGlow &g) { return g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
+		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
 	}
 	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
 	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength) {
 		if (turned && _night_card_lit) {
-			if (px >= 0 && py >= 0 && px < w && py < h) _turned_card_glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength)});
+			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength)});
 			return;
 		}
 		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
@@ -7500,6 +7568,7 @@ static int TurnedCardBandHas(const DrawPixelInfo &frame)
 {
 	extern uint64_t _dirty_blocks_pass;
 	const bool laid_now = _turned_dirty_laid_pass == _dirty_blocks_pass;
+	if (_tcg != &_turned_card_ground) return 0;
 	if ((!_turned_scroll_uncovering && !laid_now) || _night_windows_now || !_turned_card_standing_on || !TurnedCardGroundUsable(frame)) return 0;
 	TurnedCardGroundFollow(*_turned_vp, frame.zoom);
 	const TurnedCardGround &g = _turned_card_ground;
@@ -7578,8 +7647,59 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	_turned_card_dirty_passes++;
 }
 
+/**
+ * A small view drawn by the card as the main view is (SmallViewOnCard): facing north while the main view is, with the
+ * card showing its pictures; taken a number of its pictures on the card the first time.
+ * @param vp the view, not the main one
+ * @return nullptr: drawn as the game drew it
+ */
+static SmallViewOnCard *SmallViewOnCardOf(const Viewport &vp)
+{
+	if (!_small_views_on_card_on || !IsViewDrawnTurned() || IsViewTurned() || _screen_disable_anim) return nullptr;
+	if (!_turned_card_ground_on || !_turned_card_standing_on || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return nullptr;
+	if (BlitterFactory::GetCurrentBlitter()->GetName() != "40bpp-anim" || !ThreeDGpuShows() || !ThreeDGpuReady()) return nullptr;
+	auto it = _small_views_on_card.find(&vp);
+	if (it != _small_views_on_card.end()) return it->second.get();
+	std::array<bool, THREE_D_GPU_VIEWS> taken{};
+	taken[0] = true;
+	for (const auto &[other, small] : _small_views_on_card) taken[small->card.view] = true;
+	const auto unused = std::ranges::find(taken, false);
+	if (unused == taken.end()) return nullptr;
+	auto small = std::make_unique<SmallViewOnCard>();
+	small->card.view = static_cast<int>(unused - taken.begin());
+	small->card.ground_key = SMALL_VIEW_GROUND_KEY + small->card.view;
+	Debug(misc, 1, "3D: a small view {}x{} drawn by the graphics card as its view {}", vp.width, vp.height, small->card.view);
+	return _small_views_on_card.emplace(&vp, std::move(small)).first->second.get();
+}
+
+/**
+ * A view gone (its window closed, ~ViewportData()): a small view's pictures on the card shown no more and let go of.
+ * @param vp the view
+ */
+void ForgetViewportOnCard(const Viewport *vp)
+{
+	auto it = _small_views_on_card.find(vp);
+	if (it == _small_views_on_card.end()) return;
+	const SmallViewOnCard &small = *it->second;
+	if (VideoDriver::GetInstance() != nullptr) VideoDriver::GetInstance()->HideThreeDPicture(&small.card);
+	ThreeDGpuForgetView(small.card.view, small.card.ground_key);
+	_small_views_on_card.erase(it);
+}
+
+/** Its pictures on the card let go of (ForgetViewportOnCard()). */
+ViewportData::~ViewportData()
+{
+	ForgetViewportOnCard(this);
+}
+
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
+	/* A small view facing north drawn by the card as the main view (SmallViewOnCard): its pictures and kept ground. */
+	SmallViewOnCard *small = IsViewportTurned(vp) ? nullptr : SmallViewOnCardOf(vp);
+	AutoRestoreBackup small_card(_tcg, small != nullptr ? &small->card : &_turned_card_ground);
+	AutoRestoreBackup small_ground(_tg, small != nullptr ? &small->ground : &_turned_ground);
+	AutoRestoreBackup small_version(_tg_version, small != nullptr ? &small->version : &_turned_ground_version);
+	const bool turned = IsViewportTurned(vp) || small != nullptr;
 	/* The map's 3D pictures not made yet: the nearest made stands in, the thread makes them; the drawing waits for no card. */
 	AutoRestoreBackup stand_in(_three_d_pictures_stand_in, true);
 	/* The pictures it asks for kept till it draws them (the memory of the pictures is bounded, MakeRoomForPicture()). */
@@ -7618,7 +7738,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		_night_glows = cv.glows;
 		_night_card_lit = _night_windows_now;
 	}
-	if (IsViewportTurned(vp)) {
+	if (turned) {
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
 		AutoRestoreBackup turned_vp(_turned_vp, &vp);
 		/* Uncovered by a move of the view, on the card about it already (TurnedCardGround): a hole, or only its ground laid. */
@@ -7629,10 +7749,17 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		}
 		ViewportDoDrawTurned(whole_on_card || band == 2, band == 1);
 	} else {
-		/* Drawn as the game drew it (a small view, the 3D off): the turned view's ground from the card shown no more
-		 * (TurnedCardGround). A small view facing north draws the houses that are 3D objects as the objects, while the
-		 * main view is not turned (they are laid with its turn, MapLay()). */
-		if (_turned_card_ground.vp == &vp) HideTurnedCardGround();
+		/* Drawn as the game drew it (a small view the card does not draw, the 3D off): its picture on the card shown no
+		 * more (TurnedCardGround). A small view facing north draws the houses that are 3D objects as the objects, while
+		 * the main view is not turned (they are laid with its turn, MapLay()). */
+		if (_turned_card_ground.vp == &vp) {
+			AutoRestoreBackup main_card(_tcg, &_turned_card_ground);
+			HideTurnedCardGround();
+		}
+		if (auto it = _small_views_on_card.find(&vp); it != _small_views_on_card.end() && it->second->card.shown) {
+			AutoRestoreBackup small_card_hidden(_tcg, &it->second->card);
+			HideTurnedCardGround();
+		}
 		_north_house_objects = ThreeDEnabled() && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ObjectsIndexReadOrOwed();
 		_turned_objects.clear();
 		_turned_vehicle_pictures.clear();
@@ -7663,8 +7790,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	}
 
 	/* The night over it all but the signs (gui.night). */
-	if (IsNightNow()) DrawNight(IsViewportTurned(vp));
-	if (IsViewportTurned(vp)) TurnedCardGlowsShow(vp);
+	if (IsNightNow()) DrawNight(turned);
+	if (turned) TurnedCardGlowsShow(vp);
 	_turned_vehicles_on_card = false;
 	_night_lit.clear();
 	_night_glows.clear();

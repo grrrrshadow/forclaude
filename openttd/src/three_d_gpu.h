@@ -184,7 +184,15 @@ struct ThreeDGpuGround {
 	int view_x = 0, view_y = 0;  ///< where the block is in it, pixels from its top left
 	int view_w = 0, view_h = 0;  ///< its size: the view's (made anew, all black, when another)
 	int move_x = 0, move_y = 0;  ///< before the block is laid, what it holds moved by so many pixels (the view moved); a block of no size only moves it
+	int view = 0;                ///< whose pictures of the view (THREE_D_GPU_VIEWS): 0 the turned main view's, 1 on the small views'
+	/** The view's pictures let go of instead (the small view closed, ThreeDGpuForgetView()), and its kept ground's
+	 * texture by this key (ThreeDGpuGroundTexture::key), 0 none. */
+	bool forget = false;
+	uint64_t forget_key = 0;
 };
+
+/** The views whose pictures the card shows straight from it: the turned main view (0) and so many small views less one (ThreeDGpuGround::view). */
+static constexpr int THREE_D_GPU_VIEWS = 8;
 
 /**
  * A building of the view from the eyes on the card (ThreeDGpuEyePicture): its triangles as the processor draws them for
@@ -424,6 +432,7 @@ struct ThreeDGpuStanding {
 	int view_x = 0, view_y = 0;  ///< where the block is in the picture of the view, pixels from its top left
 	int width = 0, height = 0;   ///< the block
 	int view_w = 0, view_h = 0;  ///< the view's (as its ground's)
+	int view = 0;                ///< whose pictures of the view (ThreeDGpuGround::view)
 	std::vector<ThreeDGpuStandingItem> items;
 	std::vector<ThreeDGpuStandingBuilding> buildings;
 	std::vector<ThreeDGpuStandingFaces> faces;
@@ -438,11 +447,12 @@ bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
 bool ThreeDGpuDrawGround(ThreeDGpuGround &ground);
-uint32_t ThreeDGpuViewGround(uint64_t *made = nullptr);
+uint32_t ThreeDGpuViewGround(int view, uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
-uint32_t ThreeDGpuViewStanding(uint32_t *lit = nullptr);
+uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr);
+void ThreeDGpuForgetView(int view, uint64_t ground_key);
 void ThreeDGpuViewPicturesWait(void (*wait)(void *fence));
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &frame);

@@ -123,9 +123,11 @@ public:
 	 * @param over_lit which pixels of over are lit at night (its red), 0 none
 	 * @param part the part of the textures shown there: its left, top, width and height as parts of theirs (the
 	 *             picture of the turned map reaches past the view, TurnedCardGround)
+	 * @param z its window's place among the windows, from the back: of those not under, the ones further front are
+	 *          shown after (over) the others where both have holes (one window over another)
 	 * @return whether it is shown
 	 */
-	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false, [[maybe_unused]] uint32_t light = 0, [[maybe_unused]] uint32_t over = 0, [[maybe_unused]] uint32_t over_lit = 0, [[maybe_unused]] const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}) { return false; }
+	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false, [[maybe_unused]] uint32_t light = 0, [[maybe_unused]] uint32_t over = 0, [[maybe_unused]] uint32_t over_lit = 0, [[maybe_unused]] const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, [[maybe_unused]] int z = 0) { return false; }
 
 	/**
 	 * A window's picture shown straight from the graphics card no more (the window gone).

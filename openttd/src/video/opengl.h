@@ -87,6 +87,7 @@ private:
 		GLuint over = 0;     ///< the card's picture laid over it, its alpha multiplied in, 0 none
 		GLuint over_lit = 0; ///< which of over's pixels the light leaves as they are (its red), 0 none
 		std::array<float, 4> part = {0.0f, 0.0f, 1.0f, 1.0f}; ///< the part of the textures shown: left, top, width, height as parts of theirs
+		int z = 0;        ///< its window's place among the windows, from the back (ShowThreeDPicture())
 	};
 	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
 	std::map<const void *, std::vector<VideoDriver::ThreeDGlow>> three_d_glows; ///< the glows over them (SetThreeDGlows()), by their owners
@@ -145,7 +146,7 @@ public:
 	void ClearCursorCache();
 
 	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
-	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f});
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, int z = 0);
 	void HideThreeDPicture(const void *owner);
 	void SetThreeDGlows(const void *owner, std::vector<VideoDriver::ThreeDGlow> &&glows);
 	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
