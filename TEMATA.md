@@ -48,6 +48,14 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Konec hry: karta po `ThreeDGpuStop()` už úlohu nebere (okna se zavírají až potom; dřív by čekání viselo).
 - Rig: `test3d male 0|1` (malá okna kartou / postaru, vše se překreslí), `testokno pohled <x> <y>` otevře další
   pohled na dlaždici.
+- **Ověřeno v rigu (karta, 1000×700):** další pohled 324×270 nad městem jde kartou jako „view 1“, ovladač ukazuje
+  2 obrázky z karty. Obraz proti postaru stejný (liší se 934 bodů, pohyblivé věci). S koňmi u okna `modely`
+  0 ms na snímek (postaru 3–20 ms), nejdelší snímek 59–266 ms (postaru 130–714 ms). Smoke beze změny.
+- Hráč k Simtrains: *„pokračovat sim trains .“* Poslaný `cd_451031-32.exe` (InnoSetup, rozbalený `innoextract`,
+  nespouštěný) je stejná 451 jako `Trains.zip`. Kabina 750 v zipech není (`.eng` chce
+  `common.cab/cab750/750.cvf`). Hráč: *„tak to je jedno, tak mam najit kabinu od 759“* – ano, na zkoušku druhé
+  kabiny. Plán kroku 3 (ručičky, páky, kontrolky, opakovač) poslán s otázkami: živák, barvy opakovače, sběrač,
+  hodiny.
 
 ## 1. 11. (75) – Rána ve voze nejdřív porouchá vůz; kabina aut bez oka zevnitř; logy #319
 
