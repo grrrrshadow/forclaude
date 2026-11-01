@@ -162,44 +162,44 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "smrk_v1",
+    "jmeno": "smrk_k3",
     "poloha": [
      3.112,
      3.112,
      0.0
     ],
     "otoceni": 157.0,
-    "meritko": 0.5417
+    "meritko": 0.563
    },
    {
-    "jmeno": "smrk_v1",
+    "jmeno": "smrk_p0",
     "poloha": [
      11.686,
      3.112,
      0.0
     ],
     "otoceni": 223.0,
-    "meritko": 0.5417
+    "meritko": 0.77
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      1.795,
      12.366,
      0.0
     ],
     "otoceni": 17.0,
-    "meritko": 0.8571
+    "meritko": 0.338
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      13.052,
      11.967,
      0.0
     ],
     "otoceni": 64.0,
-    "meritko": 0.9286
+    "meritko": 0.299
    },
    {
     "jmeno": "kolo_caddeb0b",
@@ -365,24 +365,24 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      2.394,
      2.394,
      0.0
     ],
     "otoceni": 127.0,
-    "meritko": 0.8571
+    "meritko": 0.329
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      2.593,
      11.97,
      0.0
     ],
     "otoceni": 174.0,
-    "meritko": 0.7857
+    "meritko": 0.317
    },
    {
     "jmeno": "kolo_7c9fe836",
@@ -539,34 +539,34 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      1.995,
      2.194,
      0.0
     ],
     "otoceni": 220.0,
-    "meritko": 0.8571
+    "meritko": 0.276
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.967,
      1.995,
      0.0
     ],
     "otoceni": 267.0,
-    "meritko": 0.7143
+    "meritko": 0.274
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      1.995,
      13.084,
      0.0
     ],
     "otoceni": 314.0,
-    "meritko": 0.7143
+    "meritko": 0.574
    },
    {
     "jmeno": "ker_v1",
@@ -850,14 +850,14 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      12.051,
      12.327,
      0.0
     ],
     "otoceni": 237.0,
-    "meritko": 0.7857
+    "meritko": 0.26
    },
    {
     "jmeno": "kolo_3a822c38",
@@ -980,14 +980,14 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      8.076,
      1.736,
      0.0
     ],
     "otoceni": 347.0,
-    "meritko": 0.8571
+    "meritko": 0.594
    },
    {
     "jmeno": "kolo_caddeb0b",
@@ -1112,24 +1112,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      1.995,
      12.382,
      0.0
     ],
     "otoceni": 330.0,
-    "meritko": 0.8571
+    "meritko": 0.346
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.568,
      11.985,
      0.0
     ],
     "otoceni": 17.0,
-    "meritko": 0.7143
+    "meritko": 0.497
    },
    {
     "jmeno": "ker_v0",
@@ -1289,24 +1289,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      1.995,
      1.995,
      0.0
     ],
     "otoceni": 80.0,
-    "meritko": 0.9286
+    "meritko": 0.299
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.768,
      12.369,
      0.0
     ],
     "otoceni": 127.0,
-    "meritko": 0.7143
+    "meritko": 0.495
    },
    {
     "jmeno": "ker_v2",
@@ -1472,34 +1472,34 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "briza_k0",
     "poloha": [
      1.995,
      2.394,
      0.0
     ],
     "otoceni": 190.0,
-    "meritko": 0.8571
+    "meritko": 0.29
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      12.568,
      2.194,
      0.0
     ],
     "otoceni": 237.0,
-    "meritko": 0.7143
+    "meritko": 0.236
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "listnac_p0",
     "poloha": [
      2.194,
      12.967,
      0.0
     ],
     "otoceni": 284.0,
-    "meritko": 0.7857
+    "meritko": 0.527
    },
    {
     "jmeno": "ker_v1",
@@ -1685,24 +1685,24 @@
     "meritko": 0.6429
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "listnac_k0",
     "poloha": [
      1.795,
      12.967,
      0.0
     ],
     "otoceni": 300.0,
-    "meritko": 0.8571
+    "meritko": 0.329
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.768,
      12.568,
      0.0
     ],
     "otoceni": 347.0,
-    "meritko": 0.7857
+    "meritko": 0.302
    },
    {
     "jmeno": "ker_v0",
@@ -1893,24 +1893,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "briza_k0",
     "poloha": [
      12.306,
      10.288,
      0.0
     ],
     "otoceni": 50.0,
-    "meritko": 0.7143
+    "meritko": 0.242
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      2.194,
      2.376,
      0.0
     ],
     "otoceni": 97.0,
-    "meritko": 0.7857
+    "meritko": 0.31
    },
    {
     "jmeno": "ker_v2",
@@ -2118,24 +2118,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      11.976,
      1.995,
      0.0
     ],
     "otoceni": 160.0,
-    "meritko": 0.8571
+    "meritko": 0.276
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      11.778,
      12.169,
      0.0
     ],
     "otoceni": 207.0,
-    "meritko": 0.7857
+    "meritko": 0.544
    },
    {
     "jmeno": "ker_v1",
@@ -2281,24 +2281,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      1.795,
      12.77,
      0.0
     ],
     "otoceni": 270.0,
-    "meritko": 0.8571
+    "meritko": 0.689
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.768,
      2.052,
      0.0
     ],
     "otoceni": 317.0,
-    "meritko": 0.7857
+    "meritko": 0.547
    },
    {
     "jmeno": "ker_v0",
@@ -2448,24 +2448,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      2.394,
      12.568,
      0.0
     ],
     "otoceni": 20.0,
-    "meritko": 0.8571
+    "meritko": 0.276
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "briza_k0",
     "poloha": [
      12.568,
      12.768,
      0.0
     ],
     "otoceni": 67.0,
-    "meritko": 0.7143
+    "meritko": 0.23
    },
    {
     "jmeno": "ker_v2",
@@ -2631,24 +2631,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      1.795,
      12.768,
      0.0
     ],
     "otoceni": 130.0,
-    "meritko": 0.8571
+    "meritko": 0.689
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      12.768,
      12.568,
      0.0
     ],
     "otoceni": 177.0,
-    "meritko": 0.7143
+    "meritko": 0.236
    },
    {
     "jmeno": "ker_v1",
@@ -3080,24 +3080,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.828,
      1.937,
      0.0
     ],
     "otoceni": 110.0,
-    "meritko": 0.7143
+    "meritko": 0.289
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.828,
      12.863,
      0.0
     ],
     "otoceni": 334.0,
-    "meritko": 0.7143
+    "meritko": 0.574
    },
    {
     "jmeno": "kolo_766fab94",
@@ -3231,24 +3231,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      26.741,
      3.052,
      0.0
     ],
     "otoceni": 282.0,
-    "meritko": 0.8571
+    "meritko": 0.346
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      26.741,
      26.548,
      0.0
     ],
     "otoceni": 301.0,
-    "meritko": 0.8571
+    "meritko": 0.338
    },
    {
     "jmeno": "kolo_4b4adb95",
@@ -3371,44 +3371,44 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      13.044,
      1.964,
      0.0
     ],
     "otoceni": 210.0,
-    "meritko": 1.0
+    "meritko": 0.804
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      13.044,
      12.836,
      0.0
     ],
     "otoceni": 101.0,
-    "meritko": 1.0
+    "meritko": 0.331
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_p0",
     "poloha": [
      1.852,
      1.756,
      0.0
     ],
     "otoceni": 329.0,
-    "meritko": 1.0
+    "meritko": 0.696
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      1.852,
      13.044,
      0.0
     ],
     "otoceni": 220.0,
-    "meritko": 1.0
+    "meritko": 0.322
    }
   ],
   "postavy": [],
@@ -3675,14 +3675,14 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "briza_k0",
     "poloha": [
      12.71,
      13.074,
      0.0
     ],
     "otoceni": 67.0,
-    "meritko": 0.7857
+    "meritko": 0.253
    }
   ],
   "postavy": [
@@ -4197,14 +4197,14 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      1.751,
      12.513,
      0.0
     ],
     "otoceni": 177.0,
-    "meritko": 0.7143
+    "meritko": 0.236
    }
   ],
   "postavy": [
@@ -4470,24 +4470,24 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      1.925,
      12.446,
      0.0
     ],
     "otoceni": 287.0,
-    "meritko": 0.8571
+    "meritko": 0.329
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "briza_k0",
     "poloha": [
      13.074,
      1.726,
      0.0
     ],
     "otoceni": 334.0,
-    "meritko": 0.7857
+    "meritko": 0.266
    }
   ],
   "postavy": [
@@ -5046,14 +5046,14 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.507,
      6.246,
      0.0
     ],
     "otoceni": 37.0,
-    "meritko": 0.7143
+    "meritko": 0.282
    }
   ],
   "postavy": [
@@ -6343,24 +6343,24 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      2.668,
      11.328,
      0.0
     ],
     "otoceni": 147.0,
-    "meritko": 0.8571
+    "meritko": 0.329
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      13.07,
      13.084,
      0.0
     ],
     "otoceni": 194.0,
-    "meritko": 0.7143
+    "meritko": 0.574
    }
   ],
   "postavy": [
@@ -6486,44 +6486,44 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      13.009,
      3.579,
      0.0
     ],
     "otoceni": 141.0,
-    "meritko": 1.0
+    "meritko": 0.395
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      13.009,
      25.831,
      0.0
     ],
     "otoceni": 142.0,
-    "meritko": 1.0
+    "meritko": 0.404
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.18,
      21.57,
      0.0
     ],
     "otoceni": 314.0,
-    "meritko": 1.0
+    "meritko": 0.404
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.18,
      7.84,
      0.0
     ],
     "otoceni": 329.0,
-    "meritko": 1.0
+    "meritko": 0.696
    }
   ],
   "postavy": [
@@ -6780,34 +6780,34 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "smrk_v1",
+    "jmeno": "smrk_p1",
     "poloha": [
      4.369,
      4.858,
      0.0
     ],
     "otoceni": 235.0,
-    "meritko": 1.0417
+    "meritko": 0.835
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "briza_k0",
     "poloha": [
      4.169,
      10.643,
      0.0
     ],
     "otoceni": 267.0,
-    "meritko": 1.2143
+    "meritko": 0.391
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      12.369,
      2.394,
      0.0
     ],
     "otoceni": 314.0,
-    "meritko": 0.9286
+    "meritko": 0.375
    },
    {
     "jmeno": "ker_v1",
@@ -6902,34 +6902,34 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v3",
+    "jmeno": "listnac_k0",
     "poloha": [
      5.586,
      7.78,
      0.0
     ],
     "otoceni": 17.0,
-    "meritko": 1.5714
+    "meritko": 0.62
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "listnac_p0",
     "poloha": [
      9.975,
      2.394,
      0.0
     ],
     "otoceni": 64.0,
-    "meritko": 0.8571
+    "meritko": 0.575
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      2.394,
      12.369,
      0.0
     ],
     "otoceni": 111.0,
-    "meritko": 1.0
+    "meritko": 0.693
    },
    {
     "jmeno": "ker_v2",
@@ -7070,34 +7070,34 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.857,
      2.456,
      0.0
     ],
     "otoceni": 110.0,
-    "meritko": 0.7857
+    "meritko": 0.631
    },
    {
-    "jmeno": "strom_v3",
+    "jmeno": "briza_k0",
     "poloha": [
      12.857,
      7.256,
      0.0
     ],
     "otoceni": 157.0,
-    "meritko": 0.7857
+    "meritko": 0.26
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "listnac_p0",
     "poloha": [
      12.857,
      12.824,
      0.0
     ],
     "otoceni": 204.0,
-    "meritko": 0.7857
+    "meritko": 0.527
    },
    {
     "jmeno": "lavicka_99914b93",
@@ -7198,24 +7198,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v1",
+    "jmeno": "briza_k0",
     "poloha": [
      13.054,
      2.48,
      0.0
     ],
     "otoceni": 267.0,
-    "meritko": 0.9286
+    "meritko": 0.299
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "listnac_k0",
     "poloha": [
      13.054,
      12.32,
      0.0
     ],
     "otoceni": 180.0,
-    "meritko": 0.9286
+    "meritko": 0.357
    }
   ],
   "postavy": [],
@@ -7311,24 +7311,24 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_k0",
     "poloha": [
      10.25,
      10.972,
      0.0
     ],
     "otoceni": 347.0,
-    "meritko": 1.1429
+    "meritko": 0.439
    },
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_p0",
     "poloha": [
      11.923,
      1.995,
      0.0
     ],
     "otoceni": 34.0,
-    "meritko": 0.9286
+    "meritko": 0.746
    },
    {
     "jmeno": "ker_v1",
@@ -7459,44 +7459,44 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "strom_v2",
+    "jmeno": "listnac_k0",
     "poloha": [
      27.292,
      5.985,
      0.0
     ],
     "otoceni": 174.0,
-    "meritko": 0.8571
+    "meritko": 0.346
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "briza_k0",
     "poloha": [
      27.292,
      10.972,
      0.0
     ],
     "otoceni": 19.0,
-    "meritko": 0.8571
+    "meritko": 0.276
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      27.292,
      18.453,
      0.0
     ],
     "otoceni": 303.0,
-    "meritko": 0.8571
+    "meritko": 0.594
    },
    {
-    "jmeno": "strom_v0",
+    "jmeno": "briza_k0",
     "poloha": [
      27.292,
      23.44,
      0.0
     ],
     "otoceni": 148.0,
-    "meritko": 0.8571
+    "meritko": 0.276
    },
    {
     "jmeno": "lavicka_99914b93",

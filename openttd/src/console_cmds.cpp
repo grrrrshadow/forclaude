@@ -10249,6 +10249,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * setting gui.eye_shadows, off unless he turns it on). */
 		_settings_client.gui.eye_shadows = argv.size() < 3 || argv[2] != "0";
 		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _settings_client.gui.eye_shadows ? "zapnute" : "vypnute");
+	} else if (what == "les") {
+		/* 'les': the view on the thickest wood of the map -- the tile with the most trees on the tiles within three of
+		 * it -- to see the trees of the map (DrawThemedTrees() of tree_cmd.cpp). */
+		TileIndex best = INVALID_TILE;
+		uint most = 0;
+		for (uint y = 4; y + 4 < Map::SizeY(); y += 2) {
+			for (uint x = 4; x + 4 < Map::SizeX(); x += 2) {
+				uint trees = 0;
+				for (int dy = -3; dy <= 3; dy++) {
+					for (int dx = -3; dx <= 3; dx++) {
+						const TileIndex t = TileXY(x + dx, y + dy);
+						if (IsTileType(t, TileType::Trees)) trees += GetTreeCount(t);
+					}
+				}
+				if (trees > most) {
+					most = trees;
+					best = TileXY(x, y);
+				}
+			}
+		}
+		if (best == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "test3d: les: no trees on the map.");
+			return true;
+		}
+		ScrollMainWindowToTile(best, true);
+		UpdateViewportPosition(w, 0);
+		IConsolePrint(CC_DEFAULT, "test3d: les {},{}: {} stromu kolem, druh {}", TileX(best), TileY(best), most,
+				IsTileType(best, TileType::Trees) ? static_cast<int>(GetTreeType(best)) : -1);
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {

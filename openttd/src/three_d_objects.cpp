@@ -97,6 +97,9 @@ static std::set<std::string, std::less<>> _witches_replaced;
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 /** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees_night;
+/** The trees of the temperate map by the kind of tree on a tile (0x00-0x0B, TREE_COUNT_TEMPERATE): the add-ons that
+ * stand for it ("stromy_mapy" "druhy", the colleague's trees of 1. 11.), their figures' names. */
+static std::array<std::vector<std::string>, 12> _three_d_map_trees;
 /** The dogs, the animals, the ghosts and the sellers of dogs of the indices (ThreeDAnimal). */
 static std::vector<ThreeDAnimal> _animals;
 /** The mushrooms to pick of the indices (ThreeDMushroom). */
@@ -4242,6 +4245,21 @@ static void ReadThreeDVehicleObjects()
 					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = true;
+					/* A tree of the map (the player, 1. 11.: "the trees replace all the trees of the game ... the forest,
+					 * about the houses and about the towns"): it stands for the kinds of trees of the temperate map its
+					 * "stromy_mapy" names ("druhy", 0x00-0x0B), drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
+					if (e.contains("stromy_mapy") && e.at("stromy_mapy").is_object()) {
+						const auto &map_trees = e.at("stromy_mapy");
+						if (map_trees.value("klima", std::string("mirne")) == "mirne" && map_trees.contains("druhy") && map_trees.at("druhy").is_array()) {
+							for (const auto &kind : map_trees.at("druhy")) {
+								if (!kind.is_number_integer()) continue;
+								const int k = kind.get<int>();
+								if (k < 0 || k >= static_cast<int>(_three_d_map_trees.size())) continue;
+								auto &trees = _three_d_map_trees[k];
+								if (std::ranges::find(trees, fig.name) == trees.end()) trees.push_back(fig.name);
+							}
+						}
+					}
 					_figure_objects.push_back(std::move(fig));
 					continue;
 				}
@@ -7981,6 +7999,14 @@ std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night)
 	auto it = trees.find(theme);
 	if (it == trees.end()) return {};
 	return it->second;
+}
+
+/** The trees standing for a kind of tree of the temperate map (0x00-0x0B, "stromy_mapy"): the names of their figures, none for another kind. */
+std::span<const std::string> GetThreeDMapTrees(uint8_t kind)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (kind >= _three_d_map_trees.size()) return {};
+	return _three_d_map_trees[kind];
 }
 
 /** The creatures of the indices ("druh": "tvor", the colleague's dragons), read the first time they are asked for. */

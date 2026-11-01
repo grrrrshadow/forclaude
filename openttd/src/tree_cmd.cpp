@@ -647,10 +647,12 @@ struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
 
 /** @copydoc DrawTileProc */
 /**
- * The trees of a tile on the land of a themed town (GetTownThemeAt(); the clay town's giant mushrooms, the
- * colleague's hra/3d/PROSBA-MESTO-HLINENE.md) as the theme's trees, 3D figures, in the turned view and facing north
- * among the houses drawn as objects: one where each tree stands, its kind by the tile and the tree, as big as the
- * tree has grown.
+ * The trees of a tile as 3D figures, in the turned view, from the eyes and facing north among the houses drawn as
+ * objects: on the land of a themed town (GetTownThemeAt(); the clay town's giant mushrooms, the colleague's
+ * hra/3d/PROSBA-MESTO-HLINENE.md) the theme's trees; elsewhere on a temperate map the trees standing for the tile's
+ * kind of tree (GetThreeDMapTrees(), the colleague's hra/3d/STROMY-LES-PACK-PRO-HRU.md; the player, 1. 11.: "the trees
+ * replace all the trees of the game ... about the towns"). One where each tree stands, its kind by the tile and the
+ * tree, as big as the tree has grown.
  * @param ti the tile
  * @return whether they were drawn so, the tree sprites then left out
  */
@@ -659,9 +661,15 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	const bool eye = ViewportDrawingEye();
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	const TownTheme theme = GetTownThemeAt(ti->tile);
-	if (theme == TownTheme::None) return false;
-	/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
-	std::span<const std::string> kinds = GetThreeDThemeTrees(to_underlying(theme), IsNightNow());
+	std::span<const std::string> kinds;
+	if (theme != TownTheme::None) {
+		/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
+		kinds = GetThreeDThemeTrees(to_underlying(theme), IsNightNow());
+	} else if (_settings_game.game_creation.landscape == LandscapeType::Temperate && GetTreeType(ti->tile) < TREE_COUNT_TEMPERATE &&
+			GetThemedLand(ti->tile) != ThemedLand::Desert) {
+		/* The desert towns' land keeps its palms and cacti (DrawTile_Trees()). */
+		kinds = GetThreeDMapTrees(static_cast<uint8_t>(GetTreeType(ti->tile)));
+	}
 	if (kinds.empty()) return false;
 
 	const uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);

@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (80) – Stromy mapy z Low Poly Forest Tree Pack (společné stromy z grrrrf)
+
+- Hráč: *„stromečky společný jsou v grrrf“*.
+- **Převzato z grrrrf c77a435:** 13 stromů do `objekty/doplnky` (borovice_k0/k1, briza_k0, jedle_k0, listnac_k0/p0,
+  smrk_k0–k3, smrk_p0–p2; 36–630 trojúhelníků, textura s ořezem MASK) a indexy `doplnky`, `mirne`, `prumysl`,
+  `prumysl_vanilla`. Indexy domů a průmyslu se od našich liší jen místy stromů (prověřeno porovnáním bez stromů).
+  Autor stromů (99.Miles, Sketchfab, CC BY 4.0) je v README sady.
+- **Stromy mapy:** dosud je kreslily OpenGFX sprity (krom tématických měst). Teď v mírném klimatu (mimo poušť)
+  kreslí strom mapy 3D strom z `doplnky` podle klíče `stromy_mapy` (`klima`, `druhy` 0x00–0x0B). Mezi stromy se
+  stejným druhem vybírá dlaždice, velikost podle růstu stromu, stejně jako u stromů tématických měst. `jedle_k0` má
+  prázdné `druhy`, na mapě se nekreslí (u domů a průmyslu ano). Jiná klimata zůstávají u spritů.
+- Rig GPU (les 96,112 na mapě seed 7): stromy vidět shora při 0°, otočené o 30° i z očí.
+- Rig příkaz `test3d les` najede na nejhustší les mapy.
+
 ## 1. 11. (79) – Řidička vozidla je ta ze záznamu (College Girl), holky se střídají jen jinde
 
 - Hráč (zip logů z #320): *„sergeje řidila jiná holka než colege girl, implicidně bude colege girl řidit a dalši

@@ -143,6 +143,9 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   baset, malamut, jack russell a bulmastif (low poly dog pack, compost the second). **CC BY-NC 4.0** (jen
   nekomerčně): kočka, která chodí (pamoan10), vlk (OLEKSO), lev, loutka na tříkolce a přízrak v `carodejnice/`
   (LostBoyz2078). Odkazy na modely jsou v `objekty.json` u každého záznamu (`autor`, `licence`).
+- `doplnky/` – stromy u domů, u průmyslu a v lese a stromy mapy v mírném klimatu (`stromy_mapy`): Low Poly Forest
+  Tree Pack (99.Miles, Sketchfab, **CC BY 4.0**; od kolegy, grrrrf `hra/3d/STROMY-LES-PACK-PRO-HRU.md`: stromy
+  zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map).
 - Sady tady (`mirne/`, … `postavy/`) hra čte i z hráčovy složky
   `Dokumenty/OpenTTD/baseset/decouple/objekty/<sada>/`, ta má přednost, takže ani
   nový dům nepotřebuje build.

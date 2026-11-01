@@ -1199,54 +1199,54 @@
   "poznamka": "les: čtyři lesní smrky s holým kmenem dole a jeden listnáč, asi 7 m od sebe, jako společné doplňky (smrk_les_v*, strom_v*); na poli",
   "doplnky": [
    {
-    "jmeno": "smrk_les_v0",
+    "jmeno": "smrk_p2",
     "poloha": [
      3.42,
      3.66,
      0.0
     ],
     "otoceni": 160.8,
-    "meritko": 0.963
+    "meritko": 0.984
    },
    {
-    "jmeno": "smrk_les_v1",
+    "jmeno": "smrk_p1",
     "poloha": [
      3.52,
      11.42,
      0.0
     ],
     "otoceni": 228.6,
-    "meritko": 0.92
+    "meritko": 0.834
    },
    {
-    "jmeno": "smrk_les_v1",
+    "jmeno": "borovice_k1",
     "poloha": [
      10.12,
      3.3,
      0.0
     ],
     "otoceni": 51.1,
-    "meritko": 0.94
+    "meritko": 0.734
    },
    {
-    "jmeno": "smrk_les_v0",
+    "jmeno": "smrk_k0",
     "poloha": [
      11.59,
      10.72,
      0.0
     ],
     "otoceni": 344.2,
-    "meritko": 1.063
+    "meritko": 1.071
    },
    {
-    "jmeno": "strom_v1",
+    "jmeno": "listnac_p0",
     "poloha": [
      8.14,
      7.8,
      0.0
     ],
     "otoceni": 9.9,
-    "meritko": 1.376
+    "meritko": 0.953
    }
   ]
  },

@@ -2806,7 +2806,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.16,
-  "poznamka": "společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -2855,7 +2855,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.16,
-  "poznamka": "společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -2903,7 +2903,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.16,
-  "poznamka": "společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -2951,7 +2951,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.16,
-  "poznamka": "společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (smrk): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -3860,7 +3860,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.26,
-  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -3913,7 +3913,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.26,
-  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -3966,7 +3966,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.26,
-  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -4019,7 +4019,7 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "kmen_r": 0.26,
-  "poznamka": "společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
+  "poznamka": "Neplatí od 1. 11.: stromy na místech domů, průmyslu a lesa jsou stromy z Low Poly Forest Tree Pack (domy/stromy_les.py, nahrazuje domy/stromy_nahrad.py); záznam zůstává jen pro staré skripty. společný doplněk domů a průmyslu (strom): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci; barva číslem: každé místo jinou barvu z palety"
  },
  {
   "druh": "doplnek",
@@ -4210,5 +4210,495 @@
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "poznamka": "společný doplněk domů a průmyslu (židle): počátek pod patou, předek podél +x; dům ho umístí v klíči doplnky (poloha, otoceni, meritko); jen barva bez světla, bez noci"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p0",
+  "soubor": "smrk_p0.glb",
+  "nazev": {
+   "cs": "malý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.99,
+    1.97
+   ],
+   "y": [
+    -1.89,
+    1.77
+   ],
+   "z": [
+    0.0,
+    6.93
+   ]
+  },
+  "trojuhelniku": 624,
+  "kmen_r": 0.29,
+  "vyska_m": 6.93,
+  "polomer_m": 2.0,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p1",
+  "soubor": "smrk_p1.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -3.22,
+    3.53
+   ],
+   "y": [
+    -3.3,
+    3.44
+   ],
+   "z": [
+    0.0,
+    12.37
+   ]
+  },
+  "trojuhelniku": 624,
+  "kmen_r": 0.36,
+  "vyska_m": 12.37,
+  "polomer_m": 3.59,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8,
+    11
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_p2",
+  "soubor": "smrk_p2.glb",
+  "nazev": {
+   "cs": "vysoký smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.56,
+    2.67
+   ],
+   "y": [
+    -2.51,
+    2.5
+   ],
+   "z": [
+    0.0,
+    17.03
+   ]
+  },
+  "trojuhelniku": 630,
+  "kmen_r": 0.45,
+  "vyska_m": 17.03,
+  "polomer_m": 2.96,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "listnac_p0",
+  "soubor": "listnac_p0.glb",
+  "nazev": {
+   "cs": "listnáč"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -2.15,
+    2.29
+   ],
+   "y": [
+    -2.7,
+    2.43
+   ],
+   "z": [
+    0.0,
+    7.95
+   ]
+  },
+  "trojuhelniku": 285,
+  "kmen_r": 0.21,
+  "vyska_m": 7.95,
+  "polomer_m": 2.79,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    0,
+    1,
+    7,
+    10
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k0",
+  "soubor": "smrk_k0.glb",
+  "nazev": {
+   "cs": "štíhlý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.95,
+    2.13
+   ],
+   "y": [
+    -2.11,
+    1.96
+   ],
+   "z": [
+    0.0,
+    17.27
+   ]
+  },
+  "trojuhelniku": 113,
+  "kmen_r": 0.26,
+  "vyska_m": 17.27,
+  "polomer_m": 2.13,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    6,
+    8
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "borovice_k0",
+  "soubor": "borovice_k0.glb",
+  "nazev": {
+   "cs": "borovice"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.14,
+    2.22
+   ],
+   "y": [
+    -2.2,
+    2.16
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.29,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    5
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k1",
+  "soubor": "smrk_k1.glb",
+  "nazev": {
+   "cs": "hustý smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.24,
+    2.43
+   ],
+   "y": [
+    -2.49,
+    2.23
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 108,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.49,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    11
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k2",
+  "soubor": "smrk_k2.glb",
+  "nazev": {
+   "cs": "smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.09,
+    2.4
+   ],
+   "y": [
+    -2.25,
+    2.47
+   ],
+   "z": [
+    0.0,
+    17.43
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.26,
+  "vyska_m": 17.43,
+  "polomer_m": 2.53,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8,
+    11
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "borovice_k1",
+  "soubor": "borovice_k1.glb",
+  "nazev": {
+   "cs": "vysoká borovice"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -3.07,
+    2.87
+   ],
+   "y": [
+    -2.87,
+    2.87
+   ],
+   "z": [
+    0.0,
+    22.29
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.33,
+  "vyska_m": 22.29,
+  "polomer_m": 3.15,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    5,
+    6
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "smrk_k3",
+  "soubor": "smrk_k3.glb",
+  "nazev": {
+   "cs": "menší smrk"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -2.49,
+    2.49
+   ],
+   "y": [
+    -2.49,
+    2.49
+   ],
+   "z": [
+    0.0,
+    12.21
+   ]
+  },
+  "trojuhelniku": 36,
+  "kmen_r": 0.18,
+  "vyska_m": 12.21,
+  "polomer_m": 2.51,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    8
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "listnac_k0",
+  "soubor": "listnac_k0.glb",
+  "nazev": {
+   "cs": "listnáč"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -3.82,
+    3.82
+   ],
+   "y": [
+    -3.82,
+    3.82
+   ],
+   "z": [
+    0.0,
+    16.44
+   ]
+  },
+  "trojuhelniku": 109,
+  "kmen_r": 0.25,
+  "vyska_m": 16.44,
+  "polomer_m": 3.82,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    0,
+    2,
+    4,
+    9
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "briza_k0",
+  "soubor": "briza_k0.glb",
+  "nazev": {
+   "cs": "bříza"
+  },
+  "strom": "listnac",
+  "rozmer_m": {
+   "x": [
+    -3.74,
+    3.9
+   ],
+   "y": [
+    -3.9,
+    3.74
+   ],
+   "z": [
+    0.0,
+    19.61
+   ]
+  },
+  "trojuhelniku": 101,
+  "kmen_r": 0.29,
+  "vyska_m": 19.61,
+  "polomer_m": 3.9,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [
+    2,
+    3
+   ],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "jedle_k0",
+  "soubor": "jedle_k0.glb",
+  "nazev": {
+   "cs": "mladá jedle"
+  },
+  "strom": "jehlicnan",
+  "rozmer_m": {
+   "x": [
+    -1.21,
+    1.21
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    3.69
+   ]
+  },
+  "trojuhelniku": 40,
+  "kmen_r": 0.08,
+  "vyska_m": 3.69,
+  "polomer_m": 1.21,
+  "stromy_mapy": {
+   "klima": "mirne",
+   "druhy": [],
+   "poznamka": "druhy stromů mírné mapy (OpenTTD 0x00–0x0B), za které tento strom stojí; hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  },
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
+  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta"
  }
 ]

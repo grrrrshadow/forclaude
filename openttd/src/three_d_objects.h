@@ -1184,6 +1184,7 @@ public:
 	bool Missed() const;
 };
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
+std::span<const std::string> GetThreeDMapTrees(uint8_t kind);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
 
