@@ -54,8 +54,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - **Sběrač:** P (klávesy MSTS, elektrická mašina) ho stáhne nebo zvedne. Dole: žádný tah, napětí 0, svítí „hlavní
   porucha“, v panelu „Sběrač dole“. Uloží se do savu (`cab_pantograph_down`), puštěním vlaku zpět nahoře.
 - V vypne opakovač (jak píše readme 451).
-- Rig: `test3d kabina pult sberac 0|1`, `test3d kabina pult stav` (vypíše, co pult ukazuje).
-- MinGW a clang čisté. Rig (snímky pultu za jízdy, s EDB, brzdou a rychlobrzdou) běží po tomto zápisu.
+- Rig: `test3d kabina pult sberac 0|1`, `test3d kabina pult stav` (vypíše, co pult ukazuje, i dlaždici vlaku),
+  `test3d navest <x> <y> <x|y> [blok|cesta] [0-3]` (návěstidlo na trať, cestové jen jedním směrem). `test3d kolej`
+  bere typ koleje z dlaždice (výhybka na elektrizované trati).
+- **Ověřeno v rigu (451, 1280×720):**
+  - rychloměr LS90 při 0 / 51 / 99 km/h ukazuje správně. Tmavá čára vlevo dole na něm je namalovaná už v obrázku
+    stanoviště 451, není to chyba;
+  - LCD ukazuje hodiny a rychlost. Ručičky válce a potrubí, kV a A se hýbou. Kontrolky odporů a EDB svítí,
+    se sběračem dole svítí „hlavní porucha“. Brzdič jde přes provozní brzdění až na rychlobrzdu;
+  - kontrolér na stupni 1 ze 4 ukazuje M, revers je vpřed;
+  - opakovač na trati s návěstidly (blokové, blokové, cestové před výhybkou, cestové) ukazuje postupně:
+    - volno (zelená);
+    - výstraha (žlutá);
+    - stůj (červená);
+    - po postavení cesty volno;
+    - před koncem tratě výstraha;
+    - za posledním návěstidlem zhasne.
+
+    Cestové návěstidlo na trati bez výhybky hra ukazuje zeleně, proto tam opakovač ukáže volno;
+  - živák se po Z sám rozsvítí a „zmáčkne“, vlak nebrzdí.
+- MinGW a clang čisté.
 
 ## 1. 11. (76) – GPU #127: malá okna (okno vozidla, další pohled) kreslí karta jako hlavní pohled
 

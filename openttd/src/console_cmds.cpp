@@ -10696,8 +10696,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				return true;
 			}
 			const SimtrainsDeskState d = SimtrainsDeskStateOf(cv);
-			IConsolePrint(CC_DEFAULT, "test3d: pult rychlost {:.0f} kontroler {:.2f} paka {:.2f} edb {:.2f} brzdic {:.2f} primocinna {:.2f} rychlobrzda {} smer {} sberac {} napeti {:.1f} proud {:.0f} valec {:.2f} potrubi {:.2f} jimka {:.1f} svetla {} houkacka {} zivak {}/{} opakovac {}{} hodiny {:02}:{:02}",
-					d.speed_kmh, d.throttle, d.handle, d.dynamic, d.train_brake, d.engine_brake, d.emergency ? "ano" : "ne", d.direction, d.pantograph ? "nahore" : "dole",
+			IConsolePrint(CC_DEFAULT, "test3d: pult na {},{} rychlost {:.0f} kontroler {:.2f} paka {:.2f} edb {:.2f} brzdic {:.2f} primocinna {:.2f} rychlobrzda {} smer {} sberac {} napeti {:.1f} proud {:.0f} valec {:.2f} potrubi {:.2f} jimka {:.1f} svetla {} houkacka {} zivak {}/{} opakovac {}{} hodiny {:02}:{:02}",
+					TileX(cv->First()->tile), TileY(cv->First()->tile), d.speed_kmh, d.throttle, d.handle, d.dynamic, d.train_brake, d.engine_brake, d.emergency ? "ano" : "ne", d.direction, d.pantograph ? "nahore" : "dole",
 					d.line_kv, d.amps, d.brake_cylinder, d.brake_pipe, d.main_reservoir, d.lights, d.horn ? "ano" : "ne", d.alerter_lamp ? "sviti" : "-", d.alerter_pressed ? "zmacknut" : "-",
 					d.aspect, d.repeater_off ? " vypnuty" : "", d.hour, d.minute);
 			return true;
@@ -11102,7 +11102,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
 		AutoRestoreBackup cur_company(_current_company, _local_company);
-		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, TileXY(*x, *y), RAILTYPE_RAIL, static_cast<Track>(*tr), false);
+		/* On a tile of rail of its type (a junction on the wired line of 'obloukjizda'), else plain rail. */
+		const TileIndex at = TileXY(*x, *y);
+		const RailType rt = IsPlainRailTile(at) ? GetRailType(at) : RAILTYPE_RAIL;
+		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, rt, static_cast<Track>(*tr), false);
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
 		return true;
@@ -11482,6 +11485,24 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: uvodnihra: sign '{}' at {},{}", name, TileX(tile), TileY(tile));
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: uvodnihra: {} stations, {} signals, {} trains, depot {}", stations.size(), signals, trains.size(), depot == INVALID_TILE ? "none" : "gone");
+	} else if (what == "navest" && argv.size() > 4) {
+		/* 'navest <x> <y> <x|y> [blok|cesta] [0-3]': a signal on the straight track of a tile, to try the repeater of
+		 * a cab of MSTS by (simtrains_cab.cpp): a block signal, or a path signal; facing both ways, or only a train
+		 * going so (DiagDirection: 0 NE, 1 SE, 2 SW, 3 NW). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value() || static_cast<uint>(*x) >= Map::SizeX() || static_cast<uint>(*y) >= Map::SizeY()) return true;
+		const Track track = argv[4] == "y" ? Track::Y : Track::X;
+		const bool path = argv.size() > 5 && argv[5] == "cesta";
+		uint8_t copy = 0;
+		if (argv.size() > 6) {
+			auto d = number(6);
+			if (d.has_value() && *d >= 0 && *d < 4) copy = SignalAlongTrackdir(DiagDirToDiagTrackdir(static_cast<DiagDirection>(*d)));
+		}
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		const CommandCost r = Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, TileXY(*x, *y), track, path ? SignalType::Path : SignalType::Block,
+				SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Path, 0, copy);
+		UpdateSignalsInBuffer();
+		IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: navest {},{} {} {}: {}", *x, *y, argv[4], path ? "cesta" : "blok", r.Succeeded() ? "ano" : "NE");
 	} else if (what == "obloukjizda" && argv.size() > 4) {
 		/* 'obloukjizda <n> <wagons> <ticks>': a train of the fastest engine and so many wagons out of a depot, along
 		 * twenty tiles of X, a quarter turn with n pieces of diagonal between its corners (as 'oblouky') and twelve
