@@ -911,8 +911,9 @@ std::string RigDeskVigilance(const Vehicle *v, int seconds)
 	if (own.penalty) back(own.penalty_at);
 	static const char *const STAGES[] = {"neni", "hlida", "varuje", "zabrzdil"};
 	const SimtrainsEngine::Vigilance &vm = e->vigilance;
-	return fmt::format("zivak {}, od nuly {:.1f} s, brzdi {:.1f} s (casy {:.0f}/{:.0f}/{:.0f} s, rychlobrzda {} plna {} tah {} stani {} tlacitko {})",
+	return fmt::format("zivak {}, od nuly {:.1f} s, brzdi {:.1f} s, videno pred {:.1f} s, cur_speed {} rizen {} (casy {:.0f}/{:.0f}/{:.0f} s, rychlobrzda {} plna {} tah {} stani {} tlacitko {})",
 			STAGES[AlerterStage(t, own, e)], SecondsSince(own.reset_at), own.penalty ? SecondsSince(own.penalty_at) : 0.0f,
+			SecondsSince(own.seen_at), t->cur_speed, t->cab_driven ? 1 : 0,
 			vm.time_limit, vm.alarm_limit, vm.penalty_limit, vm.emergency_brake ? 1 : 0, vm.full_brake ? 1 : 0, vm.cuts_power ? 1 : 0,
 			vm.reset_on_zero_speed ? 1 : 0, vm.reset_on_button ? 1 : 0);
 }

@@ -54,6 +54,16 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - Čas běží v ticích hry: pauza živák zastaví, zrychlení zrychlí. Pustí-li hráč vlak (hra řídí), živák nebrzdí.
 - Rig: `test3d kabina zivak [posun <s>]` (stav živáku, posune jeho čas o tolik sekund), `kabina pult stav` vypíše
   stav živáku (0 není, 1 hlídá, 2 varuje, 3 zabrzdil).
+- **Ověřeno v rigu (451, časy 20/10/90 s z `.eng`):**
+  - před prvním Z živák není, po Z hlídá;
+  - po 21 s varuje: kontrolka a v panelu „Vigilance! Press Z“;
+  - D čas vynuluje;
+  - po 31 s zabrzdí: rychlobrzda, kontrolér na 0, „Vigilance braked“, vlak zpomaluje 86 → 66 → 40 km/h;
+  - D tah nedá;
+  - Z po 0,5 s nepustí, Z po 95 s pustí (brzdič zpět v jízdní poloze, živák hlídá);
+  - po druhém zabrzdění vlak zastaví a po 90 s se živák sám pustí stáním.
+
+  Rig musí hru nejdřív protočit (`test3d tiky 4000`), jinak posun o 95 s narazí na začátek hry.
 
 ## 1. 11. (77) – Simtrains 3: ručičky, páky, kontrolky a opakovač na pultu MSTS; živák, sběrač, hodiny
 
