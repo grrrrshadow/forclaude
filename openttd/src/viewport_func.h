@@ -158,4 +158,6 @@ inline void SetViewportCatchmentSpecializedStation(const Waypoint *st, bool sel)
 	SetViewportCatchmentWaypoint(st, sel);
 }
 
+void TurnedCardLayDirty(int left, int top, int right, int bottom);
+
 #endif /* VIEWPORT_FUNC_H */

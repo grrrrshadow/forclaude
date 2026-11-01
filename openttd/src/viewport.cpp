@@ -248,6 +248,8 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 static void TurnedCardBandUncover(const Viewport &vp, int xo, int yo);
 /** The blocks being drawn are what a move of the view uncovered (SetViewportPosition()): what the card has about the view there stays (TurnedCardGround). */
 static bool _turned_scroll_uncovering = false;
+/** The pass of DrawDirtyBlocks() whose dirty part of the turned main view the card laid at once (TurnedCardLayDirty()); else none. */
+static uint64_t _turned_dirty_laid_pass = UINT64_MAX;
 
 static ViewportDrawer _vd;
 
@@ -2430,14 +2432,15 @@ std::string TakeTurnedTimesForDiary(int frames)
 	const double n = std::max(1, frames);
 	const int blocks = _turned_ground_times.card_blocks + _turned_ground_times.processor_blocks + _turned_ground_times.view_blocks;
 	/* Of "plakaty" (what stands on the map) the card's part, waited for; whole views laid and views only moved. */
-	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2];
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
-			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0],
+	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2], _turned_card_dirty_passes;
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
 	_turned_card_view_passes = 0;
 	_turned_card_view_moves = 0;
 	_turned_card_band_passes = 0;
 	_turned_card_band_blocks[0] = _turned_card_band_blocks[1] = 0;
+	_turned_card_dirty_passes = 0;
 	t = TurnedTimes();
 	_turned_ground_times = {};
 	return s;
@@ -5065,6 +5068,8 @@ static TurnedCardGround _turned_card_ground;
 static bool _turned_whole_view_pass = false;
 bool _turned_card_band_on = true; ///< Rig: the picture of the turned main view on the card reaches past it (test3d stojici okraj); else just the view
 uint64_t _turned_card_band_passes = 0; ///< Rig: the pieces past the view the card laid (test3d cas, the diary)
+uint64_t _turned_card_dirty_passes = 0; ///< Rig: the dirty parts of the view the card laid at once (TurnedCardLayDirty(); test3d cas, the diary)
+bool _turned_card_dirty_on = true; ///< Rig: what changed on the turned main view laid by the card at once (test3d stojici naraz); else block by block
 uint64_t _turned_card_band_blocks[2] = {}; ///< Rig: the blocks a move of the view uncovered, of them taken from the card (test3d cas, the diary)
 static constexpr int TURNED_CARD_BAND = 192; ///< the pixels the picture of the view on the card reaches past it every way
 
@@ -7341,9 +7346,7 @@ static bool TurnedCardRectOnCard(const Viewport &vp, int x0, int y0, int x1, int
 	KeepThreeDPicturesOfBlock();
 	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
 	static std::vector<uint32_t> scratch;
-	const bool ok = TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch, nullptr);
-	if (ok) _turned_card_band_passes++;
-	return ok;
+	return TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch, nullptr);
 }
 
 /**
@@ -7368,7 +7371,7 @@ static void TurnedCardBandUncover(const Viewport &vp, int xo, int yo)
 	auto uncover = [&](int sx0, int sy0, int sx1, int sy1, int px0, int py0, int px1, int py1) {
 		const size_t pixels = static_cast<size_t>(sx1 - sx0) * (sy1 - sy0);
 		if (2 * TurnedCardMapCount(g.stood, sx0, sy0, sx1 - sx0, sy1 - sy0) >= pixels) return;
-		TurnedCardRectOnCard(vp, px0, py0, px1, py1);
+		if (TurnedCardRectOnCard(vp, px0, py0, px1, py1)) _turned_card_band_passes++;
 	};
 	if (xo > 0) uncover(m, m, m + xo, m + h, 0, 0, m + xo, g.h);
 	if (xo < 0) uncover(m + w + xo, m, m + w, m + h, m + w + xo, 0, g.w, g.h);
@@ -7383,7 +7386,9 @@ static void TurnedCardBandUncover(const Viewport &vp, int xo, int yo)
  */
 static int TurnedCardBandHas(const DrawPixelInfo &frame)
 {
-	if (!_turned_scroll_uncovering || _night_windows_now || !_turned_card_standing_on || !TurnedCardGroundUsable(frame)) return 0;
+	extern uint64_t _dirty_blocks_pass;
+	const bool laid_now = _turned_dirty_laid_pass == _dirty_blocks_pass;
+	if ((!_turned_scroll_uncovering && !laid_now) || _night_windows_now || !_turned_card_standing_on || !TurnedCardGroundUsable(frame)) return 0;
 	TurnedCardGroundFollow(*_turned_vp, frame.zoom);
 	const TurnedCardGround &g = _turned_card_ground;
 	if (g.band == 0) return 0;
@@ -7392,6 +7397,73 @@ static int TurnedCardBandHas(const DrawPixelInfo &frame)
 	const int fw = UnScaleByZoom(frame.width, frame.zoom), fh = UnScaleByZoom(frame.height, frame.zoom);
 	if (!TurnedCardMapHas(g.stood, bx, by, fw, fh)) return 0;
 	return TurnedCardMapHas(g.have, bx, by, fw, fh) ? 2 : 1;
+}
+
+/**
+ * What changed on the turned main view since the last frame (DrawDirtyBlocks(): the cars and horses that moved, the
+ * player's #317 and the log of 1. 11.: in a busy town 13 blocks a frame, each laid by the card on its own and waited
+ * for -- its ground 6 ms, what stands on it 8 ms, all the buildings about it again --, 4 frames a second), laid by the
+ * card at once before the blocks are drawn, as a move of the view lays what it uncovers (TurnedCardBandUncover()): one
+ * piece about all that changed in it, every dirty block of the view only a hole then (TurnedCardBandHas()). Not when the camera changed (the whole view is
+ * laid anew, TurnedViewWholeOnCard()), nor by night (the glows of the lights are told block by block).
+ * @param left,top,right,bottom the dirty part of the screen (_invalid_rect), pixels
+ */
+void TurnedCardLayDirty(int left, int top, int right, int bottom)
+{
+	extern uint64_t _dirty_blocks_pass;
+	if (!_turned_card_dirty_on || !_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim || IsNightNow()) return;
+	const Window *main = GetMainWindow();
+	if (main == nullptr || main->viewport == nullptr) return;
+	const Viewport &vp = *main->viewport;
+	if (!IsViewportTurned(vp)) return;
+	/* The camera as the card's picture of the view has it; else that is laid anew whole. */
+	const TurnedCardView &cv = _turned_card_view;
+	const int mask = ScaleByZoom(-1, vp.zoom);
+	double c, s, px, py;
+	GetViewTurn(c, s, px, py);
+	if (cv.vp != &vp || cv.yaw != GetViewYaw() || cv.pivot_x != px || cv.pivot_y != py || cv.zoom != vp.zoom ||
+			cv.width != (ScaleByZoom(vp.width, vp.zoom) & mask) || cv.height != (ScaleByZoom(vp.height, vp.zoom) & mask) ||
+			cv.left != (vp.virtual_left & mask) || cv.top != (vp.virtual_top & mask)) {
+		return;
+	}
+	TurnedCardGround &g = _turned_card_ground;
+	if (g.vp != &vp || !g.shown || g.band == 0) return;
+	if (!TurnedCardGroundFollow(vp, vp.zoom) || g.band == 0) return;
+	const int x0 = std::max(left, vp.left), y0 = std::max(top, vp.top);
+	const int x1 = std::min(right, vp.left + vp.width), y1 = std::min(bottom, vp.top + vp.height);
+	if (x1 <= x0 || y1 <= y0) return;
+	/* The screen's pixels to the picture's, as a block of the view finds itself in it (TurnedCardBandHas()). */
+	const int vs = ScaleByZoom(1, vp.zoom);
+	auto picture_x = [&](int sx) { return ((((sx - vp.left) * vs + vp.virtual_left) & mask) / vs) - g.l; };
+	auto picture_y = [&](int sy) { return ((((sy - vp.top) * vs + vp.virtual_top) & mask) / vs) - g.t; };
+	/* Whole pixels about it, as the blocks are drawn (ViewportDoDraw(): their corners on whole pixels of the zoom). */
+	const int px0 = picture_x(x0), py0 = picture_y(y0), px1 = picture_x(x1) + 1, py1 = picture_y(y1) + 1;
+	/* Only what changed under it since it was laid (MarkViewportDirty(): TurnedCardBandDirty()); the rest of it is dirty
+	 * for a window over the view (the status bar with the date, a message), the blocks there only holes. */
+	const int cx0 = std::max(0, px0), cy0 = std::max(0, py0), cx1 = std::min(g.w, px1), cy1 = std::min(g.h, py1);
+	if (cx1 <= cx0 || cy1 <= cy0 || g.stood.size() != static_cast<size_t>(g.w) * g.h || g.have.size() != g.stood.size()) return;
+	int lx0 = cx1, ly0 = cy1, lx1 = cx0, ly1 = cy0;
+	const int n = cx1 - cx0;
+	for (int y = cy0; y < cy1; y++) {
+		const uint8_t *st = &g.stood[static_cast<size_t>(y) * g.w + cx0], *hv = &g.have[static_cast<size_t>(y) * g.w + cx0];
+		const int first = static_cast<int>(std::min(std::find(st, st + n, 0) - st, std::find(hv, hv + n, 0) - hv));
+		if (first == n) continue;
+		auto last_of = [n](const uint8_t *m) {
+			const auto r = std::find(std::make_reverse_iterator(m + n), std::make_reverse_iterator(m), 0);
+			return static_cast<int>(std::make_reverse_iterator(m) - r);
+		};
+		lx0 = std::min(lx0, cx0 + first);
+		lx1 = std::max({lx1, cx0 + last_of(st), cx0 + last_of(hv)});
+		ly0 = std::min(ly0, y);
+		ly1 = y + 1;
+	}
+	if (lx1 <= lx0) {
+		_turned_dirty_laid_pass = _dirty_blocks_pass;
+		return;
+	}
+	if (!TurnedCardRectOnCard(vp, lx0, ly0, lx1, ly1)) return;
+	_turned_dirty_laid_pass = _dirty_blocks_pass;
+	_turned_card_dirty_passes++;
 }
 
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)

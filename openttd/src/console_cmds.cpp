@@ -10115,6 +10115,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_band_on = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici okraj {}", _turned_card_band_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "naraz") {
+		/* 'stojici naraz 0|1': what changed on the turned main view (the cars that moved) laid by the card at once before
+		 * the dirty blocks are drawn (1; TurnedCardLayDirty()), or each block laid on its own (0). */
+		extern bool _turned_card_dirty_on;
+		_turned_card_dirty_on = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici naraz {}", _turned_card_dirty_on ? "ano" : "ne");
 	} else if (what == "zem") {
 		/* 'zem [0|1|znovu]': the turned view's ground kept from frame to frame, only what changed drawn again (1), or
 		 * drawn anew for every block as before (0); "znovu" forgets what is kept, drawn whole at the next frame.

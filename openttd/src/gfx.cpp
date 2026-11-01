@@ -1469,6 +1469,10 @@ uint64_t _dirty_blocks_pass = 0;
 void DrawDirtyBlocks()
 {
 	_dirty_blocks_pass++;
+	/* What changed on the turned main view laid by the card at once: each of its dirty blocks only a hole then. */
+	if (_invalid_rect.left < _invalid_rect.right && _invalid_rect.top < _invalid_rect.bottom) {
+		TurnedCardLayDirty(_invalid_rect.left, _invalid_rect.top, _invalid_rect.right, _invalid_rect.bottom);
+	}
 	auto is_dirty = [](auto block) -> bool { return block != 0; };
 	auto block = _dirty_blocks.begin();
 

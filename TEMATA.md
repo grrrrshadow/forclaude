@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (73) – GPU: co se na otočené mapě změnilo, položí karta najednou, ne po blocích
+
+- Hráč poslal logy (3d_karta, snimky) a *„pokračuj v gpu“*, pak *„build 317. běž čist temata“* a *„ti nefungujou
+  počitadla asi. 317 je neknovějši, nic jsi nedělal od buildu“*.
+- **Počitadla:** jsou v buildu #318 (commit 27a6e34, hotový 31. 10. ve 23:17 UTC). Logy byly z #317, kde ještě
+  nebyla. Pro příčinu vracení bloků je potřeba log pod zátěží z #318 nebo novějšího.
+- **Pravidla z TEMATA dohnaná:** kontrola clangem (`-Werror=c++11-narrowing`) na všech souborech změněných od
+  e334ec4: bez chyb.
+- **Příčina pomalé mapy pod zátěží (log #317):** každý blok, kterým projelo auto nebo kůň, pokládala karta zvlášť
+  a hlavní vlákno na ni čekalo (zem asi 6 ms, co stojí asi 8 ms, pokaždé znovu i domy kolem), asi 13 bloků na
+  snímek.
+- **Oprava (`TurnedCardLayDirty()`):** před kreslením bloků (`DrawDirtyBlocks()`) položí karta jedním průchodem
+  kus kolem všeho, co se od minula změnilo (mapy `stood`/`have`, mazané v `MarkViewportDirty()`). Bloky jsou pak
+  jen díry. Okna přes mapu (stavový řádek s datem, zprávy) se znovu nepokládají. Nedělá se po změně kamery (celý
+  pohled se položí znovu), v noci (záře světel se počítají po blocích) a když karta něco položit nemůže (pak po
+  blocích jako dřív). Rig: `test3d stojici naraz 0|1`; deník `snimky.log` → `zmen naraz N`.
+- **Rig (llvmpipe, město, 16 koní, zoom 1):** po blocích 37–55 snímků/s, najednou 55–60. Obraz je proti kreslení po
+  blocích stejný, až na 15 pixelů na okrajích holek u domů. Šedý objekt z prvního srovnání byl rozdíl mezi dvěma
+  spuštěními, ne chyba. Smoke beze změny.
+
 ## 31. 10. (72) – Log #317 pod zátěží: mapa 2–5 snímků/s, domy procesorem v blocích, které karta vrátila
 
 - Hráč poslal logy #317 (3d_karta, 3d_domy, snimky, log) a *„dělej dál gpu.“*, pak *„do auta jsem nestih cab
