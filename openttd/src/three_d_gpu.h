@@ -220,6 +220,7 @@ struct ThreeDGpuEyeTexture {
 	const uint32_t *px = nullptr;
 	int w = 0, h = 0;
 	uint64_t uid = 0; ///< kept on the card by this number for the frames to come; 0: this frame's alone
+	const ThreeDGpuGroundTexture *ground = nullptr; ///< or the kept ground of the view from the eyes: the card keeps its own, sent what was drawn into it since
 };
 
 /** A corner of a triangle of the eye's frame, placed on the picture already (CabVertex of viewport.cpp), with how its triangle is drawn (CabRasterRows()). */

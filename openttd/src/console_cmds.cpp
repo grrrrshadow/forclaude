@@ -10130,6 +10130,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * view's ground laid by the card into its picture of the view and shown straight from it (1), or read back (0). */
 		extern bool _turned_ground_kept, _turned_ground_card, _turned_ground_check, _turned_view_ground_on, _turned_card_ground_on;
 		extern std::string DescribeTurnedGround();
+		if (argv.size() > 2 && argv[2] == "oci") {
+			/* 'zem oci [0|1]': the ground of the view from the eyes kept from frame to frame, only the tiles whose
+			 * ground changed or came new drawn into it and only that sent to the card (1), or drawn anew for every
+			 * frame as before (0); how many frames each way since the last asking. */
+			extern bool _eye_ground_kept;
+			extern uint64_t _eye_ground_frames[2];
+			if (auto on = number(3); on.has_value()) _eye_ground_kept = *on != 0;
+			IConsolePrint(CC_DEFAULT, "test3d: zem oci {}, snimku drzenou {}, kreslenou znovu {}", _eye_ground_kept ? "drzena" : "kreslena znovu", _eye_ground_frames[1], _eye_ground_frames[0]);
+			_eye_ground_frames[0] = _eye_ground_frames[1] = 0;
+			return true;
+		}
 		if (argv.size() > 2 && argv[2] == "znovu") {
 			ResetTurnedGround();
 		} else if (argv.size() > 3 && argv[2] == "pohled") {

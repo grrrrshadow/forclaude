@@ -31,6 +31,24 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (74) – GPU sběr z očí: zem z očí držená mezi snímky, na kartu jen to, co se změnilo
+
+- Hráč: *„pokračuj v gpu“* → další domluvený bod GPU, sběr pohledu z očí (#221).
+- **Co stálo čas:** každý snímek z očí procesor znovu nakreslil sprity všech dlaždic před chodcem do jedné textury země
+  (PC 1,3–2,3 ms, telefon několikrát víc). Pak ji celou poslal na kartu, asi 4 MB, i když chodec popošel o krok.
+  Log z telefonu (26. 10.): sběr z očí 17–44 ms a kreslení na kartě asi 35 ms jdou po sobě, z očí asi 14 snímků/s.
+- **Teď:** zem z očí se drží mezi snímky stejným kódem jako zem otočené mapy (`TurnedGround`, druhá instance
+  `_eye_ground`). Znovu se kreslí jen dlaždice, jejichž zem se změnila nebo přibyla. Karta drží svou kopii
+  (`GroundTextureOf()`, klíč 2): při posunu ji přesune a dostane jen obdélníky kreslené znovu. Dlaždice na základu
+  (silnice a koleje na svahu) dávají do země i děti základu, jako dřív. Velikost je nejvýš 4096 px na stranu
+  a 8 M pixelů (32 MB). Když se zavře okno z očí, paměť se uvolní. Na otočenou mapu (počitadla, verze země) to nesahá.
+- **Rig (město, 1000×624):** tvorba textury země 1,3–1,4 ms → 0,0–0,1 ms, celý sběr 4,5–6,2 → 3,0–3,4 ms. Obraz
+  s pohledem natočeným o 40° je stejný na pixel. Při 0° a po kroku se liší 73 osamocenými pixely na hranách texelů
+  (zaokrouhlení u větší textury). GPU rig: atlas snímku z očí 1488×768 → 1024×256, zem jde na kartu jako držená
+  textura 2976×1104 a obraz je v pořádku. Otočená mapa beze změny. Smoke beze změny.
+- Rig: `test3d zem oci [0|1]` (držená / kreslená každý snímek, kolik snímků kterou cestou).
+- **Na telefonu** to ukáže `oci sber` a `karta` v `snimky.log` z pohledu z očí.
+
 ## 1. 11. (73) – GPU: co se na otočené mapě změnilo, položí karta najednou, ne po blocích
 
 - Hráč poslal logy (3d_karta, snimky) a *„pokračuj v gpu“*, pak *„build 317. běž čist temata“* a *„ti nefungujou

@@ -4292,7 +4292,7 @@ bool EyeFrameAtlas(const ThreeDGpuEyeFrame &f, std::vector<std::array<int, 2>> &
 	size_t area = 0;
 	for (uint32_t i = 0; i < f.textures.size(); i++) {
 		const ThreeDGpuEyeTexture &t = f.textures[i];
-		if (t.uid != 0 || t.w <= 0 || t.h <= 0) continue;
+		if (t.uid != 0 || t.ground != nullptr || t.w <= 0 || t.h <= 0) continue;
 		order.push_back(i);
 		widest = std::max(widest, t.w);
 		area += static_cast<size_t>(t.w) * t.h;
@@ -4362,6 +4362,14 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 	std::vector<GLuint> names(f.textures.size(), 0);
 	for (size_t i = 0; i < f.textures.size(); i++) {
 		const ThreeDGpuEyeTexture &t = f.textures[i];
+		if (t.ground != nullptr) {
+			/* The kept ground of the view from the eyes, as the turned view's: what was drawn into it since sent. */
+			const GroundTextureOnCard *g = GroundTextureOf(*t.ground);
+			if (g == nullptr || g->w != t.w || g->h != t.h) return false;
+			names[i] = g->name;
+			place[i] = {0, 0};
+			continue;
+		}
 		if (t.uid == 0) {
 			names[i] = _frame_atlas;
 			continue;

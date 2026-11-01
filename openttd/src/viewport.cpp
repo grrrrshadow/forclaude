@@ -2350,13 +2350,25 @@ struct TurnedGround {
 	void ChangedForCard(const GroundRect &r);
 };
 static TurnedGround _turned_ground;
+/**
+ * The ground of the view from the eyes facing north, kept from frame to frame as the turned view's (the player, 1. 11.:
+ * "carry on with the GPU", the collecting of the view from the eyes): each frame drew all the ground ahead anew by the
+ * processor and sent all of it to the card, a few megabytes, though the eye moved by a step. Only the tiles whose ground
+ * changed or came new are drawn into it, and only what was drawn goes to the card (CollectEyeFrame()).
+ */
+static TurnedGround _eye_ground;
+bool _eye_ground_kept = true; ///< Rig: the ground of the view from the eyes kept (test3d zem oci); else drawn anew for every frame as before
+uint64_t _eye_ground_frames[2] = {}; ///< Rig: the frames from the eyes whose ground was drawn for them alone, and kept (test3d zem oci)
+static constexpr size_t EYE_GROUND_PIXELS = static_cast<size_t>(8) << 20; ///< the kept ground of the view from the eyes at most so many pixels (32 MB)
+static constexpr int EYE_GROUND_SIDE = 4096; ///< and so many a side: one texture on the card of a phone
+static constexpr uint64_t EYE_GROUND_CARD_KEY = 2; ///< its name among the card's textures of the ground (ThreeDGpuGroundTexture::key; the turned view's 1)
 static uint64_t _turned_ground_generations = 0;
 /** Counts the changes of the ground of the turned view: of the kept picture, of the tiles with a foundation (TurnedGroundOfView). */
 static uint64_t _turned_ground_version = 0;
 
 void TurnedGround::ChangedForCard(const GroundRect &r)
 {
-	if (!r.Within(this->at).Empty()) _turned_ground_version++;
+	if (this == &_turned_ground && !r.Within(this->at).Empty()) _turned_ground_version++;
 	if (this->card_whole || r.Within(this->at).Empty()) return;
 	if (this->card_changed.size() >= 1024) {
 		this->generation = ++_turned_ground_generations;
@@ -2397,6 +2409,11 @@ void ResetTurnedGround()
 	ForgetTurnedSpritePictures();
 	_turned_ground = TurnedGround();
 	_turned_ground_version++;
+	/* The view from the eyes' too, once its frame on the way is drawn from it no more. */
+	if (_eye_ground.valid) {
+		WaitEyeFrame();
+		_eye_ground = TurnedGround();
+	}
 	extern void ForgetTurnedFoundations();
 	ForgetTurnedFoundations();
 }
@@ -2462,28 +2479,32 @@ static void ForTurnedGroundCells(const TurnedGround &g, const GroundRect &r, F f
 /**
  * Place the kept picture of the ground over the pixels \a need at a zoom: as it is when it has them, else anew over
  * them and half as much more every way, with what it had where the two meet.
+ * @param max_pixels,max_side how big it may be (the view from the eyes': a texture the phone's card holds)
  * @return whether it is placed; not when the block needs more than it may have
  */
-static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect &need)
+static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect &need, size_t max_pixels = TURNED_GROUND_PIXELS, int max_side = INT32_MAX)
 {
 	const size_t need_px = need.Pixels();
-	if (need_px == 0 || need_px > TURNED_GROUND_PIXELS) return false;
+	const int nw = need.r - need.l, nh = need.b - need.t;
+	if (need_px == 0 || need_px > max_pixels || nw > max_side || nh > max_side) return false;
 	const bool keep = g.valid && g.zoom == zoom;
 	if (keep && need.Inside(g.at)) return true;
 
-	const int nw = need.r - need.l, nh = need.b - need.t;
 	double grow = 0.5;
-	if (static_cast<double>(need_px) * (1 + 2 * grow) * (1 + 2 * grow) > TURNED_GROUND_PIXELS) grow = (std::sqrt(static_cast<double>(TURNED_GROUND_PIXELS) / need_px) - 1) / 2;
+	if (static_cast<double>(need_px) * (1 + 2 * grow) * (1 + 2 * grow) > max_pixels) grow = (std::sqrt(static_cast<double>(max_pixels) / need_px) - 1) / 2;
+	grow = std::min({grow, (static_cast<double>(max_side) / nw - 1) / 2, (static_cast<double>(max_side) / nh - 1) / 2});
 	const int mx = static_cast<int>(nw * grow), my = static_cast<int>(nh * grow);
 	GroundRect at{need.l - mx, need.t - my, need.r + mx, need.b + my};
-	if (keep && at.With(g.at).Pixels() <= TURNED_GROUND_PIXELS) at = at.With(g.at);
+	const GroundRect both = keep ? at.With(g.at) : at;
+	if (keep && both.Pixels() <= max_pixels && both.r - both.l <= max_side && both.b - both.t <= max_side) at = both;
 
 	TurnedGround n;
 	n.valid = true;
 	n.zoom = zoom;
 	n.at = at;
 	n.generation = ++_turned_ground_generations;
-	_turned_ground_version++;
+	const bool map = &g == &_turned_ground;
+	if (map) _turned_ground_version++;
 	n.px.assign(at.Pixels(), 0);
 	n.cw = (at.r - at.l + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
 	n.ch = (at.b - at.t + TURNED_GROUND_CELL - 1) / TURNED_GROUND_CELL;
@@ -2510,28 +2531,38 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
 		n.card_changed = std::move(g.card_changed);
 	}
 	g = std::move(n);
-	_turned_ground_times.placed++;
+	if (map) _turned_ground_times.placed++;
 	return true;
 }
 
 /**
  * The tiles of the block into the kept picture of the ground: each whose ground changed (or came new) marks the
  * cells it reached and reaches now; those are drawn again, from the tiles reaching into them.
+ * @param on_foundations by the tiles, the ground of one with a foundation given with it (the view from the eyes: its
+ *        sprites and the foundation's children), drawn as any other tile's; none (the turned view), such a tile has
+ *        none here, its foundation and its ground are drawn by themselves (DrawTurnedTileGround())
  */
-static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tiles)
+static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tiles, std::span<const std::vector<TurnedGroundSprite>> on_foundations = {})
 {
 	double t0 = TurnedNow();
+	const bool map = &g == &_turned_ground;
 	const int s = ScaleByZoom(1, g.zoom);
-	for (const TurnedTile &t : tiles) {
+	for (size_t n = 0; n < tiles.size(); n++) {
+		const TurnedTile &t = tiles[n];
 		const bool founded = t.foundation[0] != -1 || t.foundation[1] != -1;
+		const std::vector<TurnedGroundSprite> *given = founded && n < on_foundations.size() ? &on_foundations[n] : nullptr;
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
 		GroundHash hash;
 		hash.Mix(founded);
-		if (!founded) {
+		if (given != nullptr) {
+			for (const TurnedGroundSprite &gs : *given) hash.Sprite(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
+		} else if (!founded) {
 			for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
 				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 				hash.Sprite(ts.image, ts.pal, ts.x, ts.y, ts.sub);
 			}
+		}
+		if (!founded || given != nullptr) {
 			hash.Mix(t.building);
 			if (t.building) hash.Mix(to_underlying(t.top_slope) | static_cast<uint64_t>(static_cast<uint32_t>(t.top_z)) << 8);
 			if (t.round && inside) hash.Mix(RoundTrackStripKey(TileXY(t.x, t.y), g.zoom));
@@ -2541,10 +2572,10 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		auto it = g.tiles.find(k);
 		if (it != g.tiles.end() && it->second.key == key) continue;
 
-		_turned_ground_times.tiles_changed++;
+		if (map) _turned_ground_times.tiles_changed++;
 		TurnedGroundTile &rec = (it != g.tiles.end()) ? it->second : g.tiles[k];
 		if (it != g.tiles.end()) {
-			_turned_ground_times.tiles_replaced++;
+			if (map) _turned_ground_times.tiles_replaced++;
 			if (_turned_debug_tile != INVALID_TILE) IConsolePrint(CC_DEFAULT, "ladeni: zem dlazdice {},{} jinak: spritu {} -> {}", t.x, t.y, rec.sprites.size(), founded ? 0 : t.end_sprite - t.first_sprite);
 			ForTurnedGroundCells(g, rec.Reach(), [&](int c) {
 				g.dirty[c] = 1;
@@ -2560,15 +2591,21 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		rec.order = static_cast<uint32_t>(t.x + t.y + 128) << 15 | static_cast<uint32_t>(t.y - t.x + 16384);
 		const Point north = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.raw_z);
 		rec.spot = {PixelFloor(north.x, s), PixelFloor(north.y, s), PixelFloor(north.x, s) + 1, PixelFloor(north.y, s) + 1};
-		if (!founded) {
-			for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
-				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
-				TurnedGroundSprite gs{ts.image, ts.pal, ts.x, ts.y, ts.sub != nullptr, ts.sub != nullptr ? *ts.sub : SubSprite{}};
+		if (!founded || given != nullptr) {
+			auto add = [&](const TurnedGroundSprite &gs) {
 				rec.sprites.push_back(gs);
 				/* Where the blitter puts it (GfxBlitter()), a pixel more every way. */
-				const Sprite *spr = GetSprite(GB(ts.image, 0, SPRITE_WIDTH), SpriteType::Normal);
-				const int vx = ts.x + spr->x_offs, vy = ts.y + spr->y_offs;
+				const Sprite *spr = GetSprite(GB(gs.image, 0, SPRITE_WIDTH), SpriteType::Normal);
+				const int vx = gs.x + spr->x_offs, vy = gs.y + spr->y_offs;
 				rec.area = rec.area.With({PixelFloor(vx, s) - 1, PixelFloor(vy, s) - 1, PixelCeil(vx, s) + PixelCeil(spr->width, s) + 1, PixelCeil(vy, s) + PixelCeil(spr->height, s) + 1});
+			};
+			if (given != nullptr) {
+				for (const TurnedGroundSprite &gs : *given) add(gs);
+			} else {
+				for (size_t i = t.first_sprite; i < t.end_sprite; i++) {
+					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+					add({ts.image, ts.pal, ts.x, ts.y, ts.sub != nullptr, ts.sub != nullptr ? *ts.sub : SubSprite{}});
+				}
 			}
 			if (t.round && inside) {
 				/* The strip of its track: about its north corner, its west and east corners either side and its south
@@ -2614,7 +2651,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		}
 	}
 	if (rects.empty()) {
-		_turned_times.texture += TurnedNow() - t0;
+		if (map) _turned_times.texture += TurnedNow() - t0;
 		return;
 	}
 
@@ -2636,8 +2673,10 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	/* Each rect cleared and drawn as the whole picture is: the tiles' sprites, then the strips of round track. */
 	const int w = g.Width();
 	for (const GroundRect &r : rects) {
-		_turned_ground_times.rects++;
-		_turned_ground_times.pixels += r.Pixels();
+		if (map) {
+			_turned_ground_times.rects++;
+			_turned_ground_times.pixels += r.Pixels();
+		}
 		g.ChangedForCard(r);
 		for (int y = r.t; y < r.b; y++) std::fill_n(&g.px[static_cast<size_t>(y - g.at.t) * w + (r.l - g.at.l)], r.r - r.l, 0u);
 		DrawPixelInfo d{};
@@ -2662,7 +2701,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		DrawRoundTrackStripsOf(d, round);
 	}
 	double t1 = TurnedNow();
-	_turned_times.texture += t1 - t0;
+	if (map) _turned_times.texture += t1 - t0;
 
 	/* The black under the buildings reaching into them grown over, far first: where it was grown over before, there is no black left. */
 	std::vector<const TurnedGroundTile *> buildings;
@@ -2680,7 +2719,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		g.ChangedForCard(f);
 	}
 	std::fill(g.dirty.begin(), g.dirty.end(), 0);
-	_turned_times.widen += TurnedNow() - t1;
+	if (map) _turned_times.widen += TurnedNow() - t1;
 }
 
 /**
@@ -10036,7 +10075,8 @@ struct EyeFrame {
 	std::deque<std::vector<uint32_t>> colours; ///< textures of this frame alone the triangles point to (a colour, the far land's)
 	std::deque<CabTexture> sprites;           ///< sprites painted for this frame alone (a bridge's, a foundation's)
 	std::deque<EyeCanvas> canvases;           ///< pictures of its own drawn while collecting (a tunnel seen in)
-	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead
+	std::vector<uint32_t> ground;             ///< the north-up texture of the ground ahead, drawn for it alone (else the kept one, _eye_ground)
+	ThreeDGpuGroundTexture ground_card;       ///< the kept one as the card gets it: what was drawn into it since the card had it (pixels nullptr: none)
 	std::unordered_map<const uint32_t *, uint64_t> kept; ///< the textures its triangles point to that the frames share (a sprite's), by their number
 	CabEye eye{};                             ///< the eye it is seen from
 	double near_plane = 0;                    ///< its near plane (_cab_near)
@@ -10086,6 +10126,8 @@ struct EyeCard {
 				if (k != this->of.kept.end()) uid = k->second;
 			}
 			this->frame.textures.push_back({px, w, h, uid});
+			/* The kept ground (_eye_ground): the card keeps its own, only what was drawn into it since sent. */
+			if (px != nullptr && px == this->of.ground_card.pixels) this->frame.textures.back().ground = &this->of.ground_card;
 		}
 		return it->second;
 	}
@@ -13083,6 +13125,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		size_t first, end;
 		bool building;
 		bool foundation; ///< its ground lies on a foundation, as the foundation's children
+		int raw_z;       ///< its height before its foundation (TurnedTile::raw_z)
+		int found[2];    ///< its foundations' parent sprites (_vd.foundation), -1 none
 	};
 	std::vector<CabTile> tiles;
 	int tcx = static_cast<int>(v != nullptr ? v->x_pos : eye.x) / static_cast<int>(TILE_SIZE), tcy = static_cast<int>(v != nullptr ? v->y_pos : eye.y) / static_cast<int>(TILE_SIZE);
@@ -13098,7 +13142,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				int along = t.axis == Axis::X ? tx : ty, across = t.axis == Axis::X ? ty : tx;
 				if (across * static_cast<int>(TILE_SIZE) + static_cast<int>(TILE_SIZE) / 2 == static_cast<int>(t.c_mid) && along * TILE_SIZE >= t.s_lo && (along + 1) * TILE_SIZE <= t.s_hi) continue;
 			}
-			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false, false});
+			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false, false, 0, {-1, -1}});
 		}
 	}
 	camera.tiles = static_cast<int>(tiles.size());
@@ -13175,6 +13219,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		_cur_ti.tile = TileXY(t.x, t.y);
 		TileType tile_type = GetTileType(_cur_ti.tile);
 		std::tie(_cur_ti.tileh, _cur_ti.z) = GetTilePixelSlope(_cur_ti.tile);
+		t.raw_z = _cur_ti.z;
 		_vd.foundation_part = FoundationPart::None;
 		_vd.foundation[FoundationPart::Normal] = -1;
 		_vd.foundation[FoundationPart::Halftile] = -1;
@@ -13202,7 +13247,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		is_foundation.resize(_vd.parent_sprites_to_draw.size(), 0);
 		for (int part = 0; part < 2; part++) {
 			int idx = _vd.foundation[static_cast<FoundationPart>(part)];
-			if (idx >= static_cast<int>(first_parent) && idx < static_cast<int>(_vd.parent_sprites_to_draw.size())) is_foundation[idx] = 1;
+			if (idx >= static_cast<int>(first_parent) && idx < static_cast<int>(_vd.parent_sprites_to_draw.size())) {
+				is_foundation[idx] = 1;
+				t.found[part] = idx;
+			}
 		}
 		/* What stands on the tile is a box of its sprite on a house, industry, object or station tile (a tree is a billboard). */
 		uint8_t kind = (tile_type == TileType::House || tile_type == TileType::Industry || tile_type == TileType::Object) ? 1 : (tile_type == TileType::Station ? 2 : 0);
@@ -13428,7 +13476,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	ForWalkerPlantParts(AddCabPlant);
 
 	eye_stage(1);
-	/* 3. The ground of all of them, north-up, in one texture at the normal zoom. */
+	/* 3. The ground of all of them, north-up, in one texture at the normal zoom: the kept one (_eye_ground), only the
+	 * tiles whose ground changed or came new drawn into it; or one drawn for this frame alone (the rig, or more than
+	 * the kept one may hold). */
 	DrawPixelInfo bigdpi{};
 	bigdpi.zoom = zoom;
 	int bw = 0, bh = 0;
@@ -13458,7 +13508,73 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		Debug(misc, 6, "cab ground texture {}x{} from {},{} tiles {} x {}..{} y {}..{} eye {:.0f},{:.0f} heading {:.2f}", bw, bh, bigdpi.left, bigdpi.top, tiles.size(), mnx, mxx, mny, mxy, eye.x, eye.y, camera.heading);
 	}
-	if (bw > 0 && bh > 0 && static_cast<size_t>(bw) * bh <= 24u * 1024 * 1024) {
+	const int vs = ScaleByZoom(1, zoom);
+	const uint32_t *gpx = nullptr; ///< the texture's pixels
+	int gw = 0, gh = 0;            ///< its size
+	int gl = 0, gt = 0;            ///< its first pixel, pixels of the zoom
+	if (bw > 0 && bh > 0 && _eye_ground_kept && PlaceTurnedGround(_eye_ground, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, EYE_GROUND_PIXELS, EYE_GROUND_SIDE)) {
+		/* The tiles as the kept ground takes them; one on a foundation with its ground as drawn here: its sprites, then
+		 * the foundation's children (on its top). */
+		std::vector<TurnedTile> ground_tiles;
+		std::vector<std::vector<TurnedGroundSprite>> on_foundations(tiles.size());
+		ground_tiles.reserve(tiles.size());
+		for (size_t n = 0; n < tiles.size(); n++) {
+			const CabTile &t = tiles[n];
+			TurnedTile &tt = ground_tiles.emplace_back();
+			tt.x = t.x;
+			tt.y = t.y;
+			tt.near = t.f;
+			tt.type = TileType::Clear;
+			tt.raw_slope = tt.top_slope = t.slope;
+			tt.raw_z = t.raw_z;
+			tt.top_z = t.z;
+			tt.first_sprite = t.first;
+			tt.end_sprite = t.end;
+			tt.foundation[0] = t.found[0];
+			tt.foundation[1] = t.found[1];
+			tt.building = t.building;
+			tt.round = false;
+			if (t.found[0] == -1 && t.found[1] == -1) continue;
+			std::vector<TurnedGroundSprite> &on = on_foundations[n];
+			for (size_t i = t.first; i < t.end; i++) {
+				const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+				on.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub != nullptr, ts.sub != nullptr ? *ts.sub : SubSprite{}});
+			}
+			for (int part = 0; part < 2; part++) {
+				if (t.found[part] < 0) continue;
+				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[t.found[part]];
+				for (int child_idx = ps.first_child; child_idx >= 0;) {
+					const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+					child_idx = cs.next;
+					on.push_back({cs.image, cs.pal, cs.relative ? ps.left + cs.x : ps.x + cs.x, cs.relative ? ps.top + cs.y : ps.y + cs.y, cs.sub != nullptr, cs.sub != nullptr ? *cs.sub : SubSprite{}});
+				}
+			}
+		}
+		UpdateTurnedGround(_eye_ground, ground_tiles, on_foundations);
+		const TurnedGround &g = _eye_ground;
+		gpx = g.px.data();
+		gw = g.Width();
+		gh = g.Height();
+		gl = g.at.l;
+		gt = g.at.t;
+		out.ground = {};
+		/* What the card gets of it: what was drawn into it since the card had it (FreeEyeFrame() tells it had). */
+		ThreeDGpuGroundTexture &c = out.ground_card;
+		c = {};
+		c.key = EYE_GROUND_CARD_KEY;
+		c.generation = g.generation;
+		c.from_generation = g.card_whole ? 0 : g.card_generation;
+		c.from_x = g.card_x;
+		c.from_y = g.card_y;
+		c.width = gw;
+		c.height = gh;
+		c.pixels = gpx;
+		for (const GroundRect &r : g.card_changed) {
+			const GroundRect in = r.Within(g.at);
+			if (!in.Empty()) c.changed.push_back({in.l - g.at.l, in.t - g.at.t, in.r - in.l, in.b - in.t});
+		}
+		_eye_ground_frames[1]++;
+	} else if (bw > 0 && bh > 0 && static_cast<size_t>(bw) * bh <= 24u * 1024 * 1024) {
 		out.ground.assign(static_cast<size_t>(bw) * bh, 0);
 		bigdpi.dst_ptr = out.ground.data();
 		bigdpi.pitch = bw;
@@ -13498,15 +13614,22 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			int y1 = Clamp(static_cast<int>((sth.y - bigdpi.top) * scale) + 1, 0, bh);
 			FillTurnedFootprint(out.ground.data(), bw, x0, y0, x1, y1);
 		}
-
+		gpx = out.ground.data();
+		gw = bw;
+		gh = bh;
+		gl = bigdpi.left / vs;
+		gt = bigdpi.top / vs;
+		_eye_ground_frames[0]++;
+	}
+	if (gpx != nullptr) {
 		if (_debug_misc_level >= 7) {
 			/* The rig: the ground texture as a PPM in the working directory. */
 			auto f = FileHandle::Open(std::string("cab_ground.ppm"), "wb");
 			if (f.has_value()) {
-				std::string head = fmt::format("P6\n{} {}\n255\n", bw, bh);
+				std::string head = fmt::format("P6\n{} {}\n255\n", gw, gh);
 				fwrite(head.data(), 1, head.size(), *f);
-				for (uint32_t p : out.ground) {
-					Colour c(p);
+				for (size_t i = 0; i < static_cast<size_t>(gw) * gh; i++) {
+					Colour c(gpx[i]);
 					uint8_t rgb[3] = {c.r, c.g, c.b};
 					fwrite(rgb, 1, 3, *f);
 				}
@@ -13528,10 +13651,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				double wz = t.z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
 				double cx, cy;
 				RemapCoordsF(wx, wy, wz, cx, cy);
-				p[i] = CabToEye(eye, wx, wy, wz, (cx - bigdpi.left) * scale, (cy - bigdpi.top) * scale);
+				p[i] = CabToEye(eye, wx, wy, wz, cx * scale - gl, cy * scale - gt);
 			}
 			for (int i = 0; i < 4; i++) {
-				CabDrawPolygon(dst, zb, width, height, out.ground.data(), bw, bh, {p[i], p[(i + 1) % 4], p[4]}, eye, true);
+				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, true);
 			}
 		}
 	}
@@ -14452,6 +14575,16 @@ bool EyeFrameDrawing()
 /** A frame done with: the pictures it pinned let go of, its buffers kept for the next. */
 static void FreeEyeFrame(std::unique_ptr<EyeFrame> f)
 {
+	/* The card has the kept ground as the frame sent it (DrawEyeFrameOnCard()): what was drawn into it since is sent no more. */
+	TurnedGround &g = _eye_ground;
+	if (f->on_card && f->ground_card.pixels != nullptr && f->ground_card.pixels == g.px.data() && f->ground_card.generation == g.generation) {
+		g.card_generation = g.generation;
+		g.card_x = g.card_y = 0;
+		g.card_whole = false;
+		g.card_changed.clear();
+	}
+	f->ground_card = {};
+	f->on_card = false;
 	if (f->pinned) {
 		PinThreeDPictures(false);
 		f->pinned = false;
@@ -14479,6 +14612,8 @@ static std::unique_ptr<EyeFrame> NewEyeFrame(const void *client)
 	f->pinned = false;
 	f->collect_ms = f->draw_ms = 0;
 	f->shown = 0;
+	f->on_card = false;
+	f->ground_card = {};
 	return f;
 }
 
@@ -14542,6 +14677,9 @@ void DropEyeFrame(const void *client)
 		if (_eye_drawn != nullptr && _eye_drawn->client == client) drawn = std::move(_eye_drawn);
 	}
 	if (drawn != nullptr) FreeEyeFrame(std::move(drawn));
+	/* Its kept ground let go of (megabytes), when no frame on the way is drawn from it: the next window lays it anew. */
+	std::lock_guard lock(_eye_mutex);
+	if (_eye_to_draw == nullptr && !_eye_drawing && _eye_drawn == nullptr) _eye_ground = TurnedGround();
 }
 
 /**
