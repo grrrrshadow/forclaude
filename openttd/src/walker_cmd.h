@@ -14,12 +14,13 @@
 
 #include "command_type.h"
 #include "walker_inventory.h"
+#include "vehicle_type.h"
 
 CommandCost CmdBuyWalkerItem(DoCommandFlags flags, TileIndex tile, WalkerItem item);
 CommandCost CmdUseWalkerItem(DoCommandFlags flags, WalkerItem item);
 CommandCost CmdShootWalkerItem(DoCommandFlags flags, WalkerItem item);
 CommandCost CmdFeedWalkerItem(DoCommandFlags flags, WalkerItem item);
-CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage);
+CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage, VehicleID riding);
 CommandCost CmdReviveWalker(DoCommandFlags flags, uint8_t health);
 CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver);
 CommandCost CmdBuyWalkerPet(DoCommandFlags flags, const std::string &name);

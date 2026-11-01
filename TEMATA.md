@@ -31,6 +31,39 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (75) – Rána ve voze nejdřív porouchá vůz; kabina aut bez oka zevnitř; logy #319
+
+- Hráč: *„když něco zautoči na mně v trabantu tak tam bude nejdřiv porouchanej trabant a pak při další ráně to
+  schytá postava. teď hned v trabantu ubyva život postavě.“*
+- **Rána ve voze:** `CmdHurtWalker` dostává i vozidlo, ve kterém chodec sedí. Když vozidlo není porouchané, rána ho
+  porouchá stejně, jako to dělají draci z farmy (kouř, zastaví na 7–14 s), a zdraví zůstane. Když už porouchané je,
+  ránu dostane postava. Po opravě poruchy zase nejdřív vůz. Obraz zčervená jen při ráně do postavy. Rig:
+  `test3d inventar zraneni N` (ve voze vypíše poruchu). Trabant v rigu: 1. rána porucha, zdraví 100; 2. rána 90;
+  3. rána 80.
+- Hráč: *„co ma trabant s interierem , cabvview je bez koukani zevnitř. vždycky tam bude aspoň obrys čelniho skla
+  pohled zevnitř auta. , to nevadi že nema interier“*
+- **Kabina zevnitř:** žádné auto ze sady osobních aut kolegy (Trabant, Velorex, GAZ, Škody, Karosa, Tesla) nemá
+  v záznamu oko kabiny (`kabina`). Kabina proto koukala zpředu auta bez auta. Teď se oko u modelu se sklem odhadne
+  z čelního skla (`GuessedCabEye()`): 0,55 m za jeho horní hranou uprostřed, ve 55 % jeho výšky, na levém sedadle.
+  Auto se kreslí kolem oka jako u modelů s `kabina`. Řidička se zevnitř nekreslí. Modely bez skla (kolečko,
+  dvoukolák, vozy) zůstávají jako dřív. Odhad se zapíše do logu (`3D: the eye of the cab of … guessed`).
+- Rig (Trabant, mírné klima): střecha, levý sloupek se zrcátkem, čelní sklo, palubní deska, stěrače a sedadla.
+  Trabant vnitřek má.
+- **Logy #319 (73a46da):** hráč *„tam je #317a ja vynechal 318 a nakonec je 319“*.
+  - Mapa ve městě s provozem 25–30 snímků/s (v #317 2–5). Změny najednou fungují, karta žádný blok nevrátila.
+  - 14:36–14:37:50 jen 3–4 snímky/s: `modely` 150–260 ms na snímek a `stojici procesorem` 0. Jsou to domy v malém
+    okně natočeném na sever (okno vozidla), které procesor od #123 kreslí trojúhelníky každý snímek. Oprava je
+    #127 (malá okna kartou).
+  - Z očí asi 9 snímků/s: sběr 30–40 ms, kreslení 60–70 ms (karta 55 ms). Mapa za oknem kabiny přitom dál pokládá
+    změny (`plakaty` 40 ms na snímek).
+  - `jizda.log`: auto stálo před domem (dlaždice typu dům, nelze vjet). To je správně.
+- **grrrrf 1. 11.:** Special 3D v6 (dvoukolák a kolečko 1 t), GRF si hráč dává sám. Nové stromy (13 z Low Poly
+  Forest Tree Pack) a prosba kreslit jimi i stromy mapy: domluvit s hráčem. Převzetí stadionu a vlků: u nás nic.
+- Hráč (nové): *„na hradu dračí farma bude kostra a entrem tam sebere " sada na opravu motoru " a tim opraví
+  poruchu auta tou sadou. musime udělat kostru bubaka skeletona v grrrf“*, pak *„čim to sebere? ja nemam enter
+  jenom e i a ještě jedno a to nevim a ctrl a myšítka a to je hodně šipky na to že mam telefon displej a ne
+  klavesnici“* → sbírá se klávesou E jako všechno ostatní. Návrh čeká na odsouhlasení.
+
 ## 1. 11. (74) – GPU sběr z očí: zem z očí držená mezi snímky, na kartu jen to, co se změnilo
 
 - Hráč: *„pokračuj v gpu“* → další domluvený bod GPU, sběr pohledu z očí (#221).

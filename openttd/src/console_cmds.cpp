@@ -9430,9 +9430,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (argv.size() > 3 && argv[2] == "zdravi" && n.has_value()) {
 			c->walker_health = static_cast<uint8_t>(std::clamp(*n, 0, static_cast<int>(WALKER_HEALTH_MAX)));
 		} else if (argv.size() > 3 && argv[2] == "zraneni" && n.has_value()) {
-			/* A dragon's blow, through the command, as the game deals it. */
+			/* A dragon's blow, through the command, as the game deals it: in a vehicle its breakdown first. */
+			extern const Vehicle *FirstPersonRiding();
+			const Vehicle *in = FirstPersonRiding();
 			AutoRestoreBackup cur_company(_current_company, _local_company);
-			Command<Commands::HurtWalker>::Do(DoCommandFlag::Execute, static_cast<uint8_t>(std::clamp(*n, 0, 255)));
+			Command<Commands::HurtWalker>::Do(DoCommandFlag::Execute, static_cast<uint8_t>(std::clamp(*n, 0, 255)), in != nullptr ? in->First()->index : VehicleID::Invalid());
+			if (in != nullptr) IConsolePrint(CC_DEFAULT, "test3d: inventar zraneni ve voze {}: porucha {}", in->First()->unitnumber, in->First()->breakdown_ctr);
 		} else if (argv.size() > 3 && argv[2] == "rolovat" && n.has_value()) {
 			/* 'inventar rolovat <pixels>': the list in the window scrolled so far; how long it is, how much is seen. */
 			extern std::string RigWalkerInventoryScroll(int pos);

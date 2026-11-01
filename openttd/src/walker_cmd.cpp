@@ -20,6 +20,7 @@
 #include "house.h"
 #include "town_map.h"
 #include "industry.h"
+#include "vehicle_base.h"
 #include "industry_map.h"
 #include "climate_industries.h"
 #include "cargotype.h"
@@ -225,15 +226,30 @@ CommandCost CmdFeedWalkerItem(DoCommandFlags flags, WalkerItem item)
 
 /**
  * Hurt the walker of the view from the first person: a dragon's blow (the player, 15. 10.: "they attack the player").
- * At no health left the view closes and the player is back on the map (first_person_gui.cpp).
+ * At no health left the view closes and the player is back on the map (first_person_gui.cpp). In a vehicle the blow
+ * breaks the vehicle down first, as the dragons of a farm do, and only while it is broken down does the walker take it
+ * (the player, 1. 11.: "first a broken-down Trabant, and at the next blow the figure gets it").
  * @param flags operation to perform
  * @param damage how much health it takes
+ * @param riding the vehicle the walker is in, INVALID_VEHICLE on foot
  * @return nothing, or an error
  */
-CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage)
+CommandCost CmdHurtWalker(DoCommandFlags flags, uint8_t damage, VehicleID riding)
 {
 	Company *c = Company::GetIfValid(_current_company);
 	if (c == nullptr) return CMD_ERROR;
+	Vehicle *v = Vehicle::GetIfValid(riding);
+	if (v != nullptr) v = v->First();
+	if (v != nullptr && v->breakdown_ctr == 0 && !v->vehstatus.Test(VehState::Crashed) &&
+			(v->type == VehicleType::Train || v->type == VehicleType::Road || v->type == VehicleType::Ship || v->type == VehicleType::Aircraft)) {
+		if (flags.Test(DoCommandFlag::Execute)) {
+			/* Counting down to the breakdown as CheckVehicleBreakdown() starts one: it comes in a tick or two. */
+			v->breakdown_ctr = 3;
+			v->breakdown_delay = static_cast<uint8_t>(GB(Random(), 0, 7) + 0x80);
+			v->breakdown_chance = 0;
+		}
+		return CommandCost();
+	}
 	if (flags.Test(DoCommandFlag::Execute)) {
 		c->walker_health = static_cast<uint8_t>(c->walker_health > damage ? c->walker_health - damage : 0);
 		InvalidateWindowData(WindowClass::FirstPerson, 0);

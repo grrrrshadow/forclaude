@@ -4914,6 +4914,76 @@ static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const
 }
 
 /**
+ * The eye of the cab of a model whose index has none ("kabina"): no car of the colleague's sets of cars has it, and the
+ * cab view looked out from before the car without the car (the player, 1. 11.: "there will always be at least the
+ * outline of the windscreen, the view from inside the car; it does not matter that it has no interior"). Far enough
+ * behind the top of its windscreen -- the frontmost of its glass before the driver -- that the field of view (90
+ * degrees across) holds both its pillars and the roof's edge, a little over half its height up, a little to the left
+ * (the driver's seat). A model without glass (a cart, a barrow) has none: the eye before it as before. None too while
+ * its shape is not read.
+ */
+static std::optional<std::array<double, 3>> GuessedCabEye(const ThreeDVehicleObject &m)
+{
+	/* By its shape: a model read anew is guessed anew. */
+	static std::unordered_map<uint64_t, std::array<double, 3>> guessed;
+	const ThreeDVehicleShape *shape = m.TryGetShape();
+	if (shape == nullptr || shape->pos.size() < 9) return std::nullopt;
+	if (auto it = guessed.find(shape->uid.value); it != guessed.end()) {
+		if (std::isnan(it->second[0])) return std::nullopt;
+		return it->second;
+	}
+	double rear = 1e9, front = -1e9, left = -1e9, right = 1e9, floor = 1e9, roof = -1e9;
+	for (size_t c = 0; c + 2 < shape->pos.size(); c += 3) {
+		rear = std::min<double>(rear, shape->pos[c]);
+		front = std::max<double>(front, shape->pos[c]);
+		right = std::min<double>(right, shape->pos[c + 1]);
+		left = std::max<double>(left, shape->pos[c + 1]);
+		floor = std::min<double>(floor, shape->pos[c + 2]);
+		roof = std::max<double>(roof, shape->pos[c + 2]);
+	}
+	const double width = std::max(0.5, left - right);
+	/* The glass: the frontmost before the driver, and with it what lies within most of a metre behind it. */
+	auto centre = [&](size_t t, int k) {
+		double sum = 0;
+		for (int c = 0; c < 3; c++) sum += shape->pos[shape->tri[t * 3 + c] * 3 + k];
+		return sum / 3;
+	};
+	double glass_front = -1e9;
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
+		if (shape->IsGlass(t) && std::abs(centre(t, 1)) < 0.3 * width) glass_front = std::max(glass_front, centre(t, 0));
+	}
+	double top_x = 1e9, low = 1e9, high = -1e9;
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size() && glass_front > -1e8; t++) {
+		if (!shape->IsGlass(t) || centre(t, 0) < glass_front - 0.8 || std::abs(centre(t, 1)) > 0.45 * width) continue;
+		for (int c = 0; c < 3; c++) {
+			const size_t i = shape->tri[t * 3 + c] * 3;
+			/* Its top edge in the middle, not the side windows' corners behind it. */
+			if (std::abs(shape->pos[i + 1]) < 0.3 * width) top_x = std::min<double>(top_x, shape->pos[i]);
+			low = std::min<double>(low, shape->pos[i + 2]);
+			high = std::max<double>(high, shape->pos[i + 2]);
+		}
+	}
+	std::array<double, 3> cab{};
+	if (low < high && top_x < 1e8) {
+		cab = {std::clamp(top_x - 0.55, rear + 0.3, std::max(rear + 0.3, front - 0.3)), std::min(0.4, 0.2 * width), std::clamp(low + 0.55 * (high - low), floor, roof)};
+	} else {
+		cab = {std::nan(""), 0, 0};
+	}
+	guessed[shape->uid.value] = cab;
+	Debug(misc, 1, "3D: the eye of the cab of {} guessed {:.2f}, {:.2f}, {:.2f} m (length {:.2f}..{:.2f}, width {:.2f}, height {:.2f}..{:.2f}; windscreen {:.2f}..{:.2f} m along, {:.2f}..{:.2f} m high)",
+			m.name, cab[0], cab[1], cab[2], rear, front, width, floor, roof, top_x, glass_front, low, high);
+	if (std::isnan(cab[0])) return std::nullopt;
+	return cab;
+}
+
+/** Where the eye of a model's cab is, metres in its frame: its index's ("kabina"), or one guessed (GuessedCabEye()); none not known yet. */
+static std::optional<std::array<double, 3>> CabEyeOf(const ThreeDVehicleObject &m)
+{
+	if (m.has_cab) return std::array<double, 3>{m.cab[0], m.cab[1], m.cab[2]};
+	return GuessedCabEye(m);
+}
+
+/**
  * How high the eye of a model's cab is, metres ("kabina"): where its index has it -- unless that is below the glass of
  * the windscreen in front of it, when it is lifted to the middle of the windscreen. The colleague puts the eye in the
  * driver's head, and the driver, a girl smaller than the cab was made for, looked at the dashboard under the window
@@ -4924,8 +4994,10 @@ static double CabEyeHeight(const ThreeDVehicleObject &m)
 {
 	static std::unordered_map<const ThreeDVehicleObject *, double> lifted;
 	if (auto it = lifted.find(&m); it != lifted.end()) return it->second;
+	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
+	if (!cab.has_value()) return m.cab[2];
 	const ThreeDVehicleShape *shape = m.TryGetShape();
-	if (shape == nullptr) return m.cab[2];
+	if (shape == nullptr) return (*cab)[2];
 	/* The glass ahead of the eye, within a metre and a half and as wide as a windscreen before the driver. */
 	double lo = 1e9, hi = -1e9;
 	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
@@ -4933,13 +5005,13 @@ static double CabEyeHeight(const ThreeDVehicleObject &m)
 		for (int k = 0; k < 3; k++) {
 			const size_t c = shape->tri[t * 3 + k];
 			if (c * 3 + 2 >= shape->pos.size()) continue;
-			const double x = shape->pos[c * 3] - m.cab[0], y = shape->pos[c * 3 + 1] - m.cab[1], z = shape->pos[c * 3 + 2];
-			if (x < 0.2 || x > 1.5 || std::abs(y) > 0.8 || z < m.cab[2] - 0.6) continue;
+			const double x = shape->pos[c * 3] - (*cab)[0], y = shape->pos[c * 3 + 1] - (*cab)[1], z = shape->pos[c * 3 + 2];
+			if (x < 0.2 || x > 1.5 || std::abs(y) > 0.8 || z < (*cab)[2] - 0.6) continue;
 			lo = std::min(lo, z);
 			hi = std::max(hi, z);
 		}
 	}
-	double z = m.cab[2];
+	double z = (*cab)[2];
 	if (lo < hi && z < lo + 0.1) z = (lo + hi) / 2;
 	lifted[&m] = z;
 	return z;
@@ -4990,9 +5062,10 @@ static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts
 	const auto key = std::make_tuple(&m, parts.bits, turn);
 	if (auto it = ahead.find(key); it != ahead.end()) return it->second;
 	const ThreeDVehicleShape *shape = m.TryGetShape(0, parts);
-	if (shape == nullptr) return 0;
+	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
+	if (shape == nullptr || !cab.has_value()) return 0;
 	/* From the eye along the way the model goes, through what is drawn of it from its cab (not the driver's seat). */
-	const double ox = m.cab[0], oy = m.cab[1], oz = CabEyeHeight(m), dx = std::cos(turn), dy = -std::sin(turn);
+	const double ox = (*cab)[0], oy = (*cab)[1], oz = CabEyeHeight(m), dx = std::cos(turn), dy = -std::sin(turn);
 	std::vector<std::pair<double, bool>> hits; // how far, whether of the glass
 	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
 		const uint8_t part = t < shape->tri_part.size() ? shape->tri_part[t] : 0;
@@ -12954,7 +13027,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	if (walker == nullptr && ThreeDEnabled()) {
 		for (const Vehicle *u = v->First(); u != nullptr && !in_model_cab && !over_model; u = u->Next()) {
 			ThreeDEyeVehicle ev;
-			if (!GetThreeDEyeVehicle(u, ev) || ev.obj == nullptr || (!roof && !ev.obj->has_cab)) continue;
+			/* The eye in the cab of any model: its index's, or one guessed from its windscreen (GuessedCabEye()). */
+			if (!GetThreeDEyeVehicle(u, ev) || ev.obj == nullptr || (!roof && !CabEyeOf(*ev.obj).has_value())) continue;
 			own_model = ev;
 			(roof ? over_model : in_model_cab) = true;
 		}
@@ -13001,7 +13075,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double ta = (st != nullptr ? st->turn : 0.0) * M_PI / 180.0;
 		/* Looking out through the glass, or else from before the cab (CabEyeAhead()); in a cab of MSTS where it has the eye. */
 		const double go = camera.msts ? 0.0 : CabEyeAhead(m, m.PartsOf(own_model.state), ta);
-		const double kx = m.cab[0] + go * std::cos(ta), ky = m.cab[1] - go * std::sin(ta);
+		const std::array<double, 3> cab = CabEyeOf(m).value_or(std::array<double, 3>{m.cab[0], m.cab[1], m.cab[2]});
+		const double kx = cab[0] + go * std::cos(ta), ky = cab[1] - go * std::sin(ta);
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
 		eye.x = own_model.x + cx * ahead * bfx - cy * across * bfy;
 		eye.y = own_model.y + cx * ahead * bfy + cy * across * bfx;

@@ -884,11 +884,12 @@ struct FirstPersonWindow : Window {
 			return;
 		}
 		/* The blows of the dragons and the animals since the last step (three_d_dragons.h, three_d_animals.h): the health
-		 * through the command, the picture red a moment. */
+		 * through the command, the picture red a moment; in a vehicle its breakdown first (CmdHurtWalker()). */
 		const uint damage = TakeThreeDDragonDamage() + TakeThreeDAnimalDamage();
 		if (damage > 0 && c != nullptr) {
-			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)));
-			this->hurt_steps = 6;
+			const bool broken = rv == nullptr || rv->First()->breakdown_ctr != 0;
+			Command<Commands::HurtWalker>::Post(TileIndex{}, static_cast<uint8_t>(std::min(damage, 255u)), rv != nullptr ? rv->First()->index : VehicleID::Invalid());
+			if (broken) this->hurt_steps = 6;
 		}
 		/* The walker's nurse with it, insured (three_d_animals.h): a little health back every few seconds of the game,
 		 * counted from when there is any to give back (the player, 31. 10.: "+10 every 3 s, yes"). */
@@ -2377,6 +2378,13 @@ bool FirstPersonCoversMap()
 }
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */
+/** The vehicle the walker of the view from the first person is in (the rig: test3d inventar zraneni), nullptr on foot or without the view. */
+const Vehicle *FirstPersonRiding()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr ? w->Riding() : nullptr;
+}
+
 bool FirstPersonWalkerAt(double &x, double &y)
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
