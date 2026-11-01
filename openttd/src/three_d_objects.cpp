@@ -2708,6 +2708,7 @@ static uint32_t GirlsShift(const nlohmann::json &list)
  * A figure of a list ("postava", "poza"): "<postava>/<poza>". A girl of the game there is dealt from all of them: the
  * one so many further on (the shift of the list), so the girls named differently in a list stay different and every
  * girl of the game takes her turn everywhere one sits or stands -- Lady Pink and the shaman girl, and any after them.
+ * With no shift the girl named (a vehicle's crew, ReadCrew()).
  */
 static std::string FigureNamed(const nlohmann::json &f, uint32_t shift)
 {
@@ -2725,11 +2726,14 @@ static std::string FigureNamed(const nlohmann::json &f, uint32_t shift)
  * The figures riding on a vehicle or sitting on a piece of a load ("posadka", "posadky"): each "postava" at its
  * "poloha", turned ("otoceni"), bigger than it is by "meritko" (the girls on a lorry's back), at the driver's seat
  * ("misto_ridicky"). The figure is the vehicle's package's, else the game's (GetThreeDFigure()).
+ * @param deal the girls of the game dealt by turns (FigureNamed()): the girls carried as a load on its seats; a
+ *        vehicle's own crew is who its record names (the player, 1. 11.: "College Girl drives by default, the other
+ *        girls in the configurator" -- the configurator's states choosing a group of "posadky", the set's to offer)
  */
-static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out)
+static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> &out, bool deal)
 {
 	if (!list.is_array()) return;
-	const uint32_t shift = GirlsShift(list);
+	const uint32_t shift = deal ? GirlsShift(list) : 0;
 	for (const auto &c : list) {
 		if (!c.is_object() || !c.contains("postava")) continue;
 		ThreeDVehicleCrew crew;
@@ -4032,7 +4036,7 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 			}
 		}
 	}
-	if (e.contains("posadka")) ReadCrew(e.at("posadka"), piece.seats);
+	if (e.contains("posadka")) ReadCrew(e.at("posadka"), piece.seats, true);
 	ThreeDVehicleObject fig;
 	if (e.contains("soubor") && e.at("soubor").is_string()) {
 		fig.package = package;
@@ -4835,7 +4839,7 @@ static void ReadThreeDVehicleObjects()
 					}
 				}
 				/* The crew: figures riding in it, never fading. */
-				if (e.contains("posadka")) ReadCrew(e.at("posadka"), obj.crew);
+				if (e.contains("posadka")) ReadCrew(e.at("posadka"), obj.crew, false);
 				/* The parts a state shows (the colleague's hra/3d/PROSBA-V3S-3D.md): each node of each add-on, then each
 				 * group of the crew; part 0 is what is always drawn. */
 				obj.part_names.assign(1, std::string());
@@ -4869,7 +4873,7 @@ static void ReadThreeDVehicleObjects()
 				if (e.contains("posadky") && e.at("posadky").is_object()) {
 					for (const auto &[group, list] : e.at("posadky").items()) {
 						std::vector<ThreeDVehicleCrew> crew;
-						ReadCrew(list, crew);
+						ReadCrew(list, crew, false);
 						obj.part_names.push_back("posadky/" + group);
 						obj.crew_groups.emplace_back(group, std::move(crew));
 					}

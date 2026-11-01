@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 1. 11. (79) – Řidička vozidla je ta ze záznamu (College Girl), holky se střídají jen jinde
+
+- Hráč (zip logů z #320): *„sergeje řidila jiná holka než colege girl, implicidně bude colege girl řidit a dalši
+  holky budou v konfiguratoru .“*, *„podivej se do temata“*, *„hra střida holky na balkonech a ve městě ale řídí vždy
+  coleege girl“*.
+- **Příčina:** od (#253) hra střídá všech 9 holek všude, kde index nějakou holku jmenuje, i v posádce vozidla. Sergej
+  (`posadka`: `college_girl`, `oprena_o_pult`) tak dostal jinou holku. Stejně by se zamíchaly holky skupin `posadky`,
+  které vybírá konfigurátor GRF (Special v3 se 7 holkami).
+- **Teď:** posádka vozidla (`posadka`, `posadky`) je ta, kterou jmenuje záznam. U Sergeje, Tater a V3S je to
+  College Girl. Jiné řidičky přijdou ze skupin `posadky`, které vybírá stav GRF (konfigurátor), jak bylo domluveno
+  27. 10. (20) a 18. 10. Holky na lavicích a místech nákladu, na balkonech, u domů a ve městě se střídají dál.
+- Rig (Sergej v7, `misc=3`): posádky vozidel `college_girl → college_girl` a podobně, holky na domech a lavicích
+  dál vystřídané.
+
 ## 1. 11. (78) – Simtrains: živák jako v MSTS, časy z `.eng` modelu
 
 - Hráč: *„sem řek že bude mačkat furt když jednou zmačkne živak 1 zeptaš se, řeknu ti to a živak nebrzdi vlak jak
