@@ -83,7 +83,11 @@ vzdálených měst přes blízkého slona; slon mění polohu hlavy, když kolem
   okno crash logu pak na bezpečném zásobníku jako dřív; když vlákno crash logu do 2 min neskončí (zámek
   souboru, do kterého psalo spadlé vlákno), hra skončí. Co zásobník sežralo, ukáže až další crash log.
 - `-fstack-usage` přes všechny soubory (gcc -O2): žádná funkce na cestě z očí nemá obří rámec (největší
-  `CollectEyeFrame` 2,6 KB; `ConTest3D` 68 KB je jen konzole rigu). Spíš rekurze nebo hluboké volání.
+  `CollectEyeFrame` 2,6 KB; `ConTest3D` 68 KB je jen konzole rigu). Žádná `alloca`/VLA bez meze.
+- Graf volání (`-fcallgraph-info=su`, Tarjan přes všechny soubory): v našem kódu jen dvě rekurze,
+  `EyeOrigin()` a `ObjectOriginOnMap()` (souprava aut), obě se stropem 4 článků. Neomezenou rekurzi statický graf
+  nevidí. Zbývá rekurze přes nepřímá volání (okna, události, zprávy Windows uvnitř obsluhy zprávy) nebo
+  hluboká volání s velkými rámci MSVC. Rozhodne až crash log se zásobníkem.
 
 ## 2. 11. (90) – Stromy barvené podle použití (kolega `a0e75be`)
 
