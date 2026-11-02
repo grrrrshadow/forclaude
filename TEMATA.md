@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (87) – Čáry za auty při 0° na telefonu: zink odkládá mazání s nůžkami
+
+- Hráč (#322, screenshoty): *„screenshot čáry za autama. když otáčím tak zmizí a nedělaj se. když otevřu okno
+  auta všechny čáry zmizí. když něco udělám tak zmizí a začnou znova“*, *„dělá to jen pohled ze zhora. first
+  person view nikdy nedělá čáru“*, *„ja to musim pausnout a s ničim nehybat abych to vyfotil“*.
+- Deník #322 nic nevysvětlil: změny se kladou najednou (`zmen naraz` 150–185 za 5 s), `auta kartou` 400–900,
+  nic nepřesahuje obdélník. Rig (llvmpipe) s Volhami, Tatrami, 1203 a vlastními auty města čáry neudělal.
+- **Příčina:** karta před položením bloku maže jeho obdélník `glClear()` pod nůžkami (`DrawStandingOnCard()`)
+  a mezi tím mazáním a kreslením aut přepne rámec (auta se kreslí do zvláštního rámce a zmenšují do atlasu).
+  Zink (OpenGL přes Vulkan, hráčův Winlator na Mali) mazání **odkládá až k dalšímu kreslení**; Mesa 22.2.5 na
+  telefonu ho při přepnutí rámce ztratí (staré auto zůstane: čára), zink v rigu (Mesa 25.2, lavapipe) ho občas
+  provedl až po autě (mapa bez aut, ne pokaždé). Samostatná zkouška mazání (`cisteni s nuzkami`) prošla všude,
+  protože po ní hned čte pixely zpátky a to odložené mazání provede. Otočení a okno vozidla mažou celý obrázek
+  bez nůžek, proto čáry zmizí.
+- **Oprava:** u zinku karta maže obdélník vždycky kreslením čtverce (`ClearInScissor()` jako když zkouška
+  neprojde, deník `zink odklada mazani: karta maze kreslenim`). Navíc druhá zkouška `cisteni s nuzkami mezi
+  obrazky` přesně po krocích bloku (mazání, rámec aut, zmenšení, auto v obdélníku); když neprojde, maže se
+  kreslením i jinde. Rig zink: před opravou auta chyběla, po ní jsou (`zink_e`).
+- Hráč: *„pokračuj podle plánu, dodělej věci které chybí v přechodu na gpu a pak mužem dělat chyby“*,
+  k plakátům z očí (86): *„skus to znova a pořádně“* – vzdálená auta a figury z očí jedním kreslením (instance).
+
 ## 2. 11. (86) – Z očí: paměť 3,2 GB, protože se v pohledu z očí nikdy nic neuvolnilo
 
 - Hráč: *„pokračuj gpu“*, pak *„tohle máš hotový? Sběr pohledu z očí na kartě. S tím souvisí i ty 3,2 GB paměti,

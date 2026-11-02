@@ -2039,6 +2039,147 @@ static void TestScissoredClear()
 	gl.glGetError();
 }
 
+/**
+ * The scissor's clear as what stands on a block of the turned map has it (DrawStandingOnCard()), not on its own as
+ * TestScissoredClear() tries it: the picture with what stood on it drawn, its rect cleared under the scissor, then the
+ * vehicles' frame bound, cleared and drawn into, one shrunk from it into the kept pictures, and back in the picture a
+ * vehicle laid in the rect. Zink lost such a clear (the player's #322, 2. 11., zink on Mali: behind the cars and the
+ * animals of the map rows of their old pictures, none of the rect cleared; zink of the rig, the other way, cleared the
+ * cars laid after it -- the map without cars), the plain test passing on both. Read back: the rect's other pixels
+ * cleared, the vehicle there, the picture past the rect as it was. Told in the card's diary.
+ * @return whether the card kept to it; else ClearInScissor() draws over the rect
+ */
+GLuint NewGroundTexture(int w, int h);
+static bool TestScissoredClearAmongPictures()
+{
+	if (!_standing_program_ok || _standing_vao == 0) return true;
+	const int w = 256, h = 192, fw = 128, fh = 64, kw = 64, kh = 64;
+	GLuint pic[2] = {}, frame[2] = {}, kept = 0, paint = 0, fbo[3] = {}, depth[2] = {};
+	for (GLuint &t : pic) t = NewGroundTexture(w, h);
+	for (GLuint &t : frame) t = NewGroundTexture(fw, fh);
+	kept = NewGroundTexture(kw, kh);
+	/* Two texels to draw with: white, red. */
+	static const uint8_t texels[8] = {255, 255, 255, 255, 255, 0, 0, 255};
+	gl.glGenTextures(1, &paint);
+	gl.glBindTexture(GL_TEXTURE_2D, paint);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 2, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, texels);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	gl.glGenRenderbuffers(2, depth);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, depth[0]);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, w, h);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, depth[1]);
+	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, fw, fh);
+	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	gl.glGenFramebuffers(3, fbo);
+	static const GLenum both[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
+	static const GLenum one[1] = {GL_COLOR_ATTACHMENT0};
+	bool complete = true;
+	for (int k = 0; k < 2; k++) {
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[k]);
+		const GLuint *t = k == 0 ? pic : frame;
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, t[0], 0);
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, t[1], 0);
+		gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth[k]);
+		gl.glDrawBuffers(2, both);
+		complete &= gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	}
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[2]);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, kept, 0);
+	gl.glDrawBuffers(1, one);
+	complete &= gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+
+	bool ok = true;
+	if (complete) {
+		const GLuint p = _standing_program.program;
+		gl.glUseProgram(p);
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
+		gl.glActiveTexture(GL_TEXTURE0);
+		gl.glBindVertexArray(_standing_vao);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+		gl.glDisable(GL_DEPTH_TEST);
+		gl.glDisable(GL_CULL_FACE);
+		/* A quad of the texel at u of the texture bound, over x0,y0 - x1,y1 of a picture of size sw, sh. */
+		auto quad = [&](int sw, int sh, float x0, float y0, float x1, float y1, float u) {
+			gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(sw), static_cast<float>(sh));
+			const float c[] = {x0, y0, 0, u, 0.5f, x1, y0, 0, u, 0.5f, x1, y1, 0, u, 0.5f, x0, y0, 0, u, 0.5f, x1, y1, 0, u, 0.5f, x0, y1, 0, u, 0.5f};
+			gl.glBufferData(GL_ARRAY_BUFFER, sizeof(c), c, GL_STREAM_DRAW);
+			gl.glDrawArrays(GL_TRIANGLES, 0, 6);
+		};
+		/* What stood on it: the picture drawn whole, white, a frame before. */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+		gl.glDrawBuffers(2, both);
+		gl.glViewport(0, 0, w, h);
+		gl.glDisable(GL_SCISSOR_TEST);
+		gl.glDisable(GL_BLEND);
+		gl.glClearColor(0, 0, 0, 0);
+		gl.glClear(GL_COLOR_BUFFER_BIT);
+		gl.glBindTexture(GL_TEXTURE_2D, paint);
+		quad(w, h, 0, 0, static_cast<float>(w), static_cast<float>(h), 0.5f);
+		gl.glFlush();
+		/* A block of it laid again: its rect cleared under the scissor. */
+		const int rx = 70, ry = 50, rw = 64, rh = 48;
+		gl.glScissor(rx, ry, rw, rh);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glClear(GL_COLOR_BUFFER_BIT);
+		/* A vehicle not kept yet: the vehicles' frame cleared and drawn into (red)... */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[1]);
+		gl.glDrawBuffers(2, both);
+		gl.glViewport(0, 0, fw, fh);
+		gl.glScissor(0, 0, fw, fh);
+		gl.glClearDepth(1.0);
+		gl.glDepthMask(GL_TRUE);
+		gl.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		gl.glDisable(GL_SCISSOR_TEST);
+		quad(fw, fh, 0, 0, static_cast<float>(fw), static_cast<float>(fh), 1.5f);
+		/* ...shrunk from it into the kept pictures... */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[2]);
+		gl.glDrawBuffers(1, one);
+		gl.glViewport(0, 0, kw, kh);
+		gl.glBindTexture(GL_TEXTURE_2D, frame[0]);
+		quad(kw, kh, 0, 0, static_cast<float>(kw), static_cast<float>(kh), 0.5f);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		/* ...and laid from them in the rect, over what is there. */
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, fbo[0]);
+		gl.glDrawBuffers(2, both);
+		gl.glViewport(0, 0, w, h);
+		gl.glEnable(GL_SCISSOR_TEST);
+		gl.glScissor(rx, ry, rw, rh);
+		gl.glEnable(GL_BLEND);
+		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+		gl.glBindTexture(GL_TEXTURE_2D, kept);
+		quad(w, h, 80, 60, 96, 76, 0.5f);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		gl.glDisable(GL_BLEND);
+		gl.glDisable(GL_SCISSOR_TEST);
+		/* Read back: in the rect past the vehicle, the vehicle, past the rect. */
+		uint8_t cleared[4] = {}, vehicle[4] = {}, past[4] = {};
+		gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+		gl.glReadPixels(120, 90, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, cleared);
+		gl.glReadPixels(88, 68, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, vehicle);
+		gl.glReadPixels(20, 20, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, past);
+		const bool was_cleared = cleared[3] == 0, laid = vehicle[3] == 255 && vehicle[0] == 255 && vehicle[1] == 0, stayed = past[3] == 255 && past[1] == 255;
+		ok = was_cleared && laid && stayed;
+		const std::string line = fmt::format("cisteni s nuzkami mezi obrazky: obdelnik {} ({}), auto v nem {} ({} {} {}), venku {} ({}){}",
+				was_cleared ? "smazan" : "NESMAZAN", cleared[3], laid ? "je" : "NENI", vehicle[0], vehicle[1], vehicle[3],
+				stayed ? "zustalo" : "SMAZANO", past[3], ok ? "" : "; karta maze kreslenim");
+		Diary(line, true);
+		Debug(misc, 1, "3D on the graphics card: {}", line);
+		gl.glBindVertexArray(0);
+		gl.glUseProgram(0);
+	}
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gl.glDeleteFramebuffers(3, fbo);
+	gl.glDeleteRenderbuffers(2, depth);
+	gl.glDeleteTextures(2, pic);
+	gl.glDeleteTextures(2, frame);
+	gl.glDeleteTextures(1, &kept);
+	gl.glDeleteTextures(1, &paint);
+	gl.glGetError();
+	return ok;
+}
+
 bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::string &why)
 {
 	GLuint vs = CompileShader(GL_VERTEX_SHADER, vertex, why);
@@ -2214,6 +2355,17 @@ bool StartCard(std::string &why, std::string &describe)
 	}
 	Step("zkouska cisteni s nuzkami");
 	TestScissoredClear();
+	Step("zkouska cisteni s nuzkami mezi obrazky");
+	if (_scissored_clear_ok && !TestScissoredClearAmongPictures()) _scissored_clear_ok = false;
+	/* Zink (OpenGL over Vulkan; the player's phone, Mali through Winlator) puts a clear off till the next draw, and
+	 * what stands on a block of the turned map changes the picture drawn into between the clear and the draw: its
+	 * Mesa 22.2 lost the clear (the player's #322: rows of old cars and animals behind the moving ones) or did it after
+	 * the draw (the rig's zink: the map without cars, not every time), both passing the tests above. Cleared by
+	 * drawing over the rect, which it keeps in order. */
+	if (_scissored_clear_ok && renderer != nullptr && std::string_view(renderer).find("zink") != std::string_view::npos) {
+		_scissored_clear_ok = false;
+		Diary("zink odklada mazani: karta maze kreslenim", true);
+	}
 	Step("preklad programu snimku z oci (shader)");
 	StartEyeFrame();
 	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
