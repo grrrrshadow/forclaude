@@ -482,13 +482,32 @@ static void ShowCrashlogWindow();
  */
 thread_local void *_safe_esp = nullptr;
 
-static LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS *ep)
+/**
+ * What is left of a thread's stack when it overflows (CrashLog::InitThread()), for the exception to be delivered
+ * and StackOverflowHandler() to hand the crash to a thread of its own. Wine's own is two pages, too little for the
+ * exception's context and a handler both: the player's #323 (2. 11., Wine 10.10) had Wine kill the game with
+ * "virtual_setup_exception stack overflow" and no crash log.
+ */
+static constexpr ULONG STACK_GUARANTEE = 64 * 1024;
+/** The stack of the thread the crash log of a stack overflow is written on (StackOverflowHandler()). */
+static constexpr SIZE_T CRASH_THREAD_STACK = 4 * 1024 * 1024;
+/** How long the crashed thread waits for the crash log of its stack overflow (StackOverflowHandler()), in ms. */
+static constexpr DWORD CRASH_THREAD_WAIT = 120 * 1000;
+
+/**
+ * Write the crash log, then show the crash log window on the crashed thread's safe stack.
+ * @param ep the exception
+ * @param active the window active on the crashed thread: its event loop is disabled
+ * @param safe_esp the crashed thread's safe stack (_safe_esp), nullptr without one
+ * @return what of the exception, for the handler to return
+ */
+static LONG HandleCrash(EXCEPTION_POINTERS *ep, HWND active, void *safe_esp)
 {
 	/* Restore system timer resolution. */
 	timeEndPeriod(1);
 
 	/* Disable our event loop. */
-	SetWindowLongPtr(GetActiveWindow(), GWLP_WNDPROC, (LONG_PTR)&DefWindowProc);
+	SetWindowLongPtr(active, GWLP_WNDPROC, (LONG_PTR)&DefWindowProc);
 
 	if (CrashLogWindows::current != nullptr) {
 		CrashLog::AfterCrashLogCleanup();
@@ -527,22 +546,61 @@ static LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS *ep)
 	/* Close any possible log files */
 	CloseConsoleLogIfActive();
 
-	if ((VideoDriver::GetInstance() == nullptr || VideoDriver::GetInstance()->HasGUI()) && _safe_esp != nullptr) {
+	if ((VideoDriver::GetInstance() == nullptr || VideoDriver::GetInstance()->HasGUI()) && safe_esp != nullptr) {
 #ifdef _M_AMD64
 		ep->ContextRecord->Rip = (DWORD64)ShowCrashlogWindow;
-		ep->ContextRecord->Rsp = (DWORD64)_safe_esp;
+		ep->ContextRecord->Rsp = (DWORD64)safe_esp;
 #elif defined(_M_IX86)
 		ep->ContextRecord->Eip = (DWORD)ShowCrashlogWindow;
-		ep->ContextRecord->Esp = (DWORD)_safe_esp;
+		ep->ContextRecord->Esp = (DWORD)safe_esp;
 #elif defined(_M_ARM64)
 		ep->ContextRecord->Pc = (DWORD64)ShowCrashlogWindow;
-		ep->ContextRecord->Sp = (DWORD64)_safe_esp;
+		ep->ContextRecord->Sp = (DWORD64)safe_esp;
 #endif
 		return EXCEPTION_CONTINUE_EXECUTION;
 	}
 
 	CrashLog::AfterCrashLogCleanup();
 	return EXCEPTION_EXECUTE_HANDLER;
+}
+
+static LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS *ep)
+{
+	return HandleCrash(ep, GetActiveWindow(), _safe_esp);
+}
+
+/** A crash of a thread whose stack ran out, handed to a thread of its own (StackOverflowHandler()). */
+struct CrashOfOverflow {
+	EXCEPTION_POINTERS *ep; ///< the exception, of the crashed thread
+	HWND active; ///< the window active on the crashed thread
+	void *safe_esp; ///< the crashed thread's safe stack
+	LONG result; ///< what of the exception, for the crashed thread's handler to return
+};
+
+static DWORD WINAPI HandleCrashOfOverflow(LPVOID arg)
+{
+	CrashOfOverflow *crash = static_cast<CrashOfOverflow *>(arg);
+	crash->result = HandleCrash(crash->ep, crash->active, crash->safe_esp);
+	return 0;
+}
+
+/**
+ * A stack overflow: the crashed thread has but the guarantee left (STACK_GUARANTEE), too little for the crash log
+ * (dbghelp, the survey, the files), which is written on a thread with a stack of its own while this one waits. The
+ * crash log window is then shown on the crashed thread's safe stack, as with any crash. The other thread waits for
+ * no lock the crashed one holds but a file the crashed one was writing in (the overflow of #323 was in the C
+ * runtime's writing): it is not waited for past CRASH_THREAD_WAIT, the game ended rather than hung.
+ * @param ep the exception
+ * @return what of the exception
+ */
+static LONG StackOverflowHandler(EXCEPTION_POINTERS *ep)
+{
+	CrashOfOverflow crash{ep, GetActiveWindow(), _safe_esp, EXCEPTION_CONTINUE_SEARCH};
+	HANDLE thread = CreateThread(nullptr, CRASH_THREAD_STACK, &HandleCrashOfOverflow, &crash, STACK_SIZE_PARAM_IS_A_RESERVATION, nullptr);
+	if (thread == nullptr) return HandleCrash(ep, crash.active, crash.safe_esp);
+	if (WaitForSingleObject(thread, CRASH_THREAD_WAIT) != WAIT_OBJECT_0) ImmediateExitProcess(4);
+	CloseHandle(thread);
+	return crash.result;
 }
 
 static LONG WINAPI VectoredExceptionHandler(EXCEPTION_POINTERS *ep)
@@ -559,7 +617,7 @@ static LONG WINAPI VectoredExceptionHandler(EXCEPTION_POINTERS *ep)
 		return ExceptionHandler(ep);
 	}
 	if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW) {
-		return ExceptionHandler(ep);
+		return StackOverflowHandler(ep);
 	}
 	if (ep->ExceptionRecord->ExceptionCode == CUSTOM_ABORT_EXCEPTION) {
 		return ExceptionHandler(ep);
@@ -594,6 +652,10 @@ static void CDECL CustomAbort(int)
 
 /* static */ void CrashLog::InitThread()
 {
+	/* Room for the exception of a stack overflow to be handled in (STACK_GUARANTEE). */
+	ULONG guarantee = STACK_GUARANTEE;
+	SetThreadStackGuarantee(&guarantee);
+
 #if defined(_M_AMD64) || defined(_M_ARM64)
 	CONTEXT ctx;
 	RtlCaptureContext(&ctx);

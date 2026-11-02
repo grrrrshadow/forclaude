@@ -44,6 +44,23 @@ vzdálených měst přes blízkého slona; slon mění polohu hlavy, když kolem
   („karta neumi atributy po instancich“). Vsync s tím nesouvisí.
 - Mesa v rigu (25.2) ARB_instanced_arrays vypnout nedá (`MESA_EXTENSION_OVERRIDE` ho nebere), cesta po jednom je
   ta z `test3d gpu instance 0`.
+- Pás obrysů měst přes slona a slon s jinou hlavou po každém kroku jsou nejspíš totéž: vzdálené domy měst
+  i zvířata jdou dávkami a s rozbitým dělitelem každý roh vzal matici jiné instance (tvary natažené přes obraz,
+  jiné po každém kroku, protože se mění pořadí instancí). Ověřit na dalším buildu. Slon má jen pózu `klid`
+  (55 snímků po 6 ticích, hlava se v ní hýbe sama).
+- Winlator v běhu 21:33 spadl celý (`X connection to :0 broken`) 0,4 s po prvním snímku z očí, tedy po prvním
+  čtení za koncem bufferu. Vzkaz pro Winlator DL je v cota `OD-HRY.md` (logy v `od-hry/2026-11-02-hra-323/`).
+  Winlator má `MESA_GL_VERSION_OVERRIDE=4.4` u zinku 22.2.5.
+- **Přetečení zásobníku u lesa** (běh 22:22): Wine `virtual_setup_exception stack overflow 1792 bytes addr
+  0x14134c9e5`, vlákno s GL kontextem (hlavní), zásobník 1 MB (MSVC). Podle symbolů #323 (artefakt
+  `symbols-windows-x64-run323`, `.sym`) je adresa v `_isatty` z UCRT, tedy v prvním výpisu crash handleru
+  („Crash encountered…“). Výjimka přetečení došla, ale Wine na ni nechává jen 2 stránky (8 KB), handler se
+  nevešel a Wine hru zabil bez crash logu. Teď: každé vlákno si nechá 64 KB (`SetThreadStackGuarantee`
+  v `CrashLog::InitThread()`), crash log přetečení se píše na vlastním vlákně se 4 MB (`StackOverflowHandler()`),
+  okno crash logu pak na bezpečném zásobníku jako dřív; když vlákno crash logu do 2 min neskončí (zámek
+  souboru, do kterého psalo spadlé vlákno), hra skončí. Co zásobník sežralo, ukáže až další crash log.
+- `-fstack-usage` přes všechny soubory (gcc -O2): žádná funkce na cestě z očí nemá obří rámec (největší
+  `CollectEyeFrame` 2,6 KB; `ConTest3D` 68 KB je jen konzole rigu). Spíš rekurze nebo hluboké volání.
 
 ## 2. 11. (90) – Stromy barvené podle použití (kolega `a0e75be`)
 
