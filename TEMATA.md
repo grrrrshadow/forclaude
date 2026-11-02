@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (83) – Palmová plantáž jako les, bez holek nevyrábí; rostliny u některých domů tropických měst
+
+- Hráč na otázky (plantáž bez holek: nic, nebo málo? holky měsíc? rostliny u každého domu?): *„1 nic 2 jo 3 jen
+  někde“*.
+- **Palmová plantáž** je ovocná plantáž subtropického klimatu (původní průmysl, 5 × 4 dlaždice, ne 4 × 4, jak psal
+  kolega). Kreslí se z kolegových dílů `plantaz_*` (`objekty/prumysl`, `"druh": "plantaz"`) jako les:
+  - palouček 2 × 2 ve středu u strany, odkud vede cesta, chajda na jedné jeho dlaždici;
+  - cesta od strany se silnicí do palouku, jinde plantáž s palmami v řadách.
+  - Holky (s koši u palem, na lavicích u grilu) jen po dovozu studentek, opice ze sady zvířat na místech `zvirata`.
+  - Chajda, lavice a koše jsou překážky z očí. Rožeň nad grilem plantáže není (kolega: „jinak ho vynech“).
+  - Díly mají stejné cesty jako les: kreslení, holky, zvířata, kolize, náhled. Les se nemění.
+- **Výroba:** plantáž bere studentky (s rozšířeným průmyslem, bez cizí sady). Bez nich nevyrábí nic, 30 dní po
+  dovozu vyrábí jako dosud. Stará uložená hra dostane příjem studentek po načtení. Její plantáže proto nevyrábí,
+  dokud k nim studentky nepřijedou.
+- **Holky v lese** už měsíc (30 herních dní) po dovozu zůstávaly, beze změny. Herní měsíc je při běžné rychlosti
+  asi minuta.
+- **Rostliny u domů:** na trávě vedle domu hliněného města (v každém klimatu) nebo města subtropického klimatu, asi
+  na každé třetí takové dlaždici, 1–2 rostliny: palmy, banánovníky, monstery, kapradí. Na poušti jen palmy.
+- Rig (subtropická mapa seed 7): plantáž 78,70 bez holek 0 ovoce, po dovozu 20 za týden, po 30 dnech zase 0;
+  díly, holky a opice vidět shora i otočené o 30°. Pád v rigu (soused přes okraj mapy u rostlin) opraven.
+
 ## 1. 11. (82) – Čára za auty na mapě shora: zkouška mazání karty s nůžkami, náhradní mazání kreslením
 
 - Hráč (zip #320): *„pohled ze zhora je vše rychlejší ale za autama bývá čára někdy, několik obrázků dvacet za sebou

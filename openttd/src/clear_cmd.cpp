@@ -18,6 +18,8 @@
 #include "newgrf_generic.h"
 #include "landscape_cmd.h"
 #include "town.h"
+#include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -163,6 +165,51 @@ static void DrawClearLandFence(const TileInfo *ti)
 }
 
 /** @copydoc DrawTileProc */
+/**
+ * Plants by some of the houses of the clay towns and of the towns of the tropics (the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md, point 3; the player, 2. 11.: "only somewhere"): on the grass beside a house, on
+ * about one such tile in three by the tile, one or two of the palms, banana plants, monsteras and ferns
+ * (GetThreeDHousePlants()), on the desert's sand palms alone, as 3D figures where the trees of the map are (in the
+ * turned view, from the eyes, facing north among the houses drawn as objects).
+ * @param ti the tile
+ * @param desert the tile is of the desert: palms only
+ */
+static void DrawHousePlants(const TileInfo *ti, bool desert = false)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	const uint32_t hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 2246822519u) ^ 0x5BD1E995u;
+	if (GB(hash, 0, 8) % 3 != 0) return;
+	bool by_house = false;
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		/* Not past the edge of the map (TileAddByDiagDir() is no guard there). */
+		const TileIndexDiffC step = TileIndexDiffCByDiagDir(d);
+		const TileIndex next = TileAddWrap(ti->tile, step.x, step.y);
+		if (next != INVALID_TILE && IsTileType(next, TileType::House)) {
+			by_house = true;
+			break;
+		}
+	}
+	if (!by_house) return;
+	if (_settings_game.game_creation.landscape != LandscapeType::Tropic && GetTownThemeAt(ti->tile) != TownTheme::Clay) return;
+	const auto plants = GetThreeDHousePlants(desert);
+	if (plants.empty()) return;
+	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
+	const uint count = 1 + GB(hash, 8, 1);
+	for (uint i = 0; i < count; i++) {
+		const uint32_t h = hash * (i + 1) * 668265263u;
+		const ThreeDMapTree &plant = plants[GB(h, 0, 8) % plants.size()];
+		const float size = std::round((0.8f + 0.3f * static_cast<float>(GB(h, 8, 8)) / 255.0f) * 20.0f) / 20.0f * plant.scale;
+		const float facing = static_cast<float>(GB(h, 16, 9) % 24 * 15);
+		const int x = ti->x + 3 + static_cast<int>(GB(h, 25, 3)) * 10 / 7, y = ti->y + 3 + static_cast<int>(GB(h, 28, 3)) * 10 / 7;
+		if (eye) {
+			AddCabFigure(plant.name, size, x, y, z, facing);
+		} else {
+			AddThreeDFigureToViewport(plant.name, size, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+		}
+	}
+}
+
 static void DrawTile_Clear(TileInfo *ti)
 {
 	if (IsSnowTile(ti->tile)) {
@@ -181,10 +228,12 @@ static void DrawTile_Clear(TileInfo *ti)
 	switch (GetClearGround(ti->tile)) {
 		case ClearGround::Grass:
 			DrawClearLandTile(ti, GetClearDensity(ti->tile));
+			DrawHousePlants(ti);
 			break;
 
 		case ClearGround::Rough:
 			DrawRoughLandTile(ti);
+			DrawHousePlants(ti);
 			break;
 
 		case ClearGround::Rocks:
@@ -208,6 +257,7 @@ static void DrawTile_Clear(TileInfo *ti)
 
 		case ClearGround::Desert:
 			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+			DrawHousePlants(ti, true);
 			break;
 
 		default:

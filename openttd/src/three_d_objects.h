@@ -1191,6 +1191,7 @@ struct ThreeDMapTree {
 	float scale = 1.0f;
 };
 std::span<const ThreeDMapTree> GetThreeDMapTrees(uint8_t kind, bool undergrowth = false);
+std::span<const ThreeDMapTree> GetThreeDHousePlants(bool desert = false);
 std::optional<std::string> GetThreeDHouseTitle(TileIndex tile);
 std::string DescribeThreeDObjects();
 

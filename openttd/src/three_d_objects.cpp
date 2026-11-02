@@ -107,6 +107,10 @@ static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_trees
 static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_undergrowth;
 /** The plants under the trees of each town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost": the clay town's ferns). */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_undergrowth;
+/** The plants by some houses of the clay towns and the towns of the tropics (GetThreeDHousePlants()), made the first time asked for. */
+static std::vector<ThreeDMapTree> _three_d_house_plants;
+static std::vector<ThreeDMapTree> _three_d_house_palms; ///< of them the palms alone, for the desert
+static bool _three_d_house_plants_made = false;
 /** The dogs, the animals, the ghosts and the sellers of dogs of the indices (ThreeDAnimal). */
 static std::vector<ThreeDAnimal> _animals;
 /** The mushrooms to pick of the indices (ThreeDMushroom). */
@@ -3226,8 +3230,9 @@ static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest
  */
 static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter_turns)
 {
-	/* What one bumps into, and then its floors to walk on (the high seat's steps, the player 26. 10.: "up the stairs"). */
-	static const std::vector<std::string> solid = {"srub", "posed", "klady", "ohniste"};
+	/* What one bumps into -- of the palm plantation its reed hut, benches and baskets -- and then its floors to walk on
+	 * (the high seat's steps, the player 26. 10.: "up the stairs"). */
+	static const std::vector<std::string> solid = {"srub", "posed", "klady", "ohniste", "chajda", "lavice", "kose"};
 	static const std::vector<std::string> groups = [] {
 		std::vector<std::string> all = solid;
 		all.insert(all.end(), GLB_FLOORS.begin(), GLB_FLOORS.end());
@@ -3307,16 +3312,19 @@ static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObje
 }
 
 /**
- * A part of the forest with a clearing ("druh": "les", the colleague's hra/3d/LES-PRO-HRU.md): one tile, its origin
+ * A part of the forest with a clearing ("druh": "les", the colleague's hra/3d/LES-PRO-HRU.md), or of the palm
+ * plantation ("druh": "plantaz", hra/3d/TROPY-PLANTAZ-PRO-HRU.md, as the forest's): one tile, its origin
  * in the north corner, laid by the game turned by quarter turns about the tile's middle (the clearing's four tiles
  * each with its north corner out of the clearing; the path from the side of the road): an object of its whole scene
  * (ReadGlbScene()) for each turn, read when first drawn as a house is, its trees and bushes laid in as add-ons; its
  * girls, mushrooms, game and ghosts by their places -- each turned with it.
  */
-static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
+static void ReadForestPart(const nlohmann::json &e, const std::string &folder, std::string_view kind)
 {
-	const std::string part = e.value("dil", std::string());
-	if (part.empty() || !e.contains("soubor") || !e.at("soubor").is_string()) return;
+	const std::string dil = e.value("dil", std::string());
+	if (dil.empty() || !e.contains("soubor") || !e.at("soubor").is_string()) return;
+	/* The palm plantation's parts by their own names ("plantaz:zem", ...), beside the forest's. */
+	const std::string part = kind == "les" ? dil : fmt::format("{}:{}", kind, dil);
 	const std::string file = e.at("soubor").get<std::string>();
 	const std::string name = e.value("jmeno", file);
 	if (ReadWholeFile(folder + file).empty()) return;
@@ -3365,7 +3373,9 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder)
 	 * bricks 0.75 m from its middle along the spit, its trestles 1 m, the colleague's domy/hospoda.py gril()) and the
 	 * spit in them as there (dum_20_stadion "akce" "rozen": its rod 1.01 m up in the forks, sized 1.08). */
 	std::vector<float> fire;
-	{
+	/* The palm plantation's grill is an add-on of its own, its spit not drawn on an industry (the colleague's
+	 * hra/3d/TROPY-PLANTAZ-PRO-HRU.md: "if you can draw the spit on an industry take it, else leave it"). */
+	if (kind == "les") {
 		GlbMesh mesh;
 		GlbReadOptions o;
 		o.all_nodes = true;
@@ -3491,15 +3501,62 @@ static DiagDirection GameForestPathSide(const Industry *ind)
 	return side;
 }
 
+/** The fruit plantation of the original game (IT_FRUIT_PLANTATION of table/build_industry.h): the palm plantation of the tropics. */
+static constexpr IndustryType ORIGINAL_FRUIT_PLANTATION = 19;
+
+/**
+ * What part of the palm plantation lies on a tile of it, turned how (the colleague's hra/3d/TROPY-PLANTAZ-PRO-HRU.md:
+ * "the palm plantation will be nice as the forest, a clearing, a reed hut, a grill"; the player, 1. 11.: it is the
+ * fruit plantation of the game, its look only): laid as the forest, on its 5 x 4 tiles -- the clearing on 2 x 2 of the
+ * middle, at the side the path comes from, each turned with its north corner out, the hut on one of them; the path on
+ * a tile of the edge from the side of the road into the clearing; the plantation elsewhere. Nullptr for a tile of
+ * anything else, of a set, or when the parts are not there (the base set's tile drawn then, pv_gfx_116).
+ */
+static const ThreeDForestPart *ThreeDPalmPlantationPartAt(TileIndex tile)
+{
+	const IndustryGfx gfx = GetIndustryGfx(tile);
+	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	const Industry *ind = Industry::GetByTile(tile);
+	if (ind->type != ORIGINAL_FRUIT_PLANTATION || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
+	const int w = ind->location.w, h = ind->location.h;
+	if (w < 4 || h < 4) return nullptr;
+	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));
+	const int dy = static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile));
+	if (dx < 0 || dy < 0 || dx >= w || dy >= h) return nullptr;
+	const DiagDirection side = GameForestPathSide(ind);
+	/* The clearing's north tile: by the edge the path comes in from, in the middle otherwise. */
+	const int cx = side == DiagDirection::SW ? w - 3 : side == DiagDirection::NE ? 1 : (w - 2) / 2;
+	const int cy = side == DiagDirection::SE ? h - 3 : side == DiagDirection::NW ? 1 : (h - 2) / 2;
+	if (dx >= cx && dx <= cx + 1 && dy >= cy && dy <= cy + 1) {
+		static constexpr int TURNS[2][2] = {{0, 3}, {1, 2}};
+		const bool hut = (dx - cx) + 2 * (dy - cy) == static_cast<int>(GB(ind->random, 0, 2));
+		return GetThreeDForestPart(hut ? "plantaz:palouk_chajda" : "plantaz:palouk", TURNS[dx - cx][dy - cy]);
+	}
+	bool path = false;
+	int turn = 0;
+	const int kx = cx + static_cast<int>(GB(ind->random, 2, 1)), ky = cy + static_cast<int>(GB(ind->random, 2, 1));
+	switch (side) {
+		case DiagDirection::NE: path = dy == ky && dx < cx; break;
+		case DiagDirection::SW: path = dy == ky && dx > cx + 1; break;
+		case DiagDirection::NW: path = dx == kx && dy < cy; turn = 1; break;
+		case DiagDirection::SE: path = dx == kx && dy > cy + 1; turn = 1; break;
+		default: break;
+	}
+	if (path) return GetThreeDForestPart("plantaz:cesta", turn);
+	return GetThreeDForestPart("plantaz:zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
+}
+
 /**
  * What part of the forest with a clearing lies on a tile of it, turned how (the colleague's hra/3d/LES-PRO-HRU.md):
  * the clearing on the four middle tiles, each turned with its north corner out of the clearing, the forester's cabin on
  * one of them; the path on a tile of the edge from the side of the road into the clearing; the forest floor elsewhere,
- * turned as its place says (its ground runs on over the edges however it is turned). Nullptr for any other tile.
+ * turned as its place says (its ground runs on over the edges however it is turned). The palm plantation's parts so too
+ * (ThreeDPalmPlantationPartAt()). Nullptr for any other tile.
  */
 const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile)
 {
-	if (!IsTileType(tile, TileType::Industry) || GetIndustryGfx(tile) != GFX_GAME_FOREST) return nullptr;
+	if (!IsTileType(tile, TileType::Industry)) return nullptr;
+	if (GetIndustryGfx(tile) != GFX_GAME_FOREST) return ThreeDPalmPlantationPartAt(tile);
 	const Industry *ind = Industry::GetByTile(tile);
 	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));
 	const int dy = static_cast<int>(TileY(tile)) - static_cast<int>(TileY(ind->location.tile));
@@ -3854,8 +3911,8 @@ static void ReadThreeDObjectsNow()
 					ReadOriginalIndustryTile(e, parts);
 					continue;
 				}
-				if (kind == "les") {
-					ReadForestPart(e, folder);
+				if (kind == "les" || kind == "plantaz") {
+					ReadForestPart(e, folder, kind);
 					continue;
 				}
 				if (kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
@@ -5587,6 +5644,9 @@ void ResetThreeDVehicleObjects()
 	_three_d_theme_trees.clear();
 	_three_d_theme_trees_night.clear();
 	_three_d_theme_undergrowth.clear();
+	_three_d_house_plants.clear();
+	_three_d_house_palms.clear();
+	_three_d_house_plants_made = false;
 	for (auto &trees : _three_d_map_trees) trees.clear();
 	for (auto &plants : _three_d_map_undergrowth) plants.clear();
 	_creatures.clear();
@@ -8067,6 +8127,35 @@ std::span<const ThreeDMapTree> GetThreeDMapTrees(uint8_t kind, bool undergrowth)
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	if (kind >= MAP_TREE_KINDS) return {};
 	return undergrowth ? _three_d_map_undergrowth[kind] : _three_d_map_trees[kind];
+}
+
+/**
+ * The plants by some houses of the clay towns and the towns of the tropics (the colleague's
+ * hra/3d/TROPY-PLANTAZ-PRO-HRU.md, point 3: "the plants by the houses you place"; the player, 2. 11.: "only
+ * somewhere"): the palms of the tropics' grass (0x1C-0x1E) and the undergrowth of the rainforest (banana plants,
+ * monsteras, ferns), each as it is; in the desert the palms alone.
+ * @param desert the palms alone
+ * @return their figures, none without the colleague's tropical plants
+ */
+std::span<const ThreeDMapTree> GetThreeDHousePlants(bool desert)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	if (!_three_d_house_plants_made) {
+		_three_d_house_plants_made = true;
+		auto add = [](std::vector<ThreeDMapTree> &into, const ThreeDMapTree &plant) {
+			if (std::ranges::find_if(into, [&plant](const ThreeDMapTree &p) { return p.name == plant.name; }) == into.end()) {
+				into.push_back({plant.name, 1.0f});
+			}
+		};
+		for (uint kind = TREE_SUB_TROPICAL; kind < TREE_SUB_TROPICAL + 3; kind++) {
+			for (const ThreeDMapTree &palm : _three_d_map_trees[kind]) {
+				add(_three_d_house_plants, palm);
+				add(_three_d_house_palms, palm);
+			}
+		}
+		for (const ThreeDMapTree &plant : _three_d_map_undergrowth[TREE_RAINFOREST]) add(_three_d_house_plants, plant);
+	}
+	return desert ? _three_d_house_palms : _three_d_house_plants;
 }
 
 /** The plants under the trees of a town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost"): their figures. */

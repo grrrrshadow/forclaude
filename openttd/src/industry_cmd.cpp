@@ -1433,7 +1433,7 @@ static const std::array<CargoLabel, 1> WEED_MACHINE_CARGOES{CT_MARIJUANA};
 /** What the statue of Karel Macha takes: studentky and tourists. */
 static const std::array<CargoLabel, 2> STATUE_CARGOES{CT_STUDENTKY, CargoLabel{'TOUR'}};
 
-/** What the marijuana plantation and the potato field take: the studentky who tend them (TendMarijuanaPlantations()). */
+/** What the marijuana plantation, the potato field and the palm (fruit) plantation take: the studentky who tend them (TendMarijuanaPlantations(), PalmPlantationIdle()). */
 static const std::array<CargoLabel, 1> PLANTATION_CARGOES{CT_STUDENTKY};
 
 /** What the distillery takes: the potatoes it makes alcohol of. */
@@ -1626,7 +1626,8 @@ void UpdateExtraIndustryCargoes()
 	if (!_settings_game.economy.extra_industries) return;
 	for (Industry *i : Industry::Iterate()) {
 		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
-				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST) continue;
+				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST &&
+				i->type != IT_FRUIT_PLANTATION) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1696,6 +1697,8 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
 	ResolveTownIndustryCargoes(IT_DRAGON_FARM, DRAGON_FARM_CARGOES);
 	ResolveTownIndustryCargoes(IT_GAME_FOREST, GAME_FOREST_CARGOES);
+	/* The palm plantation of the tropics (the original fruit plantation, the player, 2. 11.): worked by the girls. */
+	ResolveTownIndustryCargoes(IT_FRUIT_PLANTATION, PLANTATION_CARGOES);
 }
 
 /**
@@ -3218,6 +3221,20 @@ static void ChopLumberMillTrees(Industry *i)
 }
 
 /**
+ * Does the palm plantation of the tropics (the original fruit plantation) stand idle? The player, 2. 11.: "the girls
+ * will go to work on the palm plantation so that it produces", without them "nothing": it makes nothing but while
+ * studentky came in the last GIRLS_DAYS (HasGirls()). Only where it takes them (economy.extra_industries, no set's).
+ * @param i the industry
+ * @return whether it makes nothing now
+ */
+static bool PalmPlantationIdle(const Industry *i)
+{
+	if (i->type != IT_FRUIT_PLANTATION) return false;
+	const CargoType stud = GetCargoTypeByLabel(CT_STUDENTKY);
+	return IsValidCargoType(stud) && i->IsCargoAccepted(stud) && !HasGirls(i);
+}
+
+/**
  * Helper for ProduceIndustryGoods that scales and produces cargos.
  * @param i The industry
  * @param scale Should we scale production of this cargo directly?
@@ -3229,6 +3246,7 @@ static void ProduceIndustryGoodsHelper(Industry *i, bool scale)
 		/* The forest with a clearing: its mushrooms only while the girls are there to pick them; they grow all the time
 		 * (the player, 24. 10.: "the mushrooms grow there all the time, the girls only pick them"). */
 		if (i->type == IT_GAME_FOREST && CargoSpec::Get(p.cargo)->label == CT_MUSHROOMS && !HasGirls(i)) continue;
+		if (PalmPlantationIdle(i)) continue;
 
 		uint16_t amount = p.rate;
 		if (scale) amount = ScaleByCargoScale(amount, false);
