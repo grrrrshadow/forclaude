@@ -4267,11 +4267,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4297,7 +4297,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4360,11 +4360,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4390,7 +4390,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4451,11 +4451,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4481,7 +4481,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4552,12 +4552,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "B4DC98",
-     "C3E3A4",
-     "A9D6AC",
-     "D0E6A9",
-     "EDD8A6",
-     "F2C4CF"
+     "7CC242",
+     "8BC34A",
+     "6DBE45",
+     "9CCC65",
+     "74B83E"
     ]
    },
    "les": {
@@ -4584,7 +4583,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4647,11 +4646,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4677,7 +4676,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4739,11 +4738,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4769,7 +4768,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4830,11 +4829,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4860,7 +4859,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -4922,11 +4921,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -4952,7 +4951,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -5015,11 +5014,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -5045,7 +5044,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -5106,11 +5105,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -5136,7 +5135,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -5200,12 +5199,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "B4DC98",
-     "C3E3A4",
-     "A9D6AC",
-     "D0E6A9",
-     "EDD8A6",
-     "F2C4CF"
+     "7CC242",
+     "8BC34A",
+     "6DBE45",
+     "9CCC65",
+     "74B83E"
     ]
    },
    "les": {
@@ -5232,7 +5230,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -5294,10 +5292,10 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "E0EAA8",
-     "D2E6A8",
-     "EEE2AA",
-     "C8E2B2"
+     "9CCC65",
+     "A5D46A",
+     "8FC757",
+     "B0D976"
     ]
    },
    "les": {
@@ -5321,7 +5319,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
@@ -5372,11 +5370,11 @@
   "barvy_pouziti": {
    "mirne": {
     "koruna": [
-     "9CCBAC",
-     "A8D2B2",
-     "B2D8C0",
-     "94C4A8",
-     "BCDCBC"
+     "4CAF50",
+     "5CB860",
+     "43A047",
+     "66BB6A",
+     "52B35A"
     ]
    },
    "les": {
@@ -5402,7 +5400,7 @@
     ]
    }
   },
-  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (jasné syté zelené, hráč 2. 11. po #323: „jasnější a zelenější odstíny, žádný růžový“; dřív pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
   "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
   "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
   "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"

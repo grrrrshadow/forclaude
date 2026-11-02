@@ -45,8 +45,9 @@ srovnání“.
   `economy.tropic_towns 2`). Barvy podle použití se na poušti nepoužijí.
 - **Barvy mírných stromů**: paleta `mirne` od kolegy je pastel (smrky mátové `9CCBAC`…, listnáče i béžová `EDD8A6` a
   růžová `F2C4CF`). Návrh poslaný hráči (snímek z rigu): smrky, borovice, jedle `4CAF50 5CB860 43A047 66BB6A 52B35A`,
-  listnáče `7CC242 8BC34A 6DBE45 9CCC65 74B83E`, břízy `9CCC65 A5D46A 8FC757 B0D976`; les (`les`) beze změny. Čeká
-  na hráčovo ano.
+  listnáče `7CC242 8BC34A 6DBE45 9CCC65 74B83E`, břízy `9CCC65 A5D46A 8FC757 B0D976`; les (`les`) beze změny. Hráč:
+  „jo pěkná barva stromů“ – v sadě hry (`doplnky/objekty.json`, `barvy_pouziti.mirne`). **Při přebírání stromů od
+  kolegy paletu `mirne` nepřepsat jeho pastelem.**
 - „To jsou teď v arctic?“ Ne: les průmyslu má paletu `les` (tmavě zelenou) v mírném klimatu i v subarktickém pod
   sněžnou čarou; nad ní sníh.
 - **Hliněná města**: témata stromů hliněných měst jsou 4 obří houby + 3 palmy, 2 banánovníky, 4 monstery (tropické
