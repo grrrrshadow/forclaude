@@ -648,6 +648,21 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 
 struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
 
+/**
+ * The kind of tree a tree on the land of a desert town stands as (GetThemedLand()): palms, and a cactus now and then;
+ * as its own kind elsewhere, and where it is a tree of the tropics already. Of the kinds of the tropics' grass the
+ * palms alone (0x1C-0x1E), the 3D figures of the fourth being a broad leaved tree (the colleague's listnac_p0).
+ * @param tile the tile of the tree
+ * @param type the kind of tree on the tile
+ * @return the kind drawn
+ */
+static TreeType DesertTownTreeType(TileIndex tile, TreeType type)
+{
+	if (type >= TREE_RAINFOREST || GetThemedLand(tile) != ThemedLand::Desert) return type;
+	const uint pick = GB(TileHash(TileX(tile), TileY(tile)), 0, 3);
+	return pick < 2 ? TREE_CACTUS : static_cast<TreeType>(TREE_SUB_TROPICAL + pick % 3);
+}
+
 /** @copydoc DrawTileProc */
 /**
  * The trees of a tile as 3D figures, in the turned view, from the eyes and facing north among the houses drawn as
@@ -676,16 +691,18 @@ static bool DrawThemedTrees(const TileInfo *ti)
 		/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
 		for (const std::string &name : GetThreeDThemeTrees(to_underlying(theme), IsNightNow())) trees_of.push_back({name, 1.0f});
 		for (const std::string &name : GetThreeDThemeUndergrowth(to_underlying(theme))) under_of.push_back({name, 1.0f});
-	} else if (GetThemedLand(ti->tile) != ThemedLand::Desert) {
-		/* The desert towns' land keeps its palms and cacti (DrawTile_Trees()). */
-		const auto trees = GetThreeDMapTrees(static_cast<uint8_t>(type));
-		const auto under = GetThreeDMapTrees(static_cast<uint8_t>(type), true);
+	} else {
+		/* On the desert towns' land their palms and cacti (DesertTownTreeType(); the player, #323: "about the desert
+		 * towns the old 8bpp palms"). */
+		const TreeType kind = DesertTownTreeType(ti->tile, type);
+		const auto trees = GetThreeDMapTrees(static_cast<uint8_t>(kind));
+		const auto under = GetThreeDMapTrees(static_cast<uint8_t>(kind), true);
 		trees_of.assign(trees.begin(), trees.end());
 		under_of.assign(under.begin(), under.end());
 	}
 	if (trees_of.empty()) return false;
 	TreeUse use = TreeUse::None;
-	if (theme == TownTheme::None) {
+	if (theme == TownTheme::None && GetThemedLand(ti->tile) != ThemedLand::Desert) {
 		switch (_settings_game.game_creation.landscape) {
 			case LandscapeType::Temperate:
 				use = TreeUse::Temperate;
@@ -768,10 +785,7 @@ static void DrawTile_Trees(TileInfo *ti)
 	uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
 	TreeType type = GetTreeType(ti->tile);
 	/* On the land of a desert town (GetThemedLand()), the tropics' trees: palms, and a cactus now and then. */
-	if (type < TREE_RAINFOREST && GetThemedLand(ti->tile) == ThemedLand::Desert) {
-		const uint pick = GB(TileHash(TileX(ti->tile), TileY(ti->tile)), 0, 3);
-		type = pick < 2 ? TREE_CACTUS : static_cast<TreeType>(TREE_SUB_TROPICAL + pick % TREE_COUNT_SUB_TROPICAL);
-	}
+	type = DesertTownTreeType(ti->tile, type);
 	uint index = GB(tmp, 0, 2) + (type << 2);
 
 	/* different tree styles above one of the grounds */

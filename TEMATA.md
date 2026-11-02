@@ -31,6 +31,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (92) – Stromy po #323: pouštní města 3D palmy, barvy mírných stromů, hliněná města
+
+Hráč (#323): „kolem pouštních měst jsou staré 8bpp palmy. kolem hliněných měst je příliš mnoho nových 3D palem a
+dalších stromů. tam máme houby, tam ojediněle může být občas strom. ta kytka s placatejma listama vypadá dobře…
+barva bude naprd temperate… jasnější a zelenější odstíny, žádný růžový, idealizovanou zelenou optimistickou“; u lesa
+„barva stromů v lese je pěkná, okolo lesa… růžový, světle zelenou barvu ale sytou… průmysl les zatím nech pro
+srovnání“.
+
+- **Pouštní města: 3D palmy a kaktusy** (hotovo): `DrawThemedTrees()` pouštní zemi měst přeskakoval (z doby, kdy
+  3D palmy nebyly). Teď `DesertTownTreeType()` (společné s 8bpp cestou) dá palmy 0x1C–0x1E a občas kaktus; čtvrtý
+  druh tropické trávy (0x1F) ne, protože jeho 3D je listnáč kolegy (`listnac_p0`). Ověřeno v rigu (Wintburg,
+  `economy.tropic_towns 2`). Barvy podle použití se na poušti nepoužijí.
+- **Barvy mírných stromů**: paleta `mirne` od kolegy je pastel (smrky mátové `9CCBAC`…, listnáče i béžová `EDD8A6` a
+  růžová `F2C4CF`). Návrh poslaný hráči (snímek z rigu): smrky, borovice, jedle `4CAF50 5CB860 43A047 66BB6A 52B35A`,
+  listnáče `7CC242 8BC34A 6DBE45 9CCC65 74B83E`, břízy `9CCC65 A5D46A 8FC757 B0D976`; les (`les`) beze změny. Čeká
+  na hráčovo ano.
+- „To jsou teď v arctic?“ Ne: les průmyslu má paletu `les` (tmavě zelenou) v mírném klimatu i v subarktickém pod
+  sněžnou čarou; nad ní sníh.
+- **Hliněná města**: témata stromů hliněných měst jsou 4 obří houby + 3 palmy, 2 banánovníky, 4 monstery (tropické
+  přes `stromy_mapy_dalsi` `"tema": "hlinene"`), každý strom dlaždice vybírá rovnoměrně, takže houby jsou jen
+  třetina. Čeká se, kterou „kytku s placatými listy“ hráč myslí (monstera, nebo banánovník); pak houby většina,
+  ta kytka mezi nimi, palmy ojediněle.
+
 ## 2. 11. (91) – #323: z očí nic nejezdí, pády u lesa
 
 Hráč (#323, telefon): „padá to a nic tam nejezdí, žádný auta vlaky, jen chodim mezi stromama“; pás obrysů
