@@ -9499,13 +9499,28 @@ static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
  * the poses of the figures and the creatures, the passages between their animations, the shapes no one keeps. A big
  * map walked over kept all of it before. Between the frames, never while they are drawn.
  */
-static void ForgetUnusedThreeDObjects()
+/**
+ * A forgetting put off (ForgetUnusedThreeDObjectsNow()): done at the first moment nothing holds what the objects made
+ * (ForgetThreeDObjectsIfOwed()). Put off till the next quarter of a minute, it was never done in the view from the
+ * eyes: its frames are drawn one after the other on their thread, one always in hand, and the phone's memory grew to
+ * 3.2 GB and Android killed the game (the player's log of 2. 11., 2.3 GB to 3.2 GB in five minutes from the eyes).
+ */
+static bool _three_d_forget_owed = false;
+uint64_t _three_d_forgets_done = 0;     ///< the diary: forgettings done since its last line
+uint64_t _three_d_forgets_put_off = 0;  ///< and put off, something holding what the objects made
+
+static void ForgetUnusedThreeDObjectsNow()
 {
-	_three_d_clock += 15;
 	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
-	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; the next time, a
-	 * quarter of a minute on. */
-	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) return;
+	 * of the view from the eyes is drawn (EyeFrameDrawing()): they hold what the objects made; owed till they are
+	 * done (ForgetThreeDObjectsIfOwed()). */
+	if (ThreeDPicturesBeingMade() || EyeFrameDrawing()) {
+		if (!_three_d_forget_owed) _three_d_forgets_put_off++;
+		_three_d_forget_owed = true;
+		return;
+	}
+	_three_d_forget_owed = false;
+	_three_d_forgets_done++;
 	TrimThreeDTextures();
 	TrimThreeDEyePainted();
 	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
@@ -9545,8 +9560,23 @@ static void ForgetUnusedThreeDObjects()
 	if (forgotten > 0) Debug(misc, 1, "3D objects: {} not drawn for {} s forgotten", forgotten, THREE_D_FORGET_AFTER);
 }
 
+/** The clock of the objects on by a quarter of a minute, and what was not drawn for two minutes forgotten (ForgetUnusedThreeDObjectsNow()). */
+static void ForgetUnusedThreeDObjects()
+{
+	_three_d_clock += 15;
+	ForgetUnusedThreeDObjectsNow();
+}
+
+/** A forgetting put off done now, when nothing holds what the objects made (the view from the eyes between its frames, EyeView()). */
+void ForgetThreeDObjectsIfOwed()
+{
+	if (_three_d_forget_owed) ForgetUnusedThreeDObjectsNow();
+}
+
 /** The clock of the objects goes on in real time, every fifteen seconds (ForgetUnusedThreeDObjects()). */
 static IntervalTimer<TimerWindow> _forget_timer(std::chrono::seconds(15), [](auto) { ForgetUnusedThreeDObjects(); });
+/** A forgetting put off tried again soon, not a quarter of a minute later (the thread of the pictures of the vehicles done meanwhile). */
+static IntervalTimer<TimerWindow> _forget_owed_timer(std::chrono::milliseconds(250), [](auto) { ForgetThreeDObjectsIfOwed(); });
 
 /** The memory of a vector's elements. */
 template <typename T>

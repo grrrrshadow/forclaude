@@ -31,6 +31,32 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (86) – Z očí: paměť 3,2 GB, protože se v pohledu z očí nikdy nic neuvolnilo
+
+- Hráč: *„pokračuj gpu“*, pak *„tohle máš hotový? Sběr pohledu z očí na kartě. S tím souvisí i ty 3,2 GB paměti,
+  kvůli kterým Android hru zabil.“*
+- **Příčina paměti:** co se 2 minuty nekreslí (textury, tvary, pózy, přechody animací, zjednodušené tvary domů),
+  uvolňuje `ForgetUnusedThreeDObjects()` každých 15 s. Nesmí ale běžet, když snímek z očí drží ukazatele do
+  objektů (`EyeFrameDrawing()`) nebo vlákno dělá obrázky. Pak se přeskočilo a zkusilo až za dalších 15 s. Snímky
+  z očí se kreslí na vlákně jeden za druhým a jeden je pořád rozkreslený. Z očí se proto nikdy nic neuvolnilo.
+  Deník #321: paměť z očí 2,3 → 3,2 GB a Android hru zabil.
+- **Oprava:** odložené uvolnění je dlužné (`ForgetThreeDObjectsIfOwed()`). Provede se hned mezi snímky z očí, ve
+  chvíli, kdy se hotový snímek vzal a další se ještě nesbírá (`EyeView()`, vlákno nic nedrží), nebo nejpozději
+  za 250 ms, když vlákno obrázků doběhne.
+- **Rig (GPU, z očí s vláknem snímků jako na telefonu, minuta):** každé čtvrtminutové uvolnění se muselo odložit
+  (`odlozeno 1`). Se starým kódem by se neprovedlo nikdy, s novým proběhne ve stejných 5 s (`zapomenuti 1`).
+- **Deník:** nový sloupec `pamet 3d` s rozpisem: tvary vozidel, textury po úrovních, obrázky textur ze souboru,
+  domy (textury, lakované, tvary), obrázky otočeného pohledu, lakované textury z očí, cache spritů, a
+  `zapomenuti N, odlozeno M`. V rigu po minutě z očí: tvary vozidel 156 MB, textury 289 MB, domy 390 MB, cache
+  spritů 150 MB. Hráč má cache spritů nastavenou na 1600 MB (`sprite_cache_size_mb`), ta smí sama zabrat 1,6 GB.
+- **Plakáty z očí (zkoušeno, nezařazeno):** vzdálená auta a figury z očí jsou obrázky (plakáty), které dělá vlákno
+  a karta čte zpátky (telefon: asi 100 za 5 s). Zkusil jsem je kreslit kartou z trojúhelníků jako zblízka. Rig: 0
+  obrázků a nic se nečte zpátky, paměť 2655 → 2523 MB. Karta ale kreslila snímek 104–120 → 142–155 ms při
+  stejném počtu rohů (asi 19 500), nejspíš kvůli samostatnému kreslení každého auta. Proto zatím ne. Napřed všechna
+  vzdálená auta a figury jedním kreslením (instance), pak znovu změřit.
+- Další: sběr z očí na kartě (sběr scény 14–20 ms na hlavním vlákně), plakáty jedním kreslením. Telefon:
+  `pamet 3d` a `zapomenuti` v `snimky.log` z očí.
+
 ## 2. 11. (85) – GPU stojící věci: čára za auty a kreslení změn najednou na telefonu
 
 - Hráč: *„dělal jsi něco dalšího na gpu? nebo jen crashe?“*, pak *„tak běž dělat.“* Pořadí: stojící věci otočené mapy

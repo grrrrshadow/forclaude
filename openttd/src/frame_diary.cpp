@@ -51,6 +51,21 @@ static std::string TakePicturesForDiary()
 	return s;
 }
 
+/**
+ * What the 3D objects hold (DescribeThreeDObjectMemory()) and their pictures (DescribeThreeDPictureMemory()), and how
+ * often what was not drawn for two minutes was let go of, or had to wait (ForgetUnusedThreeDObjectsNow()): the player's
+ * log of 2. 11. had the memory grow from the eyes to 3.2 GB, Android killing the game, and no word of what it was.
+ */
+static std::string TakeThreeDMemoryForDiary()
+{
+	extern std::string DescribeThreeDObjectMemory();
+	extern std::string DescribeThreeDPictureMemory();
+	extern uint64_t _three_d_forgets_done, _three_d_forgets_put_off;
+	std::string s = fmt::format("{}; {}; zapomenuti {}, odlozeno {}", DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory(), _three_d_forgets_done, _three_d_forgets_put_off);
+	_three_d_forgets_done = _three_d_forgets_put_off = 0;
+	return s;
+}
+
 namespace {
 
 constexpr std::chrono::seconds DIARY_EVERY{5}; ///< a line so often
@@ -134,7 +149,8 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
 				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
-				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta.\n");
+				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta;"
+				" pamet 3d = co drzi 3D objekty (tvary, textury, domy) a obrazky, zapomenuti = kolikrat se pustilo, co se 2 minuty nekreslilo, odlozeno = kolikrat to muselo pockat.\n");
 	}
 	const std::time_t t = std::time(nullptr);
 	char clock[16];
@@ -142,13 +158,13 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | zpravy {:.1f} na snimek {:.1f} ms, nejvic {}, nejdelsi snimek {} za {:.0f} ms, odlozeno {}x | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {}\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | zpravy {:.1f} na snimek {:.1f} ms, nejvic {}, nejdelsi snimek {} za {:.0f} ms, odlozeno {}x | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {} | pamet 3d {}\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
 			static_cast<double>(_sum.messages) / n, _sum.messages_ms / n, _most_messages, _longest.messages, _longest.messages_ms, _sum.messages_cut,
 			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(),
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
-			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary());
+			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary(), TakeThreeDMemoryForDiary());
 	fflush(*_diary);
 	_lines++;
 }

@@ -14963,6 +14963,10 @@ static bool EyeView(const Vehicle *v, const FirstPersonEye *walker, int width, i
 	} else {
 		_eye_asked_client = nullptr;
 		_eye_last_client = &camera;
+		/* Between the frames, none on the way: what was put off forgetting is forgotten now (the frames came one after
+		 * the other, one always drawn, and nothing was ever let go of from the eyes). */
+		extern void ForgetThreeDObjectsIfOwed();
+		ForgetThreeDObjectsIfOwed();
 		std::unique_ptr<EyeFrame> f = NewEyeFrame(&camera);
 		const auto collecting = std::chrono::steady_clock::now();
 		const bool collected = CollectEyeFrame(v, walker, width, height, camera, *f);
