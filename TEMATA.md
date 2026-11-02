@@ -31,6 +31,29 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (88) – Z očí: auta a figury trojúhelníky kartou v dávkách (instance), bez plakátů
+
+- Hráč: *„pokračuj podle plánu, dodělej věci které chybí v přechodu na gpu a pak mužem dělat chyby“*; k plakátům
+  z (86): *„skus to znova a pořádně“*; *„muj mali má dvě jádra gpu … používáš dvě jádra?“* (jádra karty si hra
+  nevybírá, rozděluje je ovladač; hra ovlivní jen, jestli posílá málo velkých kreslení, nebo hodně malých a čtení
+  zpátky, při kterém karta stojí).
+- **Co je nové:** s kartou se vzdálená auta a figury z očí (stromy, holky, zvířata, posádky, náklady) kreslí
+  trojúhelníky jako zblízka, žádné plakáty (obrázky z vlákna čtené zpátky z karty). Tvar tak jednoduchý, jak
+  dálka dovolí (`TrySimpler()`), textury v té podrobnosti. Rostliny polí zůstávají plakáty.
+- **Dávky (`EyeObjectDraws::Batch`):** sítě se stejným tvarem, trojúhelníky, texturami, lakem, světlem a stranou
+  ven jdou jedním `glDrawElementsInstanced`: matice (řádky) a světlo každé instance v atributech 4–8 ze
+  společného bufferu, program z očí má `u_instanced`. Kolo, co se točí, zůstává po jednom. Deník
+  `from the eyes N meshes in M batches, K each on its own`; rig `test3d gpu instance 0|1`, `test3d gpu plakaty 0|1`.
+- **Rig (12 Volh + 6 Tater, chodec u silnice, minuta na vlákně snímků), llvmpipe:** ~100 sítí na snímek
+  (hlavně stromy) v ~30 dávkách (≈3,4 na dávku – na scéně je málo stejných věcí). Karta na snímek: instance
+  84 ms, po jedné 83 ms, plakáty 77 ms; čtení zpátky: plakáty `2048×34` každých 5 s, trojúhelníky 0.
+  **Zink (lavapipe):** instance 94–102 ms, po jedné 92–94, plakáty 90–97 (plakáty 61–117 obrázků za 5 s se
+  čtením zpátky, trojúhelníky 45 snímků a nic). Po příjezdu Volh zblízka 135 ms ve všech variantách (BeamNG
+  Volha má 110 000 trojúhelníků; bylo i dřív).
+- **Závěr:** v rigu rozdíl nejde vidět – trojúhelníky tu počítá procesor, ať jsou v dávce nebo ne. Na telefonu
+  (Mali, zink) je zisk v tom, co rig nemá: žádné `glReadPixels` plakátů (karta nestojí) a 30 kreslení místo
+  100. Ověří až telefon: `snimky.log` sloupec `oci kresleni` a `card:` řádek.
+
 ## 2. 11. (87) – Čáry za auty při 0° na telefonu: zink odkládá mazání s nůžkami
 
 - Hráč (#322, screenshoty): *„screenshot čáry za autama. když otáčím tak zmizí a nedělaj se. když otevřu okno

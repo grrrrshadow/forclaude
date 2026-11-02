@@ -229,6 +229,8 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 
 /** The rig ('test3d gpu mazani 1'): the rects of the card's pictures cleared by drawing over them whatever its glClear() does (ClearInScissor()). */
 bool _clear_by_drawing = false;
+/** The rig ('test3d gpu instance 0'): the meshes alike of the view from the eyes drawn at once by instances (EyeObjectDraws::Batch); off, each on its own. */
+bool _eye_instances_on = true;
 
 #if defined(THREE_D_GPU_WGL) || defined(THREE_D_GPU_EGL)
 
@@ -390,6 +392,9 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glEnableVertexAttribArray, (GLuint index)) \
 	X(void, glVertexAttribPointer, (GLuint index, GLint size, GLenum type, GLboolean normalized, GLsizei stride, const void *pointer)) \
 	X(void, glVertexAttrib3f, (GLuint index, GLfloat x, GLfloat y, GLfloat z)) \
+	X(void, glDisableVertexAttribArray, (GLuint index)) \
+	X(void, glVertexAttribDivisor, (GLuint index, GLuint divisor)) \
+	X(void, glDrawElementsInstanced, (GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount)) \
 	X(GLuint, glCreateShader, (GLenum type)) \
 	X(void, glShaderSource, (GLuint shader, GLsizei count, const GLchar *const *source, const GLint *length)) \
 	X(void, glCompileShader, (GLuint shader)) \
@@ -499,6 +504,9 @@ uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the pro
 uint64_t _gpu_standing_vehicles = 0;      ///< the vehicles of the turned map it drew and shrunk since the last ThreeDGpuTimes() (ThreeDGpuStandingVehicle)
 uint64_t _gpu_standing_vehicles_kept = 0; ///< and those it laid as they were kept
 uint64_t _gpu_standing_triangles[2] = {}; ///< the triangles of the buildings among what stands it drew, and of all of them those in the blocks (GpuBuilding::Cell)
+uint64_t _gpu_eye_batches = 0;   ///< the batches of meshes alike of the view from the eyes it drew at once since the last ThreeDGpuTimes() (EyeObjectDraws::Batch)
+uint64_t _gpu_eye_instances = 0; ///< and the meshes in them
+uint64_t _gpu_eye_single = 0;    ///< and the meshes it drew each on its own (a wheel that turns)
 /**
  * The blocks of the turned map whose standing things the card gave back to the processor since the last ThreeDGpuTimes()
  * (DrawStandingOnCard(): one thing it cannot lay, the processor draws the whole block -- the buildings by their
@@ -598,6 +606,7 @@ struct GpuProgram {
 	GLint near_plane = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
+	GLint instanced = -1;   ///< the view from the eyes' meshes alike drawn at once: each instance's matrix and light in attributes 4-8 (EyeMeshSource())
 };
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _ground_program, _standing_program;
 GpuProgram _standing_building_program; ///< the buildings among what stands on the turned map (DrawStandingOnCard())
@@ -607,6 +616,7 @@ int _fbo_w = 0, _fbo_h = 0;
 GLuint _eye_fbo = 0, _eye_colour_rb = 0, _eye_glow_rb = 0, _eye_depth_rb = 0;
 int _eye_w = 0, _eye_h = 0;
 GLuint _night_vao = 0, _night_vbo = 0;
+GLuint _eye_instance_vbo = 0; ///< the matrices and lights of a batch of meshes alike of the view from the eyes (EyeObjectDraws::Batch)
 GLint _max_texture = 0, _max_target = 0;
 /* The whole view from the eyes on the card (DrawEyeFrameOnCard()). */
 GLuint _frame_colour[2] = {0, 0}, _frame_glow = 0, _frame_depth = 0;
@@ -1180,6 +1190,11 @@ std::string EyeMeshSource(const char *source, bool fragment)
 		s.insert(s.find('\n') + 1, "layout(location = 3) in float a_wheel;\nuniform mat4 u_wheels[32];\nuniform int u_wheel_count;\n");
 		replace("gl_Position = u_matrix * vec4(a_pos, 1.0);", "int k = int(a_wheel + 0.5);\n\tvec3 p = a_pos, n = a_nrm;\n\tif (k > 0 && k <= u_wheel_count) {\n\t\tp = (u_wheels[k - 1] * vec4(p, 1.0)).xyz;\n\t\tn = mat3(u_wheels[k - 1]) * n;\n\t}\n\tgl_Position = u_matrix * vec4(p, 1.0);");
 		replace("dot(a_nrm, u_light)", "dot(n, u_light)");
+		/* Many of a shape at once (EyeObjectDraws::Batch): each instance's matrix (its rows) and light in attributes
+		 * 4-8 when u_instanced is set, else the uniforms as for one. */
+		s.insert(s.find('\n') + 1, "layout(location = 4) in vec4 a_m0;\nlayout(location = 5) in vec4 a_m1;\nlayout(location = 6) in vec4 a_m2;\nlayout(location = 7) in vec4 a_m3;\nlayout(location = 8) in vec4 a_light;\nuniform int u_instanced;\n");
+		replace("gl_Position = u_matrix * vec4(p, 1.0);", "vec4 p4 = vec4(p, 1.0);\n\tgl_Position = u_instanced != 0 ? vec4(dot(a_m0, p4), dot(a_m1, p4), dot(a_m2, p4), dot(a_m3, p4)) : u_matrix * p4;");
+		replace("v_light = u_lit > 0.5 ? 0.55 + 0.45 * max(0.0, dot(n, u_light)) : 1.0;", "vec3 light = u_instanced != 0 ? a_light.xyz : u_light;\n\tfloat lit = u_instanced != 0 ? a_light.w : u_lit;\n\tv_light = lit > 0.5 ? 0.55 + 0.45 * max(0.0, dot(n, light)) : 1.0;");
 	}
 	return s;
 }
@@ -2231,6 +2246,7 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.wheels = gl.glGetUniformLocation(p.program, "u_wheels");
 	p.wheel_count = gl.glGetUniformLocation(p.program, "u_wheel_count");
 	p.depth_range = gl.glGetUniformLocation(p.program, "u_depth_range");
+	p.instanced = gl.glGetUniformLocation(p.program, "u_instanced");
 	return true;
 }
 
@@ -4240,12 +4256,38 @@ struct EyeObjectDraws {
 		std::vector<GLuint> textures;
 		std::vector<PaintOnCard> paints;
 	};
+	/**
+	 * Meshes alike -- the same shape and triangles, textures, paint, light and side out -- drawn at once by instances
+	 * (DrawEyeMeshes(); the player, 2. 11.: "try it again and properly"): the distant cars of a kind, the crew in them,
+	 * a crowd of a figure, each with its matrix and light in the instances' buffer; the card draws the shape's
+	 * triangles once for all of them (each drawn on its own, a frame took a third longer, 86).
+	 */
+	struct Batch {
+		const ThreeDGpuMesh *mesh;   ///< the first of them: their shape's glow and alpha, their paint
+		const GpuShape *shape;
+		const GpuIndices *indices;
+		std::vector<GLuint> textures;
+		std::vector<PaintOnCard> paints;
+		float mirrored = 1;          ///< the sign of their matrices' determinant (CullVehicleRun()); 0 none
+		std::vector<float> instances; ///< each: its matrix's 16 (its rows), its light's 3, whether lit
+	};
 	std::vector<Draw> draws;
 	std::vector<MeshDraw> mesh_draws;
+	std::vector<Batch> batches;
 	float glass_alpha = 0.15f;
 };
 
 void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass);
+
+/** Whether two paints paint alike (EyeObjectDraws::Batch): the same masks, colours and times. */
+static bool SamePaint(const ThreeDGpuPaint &a, const ThreeDGpuPaint &b)
+{
+	return a.detail == b.detail && a.detail_colours == b.detail_colours && a.body == b.body && a.paint_mask == b.paint_mask &&
+			a.coloured == b.coloured && a.colour == b.colour && a.target == b.target && a.start == b.start && a.fade == b.fade &&
+			a.addon_mask == b.addon_mask && a.addon_colour == b.addon_colour && a.addon_start == b.addon_start &&
+			a.tinted == b.tinted && a.tint == b.tint && a.rust_mask == b.rust_mask && a.rust_colour == b.rust_colour &&
+			a.rust_time == b.rust_time && a.rust_ramp == b.rust_ramp && a.rust_gradual == b.rust_gradual;
+}
 
 /** What the objects of the view from the eyes need on the card put there: false, something it cannot hold. */
 bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
@@ -4276,6 +4318,29 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			if (t == nullptr) return false;
 			d.textures[i] = t->name;
 			if (i < m.paints.size() && m.paints[i].Any() && !PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
+		}
+		/* Among those alike, drawn at once (Batch); one with wheels that turn on its own. */
+		if (_eye_instances_on && (m.wheels.empty() || !d.shape->has_wheel)) {
+			const double det = Determinant(m.matrix);
+			const float mirrored = det > 0 ? 1.0f : (det < 0 ? -1.0f : 0.0f);
+			const bool lit = m.lit && d.shape->has_nrm;
+			EyeObjectDraws::Batch *batch = nullptr;
+			for (EyeObjectDraws::Batch &b : out.batches) {
+				if (b.shape != d.shape || b.indices != d.indices || b.mirrored != mirrored || b.textures != d.textures) continue;
+				if ((b.mesh->lit && b.shape->has_nrm) != lit || b.mesh->paints.size() != m.paints.size()) continue;
+				bool same = true;
+				for (size_t i = 0; i < m.paints.size() && same; i++) same = SamePaint(b.mesh->paints[i], m.paints[i]);
+				if (!same) continue;
+				batch = &b;
+				break;
+			}
+			if (batch == nullptr) {
+				out.batches.push_back({&m, d.shape, d.indices, d.textures, d.paints, mirrored, {}});
+				batch = &out.batches.back();
+			}
+			batch->instances.insert(batch->instances.end(), m.matrix.begin(), m.matrix.end());
+			batch->instances.insert(batch->instances.end(), {m.light[0], m.light[1], m.light[2], lit ? 1.0f : 0.0f});
+			continue;
 		}
 		out.mesh_draws.push_back(std::move(d));
 	}
@@ -4323,6 +4388,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 	PaintUnits(_eye_mesh_program);
 	ClearPaintUnits();
 	gl.glUniform1f(_eye_mesh_program.near_plane, near_plane);
+	gl.glUniform1i(_eye_mesh_program.instanced, 0);
 	gl.glActiveTexture(GL_TEXTURE0);
 	if (glass) {
 		gl.glEnable(GL_BLEND);
@@ -4331,6 +4397,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 	for (const EyeObjectDraws::MeshDraw &d : o.mesh_draws) {
 		const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? d.mesh->triangles->glass : d.mesh->triangles->opaque;
 		if (runs.empty()) continue;
+		if (!glass) _gpu_eye_single++;
 		gl.glUniformMatrix4fv(_eye_mesh_program.matrix, 1, GL_TRUE, d.mesh->matrix.data());
 		const double determinant = Determinant(d.mesh->matrix);
 		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
@@ -4358,6 +4425,56 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			CullVehicleRun(r.facing, -determinant);
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 		}
+	}
+	/* The batches of meshes alike (EyeObjectDraws::Batch): the shape's triangles once for all its instances, their
+	 * matrices and lights in attributes 4-8 of its VAO from the instances' buffer, one of each an instance. */
+	if (!o.batches.empty()) {
+		if (_eye_instance_vbo == 0) gl.glGenBuffers(1, &_eye_instance_vbo);
+		gl.glUniform1i(_eye_mesh_program.instanced, 1);
+		gl.glUniform1i(_eye_mesh_program.wheel_count, 0);
+		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
+		for (const EyeObjectDraws::Batch &b : o.batches) {
+			const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? b.mesh->triangles->glass : b.mesh->triangles->opaque;
+			if (runs.empty()) continue;
+			const GLsizei count = static_cast<GLsizei>(b.instances.size() / 20);
+			gl.glBindVertexArray(b.shape->vao);
+			gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, b.indices->ibo);
+			if (!b.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
+			if (!b.shape->has_wheel) gl.glVertexAttrib3f(3, 0, 0, 0);
+			gl.glBindBuffer(GL_ARRAY_BUFFER, _eye_instance_vbo);
+			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(b.instances.size() * sizeof(float)), b.instances.data(), GL_STREAM_DRAW);
+			for (GLuint a = 4; a <= 8; a++) {
+				gl.glVertexAttribPointer(a, 4, GL_FLOAT, GL_FALSE, 20 * sizeof(float), reinterpret_cast<const void *>((a - 4) * 4 * sizeof(float)));
+				gl.glEnableVertexAttribArray(a);
+				gl.glVertexAttribDivisor(a, 1);
+			}
+			for (const ThreeDGpuTriangles::Run &r : runs) {
+				if (r.texture >= b.textures.size() || b.textures[r.texture] == 0) continue;
+				const uint32_t glow = b.mesh->shape->Glow(r.texture);
+				const Colour e(glow);
+				gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
+				if (glass) {
+					const uint8_t alpha = b.mesh->shape->Alpha(r.texture);
+					gl.glUniform1f(_eye_mesh_program.glass_alpha, alpha < 255 ? alpha / 255.0f : o.glass_alpha);
+				}
+				gl.glUniform1i(_eye_mesh_program.texel_alpha, glass && b.mesh->shape->Alpha(r.texture) < 255 ? 1 : 0);
+				SetPaint(_eye_mesh_program, r.texture < b.mesh->paints.size() ? &b.mesh->paints[r.texture] : nullptr, &b.paints[r.texture]);
+				gl.glBindTexture(GL_TEXTURE_2D, b.textures[r.texture]);
+				CullVehicleRun(r.facing, -b.mirrored);
+				gl.glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)), count);
+			}
+			/* The shape's VAO as it was: its own attributes alone. */
+			for (GLuint a = 4; a <= 8; a++) {
+				gl.glDisableVertexAttribArray(a);
+				gl.glVertexAttribDivisor(a, 0);
+			}
+			if (!glass) {
+				_gpu_eye_batches++;
+				_gpu_eye_instances += count;
+			}
+		}
+		gl.glBindBuffer(GL_ARRAY_BUFFER, 0);
+		gl.glUniform1i(_eye_mesh_program.instanced, 0);
 	}
 	gl.glDisable(GL_CULL_FACE);
 	gl.glFrontFace(GL_CCW);
@@ -5563,6 +5680,8 @@ std::string ThreeDGpuTimes()
 	for (std::atomic<size_t> &b : _card_sent_of) b = 0;
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
+	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
+	_gpu_eye_batches = _gpu_eye_instances = _gpu_eye_single = 0;
 	if (_gpu_standing_triangles[1] > 0) s += fmt::format("; of the buildings' {} triangles in the blocks {} drawn, in the cells there", _gpu_standing_triangles[1], _gpu_standing_triangles[0]);
 	const uint64_t standing_failed = _gpu_standing_failed[0] + _gpu_standing_failed[1] + _gpu_standing_failed[2] + _gpu_standing_failed[3];
 	if (standing_failed > 0) {

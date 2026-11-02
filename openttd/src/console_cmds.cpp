@@ -10047,6 +10047,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _clear_by_drawing;
 		_clear_by_drawing = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu mazani {}", _clear_by_drawing ? "kreslenim" : "jak karta umi");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "instance") {
+		/* 'gpu instance 0|1': the meshes alike of the view from the eyes drawn at once by instances (1), or each on its own (0). */
+		extern bool _eye_instances_on;
+		_eye_instances_on = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: gpu instance {}", _eye_instances_on ? "najednou" : "po jedne");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "plakaty") {
+		/* 'gpu plakaty 0|1': the distant vehicles and figures of the view from the eyes as pictures (1), as the
+		 * processor draws them, or by their triangles on the card (0, as the card has them). */
+		extern bool _eye_figures_by_card;
+		_eye_figures_by_card = number(3).value_or(0) == 0;
+		IConsolePrint(CC_DEFAULT, "test3d: gpu plakaty {}", _eye_figures_by_card ? "ne, trojuhelniky kartou" : "ano");
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "snimek") {
 		/* 'gpu snimek 0|1': the frames of the view from the eyes drawn whole by the graphics card (1), or by the
 		 * processor with only the objects on the card (0). */

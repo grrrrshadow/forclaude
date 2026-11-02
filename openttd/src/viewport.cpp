@@ -11543,6 +11543,9 @@ struct CabFigureModel {
 	std::vector<Load> loads;
 };
 
+/** The vehicles and figures of the view from the eyes by their triangles on the card however far (no pictures of them); the rig turns it off to compare (test3d gpu plakaty 1). */
+bool _eye_figures_by_card = true;
+
 /** Whether the graphics card draws a figure by its triangles (EyeFigureOnCard()): no more wheels that turn than it turns. */
 static bool EyeFigureFitsCard(const ThreeDVehicleObject &fig, const ThreeDVehicleShape &shape, bool wheels_turn)
 {
@@ -14212,7 +14215,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double on_screen = extent * eye.focal / std::max(foot.f, CAB_NEAR);
 		const double in_picture = extent / (CAB_PX_ACROSS * per);
 		const bool small = !fg.plant && extent > 0 && on_screen >= 1.0 && (on_screen > 3.0 * in_picture || in_picture < 4.0);
-		fg.solid = fg.own_cab || fg.missile || small || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels);
+		/* By the card, a vehicle or a figure by its triangles however far (the player, 2. 11.: "try it again and
+		 * properly"): no picture of it made by the thread and read back from the card (a hundred in five seconds on
+		 * the phone, 86), those alike drawn at once (EyeObjectDraws::Batch of three_d_gpu.cpp), its shape as simple as
+		 * its distance allows (TrySimpler()) and its textures at that detail. The plants of the fields stay pictures far off. */
+		fg.solid = fg.own_cab || fg.missile || small || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels || (figures_by_card && _eye_figures_by_card));
 		if (fg.solid) {
 			/* What it needs, if it is there (CabFigureReady()): drawn by its triangles as a job of the frame, after the
 			 * billboards, all of them at once on every core (the depth sorts them out). */
