@@ -40,6 +40,7 @@
 #include "viewport_func.h"
 #include "slope_func.h"
 #include "language.h"
+#include "landscape.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "3rdparty/meshoptimizer/meshoptimizer.h"
 #include "timer/timer.h"
@@ -2596,6 +2597,122 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 	}
 }
 
+/** The colours a tree's part may be in a use at most (the colleague: "palettes of at most 8 colours, your 3 bits a part"). */
+static constexpr size_t TREE_PALETTE_MAX = 8;
+/** A tree's parts painted by its use at most: four bits a part below the use's bits (TREE_PAINT_USE_BIT) of an add-on's paint. */
+static constexpr size_t TREE_PARTS_MAX = 6;
+/** Where the use is in the paint of a tree among a building's add-ons (AddonPaintAt()): three bits. */
+static constexpr uint8_t TREE_PAINT_USE_BIT = 24;
+/** The number of a part's colour in a tree's paint that leaves the part as its texture is (a use that does not name it). */
+static constexpr uint32_t TREE_PAINT_OWN = 0xF;
+
+/** A use of a tree by its name in "barvy_pouziti" (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md); None one the game does not know. */
+static TreeUse ParseTreeUse(std::string_view name)
+{
+	if (name == "mirne") return TreeUse::Temperate;
+	if (name == "les") return TreeUse::Forest;
+	if (name == "subarkticke") return TreeUse::SubArctic;
+	if (name == "snih") return TreeUse::Snow;
+	return TreeUse::None;
+}
+
+/** A tree's part painted by its use, as read: "barvy_casti" its mask and start, "barvy_pouziti" its colours in each use. */
+struct TreePartRead {
+	std::string name;   ///< "cast": "koruna", "snih"
+	std::string mask;   ///< "maska": the path of its grey mask of the tree's first texture
+	int start = 255;    ///< "zacatek": the texture's lightness its colour is at its own
+	std::array<std::vector<uint32_t>, TREE_USES> palettes; ///< its colours in each use (Colour::data); none its texture's own there
+};
+
+/**
+ * A tree's parts painted by its use (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md; the player, 2. 11.: "one
+ * tree, one object, but many uses"): "barvy_casti" its parts -- a grey mask of its first texture each ("maska", its
+ * crown, its snow), the texture's lightness its colour is at ("zacatek") --, "barvy_pouziti" each part's colours in
+ * each use ("mirne", "les", "subarkticke", "snih": by the part's name a list of "RRGGBB"; a part a use does not name,
+ * and a use of nothing, {}, keep the texture's colours).
+ * @return the parts, at most TREE_PARTS_MAX; none when it is not painted so
+ */
+static std::vector<TreePartRead> ReadTreeParts(const nlohmann::json &e, const std::string &folder)
+{
+	std::vector<TreePartRead> parts;
+	if (!e.contains("barvy_casti") || !e.at("barvy_casti").is_array() || !e.contains("barvy_pouziti") || !e.at("barvy_pouziti").is_object()) return parts;
+	for (const auto &b : e.at("barvy_casti")) {
+		if (!b.is_object() || !b.contains("maska") || !b.at("maska").is_string() || parts.size() >= TREE_PARTS_MAX) continue;
+		TreePartRead part;
+		part.name = b.value("cast", std::string());
+		part.mask = folder + b.at("maska").get<std::string>();
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		for (const auto &[use_name, colours] : e.at("barvy_pouziti").items()) {
+			const TreeUse use = ParseTreeUse(use_name);
+			if (use == TreeUse::None || !colours.is_object() || !colours.contains(part.name) || !colours.at(part.name).is_array()) continue;
+			std::vector<uint32_t> &palette = part.palettes[to_underlying(use)];
+			for (const auto &c : colours.at(part.name)) {
+				auto rgb = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+				if (rgb.has_value() && palette.size() < TREE_PALETTE_MAX) palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+			}
+		}
+		parts.push_back(std::move(part));
+	}
+	return parts;
+}
+
+/** A tree among the add-ons of the buildings painted by its use (ReadTreeParts()): its parts painted a colour by number, each use its own palettes. */
+static void ReadTreeColours(const nlohmann::json &e, const std::string &folder, ThreeDObject &addon)
+{
+	if (!addon.colours.empty()) return; // painted a colour by number ("barvy") as the parasols
+	for (const TreePartRead &read : ReadTreeParts(e, folder)) {
+		ThreeDObjectColourPart part;
+		part.name = read.name;
+		part.mask_png = ReadWholeFile(read.mask);
+		part.start = read.start;
+		part.use_palettes = read.palettes;
+		if (part.mask_png.empty()) {
+			Debug(misc, 0, "3D object {}: the tree's part {} has no mask", addon.name, part.name);
+			continue;
+		}
+		addon.colours.push_back(std::move(part));
+	}
+	addon.tree_uses = !addon.colours.empty();
+}
+
+/**
+ * A tree of the map painted by its use (ReadTreeParts()), a figure: its first part (the crown) its paint, its second
+ * (the snow over the crown) its second paint, both over its first texture; a state of it for each colour of their
+ * palettes in each use, the same number of both (TreeState()).
+ */
+static void ReadTreeFigurePaint(const nlohmann::json &e, const std::string &folder, ThreeDVehicleObject &fig)
+{
+	const std::vector<TreePartRead> parts = ReadTreeParts(e, folder);
+	if (parts.empty()) return;
+	fig.paint.mask_file = parts[0].mask;
+	fig.paint.start = parts[0].start;
+	if (parts.size() > 1) {
+		fig.second_paint.mask_file = parts[1].mask;
+		fig.second_paint.start = parts[1].start;
+	}
+	/* So many states in a use as the palettes it names have colours together: n % each palette's length. */
+	static constexpr size_t TREE_STATES_MAX = 24;
+	for (size_t u = 1; u < TREE_USES; u++) {
+		size_t count = 0;
+		for (size_t k = 0; k < parts.size() && k < 2; k++) {
+			const size_t len = parts[k].palettes[u].size();
+			if (len > 0) count = count == 0 ? len : std::lcm(count, len);
+		}
+		if (count == 0) continue; // its texture as it is in the use
+		count = std::min(count, TREE_STATES_MAX);
+		fig.tree_states[u] = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(count)};
+		for (size_t n = 0; n < count; n++) {
+			ThreeDVehicleState st;
+			st.first = 1; // no sprite picks it
+			st.last = 0;
+			const std::vector<uint32_t> &crown = parts[0].palettes[u];
+			if (!crown.empty()) st.colour = crown[n % crown.size()];
+			if (parts.size() > 1 && !parts[1].palettes[u].empty()) st.second_colour = parts[1].palettes[u][n % parts[1].palettes[u].size()];
+			fig.states.push_back(std::move(st));
+		}
+	}
+}
+
 /**
  * The plants standing on a building or a field ("rostliny", the colleague's hra/3d/PROSBA-PRUMYSL-3D.md): a plant's
  * file ("druh": "rostlina" of the index, its foot at the origin, 1 m high) at every place of the list -- "poloha"
@@ -3404,6 +3521,7 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 		obj.glb_path = folder + file;
 		obj.variants = 0; // no house's
 		obj.scene_turns = static_cast<int8_t>(k);
+		obj.forest_trees = e.value("pouziti_stromu", std::string()) == "les";
 		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 		obj.addon_places = trees_read.addon_places;
 		for (ThreeDObjectFigure &f : obj.addon_places) turn(f);
@@ -3678,6 +3796,7 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 		addons.variants = 0; // no house's
 		addons.tiles_x = bx;
 		addons.tiles_y = by;
+		addons.forest_trees = e.value("pouziti_stromu", std::string()) == "les";
 		ReadBuildingFigures(e, addons);
 		if (!addons.addon_places.empty()) {
 			tile.parts.push_back(_three_d_objects.size());
@@ -3927,6 +4046,7 @@ static void ReadThreeDObjectsNow()
 					addon.glb_path = folder + addon.file;
 					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
 					ReadColourParts(e, folder, addon);
+					ReadTreeColours(e, folder, addon);
 					addon.trunk_r = std::clamp(e.value("kmen_r", 0.0f), 0.0f, 5.0f);
 					addon.addon = true;
 					addon.variants = 0;
@@ -4369,6 +4489,7 @@ static void ReadThreeDVehicleObjects()
 					 * sub-tropical climate"): it stands for the kinds of trees its "stromy_mapy" names, and those of
 					 * "stromy_mapy_dalsi", drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
 					if (e.contains("stromy_mapy")) ReadMapTrees(e.at("stromy_mapy"), fig.name);
+					ReadTreeFigurePaint(e, folder, fig);
 					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
 						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
@@ -5835,6 +5956,7 @@ enum LazyThing : int {
 	LAZY_RUST_MASK = 3,
 	LAZY_HOUSE_LEVELS = 4,   ///< a building's texture at all its levels
 	LAZY_HOUSE_GLB = 5,      ///< a house's shape and texture from its .glb (ThreeDObject::Read())
+	LAZY_SECOND_MASK = 6,    ///< a tree's second part's mask (ThreeDVehicleObject::second_paint)
 	LAZY_FRAME = 1000,       ///< + the frame
 	LAZY_TEXTURE = 2000,     ///< + the texture's index
 	LAZY_ADDON_MASK = 3000,  ///< + the add-on
@@ -7210,6 +7332,19 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 	return LevelOfKept(this->rust_levels, level);
 }
 
+/** A tree's second part's mask (second_paint, its snow) at a level of detail, its grey in the red; nullptr without one. */
+const ThreeDObjectTexture *ThreeDVehicleObject::GetSecondMask(int level) const
+{
+	if (this->second_paint.mask_file.empty()) return nullptr;
+	level = std::max(level, 0);
+	MakeOnce(this, LAZY_SECOND_MASK, [this, level] { return this->second_tried && (this->second_levels == nullptr || HasLevel(*this->second_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->second_paint.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+		KeepTexture(this->second_levels, std::move(made));
+		this->second_tried = true;
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return LevelOfKept(this->second_levels, level);
+}
+
 /** The paint mask ("lak": "maska") at a level of detail, its grey in the red; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetPaintMask(int level) const
 {
@@ -7277,6 +7412,7 @@ size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
 	for (const ThreeDTextureLevels &place : this->levels) trim(place);
 	trim(this->mask_levels);
 	trim(this->rust_levels);
+	trim(this->second_levels);
 	for (const ThreeDTextureLevels &place : this->addon_mask_levels) trim(place);
 	return freed;
 }
@@ -7420,6 +7556,19 @@ const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
 	/* The composed ones under the lock: made on the main thread as the pictures are made on theirs (a state once made stays where it is). */
 	std::lock_guard lock(_lazy_mutex);
 	return k < this->composed.size() ? &this->composed[k] : nullptr;
+}
+
+/**
+ * The state of a tree in a use (TreeUse; the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md): its parts in the
+ * colours of the palettes of the use, each part palette[n % its length] -- the same n for all, so the snow goes with
+ * its crown.
+ * @param n the number of its place (a hash of the tile and the tree)
+ * @return its step; 0 as its texture is (a use it is not painted for)
+ */
+int ThreeDVehicleObject::TreeState(TreeUse use, uint32_t n) const
+{
+	const auto [first, count] = this->tree_states[to_underlying(use)];
+	return count == 0 ? 0 : first + static_cast<int>(n % count);
 }
 
 /**
@@ -8510,7 +8659,8 @@ static uint8_t PaintBits(size_t parts)
  */
 uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 {
-	if (this->colours.empty()) return 0;
+	/* A tree is painted by its use where it stands among a building's add-ons (AddonPaintAt()), never on its own. */
+	if (this->colours.empty() || this->tree_uses) return 0;
 	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u;
 	uint32_t paint = 1u << 31;
 	const uint8_t bits = PaintBits(this->colours.size());
@@ -8547,6 +8697,23 @@ uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
 	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u ^ (place + 1) * 0x165667B1u;
 	uint32_t paint = 1u << 31;
 	const uint8_t bits = PaintBits(a.colours.size());
+	if (a.tree_uses) {
+		/* A tree, painted by its use here (TreeUseAt()): each part palette[n % its length], the same n for all (the
+		 * colleague: "the snow goes with its crown"); a part the use does not name as its texture is. */
+		const TreeUse use = this->TreeUseAt(origin);
+		if (use == TreeUse::None) return 0;
+		h ^= h >> 15;
+		h *= 0x2C1B3C6Du;
+		h ^= h >> 12;
+		paint |= static_cast<uint32_t>(to_underlying(use)) << TREE_PAINT_USE_BIT;
+		bool any = false;
+		for (size_t k = 0; k < a.colours.size(); k++) {
+			const std::vector<uint32_t> &palette = a.colours[k].use_palettes[to_underlying(use)];
+			any |= !palette.empty();
+			paint |= (palette.empty() ? TREE_PAINT_OWN : h % palette.size()) << (bits * k);
+		}
+		return any ? paint : 0;
+	}
 	for (size_t k = 0; k < a.colours.size(); k++) {
 		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
 		x ^= x >> 15;
@@ -9238,6 +9405,28 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 	return it != this->painted.end() ? &it->second : plain;
 }
 
+/**
+ * What a tree among the add-ons of a building is painted for on the building at a tile (the colleague's
+ * hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md): in the temperate climate pastel, on the forest of an industry ("pouziti_stromu":
+ * "les") deep green; in the sub-arctic climate as the texture is, white on the snow -- a house's snowy variant above the
+ * snow line (snow_path), the forest above the snow line --; in the other climates as the texture is.
+ * @param origin the building's north tile
+ */
+TreeUse ThreeDObject::TreeUseAt(TileIndex origin) const
+{
+	switch (_settings_game.game_creation.landscape) {
+		case LandscapeType::Temperate:
+			return this->forest_trees ? TreeUse::Forest : TreeUse::Temperate;
+		case LandscapeType::Arctic: {
+			const bool snow = !this->snow_path.empty() || (this->forest_trees && origin < Map::Size() && TileHeight(origin) >= GetSnowLine());
+			if (snow) return TreeUse::Snow;
+			return this->forest_trees ? TreeUse::Forest : TreeUse::SubArctic;
+		}
+		default:
+			return TreeUse::None;
+	}
+}
+
 /** The texture painted by number (PaintAt()): each pixel of a part's mask the part's colour at the texture's lightness, its own where the texture is "zacatek" light. */
 ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint32_t paint) const
 {
@@ -9245,6 +9434,15 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 	const uint8_t bits = PaintBits(this->colours.size());
 	for (size_t k = 0; k < this->colours.size(); k++) {
 		const ThreeDObjectColourPart &part = this->colours[k];
+		/* A tree's part in the colours of the use its paint names (AddonPaintAt()); as its texture where it names none. */
+		const uint32_t number = GB(paint, static_cast<uint8_t>(bits * k), bits);
+		const std::vector<uint32_t> *palette = &part.palette;
+		if (this->tree_uses) {
+			const uint32_t use = GB(paint, TREE_PAINT_USE_BIT, 3);
+			if (use == 0 || use >= TREE_USES || number == TREE_PAINT_OWN) continue;
+			palette = &part.use_palettes[use];
+		}
+		if (palette->empty()) continue;
 		/* The mask, read the first time (on either thread). */
 		MakeOnce(&part, LAZY_HOUSE_MASK + static_cast<int>(k), [&part] { return !part.levels.empty(); }, [&part] {
 			std::vector<ThreeDObjectTexture> made;
@@ -9259,7 +9457,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 				break;
 			}
 		}
-		const Colour colour(part.palette[GB(paint, static_cast<uint8_t>(bits * k), bits) % part.palette.size()]);
+		const Colour colour((*palette)[number % palette->size()]);
 		const float start = static_cast<float>(part.start);
 		for (int y = 0; y < t.h; y++) {
 			const int my = std::min(mask->h - 1, y * mask->h / t.h);
@@ -9482,6 +9680,8 @@ void ThreeDVehicleObject::Forget() const
 	this->mask_tried = false;
 	this->rust_levels.reset();
 	this->rust_tried = false;
+	this->second_levels.reset();
+	this->second_tried = false;
 	this->addon_mask_levels.clear();
 	this->addon_mask_tried.clear();
 	this->detail_masks.clear();

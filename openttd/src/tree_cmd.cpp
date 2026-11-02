@@ -658,6 +658,9 @@ struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
  * 1. 11.: "the trees replace all the trees of the game ... about the towns"). One where each tree stands, its kind by
  * the tile and the tree, as big as the tree has grown; under the rainforest's and the clay town's trees one or two
  * plants of their undergrowth (ferns), from the eyes and on the map zoomed in, where they are more than a few pixels.
+ * The trees of the map painted by their use (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md; the player, 2. 11.:
+ * "the temperate trees painted as needed ... about the temperate towns more pastel, sub-arctic white and snowy"): pastel
+ * in the temperate climate; in the sub-arctic as their textures are, white where the tile is snowy as its sprites are.
  * @param ti the tile
  * @return whether they were drawn so, the tree sprites then left out
  */
@@ -681,18 +684,38 @@ static bool DrawThemedTrees(const TileInfo *ti)
 		under_of.assign(under.begin(), under.end());
 	}
 	if (trees_of.empty()) return false;
+	TreeUse use = TreeUse::None;
+	if (theme == TownTheme::None) {
+		switch (_settings_game.game_creation.landscape) {
+			case LandscapeType::Temperate:
+				use = TreeUse::Temperate;
+				break;
+			case LandscapeType::Arctic: {
+				/* Snowy as the tree sprites of the tile are drawn snowy (DrawTile_Trees()). */
+				const TreeGround ground = GetTreeGround(ti->tile);
+				const bool snow = (ground == TreeGround::SnowOrDesert || ground == TreeGround::RoughSnow) && GetTreeDensity(ti->tile) >= 2;
+				use = snow ? TreeUse::Snow : TreeUse::SubArctic;
+				break;
+			}
+			default:
+				break;
+		}
+	}
 
 	const uint tmp = CountBits(ti->tile.base() + ti->x + ti->y);
 	const Coord2D<uint8_t> *d = _tree_layout_xy[GB(tmp, 2, 2)];
 	const uint trees = GetTreeCount(ti->tile);
 	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
 	bool drawn = false;
-	auto place = [&](const ThreeDMapTree &kind, float size, int x, int y, float facing) {
+	/* n: the number of the tree's place, its colours of the use (ThreeDVehicleObject::TreeState()). */
+	auto place = [&](const ThreeDMapTree &kind, float size, int x, int y, float facing, uint32_t n) {
+		const ThreeDVehicleObject *fig = use != TreeUse::None ? GetThreeDFigure(kind.name) : nullptr;
+		const int state = fig != nullptr ? fig->TreeState(use, n) : 0;
 		if (eye) {
-			AddCabFigure(kind.name, size * kind.scale, x, y, z, facing);
+			AddCabFigure(kind.name, size * kind.scale, x, y, z, facing, 0, state);
 			drawn = true;
 		} else {
-			drawn |= AddThreeDFigureToViewport(kind.name, size * kind.scale, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+			drawn |= AddThreeDFigureToViewport(kind.name, size * kind.scale, x, y, z, facing, _cur_dpi->zoom, ti->tile, 0, -1, state);
 		}
 	};
 	for (uint i = 0; i < trees; i++, d++) {
@@ -710,7 +733,7 @@ static bool DrawThemedTrees(const TileInfo *ti)
 		/* A few sizes and turns, so that the trees of the map share a few pictures. */
 		size = std::round(size * (0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
 		const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
-		place(trees_of[GB(hash, 0, 8) % trees_of.size()], size, ti->x + d->x, ti->y + d->y, facing);
+		place(trees_of[GB(hash, 0, 8) % trees_of.size()], size, ti->x + d->x, ti->y + d->y, facing, GB(hash, 25, 7));
 	}
 	/* The undergrowth: one or two plants, as they are, where the tile puts them; on the map only zoomed in (a fern of
 	 * 0.7 m is a few pixels further out, thousands of triangles each). */
@@ -721,7 +744,7 @@ static bool DrawThemedTrees(const TileInfo *ti)
 			const uint32_t hash = tile_hash * (i + 1) * 668265263u;
 			const float size = std::round((0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
 			const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
-			place(under_of[GB(hash, 0, 8) % under_of.size()], size, ti->x + 2 + static_cast<int>(GB(hash, 25, 3)) * 12 / 7, ti->y + 2 + static_cast<int>(GB(hash, 28, 3)) * 12 / 7, facing);
+			place(under_of[GB(hash, 0, 8) % under_of.size()], size, ti->x + 2 + static_cast<int>(GB(hash, 25, 3)) * 12 / 7, ti->y + 2 + static_cast<int>(GB(hash, 28, 3)) * 12 / 7, facing, 0);
 		}
 	}
 	return drawn;

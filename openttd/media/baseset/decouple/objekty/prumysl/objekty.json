@@ -3721,7 +3721,8 @@
   ],
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "lesní půda (listí, jehličí, mech), kapradí, pařezy, padlá větev, kameny; houby rostou u stromů; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 2214 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 865 kB; glb z gltfpacku"
+  "poznamka": "lesní půda (listí, jehličí, mech), kapradí, pařezy, padlá větev, kameny; houby rostou u stromů; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 2214 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 865 kB; glb z gltfpacku",
+  "pouziti_stromu": "les"
  },
  {
   "soubor": "les_cesta.glb",
@@ -3925,7 +3926,8 @@
   ],
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "lesní cesta 2,5 m podél x od okraje k okraji (y = 7.4 m, koleje, tráva na krajích), keře podél, stromy mimo; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1034 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 868 kB; glb z gltfpacku"
+  "poznamka": "lesní cesta 2,5 m podél x od okraje k okraji (y = 7.4 m, koleje, tráva na krajích), keře podél, stromy mimo; jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1034 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 868 kB; glb z gltfpacku",
+  "pouziti_stromu": "les"
  },
  {
   "soubor": "les_paseka.glb",
@@ -4171,7 +4173,8 @@
   ],
   "autor": "grrrrf: vlastní model prumysl/les_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "paseka uprostřed lesa: louka s kytkami a trsy trávy; podél okrajů x = 0 a y = 0 (u severního rohu) přechází do lesní půdy, tam dva stromy, keře a kapradí; hra natočí každé ze čtyř prostředních políček severním rohem ven, čtyři dají jednu paseku (jedno z nich je les_paseka_srub); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1244 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 858 kB; glb z gltfpacku"
+  "poznamka": "paseka uprostřed lesa: louka s kytkami a trsy trávy; podél okrajů x = 0 a y = 0 (u severního rohu) přechází do lesní půdy, tam dva stromy, keře a kapradí; hra natočí každé ze čtyř prostředních políček severním rohem ven, čtyři dají jednu paseku (jedno z nich je les_paseka_srub); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; stromy a keře jsou společné doplňky (objekty/doplnky, kmen_r v jejich záznamu, koruna barvou číslem); 1244 trojúhelníků v souboru, kapradí a tráva jako instance jedné sítě; 858 kB; glb z gltfpacku",
+  "pouziti_stromu": "les"
  },
  {
   "soubor": "les_paseka_srub.glb",
@@ -4400,7 +4403,8 @@
     "otoceni": 0,
     "poznamka": "trampský kůň stojí na pasece u srubu hajného (hráč: koně jako dekorace „jako hasičská Tatra, kolečko a Zetor“, na farmě, u lesa, nedaleko měst): vozidlo special_kun_trampsky balíčku Special 3D v4 bez jezdkyně, nasedne se E jako na kolečko; skutečná velikost (meritko 1, přepínač velikosti GRF tu neplatí), stojí (pozy stoji koně; když hra umí, střídá s pase); bez balíčku Special 3D v4 tu kůň není (model ze sady zvirata, nic dvakrát)"
    }
-  ]
+  ],
+  "pouziti_stromu": "les"
  },
  {
   "soubor": "plantaz_zem.glb",

@@ -11425,10 +11425,15 @@ bool _cab_full_textures = false;
  */
 static constexpr float CAB_FIGURE_SCALE = THREE_D_EYE_PEOPLE_SCALE;
 
-/** A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()). */
-void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame)
+/**
+ * A figure the tiles being collected for the view from the eyes have standing on them (DrawThemedTrees()).
+ * @param state its state (a tree's colours of its use, ThreeDVehicleObject::TreeState()), 0 as it is
+ */
+void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame, int state)
 {
-	_cab_figures.push_back({std::string(name), size, x, y, z, facing, frame});
+	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	f.state = state;
+	_cab_figures.push_back(std::move(f));
 }
 
 /**

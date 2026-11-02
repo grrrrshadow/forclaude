@@ -394,6 +394,13 @@ static uint32_t PaletteColour(const ThreeDVehicleObject *obj, int step)
 	return s != nullptr ? s->colour : 0;
 }
 
+/** The colour of a tree's second part a state gives (its snow, ThreeDVehicleState::second_colour): 0 none. */
+static uint32_t SecondColour(const ThreeDVehicleObject *obj, int step)
+{
+	const ThreeDVehicleState *s = StateOf(obj, step);
+	return s != nullptr ? s->second_colour : 0;
+}
+
 /** The fading of the paint in a state: 0 new, 1 the target's colour. */
 static float FadeAmount(const ThreeDVehicleObject *obj, int step)
 {
@@ -1026,9 +1033,18 @@ struct ObjectPaintOfState {
 	Colour colour, target, rust_colour;
 	float start = 255.0f, fade = 0, rust_time = 0;
 	int level = 0;                                  ///< the level of detail of the textures and masks
+	const ThreeDObjectTexture *second_mask = nullptr; ///< a tree's second part's mask (its snow, ThreeDVehicleObject::second_paint), nullptr: none painted
+	Colour second_colour;                           ///< and its colour, at the texture's lightness over the first part's
+	float second_start = 255.0f;
 
-	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour) : obj(&obj), fade(fade), rust_time(rust_time), level(level)
+	/** @param second_colour a tree's second part's colour its state gives (ThreeDVehicleState::second_colour), 0 none */
+	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour, uint32_t second_colour = 0) : obj(&obj), fade(fade), rust_time(rust_time), level(level)
 	{
+		if (second_colour != 0) {
+			this->second_mask = obj.GetSecondMask(level);
+			this->second_colour = Colour(second_colour);
+			this->second_start = obj.second_paint.start > 0 ? static_cast<float>(obj.second_paint.start) : 255.0f;
+		}
 		const ThreeDVehiclePaint &paint = obj.paint;
 		this->coloured = paint.coloured || paint_colour != 0;
 		this->mask = (paint.fades || this->coloured) ? obj.GetPaintMask(level) : nullptr;
@@ -1040,8 +1056,23 @@ struct ObjectPaintOfState {
 		this->rust_colour = Colour(obj.rust.target);
 	}
 
-	/** The paint at u, v of the body's texture over its colour: coloured at the texture's lightness, faded. */
+	/** The paint at u, v of the body's texture over its colour: coloured at the texture's lightness, faded; a tree's second part over it. */
 	inline void Paint(float u, float v, float &cr, float &cg, float &cb) const
+	{
+		this->PaintBody(u, v, cr, cg, cb);
+		if (this->second_mask == nullptr) return;
+		/* A tree's second part (its snow over its crown), as an add-on's colour is laid. */
+		const int mx = std::min(this->second_mask->w - 1, static_cast<int>(u * this->second_mask->w)), my = std::min(this->second_mask->h - 1, static_cast<int>(v * this->second_mask->h));
+		const float m = Colour(this->second_mask->px[static_cast<size_t>(my) * this->second_mask->w + mx]).r / 255.0f;
+		if (m <= 0) return;
+		const float l = std::max({cr, cg, cb}) / this->second_start;
+		cr += (std::min(255.0f, this->second_colour.r * l) - cr) * m;
+		cg += (std::min(255.0f, this->second_colour.g * l) - cg) * m;
+		cb += (std::min(255.0f, this->second_colour.b * l) - cb) * m;
+	}
+
+	/** The body's own paint at u, v (Paint()). */
+	inline void PaintBody(float u, float v, float &cr, float &cg, float &cb) const
 	{
 		if (this->mask == nullptr && !this->whole) return;
 		float m = 1.0f;
@@ -1468,7 +1499,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	}
 	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6); the rust after
 	 * the paint has faded (the colleague: the paint fades, the rust grows over it). */
-	const ObjectPaintOfState painted(obj, *whole, level, fade, rust_time, paint_colour);
+	const ObjectPaintOfState painted(obj, *whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0);
 	/* The masks of details in the vehicle's colours of its set (callback 1C1). */
 	const ObjectDetailPaint details(obj, *whole, st, texs.size(), texs);
 	/* The textures an effect is coloured in: those of its material ("barvy"), the texture times the colour. */
@@ -1810,6 +1841,11 @@ static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVeh
 		g.addon_mask = obj.GetAddonMask(a, painted.level);
 		g.addon_colour = rgb(Colour(st->addon_colours[a]));
 		g.addon_start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
+	} else if (body && painted.second_mask != nullptr) {
+		/* A tree's second part (its snow) over the body's paint, as an add-on's colour is laid over it. */
+		g.addon_mask = painted.second_mask;
+		g.addon_colour = rgb(painted.second_colour);
+		g.addon_start = painted.second_start;
 	}
 	if (tint != 0 && static_cast<size_t>(index) < whole.tex_names.size() && whole.tex_names[index] == obj.tint_material) {
 		g.tinted = true;
@@ -1970,7 +2006,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			}
 			m.textures[i] = obj.GetTexture(l, static_cast<int>(i));
 		}
-		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour);
+		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0);
 		const ObjectDetailPaint details(obj, whole, st, std::max<size_t>(1, whole.pngs.size()), m.textures);
 		m.paints.resize(m.textures.size());
 		for (size_t i = 0; i < m.textures.size(); i++) {
@@ -3843,7 +3879,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		}
 		return keep();
 	}
-	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state));
 	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return plain();
 	t.w = raw->w;
 	t.h = raw->h;
@@ -3929,7 +3965,7 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	}
 	if (state == 0) return !no_wait.Missed();
 	const ThreeDVehicleState *st = obj->State(state);
-	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state));
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state));
 	const ObjectDetailPaint details(*obj, *shape, st, textures.size(), textures);
 	paints.resize(textures.size());
 	for (size_t i = 0; i < textures.size(); i++) paints[i] = GpuPaintOf(*obj, *shape, st, static_cast<int>(i), painted, details, 0, held);
@@ -4419,7 +4455,7 @@ static void NoteMovingFigure(TileIndex tile, int ticks, const ThreeDVehicleShape
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
@@ -4471,7 +4507,8 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		const int ticks = fig->spin_ticks > 0 ? std::max(1, fig->spin_ticks / SPIN_STEPS) : fig->frame_ticks;
 		NoteMovingFigure(tile, ticks, *shape, scale, tall, x, y, z);
 	}
-	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, 0, frame, -1, 1.0f, spin_step, 0, 0, 0, 0.0f, 0);
+	/* Its state: a tree's colours of its use (ThreeDVehicleObject::TreeState()). */
+	return PictureRequest(fig, scale, zoom, world_az + yaw, world_az, false, state, frame, -1, 1.0f, spin_step, 0, 0, 0, 0.0f, 0);
 }
 
 /** A picture asked for (PictureRequest()) as it is made: now, or not waited for (later, FigureRequest()). */
@@ -4520,16 +4557,17 @@ std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, fl
  * @param zoom the zoom of the view
  * @param tile the tile it stands on, drawn again when it moves
  * @param phase how many frames on it is from the others (a hash of its tile: the girls of a map do not all move at once)
+ * @param state its state (a tree's colours of its use, ThreeDVehicleObject::TreeState()), 0 as it is
  * @return whether it was drawn so; else the caller draws its sprite
  */
-bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame)
+bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state)
 {
 	int height = 0, up = 0;
 	bool later = false;
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
-		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f);
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state);
 		if (!p.has_value()) return false;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 		std::vector<ThreeDPictureLight> lights;
@@ -4546,7 +4584,7 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 				break;
 		}
 	}
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later);
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state);
 	if (!p.has_value()) return false;
 	const ThreeDModelPicture *pic = RequestedPicture(std::move(*p), later);
 	if (pic == nullptr) return false;

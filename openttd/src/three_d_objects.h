@@ -119,6 +119,23 @@ using ThreeDTextureLevels = std::shared_ptr<const std::vector<ThreeDObjectTextur
 ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes);
 
 /**
+ * What a tree is painted for (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md; the player, 2. 11.: "one tree, one
+ * object, but many uses"): its crown and its snow ("barvy_casti") in the colours of the use ("barvy_pouziti") -- pastel
+ * in the temperate climate, deep green in the forest of an industry, as its texture is in the sub-arctic climate, white
+ * on the sub-arctic snow. None: its texture as it is (the tropics, the toyland, the themed towns).
+ */
+enum class TreeUse : uint8_t {
+	None = 0,
+	Temperate, ///< "mirne": the temperate climate, the towns and about them
+	Forest,    ///< "les": the forest of an industry ("pouziti_stromu": "les" of its tile)
+	SubArctic, ///< "subarkticke": the sub-arctic climate off the snow
+	Snow,      ///< "snih": the sub-arctic climate on the snow
+	End,
+};
+/** How many uses a tree is painted for (TreeUse), None among them. */
+static constexpr size_t TREE_USES = static_cast<size_t>(TreeUse::End);
+
+/**
  * A part of a building painted a colour by number, each house on the map its own ("barvy", the colleague's
  * hra/3d/PROSBA-DOMY-Z-BUDOVY3D.md): the roof, the plaster, the fence.
  */
@@ -128,6 +145,8 @@ struct ThreeDObjectColourPart {
 	int start = 255;                ///< "zacatek": the texture's lightness the colour is at its own
 	std::vector<uint32_t> palette;  ///< "paleta": the colours it may be (Colour::data), the first as it is built
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
+	/** A tree's part ("barvy_casti"): the colours it may be in each use ("barvy_pouziti"), none its texture's own there; palette unused. */
+	std::array<std::vector<uint32_t>, TREE_USES> use_palettes;
 };
 
 /** A figure standing on a building ("postavy" of a house): College Girl smoking by the parasols of the hotel's roof. */
@@ -258,6 +277,8 @@ struct ThreeDObject {
 	mutable std::vector<ThreeDTextureLevels> material_levels; ///< their textures, made the first time drawn (MaterialTexture())
 	bool addon = false;               ///< an add-on itself ("druh": "doplnek"): never a house of its own
 	float trunk_r = 0;                ///< an add-on's "kmen_r" (a tree), metres at size 1: only its trunk stands in the way, not its crown; 0 all of it
+	bool tree_uses = false;           ///< a tree among the add-ons, its parts painted by its use (ThreeDObjectColourPart::use_palettes)
+	bool forest_trees = false;        ///< "pouziti_stromu": "les": the trees on it are of the forest of an industry (TreeUse::Forest)
 	std::vector<uint32_t> passable_tris; ///< the triangles of its laid trees that stand in no one's way (trunk_r), first and end of each run
 	std::vector<float> trunks;           ///< the trunks of its laid trees instead: x, y and radius of each, world units (Blocks())
 	/* A house with an interior (the colleague's hra/3d/PROSBA-INTERIERY.md): the interior an object of its own in the
@@ -319,6 +340,7 @@ struct ThreeDObject {
 	const ThreeDObjectTexture *DrawnTexture(int level, uint32_t paint = 0) const;
 	const ThreeDObjectTexture *DrawnTextureOf(uint8_t texture, int level, uint32_t paint = 0) const;
 	uint32_t AddonPaintAt(TileIndex origin, uint8_t texture) const;
+	TreeUse TreeUseAt(TileIndex origin) const;
 	/** How many textures its triangles have: its own, its add-ons' and its other materials'. */
 	size_t Textures() const { return 1 + this->addon_objects.size() + this->material_pngs.size(); }
 	const ThreeDObjectTexture *MaterialTexture(size_t material, int level, bool now) const;
@@ -578,6 +600,7 @@ struct ThreeDVehicleState {
 	uint32_t first = 0;         ///< "sprity": the first ...
 	uint32_t last = 0;          ///< ... and the last sprite number in the GRF; last < first: no sprite picks it, a set of a vehicle standing (StateNamed())
 	uint32_t colour = 0;        ///< "barva": the paint's colour (Colour::data), over its mask; 0 the texture's own
+	uint32_t second_colour = 0; ///< a tree's second part's colour (its snow), over ThreeDVehicleObject::second_paint's mask; 0 the texture's own
 	float fade = 0;             ///< "lak": how far the paint has faded to its target, 0 to 1
 	float rust = 0;             ///< "rez": how far it has rusted, 0 to 1
 	ThreeDParts parts;          ///< the parts it shows ("doplnky" its nodes, "posadka" a group of the crew): bit n the part n (ThreeDVehicleObject::part_names)
@@ -709,7 +732,10 @@ struct ThreeDVehicleObject {
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	float cab[3] = {};              ///< x, y, z, metres
 	std::string msts_cab;           ///< an engine of MSTS: its cab's .cvf (SimtrainsCab), empty none
-	ThreeDVehiclePaint paint;       ///< "lak"
+	ThreeDVehiclePaint paint;       ///< "lak"; a tree's: its first part painted by its use (its crown, "barvy_casti"), the colour its state's
+	ThreeDVehiclePaint second_paint; ///< a tree's second part painted by its use (its snow over the crown): its mask and "zacatek", the colour its state's (second_colour)
+	/** A tree's states by its use (TreeUse): the step of the first and how many, one for each colour of its palettes there (TreeState()). */
+	std::array<std::pair<uint16_t, uint16_t>, TREE_USES> tree_states{};
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
@@ -791,6 +817,7 @@ struct ThreeDVehicleObject {
 	bool TextureSize(int index, int &w, int &h) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
+	const ThreeDObjectTexture *GetSecondMask(int level) const;
 	const ThreeDObjectTexture *GetAddonMask(size_t addon, int level) const;
 	const ThreeDDetailMask *GetDetailMask(int addon) const;
 	bool HasDetails() const;
@@ -808,6 +835,7 @@ struct ThreeDVehicleObject {
 	static constexpr uint64_t BODY_FRAME_MASK = 0xFF;
 	static constexpr int BODY_GAIT_FRAMES = 64;    ///< the frames of a gait at most (a pose's "snimku")
 	const ThreeDVehicleState *State(int step) const;
+	int TreeState(TreeUse use, uint32_t n) const;
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
@@ -838,6 +866,8 @@ private:
 	mutable bool mask_tried = false;
 	mutable ThreeDTextureLevels rust_levels;         ///< the rust mask likewise
 	mutable bool rust_tried = false;
+	mutable ThreeDTextureLevels second_levels;       ///< a tree's second part's mask likewise (second_paint)
+	mutable bool second_tried = false;
 	mutable std::vector<ThreeDTextureLevels> addon_mask_levels; ///< each add-on's colour mask likewise
 	mutable std::vector<bool> addon_mask_tried;
 	mutable std::vector<std::shared_ptr<const ThreeDDetailMask>> detail_masks; ///< the masks of details: [0] the body's, [1 + n] the add-on n's (GetDetailMask())

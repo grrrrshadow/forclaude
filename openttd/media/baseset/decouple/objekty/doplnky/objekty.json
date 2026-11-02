@@ -4237,16 +4237,70 @@
   "kmen_r": 0.29,
   "vyska_m": 6.93,
   "polomer_m": 2.0,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p0_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p0_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D (kmen a větve z karet), malý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4274,9 +4328,6 @@
   "kmen_r": 0.36,
   "vyska_m": 12.37,
   "polomer_m": 3.59,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4284,7 +4335,65 @@
     11
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12,
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p1_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p1_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D, střední; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4312,16 +4421,70 @@
   "kmen_r": 0.45,
   "vyska_m": 17.03,
   "polomer_m": 2.96,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_p2_maska_koruna.png",
+    "zacatek": 74
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_p2_maska_snih.png",
+    "zacatek": 65
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "214E31",
+     "295736",
+     "1F462E",
+     "325A3A",
+     "264F3E"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "62746C",
+     "5A6B63",
+     "697971"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk ve 3D, vysoký; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4349,9 +4512,6 @@
   "kmen_r": 0.21,
   "vyska_m": 7.95,
   "polomer_m": 2.79,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4367,9 +4527,67 @@
     "druhy": [
      31
     ]
+   },
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17,
+     18
+    ]
    }
   ],
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "listnac_p0_maska_koruna.png",
+    "zacatek": 86
+   },
+   {
+    "cast": "snih",
+    "maska": "listnac_p0_maska_snih.png",
+    "zacatek": 79
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "B4DC98",
+     "C3E3A4",
+     "A9D6AC",
+     "D0E6A9",
+     "EDD8A6",
+     "F2C4CF"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "4F8A3C",
+     "5B9541",
+     "418139",
+     "689A42",
+     "77973B",
+     "A87B30"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "AFB5B9",
+     "A8AFB4",
+     "B8BCBE"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "listnatý strom ve 3D, podzimní žlutohnědý; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4397,9 +4615,6 @@
   "kmen_r": 0.26,
   "vyska_m": 17.27,
   "polomer_m": 2.13,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4407,7 +4622,65 @@
     8
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     14,
+     16
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k0_maska_koruna.png",
+    "zacatek": 77
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k0_maska_snih.png",
+    "zacatek": 69
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "265938",
+     "2F633E",
+     "235034",
+     "396742",
+     "2B5A47"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "70847B",
+     "667A71",
+     "778A81"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "štíhlý smrk z karet, vysoký holý kmen; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4435,16 +4708,71 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.29,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     5
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     16,
+     19
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "borovice_k0_maska_koruna.png",
+    "zacatek": 80
+   },
+   {
+    "cast": "snih",
+    "maska": "borovice_k0_maska_snih.png",
+    "zacatek": 68
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "245535",
+     "2D5E3A",
+     "214C31",
+     "36623F",
+     "295543"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6A7D75",
+     "61746B",
+     "71837A"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "řídká borovice z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4472,16 +4800,70 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.49,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     11
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k1_maska_koruna.png",
+    "zacatek": 66
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k1_maska_snih.png",
+    "zacatek": 59
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "225032",
+     "2A5837",
+     "1F482E",
+     "335C3B",
+     "26513F"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "64766E",
+     "5B6E65",
+     "6B7B73"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "hustý tmavý smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4509,9 +4891,6 @@
   "kmen_r": 0.26,
   "vyska_m": 17.43,
   "polomer_m": 2.53,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4519,7 +4898,64 @@
     11
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     13
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k2_maska_koruna.png",
+    "zacatek": 80
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k2_maska_snih.png",
+    "zacatek": 71
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "255636",
+     "2D603C",
+     "224E32",
+     "376440",
+     "2A5744"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6C8077",
+     "63766D",
+     "73857D"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4547,9 +4983,6 @@
   "kmen_r": 0.33,
   "vyska_m": 22.29,
   "polomer_m": 3.15,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4557,7 +4990,65 @@
     6
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     15,
+     19
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "borovice_k1_maska_koruna.png",
+    "zacatek": 82
+   },
+   {
+    "cast": "snih",
+    "maska": "borovice_k1_maska_snih.png",
+    "zacatek": 74
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "225032",
+     "2A5937",
+     "1F482E",
+     "335C3C",
+     "26513F"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "64766E",
+     "5B6E65",
+     "6B7B73"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "vysoká borovice z karet, koruna nahoře; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4585,16 +5076,70 @@
   "kmen_r": 0.18,
   "vyska_m": 12.21,
   "polomer_m": 2.51,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
     8
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     12
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "smrk_k3_maska_koruna.png",
+    "zacatek": 76
+   },
+   {
+    "cast": "snih",
+    "maska": "smrk_k3_maska_snih.png",
+    "zacatek": 67
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "265837",
+     "2E623D",
+     "224F33",
+     "386642",
+     "2A5946"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "6E827A",
+     "65796F",
+     "76887F"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "menší smrk z karet; společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4622,9 +5167,6 @@
   "kmen_r": 0.25,
   "vyska_m": 16.44,
   "polomer_m": 3.82,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4634,7 +5176,66 @@
     9
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "listnac_k0_maska_koruna.png",
+    "zacatek": 99
+   },
+   {
+    "cast": "snih",
+    "maska": "listnac_k0_maska_snih.png",
+    "zacatek": 92
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "B4DC98",
+     "C3E3A4",
+     "A9D6AC",
+     "D0E6A9",
+     "EDD8A6",
+     "F2C4CF"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "487E37",
+     "53883B",
+     "3B7534",
+     "5F8C3C",
+     "6D8A36",
+     "99702C"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "A0A5A9",
+     "999FA4",
+     "A8ABAE"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "široký listnáč z karet, žlutozelený (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4662,9 +5263,6 @@
   "kmen_r": 0.29,
   "vyska_m": 19.61,
   "polomer_m": 3.9,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": [
@@ -4672,7 +5270,61 @@
     3
    ]
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "stromy_mapy_dalsi": [
+   {
+    "klima": "subarkticke",
+    "druhy": [
+     17
+    ]
+   }
+  ],
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "briza_k0_maska_koruna.png",
+    "zacatek": 103
+   },
+   {
+    "cast": "snih",
+    "maska": "briza_k0_maska_snih.png",
+    "zacatek": 95
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "E0EAA8",
+     "D2E6A8",
+     "EEE2AA",
+     "C8E2B2"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "7B9B41",
+     "8AA043",
+     "9E9E3F",
+     "6F9341"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "ADB1B4",
+     "A6ABAF"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "bříza z karet, bílý kmen, žlutá (podzim); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",
@@ -4700,14 +5352,60 @@
   "kmen_r": 0.08,
   "vyska_m": 3.69,
   "polomer_m": 1.21,
-  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
-  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map)",
-  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta",
   "stromy_mapy": {
    "klima": "mirne",
    "druhy": []
   },
-  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub"
+  "poznamka_mapy": "stromy_mapy: za které druhy stromů mapy strom stojí (klima, druhy: OpenTTD mírné 0x00–0x0B, subarktické 0x0C–0x13, subtropické 0x14–0x1F); stromy_mapy_dalsi: totéž pro další klimata a tematická města (tema: hliněné město a 4 dlaždice kolem, s houbami); podrost: true stojí pod stromy toho druhu, ne místo nich; meritko: na mapě ještě tolikrát větší (banánovníky a monstery 2,5× za široké stromy deštného lesa); hra vybere mezi stromy se stejným druhem podle dlaždice, velikost podle růstu jako u hub",
+  "barvy_casti": [
+   {
+    "cast": "koruna",
+    "maska": "jedle_k0_maska_koruna.png",
+    "zacatek": 84
+   },
+   {
+    "cast": "snih",
+    "maska": "jedle_k0_maska_snih.png",
+    "zacatek": 78
+   }
+  ],
+  "barvy_pouziti": {
+   "mirne": {
+    "koruna": [
+     "9CCBAC",
+     "A8D2B2",
+     "B2D8C0",
+     "94C4A8",
+     "BCDCBC"
+    ]
+   },
+   "les": {
+    "koruna": [
+     "1F492E",
+     "265132",
+     "1C412A",
+     "2E5436",
+     "23493A"
+    ]
+   },
+   "subarkticke": {},
+   "snih": {
+    "koruna": [
+     "5B6C65",
+     "53645C",
+     "617069"
+    ],
+    "snih": [
+     "F4F7FA",
+     "EAF0F6",
+     "FFFFFF"
+    ]
+   }
+  },
+  "poznamka_barvy": "barvy podle použití (hráč 2. 11.: „jeden strom, jeden objekt ale mnoho využití“): barvy_casti jsou masky textury prvního materiálu (koruna, snih), zacatek je jas (max r, g, b), při kterém má barva svou plnou hodnotu, jako barvy domů; barvy_pouziti dává pro každé použití palety částí: místo (dlaždice, místo v domě) má jedno číslo, každá část v použití bere paleta[číslo % délka], část, kterou použití nejmenuje, má barvy textury; prázdné použití = textura jak je. mirne: mírné klima, města a okolí měst (pastelové); les: dlaždice lesa průmyslu (záznamy s pouziti_stromu „les“); subarkticke: subarktické klima mimo sníh (dnešní barvy textury); snih: subarktické klima na sněhu (bílé zasněžené)",
+  "autor": "Low Poly Forest Tree Pack, 99.Miles (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b); převod domy/stromy_les.py",
+  "licence": "CC BY 4.0 (uvést 99.Miles; změny: stromy zvlášť, zmenšené na 0,67, textury oříznuté, průhlednost MASK, bez normálových map, od 2. 11. masky koruny a sněhu z textur)",
+  "poznamka": "mladý jehličnan z karet (3,7 m); společný strom domů, průmyslu a lesu (hráč 1. 11.: „nahradí všechny stromy ve hře“): počátek pod patou kmene, metry; textura s průhledností (alphaMode MASK), barvu dává textura, od 2. 11. podle použití paleta (barvy_pouziti)"
  },
  {
   "druh": "doplnek",

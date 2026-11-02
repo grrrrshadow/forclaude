@@ -31,6 +31,34 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (90) – Stromy barvené podle použití (kolega `a0e75be`)
+
+- Hráč (přes kolegu): *„jeden strom, jeden objekt ale mnoho využití“*. Mírné klima pastelové, les průmyslu
+  sytější, subarktické okolí měst dnešní barvy, na sněhu bílé zasněžené. K tomu *„stromy proč na co čekat. dej to
+  tam“*. Depo aut hráč nechce (*„to tam nedavej“*), nepřevzato.
+- **Převzato:** 26 masek (`*_maska_koruna.png`, `*_maska_snih.png`) a indexy `doplnky`, `prumysl`,
+  `prumysl_vanilla` z grrrrf. Soubory `.glb` jsou stejné.
+- **Použití (`TreeUse`):**
+  - mírné klima → `mirne`;
+  - dlaždice lesa průmyslu (`pouziti_stromu: "les"`) → `les`;
+  - subarktické mimo sníh → `subarkticke` (barvy textury);
+  - na sněhu → `snih`;
+  - ostatní klimata a tématická města → barvy textury.
+- **Kdy je sníh:** u stromů mapy jako u jejich spritů (sněhová půda, hustota ≥ 2); u domů zasněžená varianta nad
+  sněžnou čárou (`snih` u `nahrazuje_house`); u lesa průmyslu výška dlaždice ≥ sněžná čára. V subarktickém klimatu se
+  les sází jen nad sněžnou čárou, takže tam je les vždy `snih`.
+- **Doplňky domů a lesa** (`ThreeDObject`): části stromu jsou `colours` s paletou pro každé použití. `AddonPaintAt()`
+  dává použití do bitů 24–26 barvy a jedno `n` pro všechny části. Části, které použití nejmenuje, mají číslo 0xF
+  a zůstávají jako textura (`Painted()`).
+- **Stromy mapy** (postavy, `ThreeDVehicleObject`): koruna je lak (`paint`, maska), sníh druhý lak (`second_paint`).
+  Pro každé použití je tolik stavů, kolik je kombinací barev palet (nejmenší společný násobek délek), stav nese barvu koruny
+  (`colour`) a sněhu (`second_colour`). `TreeState(use, n)` vybere stav. Stav jde mapou, kartou i z očí stejně jako
+  u vozidel. Karta kreslí sníh ve slotu barvy doplňku (`u_addon_mask`), procesor v `ObjectPaintOfState::Paint()`.
+- **Subarktické stromy mapy** (0x0C–0x13) jsou teď kolegovy stromy (`stromy_mapy_dalsi`), dřív sprity.
+- Rig: mírná hra – les s pasekou sytě zelený, kolem pastelové (mátové, šalvějové, sem tam meruňkové; obrázky
+  `strom_les`, `strom_mapa2`). Subarktická – mimo sníh barvy textury (`arkt_les`), ve městě na sněhu šedozelené se
+  sněhem (`arkt_mesto`). Smoke beze změny.
+
 ## 2. 11. (89) – Palmová plantáž jako průmysl hry ve všech klimatech
 
 - Hráč: *„prumysl nemužu najit palmovou plantaž, ta je přece v basesetu“*. Plantáž byla původní ovocná plantáž
