@@ -31,6 +31,27 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (85) – GPU stojící věci: čára za auty a kreslení změn najednou na telefonu
+
+- Hráč: *„dělal jsi něco dalšího na gpu? nebo jen crashe?“*, pak *„tak běž dělat.“* Pořadí: stojící věci otočené mapy
+  (rozdělané), pak 1 vozidla objektem, 2 domy bez obrázků, 3 sběr z očí (a paměť 3,2 GB).
+- **Opraveno ve svém seznamu:** bod 2 je hotový od (71) (0 obrázků domů, mezipaměť zrušená). Bod 1 je hotový od
+  (68) a (76): obrázek vozidla už jen bez karty, u vozidla většího, než karta kreslí, a v depu a nákupu.
+- **Deník #321 (telefon), nová hra 04:49–04:57:** `zmen naraz 0` skoro celou dobu, bloky mapy 4–15 ms každý
+  (karta každý blok s autem pokládá zvlášť). Najednou kreslilo jen v úvodním menu (157 za 5 s) a chvíli ve 04:57
+  (bloky pak 0 ms, 33–79 snímků/s). Rig se stejnými auty, oknem vozidla, posunem i zoomem kreslí najednou. Proč
+  telefon ne, řekne deník (84): `zmen naraz N (ne: vypnuto, kamera, zem, mimo, beze zmen, karta)`.
+- **Čára za auty, oprava:** po blocích karta maže jen bloky, které hra při pohybu auta označí. To je obdélník auta
+  (`Vehicle::coord`): jeho sprite z GRF a rezerva odhadem. Kde 3D model nakreslený kartou přesáhne ten obdélník, jeho
+  kus zůstane na mapě, jak auto jede dál. Proto čára za náklaďáky, a jen po blocích, protože kreslení najednou maže
+  větší kus. Teď si hra pamatuje, kde karta každé auto nakreslila naposled (`CardReachOf()`), a obdélník auta ho
+  vždycky obsahuje (`UpdateBoundingBoxCoordinates()`). Mazání tak pokryje všechno, co karta nakreslila, bez ohledu
+  na sprite GRF.
+- **Deník:** `auta kartou N, pres obdelnik M, nejvic o X px` (`NoteCardReach()`). Rig: Tatra 613 a 1203 obdélník
+  nepřesahují (0 z 4600), nákladní Tatry s CZTR v rigu nejsou. Z telefonu se uvidí, jestli je přesahovaly.
+- GPU rig po blocích (`test3d stojici naraz 0`): obraz bez čar, smoke beze změny.
+- Další: podle deníku z telefonu opravit, proč tam karta nekreslí změny najednou. Pak bod 3, sběr z očí na kartě.
+
 ## 2. 11. (84) – Pády #321: sázení stromů přes cestu plantáže, zásobník v crash logu; čára za auty dál
 
 - Hráč (zip se třemi pády, build #321 = 3b417e8): *„výsadba stromů, vyznačil jsem plochu kde budou stromy a když

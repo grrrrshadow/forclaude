@@ -2460,6 +2460,9 @@ std::string TakeTurnedTimesForDiary(int frames)
 			why[0], why[1], why[2], why[3], why[4], why[5],
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
 	std::fill(std::begin(_turned_card_dirty_why), std::end(_turned_card_dirty_why), 0);
+	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
+	extern std::string TakeCardReachForRig();
+	if (s != "-") s += "; " + TakeCardReachForRig();
 	_turned_card_view_passes = 0;
 	_turned_card_view_moves = 0;
 	_turned_card_band_passes = 0;

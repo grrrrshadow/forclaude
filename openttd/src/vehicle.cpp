@@ -2191,6 +2191,19 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 		new_coord.right += w + 8 * ZOOM_BASE;
 		new_coord.top -= h + 8 * ZOOM_BASE;
 		new_coord.bottom += h + 8 * ZOOM_BASE;
+		/* And where the card drew it from this piece last (CardReachOf()), however far past the sprite that was: the
+		 * likeness of a GRF's lorry reached past this box, the card's picture of it left behind on the map as a line
+		 * of old lorries (the player, 1. and 2. 11.). */
+		extern bool CardReachOf(VehicleID id, Rect &reach);
+		Rect reach;
+		if (CardReachOf(this->index, reach)) {
+			const Point own = RemapCoords(this->x_pos, this->y_pos, this->z_pos);
+			const int pad = static_cast<int>(ZOOM_BASE);
+			new_coord.left = std::min(new_coord.left, own.x + reach.left - pad);
+			new_coord.top = std::min(new_coord.top, own.y + reach.top - pad);
+			new_coord.right = std::max(new_coord.right, own.x + reach.right + pad);
+			new_coord.bottom = std::max(new_coord.bottom, own.y + reach.bottom + pad);
+		}
 	}
 
 	/* At night (gui.night) the glows of its lamps reach a little beyond it, only of the parts that have them: the front

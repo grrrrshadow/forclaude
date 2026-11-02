@@ -10255,6 +10255,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * setting gui.eye_shadows, off unless he turns it on). */
 		_settings_client.gui.eye_shadows = argv.size() < 3 || argv[2] != "0";
 		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _settings_client.gui.eye_shadows ? "zapnute" : "vypnute");
+	} else if (what == "dosah") {
+		/* 'dosah': of the vehicles the card drew on the turned map since the last time, how many reached past the boxes
+		 * of their pieces (what a move draws again), by how much at most and which (NoteCardReach()). */
+		extern std::string TakeCardReachForRig();
+		IConsolePrint(CC_DEFAULT, "test3d: dosah {}", TakeCardReachForRig());
 	} else if (what == "sazet") {
 		/* 'sazet': plant trees by the player's command on and around every field road of the marijuana plantations
 		 * and potato fields -- the player dragged the tree tool over one and the game stopped on the assertion in

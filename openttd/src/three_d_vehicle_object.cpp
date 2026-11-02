@@ -54,6 +54,7 @@
 #include <functional>
 #include <map>
 #include <mutex>
+#include <unordered_map>
 #include <optional>
 #include <set>
 #include <thread>
@@ -2770,6 +2771,8 @@ size_t ThreeDPicturesWaiting()
 	return _pictures_to_make.size() + _loads_to_do.size() + (_picture_in_hand ? 1 : 0);
 }
 
+static void ForgetCardReach();
+
 /**
  * Stop the thread making the pictures of the vehicles and forget what it was asked for: the objects are read anew
  * (ResetThreeDVehicleObjectSprites()), or the game ends (ShutdownGame()). Started again the next time one is asked for.
@@ -2792,6 +2795,7 @@ void StopThreeDPictureThread()
 	_pictures_asked.clear();
 	_vehicles_owed_pictures.clear();
 	_cards_drawn_of.clear();
+	ForgetCardReach();
 }
 
 /** Whether the picture asked for now may wait for the thread (a vehicle on the map), and whether it waited: the nearest made was given. */
@@ -3263,6 +3267,87 @@ static bool NothingSeenAfter(const Vehicle *last, ZoomLevel zoom)
 	return true;
 }
 
+/** Rig (test3d dosah): of the vehicles the card drew, how many reached past what the game draws again as they move. */
+static uint64_t _card_reach_drawn = 0, _card_reach_over = 0;
+static int _card_reach_most = 0;
+static std::string _card_reach_worst;
+
+/** Where the card last drew each vehicle it drew from that piece, from the piece's point on the screen (CardReachOf()). */
+static std::map<VehicleID, Rect> _card_reach;
+static std::mutex _card_reach_lock;
+
+/**
+ * Where the card last drew a vehicle from this piece (NoteCardReach()), virtual coordinates from the screen's point of
+ * its position: the box a move of it draws again holds it (Vehicle::UpdateBoundingBoxCoordinates()), whatever the
+ * sprite of the GRF is -- else what the card drew past it is left on the map as the vehicle drives on.
+ * @return whether it drew it
+ */
+/** Where the card drew the vehicles forgotten with the pictures (a game loaded, the objects read again). */
+static void ForgetCardReach()
+{
+	std::lock_guard<std::mutex> lock(_card_reach_lock);
+	_card_reach.clear();
+}
+
+bool CardReachOf(VehicleID id, Rect &reach)
+{
+	std::lock_guard<std::mutex> lock(_card_reach_lock);
+	auto it = _card_reach.find(id);
+	if (it == _card_reach.end()) return false;
+	reach = it->second;
+	return true;
+}
+
+/**
+ * Where the card draws a vehicle (AddTurnedLikeness(): its point and its picture's corner and size), kept for the box a
+ * move of it draws again (CardReachOf()). For the rig and the diary, against the boxes of all its pieces as they were
+ * (Vehicle::coord) -- what a move of it marked to be drawn again: past them, the card's picture of it was left behind as
+ * it drove on (the player, 1. and 2. 11.: "a line behind the cars", Tatra lorries, V3S, 1203).
+ */
+static void NoteCardReach(const Vehicle *v, const ThreeDGpuStandingVehicle *card, int ax, int ay, int az, ZoomLevel zoom)
+{
+	if (card == nullptr || card->width <= 0) return;
+	const Point pt = RemapCoords(ax, ay, az);
+	const int scale = ScaleByZoom(1, zoom);
+	const int left = pt.x + card->left * scale, top = pt.y + card->top * scale;
+	const int right = left + card->width * scale, bottom = top + card->height * scale;
+	{
+		/* Kept from the piece's own point: its next move draws again where this was drawn (CardReachOf()). */
+		const Point own = RemapCoords(v->x_pos, v->y_pos, v->z_pos);
+		std::lock_guard<std::mutex> lock(_card_reach_lock);
+		_card_reach[v->index] = Rect{left - own.x, top - own.y, right - own.x, bottom - own.y};
+	}
+	int cl = INT32_MAX, ct = INT32_MAX, cr = INT32_MIN, cb = INT32_MIN;
+	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
+		if (u->coord.left == INVALID_COORD) continue;
+		cl = std::min(cl, u->coord.left);
+		ct = std::min(ct, u->coord.top);
+		cr = std::max(cr, u->coord.right);
+		cb = std::max(cb, u->coord.bottom);
+	}
+	if (cl > cr) return;
+	_card_reach_drawn++;
+	const int over = std::max({0, cl - left, right - cr, ct - top, bottom - cb}) / scale;
+	if (over == 0) return;
+	_card_reach_over++;
+	if (over > _card_reach_most) {
+		_card_reach_most = over;
+		_card_reach_worst = fmt::format("vozidlo {} smer {}: nakresleno {},{}..{},{}, maze se {},{}..{},{} (o {} px)", v->First()->unitnumber, to_underlying(v->direction),
+				left, top, right, bottom, cl, ct, cr, cb, over);
+	}
+}
+
+/** Rig (test3d dosah): what NoteCardReach() counted, started over. */
+std::string TakeCardReachForRig()
+{
+	std::string s = fmt::format("auta kartou {}, pres obdelnik {}, nejvic o {} px{}{}", _card_reach_drawn, _card_reach_over, _card_reach_most,
+			_card_reach_worst.empty() ? "" : "; ", _card_reach_worst);
+	_card_reach_drawn = _card_reach_over = 0;
+	_card_reach_most = 0;
+	_card_reach_worst.clear();
+	return s;
+}
+
 /**
  * Put a vehicle drawn as an object on the turned map (AddThreeDVehicleToViewport()), or facing north at night when
  * its model has its lights (DoDrawVehicle()): the object at the angle of the view (PlaceVehicleObject()).
@@ -3318,6 +3403,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 				PlaceVehicleObject(a, zoom, nullptr, at, on_card);
 				if (at.on_card ? at.card == nullptr : at.pic == nullptr) continue;
 				parts.push_back({at.pic, at.ax, at.ay, at.az, at.card});
+				if (at.card != nullptr) NoteCardReach(a, at.card.get(), at.ax, at.ay, at.az, zoom);
 				xmin = std::min(xmin, at.xmin); ymin = std::min(ymin, at.ymin); zmin = std::min(zmin, at.zmin);
 				xmax = std::max(xmax, at.xmax); ymax = std::max(ymax, at.ymax); zmax = std::max(zmax, at.zmax);
 			}
@@ -3326,6 +3412,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 		}
 	}
 	if (place.on_card) {
+		NoteCardReach(v, place.card.get(), place.ax, place.ay, place.az, zoom);
 		AddTurnedVehicleOnCard(place.card, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
 	} else if (place.pic != nullptr) {
 		AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
