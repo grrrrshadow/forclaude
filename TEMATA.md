@@ -50,7 +50,11 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   **Zink (lavapipe):** instance 94–102 ms, po jedné 92–94, plakáty 90–97 (plakáty 61–117 obrázků za 5 s se
   čtením zpátky, trojúhelníky 45 snímků a nic). Po příjezdu Volh zblízka 135 ms ve všech variantách (BeamNG
   Volha má 110 000 trojúhelníků; bylo i dřív).
-- **Závěr:** v rigu rozdíl nejde vidět – trojúhelníky tu počítá procesor, ať jsou v dávce nebo ne. Na telefonu
+- **Rig, chodec na silnici s auty v záběru (llvmpipe):** trojúhelníky 154–195 ms na snímek, ~95 sítí ve 34
+  dávkách; plakáty 126–145 ms, ~48 sítí v 18 dávkách (vzdálené Volhy a stromy jsou obrázky, čtení zpátky
+  `2048×44` každých 5 s). Obrázek `road_a`: vzdálené Volhy, auta vlevo, kůň i stromy kreslené správně.
+- **Závěr:** v rigu je to o čtvrtinu pomalejší než plakáty – trojúhelníky tu počítá procesor, ať jsou v dávce
+  nebo ne, a je jich dvakrát víc. Na telefonu
   (Mali, zink) je zisk v tom, co rig nemá: žádné `glReadPixels` plakátů (karta nestojí) a 30 kreslení místo
   100. Ověří až telefon: `snimky.log` sloupec `oci kresleni` a `card:` řádek.
 
