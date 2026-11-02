@@ -551,6 +551,39 @@
   "poznamka": "svazek prken 3,6 × 1 m ve čtyřech vrstvách na prokladech, bez palety; od 27. 10. kratší (dřív 4 m); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 13 kB, glb z gltfpacku"
  },
  {
+  "soubor": "ocel_ingot.glb",
+  "jmeno": "ocel_ingot",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "ingot oceli",
+   "en": "steel ingot"
+  },
+  "rozmer_m": [
+   2.0,
+   0.76,
+   0.84
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 1,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 52,
+  "naklady": [
+   {
+    "naklad": "STEL",
+    "popis": "ocel"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "ocelový ingot jako z kokily: čtvercový průřez se zkosenými hranami, 2 m dlouhý, na jednom konci 0,76 m, na druhém 0,62 m (asi 7 t), leží na dvou dřevěných prokladech napříč, okuje a trocha rzi, nebarví se; od 2. 11. (hráč: „pak budou těžký náklady, ocel třeba“, „tomu se řiká ingot oceli“), první na podvalníku Tatry 141; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 8 kB, glb z gltfpacku"
+ },
+ {
   "soubor": "balik.glb",
   "jmeno": "balik",
   "druh": "naklad",
