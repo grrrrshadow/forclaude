@@ -718,6 +718,8 @@ GpuProgram _clear_program;
 bool _clear_program_ok = false;
 /** Whether the card's glClear() keeps to the scissor's rect (TestScissoredClear()); else ClearInScissor() draws over it. */
 static bool _scissored_clear_ok = true;
+/** Whether the card divides an attribute by instance (TestInstancedArrays()); else the meshes alike drawn each on its own. */
+static bool _instanced_arrays_ok = true;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
@@ -2001,6 +2003,29 @@ GLuint CompileShader(GLenum type, const char *source, std::string &why)
 }
 
 /**
+ * Whether the card divides an attribute of a VAO by instance (glVertexAttribDivisor(), ARB_instanced_arrays), as the
+ * batches of the view from the eyes read their instances' matrices (EyeObjectDraws::Batch). The player's phone (#323,
+ * 2. 11., zink on Vortek, Mesa 22.2.5) names OpenGL 4.4 yet refused it with GL_INVALID_OPERATION each frame: every
+ * corner of a batch then read a matrix of its own from the instances' buffer, the trees and the figures drawn as
+ * splinters or not at all, past the buffer's end. A VAO of its own: the bound one of a picture is kept as it was.
+ * @return whether the card took the divisor
+ */
+static bool TestInstancedArrays()
+{
+	for (int i = 0; i < 16 && gl.glGetError() != 0; i++) {}
+	GLuint vao = 0;
+	gl.glGenVertexArrays(1, &vao);
+	gl.glBindVertexArray(vao);
+	gl.glVertexAttribDivisor(4, 1);
+	const bool ok = gl.glGetError() == 0;
+	gl.glVertexAttribDivisor(4, 0);
+	gl.glBindVertexArray(0);
+	gl.glDeleteVertexArrays(1, &vao);
+	for (int i = 0; i < 16 && gl.glGetError() != 0; i++) {}
+	return ok;
+}
+
+/**
  * Whether the card's glClear() keeps to the scissor's rect in a picture of two colours, as the pictures of the turned
  * map are cleared block by block (DrawStandingOnCard(); the player's phone, 1. 11.: behind the cars of the map rows of
  * their pictures, gone when the map moved -- which clears the pictures whole): a picture cleared whole to white, a
@@ -2382,6 +2407,9 @@ bool StartCard(std::string &why, std::string &describe)
 		_scissored_clear_ok = false;
 		Diary("zink odklada mazani: karta maze kreslenim", true);
 	}
+	Step("zkouska instanci (glVertexAttribDivisor)");
+	_instanced_arrays_ok = TestInstancedArrays();
+	if (!_instanced_arrays_ok) Diary("karta neumi atributy po instancich (ARB_instanced_arrays): z oci kazdy objekt zvlast", true);
 	Step("preklad programu snimku z oci (shader)");
 	StartEyeFrame();
 	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
@@ -4320,7 +4348,7 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			if (i < m.paints.size() && m.paints[i].Any() && !PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
 		}
 		/* Among those alike, drawn at once (Batch); one with wheels that turn on its own. */
-		if (_eye_instances_on && (m.wheels.empty() || !d.shape->has_wheel)) {
+		if (_eye_instances_on && _instanced_arrays_ok && (m.wheels.empty() || !d.shape->has_wheel)) {
 			const double det = Determinant(m.matrix);
 			const float mirrored = det > 0 ? 1.0f : (det < 0 ? -1.0f : 0.0f);
 			const bool lit = m.lit && d.shape->has_nrm;

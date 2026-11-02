@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (91) – #323: z očí nic nejezdí, pády u lesa
+
+Hráč (#323, telefon): „padá to a nic tam nejezdí, žádný auta vlaky, jen chodim mezi stromama“; pás obrysů
+vzdálených měst přes blízkého slona; slon mění polohu hlavy, když kolem něj chodí.
+
+- **Karta v telefonu neumí `glVertexAttribDivisor`** (ARB_instanced_arrays): zink na Vortek (Mesa 22.2.5) se hlásí
+  jako OpenGL 4.4, ale dělení atributu po instancích odmítá (`GL_INVALID_OPERATION` každý snímek, tisíce řádků
+  v session.txt). Dávky stejných objektů z očí (#275, stromy, auta bez točících se kol, figury) pak četly matici
+  každým rohem zvlášť z bufferu instancí – nic nebo střepy, čtení za koncem bufferu. Teď zkouška při startu karty
+  (`TestInstancedArrays()`); kde to karta neumí, kreslí se z očí každý objekt zvlášť a deník karty to napíše
+  („karta neumi atributy po instancich“). Vsync s tím nesouvisí.
+- Mesa v rigu (25.2) ARB_instanced_arrays vypnout nedá (`MESA_EXTENSION_OVERRIDE` ho nebere), cesta po jednom je
+  ta z `test3d gpu instance 0`.
+
 ## 2. 11. (90) – Stromy barvené podle použití (kolega `a0e75be`)
 
 - Hráč (přes kolegu): *„jeden strom, jeden objekt ale mnoho využití“*. Mírné klima pastelové, les průmyslu
