@@ -10255,6 +10255,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * setting gui.eye_shadows, off unless he turns it on). */
 		_settings_client.gui.eye_shadows = argv.size() < 3 || argv[2] != "0";
 		IConsolePrint(CC_DEFAULT, "test3d: stiny {}", _settings_client.gui.eye_shadows ? "zapnute" : "vypnute");
+	} else if (what == "sazet") {
+		/* 'sazet': plant trees by the player's command on and around every field road of the marijuana plantations
+		 * and potato fields -- the player dragged the tree tool over one and the game stopped on the assertion in
+		 * PlantTreesOnTile() (crash 2. 11.); the road must be refused and stay a road. */
+		uint roads = 0, planted = 0, still = 0;
+		std::vector<TileIndex> found;
+		for (TileIndex t(0); t < Map::Size(); ++t) {
+			if (IsTileType(t, TileType::Clear) && IsMarijuanaPlantationRoad(t)) found.push_back(t);
+		}
+		for (TileIndex t : found) {
+			roads++;
+			TileIndex a = TileXY(std::max<int>(TileX(t) - 2, 1), std::max<int>(TileY(t) - 2, 1));
+			TileIndex b = TileXY(std::min<uint>(TileX(t) + 2, Map::MaxX() - 1), std::min<uint>(TileY(t) + 2, Map::MaxY() - 1));
+			if (Command<Commands::PlantTree>::Do(DoCommandFlag::Execute, t, t, 0xFF, false).Succeeded()) planted++;
+			if (Command<Commands::PlantTree>::Do(DoCommandFlag::Execute, a, b, 0xFF, false).Succeeded()) planted++;
+		}
+		for (TileIndex t : found) {
+			if (IsTileType(t, TileType::Clear) && IsMarijuanaPlantationRoad(t)) still++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: sazet - cest plantazi {}, prikazu proslo {}, cest zustalo {}", roads, planted, still);
 	} else if (what == "les") {
 		/* 'les': the view on the thickest wood of the map -- the tile with the most trees on the tiles within three of
 		 * it -- to see the trees of the map (DrawThemedTrees() of tree_cmd.cpp). */

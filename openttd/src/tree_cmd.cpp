@@ -563,7 +563,10 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 				[[fallthrough]];
 
 			case TileType::Clear: {
-				if (IsBridgeAbove(current_tile)) {
+				/* Not on the field road of a marijuana plantation or potato
+				 * field either, as CanPlantTreesOnTile() says: the road is
+				 * drawn over the player's tile. */
+				if (IsBridgeAbove(current_tile) || (IsTileType(current_tile, TileType::Clear) && IsMarijuanaPlantationRoad(current_tile))) {
 					msg = STR_ERROR_SITE_UNSUITABLE;
 					continue;
 				}

@@ -31,6 +31,35 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (84) – Pády #321: sázení stromů přes cestu plantáže, zásobník v crash logu; čára za auty dál
+
+- Hráč (zip se třemi pády, build #321 = 3b417e8): *„výsadba stromů, vyznačil jsem plochu kde budou stromy a když
+  jsem pustil levý čudlík myši aby se stromy postavili tak to spadlo“*; *„spadlo to když jsem klik vyjet z depa.
+  byl to jiný druh pádu, nespadlo my noise app“*; *„spadlo to normálně, nejdřív my noise“*.
+- **Sázení stromů:** `Assertion failed ... tree_cmd.cpp: CanPlantTreesOnTile(tile, true)`. Na cestu marihuanové
+  plantáže a bramborového pole (políčko hráče, přes které se kreslí cesta) hra strom nepustí
+  (`IsMarijuanaPlantationRoad()` v `CanPlantTreesOnTile()`). Příkaz sázení na ploše ji ale nehlídal a strom tam
+  zasadil, takže hra spadla na kontrole. Teď cestu odmítne („nevhodné místo“). Rig na hráčově savu `sx.sav`
+  (`test3d sazet`: sázení na a kolem každé cesty plantáží): starý kód spadne na stejné kontrole, nový 10 cest
+  odmítne a zůstanou cestami.
+- **Vyjet z depa:** `EXCEPTION_ACCESS_VIOLATION` a prázdný zásobník: dbghelp ve Wine na telefonu nedá ani jeden
+  řádek (ani u pádu se stromy). Crash log teď píše:
+  - `address`: kde spadlo, jako `openttd.exe +RVA`;
+  - `access`: u špatného přístupu `read`/`write`/`execute` a adresu, kam sahal;
+  - zásobník podle tabulek odvíjení modulu (`RtlLookupFunctionEntry`, `RtlVirtualUnwind`), když dbghelp nedá nic;
+    každý řádek modul a posun.
+  - Jména k adresám dají symboly buildu (artefakt `symbols-windows-x64-runNNN`, soubor `openttd.sym`, 14 dní).
+    Skript ve scratchpadu `crash_sym.py` (ověřen na symbolech #321: `PlantTreesOnTile + 30 tree_cmd.cpp:107`).
+    Tento pád bez adresy zatím nevyřeším, čeká na další pád s novým logem.
+- **Zabití s MyNoise:** bez pádu hry. Paměť hry podle deníku rostla v pohledu z očí na 3,2 GB a Android zabil
+  nejdřív MyNoise a pak Winlator. Paměť GPU přestavby, čeká na dokončení GPU (pravidlo o pádech).
+- **Čára za auty:** zkouška nůžek na telefonu prošla (`uvnitr smazano (0 0), venku zustalo (255 255)`), tohle
+  příčina nebyla, mazání kreslením se nespustí. V deníku telefonu je u mapy skoro vždy `zmen naraz 0`, v rigu se
+  stejnými auty 150 za 5 s. Karta tedy změny pod auty najednou skoro nekreslí. Buď pro ně nenajde změnu (a bloky
+  bere jako hotové, staré auto zůstane), nebo odbočí jinam. Deník teď u `zmen naraz` píše, proč karta změny
+  nepoložila: vypnuto, kamera, zem, mimo, beze zmen, karta. Rig v reálném čase (Tatra 613 a 1203, i po blocích)
+  čáru neukázal. Hráčův sav v rigu nejde: chybí CZTR a ECS.
+
 ## 2. 11. (83) – Palmová plantáž jako les, bez holek nevyrábí; rostliny u některých domů tropických měst
 
 - Hráč na otázky (plantáž bez holek: nic, nebo málo? holky měsíc? rostliny u každého domu?): *„1 nic 2 jo 3 jen

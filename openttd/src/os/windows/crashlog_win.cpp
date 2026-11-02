@@ -130,6 +130,77 @@ static void RememberCppException(const EXCEPTION_RECORD *er)
 }
 #endif /* _MSC_VER && _M_AMD64 */
 
+/**
+ * Where an address of code is: the module it is in and how far into it, as
+ * "openttd.exe +1A2B3C". The offset is what the build's symbols are looked up
+ * by -- the artifact symbols-windows-x64-runNNN of the build that crashed --
+ * so a report says where even when nothing on the computer could name it.
+ * @param address the address of code
+ * @return the module and the offset into it
+ */
+static std::string DescribeCodeAddress(uintptr_t address)
+{
+	HMODULE module = nullptr;
+	if (address == 0 || !GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, reinterpret_cast<LPCWSTR>(address), &module) || module == nullptr) {
+		return fmt::format("??? {:X}", address);
+	}
+	wchar_t path[MAX_PATH] = {};
+	DWORD length = GetModuleFileNameW(module, path, MAX_PATH);
+	std::string name = length == 0 ? std::string("???") : FS2OTTD(std::wstring_view(path, length));
+	size_t slash = name.find_last_of("\\/");
+	if (slash != std::string::npos) name.erase(0, slash + 1);
+	return fmt::format("{} +{:X}", name, address - reinterpret_cast<uintptr_t>(module));
+}
+
+/** How deep the walk by the unwind tables goes, in case the stack is corrupt. */
+static const uint MAX_UNWOUND_FRAMES = 64;
+
+/**
+ * The stack walked by the unwind tables every 64-bit module carries
+ * (RtlLookupFunctionEntry, RtlVirtualUnwind), each frame as the module and the
+ * offset into it (DescribeCodeAddress()). For when dbghelp gives nothing: on
+ * the phone under Wine its StackWalk64 gave not one frame, for a failed
+ * assertion and an access violation alike (crash logs of 2 November), so a
+ * report told what happened but never where. Reading a corrupt stack may
+ * fault; the caller runs this inside TryExecute().
+ * @param start the context of the crash
+ * @param survey the list the frames are added to
+ */
+static void SurveyStackByUnwindTables(const CONTEXT &start, nlohmann::json &survey)
+{
+#if defined(_M_AMD64) || defined(__x86_64__)
+	/* The crash is handled on the thread that crashed, so its stack is this thread's. */
+	const NT_TIB *tib = reinterpret_cast<const NT_TIB *>(NtCurrentTeb());
+	const DWORD64 stack_low = reinterpret_cast<DWORD64>(tib->StackLimit);
+	const DWORD64 stack_high = reinterpret_cast<DWORD64>(tib->StackBase);
+
+	CONTEXT ctx = start;
+	for (uint num = 0; num < MAX_UNWOUND_FRAMES && ctx.Rip != 0; num++) {
+		survey.push_back(DescribeCodeAddress(static_cast<uintptr_t>(ctx.Rip)));
+		/* Never read outside the stack: the frames found so far stay in the report. */
+		if (ctx.Rsp < stack_low || ctx.Rsp + 8 > stack_high) break;
+
+		DWORD64 rsp = ctx.Rsp;
+		DWORD64 image_base = 0;
+		PRUNTIME_FUNCTION function = RtlLookupFunctionEntry(ctx.Rip, &image_base, nullptr);
+		if (function == nullptr) {
+			/* A leaf function, with no frame of its own: the return address is on the top of the stack. */
+			ctx.Rip = *reinterpret_cast<const DWORD64 *>(ctx.Rsp);
+			ctx.Rsp += 8;
+		} else {
+			PVOID handler_data = nullptr;
+			DWORD64 establisher_frame = 0;
+			RtlVirtualUnwind(UNW_FLAG_NHANDLER, image_base, ctx.Rip, function, &ctx, &handler_data, &establisher_frame, nullptr);
+		}
+		/* Each caller's frame lies above its callee's; a stack that says otherwise cannot be walked further. */
+		if (ctx.Rsp <= rsp) break;
+	}
+#else
+	(void)start;
+	(void)survey;
+#endif
+}
+
 /** A map between exception code and its name. */
 static const std::map<DWORD, std::string> exception_code_to_name{
 	{EXCEPTION_ACCESS_VIOLATION, "EXCEPTION_ACCESS_VIOLATION"},
@@ -186,6 +257,14 @@ class CrashLogWindows : public CrashLog {
 			survey["reason"] = _last_cpp_exception.empty() ? std::string("Uncaught C++ exception") : fmt::format("Uncaught C++ exception {}", _last_cpp_exception);
 		} else {
 			survey["reason"] = "Unknown exception code";
+		}
+
+		/* Where, and for a bad access what it reached for: the stack may not
+		 * be walkable, this always is. */
+		survey["address"] = DescribeCodeAddress(reinterpret_cast<uintptr_t>(ep->ExceptionRecord->ExceptionAddress));
+		if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && ep->ExceptionRecord->NumberParameters >= 2) {
+			ULONG_PTR kind = ep->ExceptionRecord->ExceptionInformation[0];
+			survey["access"] = fmt::format("{} {:X}", kind == 0 ? "read" : (kind == 1 ? "write" : "execute"), ep->ExceptionRecord->ExceptionInformation[1]);
 		}
 	}
 
@@ -381,11 +460,16 @@ static const uint MAX_FRAMES     = 64;
 
 		proc.pSymCleanup(hCur);
 	}
+
+	/* Nothing from dbghelp (under Wine): the unwind tables still know. */
+	if (survey.empty()) SurveyStackByUnwindTables(*ep->ContextRecord, survey);
 }
 #else
-/* virtual */ void CrashLogWindows::SurveyStacktrace(nlohmann::json &) const
+/* virtual */ void CrashLogWindows::SurveyStacktrace(nlohmann::json &survey) const
 {
-	/* Not supported. */
+	/* No dbghelp walk with this compiler; the unwind tables still know. */
+	survey = nlohmann::json::array();
+	SurveyStackByUnwindTables(*ep->ContextRecord, survey);
 }
 #endif /* _MSC_VER */
 

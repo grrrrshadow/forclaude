@@ -2453,10 +2453,13 @@ std::string TakeTurnedTimesForDiary(int frames)
 	const double n = std::max(1, frames);
 	const int blocks = _turned_ground_times.card_blocks + _turned_ground_times.processor_blocks + _turned_ground_times.view_blocks;
 	/* Of "plakaty" (what stands on the map) the card's part, waited for; whole views laid and views only moved. */
-	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2], _turned_card_dirty_passes;
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2], _turned_card_dirty_passes, _turned_card_dirty_why[6];
+	const uint64_t *why = _turned_card_dirty_why;
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}); stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
 			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
+			why[0], why[1], why[2], why[3], why[4], why[5],
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
+	std::fill(std::begin(_turned_card_dirty_why), std::end(_turned_card_dirty_why), 0);
 	_turned_card_view_passes = 0;
 	_turned_card_view_moves = 0;
 	_turned_card_band_passes = 0;
@@ -5234,6 +5237,13 @@ static bool _turned_whole_view_pass = false;
 bool _turned_card_band_on = true; ///< Rig: the picture of the turned main view on the card reaches past it (test3d stojici okraj); else just the view
 uint64_t _turned_card_band_passes = 0; ///< Rig: the pieces past the view the card laid (test3d cas, the diary)
 uint64_t _turned_card_dirty_passes = 0; ///< Rig: the dirty parts of the view the card laid at once (TurnedCardLayDirty(); test3d cas, the diary)
+/**
+ * Why a pass of DrawDirtyBlocks() did not have the card lay what changed at once (TurnedCardLayDirty()), for the
+ * diary: switched off or by night, the camera not the card's, its ground not shown or followed, the dirty part
+ * outside it, nothing under it told changed (the blocks only holes then), the card refused. The phone's diary of
+ * 2 November said "zmen naraz 0" nearly always where the rig had 150 in 5 s, with a line of old cars behind the cars.
+ */
+uint64_t _turned_card_dirty_why[6] = {};
 bool _turned_card_dirty_on = true; ///< Rig: what changed on the turned main view laid by the card at once (test3d stojici naraz); else block by block
 uint64_t _turned_card_band_blocks[2] = {}; ///< Rig: the blocks a move of the view uncovered, of them taken from the card (test3d cas, the diary)
 static constexpr int TURNED_CARD_BAND = 192; ///< the pixels the picture of the view on the card reaches past it every way
@@ -7592,11 +7602,13 @@ static int TurnedCardBandHas(const DrawPixelInfo &frame)
 void TurnedCardLayDirty(int left, int top, int right, int bottom)
 {
 	extern uint64_t _dirty_blocks_pass;
-	if (!_turned_card_dirty_on || !_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim || IsNightNow()) return;
 	const Window *main = GetMainWindow();
-	if (main == nullptr || main->viewport == nullptr) return;
+	if (main == nullptr || main->viewport == nullptr || !IsViewportTurned(*main->viewport)) return;
+	if (!_turned_card_dirty_on || !_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim || IsNightNow()) {
+		_turned_card_dirty_why[0]++;
+		return;
+	}
 	const Viewport &vp = *main->viewport;
-	if (!IsViewportTurned(vp)) return;
 	/* The camera as the card's picture of the view has it; else that is laid anew whole. */
 	const TurnedCardView &cv = _turned_card_view;
 	const int mask = ScaleByZoom(-1, vp.zoom);
@@ -7605,14 +7617,20 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	if (cv.vp != &vp || cv.yaw != GetViewYaw() || cv.pivot_x != px || cv.pivot_y != py || cv.zoom != vp.zoom ||
 			cv.width != (ScaleByZoom(vp.width, vp.zoom) & mask) || cv.height != (ScaleByZoom(vp.height, vp.zoom) & mask) ||
 			cv.left != (vp.virtual_left & mask) || cv.top != (vp.virtual_top & mask)) {
+		_turned_card_dirty_why[1]++;
 		return;
 	}
 	TurnedCardGround &g = _turned_card_ground;
-	if (g.vp != &vp || !g.shown || g.band == 0) return;
-	if (!TurnedCardGroundFollow(vp, vp.zoom) || g.band == 0) return;
+	if (g.vp != &vp || !g.shown || g.band == 0 || !TurnedCardGroundFollow(vp, vp.zoom) || g.band == 0) {
+		_turned_card_dirty_why[2]++;
+		return;
+	}
 	const int x0 = std::max(left, vp.left), y0 = std::max(top, vp.top);
 	const int x1 = std::min(right, vp.left + vp.width), y1 = std::min(bottom, vp.top + vp.height);
-	if (x1 <= x0 || y1 <= y0) return;
+	if (x1 <= x0 || y1 <= y0) {
+		_turned_card_dirty_why[3]++;
+		return;
+	}
 	/* The screen's pixels to the picture's, as a block of the view finds itself in it (TurnedCardBandHas()). */
 	const int vs = ScaleByZoom(1, vp.zoom);
 	auto picture_x = [&](int sx) { return ((((sx - vp.left) * vs + vp.virtual_left) & mask) / vs) - g.l; };
@@ -7622,7 +7640,10 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	/* Only what changed under it since it was laid (MarkViewportDirty(): TurnedCardBandDirty()); the rest of it is dirty
 	 * for a window over the view (the status bar with the date, a message), the blocks there only holes. */
 	const int cx0 = std::max(0, px0), cy0 = std::max(0, py0), cx1 = std::min(g.w, px1), cy1 = std::min(g.h, py1);
-	if (cx1 <= cx0 || cy1 <= cy0 || g.stood.size() != static_cast<size_t>(g.w) * g.h || g.have.size() != g.stood.size()) return;
+	if (cx1 <= cx0 || cy1 <= cy0 || g.stood.size() != static_cast<size_t>(g.w) * g.h || g.have.size() != g.stood.size()) {
+		_turned_card_dirty_why[3]++;
+		return;
+	}
 	int lx0 = cx1, ly0 = cy1, lx1 = cx0, ly1 = cy0;
 	const int n = cx1 - cx0;
 	for (int y = cy0; y < cy1; y++) {
@@ -7639,10 +7660,14 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 		ly1 = y + 1;
 	}
 	if (lx1 <= lx0) {
+		_turned_card_dirty_why[4]++;
 		_turned_dirty_laid_pass = _dirty_blocks_pass;
 		return;
 	}
-	if (!TurnedCardRectOnCard(vp, lx0, ly0, lx1, ly1)) return;
+	if (!TurnedCardRectOnCard(vp, lx0, ly0, lx1, ly1)) {
+		_turned_card_dirty_why[5]++;
+		return;
+	}
 	_turned_dirty_laid_pass = _dirty_blocks_pass;
 	_turned_card_dirty_passes++;
 }
