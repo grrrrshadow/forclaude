@@ -75,6 +75,13 @@ vzdálených měst přes blízkého slona; slon mění polohu hlavy, když kolem
 - Winlator v běhu 21:33 spadl celý (`X connection to :0 broken`) 0,4 s po prvním snímku z očí, tedy po prvním
   čtení za koncem bufferu. Vzkaz pro Winlator DL je v cota `OD-HRY.md` (logy v `od-hry/2026-11-02-hra-323/`).
   Winlator má `MESA_GL_VERSION_OVERRIDE=4.4` u zinku 22.2.5.
+- **Oprava i ve Winlatoru** (hráč: „běž si spravit glVertexAttribDivisor do cota … dej build winlatoru“; cota
+  `452f643`, push spustil Build APK): Mali-G615 r44p1 nemá `VK_EXT_` ani `VK_KHR_vertex_attribute_divisor`
+  (`tools/mesa-zink/mali-g615-edge60fusion.json`). Hostitel Vorteku teď zinku (jen „mesa zink“, jen bez
+  rozšíření v ovladači) rozšíření nahlásí s děličem 1 (`maxVertexAttribDivisor 1`, bez nulového), při
+  `vkCreateDevice` ho i jeho vlastnosti před ovladačem schová a z pipeline vyndá `VkPipelineVertexInputDivisorState`
+  – vazba `VK_VERTEX_INPUT_RATE_INSTANCE` je dělitel 1 sama. Zink tak má `ARB_instanced_arrays` a hra zase kreslí
+  z očí dávkami. Přeloženo clangem proti hlavičkám cota, na telefonu nevyzkoušené. Popis v cota `OD-HRY.md` §0.
 - **Přetečení zásobníku u lesa** (běh 22:22): Wine `virtual_setup_exception stack overflow 1792 bytes addr
   0x14134c9e5`, vlákno s GL kontextem (hlavní), zásobník 1 MB (MSVC). Podle symbolů #323 (artefakt
   `symbols-windows-x64-run323`, `.sym`) je adresa v `_isatty` z UCRT, tedy v prvním výpisu crash handleru
