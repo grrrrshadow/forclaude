@@ -2993,6 +2993,7 @@ static IndustryType IndexIndustryType(std::string_view name)
 	if (name == "lihovar" || name == "IT_DISTILLERY") return IT_DISTILLERY;
 	if (name == "hospoda" || name == "IT_PUB") return IT_PUB;
 	if (name == "draci_farma" || name == "IT_DRAGON_FARM") return IT_DRAGON_FARM;
+	if (name == "IT_PALM_PLANTATION") return IT_PALM_PLANTATION;
 	if (name == "IT_OIL_REFINERY") return 4; // the original game's, IT_OIL_REFINERY of table/build_industry.h
 	return 0xFF;
 }
@@ -3509,15 +3510,17 @@ static constexpr IndustryType ORIGINAL_FRUIT_PLANTATION = 19;
  * "the palm plantation will be nice as the forest, a clearing, a reed hut, a grill"; the player, 1. 11.: it is the
  * fruit plantation of the game, its look only): laid as the forest, on its 5 x 4 tiles -- the clearing on 2 x 2 of the
  * middle, at the side the path comes from, each turned with its north corner out, the hut on one of them; the path on
- * a tile of the edge from the side of the road into the clearing; the plantation elsewhere. Nullptr for a tile of
- * anything else, of a set, or when the parts are not there (the base set's tile drawn then, pv_gfx_116).
+ * a tile of the edge from the side of the road into the clearing; the plantation elsewhere. The game's own palm plantation
+ * (IT_PALM_PLANTATION, in every climate, the player, 2. 11.) so, and the original fruit plantation standing in a game
+ * saved before it took its place. Nullptr for a tile of anything else, of a set, or when the parts are not there (the
+ * base set's tile drawn then, pv_gfx_116).
  */
 static const ThreeDForestPart *ThreeDPalmPlantationPartAt(TileIndex tile)
 {
 	const IndustryGfx gfx = GetIndustryGfx(tile);
-	if (gfx >= NEW_INDUSTRYTILEOFFSET || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
+	if ((gfx >= NEW_INDUSTRYTILEOFFSET && gfx != GFX_PALM_PLANTATION) || GetIndustryTileSpec(gfx)->grf_prop.HasGrfFile()) return nullptr;
 	const Industry *ind = Industry::GetByTile(tile);
-	if (ind->type != ORIGINAL_FRUIT_PLANTATION || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
+	if ((ind->type != ORIGINAL_FRUIT_PLANTATION && ind->type != IT_PALM_PLANTATION) || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return nullptr;
 	const int w = ind->location.w, h = ind->location.h;
 	if (w < 4 || h < 4) return nullptr;
 	const int dx = static_cast<int>(TileX(tile)) - static_cast<int>(TileX(ind->location.tile));

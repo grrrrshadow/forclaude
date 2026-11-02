@@ -31,6 +31,26 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 2. 11. (89) – Palmová plantáž jako průmysl hry ve všech klimatech
+
+- Hráč: *„prumysl nemužu najit palmovou plantaž, ta je přece v basesetu“*. Plantáž byla původní ovocná plantáž
+  OpenTTD, a ta je jen v subtropickém klimatu (a ECS ji vypíná). Hráč vybral: **všechna klimata, vyrábí ovoce FRUT,
+  bere studentky, bez nich nic**.
+- **Co je nové:** vlastní průmysl hry `IT_PALM_PLANTATION` (typ 229, před lesem s pasekou) s vlastní dlaždicí
+  `GFX_PALM_PLANTATION` (2029, nový `GFX_GAME_OWN_FIRST`). Místo, četnost a život původní ovocné plantáže,
+  5 × 4 dlaždic, jméno „Palmová plantáž“. Kreslí se kolegovými díly `plantaz_*` jako les (palouk s chýší
+  a grilem, cesta od silnice, palmy). Bez dílů ji nakreslí stromy ovocné plantáže z basesetu (0x925/0x926).
+  Ovoce FRUT je s rozšířeným průmyslem ve hře v každém klimatu.
+- Původní ovocná plantáž se už nestaví (jako původní les). Ty, co stojí ve starých savech, zůstávají, dál je
+  kreslí díly a berou studentky.
+- **Oprava po cestě:** `MarkGameOwnIndustryDirty()` znal jen první průmysly hry. Les, dračí farma (seno) a hospoda
+  se po příchodu a odchodu holek nepřekreslily (mapa při 0° je měla dál/ještě bez nich). Teď zná všechny průmysly
+  hry od `IT_GAME_OWN_FIRST` i ovocnou plantáž.
+- Rig: `testprumysl` (nový řádek pro plantáž), `test3d postav <x> <y> palmy [bity]`. V mírné hře se seedem 7
+  vznikla jedna plantáž na 82,26; obrázek `palmy_b`: palouk s chýší a grilem, palmy, banánovníky.
+- **Otevřené:** bez ECS ovoce v mírném a arktickém klimatu nikdo nebere (bere ho jen subtropická potravinárna, když
+  je to klima zapnuté). Návrh pro hráče: lihovar (pálenka z ovoce).
+
 ## 2. 11. (88) – Z očí: auta a figury trojúhelníky kartou v dávkách (instance), bez plakátů
 
 - Hráč: *„pokračuj podle plánu, dodělej věci které chybí v přechodu na gpu a pak mužem dělat chyby“*; k plakátům

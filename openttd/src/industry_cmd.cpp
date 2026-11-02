@@ -827,6 +827,44 @@ static void SetupGameForest()
 	_industry_specs[IT_FOREST].enabled = false;
 }
 
+/**
+ * The palm plantation (IT_PALM_PLANTATION), 5x4 as the original fruit plantation, in every climate (the player, 2. 11.:
+ * "I cannot find the palm plantation, it is in the base set" -- it was the original fruit plantation of the tropics, which
+ * ECS switches off): the original fruit plantation as it is -- where it may stand, how often, its life -- with one gfx of
+ * its own on all its tiles, laid of the colleague's parts (ThreeDPalmPlantationPartAt()), the fruit plantation's tile of
+ * the base set without them. Its fruit (CT_FRUIT, the fruit plantation's of the tropics in every climate) only while the
+ * girls of a delivery of studentky work there (PalmPlantationIdle()). In the original fruit plantation's place where that
+ * one is on: it is neither built nor founded any more; those standing in a game saved before stay as they are.
+ */
+static void SetupPalmPlantation()
+{
+	const IndustrySpec &fruit = _origin_industry_specs[IT_FRUIT_PLANTATION];
+	const IndustryGfx fruit_tile = fruit.layouts.front().front().gfx;
+	IndustryTileSpec &tile = _industry_tile_specs[GFX_PALM_PLANTATION];
+	tile = _origin_industry_tile_specs[fruit_tile];
+	tile.grf_prop.subst_id = fruit_tile;
+	tile.accepts_cargo_label.fill(CT_INVALID);
+	tile.accepts_cargo.fill(INVALID_CARGO);
+	tile.acceptance.fill(0);
+
+	IndustryTileLayout layout = fruit.layouts.front();
+	for (IndustryTileLayoutTile &t : layout) t.gfx = GFX_PALM_PLANTATION;
+	IndustrySpec &spec = _industry_specs[IT_PALM_PLANTATION];
+	spec = fruit;
+	spec.layouts = {layout};
+	spec.name = STR_INDUSTRY_NAME_PALM_PLANTATION;
+	spec.produced_cargo_label.fill(CT_INVALID);
+	spec.produced_cargo_label[0] = CT_FRUIT;
+	spec.accepts_cargo_label.fill(CT_INVALID);
+	std::fill(std::begin(spec.conflicting), std::end(spec.conflicting), IT_INVALID);
+	spec.climate_availability = {LandscapeType::Temperate, LandscapeType::Arctic, LandscapeType::Tropic, LandscapeType::Toyland};
+	std::fill(std::begin(spec.appear_ingame), std::end(spec.appear_ingame), fruit.appear_ingame[to_underlying(LandscapeType::Tropic)]);
+	std::fill(std::begin(spec.appear_creation), std::end(spec.appear_creation), fruit.appear_creation[to_underlying(LandscapeType::Tropic)]);
+	spec.grf_prop.subst_id = IT_FRUIT_PLANTATION;
+	spec.enabled = true;
+	_industry_specs[IT_FRUIT_PLANTATION].enabled = false;
+}
+
 static void SetupPotatoChain()
 {
 	SetupField(IT_POTATO_FIELD, GFX_POTATO_FIELD);
@@ -927,6 +965,7 @@ static const DrawBuildingsTileStruct _game_own_draw_tile_data[][INDUSTRY_COMPLET
 	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0, 0),      // GFX_DRAGON_FARM_YARD: trodden earth
 	OWN_TILE_ON(SPR_FLAT_BARE_LAND, 0x5D4, 22), // GFX_DRAGON_FARM: the old house (house 0x18), the castle drawn as a 3D object
 	OWN_TILE_ON(0x81D, 0x81B, 39),              // GFX_GAME_FOREST: the original forest's trees, the parts drawn as 3D objects
+	OWN_TILE_ON(0x925, 0x926, 30),              // GFX_PALM_PLANTATION: the original fruit plantation's trees, the parts drawn as 3D objects
 };
 static_assert(std::size(_game_own_draw_tile_data) == GFX_GYMNASIUM_NORTH - GFX_GAME_OWN_FIRST + 1);
 
@@ -1128,7 +1167,7 @@ static void TendMarijuanaPlantations()
  */
 static void LetGirlsGo()
 {
-	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP, IT_DRAGON_FARM, IT_GAME_FOREST}) for (IndustryID id : Industry::industries[type]) {
+	for (IndustryType type : {IT_GYMNASIUM, IT_WEED_MACHINE, IT_STATUE, IT_COFFEESHOP, IT_DRAGON_FARM, IT_GAME_FOREST, IT_PALM_PLANTATION}) for (IndustryID id : Industry::industries[type]) {
 		const Industry *i = Industry::Get(id);
 		for (const Industry::AcceptedCargo &a : i->accepted) {
 			if (a.last_accepted == TimerGameEconomy::Date{} || TimerGameEconomy::date.base() - a.last_accepted.base() != GIRLS_DAYS) continue;
@@ -1405,7 +1444,7 @@ SpriteID GameOwnIndustryTileSprite(TileIndex tile)
  */
 void MarkGameOwnIndustryDirty(const Industry *ind)
 {
-	if (ind->type != IT_GYMNASIUM && ind->type != IT_WEED_MACHINE && ind->type != IT_STATUE && ind->type != IT_COFFEESHOP && ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) return;
+	if ((ind->type < IT_GAME_OWN_FIRST && ind->type != IT_FRUIT_PLANTATION) || GetIndustrySpec(ind->type)->grf_prop.HasGrfFile()) return;
 	for (TileIndex tile : ind->location) {
 		if (IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index) MarkTileDirtyByTile(tile);
 	}
@@ -1627,7 +1666,7 @@ void UpdateExtraIndustryCargoes()
 	for (Industry *i : Industry::Iterate()) {
 		if (i->type != IT_OIL_REFINERY && i->type != IT_MARIJUANA_PLANTATION && i->type != IT_COFFEESHOP && i->type != IT_GYMNASIUM && i->type != IT_WEED_MACHINE && i->type != IT_STATUE &&
 				i->type != IT_POTATO_FIELD && i->type != IT_DISTILLERY && i->type != IT_PUB && i->type != IT_DRAGON_FARM && i->type != IT_GAME_FOREST &&
-				i->type != IT_FRUIT_PLANTATION) continue;
+				i->type != IT_FRUIT_PLANTATION && i->type != IT_PALM_PLANTATION) continue;
 		const IndustrySpec *spec = GetIndustrySpec(i->type);
 		if (spec->grf_prop.HasGrfFile()) continue;
 		for (size_t index = 0; index < std::size(spec->accepts_cargo); index++) {
@@ -1653,11 +1692,12 @@ void UpdateExtraIndustryCargoes()
  * and every one of its tiles, so that a station by it takes it.
  * @param type the industry
  * @param labels the cargoes
+ * @param replaced whether one off is resolved too, an original the game's own took the place of: those standing in a game saved before
  */
-static void ResolveTownIndustryCargoes(IndustryType type, std::span<const CargoLabel> labels)
+static void ResolveTownIndustryCargoes(IndustryType type, std::span<const CargoLabel> labels, bool replaced = false)
 {
 	IndustrySpec &spec = _industry_specs[type];
-	if (!spec.enabled || spec.grf_prop.HasGrfFile()) return;
+	if ((!spec.enabled && !replaced) || spec.grf_prop.HasGrfFile()) return;
 
 	spec.accepts_cargo.fill(INVALID_CARGO);
 	for (const IndustryTileLayoutTile &t : spec.layouts.front()) {
@@ -1697,8 +1737,11 @@ void ResolveExtraIndustryCargoes()
 	ResolveTownIndustryCargoes(IT_PUB, PUB_CARGOES);
 	ResolveTownIndustryCargoes(IT_DRAGON_FARM, DRAGON_FARM_CARGOES);
 	ResolveTownIndustryCargoes(IT_GAME_FOREST, GAME_FOREST_CARGOES);
-	/* The palm plantation of the tropics (the original fruit plantation, the player, 2. 11.): worked by the girls. */
-	ResolveTownIndustryCargoes(IT_FRUIT_PLANTATION, PLANTATION_CARGOES);
+	/* The palm plantation (the player, 2. 11.): worked by the girls. And the original fruit plantation, the palm
+	 * plantation of the tropics before the game's own took its place (SetupPalmPlantation()): those standing in a game
+	 * saved before are worked by them still. */
+	ResolveTownIndustryCargoes(IT_PALM_PLANTATION, PLANTATION_CARGOES);
+	ResolveTownIndustryCargoes(IT_FRUIT_PLANTATION, PLANTATION_CARGOES, GetIndustrySpec(IT_PALM_PLANTATION)->enabled);
 }
 
 /**
@@ -1726,6 +1769,7 @@ void ResetIndustries()
 		SetupCoffeeshop();
 		SetupGymnasium();
 		SetupPotatoChain();
+		SetupPalmPlantation();
 	}
 
 	/* Reset any overrides that have been set. */
@@ -1880,6 +1924,7 @@ std::vector<CargoLabel> CargoLabelsOfClimateIndustries()
 		labels.push_back(CT_POTATOES);
 		labels.push_back(CT_ALCOHOL);
 		labels.push_back(CT_MUSHROOMS);
+		labels.push_back(CT_FRUIT); // the palm plantation's, in every climate (SetupPalmPlantation())
 	}
 	if (IndustryClimatesOn().None()) return labels;
 	auto add = [&labels](const std::vector<CargoLabel> &more) {
@@ -3229,7 +3274,7 @@ static void ChopLumberMillTrees(Industry *i)
  */
 static bool PalmPlantationIdle(const Industry *i)
 {
-	if (i->type != IT_FRUIT_PLANTATION) return false;
+	if (i->type != IT_FRUIT_PLANTATION && i->type != IT_PALM_PLANTATION) return false;
 	const CargoType stud = GetCargoTypeByLabel(CT_STUDENTKY);
 	return IsValidCargoType(stud) && i->IsCargoAccepted(stud) && !HasGirls(i);
 }

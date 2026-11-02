@@ -424,6 +424,16 @@ static bool HasOriginalIndustryParts(const Industry *ind)
 	return false;
 }
 
+/**
+ * Whether an industry is laid of the forest's parts as the map lays it (ThreeDGameForestPartAt()): the forest with a
+ * clearing, the palm plantation (the game's own, and the original fruit plantation).
+ */
+static bool LaidOfForestParts(const Industry *ind)
+{
+	const TileIndex tile = ind->location.tile;
+	return IsTileType(tile, TileType::Industry) && GetIndustryIndex(tile) == ind->index && ThreeDGameForestPartAt(tile) != nullptr;
+}
+
 /** The pictures of the industries' objects at the angles the previews were at, by the industry, the angle (tenths of a degree) and the zoom. */
 static std::map<std::tuple<uint, int, int, size_t>, ThreeDModelPicture> _preview_object_pictures;
 
@@ -478,9 +488,9 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		}
 		lay(origin, obj, nullptr, GetThreeDIndustryGirls(ind, obj), 0);
 		laid.back().second.paint = obj->PaintAt(origin);
-	} else if (ind->type == IT_GAME_FOREST) {
-		/* The forest with a clearing, a part on each tile as the map lays it (ThreeDGameForestPartAt()), its vehicles (the
-		 * horse by the cabin), its girls after a delivery of studentky. */
+	} else if (LaidOfForestParts(ind)) {
+		/* The forest with a clearing and the palm plantation, a part on each tile as the map lays it
+		 * (ThreeDGameForestPartAt()), their vehicles (the horse by the cabin), their girls after a delivery of studentky. */
 		const bool girls = HasGirls(ind);
 		for (TileIndex tile : ind->location) {
 			const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
@@ -750,7 +760,7 @@ void ShowThreeDIndustryPreview(IndustryID industry)
 	if (!ThreeDEnabled() || !Industry::IsValidID(industry)) return;
 	const Industry *ind = Industry::Get(industry);
 	const bool field = (ind->type == IT_MARIJUANA_PLANTATION || ind->type == IT_POTATO_FIELD) && GetThreeDFieldPart("zem") != nullptr;
-	const bool forest = ind->type == IT_GAME_FOREST && ThreeDGameForestPartAt(ind->location.tile) != nullptr;
+	const bool forest = LaidOfForestParts(ind);
 	if (GetThreeDIndustryObjectOf(ind) == nullptr && !field && !forest && !HasOriginalIndustryParts(ind)) return;
 	AddPreview({false, static_cast<WindowNumber>(industry)});
 }

@@ -6380,6 +6380,7 @@ STR_INDUSTRY_NAME_DISTILLERY                                    :Distillery
 STR_INDUSTRY_NAME_PUB                                           :Pub
 STR_INDUSTRY_NAME_DRAGON_FARM                                   :Dragon Farm
 STR_INDUSTRY_NAME_GAME_FOREST                                   :Forest
+STR_INDUSTRY_NAME_PALM_PLANTATION                               :Palm Plantation
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

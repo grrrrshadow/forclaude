@@ -6640,6 +6640,10 @@ STR_INDUSTRY_NAME_GAME_FOREST                                   :{G=m}Les
 STR_INDUSTRY_NAME_GAME_FOREST.gen                               :lesa
 STR_INDUSTRY_NAME_GAME_FOREST.loc                               :v lese
 STR_INDUSTRY_NAME_GAME_FOREST.small                             :les
+STR_INDUSTRY_NAME_PALM_PLANTATION                               :{G=f}Palmová plantáž
+STR_INDUSTRY_NAME_PALM_PLANTATION.gen                           :palmové plantáže
+STR_INDUSTRY_NAME_PALM_PLANTATION.loc                           :na palmové plantáži
+STR_INDUSTRY_NAME_PALM_PLANTATION.small                         :palmová plantáž
 
 ############ WARNING, using range 0x6000 for strings that are stored in the savegame
 ############ These strings may never get a new id, or savegames will break!

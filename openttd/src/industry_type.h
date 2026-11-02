@@ -85,6 +85,15 @@ static const IndustryType IT_DRAGON_FARM = NUM_INDUSTRYTYPES - 9;
  * delivery of studentky (the player, 23. 10.). Its trees, mushrooms and animals are there always.
  */
 static const IndustryType IT_GAME_FOREST = NUM_INDUSTRYTYPES - 10;
+/**
+ * The palm plantation, 5x4 out in the country (economy.extra_industries), in every climate (the player, 2. 11.: "I cannot
+ * find the palm plantation"; the original fruit plantation is of the tropics only, and a set like ECS switches it off):
+ * the original fruit plantation's place, life and fruit, laid of the colleague's parts (objekty/prumysl plantaz_*) as
+ * the forest with a clearing is; its fruit only while the girls of a delivery of studentky work there.
+ */
+static const IndustryType IT_PALM_PLANTATION = NUM_INDUSTRYTYPES - 11;
+/** The first of the game's own industry types (economy.extra_industries). */
+static const IndustryType IT_GAME_OWN_FIRST = IT_PALM_PLANTATION;
 
 static const IndustryGfx  NUM_INDUSTRYTILES_PER_GRF = 255;            ///< Maximum number of industry tiles per NewGRF; limited to 255 to allow extending Action3 with an extended byte later on.
 
@@ -136,8 +145,10 @@ static const IndustryGfx  GFX_DRAGON_FARM_YARD = NUM_INDUSTRYTILES - 16;
 static const IndustryGfx  GFX_DRAGON_FARM = NUM_INDUSTRYTILES - 17;
 /** The tiles of the forest with a clearing (IT_GAME_FOREST), all one: each laid of a part by its place (ThreeDGameForestTile()). */
 static const IndustryGfx  GFX_GAME_FOREST = NUM_INDUSTRYTILES - 18;
+/** The tiles of the palm plantation (IT_PALM_PLANTATION), all one: each laid of a part by its place (ThreeDPalmPlantationPartAt()). */
+static const IndustryGfx  GFX_PALM_PLANTATION = NUM_INDUSTRYTILES - 19;
 /** The first of the tiles of the game's own industries, which no set is given. */
-static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_GAME_FOREST;
+static const IndustryGfx  GFX_GAME_OWN_FIRST = GFX_PALM_PLANTATION;
 
 static const int INDUSTRY_COMPLETED = 3; ///< final stage of industry construction.
 

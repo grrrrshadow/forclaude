@@ -1744,6 +1744,25 @@ static bool ConTestClimateIndustries(std::span<std::string_view> argv)
 			auto min = ParseType<uint>(argv[3]);
 			if (min.has_value() && shops < *min) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - na mape je {} hulirn, ceka se aspon {}.", shops, *min);
 		}
+
+		/* The palm plantation (the player, 2. 11.: "I cannot find the palm plantation"): the game's own in every
+		 * climate, in the original fruit plantation's place, its fruit while the studentky it takes are there. */
+		const IndustrySpec *palm = GetIndustrySpec(IT_PALM_PLANTATION);
+		std::string palm_makes, palm_takes;
+		for (CargoType c : palm->produced_cargo) if (IsValidCargoType(c)) palm_makes += label_of(c) + " ";
+		for (CargoType c : palm->accepts_cargo) if (IsValidCargoType(c)) palm_takes += label_of(c) + " ";
+		const IndustryGfx palm_gfx = palm->layouts.empty() ? INVALID_INDUSTRYTILE : palm->layouts.front().front().gfx;
+		const IndustrySpec *fruit = GetIndustrySpec(static_cast<IndustryType>(palm->grf_prop.subst_id)); // the original fruit plantation it stands in for
+		IConsolePrint(CC_DEFAULT, "testprumysl: pridavny {} {} {}{}, dlazdice {} ({} dlazdic), na mape {}, vyrabi {}bere {}puvodni ovocna plantaz {}",
+				IT_PALM_PLANTATION, GetString(palm->name), palm->enabled ? "zap" : "VYP", palm->grf_prop.HasGrfFile() ? " SADA" : "",
+				palm_gfx, palm->layouts.empty() ? 0 : palm->layouts.front().size(), Industry::GetIndustryTypeCount(IT_PALM_PLANTATION),
+				palm_makes, palm_takes, fruit->enabled ? "ZAP" : "vyp");
+		if (!palm->enabled || palm->grf_prop.HasGrfFile()) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - palmova plantaz neni ve hre, nebo ji zabrala sada.");
+		if (palm->climate_availability != every_climate) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - palmova plantaz neni ve vsech klimatech.");
+		if (palm_makes != "FRUT ") IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - palmova plantaz nevyrabi ovoce.");
+		if (palm_takes.find("STUD") == std::string::npos) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - palmova plantaz nebere studentky.");
+		if (palm_gfx != GFX_PALM_PLANTATION || palm->layouts.front().size() != 20) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - palmova plantaz nema svych 5 x 4 dlazdic.");
+		if (fruit->enabled) IConsolePrint(CC_ERROR, "testprumysl: ODMITNUTO - puvodni ovocna plantaz se stavi vedle palmove.");
 	}
 
 	/* The game's own vehicles: every one under its own mark in the engine
@@ -8883,7 +8902,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		auto x = number(2), y = number(3);
 		const ThreeDObject *obj = GetThreeDObjectByName(argv[4]);
 		/* The fields have no object of their own, only parts: by their names. */
-		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : argv[4] == "paseka" ? IT_GAME_FOREST : IT_INVALID;
+		IndustryType type = obj != nullptr ? obj->industry : argv[4] == "plantaz" ? IT_MARIJUANA_PLANTATION : argv[4] == "brambory" ? IT_POTATO_FIELD : argv[4] == "paseka" ? IT_GAME_FOREST : argv[4] == "palmy" ? IT_PALM_PLANTATION : IT_INVALID;
 		/* The forest of the original game, of the climate's: no object, its tiles from the parts the industries share;
 		 * left being built, as the game builds it (its trees stand at once). */
 		IndustryType forest = IT_INVALID;
@@ -8897,18 +8916,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (n.has_value() && *n < NUM_INDUSTRYTYPES && GetIndustrySpec(static_cast<IndustryType>(*n))->enabled) type = static_cast<IndustryType>(*n);
 		}
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]|typ<N>>' (test3d objekty lists them; paseka the forest with a clearing; typ<N> an industry of the game by its number).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]|palmy [random bits]|typ<N>>' (test3d objekty lists them; paseka the forest with a clearing, palmy the palm plantation; typ<N> an industry of the game by its number).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
 		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
-		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST || argv[4].starts_with("typ"))) {
+		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST || type == IT_PALM_PLANTATION || argv[4].starts_with("typ"))) {
 			Industry *ind = Industry::GetByTile(tile);
 			/* The look asked for: the statue's bronze, or the second of two looks (the dragon farm's castle). */
 			if (obj != nullptr) SB(ind->random, 0, 1, obj->industry_variant == 1 || GetThreeDIndustryObject(type, true) == obj ? 1 : 0);
 			/* The forest with a clearing: its random bits as given (the cabin's tile, the path's place), the rig builds with none. */
-			if (type == IT_GAME_FOREST && argv.size() > 5) ind->random = static_cast<uint16_t>(number(5).value_or(0));
+			if ((type == IT_GAME_FOREST || type == IT_PALM_PLANTATION) && argv.size() > 5) ind->random = static_cast<uint16_t>(number(5).value_or(0));
 			/* Built at once, for the pictures (the game builds it in stages). */
 			for (TileIndex t : ind->location) {
 				if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index) continue;
