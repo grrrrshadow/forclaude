@@ -62,7 +62,12 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 ## 2. 11. (89) – Palmová plantáž jako průmysl hry ve všech klimatech
 
 - Hráč: *„prumysl nemužu najit palmovou plantaž, ta je přece v basesetu“*. Plantáž byla původní ovocná plantáž
-  OpenTTD, a ta je jen v subtropickém klimatu (a ECS ji vypíná). Hráč vybral: **všechna klimata, vyrábí ovoce FRUT,
+  OpenTTD, a ta je jen v subtropickém klimatu. **Oprava mé dřívější věty „ECS ji vypíná“:** ECS vypíná původní
+  průmysl hraného klimatu. Průmysl zapnutého klimatu vypnout ani nahradit nesmí, hra mu to nedovolí
+  (`IsOriginalIndustryKept()` v `newgrf_act0_industries.cpp`). V hráčově výpisu `prumysl20261102165211.txt` (mírná
+  hra, ECS) ale není ani jeden původní průmysl, takže „Průmysl pouštního klimatu“ v té hře zapnutý není. Je to
+  nastavení jen pro novou hru, save si nese stav z doby založení. Plantáž proto ve hře nebyla. Ovoce tam bere
+  ECS (Pivovar, Potravinářský závod). Hráč vybral: **všechna klimata, vyrábí ovoce FRUT,
   bere studentky, bez nich nic**.
 - **Co je nové:** vlastní průmysl hry `IT_PALM_PLANTATION` (typ 229, před lesem s pasekou) s vlastní dlaždicí
   `GFX_PALM_PLANTATION` (2029, nový `GFX_GAME_OWN_FIRST`). Místo, četnost a život původní ovocné plantáže,
