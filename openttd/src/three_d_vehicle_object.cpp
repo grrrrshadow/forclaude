@@ -3335,24 +3335,38 @@ bool CardReachOf(VehicleID id, Rect &reach)
 }
 
 /**
+ * Where a vehicle is laid on the turned map from this piece (its point, its picture's corner and size, pixels of the
+ * zoom), kept for the box a move of it draws again (CardReachOf()): drawn by the card, or its likeness from its sprites
+ * (AddThreeDVehicleToViewport() of three_d_vehicle.cpp).
+ */
+void NoteVehicleReach(const Vehicle *v, int left, int top, int width, int height, int ax, int ay, int az, ZoomLevel zoom);
+
+/**
  * Where the card draws a vehicle (AddTurnedLikeness(): its point and its picture's corner and size), kept for the box a
  * move of it draws again (CardReachOf()). For the rig and the diary, against the boxes of all its pieces as they were
  * (Vehicle::coord) -- what a move of it marked to be drawn again: past them, the card's picture of it was left behind as
  * it drove on (the player, 1. and 2. 11.: "a line behind the cars", Tatra lorries, V3S, 1203).
  */
+void NoteVehicleReach(const Vehicle *v, int left, int top, int width, int height, int ax, int ay, int az, ZoomLevel zoom)
+{
+	if (width <= 0 || height <= 0) return;
+	const Point pt = RemapCoords(ax, ay, az);
+	const int scale = ScaleByZoom(1, zoom);
+	/* Kept from the piece's own point: its next move draws again where this was drawn (CardReachOf()). */
+	const Point own = RemapCoords(v->x_pos, v->y_pos, v->z_pos);
+	const int l = pt.x + left * scale, t = pt.y + top * scale;
+	std::lock_guard<std::mutex> lock(_card_reach_lock);
+	_card_reach[v->index] = Rect{l - own.x, t - own.y, l + width * scale - own.x, t + height * scale - own.y};
+}
+
 static void NoteCardReach(const Vehicle *v, const ThreeDGpuStandingVehicle *card, int ax, int ay, int az, ZoomLevel zoom)
 {
 	if (card == nullptr || card->width <= 0) return;
+	NoteVehicleReach(v, card->left, card->top, card->width, card->height, ax, ay, az, zoom);
 	const Point pt = RemapCoords(ax, ay, az);
 	const int scale = ScaleByZoom(1, zoom);
 	const int left = pt.x + card->left * scale, top = pt.y + card->top * scale;
 	const int right = left + card->width * scale, bottom = top + card->height * scale;
-	{
-		/* Kept from the piece's own point: its next move draws again where this was drawn (CardReachOf()). */
-		const Point own = RemapCoords(v->x_pos, v->y_pos, v->z_pos);
-		std::lock_guard<std::mutex> lock(_card_reach_lock);
-		_card_reach[v->index] = Rect{left - own.x, top - own.y, right - own.x, bottom - own.y};
-	}
 	int cl = INT32_MAX, ct = INT32_MAX, cr = INT32_MIN, cb = INT32_MIN;
 	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
 		if (u->coord.left == INVALID_COORD) continue;

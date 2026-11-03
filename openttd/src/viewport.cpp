@@ -2482,10 +2482,13 @@ std::string TakeTurnedTimesForDiary(int frames)
 	const int blocks = _turned_ground_times.card_blocks + _turned_ground_times.processor_blocks + _turned_ground_times.view_blocks;
 	/* Of "plakaty" (what stands on the map) the card's part, waited for; whole views laid and views only moved. */
 	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2], _turned_card_dirty_passes, _turned_card_dirty_why[7], _small_card_dirty_passes;
+	extern uint64_t _turned_card_dirty_parts;
+	extern double _turned_card_dirty_area[2];
 	const uint64_t *why = _turned_card_dirty_why;
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), po kouscich {} ({:.0f} % plochy kusu), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
 			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
-			why[0], why[1], why[2], why[3], why[4], why[5], why[6], _small_card_dirty_passes,
+			why[0], why[1], why[2], why[3], why[4], why[5], why[6], _turned_card_dirty_parts,
+			_turned_card_dirty_area[1] > 0 ? 100.0 * _turned_card_dirty_area[0] / _turned_card_dirty_area[1] : 0.0, _small_card_dirty_passes,
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
 	std::fill(std::begin(_turned_card_dirty_why), std::end(_turned_card_dirty_why), 0);
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
@@ -2496,6 +2499,8 @@ std::string TakeTurnedTimesForDiary(int frames)
 	_turned_card_band_passes = 0;
 	_turned_card_band_blocks[0] = _turned_card_band_blocks[1] = 0;
 	_turned_card_dirty_passes = 0;
+	_turned_card_dirty_parts = 0;
+	_turned_card_dirty_area[0] = _turned_card_dirty_area[1] = 0;
 	_small_card_dirty_passes = 0;
 	t = TurnedTimes();
 	_turned_ground_times = {};
@@ -5833,6 +5838,14 @@ uint64_t _turned_card_dirty_why[7] = {};
 bool _turned_card_dirty_on = true; ///< Rig: what changed on the turned main view laid by the card at once (test3d stojici naraz); else block by block
 uint64_t _turned_card_band_blocks[2] = {}; ///< Rig: the blocks a move of the view uncovered, of them taken from the card (test3d cas, the diary)
 static constexpr int TURNED_CARD_BAND = 192; ///< the pixels the picture of the view on the card reaches past it every way
+/**
+ * The parts of the piece of the view being laid by the card that changed (TurnedCardLayChanged()), pixels of its
+ * picture (TurnedCardGround): what stands there laid only in them (ThreeDGpuStanding::parts); nullptr all of the piece.
+ */
+static const std::vector<std::array<int, 4>> *_turned_card_parts = nullptr;
+static constexpr int TURNED_CARD_PART = 32; ///< the cells of the picture the changed pixels are looked for in, pixels across
+uint64_t _turned_card_dirty_parts = 0;      ///< the diary: the parts the changes laid at once were in (TurnedCardLayChanged())
+double _turned_card_dirty_area[2] = {};     ///< the diary: their pixels, and those of the pieces about them
 
 /** The pixels the picture of the view on the card reaches past it every way (TurnedCardGround). */
 static int TurnedCardBand(const Viewport &vp)
@@ -7577,6 +7590,10 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		on_card.view_h = _tcg->h;
 		/* Its lit pixels stay on the card: the glows by them are the video driver's (_night_card_lit). */
 		on_card.read_lit = false;
+		/* Only the parts of it that changed, when so laid (TurnedCardLayChanged()): what reaches into them, there. */
+		if (_turned_card_parts != nullptr) {
+			for (const std::array<int, 4> &p : *_turned_card_parts) on_card.parts.push_back({p[0] - on_card.view_x, p[1] - on_card.view_y, p[2], p[3]});
+		}
 		const size_t glows_before = _night_glows.size();
 		for (const TurnedSprite &s : standing) AddTurnedStandingThing(on_card, frame, *s.ps);
 		const double tc0 = TurnedNow();
@@ -8304,26 +8321,62 @@ static int TurnedCardLayChanged(const Viewport &vp, int left, int top, int right
 	 * for a window over the view (the status bar with the date, a message), the blocks there only holes. */
 	const int cx0 = std::max(0, px0), cy0 = std::max(0, py0), cx1 = std::min(g.w, px1), cy1 = std::min(g.h, py1);
 	if (cx1 <= cx0 || cy1 <= cy0 || g.stood.size() != static_cast<size_t>(g.w) * g.h || g.have.size() != g.stood.size()) return 1;
-	int lx0 = cx1, ly0 = cy1, lx1 = cx0, ly1 = cy0;
-	const int n = cx1 - cx0;
+	/* Where in it: the cells of the picture (TURNED_CARD_PART) with a pixel changed, joined into rects -- the card lays
+	 * only those (ThreeDGpuStanding::parts), what reaches into them cut to them. One piece about all of it laid whole
+	 * was, with the cars about a town, nearly all the view, all its buildings laid again every frame (the player's #326:
+	 * 12 million triangles of buildings in 5 s, the map 13 to 25 frames a second). */
+	const int gx0 = cx0 / TURNED_CARD_PART, gy0 = cy0 / TURNED_CARD_PART;
+	const int gw = (cx1 - 1) / TURNED_CARD_PART + 1 - gx0, gh = (cy1 - 1) / TURNED_CARD_PART + 1 - gy0;
+	std::vector<uint8_t> cells(static_cast<size_t>(gw) * gh, 0);
+	bool changed = false;
 	for (int y = cy0; y < cy1; y++) {
-		const uint8_t *st = &g.stood[static_cast<size_t>(y) * g.w + cx0], *hv = &g.have[static_cast<size_t>(y) * g.w + cx0];
-		const int first = static_cast<int>(std::min(std::find(st, st + n, 0) - st, std::find(hv, hv + n, 0) - hv));
-		if (first == n) continue;
-		auto last_of = [n](const uint8_t *m) {
-			const auto r = std::find(std::make_reverse_iterator(m + n), std::make_reverse_iterator(m), 0);
-			return static_cast<int>(std::make_reverse_iterator(m) - r);
-		};
-		lx0 = std::min(lx0, cx0 + first);
-		lx1 = std::max({lx1, cx0 + last_of(st), cx0 + last_of(hv)});
-		ly0 = std::min(ly0, y);
-		ly1 = y + 1;
+		const uint8_t *st = &g.stood[static_cast<size_t>(y) * g.w], *hv = &g.have[static_cast<size_t>(y) * g.w];
+		uint8_t *row = &cells[static_cast<size_t>(y / TURNED_CARD_PART - gy0) * gw];
+		for (int c = 0; c < gw; c++) {
+			if (row[c] != 0) continue;
+			const int a = std::max(cx0, (gx0 + c) * TURNED_CARD_PART), b = std::min(cx1, (gx0 + c + 1) * TURNED_CARD_PART);
+			if (std::find(st + a, st + b, 0) != st + b || std::find(hv + a, hv + b, 0) != hv + b) {
+				row[c] = 1;
+				changed = true;
+			}
+		}
 	}
-	if (lx1 <= lx0) {
+	if (!changed) {
 		g.laid_pass = _dirty_blocks_pass;
 		return 2;
 	}
+	/* A run of the cells along a row, as many rows down as all of it is there; each cell in one rect. */
+	std::vector<std::array<int, 4>> parts;
+	int lx0 = cx1, ly0 = cy1, lx1 = cx0, ly1 = cy0;
+	double area = 0;
+	for (int r = 0; r < gh; r++) {
+		for (int c = 0; c < gw;) {
+			uint8_t *at = &cells[static_cast<size_t>(r) * gw + c];
+			if (*at != 1) {
+				c++;
+				continue;
+			}
+			int run = 1;
+			while (c + run < gw && at[run] == 1) run++;
+			int down = 1;
+			while (r + down < gh && std::all_of(at + static_cast<size_t>(down) * gw, at + static_cast<size_t>(down) * gw + run, [](uint8_t k) { return k == 1; })) down++;
+			for (int k = 0; k < down; k++) std::fill_n(at + static_cast<size_t>(k) * gw, run, 2);
+			const int x0 = std::max(cx0, (gx0 + c) * TURNED_CARD_PART), y0 = std::max(cy0, (gy0 + r) * TURNED_CARD_PART);
+			const int x1 = std::min(cx1, (gx0 + c + run) * TURNED_CARD_PART), y1 = std::min(cy1, (gy0 + r + down) * TURNED_CARD_PART);
+			parts.push_back({x0, y0, x1 - x0, y1 - y0});
+			area += static_cast<double>(x1 - x0) * (y1 - y0);
+			lx0 = std::min(lx0, x0);
+			ly0 = std::min(ly0, y0);
+			lx1 = std::max(lx1, x1);
+			ly1 = std::max(ly1, y1);
+			c += run;
+		}
+	}
+	AutoRestoreBackup only_parts(_turned_card_parts, static_cast<const std::vector<std::array<int, 4>> *>(&parts));
 	if (!TurnedCardRectOnCard(vp, lx0, ly0, lx1, ly1)) return 3;
+	_turned_card_dirty_parts += parts.size();
+	_turned_card_dirty_area[0] += area;
+	_turned_card_dirty_area[1] += static_cast<double>(lx1 - lx0) * (ly1 - ly0);
 	g.laid_pass = _dirty_blocks_pass;
 	return 0;
 }

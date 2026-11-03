@@ -92,11 +92,16 @@ struct Walker {
 	std::vector<Point2> path;    ///< the way, world units
 	std::vector<double> at;      ///< how far along the way each point of it is
 	double walked = 0;           ///< how far it has walked
-	TileIndex tile = INVALID_TILE; ///< the tile it is on, drawn again when it moves on
+	TileIndex tile = INVALID_TILE; ///< the tile it is on
 	int frame = -1;              ///< the frame it is drawn in
 	double x = 0, y = 0;
 	int z = 0;
 	float facing = 0;            ///< degrees, 0 along +x, 90 along +y
+	/* Where it was last drawn again on the map (MarkStandingDirty()), at its last frame: the map draws it there, as the
+	 * screen has it, till its next frame draws it again there and where it is then. */
+	double drawn_x = 0, drawn_y = 0;
+	int drawn_z = 0;
+	float drawn_facing = 0;
 };
 
 std::vector<Walker> _walkers;
@@ -122,6 +127,28 @@ int DrawnTall(const ThreeDVehicleObject *o)
 	const ThreeDVehicleShape *shape = o != nullptr ? o->GetShape(0) : nullptr;
 	if (shape == nullptr) return MAX_BUILDING_PIXELS;
 	return static_cast<int>(std::ceil(shape->z1 * WalkerScale() * OBJECT_HEIGHT_PER_METRE));
+}
+
+/**
+ * A thing of the game's own (a walker, a car) drawn again where it stands: as far as its shape reaches about its point
+ * whichever way it faces (drawn bigger, WalkerScale()), from a little below its feet to above its head -- as a figure
+ * that moves is (NoteMovingFigure()). On the turned map not its tile and the half tile or the tile about it: the card
+ * laid the buildings there again at every step it made (the player's #326: Mat and the cars about a town, the map 13
+ * to 25 frames a second). A car's lights at night reach further: two tiles about it.
+ * @param o its object
+ * @param x,y,z where it stands, world units
+ * @param lit its lights on
+ */
+void MarkStandingDirty(const ThreeDVehicleObject *o, double x, double y, int z, bool lit)
+{
+	const ThreeDVehicleShape *shape = o != nullptr ? o->GetShape(0) : nullptr;
+	double reach = 2.0 * TILE_SIZE;
+	if (shape != nullptr) {
+		const double rx = std::max(std::abs(shape->x0), std::abs(shape->x1)), ry = std::max(std::abs(shape->y0), std::abs(shape->y1));
+		reach = std::hypot(rx, ry) * WalkerScale() * OBJECT_UNITS_PER_METRE + 2;
+		if (lit) reach = std::max(reach, 2.0 * TILE_SIZE);
+	}
+	MarkWorldBoxDirty(x - reach, y - reach, x + reach, y + reach, z - TILE_HEIGHT, z + DrawnTall(o) + TILE_HEIGHT);
 }
 
 /** World units a round of the frames walks. */
@@ -326,6 +353,16 @@ void Place(Walker &w, const ThreeDVehicleObject *fig)
 	w.frame = static_cast<int>(std::floor(w.walked / round * fig->frames)) % fig->frames;
 }
 
+/** A walker drawn again on the map where it is now, as it is (Walker::drawn_x). */
+void Redraw(Walker &w, const ThreeDVehicleObject *fig)
+{
+	MarkStandingDirty(fig, w.x, w.y, w.z, false);
+	w.drawn_x = w.x;
+	w.drawn_y = w.y;
+	w.drawn_z = w.z;
+	w.drawn_facing = w.facing;
+}
+
 /** Send a walker out in a town now, if it has two doors with a way between; whether one went. */
 bool Send(const Town *town, const ThreeDVehicleObject *fig)
 {
@@ -358,7 +395,7 @@ bool Send(const Town *town, const ThreeDVehicleObject *fig)
 	w.at.push_back(0);
 	for (size_t i = 1; i < w.path.size(); i++) w.at.push_back(w.at.back() + std::hypot(w.path[i].x - w.path[i - 1].x, w.path[i].y - w.path[i - 1].y));
 	Place(w, fig);
-	MarkTileDirtyByTile(w.tile);
+	Redraw(w, fig);
 	Debug(misc, 1, "3D walker: {} out of the door of the house at {},{} to the one at {},{} in {}, {} road tiles, {:.0f} units", WALKER_FIGURE,
 			TileX(from.house), TileY(from.house), TileX(to->house), TileY(to->house), town->index.base(), route.size(), w.at.back());
 	_walkers.push_back(std::move(w));
@@ -397,7 +434,7 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 	TileIndex middle = LifeMiddle();
 	const ThreeDVehicleObject *fig = middle != INVALID_TILE ? WalkerFigure() : nullptr;
 	if (fig == nullptr) {
-		for (const Walker &w : _walkers) MarkTileDirtyByTile(w.tile);
+		for (const Walker &w : _walkers) MarkStandingDirty(GetThreeDFigure(WALKER_FIGURE), w.drawn_x, w.drawn_y, w.drawn_z, false);
 		_walkers.clear();
 		return;
 	}
@@ -409,18 +446,18 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 		w.walked += speed;
 		if (town == nullptr || w.walked >= w.at.back() || DistanceManhattan(town->xy, middle) > TOWN_GONE) {
 			/* In at the door: out again a while later, somewhere. */
-			MarkTileDirtyByTile(w.tile);
+			MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
 			_next_walk[w.town] = now + 150 + InteractiveRandomRange(450);
 			it = _walkers.erase(it);
 			continue;
 		}
-		TileIndex was = w.tile;
-		int frame = w.frame;
+		const int frame = w.frame;
 		Place(w, fig);
-		/* Only as high as it is drawn (the turned view: not a stripe of the screen up to the highest building). */
-		const int tall = DrawnTall(fig) + 2 * TILE_HEIGHT;
-		if (w.tile != was) MarkTileDirtyBetween(was, w.z - 2 * TILE_HEIGHT, w.z + tall);
-		if (w.tile != was || w.frame != frame) MarkTileDirtyBetween(w.tile, w.z - 2 * TILE_HEIGHT, w.z + tall);
+		/* Its next frame: drawn again where it was and where it is. */
+		if (w.frame != frame) {
+			MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+			Redraw(w, fig);
+		}
 		++it;
 	}
 	if (now % 16 != 0) return;
@@ -587,12 +624,11 @@ void PlaceCar(Driver &d)
 	d.tile = TileVirtXY(ix, iy);
 }
 
-/** The tiles about a car drawn again: it is longer than a tile's quarter. Only as high as it is drawn (the turned
- * view: not a stripe of the screen up to the highest building, MarkTileDirtyBetween()). */
-void MarkCarDirty(const Driver &d, TileIndex t)
+/** A car drawn again where it is now (MarkStandingDirty()), once it was put on its way. */
+void MarkCarDirty(const Driver &d)
 {
-	if (t == INVALID_TILE) return;
-	MarkTileDirtyBetween(t, d.z - 2 * TILE_HEIGHT, d.z + DrawnTall(d.car) + 2 * TILE_HEIGHT, 1);
+	if (d.tile == INVALID_TILE) return;
+	MarkStandingDirty(d.car, d.x, d.y, d.z, IsNightNow());
 }
 
 /** Send a car from the stop it stands at (or any, the first time) to another one the roads lead to; whether it went. */
@@ -622,8 +658,9 @@ bool Drive(Driver &d, TileIndex middle)
 		d.driven = 0;
 		d.house = others[pick]->house;
 		d.stand_until = 0;
-		MarkCarDirty(d, d.tile);
+		MarkCarDirty(d);
 		PlaceCar(d);
+		MarkCarDirty(d);
 		Debug(misc, 1, "3D car {}: from the house at {},{} to the one at {},{}, {} road tiles", d.car->name, TileX(from->house), TileY(from->house), TileX(d.house), TileY(d.house), route.size());
 		return true;
 	}
@@ -635,14 +672,14 @@ const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None
 	TileIndex middle = LifeMiddle();
 	const std::vector<ThreeDVehicleObject> &cars = GetThreeDDrivingCars();
 	if (middle == INVALID_TILE || cars.empty()) {
-		for (const Driver &d : _drivers) MarkCarDirty(d, d.tile);
+		for (const Driver &d : _drivers) MarkCarDirty(d);
 		_drivers.clear();
 		return;
 	}
 	const uint64_t now = TimerGameTick::counter;
 	/* One of each car of the index. */
 	if (_drivers.size() != cars.size()) {
-		for (const Driver &d : _drivers) MarkCarDirty(d, d.tile);
+		for (const Driver &d : _drivers) MarkCarDirty(d);
 		_drivers.clear();
 		for (const ThreeDVehicleObject &car : cars) {
 			Driver d;
@@ -661,14 +698,14 @@ const IntervalTimer<TimerGameTick> _drivers_timer({TimerGameTick::Priority::None
 		}
 		if (d.path.empty()) continue;
 		d.driven += d.car->drive_kmh / 3.6 / TICKS_A_SECOND * units_per_metre * WalkerScale();
-		TileIndex was = d.tile;
 		if (d.driven >= d.at.back()) {
 			d.driven = d.at.back();
 			d.stand_until = now + std::max(1, d.car->drive_stand);
 		}
+		/* Drawn again where it was and where it is (each tick it drives: where it was is where it was drawn). */
+		MarkCarDirty(d);
 		PlaceCar(d);
-		MarkCarDirty(d, was);
-		if (d.tile != was) MarkCarDirty(d, d.tile);
+		MarkCarDirty(d);
 	}
 });
 
@@ -748,7 +785,10 @@ void AddThreeDWalkersToViewport(ZoomLevel zoom)
 	if (_walkers.empty() || IsTransparencySet(TransparencyOption::Houses)) return;
 	const float scale = WalkerScale();
 	for (const Walker &w : _walkers) {
-		AddThreeDFigureToViewport(WALKER_FIGURE, scale, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, w.facing, zoom, w.tile, 0, std::max(0, w.frame));
+		/* Where it was drawn again last (Walker::drawn_x): as the screen has it. */
+		const int x = static_cast<int>(std::lround(w.drawn_x)), y = static_cast<int>(std::lround(w.drawn_y));
+		const TileIndex tile = TileVirtXY(std::clamp<int>(x, 0, Map::MaxX() * TILE_SIZE), std::clamp<int>(y, 0, Map::MaxY() * TILE_SIZE));
+		AddThreeDFigureToViewport(WALKER_FIGURE, scale, x, y, w.drawn_z, w.drawn_facing, zoom, tile, 0, std::max(0, w.frame));
 	}
 }
 

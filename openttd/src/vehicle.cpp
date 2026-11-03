@@ -2188,26 +2188,31 @@ void Vehicle::UpdateBoundingBoxCoordinates(bool update_cache) const
 	new_coord.right  += pt.x + 2 * ZOOM_BASE;
 	new_coord.bottom += pt.y + 2 * ZOOM_BASE;
 
-	/* Turned (three_d.h), the vehicle is drawn as its likeness, which may reach further than this sprite does
-	 * (the whole articulated vehicle from its first part, at its true length): room for that. */
+	/* Turned (three_d.h), the vehicle is drawn as its likeness, not as this sprite. */
 	if (IsViewDrawnTurned()) {
-		int w = new_coord.right - new_coord.left, h = new_coord.bottom - new_coord.top;
-		new_coord.left -= w + 8 * ZOOM_BASE;
-		new_coord.right += w + 8 * ZOOM_BASE;
-		new_coord.top -= h + 8 * ZOOM_BASE;
-		new_coord.bottom += h + 8 * ZOOM_BASE;
-		/* And where the card drew it from this piece last (CardReachOf()), however far past the sprite that was: the
+		/* Where the card drew it from this piece last (CardReachOf()), however far past the sprite that was: the
 		 * likeness of a GRF's lorry reached past this box, the card's picture of it left behind on the map as a line
-		 * of old lorries (the player, 1. and 2. 11.). */
+		 * of old lorries (the player, 1. and 2. 11.). Known, that and a little for the way it turned since is all: the
+		 * room of three times the sprite made each car about a town draw the buildings again over a square of 150 pixels
+		 * every frame (the player's #326: 12 million triangles in 5 s); the card lays nothing past what is drawn again
+		 * (TurnedCardLayChanged()), so nothing of it is left behind even if it reached further. */
 		extern bool CardReachOf(VehicleID id, Rect &reach);
 		Rect reach;
 		if (CardReachOf(this->index, reach)) {
 			const Point own = RemapCoords(this->x_pos, this->y_pos, this->z_pos);
-			const int pad = static_cast<int>(ZOOM_BASE);
+			const int pad = 4 * ZOOM_BASE + std::max(reach.right - reach.left, reach.bottom - reach.top) / 8;
 			new_coord.left = std::min(new_coord.left, own.x + reach.left - pad);
 			new_coord.top = std::min(new_coord.top, own.y + reach.top - pad);
 			new_coord.right = std::max(new_coord.right, own.x + reach.right + pad);
 			new_coord.bottom = std::max(new_coord.bottom, own.y + reach.bottom + pad);
+		} else {
+			/* Not drawn by the card yet: room for the likeness, which may reach further than this sprite does (the
+			 * whole articulated vehicle from its first part, at its true length). */
+			int w = new_coord.right - new_coord.left, h = new_coord.bottom - new_coord.top;
+			new_coord.left -= w + 8 * ZOOM_BASE;
+			new_coord.right += w + 8 * ZOOM_BASE;
+			new_coord.top -= h + 8 * ZOOM_BASE;
+			new_coord.bottom += h + 8 * ZOOM_BASE;
 		}
 	}
 

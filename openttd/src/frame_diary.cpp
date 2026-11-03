@@ -148,7 +148,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
-				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; zmen naraz = zmeny hlavni mapy polozene kartou jednim kusem (a proc ne), v malych oknech = totez v oknech vozidel a dalsich pohledech; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
+				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; zmen naraz = zmeny hlavni mapy polozene kartou jednim kusem (a proc ne), po kouscich = v kolika obdelnicich z nich karta kreslila (a kolik procent plochy kusu), v malych oknech = totez v oknech vozidel a dalsich pohledech; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
 				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta;"
 				" pamet 3d = co drzi 3D objekty (tvary, textury, domy) a obrazky, zapomenuti = kolikrat se pustilo, co se 2 minuty nekreslilo, odlozeno = kolikrat to muselo pockat.\n");
 	}

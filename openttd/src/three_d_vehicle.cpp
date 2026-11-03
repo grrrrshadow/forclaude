@@ -1511,6 +1511,9 @@ bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom,
 		ay = ny;
 	}
 	AddTurnedVehiclePicture(pic, ax, ay, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
+	/* Where it was laid: the box its next move draws again holds that (Vehicle::UpdateBoundingBoxCoordinates()). */
+	extern void NoteVehicleReach(const Vehicle *v, int left, int top, int width, int height, int ax, int ay, int az, ZoomLevel zoom);
+	NoteVehicleReach(v, pic->left, pic->top, pic->width, pic->height, ax, ay, v->z_pos, zoom);
 	return true;
 }
 

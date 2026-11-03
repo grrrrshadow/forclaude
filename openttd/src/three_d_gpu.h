@@ -448,6 +448,10 @@ struct ThreeDGpuStanding {
 	int width = 0, height = 0;   ///< the block
 	int view_w = 0, view_h = 0;  ///< the view's (as its ground's)
 	int view = 0;                ///< whose pictures of the view (ThreeDGpuGround::view)
+	/** The parts of the block laid, x, y, w, h pixels of it, apart from each other: each cleared, what reaches into it
+	 * laid there cut to it, the rest of the block as it was (what changed on the view, TurnedCardLayChanged() of
+	 * viewport.cpp); empty all of the block. */
+	std::vector<std::array<int, 4>> parts;
 	std::vector<ThreeDGpuStandingItem> items;
 	std::vector<ThreeDGpuStandingBuilding> buildings;
 	std::vector<ThreeDGpuStandingFaces> faces;

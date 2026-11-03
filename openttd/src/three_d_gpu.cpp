@@ -3910,7 +3910,17 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		_standing_places.clear();
 	}
 	_standing_stream_shelf = {};
-	Step(fmt::format("co stoji na plose {}x{}: {} obrazku, {} budov", s.width, s.height, s.items.size(), s.buildings.size()));
+	/* Where it is laid, pixels of the view's picture: the parts asked (ThreeDGpuStanding::parts), else all the block. */
+	std::vector<std::array<int, 4>> clips;
+	if (s.parts.empty()) {
+		clips.push_back({s.view_x, s.view_y, s.width, s.height});
+	} else {
+		for (const std::array<int, 4> &p : s.parts) {
+			const int x0 = std::max(0, p[0]), y0 = std::max(0, p[1]), x1 = std::min(s.width, p[0] + p[2]), y1 = std::min(s.height, p[1] + p[3]);
+			if (x1 > x0 && y1 > y0) clips.push_back({s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0});
+		}
+	}
+	Step(fmt::format("co stoji na plose {}x{} v {} kusech: {} obrazku, {} budov", s.width, s.height, clips.size(), s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
 	gl.glDrawBuffers(2, colour_and_lit);
@@ -3919,10 +3929,51 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glDisable(GL_CULL_FACE);
 	gl.glDisable(GL_BLEND);
 	gl.glViewport(0, 0, s.view_w, s.view_h);
-	gl.glScissor(s.view_x, s.view_y, s.width, s.height);
 	gl.glEnable(GL_SCISSOR_TEST);
 	gl.glClearColor(0, 0, 0, 0);
-	ClearInScissor(GL_COLOR_BUFFER_BIT, s.view_x, s.view_y, s.width, s.height, 0.0f);
+	for (const std::array<int, 4> &c : clips) {
+		gl.glScissor(c[0], c[1], c[2], c[3]);
+		ClearInScissor(GL_COLOR_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
+	}
+	/* The part being laid: everything that reaches into it laid there, cut to it, each part in turn. */
+	std::array<int, 4> clip = clips.empty() ? std::array<int, 4>{s.view_x, s.view_y, 0, 0} : clips.front();
+	auto reaches = [&](const std::array<int, 4> &c, const std::array<int, 4> &r) {
+		return r[2] > c[0] && r[0] < c[0] + c[2] && r[3] > c[1] && r[1] < c[1] + c[3];
+	};
+	/* Where each thing reaches (left, top, right, bottom, pixels of the view's picture; one it cannot tell of all the
+	 * block), and whether into a part at all: one that does not, not drawn, not even put on the card. */
+	std::vector<std::array<int, 4>> reach(s.items.size());
+	std::vector<uint8_t> in_some(s.items.size(), 0);
+	for (size_t k = 0; k < s.items.size(); k++) {
+		const ThreeDGpuStandingItem &item = s.items[k];
+		std::array<int, 4> r{s.view_x, s.view_y, s.view_x + s.width, s.view_y + s.height};
+		if (item.faces >= 0) {
+			if (static_cast<size_t>(item.faces) < s.faces.size()) {
+				const std::vector<float> &c = s.faces[item.faces].corners;
+				float x0 = FLT_MAX, y0 = FLT_MAX, x1 = -FLT_MAX, y1 = -FLT_MAX;
+				for (size_t i = 0; i + 3 < c.size(); i += 4) {
+					x0 = std::min(x0, c[i]);
+					x1 = std::max(x1, c[i]);
+					y0 = std::min(y0, c[i + 1]);
+					y1 = std::max(y1, c[i + 1]);
+				}
+				if (x1 >= x0) r = {s.view_x + static_cast<int>(std::floor(x0)) - 1, s.view_y + static_cast<int>(std::floor(y0)) - 1, s.view_x + static_cast<int>(std::ceil(x1)) + 1, s.view_y + static_cast<int>(std::ceil(y1)) + 1};
+			}
+		} else if (item.vehicle != nullptr) {
+			const int times = 1 << std::clamp(item.up, 0, 3);
+			r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.vehicle->width * times, s.view_y + item.y + item.vehicle->height * times};
+		} else if (item.building >= 0) {
+			if (static_cast<size_t>(item.building) < s.buildings.size()) {
+				/* Its rectangle (and its figures', its lit glass's): what its depth is cleared over. */
+				const ThreeDGpuStandingBuilding &b = s.buildings[item.building];
+				r = {s.view_x + b.clear_x, s.view_y + b.clear_y, s.view_x + b.clear_x + b.clear_w, s.view_y + b.clear_y + b.clear_h};
+			}
+		} else if (item.picture != nullptr) {
+			r = {s.view_x + item.x, s.view_y + item.y, s.view_x + item.x + item.picture->width, s.view_y + item.y + item.picture->height};
+		}
+		reach[k] = r;
+		in_some[k] = std::ranges::any_of(clips, [&](const std::array<int, 4> &c) { return reaches(c, r); }) ? 1 : 0;
+	}
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 	gl.glDepthFunc(GL_GEQUAL);
@@ -3993,12 +4044,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			textures.push_back(g != nullptr ? g->name : 0);
 		}
 		if (b.clear) {
-			const int x0 = std::max(0, b.clear_x), y0 = std::max(0, b.clear_y);
-			const int x1 = std::min(s.width, b.clear_x + b.clear_w), y1 = std::min(s.height, b.clear_y + b.clear_h);
+			const int x0 = std::max(clip[0], s.view_x + b.clear_x), y0 = std::max(clip[1], s.view_y + b.clear_y);
+			const int x1 = std::min(clip[0] + clip[2], s.view_x + b.clear_x + b.clear_w), y1 = std::min(clip[1] + clip[3], s.view_y + b.clear_y + b.clear_h);
 			if (x1 > x0 && y1 > y0) {
-				gl.glScissor(s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0);
-				ClearInScissor(GL_DEPTH_BUFFER_BIT, s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0, 0.0f);
-				gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+				gl.glScissor(x0, y0, x1 - x0, y1 - y0);
+				ClearInScissor(GL_DEPTH_BUFFER_BIT, x0, y0, x1 - x0, y1 - y0, 0.0f);
+				gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
 			}
 		}
 		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
@@ -4028,12 +4079,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				y0 = std::min(y0, py);
 				y1 = std::max(y1, py);
 			}
-			if (!behind && (x1 < s.view_x - 1 || x0 > s.view_x + s.width + 1 || y1 < s.view_y - 1 || y0 > s.view_y + s.height + 1)) {
+			if (!behind && (x1 < clip[0] - 1 || x0 > clip[0] + clip[2] + 1 || y1 < clip[1] - 1 || y0 > clip[1] + clip[3] + 1)) {
 				cell_in[c] = 0;
 				all_cells = false;
 			}
 		}
-		/* None of it in the block: its depth cleared all the same (what stands on it is laid in it), nothing drawn. */
+		/* None of it in the part: its depth cleared all the same (what stands on it is laid in it), nothing drawn. */
 		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
 		gl.glUseProgram(bp.program);
@@ -4122,7 +4173,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		const int frame_w = std::min(_max_target, THREE_D_GPU_VEHICLE_FRAME);
 		int x = 0, y = 0, row = 0;
 		for (size_t k = from; k < s.items.size(); k++) {
-			if (s.items[k].vehicle == nullptr || vehicle_at[k][0] != -1) continue;
+			if (s.items[k].vehicle == nullptr || vehicle_at[k][0] != -1 || in_some[k] == 0) continue;
 			/* Kept already, or drawn in this one before: laid from that. */
 			const uint64_t key = s.items[k].vehicle->key | STANDING_VEHICLE_KEY;
 			if (_standing_places.contains(key) || !keys.insert(key).second) continue;
@@ -4165,7 +4216,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDrawBuffers(2, colour_and_lit);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
-		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
 		gl.glDisable(GL_DEPTH_TEST);
 		gl.glDisable(GL_CULL_FACE);
 		gl.glFrontFace(GL_CCW);
@@ -4217,7 +4268,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDrawBuffers(2, colour_and_lit);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
-		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
+		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
 		gl.glEnable(GL_BLEND);
 		gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
 		_standing_places[key] = place;
@@ -4257,92 +4308,99 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		return true;
 	};
 	bool all = true;
-	for (size_t k = 0; k < s.items.size(); k++) {
-		const ThreeDGpuStandingItem &item = s.items[k];
-		if (item.faces >= 0) {
-			flush();
-			if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces])) {
-				_gpu_standing_failed[0]++;
+	for (const std::array<int, 4> &part : clips) {
+		clip = part;
+		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
+		for (size_t k = 0; k < s.items.size(); k++) {
+			const ThreeDGpuStandingItem &item = s.items[k];
+			if (in_some[k] == 0 || !reaches(clip, reach[k])) continue;
+			if (item.faces >= 0) {
+				flush();
+				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces])) {
+					_gpu_standing_failed[0]++;
+					if (_gpu_standing_failed_told < 40) {
+						_gpu_standing_failed_told++;
+						const ThreeDGpuStandingFaces *f = static_cast<size_t>(item.faces) < s.faces.size() ? &s.faces[item.faces] : nullptr;
+						Diary(fmt::format("krabice plochy procesorem: program {}, obrazek {}x{}, atlas {}", _standing_faces_ok ? "ano" : "ne",
+								f != nullptr && f->texture != nullptr ? f->texture->width : 0, f != nullptr && f->texture != nullptr ? f->texture->height : 0, _standing_atlas_size), true);
+					}
+					all = false;
+					break;
+				}
+				use_pictures();
+				drawing = 0;
+				continue;
+			}
+			if (item.vehicle != nullptr) {
+				if (!_standing_shrink_ok) continue;
+				/* Laid as a picture kept by its key: drawn and shrunk into them first, unless it is there. */
+				const ThreeDGpuStandingVehicle &v = *item.vehicle;
+				const uint64_t key = v.key | STANDING_VEHICLE_KEY;
+				std::array<int, 2> place;
+				auto kept = _standing_places.find(key);
+				if (kept != _standing_places.end()) {
+					place = kept->second;
+					_gpu_standing_vehicles_kept++;
+				} else {
+					flush();
+					if (vehicle_at[k][0] == -1) draw_vehicles(k);
+					const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
+					use_pictures();
+					drawing = 0;
+					if (!shrunk) continue;
+				}
+				/* Among the triangles of the building before it (a figure on it) where it is nearer, as a picture is. */
+				const bool depth = item.depth >= 0;
+				if (_standing_atlas != drawing || depth != in_depth) {
+					flush();
+					drawing = _standing_atlas;
+					in_depth = depth;
+				}
+				const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
+				const float times = static_cast<float>(1 << std::clamp(item.up, 0, 3));
+				const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w * times, y1 = y0 + h * times;
+				const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
+				const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
+				corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
+				continue;
+			}
+			if (item.building >= 0) {
+				flush();
+				if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
+					_gpu_standing_failed[building_failed == 2 ? 2 : 1]++;
+					all = false;
+					break;
+				}
+				use_pictures();
+				drawing = 0;
+				continue;
+			}
+			if (item.picture == nullptr) continue;
+			GLuint texture = 0;
+			std::array<int, 2> place;
+			if (!StandingPlace(item, texture, place, flush)) {
+				_gpu_standing_failed[3]++;
 				if (_gpu_standing_failed_told < 40) {
 					_gpu_standing_failed_told++;
-					const ThreeDGpuStandingFaces *f = static_cast<size_t>(item.faces) < s.faces.size() ? &s.faces[item.faces] : nullptr;
-					Diary(fmt::format("krabice plochy procesorem: program {}, obrazek {}x{}, atlas {}", _standing_faces_ok ? "ano" : "ne",
-							f != nullptr && f->texture != nullptr ? f->texture->width : 0, f != nullptr && f->texture != nullptr ? f->texture->height : 0, _standing_atlas_size), true);
+					Diary(fmt::format("obrazek plochy procesorem: {}x{}, pixelu {}, atlas {}", item.picture->width, item.picture->height, item.picture->pixels.size(), _standing_atlas_size), true);
 				}
 				all = false;
 				break;
 			}
-			use_pictures();
-			drawing = 0;
-			continue;
-		}
-		if (item.vehicle != nullptr) {
-			if (!_standing_shrink_ok) continue;
-			/* Laid as a picture kept by its key: drawn and shrunk into them first, unless it is there. */
-			const ThreeDGpuStandingVehicle &v = *item.vehicle;
-			const uint64_t key = v.key | STANDING_VEHICLE_KEY;
-			std::array<int, 2> place;
-			auto kept = _standing_places.find(key);
-			if (kept != _standing_places.end()) {
-				place = kept->second;
-				_gpu_standing_vehicles_kept++;
-			} else {
-				flush();
-				if (vehicle_at[k][0] == -1) draw_vehicles(k);
-				const bool shrunk = vehicle_at[k][0] >= 0 && shrink_vehicle(v, vehicle_at[k], key, place);
-				use_pictures();
-				drawing = 0;
-				if (!shrunk) continue;
-			}
-			/* Among the triangles of the building before it (a figure on it) where it is nearer, as a picture is. */
 			const bool depth = item.depth >= 0;
-			if (_standing_atlas != drawing || depth != in_depth) {
+			if (texture != drawing || depth != in_depth) {
 				flush();
-				drawing = _standing_atlas;
+				drawing = texture;
 				in_depth = depth;
 			}
-			const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
-			const float times = static_cast<float>(1 << std::clamp(item.up, 0, 3));
-			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w * times, y1 = y0 + h * times;
+			const float w = static_cast<float>(item.picture->width), h = static_cast<float>(item.picture->height);
+			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
 			const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
 			const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
 			corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
-			continue;
 		}
-		if (item.building >= 0) {
-			flush();
-			if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
-				_gpu_standing_failed[building_failed == 2 ? 2 : 1]++;
-				all = false;
-				break;
-			}
-			use_pictures();
-			drawing = 0;
-			continue;
-		}
-		if (item.picture == nullptr) continue;
-		GLuint texture = 0;
-		std::array<int, 2> place;
-		if (!StandingPlace(item, texture, place, flush)) {
-			_gpu_standing_failed[3]++;
-			if (_gpu_standing_failed_told < 40) {
-				_gpu_standing_failed_told++;
-				Diary(fmt::format("obrazek plochy procesorem: {}x{}, pixelu {}, atlas {}", item.picture->width, item.picture->height, item.picture->pixels.size(), _standing_atlas_size), true);
-			}
-			all = false;
-			break;
-		}
-		const bool depth = item.depth >= 0;
-		if (texture != drawing || depth != in_depth) {
-			flush();
-			drawing = texture;
-			in_depth = depth;
-		}
-		const float w = static_cast<float>(item.picture->width), h = static_cast<float>(item.picture->height);
-		const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
-		const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-		const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
-		corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
+		flush();
+		if (!all) break;
 	}
 	flush();
 	gl.glBindVertexArray(0);
@@ -4350,8 +4408,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glDisable(GL_BLEND);
 	gl.glDisable(GL_DEPTH_TEST);
 	if (!all) {
-		gl.glScissor(s.view_x, s.view_y, s.width, s.height);
-		ClearInScissor(GL_COLOR_BUFFER_BIT, s.view_x, s.view_y, s.width, s.height, 0.0f);
+		for (const std::array<int, 4> &c : clips) {
+			gl.glScissor(c[0], c[1], c[2], c[3]);
+			ClearInScissor(GL_COLOR_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
+		}
 	}
 	gl.glDisable(GL_SCISSOR_TEST);
 	/* At night which of its pixels are lit, for the glows by them. */

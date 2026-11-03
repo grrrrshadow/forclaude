@@ -79,6 +79,7 @@
 #include "gfx_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_tick.h"
+#include "timer/timer_window.h"
 #include "company_func.h"
 #include "signal_func.h"
 #include "pbs.h"
@@ -5409,6 +5410,14 @@ static std::vector<std::pair<int, std::string>> _testza_queue;
 std::string _rig_screen_picture; ///< into this .ppm, empty none
 int _rig_screen_paints = 0;      ///< after so many paints
 bool _rig_screen_quit = false;   ///< and the game ended after it
+/** A command run once the picture is taken ('obrazovka ... potom <command>'): by the clock of the windows, the game paused too. */
+static std::string _rig_screen_then;
+static const IntervalTimer<TimerWindow> _rig_screen_then_timer(std::chrono::milliseconds(30), [](auto) {
+	if (_rig_screen_then.empty() || !_rig_screen_picture.empty()) return;
+	const std::string cmd = std::move(_rig_screen_then);
+	_rig_screen_then.clear();
+	IConsoleCmdExec(cmd);
+});
 
 static bool ConTestAfter(std::span<std::string_view> argv)
 {
@@ -10115,11 +10124,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 	} else if (what == "obrazovka" && argv.size() > 2) {
 		/* 'obrazovka <name> [paints] [konec]': the screen as the video driver shows it (with what it shows straight from
 		 * the card) into <name>.ppm in the working folder, after so many paints of it (10); the game ended after it with
-		 * "konec". */
+		 * "konec"; "potom <command...>" run once it is taken (the game paused, the picture compared with another). */
 		_rig_screen_picture = std::string(argv[2]);
 		_rig_screen_paints = 10;
 		_rig_screen_quit = false;
+		_rig_screen_then.clear();
 		for (size_t i = 3; i < argv.size(); i++) {
+			if (argv[i] == "potom") {
+				for (size_t k = i + 1; k < argv.size(); k++) {
+					if (!_rig_screen_then.empty()) _rig_screen_then += ' ';
+					_rig_screen_then += argv[k];
+				}
+				break;
+			}
 			if (argv[i] == "konec") {
 				_rig_screen_quit = true;
 			} else if (auto n = ParseInteger(argv[i]); n.has_value()) {
