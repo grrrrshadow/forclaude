@@ -31,6 +31,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (96) – #324: přetečení zásobníku z očí (10:30), crash log jen s jedním rámcem
+
+- Crash log `crash20261103103015`: `EXCEPTION_STACK_OVERFLOW`, z očí (deník: 30–50 snímků/s, paměť 3,6 GB, tedy
+  ne paměť), zásobník jen `ntdll.dll +189D0`. Oprava #279 zafungovala (crash log vznikl), ale procházení
+  zásobníku bralo meze z vlákna, na kterém běží (`NtCurrentTeb()`) – přetečení se teď zpracovává na vlastním
+  vlákně, takže se chůze zastavila hned po prvním rámci.
+- Teď: meze zásobníku podle adresy pádu (`StackBoundsOf()`, `VirtualQuery`). U přetečení (nebo když chůze dá
+  méně než 4 rámce) se navíc zásobník přečte přímo (`SurveyStackByScan()`): návratové adresy do kódu hry
+  (před nimi instrukce `call`), prvních 48 odshora a 12 nejčastějších s počtem – rekurze se v nich ukáže.
+  Adresy jako `openttd.exe +RVA`, dohledat v symbolech buildu (`symbols-windows-x64-runNNN`).
+- Příčina přetečení zatím neznámá; čeká na další crash log s novým buildem.
+
 ## 3. 11. (95) – #324: noc na mapě kartou najednou; pád = paměť
 
 Hráč: „pokračuj gpu“, logy #324 (snimky.log, 3d_karta.log, crash.txt, session.txt).

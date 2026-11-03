@@ -166,13 +166,38 @@ static const uint MAX_UNWOUND_FRAMES = 64;
  * @param start the context of the crash
  * @param survey the list the frames are added to
  */
+/**
+ * The stack an address lies on: the reservation it is in, from its low end to its high end (VirtualQuery()). Not this
+ * thread's stack (NtCurrentTeb()): a stack overflow is handled on a thread of its own (StackOverflowHandler()) -- the
+ * crash log of #324 (3 November, 10:30) had then only the first frame, the walk stopping at once as the
+ * crashed stack was not the one it looked in.
+ * @param sp an address on the stack
+ * @param[out] low,high its bounds
+ * @return whether there is such a stack
+ */
+static bool StackBoundsOf(DWORD64 sp, DWORD64 &low, DWORD64 &high)
+{
+	MEMORY_BASIC_INFORMATION mbi;
+	if (VirtualQuery(reinterpret_cast<LPCVOID>(sp), &mbi, sizeof(mbi)) == 0 || mbi.State != MEM_COMMIT) return false;
+	low = reinterpret_cast<DWORD64>(mbi.AllocationBase);
+	high = reinterpret_cast<DWORD64>(mbi.BaseAddress) + mbi.RegionSize;
+	/* The regions above it of the same reservation, committed: the rest of the stack up to its base. */
+	for (int i = 0; i < 64; i++) {
+		if (VirtualQuery(reinterpret_cast<LPCVOID>(high), &mbi, sizeof(mbi)) == 0 || reinterpret_cast<DWORD64>(mbi.AllocationBase) != low || mbi.State != MEM_COMMIT) break;
+		high = reinterpret_cast<DWORD64>(mbi.BaseAddress) + mbi.RegionSize;
+	}
+	return high > sp;
+}
+
 static void SurveyStackByUnwindTables(const CONTEXT &start, nlohmann::json &survey)
 {
 #if defined(_M_AMD64) || defined(__x86_64__)
-	/* The crash is handled on the thread that crashed, so its stack is this thread's. */
-	const NT_TIB *tib = reinterpret_cast<const NT_TIB *>(NtCurrentTeb());
-	const DWORD64 stack_low = reinterpret_cast<DWORD64>(tib->StackLimit);
-	const DWORD64 stack_high = reinterpret_cast<DWORD64>(tib->StackBase);
+	/* The stack the crash happened on (StackBoundsOf()): of the thread that crashed, whichever thread handles it. */
+	DWORD64 stack_low = 0, stack_high = 0;
+	if (!StackBoundsOf(start.Rsp, stack_low, stack_high)) {
+		survey.push_back(DescribeCodeAddress(static_cast<uintptr_t>(start.Rip)));
+		return;
+	}
 
 	CONTEXT ctx = start;
 	for (uint num = 0; num < MAX_UNWOUND_FRAMES && ctx.Rip != 0; num++) {
@@ -195,6 +220,78 @@ static void SurveyStackByUnwindTables(const CONTEXT &start, nlohmann::json &surv
 		/* Each caller's frame lies above its callee's; a stack that says otherwise cannot be walked further. */
 		if (ctx.Rsp <= rsp) break;
 	}
+#else
+	(void)start;
+	(void)survey;
+#endif
+}
+
+/** How many return addresses the scan of the stack lists from its top (SurveyStackByScan()), and how many of the most frequent. */
+static const uint MAX_SCANNED_FRAMES = 48;
+static const uint MAX_FREQUENT_FRAMES = 12;
+
+/**
+ * Whether the bytes before an address of the game's code are a call: then the address is a return address (on the
+ * stack, a frame of the walk), not just a number that happens to point into the code.
+ * @param code_low,code_high the game's code
+ * @param at the address
+ */
+static bool AfterCall(uintptr_t code_low, uintptr_t code_high, uintptr_t at)
+{
+	if (at < code_low + 7 || at >= code_high) return false;
+	const uint8_t *b = reinterpret_cast<const uint8_t *>(at);
+	if (b[-5] == 0xE8) return true; // call rel32
+	/* call r/m64: FF /2, with its operand 1 to 6 bytes after the ModRM byte. */
+	for (int len = 2; len <= 7; len++) {
+		if (b[-len] == 0xFF && ((b[-len + 1] >> 3) & 7) == 2) return true;
+	}
+	return false;
+}
+
+/**
+ * The return addresses into the game found on the stack of the crash, read straight from it: for a stack overflow,
+ * whose frames the unwind tables do not get through under Wine (the crash logs of #323 and #324: one frame, in ntdll).
+ * The first ones from the top of the stack in their order, then the most frequent -- a recursion repeats its own.
+ * Each as the module and the offset into it (DescribeCodeAddress()), the offset looked up in the build's symbols.
+ * @param start the context of the crash
+ * @param survey the list the lines are added to
+ */
+static void SurveyStackByScan(const CONTEXT &start, nlohmann::json &survey)
+{
+#if defined(_M_AMD64) || defined(__x86_64__)
+	DWORD64 low = 0, high = 0;
+	if (!StackBoundsOf(start.Rsp, low, high)) return;
+	/* The game's code: the sections of its image that are executable. */
+	const uintptr_t base = reinterpret_cast<uintptr_t>(GetModuleHandle(nullptr));
+	const IMAGE_DOS_HEADER *dos = reinterpret_cast<const IMAGE_DOS_HEADER *>(base);
+	const IMAGE_NT_HEADERS *nt = reinterpret_cast<const IMAGE_NT_HEADERS *>(base + dos->e_lfanew);
+	uintptr_t code_low = UINTPTR_MAX, code_high = 0;
+	const IMAGE_SECTION_HEADER *section = IMAGE_FIRST_SECTION(nt);
+	for (WORD i = 0; i < nt->FileHeader.NumberOfSections; i++, section++) {
+		if ((section->Characteristics & IMAGE_SCN_MEM_EXECUTE) == 0) continue;
+		code_low = std::min<uintptr_t>(code_low, base + section->VirtualAddress);
+		code_high = std::max<uintptr_t>(code_high, base + section->VirtualAddress + section->Misc.VirtualSize);
+	}
+	if (code_high <= code_low) return;
+
+	std::vector<uintptr_t> found;
+	std::map<uintptr_t, uint> count;
+	for (DWORD64 at = start.Rsp & ~DWORD64{7}; at + 8 <= high; at += 8) {
+		const uintptr_t value = static_cast<uintptr_t>(*reinterpret_cast<const DWORD64 *>(at));
+		if (!AfterCall(code_low, code_high, value)) continue;
+		if (found.size() < MAX_SCANNED_FRAMES) found.push_back(value);
+		count[value]++;
+	}
+	uint total = 0;
+	for (const auto &[address, n] : count) total += n;
+	survey.push_back(fmt::format("-- stack read: {} KB from the crash up, {} return addresses into the game, the first {}:", (high - start.Rsp) / 1024, total, found.size()));
+	for (uintptr_t address : found) survey.push_back(DescribeCodeAddress(address));
+	std::vector<std::pair<uint, uintptr_t>> frequent;
+	for (const auto &[address, n] : count) frequent.emplace_back(n, address);
+	std::sort(frequent.begin(), frequent.end(), std::greater<>());
+	if (frequent.size() > MAX_FREQUENT_FRAMES) frequent.resize(MAX_FREQUENT_FRAMES);
+	survey.push_back("-- the most frequent:");
+	for (const auto &[n, address] : frequent) survey.push_back(fmt::format("{} x{}", DescribeCodeAddress(address), n));
 #else
 	(void)start;
 	(void)survey;
@@ -463,6 +560,8 @@ static const uint MAX_FRAMES     = 64;
 
 	/* Nothing from dbghelp (under Wine): the unwind tables still know. */
 	if (survey.empty()) SurveyStackByUnwindTables(*ep->ContextRecord, survey);
+	/* A stack overflow, or a walk that got nowhere: what is on the stack, read straight from it. */
+	if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW || survey.size() < 4) SurveyStackByScan(*ep->ContextRecord, survey);
 }
 #else
 /* virtual */ void CrashLogWindows::SurveyStacktrace(nlohmann::json &survey) const
@@ -470,6 +569,7 @@ static const uint MAX_FRAMES     = 64;
 	/* No dbghelp walk with this compiler; the unwind tables still know. */
 	survey = nlohmann::json::array();
 	SurveyStackByUnwindTables(*ep->ContextRecord, survey);
+	if (ep->ExceptionRecord->ExceptionCode == EXCEPTION_STACK_OVERFLOW || survey.size() < 4) SurveyStackByScan(*ep->ContextRecord, survey);
 }
 #endif /* _MSC_VER */
 
