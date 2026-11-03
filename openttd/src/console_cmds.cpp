@@ -10236,6 +10236,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _turned_card_dirty_on;
 		_turned_card_dirty_on = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: stojici naraz {}", _turned_card_dirty_on ? "ano" : "ne");
+	} else if (what == "male" && argv.size() > 2 && argv[2] == "naraz") {
+		/* 'male naraz [0|1]': what changed in the small views the card draws laid by it at once, their moves by the card
+		 * (1; TurnedCardLayDirty()), or block by block and strip by strip as before (0). */
+		extern bool _small_card_dirty_on;
+		if (argv.size() > 3) _small_card_dirty_on = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: male naraz {}", _small_card_dirty_on ? "ano" : "ne");
 	} else if (what == "male") {
 		/* 'male [0|1]': the small views facing north (the extra viewports, the vehicle windows) drawn by the card as the
 		 * main view, each its own pictures on it (1; SmallViewOnCard), or as the game drew them (0); all drawn again. */

@@ -34,6 +34,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (104) – Okno auta zpomaluje kurzor (#325): skrytá mapa pod pohledem z očí, malá okna najednou
+
+- Hráč: *„okno auta spomalí kurzor myši. jak ty okna zavřu tak je kurzor zas normální.“* Kurzor se kreslí se
+  snímkem, takže pomalé snímky = pomalý kurzor.
+- **Deník #325 (1e239539-snimky.log), 14:25–14:29, z očí:** mapa se nekreslí (`mapa -`), ale karta každý snímek
+  znovu pokládala změny skryté hlavní mapy (`zmen naraz` = počet snímků, `plakaty` 40–89 ms na snímek, 7–12
+  snímků/s). Okno auta je špinavé každý snímek, takže se ta práce děla každý snímek i ve stoje.
+  **Oprava:** pod pohledem z očí přes celou obrazovku (`FirstPersonCoversMap()`) se změny mapy nepokládají; zůstanou
+  označené (`stood`) a položí se, až je mapa vidět. V deníku nový důvod `pod oci`.
+- **Malá okna (okno vozidla, další pohled) kartou najednou:** dřív každý blok a každý proužek, který odkryl posun okna
+  za autem, byl vlastní průchod karty se všemi domy, které do něj sahají. Teď mají malá okna totéž co hlavní pohled:
+  změny se položí jedním kusem (`TurnedCardLaySmallViewsDirty()`, `TurnedCardLayChanged()` společné s hlavním
+  pohledem), bloky jsou pak jen díry. Okno, které jede za autem, se neposouvá po proužcích: karta posune svůj obrázek
+  (`TurnedCardGroundFollow()`) a doloží jen odkryté místo. Značka „položeno v tomto průchodu“ je teď v záznamu obrázku
+  (`TurnedCardGround::laid_pass`). V deníku `v malych oknech N`.
+- Rig na kartě: `SDL_VIDEO_X11_FORCE_EGL=1` u `scena_gl3.sh`/`scena_gl_save.sh` (bez toho SDL jde přes GLX, karta
+  nesdílí obraz a vše kreslí procesor). Výpis konzole přes `script <soubor>` na prvním řádku. Hráčova hra
+  `sx_uzivatel.sav` chce `unpause`. Přepínač `test3d male naraz 0|1`.
+- Ověřeno: z očí s oknem auta `pod oci 62`, `zmen naraz 0`, okno auta jedním kusem 61× za 5 s. Okno auta jedoucí za
+  autobusem postaru a nově pixel po pixelu stejné (0 rozdílů; první studený běh se lišil jen koněm, který se načítal).
+  Na hráčově hře v rigu (llvmpipe, karta na stejném procesoru) dvě okna stáhla snímky z ~48 na ~32/s postaru i nově –
+  měření na telefonu ukáže build. MinGW: chyby jen v `console_cmds.cpp` (`FetchExactNewGRFs`, `find_index`), stejné
+  i v HEAD (kontrole chybí síťové definice). Clang 0, kouřová baterie beze změny.
+
 ## 3. 11. (103) – Pád #325: přetečení zásobníku = nekonečná rekurze GetShape u prolínaných postav
 
 - Crash log `crash20261103154951` (#325, po načtení hry): `EXCEPTION_STACK_OVERFLOW`, tentokrát s přečteným
