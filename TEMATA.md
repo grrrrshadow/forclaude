@@ -34,6 +34,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (108) – GPU: hladký asfalt z očí dělá karta
+
+- Hráč: *„jo pokračuj gpu asfalt, bude textura asfaltu jako přídavné grf třeba silnice, tohle je jen základ“*.
+- **Dřív:** procesor u každé nové nebo změněné silniční dlaždice uhladil asfalt (každý šedý pixel = průměr podobně
+  světlých šedých 7 × 7 kolem, `DrawEyeRoad()`).
+- **Teď**, když snímky z očí kreslí karta: procesor zapíše asfalt tak, jak ho hra kreslí (značka
+  `THREE_D_GPU_ROAD_SURFACE`, pixely rovných pruhů barvou asfaltu). Karta ho uhladí stejným pravidlem jednou, když
+  dostane změněný kus země (`SmoothGroundRoads()` v `three_d_gpu.cpp`: kus do malého obrázku 1024 × 1024 a zpátky do
+  textury země, žádná druhá velká textura kvůli paměti telefonu). Hladí přes hranice dlaždic, takže bez švů.
+  Bez karty (nebo `test3d gpu snimek 0`) hladí procesor jako dřív; přepnutí překreslí dlaždice.
+- Textura asfaltu z přídavného GRF (jako tráva `povrch`) se později napojí na stejné místo.
+- Rig `si7`: karta a procesor se liší v 10 pixelech (>12), jinak do 12 úrovní. MinGW, clang 0, kouřová baterie
+  beze změny.
+
 ## 3. 11. (107) – Silnice z očí: bílé pruhy jako obdélníky
 
 - Hráč (nákres na papíře): dva bílé pixely na silnici zarovnat do obdélníku, *„horni a dolni roh do prostřed“*;

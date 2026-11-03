@@ -2830,11 +2830,15 @@ static bool EyeRoadTile(int x, int y)
  * (EyeRoadMark), its pixels here the smoothed surface; another (a curve, a crossing) as its pixels are, marked
  * THREE_D_GPU_ROAD_MARK, the surface THREE_D_GPU_ROAD_SURFACE. The view from the eyes takes them between their
  * texels (CabRoadTexel(), EYE_TRI_FRAGMENT): the surface smooth, those marks' edges sharp. Its verges as they are.
+ * The surface smoothed here, or as drawn for the card to smooth it (the player, 3. 11.: "go on, GPU asphalt"; the card
+ * does it once, where the ground it has is drawn again: SmoothGroundRoads() of three_d_gpu.cpp), a straight mark's
+ * pixels then the asphalt's colour.
  * @param tile_x,tile_y the tile
  * @param base_z,slope the height of the lowest corner of its ground, and its slope (on a foundation its top's)
  * @param marks its straight marks added to it
+ * @param smooth the surface smoothed here: the processor draws (no card)
  */
-static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int tile_y, int base_z, Slope slope, std::vector<EyeRoadMark> &marks)
+static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int tile_y, int base_z, Slope slope, std::vector<EyeRoadMark> &marks, bool smooth)
 {
 	const DrawPixelInfo *d = _cur_dpi;
 	if (d == nullptr || sprites.empty()) return;
@@ -3009,8 +3013,22 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 		marks.push_back(m);
 		for (size_t p : members) mark_of[p] = static_cast<int32_t>(marks.size());
 	}
+	/* For the card: the asphalt's colour, the mean of the greys of its lightness that are no marks. */
+	uint32_t asphalt_colour = 0;
+	if (!smooth) {
+		uint64_t ar = 0, ag = 0, ab = 0, an = 0;
+		for (size_t p = 0; p < n; p++) {
+			if (light[p] < 0 || mark[p] != 0 || std::abs(light[p] - asphalt) > 40) continue;
+			const Colour c(own[p]);
+			ar += c.r;
+			ag += c.g;
+			ab += c.b;
+			an++;
+		}
+		if (an > 0) asphalt_colour = Colour(static_cast<uint8_t>(ar / an), static_cast<uint8_t>(ag / an), static_cast<uint8_t>(ab / an)).data;
+	}
 	/* Laid over what is there: a mark not straight as it is, the surface (and a straight mark's pixels) smoothed among
-	 * the greys alike; the rest as drawn. */
+	 * the greys alike, or as drawn for the card; the rest as drawn. */
 	for (int j = 0; j < th; j++) {
 		for (int i = 0; i < tw; i++) {
 			const size_t p = at(i, j);
@@ -3021,6 +3039,11 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 			}
 			if (mark_of[p] == -2) {
 				put(i, j, (own[p] & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_MARK) << 24);
+				continue;
+			}
+			if (!smooth) {
+				const uint32_t as_is = mark[p] != 0 && asphalt_colour != 0 ? asphalt_colour : own[p];
+				put(i, j, (as_is & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_SURFACE) << 24);
 				continue;
 			}
 			/* The mean of the greys about it of its lightness that are no marks (a straight mark's pixel: of the asphalt's). */
@@ -3043,6 +3066,14 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 	}
 }
 
+extern bool _eye_frame_on_card;
+
+/** Whether the card smooths the roads of the kept ground of the view from the eyes (DrawEyeRoad()): when it draws the frames. */
+static bool EyeRoadsOnCard()
+{
+	return _eye_frame_on_card && ThreeDGpuAvailable() && ThreeDGpuSmoothsRoads();
+}
+
 /** Whether the ground being drawn has our grass: from the eyes always, on the map as the player chose (gui.map_grass). */
 static bool OurGrassOn(bool eyes)
 {
@@ -3056,8 +3087,10 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	/* Our grass on the game's (DrawOurGrass()): the tiles drawn again when the player switches it, or its picture comes. */
 	const bool eyes = &g == &_eye_ground;
 	const bool grass = OurGrassOn(eyes);
-	/* The roads of the view from the eyes smooth (DrawEyeRoad()): drawn again when the player switches it. */
+	/* The roads of the view from the eyes smooth (DrawEyeRoad()): drawn again when the player switches it, or another
+	 * smooths them (the card, the processor). */
 	const bool roads = eyes && _settings_client.gui.eye_roads;
+	const bool card_roads = roads && EyeRoadsOnCard();
 	const int s = ScaleByZoom(1, g.zoom);
 	for (size_t n = 0; n < tiles.size(); n++) {
 		const TurnedTile &t = tiles[n];
@@ -3066,7 +3099,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
 		GroundHash hash;
 		hash.Mix(founded);
-		hash.Mix((grass ? 1 : 0) | (roads ? 2 : 0));
+		hash.Mix((grass ? 1 : 0) | (roads ? 2 : 0) | (card_roads ? 4 : 0));
 		if (given != nullptr) {
 			for (const TurnedGroundSprite &gs : *given) hash.Sprite(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
 		} else if (!founded) {
@@ -3215,7 +3248,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 					std::vector<EyeRoadSprite> road;
 					for (const TurnedGroundSprite &gs : rec->sprites) road.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
 					rec->road_marks.clear();
-					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks);
+					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks, !card_roads);
 					if (rec->round != INVALID_TILE) round.push_back(rec->round);
 					continue;
 				}
@@ -14662,6 +14695,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		ThreeDGpuGroundTexture &c = out.ground_card;
 		c = {};
 		c.key = EYE_GROUND_CARD_KEY;
+		c.smooth_roads = _settings_client.gui.eye_roads && EyeRoadsOnCard();
 		c.generation = g.generation;
 		c.from_generation = g.card_whole ? 0 : g.card_generation;
 		c.from_x = g.card_x;
@@ -14690,7 +14724,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
 					}
-					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks);
+					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks, true);
 					continue;
 				}
 				for (size_t i = t.first; i < t.end; i++) {

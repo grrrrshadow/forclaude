@@ -415,6 +415,7 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glUniform3f, (GLint location, GLfloat x, GLfloat y, GLfloat z)) \
 	X(void, glUniform4f, (GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)) \
 	X(void, glUniform1i, (GLint location, GLint v)) \
+	X(void, glUniform2i, (GLint location, GLint x, GLint y)) \
 	X(void, glUniform1f, (GLint location, GLfloat v))
 
 /** The functions of OpenGL, of the card's context (only its thread calls them). */
@@ -638,6 +639,11 @@ GLuint _ground_atlas = 0;
 int _ground_atlas_size = 0, _ground_shelf_x = 0, _ground_shelf_y = 0, _ground_shelf_h = 0;
 GLuint _gfbo = 0, _g_colour_rb = 0;
 GLuint _g_move_fbo[2] = {0, 0}; ///< the kept picture of the ground moved on the card (GroundTextureOf()): from, to
+/* The roads of the ground of the view from the eyes smoothed on the card (SmoothGroundRoads()). */
+static constexpr int ROAD_SMOOTH_PIECE = 1024; ///< the rect smoothed by pieces so big at most
+GpuProgram _road_smooth_program;
+GLuint _road_smooth_vao = 0, _road_smooth_fbo = 0, _road_smooth_piece = 0;
+std::atomic<int> _road_smooth_state = 0; ///< 0 not tried, 1 ready, -1 the card cannot (read by the game's thread too)
 int _gfbo_w = 0, _gfbo_h = 0;
 GLuint _ground_vao = 0, _ground_vbo = 0;
 bool _ground_program_ok = false;
@@ -2531,6 +2537,10 @@ void EndCard()
 		if (_eye_fbo != 0) gl.glDeleteFramebuffers(1, &_eye_fbo);
 		if (_gfbo != 0) gl.glDeleteFramebuffers(1, &_gfbo);
 		if (_g_move_fbo[0] != 0) gl.glDeleteFramebuffers(2, _g_move_fbo);
+		if (_road_smooth_fbo != 0) gl.glDeleteFramebuffers(1, &_road_smooth_fbo);
+		if (_road_smooth_piece != 0) gl.glDeleteTextures(1, &_road_smooth_piece);
+		if (_road_smooth_vao != 0) gl.glDeleteVertexArrays(1, &_road_smooth_vao);
+		if (_road_smooth_program.program != 0) gl.glDeleteProgram(_road_smooth_program.program);
 		for (ViewPictures &v : _views) {
 			for (GLuint *fbo : {&v.ground_fbo, &v.ground_tmp_fbo, &v.standing_fbo}) {
 				if (*fbo != 0) gl.glDeleteFramebuffers(1, fbo);
@@ -3272,6 +3282,111 @@ GLuint NewGroundTexture(int w, int h)
 	return name;
 }
 
+/**
+ * The surface of a road of the ground of the view from the eyes smoothed (DrawEyeRoad() of viewport.cpp, the processor
+ * the same where it draws them): each of its texels (THREE_D_GPU_ROAD_SURFACE) the mean of those of it about it, seven
+ * by seven, of a near lightness (to 40) -- the dither gone, the edge of a pavement kept. Each texel of the rect, into a
+ * picture of its own, laid back; a texel beside it the rect reads as it is.
+ */
+const char *const ROAD_SMOOTH_VERTEX = R"(#version 330 core
+void main()
+{
+	gl_Position = vec4(float((gl_VertexID & 1) * 4 - 1), float((gl_VertexID & 2) * 2 - 1), 0.0, 1.0);
+}
+)";
+const char *const ROAD_SMOOTH_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_ground;
+uniform ivec2 u_at;
+layout(location = 0) out vec4 o_colour;
+float Light(vec3 c) { return floor((c.r * 77.0 + c.g * 150.0 + c.b * 29.0) / 256.0); }
+void main()
+{
+	ivec2 p = u_at + ivec2(gl_FragCoord.xy);
+	ivec2 size = textureSize(u_ground, 0);
+	vec4 t = texelFetch(u_ground, p, 0);
+	if (int(t.a * 255.0 + 0.5) != 253) {
+		o_colour = t;
+		return;
+	}
+	float l = Light(floor(t.rgb * 255.0 + 0.5));
+	vec3 sum = vec3(0.0);
+	float n = 0.0;
+	for (int dy = -3; dy <= 3; dy++) {
+		for (int dx = -3; dx <= 3; dx++) {
+			ivec2 q = p + ivec2(dx, dy);
+			if (q.x < 0 || q.y < 0 || q.x >= size.x || q.y >= size.y) continue;
+			vec4 s = texelFetch(u_ground, q, 0);
+			if (int(s.a * 255.0 + 0.5) != 253) continue;
+			vec3 c = floor(s.rgb * 255.0 + 0.5);
+			if (abs(Light(c) - l) > 40.0) continue;
+			sum += c;
+			n += 1.0;
+		}
+	}
+	o_colour = vec4(floor(sum / max(n, 1.0)) / 255.0, t.a);
+}
+)";
+
+/** The roads' surface of a rect of a texture of the ground smoothed on the card (ROAD_SMOOTH_FRAGMENT). */
+void SmoothGroundRoads(const GroundTextureOnCard &g, int x, int y, int w, int h)
+{
+	if (_road_smooth_state == 0) {
+		std::string why;
+		if (!MakeProgram(_road_smooth_program, ROAD_SMOOTH_VERTEX, ROAD_SMOOTH_FRAGMENT, why)) {
+			Debug(misc, 0, "[3d] karta: hladky asfalt z oci nejde ({}), hladi ho procesor", why);
+			_road_smooth_state = -1;
+			return;
+		}
+		gl.glGenVertexArrays(1, &_road_smooth_vao);
+		gl.glGenFramebuffers(1, &_road_smooth_fbo);
+		_road_smooth_piece = NewGroundTexture(ROAD_SMOOTH_PIECE, ROAD_SMOOTH_PIECE);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		_road_smooth_state = 1;
+	}
+	if (_road_smooth_state < 0) return;
+	x = std::max(0, x);
+	y = std::max(0, y);
+	w = std::min(w, g.w - x);
+	h = std::min(h, g.h - y);
+	if (w <= 0 || h <= 0) return;
+	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
+	gl.glDisable(GL_SCISSOR_TEST);
+	gl.glDisable(GL_DEPTH_TEST);
+	gl.glDisable(GL_BLEND);
+	gl.glUseProgram(_road_smooth_program.program);
+	gl.glUniform1i(gl.glGetUniformLocation(_road_smooth_program.program, "u_ground"), 0);
+	const GLint at = gl.glGetUniformLocation(_road_smooth_program.program, "u_at");
+	gl.glBindVertexArray(_road_smooth_vao);
+	for (int py = y; py < y + h; py += ROAD_SMOOTH_PIECE) {
+		for (int px = x; px < x + w; px += ROAD_SMOOTH_PIECE) {
+			const int pw = std::min(ROAD_SMOOTH_PIECE, x + w - px), ph = std::min(ROAD_SMOOTH_PIECE, y + h - py);
+			/* Into the piece's picture, the texture read as it is. */
+			gl.glBindFramebuffer(GL_FRAMEBUFFER, _road_smooth_fbo);
+			gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _road_smooth_piece, 0);
+			gl.glDrawBuffers(1, colour_only);
+			gl.glViewport(0, 0, pw, ph);
+			gl.glActiveTexture(GL_TEXTURE0);
+			gl.glBindTexture(GL_TEXTURE_2D, g.name);
+			gl.glUniform2i(at, px, py);
+			gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+			gl.glBindTexture(GL_TEXTURE_2D, 0);
+			/* Laid back into the texture. */
+			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, _road_smooth_fbo);
+			gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
+			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, _g_move_fbo[1]);
+			gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g.name, 0);
+			gl.glDrawBuffers(1, colour_only);
+			gl.glBlitFramebuffer(0, 0, pw, ph, px, py, px + pw, py + ph, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+			gl.glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+			gl.glBindFramebuffer(GL_FRAMEBUFFER, _road_smooth_fbo);
+			gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+		}
+	}
+	gl.glBindVertexArray(0);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	gl.glUseProgram(0);
+}
+
 /** A big texture of the ground on the card as it is now: sent whole the first time and in another generation, else only its rects drawn again. */
 const GroundTextureOnCard *GroundTextureOf(const ThreeDGpuGroundTexture &t)
 {
@@ -3322,10 +3437,19 @@ const GroundTextureOnCard *GroundTextureOf(const ThreeDGpuGroundTexture &t)
 	if (g.generation != t.generation) {
 		SendGroundRect(t, 0, 0, t.width, t.height, 0, 0);
 		g.generation = t.generation;
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		if (t.smooth_roads) SmoothGroundRoads(g, 0, 0, t.width, t.height);
 	} else {
 		for (const auto &[x, y, w, h] : t.changed) {
 			if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > t.width || y + h > t.height) continue;
 			SendGroundRect(t, x, y, w, h, 0, 0);
+		}
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
+		if (t.smooth_roads) {
+			for (const auto &[x, y, w, h] : t.changed) {
+				if (x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > t.width || y + h > t.height) continue;
+				SmoothGroundRoads(g, x, y, w, h);
+			}
 		}
 	}
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -5453,6 +5577,12 @@ bool ThreeDGpuReady()
 	return _gpu_state == GpuState::Ready;
 }
 
+/** Whether the card smooths the roads of the ground of the view from the eyes (SmoothGroundRoads()): not when it was found it cannot. */
+bool ThreeDGpuSmoothsRoads()
+{
+	return _road_smooth_state >= 0;
+}
+
 /**
  * Whether the card draws the 3D pictures: the first time asked its thread is started, not waited for -- till its
  * context is made and its programs compiled the processor draws (cota PRO-HRU.md section 7: the first frame of the
@@ -5807,6 +5937,7 @@ std::string ThreeDGpuTimes()
 #else /* no card */
 
 bool ThreeDGpuAvailable(bool) { return false; }
+bool ThreeDGpuSmoothsRoads() { return false; }
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &) { return false; }
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &) { return false; }
 void ThreeDGpuVideoContext(void *, void *, bool) {}

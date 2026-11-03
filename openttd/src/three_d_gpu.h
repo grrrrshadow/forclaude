@@ -156,6 +156,7 @@ struct ThreeDGpuGroundTexture {
 	int width = 0, height = 0;
 	const uint32_t *pixels = nullptr; ///< Colour::data, top row first, width a row
 	bool atlas = false;               ///< a small one, kept among others in one texture on the card (a tile's)
+	bool smooth_roads = false;        ///< its roads' surface as the game draws it (THREE_D_GPU_ROAD_SURFACE): smoothed by the card where sent (DrawEyeRoad() of viewport.cpp)
 	std::vector<std::array<int, 4>> changed; ///< x, y, w, h drawn again since the card last had it (or since from_generation)
 };
 
@@ -457,6 +458,8 @@ struct ThreeDGpuStanding {
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
+/** Whether the card smooths the roads of the ground of the view from the eyes (ThreeDGpuGroundTexture::smooth_roads): not when found it cannot. */
+bool ThreeDGpuSmoothsRoads();
 bool ThreeDGpuReady();
 void ThreeDGpuCheckLastRun();
 bool ThreeDGpuRender(std::span<ThreeDGpuPicture *const> pics);
