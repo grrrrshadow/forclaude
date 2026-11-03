@@ -245,9 +245,13 @@ static constexpr int THREE_D_GPU_EYE_REPEAT = 2;       ///< its texture repeated
 static constexpr int THREE_D_GPU_EYE_CORNER_LIGHT = 4; ///< the light of each corner, straight across the picture between them (a thing in the hand)
 static constexpr int THREE_D_GPU_EYE_TEXEL_ALPHA = 8;  ///< see-through times its texel's alpha (a material "BLEND", CAB_TEXEL_ALPHA)
 static constexpr int THREE_D_GPU_EYE_ROAD = 16;        ///< the ground: its texels of a road (THREE_D_GPU_ROAD_SURFACE, THREE_D_GPU_ROAD_MARK) between their four, the marks' edges sharp (CAB_ROAD)
+static constexpr int THREE_D_GPU_EYE_GRASS = 32;       ///< the ground: its texels of our grass (THREE_D_GPU_GRASS) coloured from our grass's picture at the world point the pixel shows (CAB_GRASS)
 /** A texel of the ground of the view from the eyes on a road (DrawEyeRoad() of viewport.cpp), by its alpha: its surface smoothed, a white mark. */
 static constexpr uint8_t THREE_D_GPU_ROAD_SURFACE = 253;
 static constexpr uint8_t THREE_D_GPU_ROAD_MARK = 254;
+/** A texel of the ground of the view from the eyes of our grass (DrawOurGrass() of viewport.cpp), by its alpha: no colour, its
+ * red which tint of ThreeDGpuEyeFrame::grass_tint, its green its light in 128ths (the game's grass on that slope). */
+static constexpr uint8_t THREE_D_GPU_GRASS = 252;
 
 /** Triangles of the eye's frame of one texture, in the order they are drawn: corners first to first + count. */
 struct ThreeDGpuEyeRun {
@@ -348,6 +352,12 @@ struct ThreeDGpuEyeFrame {
 	std::vector<ThreeDGpuEyeCorner> corners;
 	std::vector<ThreeDGpuEyeRun> runs;
 	std::vector<ThreeDGpuEyeStep> steps;
+	/** Our grass of the ground's texels of it (THREE_D_GPU_EYE_GRASS): its picture (one of textures, -1 none), over how many
+	 * world units it runs each way, the eye's x and y within such a run, each kind's tint (red, green, blue of each). */
+	int grass_texture = -1;
+	float grass_units = 0;
+	std::array<float, 2> grass_eye{};
+	std::array<float, 15> grass_tint{};
 	bool show = false;               ///< to be shown straight from the card (ThreeDGpuShows()): no pixels read back
 	std::vector<uint32_t> pixels;    ///< what comes: the colours (Colour::data), top row first; or
 	uint32_t shown = 0;              ///< the texture of the video driver's OpenGL it is in, top row first (shown)

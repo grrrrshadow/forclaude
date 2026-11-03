@@ -1258,6 +1258,12 @@ void main()
 const char *const EYE_TRI_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_tex;
 uniform float u_near;
+uniform sampler2D u_grass;
+uniform float u_grass_units; // world units its picture runs over each way; 0 none
+uniform vec2 u_grass_eye;    // the eye's x, y within such a run
+uniform vec3 u_grass_tint[5];
+uniform vec4 u_eye_dir;      // fx, fy, rx, ry
+uniform vec3 u_eye_lens;     // focal, cx, cy
 in vec2 v_uv;
 flat in vec4 v_rect;
 flat in float v_light;
@@ -1317,6 +1323,29 @@ void main()
 			}
 			if (r > 0.0) t.rgb = m >= 0.4 * r ? mark / max(m, 1e-4) : surface / max(r - m, 1e-4);
 		}
+	}
+	/* Our grass's texel of the ground (THREE_D_GPU_EYE_GRASS): its colour our grass's picture at the world point the pixel
+	 * shows, between its four texels, repeated; tinted to its kind (red), lit as the game's grass is there (green,
+	 * 128ths) -- DrawOurGrass() and CabGrassTexel() of viewport.cpp. */
+	if ((how & 32) != 0 && u_grass_units > 0.0 && int(t.a * 255.0 + 0.5) == 252) {
+		float f = 1.0 / gl_FragCoord.w;
+		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x;
+		vec2 world = u_grass_eye + vec2(f * u_eye_dir.x + side * u_eye_dir.z, f * u_eye_dir.y + side * u_eye_dir.w);
+		ivec2 gs = textureSize(u_grass, 0);
+		vec2 g = world * vec2(gs) / u_grass_units - 0.5;
+		ivec2 b = ivec2(floor(g));
+		vec2 w = g - vec2(b);
+		vec3 sum = vec3(0.0);
+		for (int k = 0; k < 4; k++) {
+			ivec2 o = ivec2(k & 1, k >> 1);
+			ivec2 q = b + o;
+			q -= gs * ivec2(floor(vec2(q) / vec2(gs)));
+			float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
+			sum += wk * floor(texelFetch(u_grass, clamp(q, ivec2(0), gs - 1), 0).rgb * 255.0 + 0.5);
+		}
+		int kind = clamp(int(t.r * 255.0 + 0.5), 0, 4);
+		float lit = floor(t.g * 255.0 + 0.5) / 128.0;
+		t = vec4(clamp(floor(sum * u_grass_tint[kind] * lit), 0.0, 255.0) / 255.0, 1.0);
 	}
 	/* See-through by so many 256ths; a material "BLEND"'s times its texel's alpha (THREE_D_GPU_EYE_TEXEL_ALPHA). */
 	float alpha = v_how.x >= 256.0 ? 1.0 : v_how.x / 256.0;
@@ -5021,6 +5050,19 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glUniform1i(gl.glGetUniformLocation(_frame_tri_program.program, "u_tex"), 0);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_tri_program.program, "u_near"), depth_scale);
 				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
+				/* Our grass of the ground (THREE_D_GPU_EYE_GRASS): its picture beside the texture, where the eye is. */
+				const bool grass = f.grass_texture >= 0 && static_cast<size_t>(f.grass_texture) < names.size() && f.grass_units > 0;
+				gl.glUniform1i(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass"), 1);
+				gl.glUniform1f(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass_units"), grass ? f.grass_units : 0.0f);
+				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_grass_eye"), f.grass_eye[0], f.grass_eye[1]);
+				for (int k = 0; k < 5; k++) {
+					const std::string name = fmt::format("u_grass_tint[{}]", k);
+					gl.glUniform3f(gl.glGetUniformLocation(_frame_tri_program.program, name.c_str()), f.grass_tint[k * 3], f.grass_tint[k * 3 + 1], f.grass_tint[k * 3 + 2]);
+				}
+				gl.glUniform4f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
+				gl.glUniform3f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+				gl.glActiveTexture(GL_TEXTURE1);
+				gl.glBindTexture(GL_TEXTURE_2D, grass ? names[f.grass_texture] : 0);
 				gl.glActiveTexture(GL_TEXTURE0);
 				gl.glBindVertexArray(_frame_vao);
 				for (size_t r = s.first_run; r < s.first_run + s.runs && r < f.runs.size(); r++) {
@@ -5043,6 +5085,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					}
 				}
 				gl.glBindVertexArray(0);
+				gl.glActiveTexture(GL_TEXTURE1);
+				gl.glBindTexture(GL_TEXTURE_2D, 0);
+				gl.glActiveTexture(GL_TEXTURE0);
 				break;
 			}
 			case Kind::Objects:

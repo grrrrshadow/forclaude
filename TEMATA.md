@@ -34,6 +34,23 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (106) – GPU: tráva z očí barví karta, procesor jen záloha
+
+- Hráč: *„to nema kreslit procesor jen jako založni řešeni, sprav to a koukni do planu gpu kdy to bude dělat gpu“*
+  (bod GPU plánu „sběr z očí na kartě“, (74) a #221).
+- **Dřív:** zem z očí (`_eye_ground`) kreslil procesor i s naší trávou: u každého pixelu textury země hledal světový
+  bod (zpětně přes svah) a z obrázku trávy počítal barvu (`DrawOurGrass()`), u každé nové dlaždice.
+- **Teď:** procesor do textury země nakreslí jen sprity hry a místo barvy trávy zapíše značku (alfa
+  `THREE_D_GPU_GRASS` 252: červená = který odstín, zelená = světlo trávy hry na tom svahu ve 128-inách). Barvu
+  dopočítá karta u každého pixelu obrazu (`EYE_TRI_FRAGMENT`, příznak `THREE_D_GPU_EYE_GRASS` 32 = `CAB_GRASS`):
+  světový bod pixelu z oka, obrázek trávy (stejná úroveň, drží ho karta), mezi čtyřmi texely, odstín a světlo.
+  Zblízka je tráva hladší než dřív (barva po pixelech obrazu, ne po texelech země).
+- **Záloha procesoru** (bez karty nebo `test3d gpu snimek 0`): totéž v `CabRasterRows()` (`CabGrassTexel()`) se
+  stejným vzorkováním (`OurGrassAt()`, společné i s trávou mapy, ta se nemění).
+- Rig na kartě (tráva 82,82, z očí s pohledem dolů): karta a procesor se liší ve 41 pixelech z 921 600 (>12), jinak
+  stejné. MinGW, clang 0, kouřová baterie beze změny.
+- Další v plánu GPU: silnice z očí (vyhlazení `DrawEyeRoad()` 7×7) a nový požadavek na rovné bílé pruhy (107).
+
 ## 3. 11. (105) – Kouř měděného dolu (a elektrárny) z vršku 3D komína
 
 - Hráč (#325, foto): *„je to jinej dul, na měď asi a kouř vychazí moc nizko. uprostřed komina se vytvoři kolečko
@@ -475,7 +492,7 @@ vzdálených měst přes blízkého slona; slon mění polohu hlavy, když kolem
   stejném počtu rohů (asi 19 500), nejspíš kvůli samostatnému kreslení každého auta. Proto zatím ne. Napřed všechna
   vzdálená auta a figury jedním kreslením (instance), pak znovu změřit.
 - Další: sběr z očí na kartě (sběr scény 14–20 ms na hlavním vlákně), plakáty jedním kreslením. Telefon:
-  `pamet 3d` a `zapomenuti` v `snimky.log` z očí.
+  `pamet 3d` a `zapomenuti` v `snimky.log` z očí. (Tráva z očí kartou: (106).)
 
 ## 2. 11. (85) – GPU stojící věci: čára za auty a kreslení změn najednou na telefonu
 

@@ -2611,14 +2611,86 @@ static const OurGrassSurface &OurGrassPicture()
 	return grass;
 }
 
+/** Each kind's tint of our grass: the mean of its flat sprite against our picture's; and the light of the game's flat grass. */
+struct OurGrassFit {
+	std::array<std::array<float, 3>, OUR_GRASS_KINDS> tint;
+	float light;
+};
+
+/** OurGrassFit of our grass's picture (there: OurGrassPicture()), once. */
+static const OurGrassFit &OurGrassFitOf(const ThreeDTextureLevels &picture)
+{
+	static const OurGrassFit fit = [&picture] {
+		uint64_t r = 0, g = 0, b = 0;
+		for (uint32_t p : picture->front().px) {
+			const Colour c(p);
+			r += c.r;
+			g += c.g;
+			b += c.b;
+		}
+		const double n = std::max<size_t>(1, picture->front().px.size());
+		const double mr = std::max(1.0, r / n), mg = std::max(1.0, g / n), mb = std::max(1.0, b / n);
+		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND};
+		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45)};
+		OurGrassFit f{};
+		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
+			const Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
+			f.tint[k] = {static_cast<float>(c.r / mr), static_cast<float>(c.g / mg), static_cast<float>(c.b / mb)};
+		}
+		const Colour game = CabSpriteColour(SPR_FLAT_GRASS_TILE, PAL_NONE, fallback[3]);
+		f.light = static_cast<float>(std::max(1.0, (game.r * 77 + game.g * 150 + game.b * 29) / 256.0));
+		return f;
+	}();
+	return fit;
+}
+
+/** The level of our grass's picture of about so many texels along a side of a tile, or more. */
+static const ThreeDObjectTexture &OurGrassLevel(const OurGrassSurface &grass, double want)
+{
+	const ThreeDTextureLevels &picture = grass.picture;
+	size_t k = 0;
+	while (k + 1 < picture->size() && (*picture)[k + 1].w >= want * grass.tiles) k++;
+	return (*picture)[k];
+}
+
+/** From the eyes our picture coarse, a texel about a metre (its blades are our grass's tufts there, AddOurGrass()): the level of it, nullptr none. */
+static const ThreeDObjectTexture *OurGrassEyeLevel()
+{
+	const OurGrassSurface &grass = OurGrassPicture();
+	if (grass.picture == nullptr || grass.picture->empty() || grass.picture->front().w < 2) return nullptr;
+	return &OurGrassLevel(grass, 16.0);
+}
+
+/**
+ * Our grass at a world point: its picture there between its four texels (repeated over grass.tiles tiles each way),
+ * tinted, lit -- on the map (DrawOurGrass()), from the eyes on the card (EYE_TRI_FRAGMENT of three_d_gpu.cpp) and by
+ * the processor (CabGrassTexel()) alike.
+ */
+static Colour OurGrassAt(const ThreeDObjectTexture &level, int tiles, double wx, double wy, const std::array<float, 3> &tint, double light)
+{
+	const int lw = level.w, lh = level.h;
+	const double tex_per_unit_x = static_cast<double>(lw) / (TILE_SIZE * tiles), tex_per_unit_y = static_cast<double>(lh) / (TILE_SIZE * tiles);
+	auto texel = [&](int u, int v) { return Colour(level.px[static_cast<size_t>(((v % lh) + lh) % lh) * lw + ((u % lw) + lw) % lw]); };
+	const double u = wx * tex_per_unit_x - 0.5, v = wy * tex_per_unit_y - 0.5;
+	const int u0 = static_cast<int>(std::floor(u)), v0 = static_cast<int>(std::floor(v));
+	const double fu = u - u0, fv = v - v0;
+	const Colour c00 = texel(u0, v0), c10 = texel(u0 + 1, v0), c01 = texel(u0, v0 + 1), c11 = texel(u0 + 1, v0 + 1);
+	auto lerp = [&](uint8_t q00, uint8_t q10, uint8_t q01, uint8_t q11) {
+		return (q00 * (1 - fu) + q10 * fu) * (1 - fv) + (q01 * (1 - fu) + q11 * fu) * fv;
+	};
+	auto channel = [&](double ours, float k) { return static_cast<uint8_t>(std::clamp(ours * k * light, 0.0, 255.0)); };
+	return Colour(channel(lerp(c00.r, c10.r, c01.r, c11.r), tint[0]), channel(lerp(c00.g, c10.g, c01.g, c11.g), tint[1]), channel(lerp(c00.b, c10.b, c01.b, c11.b), tint[2]));
+}
+
 /**
  * The game's ground of a tile drawn as our grass into the picture being drawn (_cur_dpi, the ground facing north):
  * the sprite's pixels, of our picture at the world points they show -- the same at every edge, so that it runs on over
  * the tiles and their slopes --, tinted to the mean of the sprite's kind as the game draws it flat (bare land brown,
  * rough land dark), lit as the game's grass is on that slope (its light blurred over its dithering).
  * @param ground what of ours the sprite is (OurGrassGroundOf())
- * @param eyes the ground of the view from the eyes: our picture coarse, a texel about a metre (its blades are our
- *             grass's tufts there, AddOurGrass()); on the map about a texel to a pixel
+ * @param eyes the ground of the view from the eyes: not coloured, marked (THREE_D_GPU_GRASS) -- which tint, how lit --,
+ *             its colour our picture at the world point a pixel of the view shows, put by the card (CabGrassTexel() of
+ *             the processor where it draws); on the map our picture about a texel to a pixel
  * @param tile_x,tile_y the tile
  * @param base_z the height of its lowest corner
  * @param slope its slope
@@ -2632,32 +2704,7 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 		DrawSpriteViewport(image, pal, x, y, nullptr);
 		return;
 	}
-	/* Each kind's tint, once: the mean of its flat sprite against our picture's; and the light of the game's flat grass. */
-	struct Fit {
-		std::array<std::array<float, 3>, OUR_GRASS_KINDS> tint;
-		float light;
-	};
-	static const Fit fit = [&picture] {
-		uint64_t r = 0, g = 0, b = 0;
-		for (uint32_t p : picture->front().px) {
-			const Colour c(p);
-			r += c.r;
-			g += c.g;
-			b += c.b;
-		}
-		const double n = std::max<size_t>(1, picture->front().px.size());
-		const double mr = std::max(1.0, r / n), mg = std::max(1.0, g / n), mb = std::max(1.0, b / n);
-		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND};
-		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45)};
-		Fit f{};
-		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
-			const Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
-			f.tint[k] = {static_cast<float>(c.r / mr), static_cast<float>(c.g / mg), static_cast<float>(c.b / mb)};
-		}
-		const Colour game = CabSpriteColour(SPR_FLAT_GRASS_TILE, PAL_NONE, fallback[3]);
-		f.light = static_cast<float>(std::max(1.0, (game.r * 77 + game.g * 150 + game.b * 29) / 256.0));
-		return f;
-	}();
+	const OurGrassFit &fit = OurGrassFitOf(picture);
 	const int s = ScaleByZoom(1, d->zoom);
 	auto floor_div = [](int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
 	const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
@@ -2701,24 +2748,27 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 		return sum[static_cast<size_t>(j1) * (tw + 1) + i1] - sum[static_cast<size_t>(j0) * (tw + 1) + i1] - sum[static_cast<size_t>(j1) * (tw + 1) + i0] + sum[static_cast<size_t>(j0) * (tw + 1) + i0];
 	};
 	/* The level of our picture: on the map a texel or two to a pixel (a side of a tile is 36 pixels long at the normal
-	 * zoom); from the eyes about a metre a texel, smooth, its blades the tufts'. */
-	const ThreeDObjectTexture *level = &picture->front();
-	{
-		const double want = eyes ? 16.0 : 36.0 * ZOOM_BASE / s; // texels along a side of a tile
-		size_t k = 0;
-		while (k + 1 < picture->size() && (*picture)[k + 1].w >= want * grass.tiles) k++;
-		level = &(*picture)[k];
-	}
-	const int lw = level->w, lh = level->h;
-	const double tex_per_unit_x = static_cast<double>(lw) / (TILE_SIZE * grass.tiles), tex_per_unit_y = static_cast<double>(lh) / (TILE_SIZE * grass.tiles);
-	auto texel = [&](int u, int v) { return Colour(level->px[static_cast<size_t>(((v % lh) + lh) % lh) * lw + ((u % lw) + lw) % lw]); };
+	 * zoom). From the eyes none: the card colours its pixels from it (CAB_GRASS). */
+	const ThreeDObjectTexture &level = OurGrassLevel(grass, 36.0 * ZOOM_BASE / s);
 	/* From the eyes the grass of every thickness and the rough land alike (how thick it is, its tufts show,
 	 * AddOurGrass()): no edges of the tiles between them; bare land as it is. */
-	const std::array<float, 3> &tint = fit.tint[eyes && ground.kind > 0 ? 3 : ground.kind];
+	const int kind = eyes && ground.kind > 0 ? 3 : ground.kind;
+	const std::array<float, 3> &tint = fit.tint[kind];
 	for (int j = 0; j < th; j++) {
 		for (int i = 0; i < tw; i++) {
 			const uint32_t p = own[static_cast<size_t>(j) * tw + i];
 			if ((p >> 24) == 0) continue;
+			uint32_t &out = static_cast<uint32_t *>(d->dst_ptr)[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)];
+			/* Lit as the game's grass is there. */
+			const int i0 = std::max(0, i - blur), j0 = std::max(0, j - blur), i1 = std::min(tw, i + blur + 1), j1 = std::min(th, j + blur + 1);
+			const uint32_t n = box(sum_n, i0, j0, i1, j1);
+			const double light = n == 0 ? 1.0 : std::clamp(box(sum_l, i0, j0, i1, j1) / static_cast<double>(n) / fit.light, 0.35, 1.7);
+			if (eyes) {
+				/* From the eyes no colour: which tint, how lit (THREE_D_GPU_GRASS); the card (or CabGrassTexel()) colours it
+				 * from our picture at the world point each pixel of the view shows, however near. */
+				out = Colour(static_cast<uint8_t>(kind), static_cast<uint8_t>(std::clamp<long>(std::lround(light * 128), 0, 255)), 0, THREE_D_GPU_GRASS).data;
+				continue;
+			}
 			/* The world point the pixel shows, on the tile's slope: from the view's coordinates, its height found by going
 			 * up and down the slope a few times (RemapCoords() backwards). */
 			const double vx = t.left + i * s + s / 2.0, vy = t.top + j * s + s / 2.0;
@@ -2731,21 +2781,7 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 				const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
 				z = base_z + GetPartialPixelZ(fx, fy, slope);
 			}
-			/* Our picture there, between its four texels. */
-			const double u = wx * tex_per_unit_x - 0.5, v = wy * tex_per_unit_y - 0.5;
-			const int u0 = static_cast<int>(std::floor(u)), v0 = static_cast<int>(std::floor(v));
-			const double fu = u - u0, fv = v - v0;
-			const Colour c00 = texel(u0, v0), c10 = texel(u0 + 1, v0), c01 = texel(u0, v0 + 1), c11 = texel(u0 + 1, v0 + 1);
-			auto lerp = [&](uint8_t q00, uint8_t q10, uint8_t q01, uint8_t q11) {
-				return (q00 * (1 - fu) + q10 * fu) * (1 - fv) + (q01 * (1 - fu) + q11 * fu) * fv;
-			};
-			/* Lit as the game's grass is there. */
-			const int i0 = std::max(0, i - blur), j0 = std::max(0, j - blur), i1 = std::min(tw, i + blur + 1), j1 = std::min(th, j + blur + 1);
-			const uint32_t n = box(sum_n, i0, j0, i1, j1);
-			const double light = n == 0 ? 1.0 : std::clamp(box(sum_l, i0, j0, i1, j1) / static_cast<double>(n) / fit.light, 0.35, 1.7);
-			auto channel = [&](double ours, float k) { return static_cast<uint8_t>(std::clamp(ours * k * light, 0.0, 255.0)); };
-			const Colour out(channel(lerp(c00.r, c10.r, c01.r, c11.r), tint[0]), channel(lerp(c00.g, c10.g, c01.g, c11.g), tint[1]), channel(lerp(c00.b, c10.b, c01.b, c11.b), tint[2]));
-			static_cast<uint32_t *>(d->dst_ptr)[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)] = out.data;
+			out = OurGrassAt(level, grass.tiles, wx, wy, tint, light).data;
 		}
 	}
 }
@@ -10649,6 +10685,7 @@ static constexpr uint8_t CAB_FILL_HOLES = 1; ///< the nearest drawn texel where 
 static constexpr uint8_t CAB_REPEAT = 2;     ///< the texture repeated beyond its edges, as glTF's samplers do (a model's texture moved and stretched by "KHR_texture_transform": the ghost's sixteen times)
 static constexpr uint8_t CAB_TEXEL_ALPHA = 8; ///< see-through as much as its alpha times its texel's (a material "BLEND": the saucer's beam; THREE_D_GPU_EYE_TEXEL_ALPHA)
 static constexpr uint8_t CAB_ROAD = 16;       ///< the ground: a road's texels between their four, its white marks' edges sharp (CabRoadTexel(), THREE_D_GPU_EYE_ROAD)
+static constexpr uint8_t CAB_GRASS = 32;      ///< the ground: our grass's texels coloured from its picture at the world point the pixel shows (CabGrassTexel(), THREE_D_GPU_EYE_GRASS)
 
 /**
  * A texel of a road of the ground of the view from the eyes (DrawEyeRoad()), as the card's EYE_TRI_FRAGMENT takes it:
@@ -10692,14 +10729,36 @@ static uint32_t CabRoadTexel(const uint32_t *tex, int tw, int th, double u, doub
 	return Colour(channel(0), channel(1), channel(2)).data;
 }
 
+static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, float iw, double &x, double &y, double &zu);
+
+/**
+ * A texel of our grass of the ground of the view from the eyes (DrawOurGrass(): which tint, how lit), as the card's
+ * EYE_TRI_FRAGMENT colours it: our grass's picture at the world point the pixel shows (OurGrassAt()).
+ * @param eye the eye the picture is seen from
+ * @param sx,sy the pixel's middle
+ * @param iw its 1 / how far ahead
+ */
+static uint32_t CabGrassTexel(uint32_t p, const CabEye &eye, double sx, double sy, double iw)
+{
+	const Colour mark(p);
+	const OurGrassSurface &grass = OurGrassPicture();
+	const ThreeDObjectTexture *level = OurGrassEyeLevel();
+	if (level == nullptr) return Colour(mark.g, mark.g, mark.g).data;
+	double x, y, zu;
+	CabPixelInWorld(eye, sx, sy, static_cast<float>(iw), x, y, zu);
+	const OurGrassFit &fit = OurGrassFitOf(grass.picture);
+	return OurGrassAt(*level, grass.tiles, x, y, fit.tint[std::min<int>(mark.r, OUR_GRASS_KINDS - 1)], mark.g / 128.0).data;
+}
+
 /**
  * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
  * the picture, CabFlushBatch()): 1/depth and the texture pixel over depth change linearly across the picture, so
  * each pixel's texture pixel is their quotient. A pixel is drawn where the triangle is nearer than what is there.
  * @param fill_holes CAB_FILL_HOLES, CAB_REPEAT (true: CAB_FILL_HOLES); beyond the texture's edges nothing without CAB_REPEAT
  * @param alpha below 256 see-through (a vehicle's glass): laid over what is there by so many 256ths, its depth not kept
+ * @param grass_eye with CAB_GRASS the eye the picture is seen from (CabGrassTexel())
  */
-static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light, int row_lo, int row_hi, uint alpha = 256)
+static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light, int row_lo, int row_hi, uint alpha = 256, const CabEye *grass_eye = nullptr)
 {
 	const bool repeat = (fill_holes & CAB_REPEAT) != 0;
 	const bool fill = (fill_holes & CAB_FILL_HOLES) != 0;
@@ -10772,6 +10831,7 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			}
 			if (p == 0) continue;
 			if ((fill_holes & CAB_ROAD) != 0) p = CabRoadTexel(tex, tw, th, uw * inv, vw * inv, p);
+			if ((fill_holes & CAB_GRASS) != 0 && grass_eye != nullptr && static_cast<uint8_t>(p >> 24) == THREE_D_GPU_GRASS) p = CabGrassTexel(p, *grass_eye, x + 0.5, yc, iw);
 			const uint32_t lit = light == 256 ? p : ShadedPixel(p, light);
 			if (alpha < 256) {
 				const uint a = (fill_holes & CAB_TEXEL_ALPHA) != 0 ? alpha * Colour(p).a / 255 : alpha;
@@ -10804,6 +10864,7 @@ struct CabBatchTriangle {
 	uint8_t fill_holes; ///< CAB_FILL_HOLES, CAB_REPEAT
 	uint light;
 	uint alpha = 256; ///< see-through (CabRasterRows())
+	const CabEye *grass_eye = nullptr; ///< with CAB_GRASS the eye of the frame it is in (CabGrassTexel())
 };
 static std::vector<CabBatchTriangle> _cab_batch;
 static bool _cab_batching = false;
@@ -10859,6 +10920,7 @@ struct EyeFrame {
 	ThreeDGpuGroundTexture ground_card;       ///< the kept one as the card gets it: what was drawn into it since the card had it (pixels nullptr: none)
 	std::unordered_map<const uint32_t *, uint64_t> kept; ///< the textures its triangles point to that the frames share (a sprite's), by their number
 	CabEye eye{};                             ///< the eye it is seen from
+	const ThreeDObjectTexture *grass = nullptr; ///< the level of our grass's picture its ground's marks of it are coloured from (CAB_GRASS); nullptr none
 	double near_plane = 0;                    ///< its near plane (_cab_near)
 	const void *client = nullptr;             ///< whose picture it is: the window's camera
 	bool depot = false;                       ///< nothing to draw: the picture was filled while collecting (hidden in a depot)
@@ -11125,7 +11187,7 @@ static void CabRasterLists(std::span<const std::vector<CabBatchTriangle> *const>
 	const int threads = ParallelThreads(h, worth);
 	if (threads <= 1) {
 		for (const std::vector<CabBatchTriangle> *l : lists) {
-			for (const CabBatchTriangle &t : *l) CabRasterRows(t.dst, t.zb, t.w, t.h, t.tex, t.tw, t.th, t.a, t.b, t.c, t.fill_holes, t.light, 0, h, t.alpha);
+			for (const CabBatchTriangle &t : *l) CabRasterRows(t.dst, t.zb, t.w, t.h, t.tex, t.tw, t.th, t.a, t.b, t.c, t.fill_holes, t.light, 0, h, t.alpha, t.grass_eye);
 		}
 		return;
 	}
@@ -11162,7 +11224,7 @@ static void CabRasterLists(std::span<const std::vector<CabBatchTriangle> *const>
 				for (size_t i = 0; i < list.size(); i++) {
 					if (r[i].second < lo || r[i].first >= hi) continue;
 					const CabBatchTriangle &t = list[i];
-					CabRasterRows(t.dst, t.zb, t.w, t.h, t.tex, t.tw, t.th, t.a, t.b, t.c, t.fill_holes, t.light, lo, hi, t.alpha);
+					CabRasterRows(t.dst, t.zb, t.w, t.h, t.tex, t.tw, t.th, t.a, t.b, t.c, t.fill_holes, t.light, lo, hi, t.alpha, t.grass_eye);
 				}
 			}
 		}
@@ -11207,20 +11269,22 @@ struct CabBatchScope {
 static void CabRasterTriangle(uint32_t *dst, float *zb, int w, int h, const uint32_t *tex, int tw, int th, const CabVertex &a, const CabVertex &b, const CabVertex &c, uint8_t fill_holes, uint light = 256)
 {
 	if (_cab_glass_alpha < 256) fill_holes |= _cab_glass_texel;
+	/* Our grass of the ground is coloured as seen from the frame's eye (CabGrassTexel()). */
+	const CabEye *grass_eye = (fill_holes & CAB_GRASS) != 0 && _eye_frame != nullptr ? &_eye_frame->eye : nullptr;
 	if (_eye_frame != nullptr) {
 		/* Into the frame being collected (the glass apart, laid over at CabFlushGlass()). */
 		if (_cab_glass_alpha < 256) {
-			_cab_glass_batch.push_back({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, _cab_glass_alpha});
+			_cab_glass_batch.push_back({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, _cab_glass_alpha, grass_eye});
 		} else {
-			_eye_frame->Add({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 256});
+			_eye_frame->Add({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 256, grass_eye});
 		}
 		return;
 	}
 	if (_cab_batching) {
-		(_cab_glass_alpha < 256 ? _cab_glass_batch : _cab_batch).push_back({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, _cab_glass_alpha});
+		(_cab_glass_alpha < 256 ? _cab_glass_batch : _cab_batch).push_back({dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, _cab_glass_alpha, grass_eye});
 		return;
 	}
-	CabRasterRows(dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 0, h, _cab_glass_alpha);
+	CabRasterRows(dst, zb, w, h, tex, tw, th, a, b, c, fill_holes, light, 0, h, _cab_glass_alpha, grass_eye);
 }
 
 /** Draw a polygon of the eye's frame, cut to the near plane, as a fan of triangles. */
@@ -14385,6 +14449,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	ForWalkerPlantParts([](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) { AddCabPlant(name, scale, stretch, x, y, z, facing); });
 
 	eye_stage(1);
+	/* Our grass of the ground marked, coloured where the picture is drawn from its picture (CAB_GRASS, CabGrassTexel()). */
+	const bool eye_grass = OurGrassOn(true);
+	out.grass = eye_grass ? OurGrassEyeLevel() : nullptr;
 	/* 3. The ground of all of them, north-up, in one texture at the normal zoom: the kept one (_eye_ground), only the
 	 * tiles whose ground changed or came new drawn into it; or one drawn for this frame alone (the rig, or more than
 	 * the kept one may hold). */
@@ -14490,7 +14557,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		{
 			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
-			const bool grass = OurGrassOn(true);
+			const bool grass = eye_grass;
 			for (const CabTile &t : tiles) {
 				if (EyeRoadTile(t.x, t.y)) {
 					std::vector<EyeRoadSprite> road;
@@ -14577,7 +14644,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				p[i] = CabToEye(eye, wx, wy, wz, cx * scale - gl, cy * scale - gt);
 			}
 			for (int i = 0; i < 4; i++) {
-				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0)));
+				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0) | (eye_grass ? CAB_GRASS : 0)));
 			}
 		}
 	}
@@ -15407,6 +15474,19 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 	c.near_plane = static_cast<float>(f.near_plane);
 	c.eye = {static_cast<float>(f.eye.x), static_cast<float>(f.eye.y), static_cast<float>(f.eye.z), static_cast<float>(f.eye.fx), static_cast<float>(f.eye.fy),
 			static_cast<float>(f.eye.rx), static_cast<float>(f.eye.ry), static_cast<float>(f.eye.focal), static_cast<float>(f.eye.cx), static_cast<float>(f.eye.cy)};
+	/* Our grass of the ground (CAB_GRASS): its picture kept on the card, the eye where it is within a run of it. */
+	if (f.grass != nullptr) {
+		static const uint64_t grass_uid = ThreeDUniqueId::Next();
+		const double units = static_cast<double>(TILE_SIZE) * OurGrassPicture().tiles;
+		auto within = [units](double v) { const double m = std::fmod(v, units); return static_cast<float>(m < 0 ? m + units : m); };
+		c.grass_texture = static_cast<int>(card.Texture(f.grass->px.data(), f.grass->w, f.grass->h, grass_uid));
+		c.grass_units = static_cast<float>(units);
+		c.grass_eye = {within(f.eye.x), within(f.eye.y)};
+		const OurGrassFit &fit = OurGrassFitOf(OurGrassPicture().picture);
+		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
+			for (int ch = 0; ch < 3; ch++) c.grass_tint[k * 3 + ch] = fit.tint[k][ch];
+		}
+	}
 	/* Shown straight from the card where the video driver can: not read back (ThreeDGpuShows()). */
 	c.show = ThreeDGpuShows();
 	card.Step(ThreeDGpuEyeStep::Kind::Background).horizon = static_cast<float>(f.eye.cy);
