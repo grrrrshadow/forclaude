@@ -5074,6 +5074,9 @@ static constexpr double CAB_EYE_PAST_SOLID_M = 0.15;
  */
 static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts, double turn)
 {
+	/* An engine of MSTS has its eye where its .eng (Open Rails' or MSTS's) has it: its glass is no glass of its own,
+	 * the solid before it a pillar between its windows; past it the eye was out of the cab, over the 742's bonnet. */
+	if (m.file.ends_with(".s") || m.file.ends_with(".S")) return 0;
 	static std::map<std::tuple<const ThreeDVehicleObject *, std::array<uint64_t, 2>, double>, double> ahead;
 	const auto key = std::make_tuple(&m, parts.bits, turn);
 	if (auto it = ahead.find(key); it != ahead.end()) return it->second;
@@ -5118,6 +5121,20 @@ static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts
 	}
 	ahead[key] = move;
 	return move;
+}
+
+/**
+ * For the rig ("test3d model rozmery"): the eye of a model's cab as the cab view takes it (CabEyeOf(), and how far
+ * ahead of it CabEyeAhead() puts it), metres in its frame.
+ * @return false: none
+ */
+bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead)
+{
+	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
+	if (!cab.has_value()) return false;
+	eye = *cab;
+	ahead = CabEyeAhead(m, m.PartsOf(0), 0);
+	return true;
 }
 
 /**

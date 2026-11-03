@@ -8697,6 +8697,73 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: obal {}", _draw_road_consists_whole ? "zapnuty" : "vypnuty");
 		return true;
+	} else if (what == "model" && argv.size() > 3 && argv[2] == "rozmery") {
+		/* 'model rozmery <name>': where the parts of a vehicle's model are, by their textures, metres in its frame (x
+		 * forward, y left, z up) -- the cab of a model of MSTS by its driver's figure or its desk. */
+		const ThreeDVehicleObject *m = GetThreeDVehicleObjectNamed(argv[3]);
+		const ThreeDVehicleShape *shape = m != nullptr ? m->GetShape() : nullptr;
+		if (shape == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: model {} neni", argv[3]);
+			return true;
+		}
+		std::map<uint8_t, std::array<float, 7>> box;
+		/* Of each texture the triangles see-through in its middle (the alpha of the texel there below half), and where. */
+		std::map<uint8_t, std::array<float, 7>> clear;
+		auto alpha_at = [shape](uint8_t tex, float u, float v) -> int {
+			if (tex >= shape->pngs.size() || shape->pngs[tex] == nullptr) return -1;
+			const std::vector<uint8_t> &b = *shape->pngs[tex];
+			if (b.size() < 17 || std::string_view(reinterpret_cast<const char *>(b.data()), 9) != "OTTD-RGBA") return -1;
+			auto u32 = [&b](size_t p) { return b[p] | b[p + 1] << 8 | b[p + 2] << 16 | static_cast<uint32_t>(b[p + 3]) << 24; };
+			const uint32_t w = u32(9), h = u32(13);
+			if (w == 0 || h == 0 || b.size() < 17 + static_cast<size_t>(w) * h * 4) return -1;
+			const uint32_t x = static_cast<uint32_t>(std::clamp<float>((u - std::floor(u)) * w, 0, w - 1));
+			const uint32_t y = static_cast<uint32_t>(std::clamp<float>((v - std::floor(v)) * h, 0, h - 1));
+			return b[17 + (static_cast<size_t>(y) * w + x) * 4 + 3];
+		};
+		for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+			const uint8_t tex = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+			float cu = 0, cv = 0;
+			for (int c = 0; c < 3 && shape->uv.size() >= shape->pos.size() / 3 * 2; c++) {
+				cu += shape->uv[shape->tri[t + c] * 2] / 3;
+				cv += shape->uv[shape->tri[t + c] * 2 + 1] / 3;
+			}
+			if (const int a = alpha_at(tex, cu, cv); a >= 0 && a < 128) {
+				auto ct = clear.try_emplace(tex, std::array<float, 7>{1e9f, -1e9f, 1e9f, -1e9f, 1e9f, -1e9f, 0}).first;
+				for (int c = 0; c < 3; c++) {
+					const float *p = &shape->pos[shape->tri[t + c] * 3];
+					for (int k = 0; k < 3; k++) {
+						ct->second[2 * k] = std::min(ct->second[2 * k], p[k]);
+						ct->second[2 * k + 1] = std::max(ct->second[2 * k + 1], p[k]);
+					}
+				}
+				ct->second[6]++;
+			}
+			auto it = box.try_emplace(tex, std::array<float, 7>{1e9f, -1e9f, 1e9f, -1e9f, 1e9f, -1e9f, 0}).first;
+			for (int c = 0; c < 3; c++) {
+				const float *p = &shape->pos[shape->tri[t + c] * 3];
+				for (int k = 0; k < 3; k++) {
+					it->second[2 * k] = std::min(it->second[2 * k], p[k]);
+					it->second[2 * k + 1] = std::max(it->second[2 * k + 1], p[k]);
+				}
+			}
+			it->second[6]++;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: model {}: oko kabiny {} {:.2f} {:.2f} {:.2f}", argv[3], m->has_cab ? "ano" : "ne", m->cab[0], m->cab[1], m->cab[2]);
+		extern bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead);
+		std::array<double, 3> eye{};
+		double ahead = 0;
+		if (DescribeCabEye(*m, eye, ahead)) {
+			IConsolePrint(CC_DEFAULT, "test3d: model {}: oko v kabine {:.2f} {:.2f} {:.2f}, pred sklo o {:.2f}", argv[3], eye[0], eye[1], eye[2], ahead);
+		}
+		for (const auto &[tex, b] : box) {
+			IConsolePrint(CC_DEFAULT, "test3d: model {} textura {} '{}': x {:.2f}..{:.2f} y {:.2f}..{:.2f} z {:.2f}..{:.2f}, {} trojuhelniku", argv[3], tex,
+					tex < shape->tex_names.size() ? shape->tex_names[tex] : std::string("?"), b[0], b[1], b[2], b[3], b[4], b[5], static_cast<int>(b[6]));
+			if (auto ct = clear.find(tex); ct != clear.end()) {
+				const auto &c = ct->second;
+				IConsolePrint(CC_DEFAULT, "test3d: model {} textura {} pruhledne: x {:.2f}..{:.2f} y {:.2f}..{:.2f} z {:.2f}..{:.2f}, {} trojuhelniku", argv[3], tex,
+						c[0], c[1], c[2], c[3], c[4], c[5], static_cast<int>(c[6]));
+			}
+		}
 	} else if (what == "objekty") {
 		/* The rig: the buildings that are real 3D objects (three_d_objects.h), as read. */
 		extern std::string DescribeThreeDObjects();

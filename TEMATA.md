@@ -31,6 +31,35 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (97) – Simtrains: kabina 742 a 451; Open Rails přednostně
+
+- Hráč: 742 – v kabině „jsem uprostřed lokomotivy“, 451 – bez kabiny a pák. „Psát něco extra pro model je cesta do
+  pekel“ (1203 z BeamNG dostal výjimku); „simtrains jsou modely MSTS a Open Rails, liší se“; „742 je asi Open
+  Rails“; „přednostně Open Rails – dobrý nápad“.
+- Model (.s) je u MSTS i Open Rails stejný. Liší se .eng: balíček 742 má MSTS .eng a v podsložce `Openrails` .eng
+  pro Open Rails. MSTS `cd_742451rv.eng` (obrácená) má `HeadOut ( 1.7 3.0 -3.37 )` zkopírované z normální 742 –
+  oko v dlouhé kapotě; Open Rails verze má `3.37` (kabina obrácené je na druhém konci) a kabinu `cab742_OR`.
+- Podle zdrojáků Open Rails (`ORFileHelper.FindORTSFile`, `MSTSWagon`, `MSTSLocomotive.BuildCabView`): když je
+  `<složka mašiny>/OpenRails/<stejné jméno>`, čte se ten; model, kabina a ostatní cesty se hledají dál od složky
+  originálu; kabina z `<složka>/CABVIEW/` + cesta z .eng (OR zkouší i `<jméno>_rv.cvf` pro zadní stanoviště);
+  `include ( soubor )` je relativně k souboru, který ho obsahuje.
+- Hra teď stejně: `OpenRailsFileOf()`, `ReadTextFile()` (include), `JoinBlocks()` (pozdější blok Wagon/Engine
+  přepisuje dřívější); soubory v `OpenRails` se nehledají jako samostatné mašiny (dřív se zahodily „model není“ a
+  jela MSTS verze). Obrácená 742 má oko v kabině (rig `m742o_*`).
+- U modelů MSTS se oko už neposouvá „před sklo“ (`CabEyeAhead`, dělané pro Zetora): u 742 narazilo na sloupek okna
+  a vystrčilo oko z kabiny. Oko je tam, kde ho má .eng.
+- 451: instalátor dává mašinu do `Trains/Trainset/cd_451` a kabinu do `Trains/Trainset/common.cab` – standardní
+  MSTS, hra ji tak najde (`../../common.cab/cab451/451.cvf` od `cd_451/CABVIEW`). Moje kopie v rigu měla
+  `Trains/cd_451` – moje chyba při rozbalení, ne balíček. Chybějící kabina se teď píše do logu i bez ladění
+  („its cab … is not there“) – z log.txt hráče bude vidět, co chybí.
+- Instalace do `newgrf/simtrains`: zachovat strukturu balíčku (`Trains/Trainset/<mašina>` i s `Openrails`,
+  `Trains/Trainset/common.cab` vedle). 742 kabinu v balíčku nemá (common.cab z msts.sinus.cz: `cab742`, `cab742_OR`).
+- Zahozeno: odhad oken z průhlednosti textur a zrcadlení oka podle oken – hádání z modelu (u 742 je čelní okno v
+  textuře neprůhledné), hráč chce hlubší průzkum, ne odhady. Rigový příkaz `test3d model rozmery <jméno>` zůstal
+  (díly modelu podle textur, průhledná místa, oko kabiny jak ho hra bere).
+- MakeModelLite.rar (zip 2. 11.): jen `MakeModelLite.exe` (.NET, 2012, česky) – převod modelů z 3ds Max (.3DS) do
+  MSTS .s s LODy a zpět, analýza modelu, výměna textur.
+
 ## 3. 11. (96) – #324: přetečení zásobníku z očí (10:30), crash log jen s jedním rámcem
 
 - Crash log `crash20261103103015`: `EXCEPTION_STACK_OVERFLOW`, z očí (deník: 30–50 snímků/s, paměť 3,6 GB, tedy

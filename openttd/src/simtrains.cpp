@@ -734,6 +734,10 @@ public:
 	bool AddFile(const std::string &filename, size_t, const std::string &tar_filename) override
 	{
 		if (!tar_filename.empty()) return false;
+		/* One in a folder "OpenRails" is what Open Rails reads instead of the one of its name above it (OpenRailsFileOf()), not a vehicle of its own. */
+		const size_t slash = filename.find_last_of(PATHSEPCHAR);
+		const size_t above = slash == std::string::npos || slash == 0 ? std::string::npos : filename.find_last_of(PATHSEPCHAR, slash - 1);
+		if (slash != std::string::npos && StrEqualsIgnoreCase(std::string_view(filename).substr(above + 1, slash - above - 1), "OpenRails")) return false;
 		this->files.push_back(filename);
 		return true;
 	}
@@ -862,14 +866,85 @@ void ReadSize(const TextNode *wagon, SimtrainsEngine &e)
 }
 
 /**
+ * The file Open Rails reads for an .eng or a .wag: the one of the same name in the folder "OpenRails" beside it, when
+ * there is one, else it (Open Rails, ORFileHelper.FindORTSFile()). What it names -- the model, the cab -- Open Rails
+ * looks for from the folder of the original still (MSTSWagon.WagFilePath). A package for both has there what Open
+ * Rails reads otherwise than MSTS: the 742 "obrácená" its eye on its own end, "HeadOut ( 1.7 3.0 3.37 )", where the
+ * file for MSTS has the 742's, -3.37, in the bonnet (the player, 3. 11.: "in the cab I am in the middle of the engine";
+ * "the 742 is probably Open Rails").
+ */
+std::string OpenRailsFileOf(const std::string &path)
+{
+	const size_t slash = path.find_last_of(PATHSEPCHAR);
+	if (slash == std::string::npos) return path;
+	const std::string own = SubFolder(path.substr(0, slash + 1), "OpenRails");
+	if (own.empty()) return path;
+	const std::string found = FindInFolder(own, path.substr(slash + 1));
+	return found.empty() ? path : found;
+}
+
+/**
+ * The names of a file of MSTS read, each "include ( file )" in it the names of that file in its place, the file from
+ * the folder of the one that includes it (STF as Open Rails reads it: a file of Open Rails is often the original
+ * included and what Open Rails has more after it).
+ * @param depth how many files include this one
+ */
+std::vector<TextNode> ReadTextFile(const std::string &path, int depth = 0)
+{
+	std::vector<uint8_t> data = ReadBytes(path);
+	if (data.empty() || !Unpack(data)) return {};
+	std::vector<TextNode> top = ParseText(TextOf(data));
+	const size_t slash = path.find_last_of(PATHSEPCHAR);
+	const std::string folder = slash == std::string::npos ? std::string() : path.substr(0, slash + 1);
+	std::vector<TextNode> out;
+	for (TextNode &n : top) {
+		if (!StrEqualsIgnoreCase(n.name, "include")) {
+			out.push_back(std::move(n));
+			continue;
+		}
+		const std::string file = depth < 4 ? FindByMstsPath(folder, n.Value()) : std::string();
+		if (file.empty()) {
+			Debug(grf, 0, "Simtrains: {}: its include {} is not there", path, n.Value());
+			continue;
+		}
+		for (TextNode &m : ReadTextFile(file, depth + 1)) out.push_back(std::move(m));
+	}
+	return out;
+}
+
+/**
+ * The blocks "Wagon" and "Engine" of a file read as one each, as Open Rails reads them one after another: what a later
+ * one has instead of what an earlier one had of the same name (a file of Open Rails including the original).
+ */
+void JoinBlocks(std::vector<TextNode> &top)
+{
+	std::vector<TextNode> out;
+	for (TextNode &n : top) {
+		auto first = std::ranges::find_if(out, [&n](const TextNode &o) { return StrEqualsIgnoreCase(o.name, n.name); });
+		if (first == out.end() || (!StrEqualsIgnoreCase(n.name, "Wagon") && !StrEqualsIgnoreCase(n.name, "Engine"))) {
+			out.push_back(std::move(n));
+			continue;
+		}
+		for (TextNode &c : n.children) {
+			std::erase_if(first->children, [&c](const TextNode &o) { return StrEqualsIgnoreCase(o.name, c.name); });
+			first->children.push_back(std::move(c));
+		}
+	}
+	top = std::move(out);
+}
+
+/**
  * A vehicle of its .eng or .wag, if it is one with a model: an engine of an .eng; a carriage or a goods wagon of a
  * .wag (a tender, and a .wag that is an engine of the same folder hauled dead, its model the engine's, are left out).
+ * Read as Open Rails reads it (OpenRailsFileOf()).
  */
 std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 {
-	std::vector<uint8_t> data = ReadBytes(path);
-	if (data.empty() || !Unpack(data)) return std::nullopt;
-	std::vector<TextNode> top = ParseText(TextOf(data));
+	const std::string file = OpenRailsFileOf(path);
+	if (file != path) Debug(grf, 1, "Simtrains: {} read as Open Rails has it, {}", path, file);
+	std::vector<TextNode> top = ReadTextFile(file);
+	JoinBlocks(top);
+	if (top.empty()) return std::nullopt;
 	const TextNode *wagon = nullptr, *engine = nullptr;
 	for (const TextNode &n : top) {
 		if (StrEqualsIgnoreCase(n.name, "Wagon")) wagon = &n;
@@ -1020,10 +1095,11 @@ std::optional<SimtrainsEngine> ReadEng(const std::string &path)
 		v.present = v.time_limit > 0;
 	}
 	if (const TextNode *cab = engine->Child("CabView"); cab != nullptr && !cab->Value().empty()) {
-		/* MSTS reads it from the folder CABVIEW of the engine's; a cab of several engines is in a folder above. */
+		/* MSTS and Open Rails read it from the folder CABVIEW of the engine's; a cab of several engines is in a folder above. */
 		e.cvf = FindByMstsPath(e.folder + "CABVIEW" PATHSEP, cab->Value());
 		if (e.cvf.empty()) e.cvf = FindByMstsPath(e.folder, cab->Value());
-		if (e.cvf.empty()) Debug(grf, 1, "Simtrains: {}: its cab {} is not there", path, cab->Value());
+		/* In the log of the player: an engine without its cab is driven without the desk (the player, 3. 11., the 451). */
+		if (e.cvf.empty()) Debug(grf, 0, "Simtrains: {}: its cab {} is not there", path, cab->Value());
 	}
 	if (e.power_kw <= 0 || e.speed_kmh <= 0 || e.mass_t <= 0) {
 		Debug(grf, 0, "Simtrains: {}: no power, speed or mass", path);
