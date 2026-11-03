@@ -31,6 +31,18 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (102) – Diamantový důl: bouda vzadu přes halu vepředu (#325)
+
+- Hráč (snímek z #325): *„vyfotil jsem diamantový důl že se blbě kreslí, dělá to při všech zoomech. bouda vzadu je přes
+  domek vepředu“*.
+- **Příčina:** díly bloku původního průmyslu (`dily`: těžní věž, hala, kanceláře, …) se na mapu přidávaly každý
+  jako samostatný předmět. Každý měl stopu celého bloku 3 × 3 a vlastní hloubku. Řazení tak nepoznalo, který je
+  vepředu, a díl kreslený později byl celý přes díl před ním. Proto bouda u věže ležela přes střechu haly.
+- **Teď** (`AddOriginalIndustryTile()`): díly bloku a jeho rostliny se kreslí jako jeden předmět (`with`, jedna
+  hloubka) na kartě i procesorem, jako seno dračí farmy nebo křídla dveří. Box pro řazení má výšku nejvyššího dílu,
+  obrázky postav se připravují i u přidaných dílů. Rig (subtropy, `test3d postav 80 80 typ17`): hala kryje boudu
+  za sebou, komín stojí před hromadou kimberlitu. Platí pro všechny průmysly ze společných dílů.
+
 ## 3. 11. (101) – Silnice z očí: hladký asfalt, ostré hrany bílých pruhů
 
 - Hráč: *„silnice, mam teď cztr a skusime i originalni, vyhladit ty kostičky a zároveň udržet ostré linky bílých

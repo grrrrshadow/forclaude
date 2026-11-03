@@ -4930,6 +4930,7 @@ static void AddTurnedObjectsToDraw()
 			};
 			if (to.ground != nullptr) ask(to.ground, {});
 			ask(to.obj, to.more);
+			for (const ThreeDObject *w : to.with) ask(w, {});
 		}
 	});
 	for (size_t m = 0; m < _turned_objects.size(); m++) {
@@ -4938,9 +4939,14 @@ static void AddTurnedObjectsToDraw()
 		int ox = TileX(to.origin) * TILE_SIZE, oy = TileY(to.origin) * TILE_SIZE;
 		/* Only figures (the girls by the field road): the box of the tile, as tall as a girl twice the size. */
 		const int tiles_x = to.obj != nullptr ? to.obj->tiles_x : 1, tiles_y = to.obj != nullptr ? to.obj->tiles_y : 1;
-		/* (Its height as read: read now if the textures made above did not read it, ThreeDObject::Read().) */
+		/* (Its height as read: read now if the textures made above did not read it, ThreeDObject::Read().) The highest of
+		 * it and the parts drawn with it (an industry's block, AddOriginalIndustryTile()). */
 		if (to.obj != nullptr) to.obj->Read();
-		const int top = to.obj != nullptr ? static_cast<int>(std::ceil(to.obj->top)) : 2 * TILE_HEIGHT;
+		int top = to.obj != nullptr ? static_cast<int>(std::ceil(to.obj->top)) : 2 * TILE_HEIGHT;
+		for (const ThreeDObject *w : to.with) {
+			w->Read();
+			top = std::max(top, static_cast<int>(std::ceil(w->top)));
+		}
 		ps.xmin = ox;
 		ps.xmax = ox + tiles_x * TILE_SIZE - 1;
 		ps.ymin = oy;
@@ -5084,16 +5090,20 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
 	const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, of);
 	if (anchor == INVALID_TILE) return;
 	const int z = GetTileMaxPixelZ(anchor);
-	auto add = [&](const ThreeDObject *obj, std::span<const ThreeDObjectFigure> more = {}) {
-		for (const TurnedObject &to : _turned_objects) {
-			if (to.origin == anchor && to.obj == obj) return;
-		}
-		_turned_objects.push_back({obj, anchor, z, nullptr, more});
-	};
-	/* Its vehicles of the sets (the Zetor, the wheelbarrow of the farm) with its first part, or alone. */
-	if (of->parts.empty() && !of->vehicles.empty()) add(nullptr, of->vehicles);
-	for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());
-	if (of->plants != nullptr) add(of->plants);
+	/* Its parts and plants drawn as one, in one depth (the player, #325: "the diamond mine is drawn badly, at every
+	 * zoom: the shed at the back is over the house in front"): each part spans the whole block, so as things of their
+	 * own the sorting could not tell which is in front, and the one drawn later was over all of the one before. Its
+	 * vehicles of the sets (the Zetor, the wheelbarrow of the farm) with the first; the block's other tiles add nothing
+	 * more. */
+	std::vector<const ThreeDObject *> pieces(of->parts.begin(), of->parts.end());
+	if (of->plants != nullptr) pieces.push_back(of->plants);
+	if (pieces.empty() && of->vehicles.empty()) return;
+	const ThreeDObject *first = pieces.empty() ? nullptr : pieces.front();
+	for (const TurnedObject &to : _turned_objects) {
+		if (to.origin == anchor && to.obj == first) return;
+	}
+	TurnedObject &to = _turned_objects.emplace_back(first, anchor, z, nullptr, of->vehicles);
+	if (pieces.size() > 1) to.with.assign(pieces.begin() + 1, pieces.end());
 }
 
 /**
