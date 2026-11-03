@@ -6723,7 +6723,13 @@ const ThreeDVehicleShape *ThreeDVehicleObject::GetShape(int frame) const
 		return this->frame_shapes[frame] != nullptr;
 	}, [this, frame] { return this->MakeShape(frame); }, [this, frame](std::shared_ptr<const ThreeDVehicleShape> made) { this->frame_shapes[frame] = std::move(made); });
 	const ThreeDVehicleShape *made = this->frame_shapes[frame].get();
-	return made != nullptr ? made : this->GetShape();
+	if (made != nullptr) return made;
+	/* Not made (being read in the background, the drawing not waiting for it; or it cannot be): a figure that does not
+	 * blend from another motion stands in its still shape (GetShape()). One that does (blend_from) is sent back here by
+	 * GetShape() for its frame 0 -- round and round till the stack ran out (#325, the animals on their skeletons as a
+	 * game was loaded) --: its first frame if that one is made, else nothing this time. */
+	if (this->blend_from == nullptr) return this->GetShape();
+	return frame != 0 && this->frame_shapes[0] != nullptr ? this->frame_shapes[0].get() : nullptr;
 }
 
 /**

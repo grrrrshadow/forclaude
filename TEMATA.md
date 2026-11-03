@@ -31,6 +31,20 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (103) – Pád #325: přetečení zásobníku = nekonečná rekurze GetShape u prolínaných postav
+
+- Crash log `crash20261103154951` (#325, po načtení hry): `EXCEPTION_STACK_OVERFLOW`, tentokrát s přečteným
+  zásobníkem (oprava (96)): 11 822 návratových adres, nejčastější tři po ~2 910× za sebou. Podle symbolů #325
+  (artefakt `symbols-windows-x64-run325`, `crash_sym.py`): `ThreeDVehicleObject::GetShape(int)` →
+  `GetShape()` → `GetShape(int, ThreeDParts)` → `GetShape(int)` … dokola.
+- **Příčina:** postava, která prolíná pohyby (`blend_from`, průchod mezi animacemi zvířat a postav na kostře),
+  chce snímek. Když ještě není hotový (čte se na pozadí a kreslení na něj nečeká, nebo ho nejde udělat),
+  `GetShape(int)` vrátila „tvar v klidu“ přes `GetShape()`. Jenže ta prolínanou postavu posílá zpátky na snímek
+  0 – a tak dokola, dokud nedošel zásobník. V rigu se to nestalo, protože tam se všechno načítá najednou a čeká se.
+- **Teď:** když snímek není, postava bez prolínání dostane tvar v klidu jako dřív, prolínaná svůj snímek 0, je-li
+  hotový, jinak tentokrát nic (všichni volající s `nullptr` počítají, další snímek už tam bude). To je i příčina
+  „přetečení u lesa“ z #323 (#279): u lesa chodí zvířata na kostře.
+
 ## 3. 11. (102) – Diamantový důl: bouda vzadu přes halu vepředu (#325)
 
 - Hráč (snímek z #325): *„vyfotil jsem diamantový důl že se blbě kreslí, dělá to při všech zoomech. bouda vzadu je přes
