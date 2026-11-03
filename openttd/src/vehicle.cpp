@@ -18,6 +18,7 @@
 #include "three_d.h"
 #include "three_d_vehicle_object.h"
 #include "three_d_ufo.h"
+#include "three_d_objects.h"
 #include "blitter/factory.hpp"
 #include "news_func.h"
 #include "command_func.h"
@@ -1418,11 +1419,15 @@ static void DoDrawVehicle(const Vehicle *v)
 		if (turned.IsValid()) seq = &turned;
 	}
 
+	/* The smoke of an industry's chimney in the 3D views: out of the top of the chimney of its parts (ThreeDIndustrySmokeAt()). */
+	int x = v->x_pos, y = v->y_pos, z = v->z_pos;
+	if ((ViewportDrawingTurned() || ViewportDrawingNorthObjects()) && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32) ThreeDIndustrySmokeAt(v, x, y, z);
+
 	StartSpriteCombine();
 	for (uint i = 0; i < seq->count; ++i) {
 		PaletteID pal2 = seq->seq[i].pal;
 		if (!pal2 || v->vehstatus.Test(VehState::Crashed)) pal2 = pal;
-		AddSortableSpriteToDraw(seq->seq[i].sprite, pal2, v->x_pos, v->y_pos, v->z_pos, v->bounds, shadowed, nullptr, v->draw_offs);
+		AddSortableSpriteToDraw(seq->seq[i].sprite, pal2, x, y, z, v->bounds, shadowed, nullptr, v->draw_offs);
 	}
 	EndSpriteCombine();
 
@@ -2321,6 +2326,20 @@ void Vehicle::UpdateViewport(bool dirty)
 				std::min(this->sprite_cache.old_coord.top, this->coord.top),
 				std::max(this->sprite_cache.old_coord.right, this->coord.right),
 				std::max(this->sprite_cache.old_coord.bottom, this->coord.bottom));
+		}
+		/* Drawn elsewhere in the 3D views (the smoke of an industry's chimney out of the top of the chimney of its parts,
+		 * ThreeDIndustrySmokeAt()): drawn again there too, the step it rose and the sprite it had about it. */
+		if (this->type == VehicleType::Effect && ThreeDEnabled()) {
+			int x = this->x_pos, y = this->y_pos, z = this->z_pos;
+			if (ThreeDIndustrySmokeAt(this, x, y, z)) {
+				Rect b;
+				this->sprite_cache.sprite_seq.GetBounds(&b);
+				Point pt = RemapCoords(x + this->bounds.origin.x + this->bounds.offset.x, y + this->bounds.origin.y + this->bounds.offset.y, z);
+				pt.x += this->draw_offs.x;
+				pt.y += this->draw_offs.y;
+				const int m = 8 * ZOOM_BASE;
+				::MarkAllViewportsDirty(pt.x + b.left - m, pt.y + b.top - m, pt.x + b.right + m, pt.y + b.bottom + m);
+			}
 		}
 		MarkVehicleLightPoolDirty(this);
 	}

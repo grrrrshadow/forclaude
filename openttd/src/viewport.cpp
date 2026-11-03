@@ -14839,7 +14839,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		if (u->type == VehicleType::Effect && u->sprite_cache.sprite_seq.count == 0) continue;
 		/* A disaster's UFO: the saucer among the figures (AddThreeDUfosToEye()), not its sprite. */
 		if (ThreeDEnabled() && ThreeDUfoDrawsDisaster(u)) continue;
-		CabPoint c = CabToEye(eye, u->x_pos, u->y_pos, u->z_pos, 0, 0);
+		/* The smoke of an industry's chimney: out of the top of the chimney of its parts (ThreeDIndustrySmokeAt()). */
+		int ux = u->x_pos, uy = u->y_pos, uz = u->z_pos;
+		if (ThreeDEnabled()) ThreeDIndustrySmokeAt(u, ux, uy, uz);
+		CabPoint c = CabToEye(eye, ux, uy, uz, 0, 0);
 		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
 		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the
 		 * sprites of its eight directions are only for what is drawn from them (the player, 16. 10.). */
@@ -14858,7 +14861,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		PaletteID pal = PAL_NONE;
 		if (u->vehstatus.Test(VehState::DefaultPalette)) pal = (u->vehstatus.Test(VehState::Crashed) || u->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(u);
-		Point pt = RemapCoords(u->x_pos, u->y_pos, u->z_pos);
+		Point pt = RemapCoords(ux, uy, uz);
 		for (uint k = 0; k < seq.count; k++) {
 			const Sprite *spr = GetSprite(seq.seq[k].sprite & SPRITE_MASK, SpriteType::Normal);
 			ParentSpriteToDraw ps{};
@@ -14872,13 +14875,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ps.top = pt.y + spr->y_offs;
 			/* Its box, the vehicle's: an empty one (all 0) read as a fence piece, a point under a tall sprite, and the
 			 * vehicles around were not drawn at all (the player: "I don't see the cars around from the cab"). */
-			ps.xmin = u->x_pos + u->bounds.origin.x;
-			ps.ymin = u->y_pos + u->bounds.origin.y;
-			ps.zmin = u->z_pos + u->bounds.origin.z;
+			ps.xmin = ux + u->bounds.origin.x;
+			ps.ymin = uy + u->bounds.origin.y;
+			ps.zmin = uz + u->bounds.origin.z;
 			ps.xmax = ps.xmin + std::max<int>(u->bounds.extent.x, 2) - 1;
 			ps.ymax = ps.ymin + std::max<int>(u->bounds.extent.y, 2) - 1;
 			ps.zmax = ps.zmin + std::max<int>(u->bounds.extent.z, 5) - 1;
-			bills.push_back({c.f, static_cast<double>(u->x_pos), static_cast<double>(u->y_pos), static_cast<double>(u->z_pos), 0, 0.0, 0.0, ps});
+			bills.push_back({c.f, static_cast<double>(ux), static_cast<double>(uy), static_cast<double>(uz), 0, 0.0, 0.0, ps});
 		}
 	}
 	/* The figures standing on the tiles (the clay town's mushrooms, the dragons): near the eye their triangles as they

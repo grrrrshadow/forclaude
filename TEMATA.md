@@ -34,6 +34,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (105) – Kouř měděného dolu (a elektrárny) z vršku 3D komína
+
+- Hráč (#325, foto): *„je to jinej dul, na měď asi a kouř vychazí moc nizko. uprostřed komina se vytvoři kolečko
+  kouře a stoupá a bourá grafiku komina“*; potom *„zmenši kominy jestli to je složite“* – složité to nebylo, komíny
+  (kolegovy díly) zůstaly.
+- **Příčina:** hra pouští kouř tam, kde má komín sprite dlaždice: měděný důl (gfx 49) 43 jednotek nad zemí na 6,6
+  dlaždice, elektrárna (gfx 8) 59 na 15,14. Náš komín `pv_komin_cihlovy` je 28 m (75 jednotek) a stojí na 11,9 m,
+  `pv_komin_vysoky` 60 m. Kouř tak vznikal v půlce komína vedle něj a kreslil se přes něj.
+- **Oprava (jen kreslení, hra beze změny):** `ThreeDIndustrySmokeAt()` (three_d_objects.cpp) – kouř komína průmyslu
+  kresleného z dílů se ve 3D pohledech (mapa i z očí) kreslí od středu vršku komínového dílu dlaždice (díl s „komin“
+  v názvu, střed jeho nejvyšších vrcholů), stoupá stejně jako ve hře. Místo, kde se kreslí, se značí ke kreslení
+  znovu (`Vehicle::UpdateViewport()`), aby za ním nezůstávaly stopy.
+- Rig (subtropy, `EXTRA=1`, `test3d postav 80 80 typ10`, `test3d zoom 2`, snímky po 16 ticích): hra kouř 67, kreslí
+  se 100 = vršek komína (24 + 75), posun o 7 k ose komína; kroužek sedí na vršku komína a stoupá. MinGW, clang 0,
+  kouřová baterie beze změny.
+
 ## 3. 11. (104) – Okno auta zpomaluje kurzor (#325): skrytá mapa pod pohledem z očí, malá okna najednou
 
 - Hráč: *„okno auta spomalí kurzor myši. jak ty okna zavřu tak je kurzor zas normální.“* Kurzor se kreslí se

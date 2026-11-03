@@ -1131,6 +1131,8 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);
 TileIndex GetThreeDOriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTileParts *&parts);
+struct Vehicle;
+bool ThreeDIndustrySmokeAt(const Vehicle *v, int &x, int &y, int &z);
 bool ThreeDForestTile(TileIndex tile);
 
 /** A place of the forest with a clearing where the game or the ghosts come ("zvirata", "noc_postavy"), with their kinds. */

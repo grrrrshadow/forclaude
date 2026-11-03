@@ -31,6 +31,7 @@
 #include "core/bitmath_func.hpp"
 #include "engine_base.h"
 #include "vehicle_base.h"
+#include "effectvehicle_func.h"
 #include "core/string_consumer.hpp"
 #include "three_d.h"
 #include "town.h"
@@ -8368,6 +8369,71 @@ TileIndex GetThreeDOriginalIndustryAnchor(TileIndex tile, const ThreeDIndustryTi
 	if (anchor == INVALID_TILE || !IsTileType(anchor, TileType::Industry) || GetIndustryIndex(anchor) != GetIndustryIndex(tile)) return INVALID_TILE;
 	parts = GetThreeDOriginalIndustryTileAt(anchor);
 	return parts != nullptr && !parts->member ? anchor : INVALID_TILE;
+}
+
+/**
+ * Where the smoke of an industry's chimney is drawn in the 3D views (the player's #325, a copper mine: "the smoke comes
+ * out too low; in the middle of the chimney a ring of smoke forms and rises over the chimney's picture"): the game lets
+ * its smoke out where the sprite of the tile has its chimney (a copper mine 43 units over the ground at 6, 6 of the
+ * tile -- half way up our chimney of 28 m, beside it --, a power station 59 at 15, 14), and it rises from there.
+ * Drawn the same way up from the middle of the top of the chimney of the tile's parts (a part "...komin..." of
+ * GetThreeDOriginalIndustryTileAt()); the game's smoke itself, where it is and how it moves, as ever.
+ * @param v the vehicle drawn: anything but the smoke of an industry's chimney drawn from our parts left as it is
+ * @param[in,out] x,y,z where to draw it, world units
+ * @return whether it is drawn elsewhere
+ */
+bool ThreeDIndustrySmokeAt(const Vehicle *v, int &x, int &y, int &z)
+{
+	if (v->type != VehicleType::Effect) return false;
+	/* Where the game lets it out over the ground of its tile (TileLoop_Industry(), CreateChimneySmoke()). */
+	int ox, oy, oz;
+	bool by_slope;
+	switch (static_cast<EffectVehicleType>(v->subtype)) {
+		case EV_COPPER_MINE_SMOKE: ox = 6; oy = 6; oz = 43; by_slope = true; break;
+		case EV_CHIMNEY_SMOKE: ox = 15; oy = 14; oz = 59; by_slope = false; break;
+		default: return false;
+	}
+	const TileIndex tile = TileVirtXY(v->x_pos, v->y_pos);
+	if (!IsTileType(tile, TileType::Industry)) return false;
+	const ThreeDIndustryTileParts *parts = GetThreeDOriginalIndustryTileAt(tile);
+	if (parts == nullptr || !ThreeDOriginalIndustryTileStands(tile, *parts)) return false;
+	const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, parts);
+	if (anchor == INVALID_TILE) return false;
+	/* The top of its chimney, once for each part: the middle of its highest corners. */
+	struct Top {
+		float x = 0, y = 0, z = 0;
+		bool chimney = false;
+	};
+	static std::unordered_map<const ThreeDObject *, Top> tops;
+	const Top *best = nullptr;
+	for (const ThreeDObject *part : parts->parts) {
+		auto [it, made] = tops.try_emplace(part);
+		Top &t = it->second;
+		if (made) {
+			const size_t slash = part->name.rfind('/');
+			t.chimney = slash != std::string::npos && part->name.find("komin", slash) != std::string::npos && part->top > 0;
+			if (t.chimney) {
+				double sx = 0, sy = 0;
+				int n = 0;
+				for (size_t i = 0; i + 2 < part->pos.size(); i += 3) {
+					if (part->pos[i + 2] < part->top * 0.97f) continue;
+					sx += part->pos[i];
+					sy += part->pos[i + 1];
+					n++;
+				}
+				t.chimney = n > 0;
+				if (n > 0) t = {static_cast<float>(sx / n), static_cast<float>(sy / n), part->top, true};
+			}
+		}
+		if (t.chimney && (best == nullptr || t.z > best->z)) best = &t;
+	}
+	if (best == nullptr) return false;
+	const int from = by_slope ? GetSlopePixelZ(TileX(tile) * TILE_SIZE + ox, TileY(tile) * TILE_SIZE + oy) : GetTileMaxPixelZ(tile);
+	const int risen = v->z_pos - (from + oz);
+	x = static_cast<int>(TileX(anchor) * TILE_SIZE + std::lround(best->x));
+	y = static_cast<int>(TileY(anchor) * TILE_SIZE + std::lround(best->y));
+	z = GetTileMaxPixelZ(anchor) + static_cast<int>(std::lround(best->z)) + std::max(0, risen);
+	return true;
 }
 
 /**
