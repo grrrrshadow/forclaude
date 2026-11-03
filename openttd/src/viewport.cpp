@@ -2322,6 +2322,9 @@ struct TurnedGroundTile {
 	TileIndex round = INVALID_TILE; ///< its track is drawn as a strip (round_track.h)
 	uint32_t order = 0; ///< drawn far first facing north, as the game draws the ground: by this
 	GroundRect spot;    ///< the pixel of its north corner: where a tile that draws nothing is
+	int tile_x = 0, tile_y = 0; ///< the tile (our grass on it, DrawOurGrass())
+	int base_z = 0;     ///< the height of its lowest corner, of the ground drawn
+	Slope slope = SLOPE_FLAT; ///< and its slope
 	GroundRect Reach() const { return this->area.With(this->fill); }
 };
 
@@ -2558,10 +2561,198 @@ static bool PlaceTurnedGround(TurnedGround &g, ZoomLevel zoom, const GroundRect 
  *        sprites and the foundation's children), drawn as any other tile's; none (the turned view), such a tile has
  *        none here, its foundation and its ground are drawn by themselves (DrawTurnedTileGround())
  */
+static Colour CabSpriteColour(SpriteID image, PaletteID pal, Colour fallback);
+
+/**
+ * What of the game's ground a sprite is that our grass covers (DrawOurGrass()): the land of the temperate climate that
+ * grass grows on (the player, 3. 11.: "a grassy surface for the temperate climate ... it hides much of the chequered
+ * original ground"; from the eyes "only our grass works, and it covers everything") -- bare land, a third, two thirds
+ * or all of it grown over, rough land (under trees too) --, not the land of a themed town in its colours.
+ */
+struct OurGrassGround {
+	int kind = -1;      ///< 0 bare land, 1-3 its thirds grown over, 4 rough land; -1 none of ours
+	uint slope = 0;     ///< which of the sprites of its kind by the slope (SlopeToSpriteOffset())
+};
+static constexpr int OUR_GRASS_KINDS = 5;
+
+static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
+{
+	if (pal != PAL_NONE || _settings_game.game_creation.landscape != LandscapeType::Temperate) return {};
+	const SpriteID s = image & SPRITE_MASK;
+	static const SpriteID grown[4] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE};
+	for (int k = 0; k < 4; k++) {
+		if (s >= grown[k] && s < grown[k] + 19) return {k, s - grown[k]};
+	}
+	if (s >= SPR_FLAT_ROUGH_LAND && s < SPR_FLAT_ROUGH_LAND + 19) return {4, s - SPR_FLAT_ROUGH_LAND};
+	if (s >= SPR_FLAT_ROUGH_LAND_1 && s <= SPR_FLAT_ROUGH_LAND_4) return {4, 0}; // the flat rough land's others
+	return {};
+}
+
+/** Our grass's picture ("povrch": "trava" of the index, objekty/nase/trava_mirna.png), its levels halved, and over how many tiles each way it runs. */
+struct OurGrassSurface {
+	ThreeDTextureLevels picture; ///< nullptr while the indices are not read, or without it
+	int tiles = 1;
+};
+
+static const OurGrassSurface &OurGrassPicture()
+{
+	static OurGrassSurface grass;
+	if (grass.picture == nullptr && ObjectsIndexReadOrOwed()) grass.picture = GetThreeDSurface("trava", grass.tiles);
+	return grass;
+}
+
+/**
+ * The game's ground of a tile drawn as our grass into the picture being drawn (_cur_dpi, the ground facing north):
+ * the sprite's pixels, of our picture at the world points they show -- the same at every edge, so that it runs on over
+ * the tiles and their slopes --, tinted to the mean of the sprite's kind as the game draws it flat (bare land brown,
+ * rough land dark), lit as the game's grass is on that slope (its light blurred over its dithering).
+ * @param ground what of ours the sprite is (OurGrassGroundOf())
+ * @param eyes the ground of the view from the eyes: our picture coarse, a texel about a metre (its blades are our
+ *             grass's tufts there, AddOurGrass()); on the map about a texel to a pixel
+ * @param tile_x,tile_y the tile
+ * @param base_z the height of its lowest corner
+ * @param slope its slope
+ */
+static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGround ground, bool eyes, int tile_x, int tile_y, int base_z, Slope slope)
+{
+	const OurGrassSurface &grass = OurGrassPicture();
+	const ThreeDTextureLevels &picture = grass.picture;
+	const DrawPixelInfo *d = _cur_dpi;
+	if (picture == nullptr || picture->empty() || picture->front().w < 2 || d == nullptr || ground.kind < 0) {
+		DrawSpriteViewport(image, pal, x, y, nullptr);
+		return;
+	}
+	/* Each kind's tint, once: the mean of its flat sprite against our picture's; and the light of the game's flat grass. */
+	struct Fit {
+		std::array<std::array<float, 3>, OUR_GRASS_KINDS> tint;
+		float light;
+	};
+	static const Fit fit = [&picture] {
+		uint64_t r = 0, g = 0, b = 0;
+		for (uint32_t p : picture->front().px) {
+			const Colour c(p);
+			r += c.r;
+			g += c.g;
+			b += c.b;
+		}
+		const double n = std::max<size_t>(1, picture->front().px.size());
+		const double mr = std::max(1.0, r / n), mg = std::max(1.0, g / n), mb = std::max(1.0, b / n);
+		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND};
+		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45)};
+		Fit f{};
+		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
+			const Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
+			f.tint[k] = {static_cast<float>(c.r / mr), static_cast<float>(c.g / mg), static_cast<float>(c.b / mb)};
+		}
+		const Colour game = CabSpriteColour(SPR_FLAT_GRASS_TILE, PAL_NONE, fallback[3]);
+		f.light = static_cast<float>(std::max(1.0, (game.r * 77 + game.g * 150 + game.b * 29) / 256.0));
+		return f;
+	}();
+	const int s = ScaleByZoom(1, d->zoom);
+	auto floor_div = [](int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
+	const Sprite *spr = GetSprite(image & SPRITE_MASK, SpriteType::Normal);
+	const int px0 = std::max(0, floor_div(x + spr->x_offs - d->left, s) - 1);
+	const int py0 = std::max(0, floor_div(y + spr->y_offs - d->top, s) - 1);
+	const int px1 = std::min(d->width / s, floor_div(x + spr->x_offs + spr->width - d->left + s - 1, s) + 1);
+	const int py1 = std::min(d->height / s, floor_div(y + spr->y_offs + spr->height - d->top + s - 1, s) + 1);
+	const int tw = px1 - px0, th = py1 - py0;
+	if (tw <= 0 || th <= 0) return;
+	/* The sprite as the game draws it, on its own (where it has pixels), and the game's grass on that slope (its light:
+	 * not the bumps of rough land nor the clods of bare land). */
+	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0), lit(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo t{};
+	t.left = d->left + px0 * s;
+	t.top = d->top + py0 * s;
+	t.width = tw * s;
+	t.height = th * s;
+	t.pitch = tw;
+	t.zoom = d->zoom;
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
+		t.dst_ptr = own.data();
+		DrawSpriteViewport(image, pal, x, y, nullptr);
+		t.dst_ptr = lit.data();
+		DrawSpriteViewport(SPR_FLAT_GRASS_TILE + ground.slope, PAL_NONE, x, y, nullptr);
+	}
+	/* Its light blurred over two of its pixels each way (it is dithered), as sums over the rect up to each pixel. */
+	const int blur = std::max(1, 2 * static_cast<int>(ZOOM_BASE) / s);
+	std::vector<uint32_t> sum_l(static_cast<size_t>(tw + 1) * (th + 1), 0), sum_n(static_cast<size_t>(tw + 1) * (th + 1), 0);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const uint32_t p = lit[static_cast<size_t>(j) * tw + i];
+			const Colour c(p);
+			const uint32_t has = (p >> 24) != 0 ? 1 : 0;
+			const size_t at = static_cast<size_t>(j + 1) * (tw + 1) + (i + 1);
+			sum_l[at] = (has != 0 ? (c.r * 77 + c.g * 150 + c.b * 29) >> 8 : 0) + sum_l[at - 1] + sum_l[at - (tw + 1)] - sum_l[at - (tw + 1) - 1];
+			sum_n[at] = has + sum_n[at - 1] + sum_n[at - (tw + 1)] - sum_n[at - (tw + 1) - 1];
+		}
+	}
+	auto box = [&](const std::vector<uint32_t> &sum, int i0, int j0, int i1, int j1) {
+		return sum[static_cast<size_t>(j1) * (tw + 1) + i1] - sum[static_cast<size_t>(j0) * (tw + 1) + i1] - sum[static_cast<size_t>(j1) * (tw + 1) + i0] + sum[static_cast<size_t>(j0) * (tw + 1) + i0];
+	};
+	/* The level of our picture: on the map a texel or two to a pixel (a side of a tile is 36 pixels long at the normal
+	 * zoom); from the eyes about a metre a texel, smooth, its blades the tufts'. */
+	const ThreeDObjectTexture *level = &picture->front();
+	{
+		const double want = eyes ? 16.0 : 36.0 * ZOOM_BASE / s; // texels along a side of a tile
+		size_t k = 0;
+		while (k + 1 < picture->size() && (*picture)[k + 1].w >= want * grass.tiles) k++;
+		level = &(*picture)[k];
+	}
+	const int lw = level->w, lh = level->h;
+	const double tex_per_unit_x = static_cast<double>(lw) / (TILE_SIZE * grass.tiles), tex_per_unit_y = static_cast<double>(lh) / (TILE_SIZE * grass.tiles);
+	auto texel = [&](int u, int v) { return Colour(level->px[static_cast<size_t>(((v % lh) + lh) % lh) * lw + ((u % lw) + lw) % lw]); };
+	/* From the eyes the grass of every thickness and the rough land alike (how thick it is, its tufts show,
+	 * AddOurGrass()): no edges of the tiles between them; bare land as it is. */
+	const std::array<float, 3> &tint = fit.tint[eyes && ground.kind > 0 ? 3 : ground.kind];
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const uint32_t p = own[static_cast<size_t>(j) * tw + i];
+			if ((p >> 24) == 0) continue;
+			/* The world point the pixel shows, on the tile's slope: from the view's coordinates, its height found by going
+			 * up and down the slope a few times (RemapCoords() backwards). */
+			const double vx = t.left + i * s + s / 2.0, vy = t.top + j * s + s / 2.0;
+			const double a = vx / (2.0 * ZOOM_BASE), b = vy / ZOOM_BASE;
+			double z = base_z, wx = 0, wy = 0;
+			for (int k = 0; k < 3; k++) {
+				wx = (b + z - a) / 2;
+				wy = (b + z + a) / 2;
+				const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+				const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+				z = base_z + GetPartialPixelZ(fx, fy, slope);
+			}
+			/* Our picture there, between its four texels. */
+			const double u = wx * tex_per_unit_x - 0.5, v = wy * tex_per_unit_y - 0.5;
+			const int u0 = static_cast<int>(std::floor(u)), v0 = static_cast<int>(std::floor(v));
+			const double fu = u - u0, fv = v - v0;
+			const Colour c00 = texel(u0, v0), c10 = texel(u0 + 1, v0), c01 = texel(u0, v0 + 1), c11 = texel(u0 + 1, v0 + 1);
+			auto lerp = [&](uint8_t q00, uint8_t q10, uint8_t q01, uint8_t q11) {
+				return (q00 * (1 - fu) + q10 * fu) * (1 - fv) + (q01 * (1 - fu) + q11 * fu) * fv;
+			};
+			/* Lit as the game's grass is there. */
+			const int i0 = std::max(0, i - blur), j0 = std::max(0, j - blur), i1 = std::min(tw, i + blur + 1), j1 = std::min(th, j + blur + 1);
+			const uint32_t n = box(sum_n, i0, j0, i1, j1);
+			const double light = n == 0 ? 1.0 : std::clamp(box(sum_l, i0, j0, i1, j1) / static_cast<double>(n) / fit.light, 0.35, 1.7);
+			auto channel = [&](double ours, float k) { return static_cast<uint8_t>(std::clamp(ours * k * light, 0.0, 255.0)); };
+			const Colour out(channel(lerp(c00.r, c10.r, c01.r, c11.r), tint[0]), channel(lerp(c00.g, c10.g, c01.g, c11.g), tint[1]), channel(lerp(c00.b, c10.b, c01.b, c11.b), tint[2]));
+			static_cast<uint32_t *>(d->dst_ptr)[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)] = out.data;
+		}
+	}
+}
+
+/** Whether the ground being drawn has our grass: from the eyes always, on the map as the player chose (gui.map_grass). */
+static bool OurGrassOn(bool eyes)
+{
+	return (eyes || _settings_client.gui.map_grass) && _settings_game.game_creation.landscape == LandscapeType::Temperate && OurGrassPicture().picture != nullptr;
+}
+
 static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tiles, std::span<const std::vector<TurnedGroundSprite>> on_foundations = {})
 {
 	double t0 = TurnedNow();
 	const bool map = &g == &_turned_ground;
+	/* Our grass on the game's (DrawOurGrass()): the tiles drawn again when the player switches it, or its picture comes. */
+	const bool eyes = &g == &_eye_ground;
+	const bool grass = OurGrassOn(eyes);
 	const int s = ScaleByZoom(1, g.zoom);
 	for (size_t n = 0; n < tiles.size(); n++) {
 		const TurnedTile &t = tiles[n];
@@ -2570,6 +2761,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
 		GroundHash hash;
 		hash.Mix(founded);
+		hash.Mix(grass ? 1 : 0);
 		if (given != nullptr) {
 			for (const TurnedGroundSprite &gs : *given) hash.Sprite(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
 		} else if (!founded) {
@@ -2605,6 +2797,10 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		rec.fill = {};
 		rec.round = INVALID_TILE;
 		rec.order = static_cast<uint32_t>(t.x + t.y + 128) << 15 | static_cast<uint32_t>(t.y - t.x + 16384);
+		rec.tile_x = t.x;
+		rec.tile_y = t.y;
+		rec.base_z = t.top_z;
+		rec.slope = t.top_slope;
 		const Point north = RemapCoords(t.x * TILE_SIZE, t.y * TILE_SIZE, t.raw_z);
 		rec.spot = {PixelFloor(north.x, s), PixelFloor(north.y, s), PixelFloor(north.x, s) + 1, PixelFloor(north.y, s) + 1};
 		if (!founded || given != nullptr) {
@@ -2709,7 +2905,13 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
 			for (const TurnedGroundTile *rec : tiles_in(r)) {
 				if (!rec->area.Meets(r)) continue;
-				for (const TurnedGroundSprite &gs : rec->sprites) DrawSpriteViewport(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
+				for (const TurnedGroundSprite &gs : rec->sprites) {
+					if (const OurGrassGround ours = grass && !gs.has_sub ? OurGrassGroundOf(gs.image, gs.pal) : OurGrassGround{}; ours.kind >= 0) {
+						DrawOurGrass(gs.image, gs.pal, gs.x, gs.y, ours, eyes, rec->tile_x, rec->tile_y, rec->base_z, rec->slope);
+					} else {
+						DrawSpriteViewport(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
+					}
+				}
 				if (rec->round != INVALID_TILE) round.push_back(rec->round);
 			}
 		}
@@ -11475,6 +11677,7 @@ struct CabFigure {
 	bool own_cab = false; ///< the vehicle whose cab the eye is in: drawn round the eye, its driver not
 	double pitch = 0;     ///< degrees its +x is raised over the level (an arrow flying, AddCabMissile())
 	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
+	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
 };
 static std::vector<CabFigure> _cab_figures;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
@@ -11573,10 +11776,13 @@ static ThreeDEyeVehicle CabFigureVehicle(const CabFigure &fg)
  * A plant of a field in the view from the eyes (the technologies of OpenMW, the player, 16. 10.: thousands of the
  * same plant cheaply): one model and a few pictures of it for all of them, each drawn where it stands -- the
  * pictures at a few angles and sizes (GetThreeDPlantPicture()), the model only for those at the walker's feet.
+ * @param rise_x,rise_y the ground it is sheared along (our grass's tufts, AddOurGrass()): units of height a world unit
  */
-static void AddCabPlant(std::string_view name, float scale, float stretch, double x, double y, double z, float facing)
+static void AddCabPlant(std::string_view name, float scale, float stretch, double x, double y, double z, float facing, float rise_x = 0, float rise_y = 0)
 {
-	_cab_figures.push_back({std::string(name), scale, x, y, z, facing, 0, stretch, true});
+	CabFigure &f = _cab_figures.emplace_back(CabFigure{std::string(name), scale, x, y, z, facing, 0, stretch, true});
+	f.rise_x = rise_x;
+	f.rise_y = rise_y;
 }
 
 /** What a figure drawn by its triangles needs, resolved while collecting (CabFigureReady(), the Try... getters): drawn as a job of the frame (CabDrawFigureModel()). */
@@ -11849,7 +12055,8 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				nz = rz;
 			}
 			const double fx = mx * OBJECT_UNITS_PER_METRE, fy = py * across;
-			pts[i] = CabToEye(eye, fg.x + fx * ca - fy * sa, fg.y + fx * sa + fy * ca, fg.z + mz * OBJECT_HEIGHT_PER_METRE, s.uv[i * 2], s.uv[i * 2 + 1]);
+			const double ox = fx * ca - fy * sa, oy = fx * sa + fy * ca;
+			pts[i] = CabToEye(eye, fg.x + ox, fg.y + oy, fg.z + mz * OBJECT_HEIGHT_PER_METRE + fg.rise_x * ox + fg.rise_y * oy, s.uv[i * 2], s.uv[i * 2 + 1]);
 			if (pts[i].f >= _cab_near) scr[i] = CabProject(eye, pts[i]);
 			if (shape_lit) {
 				const double wx = nx * ca - ny * sa, wy = nx * sa + ny * ca;
@@ -12030,7 +12237,9 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 	const M3 size{fg.size * fg.along, 0, 0, 0, fg.size, 0, 0, 0, fg.size * fg.stretch};
 	const M3 units{OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_UNITS_PER_METRE, 0, 0, 0, OBJECT_HEIGHT_PER_METRE};
 	const M3 rotate = mul(facing, mul(pitch, turn));
-	const M3 place = mul(units, mul(facing, mul(pitch, mul(size, turn))));
+	/* A plant sheared along the ground under it (AddOurGrass()): its height raised by its place along x and y. */
+	const M3 shear{1, 0, 0, 0, 1, 0, fg.rise_x, fg.rise_y, 1};
+	const M3 place = mul(shear, mul(units, mul(facing, mul(pitch, mul(size, turn)))));
 	const std::array<double, 16> clip = EyeClip(eye, width, height, fg.x, fg.y, fg.z, near);
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
 	/* A shape whose corners are first placed in the model's frame by local and at (a figure of its crew). */
@@ -12213,6 +12422,114 @@ static constexpr double CAB_COARSE = 14.0 * TILE_SIZE;
 static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
 /** The wheat of the farm's fields is drawn this many tiles about the eye; farther, the field's ground. */
 static constexpr double CAB_WHEAT_TILES = 10.0;
+/** Our grass's tufts (objekty/nase/trava_trs) are laid this many tiles about the eye; farther, our grass's picture. */
+static constexpr double CAB_GRASS_TILES = 3.0;
+/** And a tile has so many of them along each side (a tuft is 2 x 2 m, the tile 14.8 m): fewer as it is grown over. */
+static constexpr int CAB_GRASS_TUFTS = 7;
+
+/**
+ * The ground of a tile where a point of it lies, as the view from the eyes lays it (four triangles meeting in its
+ * middle, so that a slope keeps its fold): its height there, and how it rises along x and y, units of height a unit.
+ * @param x,y the point within the tile, world units from its north corner
+ */
+static void CabGroundPlane(Slope slope, int base_z, double x, double y, double &z, double &rise_x, double &rise_y)
+{
+	slope = RemoveHalftileSlope(slope);
+	const double h = TILE_SIZE, m = TILE_SIZE / 2.0;
+	const double zn = GetSlopePixelZInCorner(slope, CORNER_N), ze = GetSlopePixelZInCorner(slope, CORNER_E);
+	const double zs = GetSlopePixelZInCorner(slope, CORNER_S), zw = GetSlopePixelZInCorner(slope, CORNER_W);
+	const double zm = GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, slope);
+	/* The corners: north (0, 0), east (0, 1), south (1, 1), west (1, 0); the triangle of the side nearest the point. */
+	struct P { double x, y, z; };
+	P a, b;
+	const bool ne = x < y && x < h - y, se = y >= x && y >= h - x, sw = x >= y && x >= h - y;
+	if (ne) {
+		a = {0, 0, zn}; b = {0, h, ze};
+	} else if (se) {
+		a = {0, h, ze}; b = {h, h, zs};
+	} else if (sw) {
+		a = {h, h, zs}; b = {h, 0, zw};
+	} else {
+		a = {h, 0, zw}; b = {0, 0, zn};
+	}
+	/* The plane through a, b and the middle: z = zm + rx (x - m) + ry (y - m). */
+	const double ax = a.x - m, ay = a.y - m, az = a.z - zm, bx = b.x - m, by = b.y - m, bz = b.z - zm;
+	const double det = ax * by - ay * bx;
+	rise_x = det != 0 ? (az * by - ay * bz) / det : 0;
+	rise_y = det != 0 ? (ax * bz - az * bx) / det : 0;
+	z = base_z + zm + rise_x * (x - m) + rise_y * (y - m);
+}
+
+/**
+ * Our grass on a tile of the temperate climate about the walker (the player, 3. 11.: "denser grass, like stubble at
+ * least, simple, colourful by its colouring ... the tuft can be modular, with flowers to add"; on the farm's field
+ * "I don't see the ground"): our tufts (objekty/nase/trava_trs, 2 x 2 m of short blades in eight shades) laid over it in
+ * rows, each turned anyhow and sheared to the ground under it (CabGroundPlane()) -- as many as the tile is grown over,
+ * rough land (under trees too) all of them and taller, bare land none --, and our flowers (trava_kvitky) here and
+ * there among them. Not on the land of a themed town.
+ */
+static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
+{
+	if (!OurGrassOn(true) || GetThemedLand(tile) != ThemedLand::None) return;
+	int thirds = 0;
+	bool rough = false;
+	if (IsTileType(tile, TileType::Clear)) {
+		if (IsSnowTile(tile)) return;
+		if (IsClearGround(tile, ClearGround::Grass)) {
+			thirds = GetClearDensity(tile);
+		} else if (IsClearGround(tile, ClearGround::Rough)) {
+			rough = true;
+		} else {
+			return;
+		}
+	} else if (IsTileType(tile, TileType::Trees)) {
+		if (GetTreeGround(tile) == TreeGround::Grass) {
+			thirds = GetTreeDensity(tile);
+		} else if (GetTreeGround(tile) == TreeGround::Rough) {
+			rough = true;
+		} else {
+			return;
+		}
+	} else {
+		return;
+	}
+	if (rough) thirds = 3;
+	if (thirds <= 0) return;
+	uint32_t seed = TileX(tile) * 2654435761u ^ (TileY(tile) + 0x9E3779B9u) * 2246822519u;
+	auto next = [&seed]() {
+		seed ^= seed << 13;
+		seed ^= seed >> 17;
+		seed ^= seed << 5;
+		return (seed & 0xFFFFFF) / static_cast<double>(0x1000000);
+	};
+	/* A piece at a point of the tile: on the ground there, sheared along it. Its turn in eighths and its height in a few
+	 * steps: without the card its picture is shared by all alike (GetThreeDPlantPicture()). */
+	auto lay = [&](std::string_view name, double x, double y, float size, float stretch) {
+		double z, rise_x, rise_y;
+		CabGroundPlane(slope, base_z, x, y, z, rise_x, rise_y);
+		const float facing = static_cast<float>(45 * static_cast<int>(next() * 8));
+		AddCabPlant(name, size, stretch, x0 + x, y0 + y, z, facing, static_cast<float>(rise_x), static_cast<float>(rise_y));
+	};
+	static constexpr float GRASS_HEIGHTS[3] = {0.85f, 1.0f, 1.2f};
+	static constexpr float ROUGH_HEIGHTS[3] = {1.4f, 1.7f, 2.0f};
+	const double cell = static_cast<double>(TILE_SIZE) / CAB_GRASS_TUFTS;
+	for (int i = 0; i < CAB_GRASS_TUFTS; i++) {
+		for (int j = 0; j < CAB_GRASS_TUFTS; j++) {
+			const double x = std::clamp((i + 0.2 + 0.6 * next()) * cell, 0.0, TILE_SIZE - 0.01);
+			const double y = std::clamp((j + 0.2 + 0.6 * next()) * cell, 0.0, TILE_SIZE - 0.01);
+			const double keep = next(), height = next();
+			if (keep * 3 >= thirds) continue;
+			const float stretch = (rough ? ROUGH_HEIGHTS : GRASS_HEIGHTS)[std::min(2, static_cast<int>(height * 3))];
+			lay("trava_trs", x, y, 1.1f, stretch);
+		}
+	}
+	/* The flowers: a few on a meadow, fewer on rough land and where the grass is thin. */
+	const int flowers = static_cast<int>(next() * (rough ? 3 : 2 + 2 * thirds));
+	for (int k = 0; k < flowers; k++) {
+		const double x = next() * (TILE_SIZE - 0.01), y = next() * (TILE_SIZE - 0.01);
+		lay("trava_kvitky", x, y, 1.0f, next() < 0.5 ? 0.9f : 1.15f);
+	}
+}
 
 /**
  * The night sky in the view from an eye (the player, 15. 10.: "only the night sky", as OpenMW has it): the stars, fixed
@@ -13612,6 +13929,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
+		/* Our grass about the walker (AddOurGrass()). */
+		if ((tile_type == TileType::Clear || tile_type == TileType::Trees) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
+			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh);
+		}
 		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* A pasture (AddPastureTile()): its fences, its shelter or trough, its animals grazing, on the game's grass. */
 			if (const ThreeDPasture *p = GetThreeDPasture(); p != nullptr) {
@@ -13774,7 +14095,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	AddFirstPersonMissilesToEye();
 	AddThreeDWalkersToEye(CAB_FIGURE_SCALE);
 	AddThreeDDriversToEye();
-	ForWalkerPlantParts(AddCabPlant);
+	ForWalkerPlantParts([](std::string_view name, float scale, float stretch, double x, double y, double z, float facing) { AddCabPlant(name, scale, stretch, x, y, z, facing); });
 
 	eye_stage(1);
 	/* 3. The ground of all of them, north-up, in one texture at the normal zoom: the kept one (_eye_ground), only the
@@ -13882,10 +14203,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		{
 			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
+			const bool grass = OurGrassOn(true);
 			for (const CabTile &t : tiles) {
 				for (size_t i = t.first; i < t.end; i++) {
 					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
-					DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+					if (const OurGrassGround ours = grass && ts.sub == nullptr ? OurGrassGroundOf(ts.image, ts.pal) : OurGrassGround{}; ours.kind >= 0) {
+						DrawOurGrass(ts.image, ts.pal, ts.x, ts.y, ours, true, t.x, t.y, t.z, t.slope);
+					} else {
+						DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
+					}
 				}
 			}
 			/* On a foundation (a road or rail levelled on a slope) the ground is drawn as children of the foundation's

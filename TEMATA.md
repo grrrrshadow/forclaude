@@ -31,6 +31,30 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (100) – Tráva mírného klimatu: z očí 3D trsy a kvítky, na mapě hladký povrch
+
+- Hráč: *„uděláme travnatý povrch pro temperate … tráva nízká řídká ale hodně zakryje čtverečkovaný originalni
+  podklad“*; *„2c na mapě porost za přepínačem implicidně, z oči neustále“*; *„takhle seshora to si každý muže zapnout
+  original dlaždice a mit třeba grf ground title, ale first person view, to je duležitý, tam funguje jen naše 3D tráva
+  a všechno zakryje“*; *„hustši travu jako strniště aspoň. jednoduchou. pestrou barvenim … barvit nezabere tolik jako
+  dalši objekt travy“* (na poli u farmy „nevidim tam ground“); *„muže být modulární ten trs, s přidávacími kvítky“*.
+- **Povrch** (`objekty/nase/trava_mirna.png` z `trava.py`, záznam `"druh": "povrch"`, `"povrch": "trava"`,
+  `"dlazdic": 2` – hra ho teď čte): sprity holé zemi, třetin trávy, plné trávy a hrubé zemi (i pod stromy) mírného
+  klimatu se do obrázku země kreslí naším obrázkem podle souřadnic světa (navazuje přes dlaždice i svahy), obarveným
+  na průměr spritu toho druhu a stínovaným jako sprite **plné trávy** na tom svahu (ne hrboly hrubé zemi). Na mapě
+  podle nastavení „Travnatý povrch na mapě“ (`gui.map_grass`, výchozí zapnuto), z očí vždy. Z očí hrubě (texel asi
+  metr, žádné kostičky) a tráva všech hustot i hrubá zem jedním odstínem plné trávy, ať nejsou vidět hrany dlaždic –
+  hustotu ukazují trsy; holá zem hnědá.
+- **Trsy** (`objekty/nase/trava_3d.py` → `trava_trs.glb` a `trava_kvitky.glb`, druh `rostlina`): trs = kus porostu
+  2 × 2 m, 329 stébel (každé jeden trojúhelník) v chomáčích i samotných, většinou pár cm jako strniště, některá do
+  čtvrt metru, každé jedním z osmi odstínů palety (pestrost barvou, ne dalšími modely). Kvítky = 7 stonků s hlavičkou
+  z pěti lístků (bílá, žlutá, fialová, modrá, růžová, červená). Hra (`AddOurGrass()`) kolem chodce do 3 dlaždic
+  pokládá 7 × 7 trsů na dlaždici v řadách s posunem, natočené po 45°, výška ve třech krocích; tráva podle hustoty
+  (třetina dlaždice → třetina trsů), hrubá zem všechny a vyšší, holá zem nic; kvítků pár na dlaždici. Trs je
+  **zkosený podle svahu** pod sebou (nové `rise_x`, `rise_y` u kytky: rovina trojúhelníku dlaždice pod středem trsu,
+  jak zem z očí kreslí čtyři trojúhelníky do středu) – na kartě i procesorem, ať stébla nelevitují.
+- Starý jednotlivý `trs_travy` (42 trojúhelníků, 48 na dlaždici) pryč.
+
 ## 3. 11. (99) – Palmová plantáž: lesní srub, posed na kraji; přepis textur materiálů
 
 - Hráč: *„vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč

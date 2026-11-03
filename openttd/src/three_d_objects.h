@@ -1083,6 +1083,7 @@ const ThreeDObject *GetThreeDIndustryObjectOf(const Industry *ind);
 TileIndex GetThreeDIndustryObjectOrigin(const Industry *ind);
 std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
+ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles);
 const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);

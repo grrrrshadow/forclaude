@@ -3887,6 +3887,29 @@ const ThreeDForestPart *ThreeDGameForestPartAt(TileIndex tile)
 	return GetThreeDForestPart("zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
 }
 
+/** A picture of a surface of the land ("druh": "povrch"): its file, and over how many tiles each way it runs ("dlazdic"). */
+struct ThreeDSurfaceFile {
+	std::string file;
+	int tiles = 1;
+};
+/** The pictures of the surfaces of the land by their "povrch". */
+static std::map<std::string, ThreeDSurfaceFile, std::less<>> _three_d_surfaces;
+
+/**
+ * The picture of a surface of the land by its "povrch" of the index ("trava": our grass of the temperate climate,
+ * objekty/nase/trava_mirna.png, drawn on the game's grass, DrawOurGrass()), its levels halved down to a pixel;
+ * nullptr without it.
+ * @param[out] tiles over how many tiles each way the picture runs
+ */
+ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles)
+{
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_surfaces.find(surface);
+	if (it == _three_d_surfaces.end()) return nullptr;
+	tiles = it->second.tiles;
+	return TextureLevelsOfFile(it->second.file, 0);
+}
+
 /** The grills over the forests' fires (SetThreeDForestGrill()): the animal on each spit by the tile of its fire; never saved, as the doors open. */
 static std::map<TileIndex, int> _three_d_forest_grills;
 
@@ -4220,6 +4243,12 @@ static void ReadThreeDObjectsNow()
 				}
 				if (kind == "les" || kind == "plantaz") {
 					ReadForestPart(e, folder, kind);
+					continue;
+				}
+				if (kind == "povrch" && e.contains("soubor") && e.at("soubor").is_string() && e.contains("povrch") && e.at("povrch").is_string()) {
+					/* A picture of a surface of the land (the grass of the temperate climate, GetThreeDSurface()). */
+					const int tiles = e.contains("dlazdic") && e.at("dlazdic").is_number_integer() ? std::clamp(e.at("dlazdic").get<int>(), 1, 64) : 1;
+					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
 					continue;
 				}
 				if (kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
