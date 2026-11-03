@@ -2058,6 +2058,11 @@ static std::vector<std::array<double, 4>> _night_glows;
  * each, block by block, all night).
  */
 static bool _night_card_lit = false;
+/**
+ * The block being drawn is only a hole for what the card laid there at once (TurnedPassOnCard(): the whole view, a move
+ * of it, what changed on it): the glows of its buildings' lights came with that, the block tells only its vehicles'.
+ */
+static bool _night_block_hole = false;
 
 /** A glow of the night over the picture of a view on the card (_night_card_lit, TurnedCardGround::glows): where, unscaled virtual pixels of the view. */
 struct TurnedCardGlow {
@@ -2065,6 +2070,7 @@ struct TurnedCardGlow {
 	float rx, ry;
 	Colour colour;
 	float strength;
+	bool house = false; ///< a light of a building or of a thing standing (its "svetlo_NN", _night_glows), told with what the card laid there; else a vehicle's, told by its block
 };
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
@@ -5242,7 +5248,7 @@ uint64_t _turned_card_band_passes = 0; ///< Rig: the pieces past the view the ca
 uint64_t _turned_card_dirty_passes = 0; ///< Rig: the dirty parts of the view the card laid at once (TurnedCardLayDirty(); test3d cas, the diary)
 /**
  * Why a pass of DrawDirtyBlocks() did not have the card lay what changed at once (TurnedCardLayDirty()), for the
- * diary: switched off or by night, the camera not the card's, its ground not shown or followed, the dirty part
+ * diary: switched off, the camera not the card's, its ground not shown or followed, the dirty part
  * outside it, nothing under it told changed (the blocks only holes then), the card refused. The phone's diary of
  * 2 November said "zmen naraz 0" nearly always where the rig had 150 in 5 s, with a line of old cars behind the cars.
  */
@@ -5442,11 +5448,12 @@ static void TurnedCardGroundLaid(int bx, int by, int fw, int fh)
 
 /**
  * What stands on a block laid into the picture of the view on the card (TurnedCardGround), at bx, by of it; or not
- * (the processor drew it into the block). Laid at night it is told not stood: the picture past the view is used by day.
+ * (the processor drew it into the block). By night too: the glows of its buildings were told with it (DrawNight(),
+ * TurnedPassOnCard()); the night switched on or off lays all anew (MarkWholeScreenDirty(), ForgetTurnedCardBand()).
  */
 static void TurnedCardStandingLaid(int bx, int by, int fw, int fh, bool laid)
 {
-	TurnedCardMapSet(_tcg->stood, bx, by, fw, fh, laid && !_night_windows_now);
+	TurnedCardMapSet(_tcg->stood, bx, by, fw, fh, laid);
 }
 
 /**
@@ -7186,6 +7193,26 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 	VideoDriver::GetInstance()->SetThreeDGlows(&card, std::move(glows));
 }
 
+/** The glow of a light of a building at night (its "svetlo_NN"): its colour, its half width in units of the world along the ground, how strong. */
+static const Colour TURNED_HOUSE_GLOW_COLOUR(255, 200, 110);
+static constexpr double TURNED_HOUSE_GLOW_SIZE = 1.4;
+static constexpr double TURNED_HOUSE_GLOW_STRENGTH = 0.35;
+
+/**
+ * The glow of a light of a building or of a thing standing on the turned view (_night_glows), as the card's picture of the
+ * view has it (TurnedCardGlow), as DrawNight() tells it for a block.
+ * @param g where the light is, world units, and its share of the glow
+ * @param zoom the zoom of the view
+ */
+static TurnedCardGlow TurnedHouseGlow(const std::array<double, 4> &g, ZoomLevel zoom)
+{
+	double vx, vy;
+	ProjectTurnedF(g[0], g[1], g[2], vx, vy);
+	const double scale = 1.0 / (1 << to_underlying(zoom));
+	const float r = static_cast<float>(TURNED_HOUSE_GLOW_SIZE * 2 * ZOOM_BASE * scale * g[3]);
+	return {static_cast<float>(vx * scale), static_cast<float>(vy * scale), r, r, TURNED_HOUSE_GLOW_COLOUR, static_cast<float>(TURNED_HOUSE_GLOW_STRENGTH), true};
+}
+
 /**
  * The night (gui.night, the player: "a dark mode, and it will make night, as if it were night, and the cars will
  * shine"): the block just drawn darkened as under the moon, and the lights of the vehicles in it -- two headlights at
@@ -7250,23 +7277,25 @@ static void DrawNight(bool turned)
 			_tcg->glows.clear();
 			_tcg->glows_zoom = dpi.zoom;
 		}
-		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
+		/* A block only a hole for what the card laid at once keeps its buildings' glows: they came with that. */
+		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return (!_night_block_hole || !g.house) && g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
 	}
 	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
-	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength) {
+	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool house = false) {
 		if (turned && _night_card_lit) {
-			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength)});
+			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), house});
 			return;
 		}
 		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
 	};
-	/* The glows of the houses' lights (their "svetlo_NN"): small and warm. */
-	const Colour window(255, 200, 110);
+	/* The glows of the houses' lights (their "svetlo_NN"): small and warm (TurnedHouseGlow()); a hole has them already. */
+	if (turned && _night_block_hole) _night_glows.clear();
+	const Colour window = TURNED_HOUSE_GLOW_COLOUR;
 	for (const auto &g : _night_glows) {
 		double px, py;
 		project(g[0], g[1], g[2], px, py);
 		if (px < 0 || py < 0 || px >= w || py >= h) continue;
-		lit_glow(px, py, 1.4 * unit * g[3], 1.4 * unit * g[3], window, 0.35);
+		lit_glow(px, py, TURNED_HOUSE_GLOW_SIZE * unit * g[3], TURNED_HOUSE_GLOW_SIZE * unit * g[3], window, TURNED_HOUSE_GLOW_STRENGTH, true);
 	}
 	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block; braking,
 	 * its red lights glow more (VehicleBrakeLightsOn()). */
@@ -7410,7 +7439,6 @@ struct TurnedCardView {
 	double pivot_x = 0, pivot_y = 0;
 	ZoomLevel zoom = ZoomLevel::Normal;
 	int left = 0, top = 0, width = 0, height = 0; ///< the view, virtual coordinates (whole pixels of its zoom)
-	std::vector<std::array<double, 4>> glows;    ///< the glows of the lights it told (_night_glows)
 	std::vector<uint32_t> scratch;                ///< where the processor's part of the pass goes: nowhere seen
 };
 static TurnedCardView _turned_card_view;
@@ -7423,10 +7451,9 @@ bool _turned_card_view_on = true; ///< the rig: the whole view laid at once when
  * once, its ground and what stands on it laid by the card into the picture of the view.
  * @param left,top,width,height the piece, virtual coordinates (whole pixels of the zoom)
  * @param scratch where the processor's part of the pass goes: nowhere seen
- * @param[out] glows the glows of the lights it told (_night_glows), nullptr not wanted
  * @return whether the card laid what stands on it
  */
-static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, int height, std::vector<uint32_t> &scratch, std::vector<std::array<double, 4>> *glows)
+static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, int height, std::vector<uint32_t> &scratch)
 {
 	const int fw = UnScaleByZoom(width, vp.zoom), fh = UnScaleByZoom(height, vp.zoom);
 	if (fw <= 0 || fh <= 0) return false;
@@ -7457,7 +7484,23 @@ static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, i
 	const int laid = _turned_times.standing_card;
 	ViewportDoDrawTurned();
 	const bool ok = _turned_times.standing_card > laid;
-	if (glows != nullptr) *glows = std::move(_night_glows);
+	if (ok && _night_windows_now) {
+		/* At night the glows of its buildings' lights with it, instead of those it had there: a block that is only a
+		 * hole for it keeps them (DrawNight(), _night_block_hole), as the card keeps what it laid. */
+		TurnedCardGround &g = _turned_card_ground;
+		if (g.glows_zoom != vp.zoom) {
+			g.glows.clear();
+			g.glows_zoom = vp.zoom;
+		}
+		const int vs = ScaleByZoom(1, vp.zoom);
+		const float x0 = static_cast<float>(left / vs), y0 = static_cast<float>(top / vs), x1 = x0 + fw, y1 = y0 + fh;
+		auto inside = [&](const TurnedCardGlow &c) { return c.x >= x0 && c.x < x1 && c.y >= y0 && c.y < y1; };
+		std::erase_if(g.glows, [&](const TurnedCardGlow &c) { return c.house && inside(c); });
+		for (const auto &light : _night_glows) {
+			const TurnedCardGlow c = TurnedHouseGlow(light, vp.zoom);
+			if (inside(c)) g.glows.push_back(c);
+		}
+	}
 	_night_lit.clear();
 	_night_glows.clear();
 	_vd.string_sprites_to_draw.clear();
@@ -7514,7 +7557,7 @@ static bool TurnedViewWholeOnCard(const Viewport &vp)
 	cv.height = height;
 	cv.pass = _dirty_blocks_pass;
 	cv.ok = false;
-	cv.ok = TurnedPassOnCard(vp, left, top, width, height, cv.scratch, &cv.glows);
+	cv.ok = TurnedPassOnCard(vp, left, top, width, height, cv.scratch);
 	if (cv.ok) _turned_card_view_passes++;
 	return cv.ok;
 }
@@ -7539,21 +7582,22 @@ static bool TurnedCardRectOnCard(const Viewport &vp, int x0, int y0, int x1, int
 	KeepThreeDPicturesOfBlock();
 	RoundTrackPass round_track_pass(IsViewportTurnedAway(vp));
 	static std::vector<uint32_t> scratch;
-	return TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch, nullptr);
+	return TurnedPassOnCard(vp, (g.l + x0) * vs, (g.t + y0) * vs, (x1 - x0) * vs, (y1 - y0) * vs, scratch);
 }
 
 /**
  * What a move of the turned main view uncovers (SetViewportPosition(), before it draws it): laid by the card first
  * where it does not have it about the view (TurnedCardGround), and with it all that lies past it to the edge of the
  * picture -- the next steps of the drag find it there, the uncovered blocks are only holes for it (ViewportDoDraw()).
- * A move by half the view or more lays all of it anew (TurnedViewWholeOnCard()); by night the blocks are laid as before.
+ * A move by half the view or more lays all of it anew (TurnedViewWholeOnCard()); by night too (the player's #324: the
+ * map by night block by block, 3 to 6 frames a second where by day 8 to 19), the glows of its buildings with it.
  * @param vp the view, moved
  * @param xo,yo by how many pixels what it shows moved, right and down
  */
 static void TurnedCardBandUncover(const Viewport &vp, int xo, int yo)
 {
 	if (!_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim) return;
-	if (IsNightNow() || std::abs(xo) >= vp.width / 2 || std::abs(yo) >= vp.height / 2) return;
+	if (std::abs(xo) >= vp.width / 2 || std::abs(yo) >= vp.height / 2) return;
 	const TurnedCardGround &g = _turned_card_ground;
 	if (g.vp != &vp || !g.shown || g.band == 0) return;
 	if (!TurnedCardGroundFollow(vp, vp.zoom) || g.band == 0) return;
@@ -7574,7 +7618,7 @@ static void TurnedCardBandUncover(const Viewport &vp, int xo, int yo)
 
 /**
  * Whether a block a move of the turned main view uncovered has what stands on it on the card about the view
- * (TurnedCardGround), by day.
+ * (TurnedCardGround).
  * @return 2 that and its ground: the block only a hole; 1 only what stands on it: its ground laid; 0 neither
  */
 static int TurnedCardBandHas(const DrawPixelInfo &frame)
@@ -7582,7 +7626,7 @@ static int TurnedCardBandHas(const DrawPixelInfo &frame)
 	extern uint64_t _dirty_blocks_pass;
 	const bool laid_now = _turned_dirty_laid_pass == _dirty_blocks_pass;
 	if (_tcg != &_turned_card_ground) return 0;
-	if ((!_turned_scroll_uncovering && !laid_now) || _night_windows_now || !_turned_card_standing_on || !TurnedCardGroundUsable(frame)) return 0;
+	if ((!_turned_scroll_uncovering && !laid_now) || !_turned_card_standing_on || !TurnedCardGroundUsable(frame)) return 0;
 	TurnedCardGroundFollow(*_turned_vp, frame.zoom);
 	const TurnedCardGround &g = _turned_card_ground;
 	if (g.band == 0) return 0;
@@ -7599,7 +7643,8 @@ static int TurnedCardBandHas(const DrawPixelInfo &frame)
  * for -- its ground 6 ms, what stands on it 8 ms, all the buildings about it again --, 4 frames a second), laid by the
  * card at once before the blocks are drawn, as a move of the view lays what it uncovers (TurnedCardBandUncover()): one
  * piece about all that changed in it, every dirty block of the view only a hole then (TurnedCardBandHas()). Not when the camera changed (the whole view is
- * laid anew, TurnedViewWholeOnCard()), nor by night (the glows of the lights are told block by block).
+ * laid anew, TurnedViewWholeOnCard()). By night too: the glows of its buildings' lights with it (TurnedPassOnCard()), the
+ * blocks only holes tell their vehicles' (the player's #324: by night 3 to 6 frames a second, every block on its own).
  * @param left,top,right,bottom the dirty part of the screen (_invalid_rect), pixels
  */
 void TurnedCardLayDirty(int left, int top, int right, int bottom)
@@ -7607,7 +7652,7 @@ void TurnedCardLayDirty(int left, int top, int right, int bottom)
 	extern uint64_t _dirty_blocks_pass;
 	const Window *main = GetMainWindow();
 	if (main == nullptr || main->viewport == nullptr || !IsViewportTurned(*main->viewport)) return;
-	if (!_turned_card_dirty_on || !_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim || IsNightNow()) {
+	if (!_turned_card_dirty_on || !_turned_card_standing_on || !_turned_card_view_on || _screen_disable_anim) {
 		_turned_card_dirty_why[0]++;
 		return;
 	}
@@ -7749,6 +7794,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_night_lit.clear();
 	_night_glows.clear();
 	_night_card_lit = false;
+	_night_block_hole = false;
 	_night_windows_now = IsNightNow() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32;
 	_vd.dpi.pitch = _cur_dpi->pitch;
 	_vd.last_child = LAST_CHILD_NONE;
@@ -7759,13 +7805,6 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.dst_ptr = BlitterFactory::GetCurrentBlitter()->MoveTo(_cur_dpi->dst_ptr, x - _cur_dpi->left, y - _cur_dpi->top);
 	AutoRestoreBackup dpi_backup(_cur_dpi, &_vd.dpi);
 
-	if (whole_on_card) {
-		/* The night of the block as the card's pass told it: the glows of its lights, seen by the card's lit pixels
-		 * (_night_card_lit) -- the pass laid what stands on it. */
-		const TurnedCardView &cv = _turned_card_view;
-		_night_glows = cv.glows;
-		_night_card_lit = _night_windows_now;
-	}
 	if (turned) {
 		/* The second renderer (three_d.h): the same lists, drawn turned; the signs it collected are drawn below as always. */
 		AutoRestoreBackup turned_vp(_turned_vp, &vp);
@@ -7774,6 +7813,12 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		if (_turned_scroll_uncovering && !whole_on_card) {
 			_turned_card_band_blocks[0]++;
 			if (band > 0) _turned_card_band_blocks[1]++;
+		}
+		if (whole_on_card || band == 2) {
+			/* Only a hole for what the card laid at once: by night the glows of its buildings came with that
+			 * (TurnedPassOnCard()), its vehicles' are told (DrawNight()), seen by the card's lit pixels. */
+			_night_block_hole = true;
+			_night_card_lit = _night_windows_now;
 		}
 		ViewportDoDrawTurned(whole_on_card || band == 2, band == 1);
 	} else {
@@ -7821,6 +7866,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	if (IsNightNow()) DrawNight(turned);
 	if (turned) TurnedCardGlowsShow(vp);
 	_turned_vehicles_on_card = false;
+	_night_block_hole = false;
 	_night_lit.clear();
 	_night_glows.clear();
 	_night_windows_now = false;

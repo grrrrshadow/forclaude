@@ -31,6 +31,33 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (95) – #324: noc na mapě kartou najednou; pád = paměť
+
+Hráč: „pokračuj gpu“, logy #324 (snimky.log, 3d_karta.log, crash.txt, session.txt).
+
+- **Vortek dělitel funguje:** 3d_karta.log bez „karta neumi atributy po instancich“, session.txt bez tisíců
+  `GL_INVALID_OPERATION`. Nový Winlator nainstalován 3. 11. 0:38 (crash.txt `PACKAGE_UPDATED`). Pád v kompilátoru
+  shaderů Mali (SIGSEGV 2. 11. 21:44) byl ještě se starým.
+- **Mapa v noci (pohled 0):** deník: ve dne skládá karta změny najednou (`zmen naraz`, 8–19 snímků/s), v noci
+  vypnuto (`vypnuto` 19–43) a po blocích 3–6 snímků/s (bloky 150–256 ms: plakáty 108 ms, sběr 44 ms, zem 93 ms).
+  Vypnuté to bylo, protože záře oken domů se hlásily po blocích. Teď: kus položený kartou najednou (celý pohled,
+  posun, změny – `TurnedPassOnCard()`) si zapíše záře oken svých domů rovnou (`TurnedHouseGlow()`, záře s
+  příznakem `house`). Blok, který je jen díra, je nechá a hlásí jen záře aut (`_night_block_hole`). Položené se
+  pamatuje i v noci; přepnutí dne a noci kreslí všechno znovu (`MarkWholeScreenDirty()` zapomene položené).
+  Celý pohled kartou už nepotřebuje `cv.glows`.
+- Rig (noc, Sufingpool, 16 aut, přiblížení 2): `zmen naraz` 69–82 za 5 s (předtím vypnuto). Obraz najednou
+  i po blocích stejný kromě chodících postav, záře oken stejné. Na llvmpipe je ale v noci kus najednou dražší
+  (20 snímků/s proti 48 po blocích; ve dne 45 proti 55): auta mají v noci větší krabice kvůli světlům a
+  obdélník kolem všech změn pokryje skoro celé město. Na telefonu rozhodovalo čekání na kartu u každého bloku
+  (#264). Ověřit deníkem z telefonu (noc, `zmen naraz`, snímky/s). Kdyby to bylo horší, kreslit změny po
+  několika obdélnících místo jednoho.
+- **Pád v 9:51 (#324):** crash.txt po dalším startu: Winlator skončil 9:51:31 `REMOVE TASK` (ruční zavření, už na
+  pozadí). Deník snímků končí 9:51:18 z očí, session.txt nic. Paměť hry v deníku: na mapě 4,9 GB, za 2 minuty z očí
+  5,87 GB (telefon 7,24 GB). Nejspíš lmkd zabil proces hry (SIGKILL, žádný crash log). Rostlo: tvary vozidel
+  0,73 → 1,04 GB (715), textury po úrovních 0,26 → 0,79 GB, domy 0,47 → 0,67 GB; cache spritů 1,47 GB z 1600 MB.
+  Zapomínání je jen podle času (2 min nekreslené, `THREE_D_FORGET_AFTER`), strop paměti 3D objektů nemá.
+  Karta z očí za 5 s nahrála 629 MB a 8× pustila (její mezipaměť je malá a točí se dokola).
+
 ## 3. 11. (94) – #324: svítící okna města z mapy zůstávala před očima
 
 Hráč (#324, foto): město v noci z pohledu 0, pak pohled z očí – tečky na obloze ve tvaru oken města, „můžu chodit,
