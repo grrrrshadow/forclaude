@@ -46,6 +46,8 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
 - `beamng.log`: 1203 má 2 chybějící sítě ze 117 (#226). `log.txt`: jen známé vypnutí Karibiku. Pád = (103).
 - Pravidlo: žádná okna s povolením – nepoužívat v Bash dosazování `$(...)`, smyčky a posílání souborů hráči; kód číst
   přes Read/Grep.
+- Klínek (#41, trojúhelník sousedního domu přes průčelí vysokého žlutého domu v Sufingpoolu, seed 7): rig při 0°, +1°
+  a −1° – průčelí čisté. Domy kreslí karta po objektech s vlastní hloubkou, chyba z doby obrázků domů už není.
 
 ## 3. 11. (108) – GPU: hladký asfalt z očí dělá karta
 
