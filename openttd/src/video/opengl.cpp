@@ -1184,11 +1184,41 @@ void OpenGLBackend::Paint()
 			_glActiveTexture(GL_TEXTURE1);
 			_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
 			_glActiveTexture(GL_TEXTURE0);
-			std::vector<const ThreeDPicture *> in_order;
+			std::vector<std::pair<const void *, const ThreeDPicture *>> in_order;
 			in_order.reserve(this->three_d_pictures.size());
-			for (const auto &[owner, pic] : this->three_d_pictures) in_order.push_back(&pic);
-			std::stable_sort(in_order.begin(), in_order.end(), [](const ThreeDPicture *a, const ThreeDPicture *b) { return a->under != b->under ? a->under : a->z < b->z; });
-			for (const ThreeDPicture *shown : in_order) {
+			for (const auto &[owner, pic] : this->three_d_pictures) in_order.emplace_back(owner, &pic);
+			std::stable_sort(in_order.begin(), in_order.end(), [](const auto &a, const auto &b) { return a.second->under != b.second->under ? a.second->under : a.second->z < b.second->z; });
+			/* The glows of the night over a picture, added, each where the picture is lit near its middle
+			 * (SetThreeDGlows()): right after the picture, so that a window's picture in front of it covers them as it
+			 * covers the picture (the player, #324: the town's lit windows of the map stayed before the eyes in the
+			 * view from the first person over it, as it was turned and walked). */
+			auto draw_glows = [this](const void *owner, const ThreeDPicture &pic) {
+				auto glows = this->three_d_glows.find(owner);
+				if (this->three_d_glow_program == 0 || glows == this->three_d_glows.end() || glows->second.empty() || pic.over_lit == 0) return;
+				_glUseProgram(this->three_d_glow_program);
+				_glUniform2f(this->three_d_glow_screen_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+				_glUniform2f(this->three_d_glow_size_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
+				_glEnable(GL_BLEND);
+				_glBlendFunc(GL_ONE, GL_ONE);
+				_glActiveTexture(GL_TEXTURE3);
+				_glBindTexture(GL_TEXTURE_2D, pic.over_lit);
+				_glActiveTexture(GL_TEXTURE0);
+				const float rw = static_cast<float>(pic.r.right - pic.r.left + 1), rh = static_cast<float>(pic.r.bottom - pic.r.top + 1);
+				for (const VideoDriver::ThreeDGlow &g : glows->second) {
+					if (g.rx < 0.5f || g.ry < 0.5f) continue;
+					/* Its middle in the picture's lit pixels, and one of them, as the picture is laid over the window (part). */
+					const float u = pic.part[0] + (g.x - pic.r.left) / rw * pic.part[2], v = pic.part[1] + (g.y - pic.r.top) / rh * pic.part[3];
+					_glUniform4f(this->three_d_glow_lit_loc, u, v, pic.part[2] / rw, pic.part[3] / rh);
+					_glUniform4f(this->three_d_glow_colour_loc, g.r / 255.0f, g.g / 255.0f, g.b / 255.0f, g.strength);
+					/* Exactly its ellipse: the pixels whose middles are in it, as the processor's (AddNightLight()). */
+					_glUniform4f(this->three_d_glow_sprite_loc, g.x - g.rx, g.y - g.ry, 2.0f * g.rx, 2.0f * g.ry);
+					_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+				}
+				_glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+				_glDisable(GL_BLEND);
+				_glUseProgram(this->three_d_program);
+			};
+			for (const auto &[owner, shown] : in_order) {
 				const ThreeDPicture &pic = *shown;
 				const Colour tint(pic.tint);
 				_glUniform4f(this->three_d_sprite_loc, static_cast<float>(pic.r.left), static_cast<float>(pic.r.top), static_cast<float>(pic.r.right - pic.r.left + 1), static_cast<float>(pic.r.bottom - pic.r.top + 1));
@@ -1205,41 +1235,7 @@ void OpenGLBackend::Paint()
 				_glActiveTexture(GL_TEXTURE0);
 				_glBindTexture(GL_TEXTURE_2D, pic.texture);
 				_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-			}
-			/* The glows of the night over them, added, each where its picture is lit near its middle (SetThreeDGlows()). */
-			if (this->three_d_glow_program != 0) {
-				bool using_glows = false;
-				for (const auto &[owner, glows] : this->three_d_glows) {
-					auto it = this->three_d_pictures.find(owner);
-					if (glows.empty() || it == this->three_d_pictures.end() || it->second.over_lit == 0) continue;
-					const ThreeDPicture &pic = it->second;
-					if (!using_glows) {
-						using_glows = true;
-						_glUseProgram(this->three_d_glow_program);
-						_glUniform2f(this->three_d_glow_screen_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
-						_glUniform2f(this->three_d_glow_size_loc, static_cast<float>(_screen.width), static_cast<float>(_screen.height));
-						_glEnable(GL_BLEND);
-						_glBlendFunc(GL_ONE, GL_ONE);
-					}
-					_glActiveTexture(GL_TEXTURE3);
-					_glBindTexture(GL_TEXTURE_2D, pic.over_lit);
-					_glActiveTexture(GL_TEXTURE0);
-					const float rw = static_cast<float>(pic.r.right - pic.r.left + 1), rh = static_cast<float>(pic.r.bottom - pic.r.top + 1);
-					for (const VideoDriver::ThreeDGlow &g : glows) {
-						if (g.rx < 0.5f || g.ry < 0.5f) continue;
-						/* Its middle in the picture's lit pixels, and one of them, as the picture is laid over the window (part). */
-						const float u = pic.part[0] + (g.x - pic.r.left) / rw * pic.part[2], v = pic.part[1] + (g.y - pic.r.top) / rh * pic.part[3];
-						_glUniform4f(this->three_d_glow_lit_loc, u, v, pic.part[2] / rw, pic.part[3] / rh);
-						_glUniform4f(this->three_d_glow_colour_loc, g.r / 255.0f, g.g / 255.0f, g.b / 255.0f, g.strength);
-						/* Exactly its ellipse: the pixels whose middles are in it, as the processor's (AddNightLight()). */
-						_glUniform4f(this->three_d_glow_sprite_loc, g.x - g.rx, g.y - g.ry, 2.0f * g.rx, 2.0f * g.ry);
-						_glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-					}
-				}
-				if (using_glows) {
-					_glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-					_glDisable(GL_BLEND);
-				}
+				draw_glows(owner, pic);
 			}
 			for (GLenum unit : {GL_TEXTURE2, GL_TEXTURE3}) {
 				_glActiveTexture(unit);

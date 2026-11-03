@@ -31,6 +31,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (94) – #324: svítící okna města z mapy zůstávala před očima
+
+Hráč (#324, foto): město v noci z pohledu 0, pak pohled z očí – tečky na obloze ve tvaru oken města, „můžu chodit,
+otáčet hlavou a tečky tam jsou furt, jsou stále před očima“.
+
+- **Příčina:** ovladač videa přidával noční záře (`SetThreeDGlows`, z (63)) až po všech obrázcích karty, přes
+  celou obrazovku. Obrázek mapy pod pohledem z očí zakryl obrázek z očí, ale záře oken mapy se přičetly navrch.
+  Stejně by prosvítaly přes každé menší okno s obrázkem karty před mapou (okno vozidla, extra pohled).
+- **Oprava:** záře obrázku se kreslí hned po něm, ve stejném pořadí (spodní, pak od zadního okna k přednímu).
+  Obrázek před ním je zakryje jako zbytek obrázku. Shader, záře i čtení zpět beze změny.
+- Rig (noc, Sufingpool, oddálená mapa, pohled 0, pak z očí): rozdíl starý/nový jsou přesně žluté tečky na obloze
+  (a stromy, které se hýbou ve větru). Mapa v noci záře oken má dál.
+
 ## 3. 11. (93) – Rostliny polí z očí kartou (GPU bod 4)
 
 Hráč: „4 asi je potřeba rostliny čtené zpátky z karty, mně to padalo mezi stromy.“
