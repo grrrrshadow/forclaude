@@ -4643,6 +4643,217 @@
   "poznamka": "červená tropická půda se suchými palmovými listy a trávou, palmy v řadách 4,93 m (3 × 3), kapradí a banánovníky mezi nimi, koše s kokosy u holek, kokosy na zemi; palmová plantáž (hráč 1. 11.: „prumysl palmova plantaž bude pěkná jako les, budu tam mit palouček, chajdu z rakosu, grill , holky budou jezdit na palmovou plantaž pracovat aby produkovala“); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; palmy a podrost jsou společné doplňky (objekty/doplnky, rostliny_tropy.py); 2730 trojúhelníků v souboru; 886 kB; glb z gltfpacku"
  },
  {
+  "soubor": "plantaz_zem.glb",
+  "jmeno": "plantaz_zem_posed",
+  "druh": "plantaz",
+  "dil": "zem_posed",
+  "doplnky": [
+   {
+    "jmeno": "palma_1",
+    "poloha": [
+     2.4,
+     2.72,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 1.272
+   },
+   {
+    "jmeno": "palma_0",
+    "poloha": [
+     7.22,
+     2.69,
+     0.0
+    ],
+    "otoceni": 264.1,
+    "meritko": 1.281
+   },
+   {
+    "jmeno": "palma_0",
+    "poloha": [
+     7.51,
+     7.58,
+     0.0
+    ],
+    "otoceni": 354.9,
+    "meritko": 1.483
+   },
+   {
+    "jmeno": "palma_1",
+    "poloha": [
+     7.26,
+     12.14,
+     0.0
+    ],
+    "otoceni": 149.4,
+    "meritko": 1.563
+   },
+   {
+    "jmeno": "palma_0",
+    "poloha": [
+     12.51,
+     2.35,
+     0.0
+    ],
+    "otoceni": 198.2,
+    "meritko": 1.451
+   },
+   {
+    "jmeno": "palma_1",
+    "poloha": [
+     12.39,
+     7.41,
+     0.0
+    ],
+    "otoceni": 85.2,
+    "meritko": 1.5
+   },
+   {
+    "jmeno": "palma_1",
+    "poloha": [
+     12.49,
+     12.18,
+     0.0
+    ],
+    "otoceni": 166.6,
+    "meritko": 1.592
+   },
+   {
+    "jmeno": "kapradi_1",
+    "poloha": [
+     10.45,
+     12.18,
+     0.0
+    ],
+    "otoceni": 308.6,
+    "meritko": 1.464
+   },
+   {
+    "jmeno": "kapradi_2",
+    "poloha": [
+     9.58,
+     8.57,
+     0.0
+    ],
+    "otoceni": 195.2,
+    "meritko": 1.902
+   },
+   {
+    "jmeno": "kapradi_2",
+    "poloha": [
+     13.2,
+     0.89,
+     0.0
+    ],
+    "otoceni": 284.9,
+    "meritko": 1.926
+   },
+   {
+    "jmeno": "banan_0",
+    "poloha": [
+     6.87,
+     0.82,
+     0.0
+    ],
+    "otoceni": 110.8,
+    "meritko": 1.468
+   },
+   {
+    "jmeno": "kapradi_0",
+    "poloha": [
+     5.2,
+     7.8,
+     0.0
+    ],
+    "otoceni": 40.0,
+    "meritko": 1.2
+   },
+   {
+    "jmeno": "kapradi_0",
+    "poloha": [
+     4.9,
+     12.0,
+     0.0
+    ],
+    "otoceni": 210.0,
+    "meritko": 1.2
+   }
+  ],
+  "holky": [
+   {
+    "postava": "pole_chill",
+    "poloha": [
+     1.515,
+     4.512,
+     0.0
+    ],
+    "otoceni": 296.1,
+    "meritko": 2.0,
+    "poznamka": "pracuje na plantáži u palmy (sbírá kokosy do koše)"
+   },
+   {
+    "postava": "pole_sedi",
+    "poloha": [
+     12.783,
+     4.331,
+     0.0
+    ],
+    "otoceni": 262.0,
+    "meritko": 2.0,
+    "poznamka": "pracuje na plantáži u palmy (sbírá kokosy do koše)"
+   }
+  ],
+  "zvirata": [
+   {
+    "poloha": [
+     5.02,
+     2.63,
+     0.0
+    ],
+    "otoceni": 286.4,
+    "druhy": [
+     "opice_hneda",
+     "opice_madagaskar",
+     "opice_sergio",
+     "opice_stylizovana"
+    ]
+   },
+   {
+    "poloha": [
+     9.11,
+     4.9,
+     0.0
+    ],
+    "otoceni": 45.1,
+    "druhy": [
+     "opice_hneda",
+     "opice_madagaskar",
+     "opice_sergio",
+     "opice_stylizovana"
+    ]
+   }
+  ],
+  "autor": "grrrrf: vlastní model prumysl/plantaz_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu); palmy, banánovníky, monstery a kapradí jako společné doplňky (Tropical Plants Pack M02P, MozzarellaARC, CC BY 4.0)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura); doplňky rostlin CC BY 4.0 (MozzarellaARC)",
+  "poznamka": "políčko plantáže na kraji naproti cestě s posedem z lesa (hráč 3. 11.: „posez na palmovou plantaž nedame, dame posez na kraj plantaže a bude se z posezu koukat ven z plantáže do dálky“): plantaz_zem bez dvou palem vnější řady, dvou kapradí a banánovníku u schodů a bez holky u posedu; hra ho otočí plošinou ven z plantáže; červená tropická půda se suchými palmovými listy a trávou, palmy v řadách 4,93 m (3 × 3), kapradí a banánovníky mezi nimi, koše s kokosy u holek, kokosy na zemi; palmová plantáž (hráč 1. 11.: „prumysl palmova plantaž bude pěkná jako les, budu tam mit palouček, chajdu z rakosu, grill , holky budou jezdit na palmovou plantaž pracovat aby produkovala“); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; palmy a podrost jsou společné doplňky (objekty/doplnky, rostliny_tropy.py); 2730 trojúhelníků v souboru; 886 kB; glb z gltfpacku",
+  "scena_navic": [
+   {
+    "soubor": "les_paseka_srub.glb",
+    "uzly": [
+     "posed",
+     "podlaha"
+    ],
+    "otoceni": 180.0,
+    "poloha": [
+     13.2,
+     12.7,
+     0.0
+    ],
+    "poznamka": "posed lesního srubu (uzly posed a podlaha: schody a plošina 2,84 m) ze stejného souboru, otočený plošinou ven: plošina x 1,05–3,6 m, y 8,85–10,75 m, schody dolů do plantáže k x 6,25 m"
+   }
+  ]
+ },
+ {
   "soubor": "plantaz_cesta.glb",
   "jmeno": "plantaz_cesta",
   "druh": "plantaz",
@@ -4983,14 +5194,22 @@
   "poznamka": "palouček uprostřed plantáže: šťavnatá tráva s kytkami (barvy ibišku); podél okrajů x = 0 a y = 0 (u severního rohu) přechází do půdy plantáže, tam dvě palmy, monstery, banánovník a kapradí; hra natočí každé ze čtyř prostředních políček severním rohem ven jako u lesa (okraj_lesa), jedno z nich je plantaz_palouk_chajda; palmová plantáž (hráč 1. 11.: „prumysl palmova plantaž bude pěkná jako les, budu tam mit palouček, chajdu z rakosu, grill , holky budou jezdit na palmovou plantaž pracovat aby produkovala“); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; palmy a podrost jsou společné doplňky (objekty/doplnky, rostliny_tropy.py); 2 trojúhelníků v souboru; 768 kB; glb z gltfpacku"
  },
  {
-  "soubor": "plantaz_palouk_chajda.glb",
-  "jmeno": "plantaz_palouk_chajda",
+  "soubor": "les_paseka_srub.glb",
+  "jmeno": "plantaz_srub",
   "druh": "plantaz",
-  "dil": "palouk_chajda",
+  "dil": "palouk_srub",
   "okraj_lesa": [
    "x0",
    "y0"
   ],
+  "bez_uzlu": [
+   "posed",
+   "podlaha",
+   "klady"
+  ],
+  "textury_materialu": {
+   "les_zem": "plantaz_palouk.glb#plantaz_palouk"
+  },
   "doplnky": [
    {
     "jmeno": "palma_2",
@@ -5013,6 +5232,16 @@
     "meritko": 1.349
    },
    {
+    "jmeno": "palma_1",
+    "poloha": [
+     12.6,
+     3.4,
+     0.0
+    ],
+    "otoceni": 40.0,
+    "meritko": 1.45
+   },
+   {
     "jmeno": "monstera_0",
     "poloha": [
      12.01,
@@ -5033,14 +5262,14 @@
     "meritko": 1.377
    },
    {
-    "jmeno": "gril_090fce5f",
+    "jmeno": "banan_1",
     "poloha": [
-     9.4,
-     6.4,
+     10.6,
+     12.6,
      0.0
     ],
-    "otoceni": 0.0,
-    "meritko": 2.0
+    "otoceni": 200.0,
+    "meritko": 1.4
    },
    {
     "jmeno": "kapradi_0",
@@ -5061,51 +5290,91 @@
     ],
     "otoceni": 285.2,
     "meritko": 1.517
+   },
+   {
+    "jmeno": "kapradi_3",
+    "poloha": [
+     13.6,
+     11.8,
+     0.0
+    ],
+    "otoceni": 310.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "kapradi_4",
+    "poloha": [
+     6.9,
+     13.3,
+     0.0
+    ],
+    "otoceni": 20.0,
+    "meritko": 0.9
+   },
+   {
+    "jmeno": "lampa_papirova",
+    "poloha": [
+     6.55,
+     8.6,
+     2.25
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lampa_papirova",
+    "poloha": [
+     6.55,
+     10.1,
+     2.25
+    ],
+    "otoceni": 0.0,
+    "meritko": 1.0
    }
   ],
   "holky": [
    {
     "postava": "college_girl_sedi",
     "poloha": [
-     9.4,
-     4.3,
+     10.43,
+     8.402,
      0.94
     ],
-    "otoceni": 90.0,
+    "otoceni": 231.6,
     "meritko": 2.0,
-    "poznamka": "sedí na bambusové lavici u grilu čelem ke grilu (sedák 0,94 m)"
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
    },
    {
     "postava": "galaxia_sedi",
     "poloha": [
-     9.4,
-     8.5,
+     6.725,
+     6.937,
      0.94
     ],
-    "otoceni": 270.0,
+    "otoceni": 351.6,
     "meritko": 2.0,
-    "poznamka": "sedí na bambusové lavici u grilu čelem ke grilu (sedák 0,94 m)"
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
    },
    {
     "postava": "anime_girl_sedi",
     "poloha": [
-     12.8,
-     6.4,
+     9.845,
+     4.461,
      0.94
     ],
-    "otoceni": 180.0,
+    "otoceni": 111.6,
     "meritko": 2.0,
-    "poznamka": "sedí na bambusové lavici u grilu čelem ke grilu (sedák 0,94 m)"
+    "poznamka": "sedí na kládě u ohně čelem k ohni (sedák 0,94 m)"
    }
   ],
   "zvirata": [
    {
     "poloha": [
-     5.2,
-     2.52,
+     8.23,
+     11.06,
      0.0
     ],
-    "otoceni": 72.4,
+    "otoceni": 276.0,
     "druhy": [
      "opice_hneda",
      "opice_madagaskar",
@@ -5115,11 +5384,11 @@
    },
    {
     "poloha": [
-     8.68,
-     12.03,
+     4.9,
+     2.9,
      0.0
     ],
-    "otoceni": 31.6,
+    "otoceni": 237.8,
     "druhy": [
      "opice_hneda",
      "opice_madagaskar",
@@ -5128,36 +5397,72 @@
     ]
    }
   ],
-  "vchod_chajdy": {
-   "poloha": [
-    5.92,
-    9.2,
-    0.0
-   ],
-   "smer": [
-    1,
-    0
-   ],
-   "sirka": 1.0
-  },
-  "rozen": {
-   "poloha": [
-    9.4,
-    6.4,
-    2.02
-   ],
-   "otoceni": 0,
-   "meritko": 2.16,
-   "poznamka": "místo pro rožeň nad grilem jako na stadionu (akce.rozen, tam gril meritko 1, rožeň z 1,01 m, meritko 1,08), tady všechno 2×; tyč podél x jako vidlice grilu"
+  "dvere": [
+   {
+    "poloha": [
+     5.82,
+     9.35,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1
+   }
+  ],
+  "okna": [
+   {
+    "uzel": "okno_00",
+    "poloha": [
+     5.86,
+     11.2,
+     1.4
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.92,
+    "vyska": 0.96,
+    "pant": [
+     5.86,
+     10.74
+    ],
+    "otevira_se": "ven"
+   },
+   {
+    "uzel": "okno_01",
+    "poloha": [
+     3.7,
+     12.56,
+     1.55
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 0.92,
+    "vyska": 0.96,
+    "pant": [
+     4.16,
+     12.56
+    ],
+    "otevira_se": "ven"
+   }
+  ],
+  "interier": {
+   "soubor": "les_paseka_srub_interier.glb",
+   "poznamka": "interiér lesního srubu, stejný soubor (hráč 3. 11.: „zachovej interier, otviraci okna dveře“, „interier stejny“)"
   },
   "noc": {
    "uzel": "noc",
    "den": "den",
    "svetla": 1,
-   "poznamka": "v noci ukaž uzel noc: žhavé uhlíky na grilu, svetlo_00 je místo pro jejich záři; chajda je tmavá"
+   "poznamka": "v noci ukaž uzel noc: žhavé uhlíky v ohništi, svetlo_00 je místo pro jejich záři; srub je v noci tmavý, okna nesvítí, lucerna nikde (hráč nosí svoji z inventáře)"
   },
-  "autor": "grrrrf: vlastní model prumysl/plantaz_dily.py (stavebnice predmety/stavebnice3d.py, textury z šumu); palmy, banánovníky, monstery a kapradí jako společné doplňky (Tropical Plants Pack M02P, MozzarellaARC, CC BY 4.0)",
+  "autor": "grrrrf: srub, ohniště a interiér z lesa (les_paseka_srub, prumysl/les_dily.py); tráva palouku z plantaz_palouk; palmy, banánovníky, monstery a kapradí jako společné doplňky (Tropical Plants Pack M02P, MozzarellaARC, CC BY 4.0), papírové lucerny ze sady lampy",
   "licence": "GPL-2.0 (vlastní geometrie i textura); doplňky rostlin CC BY 4.0 (MozzarellaARC)",
-  "poznamka": "palouček jako plantaz_palouk s chajdou z rákosu (stěny z otýpek rákosu, doškovou střechou, dveře zastřené rohoží do palouku, okénko s rákosovou okenicí do +y; skutečná velikost jako srub, dovnitř se nechodí), s grilem (doplněk gril_090fce5f, 2× jako holky a lavice, rožeň podél x) a třemi bambusovými lavicemi kolem (holky sedí čelem ke grilu); dva koše s kokosy u chajdy; jedno ze čtyř prostředních políček; palmová plantáž (hráč 1. 11.: „prumysl palmova plantaž bude pěkná jako les, budu tam mit palouček, chajdu z rakosu, grill , holky budou jezdit na palmovou plantaž pracovat aby produkovala“); jedno políčko 14,8 m, počátek v severním rohu, osy hry, metry; textura půdy jde přes okraje políček dokola; palmy a podrost jsou společné doplňky (objekty/doplnky, rostliny_tropy.py); 6306 trojúhelníků v souboru; 810 kB; glb z gltfpacku"
+  "poznamka": "palouček plantáže s lesním srubem místo rákosové chajdy (hráč 3. 11.: „vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč ten cihlovej grill a zase to vem cely z lesa, ohniště, rožeň, včetně funkčnosti E. nic nemusi byt dvakrat, objekty dělame usporně“; „dej rovnou srub z lesa a skus ho nějak ozdobit zvenku exoticky“): soubor lesního srubu bez posedu, jeho schodů a hromady klád (bez_uzlu; posed stojí na kraji plantáže, plantaz_zem_posed), země v trávě palouku (textury_materialu: les_zem dostane obrázek materiálu plantaz_palouk z plantaz_palouk.glb, stejné UV), ohniště s rožněm a E jako v lese, holky na kládách u ohně, opice; zvenku exoticky: palmy, banánovníky, monstera, kapradí a dvě papírové lucerny pod okapem u dveří"
  }
 ]

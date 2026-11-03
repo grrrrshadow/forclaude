@@ -31,6 +31,28 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (99) – Palmová plantáž: lesní srub, posed na kraji; přepis textur materiálů
+
+- Hráč: *„vem z lesa chajdu … mužou zustat dřevěné okna a dveře. zachovej interier, otviraci okna dveře, venku pryč
+  ten cihlovej grill a zase to vem cely z lesa, ohniště, rožeň, včetně funkčnosti E. nic nemusi byt dvakrat, objekty
+  dělame usporně“*; *„dej rovnou srub z lesa a skus ho nějak ozdobit zvenku exoticky a je to“*; *„posez na palmovou
+  plantaž nedame, dame posez na kraj plantaže a bude se z posezu koukat ven z plantáže do dálky“*; interiér stejný.
+- Díl `plantaz:palouk_srub` (záznam `plantaz_srub` v `objekty/prumysl`): soubor lesního srubu `les_paseka_srub.glb`
+  bez posedu, jeho podlahy a hromady klád (`bez_uzlu`), interiér, dveře a okenice, ohniště s rožněm a E jako v lese
+  (oheň se čte u všech dílů se `svetlo_00`, ne jen v lese), holky na kládách u ohně, opice. Zem v trávě palouku:
+  materiál `les_zem` dostane obrázek materiálu `plantaz_palouk` z `plantaz_palouk.glb` (stejné UV, navazuje). Zvenku
+  palmy, banánovníky, monstera, kapradí a dvě papírové lucerny pod okapem u dveří. Rákosová chajda a cihlový gril
+  pryč (`plantaz_palouk_chajda.glb` smazán).
+- Díl `plantaz:zem_posed`: `plantaz_zem.glb` + posed ze souboru srubu (`scena_navic`: uzly `posed` a `podlaha`,
+  otočený o 180°, plošina na kraji, schody do plantáže), bez dvou palem vnější řady, kapradí a banánovníku u schodů.
+  Stojí uprostřed kraje naproti cestě, natočený plošinou ven.
+- Obecně v indexu (hráč: *„ta funkce změny textur je užitečna, mnoho modelu je stejnych s jinou texturou“*, *„dělali
+  jsme mnoho druhů střech s jednim 2D podkladem, teď je podklad 3D“*): `"textury_materialu": {"<materiál>":
+  "<obrázek.png>" nebo "<soubor.glb>#<materiál>"}` u domu, průmyslu, doplňku, dílu lesa/plantáže i v `interier`
+  (dveře a okenice domu dědí). Jeden model, víc záznamů s jinou texturou, bez kopie souboru.
+- Chyba nalezená cestou: výplň nedostupných míst v kolizích zazdila schody posedu (koridor 0,8 m mezi zábradlím je na
+  mřížce 64/dlaždici užší než tělo). V lese to schovával interiér srubu. Teď se pod podlahami (`podlaha`) nevyplňuje.
+
 ## 3. 11. (98) – Vlk u dveří pryč, stylizovaný vlk 2,5× větší u dveří
 
 - Hráč (#324, snímek z očí): vlk s rozbitou hlavou. Byl to **vlk u dveří** (`vlk_u_dveri`, světle šedý,

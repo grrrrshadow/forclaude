@@ -223,6 +223,18 @@ struct ThreeDCopyableState {
 	}
 };
 
+/**
+ * A part of another .glb laid into a part of the forest with a clearing ("scena_navic", ReadGlbScene()): the forest
+ * cabin's high seat at the edge of the palm plantation (the player, 3. 11.: "the high seat to the edge of the plantation,
+ * and from it one looks out of the plantation into the distance"), one file for both.
+ */
+struct ThreeDSceneMore {
+	std::string glb_path;           ///< its file
+	std::vector<std::string> nodes; ///< its nodes laid in (with their children), each of the solid ones or the floors of a scene
+	float turn = 0;                 ///< turned about z, degrees
+	float at[3] = {};               ///< and then moved, metres
+};
+
 /** A building as a 3D object. */
 struct ThreeDObject {
 	std::string name;         ///< its name in the index
@@ -287,6 +299,11 @@ struct ThreeDObject {
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors and windows ("dvere_NN", "okno_NN" of its file, then of its interior's): shut, open one way, the other
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
+	std::vector<ThreeDSceneMore> scene_more;  ///< and parts of other files laid into it ("scena_navic")
+	/* Its materials' pictures taken from elsewhere ("textury_materialu"; the player, 3. 11.: "many models are the same
+	 * with another texture", "we made many kinds of roofs on one 2D base, now the base is 3D"): one shape, dressed
+	 * otherwise by each record, without a copy of its file. */
+	std::vector<std::pair<std::string, std::string>> material_from; ///< the material's name; the picture's path: a PNG, or "<file>.glb#<material>" another file's material
 	/* An industry: every node of its file read, not only the first (the colleague's dragon castle: "zem", "hrad",
 	 * "podlaha"; the vending machine's weeds under "krovi"), but the night's, the wings of doors and these. */
 	bool all_roots = false;

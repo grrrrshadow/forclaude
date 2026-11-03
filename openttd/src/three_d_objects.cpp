@@ -2120,12 +2120,81 @@ static std::vector<uint16_t> CornerLight(const std::vector<float> &nrm)
 	return light;
 }
 
+/**
+ * The pictures of materials taken from elsewhere (ThreeDObject::material_from) by their paths, while anything has them:
+ * a picture of another file's material read once for all the objects dressed in it (the four turns of a part of the
+ * plantation, its outside).
+ */
+static std::map<std::string, std::weak_ptr<const std::vector<uint8_t>>, std::less<>> _material_pictures;
+static std::mutex _material_pictures_mutex;
+
+/** The picture of a material taken from elsewhere: a PNG, or "<file>.glb#<material>" that material's of another .glb; nullptr when it cannot be read. */
+static ThreeDTextureBytes MaterialPictureFrom(const std::string &from)
+{
+	{
+		std::lock_guard lock(_material_pictures_mutex);
+		auto it = _material_pictures.find(from);
+		if (it != _material_pictures.end()) {
+			if (ThreeDTextureBytes known = it->second.lock(); known != nullptr) return known;
+		}
+	}
+	ThreeDTextureBytes png;
+	const size_t hash = from.rfind('#');
+	if (hash == std::string::npos) {
+		png = InternThreeDTextureBytes(ReadWholeFile(from));
+	} else {
+		GlbMesh other;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		ReadGlbMesh(from.substr(0, hash), other, o);
+		const std::string_view material = std::string_view(from).substr(hash + 1);
+		for (const GlbTexture &t : other.textures) {
+			if (t.name == material && t.png != nullptr) png = t.png;
+		}
+	}
+	if (png == nullptr) return nullptr;
+	std::lock_guard lock(_material_pictures_mutex);
+	_material_pictures[from] = png;
+	return png;
+}
+
+/**
+ * A mesh's materials dressed in the pictures taken from elsewhere (ThreeDObject::material_from): over the same texture
+ * coordinates, its first material's as the object's own texture too (GlbMesh::png).
+ */
+static void TakeMaterialPictures(GlbMesh &mesh, const ThreeDObject &obj)
+{
+	for (const auto &[material, from] : obj.material_from) {
+		for (size_t k = 0; k < mesh.textures.size(); k++) {
+			if (mesh.textures[k].name != material) continue;
+			ThreeDTextureBytes png = MaterialPictureFrom(from);
+			if (png == nullptr) {
+				Debug(misc, 0, "3D object {}: the picture {} of its material {} is not there", obj.name, from, material);
+				ReadDiary(fmt::format("objekt {}: textura {} materiálu {} chybí", obj.name, from, material), true);
+				return;
+			}
+			mesh.textures[k].png = png;
+			if (static_cast<int>(k) == mesh.png_texture) mesh.png = *png;
+		}
+	}
+}
+
+/** "textury_materialu" of a record ({"<material>": "<picture>"}, ThreeDObject::material_from), the pictures beside its index. */
+static void ReadMaterialPictures(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
+{
+	if (!e.contains("textury_materialu") || !e.at("textury_materialu").is_object()) return;
+	for (const auto &[material, from] : e.at("textury_materialu").items()) {
+		if (from.is_string() && !from.get<std::string>().empty()) obj.material_from.emplace_back(material, folder + from.get<std::string>());
+	}
+}
+
 /** A building's night from its .glb: the node "noc" (the lit windows) and the places "svetlo_NN" (the glows), when it has them. */
 static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
 {
 	GlbMesh night;
 	std::vector<float> lights;
 	ReadGlbMesh(path, night, true, {}, 0, "noc", "svetlo_", &lights);
+	TakeMaterialPictures(night, obj);
 	for (size_t i = 0; i + 2 < night.pos.size(); i += 3) {
 		obj.night_pos.push_back(static_cast<float>(night.pos[i] * OBJECT_UNITS_PER_METRE));
 		obj.night_pos.push_back(static_cast<float>(night.pos[i + 1] * OBJECT_UNITS_PER_METRE));
@@ -2175,6 +2244,7 @@ static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
 /** A mesh read (ReadGlbMesh()) into a building: metres into units, the side of each triangle facing out, the light from its normals. */
 static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 {
+	TakeMaterialPictures(mesh, obj);
 	obj.pos.reserve(mesh.pos.size());
 	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
 		obj.pos.push_back(static_cast<float>(mesh.pos[i] * OBJECT_UNITS_PER_METRE));
@@ -2776,6 +2846,7 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 	interior.glb_path = folder + file;
 	interior.is_interior = true;
 	interior.scene_turns = quarter_turns;
+	if (in.is_object()) ReadMaterialPictures(in, folder, interior);
 	if (in.is_object() && in.contains("postavy") && in.at("postavy").is_array()) {
 		for (const auto &f : in.at("postavy")) {
 			ThreeDObjectFigure fig;
@@ -2795,6 +2866,7 @@ static void ReadInterior(const nlohmann::json &e, const std::string &folder, Thr
 				wing.door_node = node;
 				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
 				wing.scene_turns = quarter_turns;
+				wing.material_from = path == obj.glb_path ? obj.material_from : interior.material_from;
 				wings[k] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(wing));
 			}
@@ -3142,6 +3214,7 @@ static void ReadIndustryObject(const nlohmann::json &e, const std::string &folde
 			if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
 		}
 	}
+	ReadMaterialPictures(e, folder, obj);
 	if (!obj.file.empty() && !ReadGlb(folder + obj.file, obj)) return;
 	/* Read now for what the index needs of it, and again with its add-ons when it is first drawn (Read()): without its
 	 * file there, that read laid the add-ons alone over it -- since the industries have the shared trees and bushes
@@ -3345,6 +3418,59 @@ struct ForestPartRead {
 static std::map<std::string, std::array<ForestPartRead, 4>, std::less<>> _forest_parts_read;
 
 /**
+ * The triangles of a mesh read of another file under some of its nodes (ThreeDSceneMore::nodes, among the groups both
+ * were read with), turned about z and moved, laid into a mesh: its corners, textures and groups after those there.
+ */
+static void AddGlbMeshNodes(GlbMesh &into, const GlbMesh &from, const std::vector<std::string> &groups, const ThreeDSceneMore &more)
+{
+	if (from.tri_group.size() != from.tri.size() / 3) return;
+	const double a = more.turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	const bool normals = !from.nrm.empty() && (!into.nrm.empty() || into.pos.empty());
+	if (!normals) into.nrm.clear();
+	const bool textured = from.tri_tex.size() == from.tri.size() / 3 && (into.tri_tex.size() == into.tri.size() / 3);
+	/* Its textures among those there: the same picture of the same material once. */
+	std::vector<uint8_t> texture(from.textures.size(), 0);
+	for (size_t k = 0; k < from.textures.size(); k++) {
+		const GlbTexture &t = from.textures[k];
+		auto same = std::ranges::find_if(into.textures, [&](const GlbTexture &u) { return u.name == t.name && u.png == t.png && u.flat == t.flat; });
+		if (same == into.textures.end()) {
+			if (into.textures.size() >= UINT8_MAX) continue;
+			into.textures.push_back(t);
+			same = into.textures.end() - 1;
+		}
+		texture[k] = static_cast<uint8_t>(same - into.textures.begin());
+	}
+	std::vector<uint32_t> corner(from.pos.size() / 3, UINT32_MAX);
+	for (size_t t = 0; t < from.tri_group.size(); t++) {
+		const uint16_t g = from.tri_group[t];
+		if (g == 0 || g > groups.size() || std::ranges::find(more.nodes, groups[g - 1]) == more.nodes.end()) continue;
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = from.tri[t * 3 + k];
+			if (corner[i] == UINT32_MAX) {
+				corner[i] = static_cast<uint32_t>(into.pos.size() / 3);
+				const double x = from.pos[i * 3], y = from.pos[i * 3 + 1];
+				into.pos.push_back(static_cast<float>(x * c - y * s + more.at[0]));
+				into.pos.push_back(static_cast<float>(x * s + y * c + more.at[1]));
+				into.pos.push_back(static_cast<float>(from.pos[i * 3 + 2] + more.at[2]));
+				if (normals) {
+					const double nx = from.nrm[i * 3], ny = from.nrm[i * 3 + 1];
+					into.nrm.push_back(static_cast<float>(nx * c - ny * s));
+					into.nrm.push_back(static_cast<float>(nx * s + ny * c));
+					into.nrm.push_back(from.nrm[i * 3 + 2]);
+				}
+				into.uv.push_back(i * 2 + 1 < from.uv.size() ? from.uv[i * 2] : 0.0f);
+				into.uv.push_back(i * 2 + 1 < from.uv.size() ? from.uv[i * 2 + 1] : 0.0f);
+			}
+			into.tri.push_back(corner[i]);
+		}
+		if (textured) into.tri_tex.push_back(from.tri_tex[t] < texture.size() ? texture[from.tri_tex[t]] : 0);
+		into.tri_group.push_back(g);
+		if (!into.tri_mark.empty()) into.tri_mark.push_back(0);
+		if (!into.tri_glass.empty()) into.tri_glass.push_back(0);
+	}
+}
+
+/**
  * The whole scene of a part of the forest with a clearing (ThreeDObject::scene_turns): every node but those lit at
  * night ("noc", read as a house's), turned about the middle of the tile by quarter turns, its night and glows with it.
  * Only the cabin, the high seat, the logs and the fireplace keep the walker off, not the ferns, the grass and the
@@ -3365,9 +3491,25 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 	o.all_nodes = true;
 	o.skip_night = true;
 	o.groups = &groups;
-	/* Without its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
+	/* Without the nodes its record leaves out ("bez_uzlu": the high seat and the logs of the forest cabin on the palm
+	 * plantation), its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
+	if (!obj.left_out.empty()) o.skip_nodes = &obj.left_out;
 	if (!obj.outside_of.empty()) o.skip_wings = true;
 	if (!ReadGlbMesh(path, mesh, o)) return false;
+	TakeMaterialPictures(mesh, obj);
+	for (const ThreeDSceneMore &more : obj.scene_more) {
+		GlbMesh other;
+		GlbReadOptions mo;
+		mo.all_nodes = true;
+		mo.skip_night = true;
+		mo.skip_wings = true;
+		mo.groups = &groups;
+		if (!ReadGlbMesh(more.glb_path, other, mo)) {
+			Debug(misc, 0, "3D object {}: {} of scena_navic not read", obj.name, more.glb_path);
+			continue;
+		}
+		AddGlbMeshNodes(mesh, other, groups, more);
+	}
 	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
 	TurnGlbMeshQuarters(mesh, quarter_turns);
 	TakeGlbFloors(mesh, obj, static_cast<uint16_t>(solid.size() + 1), false);
@@ -3495,9 +3637,10 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 	 * bricks 0.75 m from its middle along the spit, its trestles 1 m, the colleague's domy/hospoda.py gril()) and the
 	 * spit in them as there (dum_20_stadion "akce" "rozen": its rod 1.01 m up in the forks, sized 1.08). */
 	std::vector<float> fire;
-	/* The palm plantation's grill is an add-on of its own, its spit not drawn on an industry (the colleague's
-	 * hra/3d/TROPY-PLANTAZ-PRO-HRU.md: "if you can draw the spit on an industry take it, else leave it"). */
-	if (kind == "les") {
+	/* The palm plantation's hut the forest cabin with its fire too (the player, 3. 11.: "take the hut from the forest ...
+	 * outside away with the brick grill, and again take it whole from the forest, the fireplace, the spit, with what E
+	 * does"). */
+	{
 		GlbMesh mesh;
 		GlbReadOptions o;
 		o.all_nodes = true;
@@ -3526,6 +3669,30 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 		obj.variants = 0; // no house's
 		obj.scene_turns = static_cast<int8_t>(k);
 		obj.forest_trees = e.value("pouziti_stromu", std::string()) == "les";
+		/* Of its file without some nodes ("bez_uzlu"), its materials dressed otherwise ("textury_materialu"), parts of
+		 * other files laid in ("scena_navic"): the forest cabin on the palm plantation without its high seat and logs,
+		 * on the clearing's grass, and the high seat at the plantation's edge (the player, 3. 11.). */
+		if (e.contains("bez_uzlu") && e.at("bez_uzlu").is_array()) {
+			for (const auto &n : e.at("bez_uzlu")) {
+				if (n.is_string()) obj.left_out.push_back(n.get<std::string>());
+			}
+		}
+		ReadMaterialPictures(e, folder, obj);
+		if (e.contains("scena_navic") && e.at("scena_navic").is_array()) {
+			for (const auto &m : e.at("scena_navic")) {
+				if (!m.is_object() || !m.contains("soubor") || !m.at("soubor").is_string() || !m.contains("uzly") || !m.at("uzly").is_array()) continue;
+				ThreeDSceneMore more;
+				more.glb_path = folder + m.at("soubor").get<std::string>();
+				for (const auto &n : m.at("uzly")) {
+					if (n.is_string()) more.nodes.push_back(n.get<std::string>());
+				}
+				more.turn = m.value("otoceni", 0.0f);
+				if (m.contains("poloha") && m.at("poloha").is_array() && m.at("poloha").size() == 3) {
+					for (int i = 0; i < 3; i++) more.at[i] = m.at("poloha").at(i).get<float>();
+				}
+				obj.scene_more.push_back(std::move(more));
+			}
+		}
 		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 		obj.addon_places = trees_read.addon_places;
 		for (ThreeDObjectFigure &f : obj.addon_places) turn(f);
@@ -3631,8 +3798,9 @@ static constexpr IndustryType ORIGINAL_FRUIT_PLANTATION = 19;
  * What part of the palm plantation lies on a tile of it, turned how (the colleague's hra/3d/TROPY-PLANTAZ-PRO-HRU.md:
  * "the palm plantation will be nice as the forest, a clearing, a reed hut, a grill"; the player, 1. 11.: it is the
  * fruit plantation of the game, its look only): laid as the forest, on its 5 x 4 tiles -- the clearing on 2 x 2 of the
- * middle, at the side the path comes from, each turned with its north corner out, the hut on one of them; the path on
- * a tile of the edge from the side of the road into the clearing; the plantation elsewhere. The game's own palm plantation
+ * middle, at the side the path comes from, each turned with its north corner out, the hut on one of them (the forest
+ * cabin since 3. 11.); the path on a tile of the edge from the side of the road into the clearing; the forest cabin's
+ * high seat on the middle tile of the edge across; the plantation elsewhere. The game's own palm plantation
  * (IT_PALM_PLANTATION, in every climate, the player, 2. 11.) so, and the original fruit plantation standing in a game
  * saved before it took its place. Nullptr for a tile of anything else, of a set, or when the parts are not there (the
  * base set's tile drawn then, pv_gfx_116).
@@ -3655,7 +3823,7 @@ static const ThreeDForestPart *ThreeDPalmPlantationPartAt(TileIndex tile)
 	if (dx >= cx && dx <= cx + 1 && dy >= cy && dy <= cy + 1) {
 		static constexpr int TURNS[2][2] = {{0, 3}, {1, 2}};
 		const bool hut = (dx - cx) + 2 * (dy - cy) == static_cast<int>(GB(ind->random, 0, 2));
-		return GetThreeDForestPart(hut ? "plantaz:palouk_chajda" : "plantaz:palouk", TURNS[dx - cx][dy - cy]);
+		return GetThreeDForestPart(hut ? "plantaz:palouk_srub" : "plantaz:palouk", TURNS[dx - cx][dy - cy]);
 	}
 	bool path = false;
 	int turn = 0;
@@ -3668,6 +3836,19 @@ static const ThreeDForestPart *ThreeDPalmPlantationPartAt(TileIndex tile)
 		default: break;
 	}
 	if (path) return GetThreeDForestPart("plantaz:cesta", turn);
+	/* The forest cabin's high seat in the middle of the edge across from the path, its platform out at the edge (the
+	 * part's -x side turned so): from it one looks out of the plantation into the distance (the player, 3. 11.). */
+	int seat_x = 0, seat_y = 0, seat_turn = 0;
+	switch (side) {
+		case DiagDirection::NE: seat_x = w - 1; seat_y = h / 2; seat_turn = 2; break;
+		case DiagDirection::SW: seat_x = 0; seat_y = h / 2; seat_turn = 0; break;
+		case DiagDirection::NW: seat_x = w / 2; seat_y = h - 1; seat_turn = 3; break;
+		case DiagDirection::SE: seat_x = w / 2; seat_y = 0; seat_turn = 1; break;
+		default: break;
+	}
+	if (dx == seat_x && dy == seat_y) {
+		if (const ThreeDForestPart *seat = GetThreeDForestPart("plantaz:zem_posed", seat_turn); seat != nullptr) return seat;
+	}
 	return GetThreeDForestPart("plantaz:zem", (dx * 3 + dy * 5 + static_cast<int>(GB(ind->random, 5, 2))) & 3);
 }
 
@@ -4049,6 +4230,7 @@ static void ReadThreeDObjectsNow()
 					addon.name = e.value("jmeno", addon.file);
 					addon.glb_path = folder + addon.file;
 					NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
+					ReadMaterialPictures(e, folder, addon);
 					ReadColourParts(e, folder, addon);
 					ReadTreeColours(e, folder, addon);
 					addon.trunk_r = std::clamp(e.value("kmen_r", 0.0f), 0.0f, 5.0f);
@@ -4081,6 +4263,7 @@ static void ReadThreeDObjectsNow()
 					}
 					obj.glb_path = folder + obj.file;
 					NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+					ReadMaterialPictures(e, folder, obj);
 					ReadColourParts(e, folder, obj);
 					ReadBuildingFigures(e, obj);
 					ReadBuildingTitle(e, obj);
@@ -4111,6 +4294,7 @@ static void ReadThreeDObjectsNow()
 				/* Its shape and texture read the first time it is drawn (ThreeDObject::Read()). */
 				obj.glb_path = folder + obj.file;
 				NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+				ReadMaterialPictures(e, folder, obj);
 				ReadColourParts(e, folder, obj);
 				ReadBuildingFigures(e, obj);
 				ReadBuildingTitle(e, obj);
@@ -9004,6 +9188,8 @@ bool ThreeDObject::Read() const
 		read.all_roots = this->all_roots;
 		read.left_out = this->left_out;
 		read.outside_of = this->outside_of;
+		read.material_from = this->material_from;
+		read.scene_more = this->scene_more;
 		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
 		 * (ReadInterior()) read as they are. */
 		bool ok;
@@ -9281,9 +9467,30 @@ bool ThreeDObject::Blocks(double x, double y, double feet) const
 			reach[n] = reach[from] + 1;
 			return true;
 		});
+		/* Under its floors ("podlaha") never: one walks there, the corridor of a high seat's stairs between their
+		 * handrails (0.8 m) is narrower than a body on this grid -- the forest cabin's had its interior to keep it
+		 * open, the one at the edge of the palm plantation stood alone, its stairs walled up (the player, 3. 11.). */
+		std::vector<uint8_t> on_floor(static_cast<size_t>(w) * h, 0);
+		for (size_t i = 0; i + 8 < this->floor.size(); i += 9) {
+			const float *a = &this->floor[i], *b = &this->floor[i + 3], *c = &this->floor[i + 6];
+			const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+			if (std::abs(d) < 1e-9) continue;
+			const int x0 = std::max(0, static_cast<int>(std::floor(std::min({a[0], b[0], c[0]}) / cell)));
+			const int x1 = std::min(w - 1, static_cast<int>(std::floor(std::max({a[0], b[0], c[0]}) / cell)));
+			const int y0 = std::max(0, static_cast<int>(std::floor(std::min({a[1], b[1], c[1]}) / cell)));
+			const int y1 = std::min(h - 1, static_cast<int>(std::floor(std::max({a[1], b[1], c[1]}) / cell)));
+			for (int cy = y0; cy <= y1; cy++) {
+				for (int cx = x0; cx <= x1; cx++) {
+					const double px = (cx + 0.5) * cell, py = (cy + 0.5) * cell;
+					const double l1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / d;
+					const double l2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / d;
+					if (l1 >= -1e-6 && l2 >= -1e-6 && 1 - l1 - l2 >= -1e-6) on_floor[static_cast<size_t>(cy) * w + cx] = 1;
+				}
+			}
+		}
 		for (size_t i = 0; i < cells; i++) {
 			const int o = own(i);
-			if (o >= 0 && reach[i] == INT_MAX && !this->is_interior && this->interior == SIZE_MAX) this->footprint[o] = 1; // a house with an interior: its walls in the way, its interior's inside
+			if (o >= 0 && reach[i] == INT_MAX && !on_floor[o] && !this->is_interior && this->interior == SIZE_MAX) this->footprint[o] = 1; // a house with an interior: its walls in the way, its interior's inside
 		}
 	}
 	const int cx = static_cast<int>(std::floor(x / cell)), cy = static_cast<int>(std::floor(y / cell));
