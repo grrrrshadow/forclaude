@@ -34,6 +34,19 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (109) – Logy #325 (karta, snímky, domy, beamng): nic nového
+
+- `3d_karta.log`: start v pořádku (zink na Mali-G615, OpenGL 4.4, mazání kreslením, instance prošly), obrázky 1–30 po
+  2–15 ms.
+- `snimky.log` 15:48–15:49, z očí 14–18 snímků/s: `bloky 70× průměr 41 ms` a `zmen naraz 70` – karta pokládala
+  skrytou mapu pod pohledem z očí (23 milionů trojúhelníků domů na snímek). To je #291, opraveno v (104). Z očí sběr
+  13 ms, kreslení 48 ms (karta 39 ms, 22 000 rohů) – po opravě zbude jen to.
+- Paměť 3,36 GB: tvary vozidel 575 MB (644), domy 550 MB, cache spritů 975 MB z 1600 MB – patří k #285 (strop paměti,
+  domluvit).
+- `beamng.log`: 1203 má 2 chybějící sítě ze 117 (#226). `log.txt`: jen známé vypnutí Karibiku. Pád = (103).
+- Pravidlo: žádná okna s povolením – nepoužívat v Bash dosazování `$(...)`, smyčky a posílání souborů hráči; kód číst
+  přes Read/Grep.
+
 ## 3. 11. (108) – GPU: hladký asfalt z očí dělá karta
 
 - Hráč: *„jo pokračuj gpu asfalt, bude textura asfaltu jako přídavné grf třeba silnice, tohle je jen základ“*.
