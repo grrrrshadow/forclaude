@@ -12184,6 +12184,7 @@ struct CabFigure {
 	double pitch = 0;     ///< degrees its +x is raised over the level (an arrow flying, AddCabMissile())
 	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
 	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
+	std::shared_ptr<const ThreeDLikenessSolid> likeness; ///< a vehicle of sprites only: its likeness's solid (AddCabLikeness()), kept till the frame is drawn
 };
 static std::vector<CabFigure> _cab_figures;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
@@ -12240,6 +12241,16 @@ static void AddCabVehicle(const ThreeDEyeVehicle &ev, bool own_car)
 	f.rolled = ev.rolled;
 	f.walk = ev.walk;
 	f.curvature = ev.curvature;
+	_cab_figures.push_back(std::move(f));
+}
+
+/** A vehicle of sprites only in the view from the eyes: its likeness's solid (GetThreeDEyeLikeness()), always by its triangles. */
+static void AddCabLikeness(const ThreeDEyeLikeness &el, double z)
+{
+	CabFigure f{std::string(), 1.0f, el.x, el.y, z, el.facing, 0};
+	f.along = el.along;
+	f.pitch = el.pitch;
+	f.likeness = el.solid;
 	_cab_figures.push_back(std::move(f));
 }
 
@@ -12344,6 +12355,15 @@ static bool EyeFigureFitsCard(const ThreeDVehicleObject &fig, const ThreeDVehicl
  */
 static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card, CabFigureModel &model)
 {
+	/* A vehicle of sprites only: its likeness's solid as it is, its one texture, nothing to paint (its level of detail
+	 * chosen when it was collected). */
+	if (fg.likeness != nullptr) {
+		model.fig = &fg.likeness->object;
+		model.whole = &fg.likeness->shape;
+		model.shape = model.whole;
+		model.texs = {&fg.likeness->texture};
+		return !model.shape->tri.empty();
+	}
 	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
 	const ThreeDVehicleShape *whole = fig->TryGetShape(fig->ShapeFrame(fg.frame, fg.walk), fig->PartsOf(fg.state));
@@ -15121,6 +15141,24 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (ev.obj != nullptr) AddCabVehicle(ev, false);
 			continue;
 		}
+		PaletteID pal = PAL_NONE;
+		if (u->vehstatus.Test(VehState::DefaultPalette)) pal = (u->vehstatus.Test(VehState::Crashed) || u->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(u);
+		/* A vehicle of a set's sprites only: its likeness made from its eight sprites (three_d_vehicle.cpp) as a solid,
+		 * seen from the eye as it stands -- not the sprite of its nearest direction, drawn from thirty degrees up and
+		 * leaning when it is turned to the eye (the player, 3. 11.: "make of the 2D a proper 3D first person view"). As
+		 * detailed as its distance needs (its voxels about two pixels). Where it has none, its sprites as before. */
+		const bool turnable = u->type == VehicleType::Train || u->type == VehicleType::Road || u->type == VehicleType::Ship ||
+				(u->type == VehicleType::Aircraft && Aircraft::From(u)->IsNormalAircraft());
+		if (ThreeDEnabled() && turnable && u->direction != Direction::Invalid && !u->vehstatus.Test(VehState::Crashed)) {
+			const double pixels_per_metre = eye.focal * OBJECT_UNITS_PER_METRE / std::max(c.f, CAB_NEAR);
+			ThreeDEyeLikeness el;
+			const EyeLikeness likeness = GetThreeDEyeLikeness(u, pal, _cab_detail_pixels / pixels_per_metre, el);
+			if (likeness == EyeLikeness::WithOther) continue;
+			if (likeness == EyeLikeness::Solid) {
+				AddCabLikeness(el, uz);
+				continue;
+			}
+		}
 		if (c.f < CAB_NEAR * 0.5) continue;
 		VehicleSpriteSeq seq;
 		if (u->type == VehicleType::Effect || u->direction == Direction::Invalid) {
@@ -15129,8 +15167,6 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			u->GetImage(static_cast<Direction>((to_underlying(udir) - step) & 7), EngineImageType::OnMap, &seq);
 			if (!seq.IsValid()) seq = u->sprite_cache.sprite_seq;
 		}
-		PaletteID pal = PAL_NONE;
-		if (u->vehstatus.Test(VehState::DefaultPalette)) pal = (u->vehstatus.Test(VehState::Crashed) || u->IsWrecked()) ? PALETTE_CRASH : GetVehiclePalette(u);
 		Point pt = RemapCoords(ux, uy, uz);
 		for (uint k = 0; k < seq.count; k++) {
 			const Sprite *spr = GetSprite(seq.seq[k].sprite & SPRITE_MASK, SpriteType::Normal);
@@ -15163,6 +15199,19 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	for (CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
+		/* A vehicle of sprites only: its likeness's solid, by its triangles however far (as detailed as it was chosen). */
+		if (fg.likeness != nullptr) {
+			const ThreeDVehicleShape &ls = fg.likeness->shape;
+			const double extent = std::max({(ls.x1 - ls.x0) * fg.along, ls.y1 - ls.y0, ls.z1 - ls.z0}) * OBJECT_UNITS_PER_METRE;
+			if (foot.f < -extent) continue;
+			CabFigureModel model;
+			fg.solid = CabFigureReady(eye, fg, figures_by_card, model);
+			if (fg.solid) {
+				solid_figures.emplace_back(fg, std::move(model));
+				camera.billboards++;
+			}
+			continue;
+		}
 		/* How big it is: its longest side, world units (a field's plant: hundreds of them, only at the walker's feet);
 		 * a shape not read yet is read in the background, the figure a billboard or nothing this frame. */
 		const ThreeDVehicleObject *model = fg.obj != nullptr ? fg.obj : (fg.plant ? nullptr : GetThreeDFigure(fg.name));

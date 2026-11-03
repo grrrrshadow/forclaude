@@ -891,6 +891,17 @@ private:
 	mutable std::vector<bool> detail_tried;
 };
 
+/**
+ * A part of a vehicle's likeness made from its eight sprites as a solid for the view from the eyes (three_d_vehicle.cpp,
+ * GetThreeDEyeLikeness()): the faces of the hull's voxels, those side by side in one plane joined into rectangles, each
+ * coloured by the sprites that see it most squarely -- drawn by its triangles as a vehicle's object is.
+ */
+struct ThreeDLikenessSolid {
+	ThreeDVehicleShape shape;     ///< metres about the piece it hangs from (x forward, y to its left, z up); no normals: the colours are lit as the sprites are
+	ThreeDObjectTexture texture;  ///< the faces' colours, a texel to a face of a voxel, a texel's border round each rectangle
+	ThreeDVehicleObject object;   ///< stands in for a vehicle's object where the eye draws one: no wheels, no states, no crew
+};
+
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = nullptr);
 std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);

@@ -50,6 +50,7 @@
 #include "tile_type.h"
 
 #include <map>
+#include <memory>
 #include <span>
 
 struct Viewport;
@@ -152,6 +153,24 @@ void ClearThreeDVehicleModels();
 struct Vehicle;
 struct RoundTrackPose;
 bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom, const RoundTrackPose *pose = nullptr);
+
+/* A vehicle of sprites only in the view from the eyes: its likeness as a solid (three_d_vehicle.cpp). */
+struct ThreeDLikenessSolid;
+/** Where a vehicle of sprites only stands in the view from the eyes as its likeness's solid (GetThreeDEyeLikeness()). */
+struct ThreeDEyeLikeness {
+	std::shared_ptr<const ThreeDLikenessSolid> solid; ///< the solid of the part of the likeness this piece hangs
+	double x = 0, y = 0; ///< where it hangs, world units
+	float facing = 0;    ///< the way its front faces, degrees as the figures count them (0 along +x, 90 along +y)
+	float along = 1;     ///< its length foreshortened as the game spaces its vehicles
+	float pitch = 0;     ///< degrees its front is raised over the level (a slope)
+};
+/** What a vehicle is in the view from the eyes as its likeness (GetThreeDEyeLikeness()). */
+enum class EyeLikeness : uint8_t {
+	None,      ///< no likeness of it: its sprites
+	WithOther, ///< a piece drawn with the piece of its part that has a picture: nothing of its own
+	Solid,     ///< the solid of its part
+};
+EyeLikeness GetThreeDEyeLikeness(const Vehicle *v, PaletteID pal, double cell_m, ThreeDEyeLikeness &out);
 
 /* The previews that turn (three_d_preview_gui.cpp). */
 void ShowThreeDVehiclePreview(WindowNumber parent_number);

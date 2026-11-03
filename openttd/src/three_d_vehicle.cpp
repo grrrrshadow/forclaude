@@ -66,12 +66,15 @@
 #include "debug.h"
 #include "round_track.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_objects.h"
 
 #include "table/sprites.h"
 
 #include <chrono>
 #include <cmath>
 #include <map>
+#include <numeric>
+#include <unordered_map>
 
 #include "safeguards.h"
 
@@ -140,6 +143,14 @@ struct ThreeDVehicleModel {
 	uint64_t look = 0;                  ///< the look of the vehicle the model was made from (VehicleLook()): 0 for one made from the engine's own pictures (the purchase window)
 	int build_ms = 0;
 	int voxels = 0;
+	/* The hull itself, for its solids of the view from the eyes (MakeLikenessSolid()): the grid's size and its corner,
+	 * which of its voxels are in (a bit each), and each surface point's voxel. */
+	int gnx = 0, gny = 0, gnz = 0;
+	float gx0 = 0, gy0 = 0, gz0 = 0;
+	std::vector<uint64_t> hull;
+	std::vector<uint32_t> cell;
+	/** Its solids made, by part and level of detail (GetThreeDEyeLikeness()); a frame drawing one keeps it. */
+	mutable std::map<std::pair<int, int>, std::shared_ptr<const ThreeDLikenessSolid>> solids;
 	std::string note;                   ///< what the rig says about it
 	/** The eight views the likeness was made from, the set's own pictures, kept at VIEWS_KEPT_ZOOM (or the views'
 	 * zoom when coarser): in its own direction a picture is the set's (RenderThreeDVehicle()), the likeness only
@@ -959,6 +970,16 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 		model->note += "empty hull";
 		return nullptr;
 	}
+	model->gnx = g.nx;
+	model->gny = g.ny;
+	model->gnz = g.nz;
+	model->gx0 = g.x0;
+	model->gy0 = g.y0;
+	model->gz0 = g.z0;
+	model->hull.assign((g.occ.size() + 63) / 64, 0);
+	for (size_t i = 0; i < g.occ.size(); i++) {
+		if (g.occ[i] != 0) model->hull[i >> 6] |= uint64_t{1} << (i & 63);
+	}
 
 	/* The surface: voxels with an empty neighbour; the normal towards the empty side. */
 	std::vector<int32_t> point_at(g.occ.size(), -1);
@@ -981,6 +1002,7 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 				float len = std::sqrt(nx * nx + ny * ny + nz * nz);
 				if (len < 1e-6f) { nx = 0; ny = 0; nz = 1; len = 1; }
 				point_at[g.Index(x, y, z)] = static_cast<int32_t>(model->count);
+				model->cell.push_back(static_cast<uint32_t>(g.Index(x, y, z)));
 				model->xyz.push_back(g.X(x)); model->xyz.push_back(g.Y(y)); model->xyz.push_back(g.Z(z));
 				model->rank.push_back(static_cast<uint8_t>(((static_cast<uint32_t>(x) * 73856093u) ^ (static_cast<uint32_t>(y) * 19349663u) ^ (static_cast<uint32_t>(z) * 83492791u)) >> 13));
 				nrm.push_back(nx / len); nrm.push_back(ny / len); nrm.push_back(nz / len);
@@ -1490,6 +1512,320 @@ bool AddThreeDVehicleToViewport(const Vehicle *v, PaletteID pal, ZoomLevel zoom,
 	}
 	AddTurnedVehiclePicture(pic, ax, ay, v->z_pos, xmin, ymin, zmin, xmax, ymax, zmax);
 	return true;
+}
+
+/** The levels of detail of a likeness's solids: at level n its voxels joined in cells of 2^n along each side. */
+static constexpr int SOLID_LEVELS = 4;
+
+/**
+ * The solid of a part of a likeness at a level of detail for the view from the eyes (GetThreeDEyeLikeness(); the
+ * player, 3. 11.: "make of the 2D a proper 3D first person view"): the hull's voxels joined in cells of 2^level along
+ * each side (a cell is in where any of its voxels is), the faces of the cells with none beyond them -- those side by
+ * side in one plane joined into rectangles -- each face coloured as the sprites show it: by the views looking at it
+ * most squarely of those that see its voxels, so a side is the side's sprite and the top the roof all of them show;
+ * the bottom, which none sees, the voxels' colour of all the views, darker. Its corners about the position of the
+ * part's piece, as the turned map hangs the part (AddThreeDVehicleToViewport()).
+ */
+static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeDVehicleModel &m, int part, int level)
+{
+	auto solid = std::make_shared<ThreeDLikenessSolid>();
+	solid->object.name = "likeness";
+	if (m.hull.empty() || m.gnx <= 0 || m.gny <= 0 || m.gnz <= 0) return solid;
+	const int f = 1 << level;
+	const int n[3] = {(m.gnx + f - 1) / f, (m.gny + f - 1) / f, (m.gnz + f - 1) / f};
+	const float side = m.vox * f;
+	const float origin[3] = {m.gx0, m.gy0, m.gz0};
+	auto at = [&](int x, int y, int z) { return (static_cast<size_t>(z) * n[1] + y) * n[0] + x; };
+
+	/* The part: the cells whose middle is between its cuts (RenderThreeDVehicle()). */
+	float x_lo = -std::numeric_limits<float>::infinity(), x_hi = std::numeric_limits<float>::infinity(), x_at = 0.0f;
+	if (part >= 0 && static_cast<size_t>(part) < m.part_x.size()) {
+		x_at = m.part_x[part];
+		if (part > 0) x_hi = m.part_cut[part - 1];
+		if (static_cast<size_t>(part) < m.part_cut.size()) x_lo = m.part_cut[part];
+	}
+	std::vector<uint8_t> in(static_cast<size_t>(n[0]) * n[1] * n[2], 0);
+	for (int z = 0; z < m.gnz; z++) {
+		for (int y = 0; y < m.gny; y++) {
+			for (int x = 0; x < m.gnx; x++) {
+				const size_t i = (static_cast<size_t>(z) * m.gny + y) * m.gnx + x;
+				if (((m.hull[i >> 6] >> (i & 63)) & 1) != 0) in[at(x / f, y / f, z / f)] = 1;
+			}
+		}
+	}
+	for (int x = 0; x < n[0]; x++) {
+		const float mid = origin[0] + (x + 0.5f) * side;
+		if (mid >= x_lo && mid < x_hi) continue;
+		for (int z = 0; z < n[2]; z++) {
+			for (int y = 0; y < n[1]; y++) in[at(x, y, z)] = 0;
+		}
+	}
+
+	/* The colour of each face of a cell: its surface voxels' colours in the views, each weighted by how much the view
+	 * sees the voxel and how squarely it looks at that face. The cameras as ViewCamera has them. */
+	static const float NORMAL[6][3] = {{-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}};
+	float cam[8][3];
+	for (int d = 0; d < 8; d++) {
+		const float a = ViewAzimuth(d) * static_cast<float>(M_PI) / 180.0f;
+		cam[d][0] = -std::sin(a) * CAM_COS;
+		cam[d][1] = -std::cos(a) * CAM_COS;
+		cam[d][2] = CAM_SIN;
+	}
+	struct Sum {
+		float r[6] = {}, g[6] = {}, b[6] = {}, w[6] = {};
+		float all_r = 0, all_g = 0, all_b = 0;
+		int all = 0;
+	};
+	std::unordered_map<size_t, uint32_t> sum_of;
+	std::vector<Sum> sums;
+	for (size_t i = 0; i < m.count && i < m.cell.size(); i++) {
+		const uint32_t c = m.cell[i];
+		const int x = static_cast<int>(c % m.gnx), y = static_cast<int>((c / m.gnx) % m.gny), z = static_cast<int>(c / (static_cast<uint32_t>(m.gnx) * m.gny));
+		const size_t k = at(x / f, y / f, z / f);
+		if (in[k] == 0) continue;
+		auto [it, added] = sum_of.emplace(k, static_cast<uint32_t>(sums.size()));
+		if (added) sums.emplace_back();
+		Sum &s = sums[it->second];
+		const Colour fb = m.fallback[i];
+		s.all_r += fb.r;
+		s.all_g += fb.g;
+		s.all_b += fb.b;
+		s.all++;
+		/* Of each face, the pixel of the one view that sees the voxel and looks at the face most squarely: a side is its
+		 * side's sprite pixel for pixel, not a mean of the views about it (a grey lump in the rig). */
+		for (int face = 0; face < 6; face++) {
+			float best = 0;
+			int best_d = -1;
+			for (int d = 0; d < 8; d++) {
+				const uint8_t seen = m.w8[i * 8 + d];
+				if (seen == 0) continue;
+				const float facing = NORMAL[face][0] * cam[d][0] + NORMAL[face][1] * cam[d][1] + NORMAL[face][2] * cam[d][2];
+				if (facing <= 0) continue;
+				const float w = seen * facing * facing;
+				if (w > best) {
+					best = w;
+					best_d = d;
+				}
+			}
+			if (best_d < 0) continue;
+			const uint8_t *rgb = &m.col8[i * 24 + best_d * 3];
+			s.r[face] += rgb[0];
+			s.g[face] += rgb[1];
+			s.b[face] += rgb[2];
+			s.w[face] += 1;
+		}
+	}
+	auto face_colour = [&](size_t k, int face) {
+		auto it = sum_of.find(k);
+		if (it == sum_of.end()) return Colour(90, 90, 90, 255).data;
+		const Sum &s = sums[it->second];
+		if (s.w[face] > 0) {
+			return Colour(static_cast<uint8_t>(s.r[face] / s.w[face] + 0.5f), static_cast<uint8_t>(s.g[face] / s.w[face] + 0.5f), static_cast<uint8_t>(s.b[face] / s.w[face] + 0.5f), 255).data;
+		}
+		const float dark = 0.6f / std::max(1, s.all);
+		return Colour(static_cast<uint8_t>(s.all_r * dark), static_cast<uint8_t>(s.all_g * dark), static_cast<uint8_t>(s.all_b * dark), 255).data;
+	};
+
+	/* The faces with no cell beyond, in each plane those side by side joined into rectangles (greedy). */
+	struct Rect {
+		int face, layer, u0, v0, w, h;
+	};
+	std::vector<Rect> rects;
+	for (int face = 0; face < 6; face++) {
+		const int a = face / 2, dir = (face & 1) != 0 ? 1 : -1, ua = (a + 1) % 3, va = (a + 2) % 3;
+		const int nu = n[ua], nv = n[va];
+		std::vector<uint8_t> mask(static_cast<size_t>(nu) * nv);
+		for (int layer = 0; layer < n[a]; layer++) {
+			for (int v = 0; v < nv; v++) {
+				for (int u = 0; u < nu; u++) {
+					int p[3];
+					p[a] = layer;
+					p[ua] = u;
+					p[va] = v;
+					bool open = in[at(p[0], p[1], p[2])] != 0;
+					if (open) {
+						p[a] += dir;
+						open = p[a] < 0 || p[a] >= n[a] || in[at(p[0], p[1], p[2])] == 0;
+					}
+					mask[static_cast<size_t>(v) * nu + u] = open ? 1 : 0;
+				}
+			}
+			for (int v = 0; v < nv; v++) {
+				for (int u = 0; u < nu; u++) {
+					if (mask[static_cast<size_t>(v) * nu + u] == 0) continue;
+					int w = 1;
+					while (u + w < nu && mask[static_cast<size_t>(v) * nu + u + w] != 0) w++;
+					int h = 1;
+					for (; v + h < nv; h++) {
+						bool row = true;
+						for (int k = 0; k < w && row; k++) row = mask[static_cast<size_t>(v + h) * nu + u + k] != 0;
+						if (!row) break;
+					}
+					for (int j = 0; j < h; j++) std::fill_n(&mask[static_cast<size_t>(v + j) * nu + u], w, 0);
+					rects.push_back({face, layer, u, v, w, h});
+				}
+			}
+		}
+	}
+	if (rects.empty()) return solid;
+
+	/* The texture: each rectangle's faces a texel each, with a border of the edge's texels round it so that no texel of
+	 * the next one is taken at its edge; the rectangles laid in shelves, the tallest first. */
+	size_t area = 0;
+	int widest = 0;
+	for (const Rect &r : rects) {
+		area += static_cast<size_t>(r.w + 2) * (r.h + 2);
+		widest = std::max(widest, r.w + 2);
+	}
+	int width = 16;
+	while (static_cast<size_t>(width) * width < area + area / 4 && width < 4096) width *= 2;
+	width = std::max(width, widest);
+	std::vector<size_t> order(rects.size());
+	std::iota(order.begin(), order.end(), size_t{0});
+	std::sort(order.begin(), order.end(), [&](size_t i, size_t j) { return rects[i].h != rects[j].h ? rects[i].h > rects[j].h : rects[i].w > rects[j].w; });
+	std::vector<std::pair<int, int>> place(rects.size());
+	int px = 0, py = 0, shelf = 0;
+	for (size_t i : order) {
+		const int rw = rects[i].w + 2, rh = rects[i].h + 2;
+		if (px + rw > width) {
+			py += shelf;
+			px = 0;
+			shelf = 0;
+		}
+		place[i] = {px, py};
+		px += rw;
+		shelf = std::max(shelf, rh);
+	}
+	const int height = py + shelf;
+	ThreeDObjectTexture &tex = solid->texture;
+	tex.w = width;
+	tex.h = height;
+	tex.px.assign(static_cast<size_t>(width) * height, 0);
+
+	ThreeDVehicleShape &shape = solid->shape;
+	for (size_t i = 0; i < rects.size(); i++) {
+		const Rect &r = rects[i];
+		const int a = r.face / 2, ua = (a + 1) % 3, va = (a + 2) % 3;
+		const auto [bx, by] = place[i];
+		for (int ty = -1; ty <= r.h; ty++) {
+			for (int tx = -1; tx <= r.w; tx++) {
+				int p[3];
+				p[a] = r.layer;
+				p[ua] = r.u0 + std::clamp(tx, 0, r.w - 1);
+				p[va] = r.v0 + std::clamp(ty, 0, r.h - 1);
+				tex.px[static_cast<size_t>(by + 1 + ty) * width + bx + 1 + tx] = face_colour(at(p[0], p[1], p[2]), r.face);
+			}
+		}
+		/* Its corners going round its outer side (the right hand's rule): (u, v) round for +, the other way for -. */
+		const int plane = (r.face & 1) != 0 ? r.layer + 1 : r.layer;
+		static const int ROUND[4][2] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+		const uint32_t first = static_cast<uint32_t>(shape.pos.size() / 3);
+		for (int c = 0; c < 4; c++) {
+			const int k = (r.face & 1) != 0 ? c : (4 - c) % 4;
+			const int cu = ROUND[k][0] * r.w, cv = ROUND[k][1] * r.h;
+			float q[3];
+			q[a] = origin[a] + plane * side;
+			q[ua] = origin[ua] + (r.u0 + cu) * side;
+			q[va] = origin[va] + (r.v0 + cv) * side;
+			shape.pos.insert(shape.pos.end(), {q[0] - x_at, q[1], q[2]});
+			shape.uv.push_back(static_cast<float>(bx + 1 + cu) / width);
+			shape.uv.push_back(static_cast<float>(by + 1 + cv) / height);
+		}
+		shape.tri.insert(shape.tri.end(), {first, first + 1, first + 2, first, first + 2, first + 3});
+	}
+	shape.x0 = shape.y0 = shape.z0 = std::numeric_limits<float>::infinity();
+	shape.x1 = shape.y1 = shape.z1 = -std::numeric_limits<float>::infinity();
+	for (size_t i = 0; i + 2 < shape.pos.size(); i += 3) {
+		shape.x0 = std::min(shape.x0, shape.pos[i]); shape.x1 = std::max(shape.x1, shape.pos[i]);
+		shape.y0 = std::min(shape.y0, shape.pos[i + 1]); shape.y1 = std::max(shape.y1, shape.pos[i + 1]);
+		shape.z0 = std::min(shape.z0, shape.pos[i + 2]); shape.z1 = std::max(shape.z1, shape.pos[i + 2]);
+	}
+	const float all[6] = {shape.x0, shape.x1, shape.y0, shape.y1, shape.z0, shape.z1};
+	std::copy(std::begin(all), std::end(all), shape.all);
+	Debug(misc, 3, "3D likeness solid of engine {} part {} level {}: {} rectangles, texture {}x{}", m.engine.base(), part, level, rects.size(), width, height);
+	return solid;
+}
+
+/**
+ * How far a vehicle's front is raised over its back on a slope, degrees (VehicleSlopePitch() of the objects): the
+ * ground under its two ends, its length apart. Level on a bridge and in a tunnel, and a ship or an aircraft.
+ */
+static float LikenessPitch(const Vehicle *v, double x, double y, double facing, double length_m)
+{
+	if (v->type == VehicleType::Train) {
+		if (Train::From(v)->track == Track::Wormhole) return 0;
+	} else if (v->type == VehicleType::Road) {
+		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return 0;
+	} else {
+		return 0;
+	}
+	const double half = length_m * OBJECT_UNITS_PER_METRE / 2;
+	if (half <= 0) return 0;
+	auto ground = [](double px, double py) {
+		const int gx = std::clamp(static_cast<int>(px), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
+		const int gy = std::clamp(static_cast<int>(py), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
+		return GetSlopePixelZ(gx, gy, true);
+	};
+	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
+	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE;
+	return static_cast<float>(std::atan2(rise_m, length_m) * 180.0 / M_PI);
+}
+
+/**
+ * A vehicle of a set's sprites only in the view from the eyes, the walker's, the passenger's and the cab's: its
+ * likeness made from its eight sprites (BuildVehicleModel()) as a solid seen from where the eye is -- not its sprite
+ * of the nearest direction, drawn from thirty degrees up, turned to the eye (the player, 3. 11.: "you have the engine
+ * from the side ... make of the 2D a proper 3D first person view"). Each part where the turned map hangs it, from the
+ * position of its piece, in the piece's direction or along a round curve's arc; foreshortened along as the game
+ * spaces its vehicles; raised up a slope.
+ * @param pal the palette of its sprites (the company's colours)
+ * @param cell_m how coarse it may be, metres (its distance): the level of detail of its solid
+ * @param[out] out where and which solid
+ */
+EyeLikeness GetThreeDEyeLikeness(const Vehicle *v, PaletteID pal, double cell_m, ThreeDEyeLikeness &out)
+{
+	out = {};
+	if (v->direction == Direction::Invalid) return EyeLikeness::None;
+	const Vehicle *front = v;
+	int piece = 0;
+	if (v->type == VehicleType::Train && Train::From(v)->IsRearDualheaded()) {
+		front = Train::From(v)->other_multiheaded_part;
+		if (front == nullptr) return EyeLikeness::None;
+		piece = 1;
+		for (const Vehicle *u = front; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) piece++;
+	} else {
+		while (front->IsArticulatedPart()) {
+			front = front->Previous();
+			if (front == nullptr) return EyeLikeness::None;
+			piece++;
+		}
+	}
+	const ThreeDVehicleModel *model = GetThreeDVehicleModel(front->engine_type, pal, front);
+	if (model == nullptr || model->hull.empty() || static_cast<size_t>(piece) >= model->piece_part.size()) return EyeLikeness::None;
+	const int part = model->piece_part[piece];
+	if (model->part_piece[part] != piece) return EyeLikeness::WithOther;
+	int level = 0;
+	if (cell_m > model->vox) level = std::clamp(static_cast<int>(std::floor(std::log2(cell_m / model->vox))), 0, SOLID_LEVELS - 1);
+	std::shared_ptr<const ThreeDLikenessSolid> &kept = model->solids[{part, level}];
+	if (kept == nullptr) kept = MakeLikenessSolid(*model, part, level);
+	if (kept->shape.tri.empty()) return EyeLikeness::None;
+	out.solid = kept;
+	double facing;
+	if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) {
+		out.x = pose.x;
+		out.y = pose.y;
+		facing = (pose.azimuth + 135.0) * M_PI / 180.0;
+	} else {
+		const int d = to_underlying(v->direction) & 7;
+		out.x = v->x_pos;
+		out.y = v->y_pos;
+		facing = std::atan2(static_cast<double>(DIR_DY[d]), static_cast<double>(DIR_DX[d]));
+	}
+	facing = std::remainder(facing, 2 * M_PI);
+	out.facing = static_cast<float>(facing * 180.0 / M_PI);
+	out.along = model->squeeze ? 1.0f - (1.0f - 0.70710678f) * static_cast<float>(std::abs(std::cos(2.0 * facing))) : 1.0f;
+	out.pitch = LikenessPitch(v, out.x, out.y, facing, (kept->shape.x1 - kept->shape.x0) * out.along);
+	return EyeLikeness::Solid;
 }
 
 /** What the rig says about a model. */
