@@ -42,9 +42,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   pohyby jsou v pořádku.
 - Pryč: záznam `vlk_u_dveri` v `objekty/psi`, `vlk_u_dveri.glb`. V README zůstal autor u pohybů ležení ostatních psů
   (přenesené z jeho SLEEP).
-- `vlk_stylizovany`: `meritko` 2 → 5, `kde` „ulice“ → „dvere“. U dveří se zvíře staví tak daleko, aby nevlezlo do
+- `vlk_stylizovany`: `meritko` 2 → 5, `kde` „ulice“ → „dvere“. Fenek taky 2,5× (`meritko` 5; hráč: „toho malýho bílýho
+  psa před vlkem taky 2,5× většího“). U dveří se zvíře staví tak daleko, aby nevlezlo do
   zdi: aspoň metr, velké o půl své šířky a 0,3 m (`three_d_animals.cpp`, dřív pevně metr).
-- **Při přebírání `psi` z grrrrf** tohle nevrátit (vlk u dveří ne, stylizovaný vlk meritko 5 u dveří); kolegovi
+- **Při přebírání `psi` z grrrrf** tohle nevrátit (vlk u dveří ne, stylizovaný vlk meritko 5 u dveří, fenek meritko 5); kolegovi
   poznámka `hra/3d/ODPOVED-VLCI.md`.
 - Open Rails ve Winlatoru: hra ho nepotřebuje (čte balíčky sama, i složku Openrails). Wine Mono je náhrada .NET ve
   Wine (s grafikou nesouvisí); .NET 4.7.2 instalátor ve Wine padá (kód 731). Přepsat Open Rails bez .NET nejde

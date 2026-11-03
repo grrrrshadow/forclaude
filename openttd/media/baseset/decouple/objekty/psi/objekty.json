@@ -431,7 +431,7 @@
    "cs": "fenek",
    "en": "fennec fox"
   },
-  "meritko": 2,
+  "meritko": 5,
   "rozmer_m": [
    0.66,
    0.24,
@@ -492,7 +492,7 @@
   "trojuhelniku": 4294,
   "autor": "Fennec Fox, Dylan Martínez Sánchez (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/fennec-fox-f1a74a0a076b403cb78be57efe31bea8), převod tvorove/par13_zvirata.py bez renderu",
   "licence": "CC BY 4.0 (uvést Dylan Martínez Sánchez; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); 2,5× větší (hráč 3. 11.: „toho malýho bílýho psa před vlkem taky 2,5× většího“)",
   "prenesene_pozy": {
    "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
    "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
