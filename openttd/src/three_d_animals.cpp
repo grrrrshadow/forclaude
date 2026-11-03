@@ -1312,13 +1312,16 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			});
 			if (doors.empty()) return false;
 			const auto &[house, d] = doors[InteractiveRandomRange(static_cast<uint32_t>(doors.size()))];
-			const double len = std::max(1e-3, static_cast<double>(std::hypot(d.out[0], d.out[1])));
-			x = TileX(house) * TILE_SIZE + (d.at[0] + d.out[0] / len * 1.0) * OBJECT_UNITS_PER_METRE;
-			y = TileY(house) * TILE_SIZE + (d.at[1] + d.out[1] / len * 1.0) * OBJECT_UNITS_PER_METRE;
-			if (Taken(x, y, 6)) return false;
 			const Town *town = ClosestTownFromTile(house, UINT_MAX);
 			const ThreeDAnimal *a = town != nullptr ? PickKind(town, house, ThreeDAnimal::DOOR, {ThreeDAnimal::Kind::Dog, ThreeDAnimal::Kind::Animal}, night) : nullptr;
 			if (a == nullptr) return false;
+			/* A metre out of the door, a big one (the stylized wolf two and a half times as big, the player 3. 11.) as far
+			 * as half its width and a little, so that its side is not in the wall. */
+			const double len = std::max(1e-3, static_cast<double>(std::hypot(d.out[0], d.out[1])));
+			const double out_m = std::max(1.0, a->size[1] * a->scale / 2.0 + 0.3);
+			x = TileX(house) * TILE_SIZE + (d.at[0] + d.out[0] / len * out_m) * OBJECT_UNITS_PER_METRE;
+			y = TileY(house) * TILE_SIZE + (d.at[1] + d.out[1] / len * out_m) * OBJECT_UNITS_PER_METRE;
+			if (Taken(x, y, 6)) return false;
 			/* Along the door, its head to the street. */
 			Put(*a, place, x, y, 0, std::atan2(d.out[1], d.out[0]) + M_PI / 2, now);
 			return true;

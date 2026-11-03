@@ -31,6 +31,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (98) – Vlk u dveří pryč, stylizovaný vlk 2,5× větší u dveří
+
+- Hráč (#324, snímek z očí): vlk s rozbitou hlavou. Byl to **vlk u dveří** (`vlk_u_dveri`, světle šedý,
+  victory_mirosya), ne OLEKSO. Hráč: „nelíbí se mi nevýrazné boky čumáku, vypadá to jako vada, ale je tak udělaný“;
+  „tohodle (modrého stylizovaného) vlka jsem chtěl dlouho zvětšit, udělej 2,5× většího ke dveřím, ušetříme objekt“.
+- Rozbor (kolegův `tvorove/prenos_pohybu.py`, glb z grrrrf `e860869` před přebalením): sed, sedání a vstávání vlka
+  u dveří jsou přenesené z kočky (`kocka_somalska`) – vlk v nich nesedne (zadek nahoře, zadní nohy koleny dopředu)
+  a ocas se utrhne a trčí do boku (na hráčově snímku vpravo). Chůze (z chodícího psa), běh (z vlčete) a jeho vlastní
+  pohyby jsou v pořádku.
+- Pryč: záznam `vlk_u_dveri` v `objekty/psi`, `vlk_u_dveri.glb`. V README zůstal autor u pohybů ležení ostatních psů
+  (přenesené z jeho SLEEP).
+- `vlk_stylizovany`: `meritko` 2 → 5, `kde` „ulice“ → „dvere“. U dveří se zvíře staví tak daleko, aby nevlezlo do
+  zdi: aspoň metr, velké o půl své šířky a 0,3 m (`three_d_animals.cpp`, dřív pevně metr).
+- **Při přebírání `psi` z grrrrf** tohle nevrátit (vlk u dveří ne, stylizovaný vlk meritko 5 u dveří); kolegovi
+  poznámka `hra/3d/ODPOVED-VLCI.md`.
+- Open Rails ve Winlatoru: hra ho nepotřebuje (čte balíčky sama, i složku Openrails). Wine Mono je náhrada .NET ve
+  Wine (s grafikou nesouvisí); .NET 4.7.2 instalátor ve Wine padá (kód 731). Přepsat Open Rails bez .NET nejde
+  (celý program v C#).
+
 ## 3. 11. (97) – Simtrains: kabina 742 a 451; Open Rails přednostně
 
 - Hráč: 742 – v kabině „jsem uprostřed lokomotivy“, 451 – bez kabiny a pák. „Psát něco extra pro model je cesta do

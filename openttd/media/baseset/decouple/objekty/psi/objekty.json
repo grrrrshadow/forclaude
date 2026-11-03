@@ -927,13 +927,13 @@
    "cs": "vlk",
    "en": "wolf"
   },
-  "meritko": 2,
+  "meritko": 5,
   "rozmer_m": [
    1.62,
    0.49,
    0.9
   ],
-  "kde": "ulice",
+  "kde": "dvere",
   "povaha": "vyprovokovat",
   "pozy": {
    "klid": {
@@ -992,7 +992,7 @@
   "trojuhelniku": 7928,
   "autor": "Stylized Wolf, ESO (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/stylized-wolf-2b369cacbd3a4d19b39353f6cf60b8a9), převod tvorove/par13_zvirata.py bez renderu",
   "licence": "CC BY 4.0 (uvést ESO; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); u dveří domů a 2,5× větší (hráč 3. 11.: „tohodle vlka jsem chtěl dlouho zvětšit, udělej 2,5× většího ke dveřím“, místo vlka u dveří)",
   "prenesene_pozy": {
    "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
    "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
@@ -1310,83 +1310,6 @@
    "lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
    "lehani": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
    "vstavani_lezi": "z vlk_u_dveri (tvorove/prenos_pohybu.py)",
-   "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
-   "beh": "z vlce (tvorove/prenos_pohybu.py)"
-  }
- },
- {
-  "soubor": "vlk_u_dveri.glb",
-  "jmeno": "vlk_u_dveri",
-  "druh": "pes",
-  "nazev": {
-   "cs": "vlk u dveří",
-   "en": "wolf at the door"
-  },
-  "meritko": 2,
-  "rozmer_m": [
-   1.33,
-   0.32,
-   0.9
-  ],
-  "kde": "dvere",
-  "povaha": "vyprovokovat",
-  "pozy": {
-   "lezi": {
-    "animace": "metarig.002|SLEEP",
-    "snimku": 46,
-    "tiku": 2
-   },
-   "klid": {
-    "animace": "metarig.002|IDLE",
-    "snimku": 49,
-    "tiku": 2
-   },
-   "zere": {
-    "animace": "metarig.002|eating",
-    "snimku": 47,
-    "tiku": 2
-   },
-   "vrci": {
-    "animace": "metarig.002|RRAR",
-    "snimku": 46,
-    "tiku": 2
-   },
-   "sedi": {
-    "animace": "prenos|sedi",
-    "snimku": 37,
-    "tiku": 2
-   },
-   "sedani": {
-    "animace": "prenos|sedani",
-    "snimku": 56,
-    "tiku": 1
-   },
-   "vstavani": {
-    "animace": "prenos|vstavani",
-    "snimku": 56,
-    "tiku": 1
-   },
-   "chuze": {
-    "animace": "prenos|chuze",
-    "snimku": 49,
-    "tiku": 1,
-    "krok_m": 0.87
-   },
-   "beh": {
-    "animace": "prenos|beh",
-    "snimku": 32,
-    "tiku": 1,
-    "krok_m": 1.86
-   }
-  },
-  "trojuhelniku": 9948,
-  "autor": "wolf animated, victory_mirosya (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/wolf-animated-79bd16a8c36a45c78ccd13b84b7ca99c), převod tvorove/par13_zvirata.py bez renderu",
-  "licence": "CC BY 4.0 (uvést victory_mirosya; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo)",
-  "prenesene_pozy": {
-   "sedi": "z kocka_somalska (tvorove/prenos_pohybu.py)",
-   "sedani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
-   "vstavani": "z kocka_somalska (tvorove/prenos_pohybu.py)",
    "chuze": "z chodici_pes (tvorove/prenos_pohybu.py)",
    "beh": "z vlce (tvorove/prenos_pohybu.py)"
   }
