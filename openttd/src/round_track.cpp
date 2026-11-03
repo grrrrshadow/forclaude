@@ -1021,6 +1021,8 @@ bool GetRoundTrackPose(const Vehicle *v, RoundTrackPose &pose)
 
 RoundTrackPass::RoundTrackPass(bool active) : was(_round_track_drawing)
 {
+	/* A pass within another (the view from the eyes collected while a view is drawn): the other's tiles kept for it. */
+	this->outer_tiles.swap(_round_track_tiles);
 	_round_track_drawing = active;
 	_round_track_tiles.clear();
 	_curves.clear();
@@ -1029,6 +1031,6 @@ RoundTrackPass::RoundTrackPass(bool active) : was(_round_track_drawing)
 RoundTrackPass::~RoundTrackPass()
 {
 	_round_track_drawing = this->was;
-	_round_track_tiles.clear();
+	_round_track_tiles.swap(this->outer_tiles);
 	_curves.clear();
 }

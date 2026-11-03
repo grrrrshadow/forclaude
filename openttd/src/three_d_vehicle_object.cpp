@@ -3640,6 +3640,14 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	ObjectEnds(obj, v, front, last);
 	double x, y, facing, rolled = 0, curvature = 0;
 	EyeOrigin(obj, v, x, y, facing, rolled, curvature);
+	/* A train's piece on a round curve from the eyes as on the turned map (round_track.h, PlaceVehicleObject()): on the
+	 * arc, along it. */
+	if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) {
+		x = pose.x;
+		y = pose.y;
+		facing = (pose.azimuth + 135.0 + (reversed ? 180.0 : 0.0)) * M_PI / 180.0;
+		facing = std::remainder(facing, 2 * M_PI);
+	}
 	out.rolled = reversed ? -rolled : rolled;
 	out.curvature = curvature;
 

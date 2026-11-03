@@ -14046,6 +14046,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	AutoRestoreBackup frame_backup(_eye_frame, &out);
 	PinThreeDPictures(true);
 	out.pinned = true;
+	/* The round curves of the rails from the eyes too (round_track.h): the curves' tiles drawn as strips into the ground,
+	 * the trains on the arcs, the eye riding one along it. */
+	RoundTrackPass round_track_pass(true);
 	/* The rig: how long each stage took (CabViewCamera::stage). */
 	double t_last = t0;
 	auto eye_stage = [&](int i) {
@@ -14095,6 +14098,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		target = v->cab_yaw * (2 * M_PI / CAB_YAW_TURN);
 	} else if (v->direction != Direction::Invalid) {
 		target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)]));
+		/* On a round curve along the arc (round_track.h). */
+		if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) target = (pose.azimuth + 135.0) * M_PI / 180.0;
 	}
 	if (!camera.valid) {
 		camera.heading = target;
@@ -14135,8 +14140,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
 		double want = type_z;
 		if (!roof) {
-			eye.x = v->x_pos + bfx * CAB_EYE_AHEAD;
-			eye.y = v->y_pos + bfy * CAB_EYE_AHEAD;
+			/* On a round curve over the arc (round_track.h). */
+			RoundTrackPose pose;
+			const bool on_arc = !v->cab_free && GetRoundTrackPose(v, pose);
+			eye.x = (on_arc ? pose.x : v->x_pos) + bfx * CAB_EYE_AHEAD;
+			eye.y = (on_arc ? pose.y : v->y_pos) + bfy * CAB_EYE_AHEAD;
 		} else {
 			/* Over the roof (CabCamera::Roof; the player, 28. 10.: "the view on the roof of the car"): behind its back
 			 * and over its roof, looking at it and ahead a little down; the head turned goes round it -- not in a
@@ -14251,6 +14259,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		bool foundation; ///< its ground lies on a foundation, as the foundation's children
 		int raw_z;       ///< its height before its foundation (TurnedTile::raw_z)
 		int found[2];    ///< its foundations' parent sprites (_vd.foundation), -1 none
+		bool round = false; ///< its track a round curve, drawn as a strip into the ground (round_track.h)
 	};
 	std::vector<CabTile> tiles;
 	int tcx = static_cast<int>(v != nullptr ? v->x_pos : eye.x) / static_cast<int>(TILE_SIZE), tcy = static_cast<int>(v != nullptr ? v->y_pos : eye.y) / static_cast<int>(TILE_SIZE);
@@ -14351,7 +14360,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		_vd.last_foundation_child[FoundationPart::Halftile] = LAST_CHILD_NONE;
 		t.first = _vd.tile_sprites_to_draw.size();
 		size_t first_parent = _vd.parent_sprites_to_draw.size();
+		const size_t round_before = RoundTrackTileCount();
 		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
+		t.round = RoundTrackTileCount() != round_before;
 		t.end = _vd.tile_sprites_to_draw.size();
 		t.slope = _cur_ti.tileh;
 		t.z = _cur_ti.z;
@@ -14666,7 +14677,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			tt.foundation[0] = t.found[0];
 			tt.foundation[1] = t.found[1];
 			tt.building = t.building;
-			tt.round = false;
+			tt.round = t.round;
 			if (t.found[0] == -1 && t.found[1] == -1) continue;
 			std::vector<TurnedGroundSprite> &on = on_foundations[n];
 			for (size_t i = t.first; i < t.end; i++) {
@@ -14752,6 +14763,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
+		/* The round curves of rails along their arcs, into the ground's picture (round_track.h). */
+		DrawRoundTrackStrips(bigdpi);
 		/* The black under a building, grown over from the ground beside it. */
 		for (const CabTile &t : tiles) {
 			if (!t.building) continue;
@@ -15091,6 +15104,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* The smoke of an industry's chimney: out of the top of the chimney of its parts (ThreeDIndustrySmokeAt()). */
 		int ux = u->x_pos, uy = u->y_pos, uz = u->z_pos;
 		if (ThreeDEnabled()) ThreeDIndustrySmokeAt(u, ux, uy, uz);
+		/* A train's piece on a round curve (round_track.h): on the arc, its picture that of the direction nearest the
+		 * arc's there -- as the turned map has it (the player, 3. 11.: "why have we no round rails from the eyes"). */
+		Direction udir = u->direction;
+		if (RoundTrackPose pose; GetRoundTrackPose(u, pose)) {
+			ux = static_cast<int>(std::lround(pose.x));
+			uy = static_cast<int>(std::lround(pose.y));
+			udir = static_cast<Direction>((2 - static_cast<int>(std::lround(pose.azimuth / 45.0))) & 7);
+		}
 		CabPoint c = CabToEye(eye, ux, uy, uz, 0, 0);
 		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
 		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the
@@ -15105,7 +15126,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		if (u->type == VehicleType::Effect || u->direction == Direction::Invalid) {
 			seq = u->sprite_cache.sprite_seq;
 		} else {
-			u->GetImage(static_cast<Direction>((to_underlying(u->direction) - step) & 7), EngineImageType::OnMap, &seq);
+			u->GetImage(static_cast<Direction>((to_underlying(udir) - step) & 7), EngineImageType::OnMap, &seq);
 			if (!seq.IsValid()) seq = u->sprite_cache.sprite_seq;
 		}
 		PaletteID pal = PAL_NONE;

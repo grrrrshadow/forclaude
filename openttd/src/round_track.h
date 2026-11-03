@@ -20,8 +20,10 @@
  * picture of the straight track of its rail type; a train on it is drawn as its 3D likeness, turned along the arc.
  * Building, the pathfinder and the trains' movement are untouched.
  *
- * Only in the turned view (three_d.h). The player: "at angle 0 it is off, angle 0 is for building, turning is for
- * looking" -- facing north, and in every other viewport, the curves are as they always were.
+ * In the turned view (three_d.h) and from the eyes -- the walker, a vehicle's cab, its train on the arc and the eye
+ * riding it (the player, 3. 11.: "why don't we have round rails in the first person view, boarding with E and the
+ * cab view"). The player: "at angle 0 it is off, angle 0 is for building, turning is for looking" -- facing north,
+ * and in every other viewport, the curves are as they always were.
  *
  * Only plain rail on flat ground without signals is rounded; a curve ends where another tile is. At a switch the
  * straight way stays straight and the way branching off it is round, drawn on over the straight way as far as its arc
@@ -36,6 +38,7 @@
 #include "zoom_type.h"
 
 #include <span>
+#include <vector>
 
 struct Vehicle;
 struct DrawPixelInfo;
@@ -66,6 +69,7 @@ public:
 	~RoundTrackPass();
 private:
 	bool was;
+	std::vector<TileIndex> outer_tiles; ///< those of the pass this one is in, given back at its end
 };
 
 #endif /* ROUND_TRACK_H */
