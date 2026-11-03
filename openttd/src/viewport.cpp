@@ -2323,8 +2323,18 @@ struct TurnedGroundSprite {
 };
 
 /** A tile in the kept picture of the ground (TurnedGround). */
+/**
+ * A straight white mark of a road of the view from the eyes (DrawEyeRoad()): a rectangle lying on the road, drawn by
+ * triangles of its own over the ground, so that its edges and corners are sharp however near.
+ */
+struct EyeRoadMark {
+	std::array<std::array<double, 3>, 4> corner{}; ///< its corners in the world, round it, on the ground there
+	Colour colour;                                 ///< the mean of its pixels
+};
+
 struct TurnedGroundTile {
 	std::vector<TurnedGroundSprite> sprites; ///< its ground (none with a foundation: that is drawn by itself, DrawTurnedTileGround())
+	mutable std::vector<EyeRoadMark> road_marks; ///< the ground of the view from the eyes: the straight white marks of its road, as last drawn (DrawEyeRoad())
 	uint64_t key = 0;   ///< what its pixels depend on: when the tile gives another, it is drawn again
 	GroundRect area;    ///< the pixels its sprites and its strip of round track reach
 	GroundRect fill;    ///< a building's: the rows whose black is grown over (FillTurnedFootprint())
@@ -2810,13 +2820,21 @@ static bool EyeRoadTile(int x, int y)
  * CZTR now and we will try the original too: smooth the blocks and at once keep the sharp lines of the white stripes
  * ... smear the road and sharpen the edges of the white places"): its sprites as the game draws them, whatever set
  * they are of, and then by their colours -- its grey surface (the asphalt, a pavement) smoothed among the greys alike
- * (a pixel the mean of those about it of a near lightness: the dither gone, the edge of the pavement kept), marked
- * THREE_D_GPU_ROAD_SURFACE; its white marks (grey, much lighter than the asphalt, and thin: less than half the pixels
- * about them so light, unlike a pavement) as they are, marked THREE_D_GPU_ROAD_MARK. The view from the eyes takes them
- * between their texels (CabRoadTexel(), EYE_TRI_FRAGMENT): the surface smooth, the marks' edges sharp. Its verges as
- * they are.
+ * (a pixel the mean of those about it of a near lightness: the dither gone, the edge of the pavement kept); its white
+ * marks (grey, much lighter than the asphalt, and thin: less than half the pixels about them so light, unlike a
+ * pavement) as rectangles along the road (the player, 3. 11., a drawing of two white pixels in a hatched rectangle:
+ * "align them into the rectangle, the top and the bottom corner to the middle"; "fill the gap between them, into the
+ * shape of a rectangle"): a straight mark -- its pixels touching, spread across the road no more than a world unit --
+ * from the middle of its first pixel to the middle of its last along the road (to the edge of the tile, where it goes
+ * on in the next one), as wide as the corners of its outer pixels reach, laid on the road by triangles of its own
+ * (EyeRoadMark), its pixels here the smoothed surface; another (a curve, a crossing) as its pixels are, marked
+ * THREE_D_GPU_ROAD_MARK, the surface THREE_D_GPU_ROAD_SURFACE. The view from the eyes takes them between their
+ * texels (CabRoadTexel(), EYE_TRI_FRAGMENT): the surface smooth, those marks' edges sharp. Its verges as they are.
+ * @param tile_x,tile_y the tile
+ * @param base_z,slope the height of the lowest corner of its ground, and its slope (on a foundation its top's)
+ * @param marks its straight marks added to it
  */
-static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
+static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int tile_y, int base_z, Slope slope, std::vector<EyeRoadMark> &marks)
 {
 	const DrawPixelInfo *d = _cur_dpi;
 	if (d == nullptr || sprites.empty()) return;
@@ -2830,10 +2848,8 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
 		px1 = std::max(px1, floor_div(e.x + spr->x_offs + spr->width - d->left + s - 1, s) + 1);
 		py1 = std::max(py1, floor_div(e.y + spr->y_offs + spr->height - d->top + s - 1, s) + 1);
 	}
-	px0 = std::max(px0, 0);
-	py0 = std::max(py0, 0);
-	px1 = std::min(px1, d->width / s);
-	py1 = std::min(py1, d->height / s);
+	/* All of it, also beyond the picture drawn into (a rect of the kept ground): its marks whole. */
+	if (px1 <= 0 || py1 <= 0 || px0 >= d->width / s || py0 >= d->height / s) return;
 	const int tw = px1 - px0, th = py1 - py0;
 	if (tw <= 0 || th <= 0) return;
 	/* Its sprites as the game draws them, on their own. */
@@ -2850,6 +2866,12 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
 		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
 		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
 	}
+	uint32_t *dst = static_cast<uint32_t *>(d->dst_ptr);
+	const int dw = d->width / s, dh = d->height / s;
+	auto put = [&](int i, int j, uint32_t c) {
+		const int x = px0 + i, y = py0 + j;
+		if (x >= 0 && y >= 0 && x < dw && y < dh) dst[static_cast<size_t>(y) * d->pitch + x] = c;
+	};
 	/* Its greys and their lightness; the asphalt's, the middle one of them. */
 	const size_t n = own.size();
 	std::vector<int16_t> light(n, -1); // -1: not a grey of it
@@ -2864,7 +2886,11 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
 		greys++;
 	}
 	if (greys == 0) {
-		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+		for (int j = 0; j < th; j++) {
+			for (int i = 0; i < tw; i++) {
+				if ((own[static_cast<size_t>(j) * tw + i] >> 24) != 0) put(i, j, own[static_cast<size_t>(j) * tw + i]);
+			}
+		}
 		return;
 	}
 	int asphalt = 0;
@@ -2893,32 +2919,126 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
 			if (box(sum_light, i0, j0, i1, j1) * 2 < box(sum_drawn, i0, j0, i1, j1)) mark[at(i, j)] = 1;
 		}
 	}
-	/* Laid over what is there: the marks as they are, the greys smoothed among the greys alike, the rest as drawn. */
-	uint32_t *dst = static_cast<uint32_t *>(d->dst_ptr);
+	/* The world point of a pixel's middle, on the tile's slope (RemapCoords() backwards, as DrawOurGrass()). */
+	auto world = [&](int i, int j) {
+		const double vx = t.left + i * s + s / 2.0, vy = t.top + j * s + s / 2.0;
+		const double a = vx / (2.0 * ZOOM_BASE), b = vy / ZOOM_BASE;
+		double z = base_z, wx = 0, wy = 0;
+		for (int k = 0; k < 3; k++) {
+			wx = (b + z - a) / 2;
+			wy = (b + z + a) / 2;
+			const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+			const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+			z = base_z + GetPartialPixelZ(fx, fy, slope);
+		}
+		return std::array<double, 2>{wx, wy};
+	};
+	/* The height of the ground at a world point of the tile: between its corners (a road's ground is flat or one slope). */
+	auto height = [&](double x, double y) {
+		const Slope flat = RemoveHalftileSlope(slope);
+		const double fx = std::clamp((x - tile_x * static_cast<int>(TILE_SIZE)) / TILE_SIZE, 0.0, 1.0), fy = std::clamp((y - tile_y * static_cast<int>(TILE_SIZE)) / TILE_SIZE, 0.0, 1.0);
+		const double zn = GetSlopePixelZInCorner(flat, CORNER_N), zw = GetSlopePixelZInCorner(flat, CORNER_W), ze = GetSlopePixelZInCorner(flat, CORNER_E), zs = GetSlopePixelZInCorner(flat, CORNER_S);
+		return base_z + (zn * (1 - fx) + zw * fx) * (1 - fy) + (ze * (1 - fx) + zs * fx) * fy;
+	};
+	std::vector<std::array<double, 2>> where(n);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			if (light[at(i, j)] >= 0) where[at(i, j)] = world(i, j);
+		}
+	}
+	/* The marks: the pixels touching each other. A straight one a rectangle along the road; another as it is (-2). */
+	std::vector<int32_t> mark_of(n, -1);
+	std::vector<size_t> members, stack;
+	for (size_t first = 0; first < n; first++) {
+		if (mark[first] == 0 || mark_of[first] != -1) continue;
+		members.clear();
+		stack.assign(1, first);
+		mark_of[first] = -3;
+		while (!stack.empty()) {
+			const size_t p = stack.back();
+			stack.pop_back();
+			members.push_back(p);
+			const int pi = static_cast<int>(p % tw), pj = static_cast<int>(p / tw);
+			for (int dj = -1; dj <= 1; dj++) {
+				for (int di = -1; di <= 1; di++) {
+					const int qi = pi + di, qj = pj + dj;
+					if (qi < 0 || qj < 0 || qi >= tw || qj >= th) continue;
+					const size_t q = at(qi, qj);
+					if (mark[q] == 0 || mark_of[q] != -1) continue;
+					mark_of[q] = -3;
+					stack.push_back(q);
+				}
+			}
+		}
+		/* Its pixels' middles: how far they spread each way; its colour. */
+		double lo[2] = {std::numeric_limits<double>::max(), std::numeric_limits<double>::max()}, hi[2] = {-std::numeric_limits<double>::max(), -std::numeric_limits<double>::max()};
+		uint64_t cr = 0, cg = 0, cb = 0;
+		for (size_t p : members) {
+			for (int k = 0; k < 2; k++) {
+				lo[k] = std::min(lo[k], where[p][k]);
+				hi[k] = std::max(hi[k], where[p][k]);
+			}
+			const Colour c(own[p]);
+			cr += c.r;
+			cg += c.g;
+			cb += c.b;
+		}
+		const int axis = hi[0] - lo[0] >= hi[1] - lo[1] ? 0 : 1, across = 1 - axis;
+		if (members.size() < 2 || hi[across] - lo[across] > 1.0 || hi[axis] - lo[axis] <= hi[across] - lo[across]) {
+			for (size_t p : members) mark_of[p] = -2;
+			continue;
+		}
+		/* How far a pixel reaches across the road from its middle: half its width there, its corners. */
+		const int i0 = static_cast<int>(members.front() % tw), j0 = static_cast<int>(members.front() / tw);
+		const std::array<double, 2> w0 = world(i0, j0), wu = world(i0 + 1, j0), wv = world(i0, j0 + 1);
+		const double half = (std::abs(wu[across] - w0[across]) + std::abs(wv[across] - w0[across])) / 2;
+		double from = lo[axis], to = hi[axis];
+		const double side0 = lo[across] - half, side1 = hi[across] + half;
+		/* At an edge of the tile to the edge: a line going on there, its pixels the next tile's. */
+		const double edge0 = static_cast<double>((axis == 0 ? tile_x : tile_y) * static_cast<int>(TILE_SIZE)), edge1 = edge0 + TILE_SIZE;
+		if (from - edge0 <= 0.6) from = edge0;
+		if (edge1 - to <= 0.6) to = edge1;
+		EyeRoadMark m;
+		const size_t cnt = members.size();
+		m.colour = Colour(static_cast<uint8_t>(cr / cnt), static_cast<uint8_t>(cg / cnt), static_cast<uint8_t>(cb / cnt));
+		const double along[4] = {from, to, to, from}, side[4] = {side0, side0, side1, side1};
+		for (int k = 0; k < 4; k++) {
+			const double x = axis == 0 ? along[k] : side[k], y = axis == 0 ? side[k] : along[k];
+			m.corner[k] = {x, y, height(x, y)};
+		}
+		marks.push_back(m);
+		for (size_t p : members) mark_of[p] = static_cast<int32_t>(marks.size());
+	}
+	/* Laid over what is there: a mark not straight as it is, the surface (and a straight mark's pixels) smoothed among
+	 * the greys alike; the rest as drawn. */
 	for (int j = 0; j < th; j++) {
 		for (int i = 0; i < tw; i++) {
 			const size_t p = at(i, j);
 			if ((own[p] >> 24) == 0) continue;
-			uint32_t out = own[p];
-			if (mark[p] != 0) {
-				out = (out & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_MARK) << 24;
-			} else if (light[p] >= 0) {
-				uint32_t r = 0, g = 0, b = 0, cnt = 0;
-				for (int y = std::max(0, j - R); y <= std::min(th - 1, j + R); y++) {
-					for (int x = std::max(0, i - R); x <= std::min(tw - 1, i + R); x++) {
-						const size_t q = at(x, y);
-						if (light[q] < 0 || mark[q] != 0 || std::abs(light[q] - light[p]) > 40) continue;
-						const Colour c(own[q]);
-						r += c.r;
-						g += c.g;
-						b += c.b;
-						cnt++;
-					}
-				}
-				const Colour smooth(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt));
-				out = (smooth.data & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_SURFACE) << 24;
+			if (light[p] < 0) {
+				put(i, j, own[p]);
+				continue;
 			}
-			dst[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)] = out;
+			if (mark_of[p] == -2) {
+				put(i, j, (own[p] & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_MARK) << 24);
+				continue;
+			}
+			/* The mean of the greys about it of its lightness that are no marks (a straight mark's pixel: of the asphalt's). */
+			const int want = mark[p] != 0 ? asphalt : light[p];
+			uint32_t r = 0, g = 0, b = 0, cnt = 0;
+			for (int y = std::max(0, j - R); y <= std::min(th - 1, j + R); y++) {
+				for (int x = std::max(0, i - R); x <= std::min(tw - 1, i + R); x++) {
+					const size_t q = at(x, y);
+					if (light[q] < 0 || mark[q] != 0 || std::abs(light[q] - want) > 40) continue;
+					const Colour c(own[q]);
+					r += c.r;
+					g += c.g;
+					b += c.b;
+					cnt++;
+				}
+			}
+			const uint32_t smooth = cnt == 0 ? own[p] : Colour(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt)).data;
+			put(i, j, (smooth & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_SURFACE) << 24);
 		}
 	}
 }
@@ -2978,6 +3098,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		}
 		rec.key = key;
 		rec.sprites.clear();
+		rec.road_marks.clear();
 		rec.area = {};
 		rec.fill = {};
 		rec.round = INVALID_TILE;
@@ -3093,7 +3214,8 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 				if (roads && EyeRoadTile(rec->tile_x, rec->tile_y)) {
 					std::vector<EyeRoadSprite> road;
 					for (const TurnedGroundSprite &gs : rec->sprites) road.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
-					DrawEyeRoad(road);
+					rec->road_marks.clear();
+					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks);
 					if (rec->round != INVALID_TILE) round.push_back(rec->round);
 					continue;
 				}
@@ -14488,6 +14610,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	const uint32_t *gpx = nullptr; ///< the texture's pixels
 	int gw = 0, gh = 0;            ///< its size
 	int gl = 0, gt = 0;            ///< its first pixel, pixels of the zoom
+	bool ground_kept = false;      ///< the kept one (_eye_ground): the straight white marks of its roads with its tiles
+	std::vector<EyeRoadMark> frame_marks; ///< else those of the one drawn for this frame (DrawEyeRoad())
 	if (bw > 0 && bh > 0 && _eye_ground_kept && PlaceTurnedGround(_eye_ground, zoom, {bigdpi.left / vs, bigdpi.top / vs, bigdpi.left / vs + bw, bigdpi.top / vs + bh}, EYE_GROUND_PIXELS, EYE_GROUND_SIDE)) {
 		/* The tiles as the kept ground takes them; one on a foundation with its ground as drawn here: its sprites, then
 		 * the foundation's children (on its top). */
@@ -14550,6 +14674,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (!in.Empty()) c.changed.push_back({in.l - g.at.l, in.t - g.at.t, in.r - in.l, in.b - in.t});
 		}
 		_eye_ground_frames[1]++;
+		ground_kept = true;
 	} else if (bw > 0 && bh > 0 && static_cast<size_t>(bw) * bh <= 24u * 1024 * 1024) {
 		out.ground.assign(static_cast<size_t>(bw) * bh, 0);
 		bigdpi.dst_ptr = out.ground.data();
@@ -14565,7 +14690,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
 					}
-					DrawEyeRoad(road);
+					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks);
 					continue;
 				}
 				for (size_t i = t.first; i < t.end; i++) {
@@ -14630,6 +14755,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		static const Corner corners[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
 		static const int cxs[4] = {0, 0, TILE_SIZE, TILE_SIZE};
 		static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+		std::deque<uint32_t> mark_colours; // the colours the marks' triangles point to (drawn at the end of the batch)
 		CabBatchScope ground_batch; // the ground texture stays as it is: on every core
 		for (const CabTile &t : tiles) {
 			if (t.first >= t.end && !t.foundation) continue;
@@ -14645,6 +14771,28 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 			for (int i = 0; i < 4; i++) {
 				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0) | (eye_grass ? CAB_GRASS : 0)));
+			}
+		}
+		/* The straight white marks of the roads (DrawEyeRoad()): rectangles lying on them a hair above the ground, sharp
+		 * however near. */
+		if (_settings_client.gui.eye_roads) {
+			static constexpr double LIFT = 0.05 * OBJECT_HEIGHT_PER_METRE;
+			auto lay = [&](const std::vector<EyeRoadMark> &marks) {
+				for (const EyeRoadMark &m : marks) {
+					mark_colours.push_back(m.colour.data);
+					const uint32_t *tex = EyeColour(mark_colours.back());
+					std::vector<CabPoint> poly;
+					for (const auto &c : m.corner) poly.push_back(CabToEye(eye, c[0], c[1], c[2] + LIFT, 0, 0));
+					CabDrawPolygon(dst, zb, width, height, tex, 1, 1, std::move(poly), eye, 0);
+				}
+			};
+			if (ground_kept) {
+				for (const CabTile &t : tiles) {
+					auto it = _eye_ground.tiles.find(TurnedGroundTileKey(t.x, t.y));
+					if (it != _eye_ground.tiles.end()) lay(it->second.road_marks);
+				}
+			} else {
+				lay(frame_marks);
 			}
 		}
 	}

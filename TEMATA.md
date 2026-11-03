@@ -34,6 +34,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (107) – Silnice z očí: bílé pruhy jako obdélníky
+
+- Hráč (nákres na papíře): dva bílé pixely na silnici zarovnat do obdélníku, *„horni a dolni roh do prostřed“*;
+  po ukázce *„to se nepovedlo dva bily fleky ať je to obdelnik“*, *„mezeru mezi nimi vyplnime a do tvaru obdelniku“*.
+  Ke kartě: *„procesor je zaloha když nejde karta gpu. nic vic“*.
+- Čárka pruhu originální silnice jsou 4 pixely obrázku země (dva páry vedle sebe, každý pár jeden „flek“). Pixel je
+  ve světě natočený o 45°, proto kosočtverce a kapky.
+- **Teď** (`DrawEyeRoad()`): bílé pixely, které se dotýkají, jsou jedna značka. Rovná značka (napříč silnicí nejvýš
+  1 jednotka, delší podél než napříč) je obdélník podél silnice: od středu prvního do středu posledního pixelu (u kraje
+  dlaždice až po kraj, ať čára pokračuje do další), na šířku přes rohy krajních pixelů. Kreslí se jako vlastní
+  trojúhelníky ležící na silnici (`EyeRoadMark`, 5 cm nad zemí) – karta i procesor stejně, rohy ostré zblízka.
+  V obrázku země jsou její pixely asfalt. Ostatní značky (oblouk, křižovatka, samotný flek) zůstávají jako dřív.
+  Zkoušel jsem i vzdálenost od okraje v alfě textury: boky rovné, ale rohy useknuté (pixel je na roh moc velký).
+- Rig `si6` (silnice z `test3d silnice`): karta a procesor se liší v 10 pixelech. MinGW, clang 0, kouřová baterie
+  beze změny.
+
 ## 3. 11. (106) – GPU: tráva z očí barví karta, procesor jen záloha
 
 - Hráč: *„to nema kreslit procesor jen jako založni řešeni, sprav to a koukni do planu gpu kdy to bude dělat gpu“*
