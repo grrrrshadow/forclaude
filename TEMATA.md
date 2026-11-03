@@ -12,7 +12,10 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   MinGW jen varuje: build 295 umřel na kmenech stromů, 24. 10.).
 - Kontrola MinGW s definicemi jako build na GitHubu, hlavně `-DPSAPI_VERSION=1` (build 297 umřel na
   `K32GetProcessMemoryInfo`, s verzí 1 není deklarovaná; hra linkuje `psapi`, správně je `GetProcessMemoryInfo`).
-- Žádná vyskakovací okna s povolením (nový host, add_repo apod.).
+- Žádná vyskakovací okna s povolením (nový host, add_repo apod.). Hráč (3. 11.): *„ja tady nejsem a stejně zmačknu
+  alow, nečtu to, tak s tim přestaň“* – patří sem i stahování artefaktů buildu (symboly, exe) z GitHubu (`curl`
+  na úložiště artefaktů, nástroje GitHub Actions). Adresy z crash logu převádět jen symboly, které už jsou ve
+  scratchpadu; jinak najít příčinu z kódu a logů bez stahování.
 - **Mody a hra jsou dva oddělené světy.** GRF je mod: objekt místo spritu, jinak funguje jako dřív. Co GRF chce
   (barva, blednutí, rez, blikání majáku), vybírá GRF svým spritem (`stavy`). Hra sama nic nerozhoduje a nic do GRF
   nestrká. Kolega v grrrrf dělá GRF a objekty, já hru a prostředí pro ně.
