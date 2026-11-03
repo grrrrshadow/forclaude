@@ -1290,6 +1290,34 @@ void main()
 		}
 	}
 	if (t == vec4(0.0)) discard;
+	/* A road's texel of the ground (THREE_D_GPU_EYE_ROAD): between the four about the point, of the road's alone --
+	 * its surface as they blend, a white mark where the marks have two fifths of them or more (a mark of two texels
+	 * touching at a corner one, not two), so that its edge is sharp however near (DrawEyeRoad() of viewport.cpp,
+	 * CabRoadTexel()). */
+	if ((how & 16) != 0) {
+		int ta = int(t.a * 255.0 + 0.5);
+		if (ta == 253 || ta == 254) {
+			vec2 f = v_uv - 0.5;
+			ivec2 b = ivec2(floor(f));
+			vec2 w = f - vec2(b);
+			vec3 mark = vec3(0.0), surface = vec3(0.0);
+			float m = 0.0, r = 0.0;
+			for (int k = 0; k < 4; k++) {
+				ivec2 o = ivec2(k & 1, k >> 1);
+				vec4 q = texelFetch(u_tex, origin + clamp(b + o, ivec2(0), size - 1), 0);
+				int qa = int(q.a * 255.0 + 0.5);
+				float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
+				if (qa == 254) {
+					m += wk;
+					mark += wk * q.rgb;
+				} else if (qa == 253) {
+					surface += wk * q.rgb;
+				}
+				if (qa == 253 || qa == 254) r += wk;
+			}
+			if (r > 0.0) t.rgb = m >= 0.4 * r ? mark / max(m, 1e-4) : surface / max(r - m, 1e-4);
+		}
+	}
 	/* See-through by so many 256ths; a material "BLEND"'s times its texel's alpha (THREE_D_GPU_EYE_TEXEL_ALPHA). */
 	float alpha = v_how.x >= 256.0 ? 1.0 : v_how.x / 256.0;
 	if ((how & 8) != 0) alpha *= t.a;

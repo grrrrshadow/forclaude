@@ -808,6 +808,7 @@ SettingsContainer &GetSettingsTree()
 			graphics->Add(new SettingEntry("gui.night_light"));
 			graphics->Add(new SettingEntry("gui.eye_shadows"));
 			graphics->Add(new SettingEntry("gui.map_grass"));
+			graphics->Add(new SettingEntry("gui.eye_roads"));
 			graphics->Add(new SettingEntry("gui.cab_camera"));
 			graphics->Add(new SettingEntry("gui.round_track_curves"));
 			graphics->Add(new SettingEntry("gui.smallmap_land_colour"));

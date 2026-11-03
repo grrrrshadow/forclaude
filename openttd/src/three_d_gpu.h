@@ -244,6 +244,10 @@ static constexpr int THREE_D_GPU_EYE_FILL = 1;         ///< a hole of its textur
 static constexpr int THREE_D_GPU_EYE_REPEAT = 2;       ///< its texture repeated beyond its edges (CAB_REPEAT)
 static constexpr int THREE_D_GPU_EYE_CORNER_LIGHT = 4; ///< the light of each corner, straight across the picture between them (a thing in the hand)
 static constexpr int THREE_D_GPU_EYE_TEXEL_ALPHA = 8;  ///< see-through times its texel's alpha (a material "BLEND", CAB_TEXEL_ALPHA)
+static constexpr int THREE_D_GPU_EYE_ROAD = 16;        ///< the ground: its texels of a road (THREE_D_GPU_ROAD_SURFACE, THREE_D_GPU_ROAD_MARK) between their four, the marks' edges sharp (CAB_ROAD)
+/** A texel of the ground of the view from the eyes on a road (DrawEyeRoad() of viewport.cpp), by its alpha: its surface smoothed, a white mark. */
+static constexpr uint8_t THREE_D_GPU_ROAD_SURFACE = 253;
+static constexpr uint8_t THREE_D_GPU_ROAD_MARK = 254;
 
 /** Triangles of the eye's frame of one texture, in the order they are drawn: corners first to first + count. */
 struct ThreeDGpuEyeRun {

@@ -31,6 +31,22 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (101) – Silnice z očí: hladký asfalt, ostré hrany bílých pruhů
+
+- Hráč: *„silnice, mam teď cztr a skusime i originalni, vyhladit ty kostičky a zároveň udržet ostré linky bílých
+  pruhů. zase to musí být volitelné za přepinačem v nastavení. rozpatlat silnici a vyhranit hrany bilych mist“*;
+  *„ze zhora neni potřeba na mapě, jen z očí“*; *„zapnute implicidně“*.
+- Nastavení „Hladké silnice v pohledu z očí“ (`gui.eye_roads`, výchozí zapnuto). Mapa beze změny.
+- Do obrázku země z očí se obyčejná silniční dlaždice (ne přejezd, ne depo) kreslí `DrawEyeRoad()`: její sprity jak
+  je hra kreslí (originál i sada, třeba CZTR), pak **podle barev**: šedé plochy (asfalt, chodník) vyhlazené mezi
+  šedými podobné světlosti (okno 7 × 7, rozdíl do 40 – dither pryč, hrana chodníku zůstane), označené alfou 253;
+  bílé značky (šedé, o 60 světlejší než prostřední šeď asfaltu, aspoň 160, a tenké – v okně je světlých méně než
+  polovina, chodník ne) beze změny, alfou 254; krajnice jak jsou.
+- Z očí (karta `EYE_TRI_FRAGMENT` i procesor `CabRoadTexel()`, příznak `CAB_ROAD` / `THREE_D_GPU_EYE_ROAD` u
+  trojúhelníků země): texel silnice se bere ze čtyř okolních texelů silnice – asfalt plynule, značka tam, kde značky
+  mají aspoň dvě pětiny váhy (dva texely dotýkající se rohem dají jednu značku, ne osmičku) → hrana značky ostrá
+  i zblízka. Karta a procesor kreslí stejně (rig `si3`).
+
 ## 3. 11. (100) – Tráva mírného klimatu: z očí 3D trsy a kvítky, na mapě hladký povrch
 
 - Hráč: *„uděláme travnatý povrch pro temperate … tráva nízká řídká ale hodně zakryje čtverečkovaný originalni

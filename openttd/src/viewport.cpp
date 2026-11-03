@@ -2740,6 +2740,143 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 	}
 }
 
+/** A sprite of the ground of a tile as DrawEyeRoad() draws them. */
+struct EyeRoadSprite {
+	SpriteID image;
+	PaletteID pal;
+	int x, y;
+	const SubSprite *sub;
+};
+
+/**
+ * Whether the ground of a tile in the view from the eyes is a road's that DrawEyeRoad() smooths: a plain road (not a
+ * level crossing, a depot), of the game's roads or a set's (CZTR), as the player chose (gui.eye_roads).
+ */
+static bool EyeRoadTile(int x, int y)
+{
+	if (!_settings_client.gui.eye_roads || !IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) return false;
+	const TileIndex tile = TileXY(x, y);
+	return IsTileType(tile, TileType::Road) && IsNormalRoad(tile);
+}
+
+/**
+ * The ground of a road tile drawn into the ground of the view from the eyes (the player, 3. 11.: "the roads, I have
+ * CZTR now and we will try the original too: smooth the blocks and at once keep the sharp lines of the white stripes
+ * ... smear the road and sharpen the edges of the white places"): its sprites as the game draws them, whatever set
+ * they are of, and then by their colours -- its grey surface (the asphalt, a pavement) smoothed among the greys alike
+ * (a pixel the mean of those about it of a near lightness: the dither gone, the edge of the pavement kept), marked
+ * THREE_D_GPU_ROAD_SURFACE; its white marks (grey, much lighter than the asphalt, and thin: less than half the pixels
+ * about them so light, unlike a pavement) as they are, marked THREE_D_GPU_ROAD_MARK. The view from the eyes takes them
+ * between their texels (CabRoadTexel(), EYE_TRI_FRAGMENT): the surface smooth, the marks' edges sharp. Its verges as
+ * they are.
+ */
+static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites)
+{
+	const DrawPixelInfo *d = _cur_dpi;
+	if (d == nullptr || sprites.empty()) return;
+	const int s = ScaleByZoom(1, d->zoom);
+	auto floor_div = [](int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
+	int px0 = INT_MAX, py0 = INT_MAX, px1 = INT_MIN, py1 = INT_MIN;
+	for (const EyeRoadSprite &e : sprites) {
+		const Sprite *spr = GetSprite(e.image & SPRITE_MASK, SpriteType::Normal);
+		px0 = std::min(px0, floor_div(e.x + spr->x_offs - d->left, s) - 1);
+		py0 = std::min(py0, floor_div(e.y + spr->y_offs - d->top, s) - 1);
+		px1 = std::max(px1, floor_div(e.x + spr->x_offs + spr->width - d->left + s - 1, s) + 1);
+		py1 = std::max(py1, floor_div(e.y + spr->y_offs + spr->height - d->top + s - 1, s) + 1);
+	}
+	px0 = std::max(px0, 0);
+	py0 = std::max(py0, 0);
+	px1 = std::min(px1, d->width / s);
+	py1 = std::min(py1, d->height / s);
+	const int tw = px1 - px0, th = py1 - py0;
+	if (tw <= 0 || th <= 0) return;
+	/* Its sprites as the game draws them, on their own. */
+	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo t{};
+	t.dst_ptr = own.data();
+	t.left = d->left + px0 * s;
+	t.top = d->top + py0 * s;
+	t.width = tw * s;
+	t.height = th * s;
+	t.pitch = tw;
+	t.zoom = d->zoom;
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
+		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+	}
+	/* Its greys and their lightness; the asphalt's, the middle one of them. */
+	const size_t n = own.size();
+	std::vector<int16_t> light(n, -1); // -1: not a grey of it
+	std::array<uint32_t, 256> counts{};
+	uint32_t greys = 0;
+	for (size_t i = 0; i < n; i++) {
+		if ((own[i] >> 24) == 0) continue;
+		const Colour c(own[i]);
+		if (std::max({c.r, c.g, c.b}) - std::min({c.r, c.g, c.b}) >= 32) continue;
+		light[i] = static_cast<int16_t>((c.r * 77 + c.g * 150 + c.b * 29) >> 8);
+		counts[light[i]]++;
+		greys++;
+	}
+	if (greys == 0) {
+		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+		return;
+	}
+	int asphalt = 0;
+	for (uint32_t seen = 0; asphalt < 255 && (seen += counts[asphalt]) * 2 < greys; asphalt++) {}
+	const int bright = std::max(160, asphalt + 60);
+	/* The light ones, and how many of the pixels about each are light (sums over the rect up to each pixel). */
+	static constexpr int R = 3; // pixels each way about a pixel: a window of seven
+	auto at = [&](int i, int j) { return static_cast<size_t>(j) * tw + i; };
+	std::vector<uint32_t> sum_light(static_cast<size_t>(tw + 1) * (th + 1), 0), sum_drawn(static_cast<size_t>(tw + 1) * (th + 1), 0);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const size_t k = static_cast<size_t>(j + 1) * (tw + 1) + (i + 1);
+			const size_t p = at(i, j);
+			sum_light[k] = (light[p] >= bright ? 1 : 0) + sum_light[k - 1] + sum_light[k - (tw + 1)] - sum_light[k - (tw + 1) - 1];
+			sum_drawn[k] = ((own[p] >> 24) != 0 ? 1 : 0) + sum_drawn[k - 1] + sum_drawn[k - (tw + 1)] - sum_drawn[k - (tw + 1) - 1];
+		}
+	}
+	auto box = [&](const std::vector<uint32_t> &sum, int i0, int j0, int i1, int j1) {
+		return sum[static_cast<size_t>(j1) * (tw + 1) + i1] - sum[static_cast<size_t>(j0) * (tw + 1) + i1] - sum[static_cast<size_t>(j1) * (tw + 1) + i0] + sum[static_cast<size_t>(j0) * (tw + 1) + i0];
+	};
+	std::vector<uint8_t> mark(n, 0);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			if (light[at(i, j)] < bright) continue;
+			const int i0 = std::max(0, i - R), j0 = std::max(0, j - R), i1 = std::min(tw, i + R + 1), j1 = std::min(th, j + R + 1);
+			if (box(sum_light, i0, j0, i1, j1) * 2 < box(sum_drawn, i0, j0, i1, j1)) mark[at(i, j)] = 1;
+		}
+	}
+	/* Laid over what is there: the marks as they are, the greys smoothed among the greys alike, the rest as drawn. */
+	uint32_t *dst = static_cast<uint32_t *>(d->dst_ptr);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const size_t p = at(i, j);
+			if ((own[p] >> 24) == 0) continue;
+			uint32_t out = own[p];
+			if (mark[p] != 0) {
+				out = (out & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_MARK) << 24;
+			} else if (light[p] >= 0) {
+				uint32_t r = 0, g = 0, b = 0, cnt = 0;
+				for (int y = std::max(0, j - R); y <= std::min(th - 1, j + R); y++) {
+					for (int x = std::max(0, i - R); x <= std::min(tw - 1, i + R); x++) {
+						const size_t q = at(x, y);
+						if (light[q] < 0 || mark[q] != 0 || std::abs(light[q] - light[p]) > 40) continue;
+						const Colour c(own[q]);
+						r += c.r;
+						g += c.g;
+						b += c.b;
+						cnt++;
+					}
+				}
+				const Colour smooth(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt));
+				out = (smooth.data & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_ROAD_SURFACE) << 24;
+			}
+			dst[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)] = out;
+		}
+	}
+}
+
 /** Whether the ground being drawn has our grass: from the eyes always, on the map as the player chose (gui.map_grass). */
 static bool OurGrassOn(bool eyes)
 {
@@ -2753,6 +2890,8 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 	/* Our grass on the game's (DrawOurGrass()): the tiles drawn again when the player switches it, or its picture comes. */
 	const bool eyes = &g == &_eye_ground;
 	const bool grass = OurGrassOn(eyes);
+	/* The roads of the view from the eyes smooth (DrawEyeRoad()): drawn again when the player switches it. */
+	const bool roads = eyes && _settings_client.gui.eye_roads;
 	const int s = ScaleByZoom(1, g.zoom);
 	for (size_t n = 0; n < tiles.size(); n++) {
 		const TurnedTile &t = tiles[n];
@@ -2761,7 +2900,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
 		GroundHash hash;
 		hash.Mix(founded);
-		hash.Mix(grass ? 1 : 0);
+		hash.Mix((grass ? 1 : 0) | (roads ? 2 : 0));
 		if (given != nullptr) {
 			for (const TurnedGroundSprite &gs : *given) hash.Sprite(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
 		} else if (!founded) {
@@ -2905,6 +3044,13 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
 			for (const TurnedGroundTile *rec : tiles_in(r)) {
 				if (!rec->area.Meets(r)) continue;
+				if (roads && EyeRoadTile(rec->tile_x, rec->tile_y)) {
+					std::vector<EyeRoadSprite> road;
+					for (const TurnedGroundSprite &gs : rec->sprites) road.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
+					DrawEyeRoad(road);
+					if (rec->round != INVALID_TILE) round.push_back(rec->round);
+					continue;
+				}
 				for (const TurnedGroundSprite &gs : rec->sprites) {
 					if (const OurGrassGround ours = grass && !gs.has_sub ? OurGrassGroundOf(gs.image, gs.pal) : OurGrassGround{}; ours.kind >= 0) {
 						DrawOurGrass(gs.image, gs.pal, gs.x, gs.y, ours, eyes, rec->tile_x, rec->tile_y, rec->base_z, rec->slope);
@@ -10405,6 +10551,49 @@ static void CabClipNear(std::vector<CabPoint> &poly)
 static constexpr uint8_t CAB_FILL_HOLES = 1; ///< the nearest drawn texel where the texture has none (the diamonds of the ground)
 static constexpr uint8_t CAB_REPEAT = 2;     ///< the texture repeated beyond its edges, as glTF's samplers do (a model's texture moved and stretched by "KHR_texture_transform": the ghost's sixteen times)
 static constexpr uint8_t CAB_TEXEL_ALPHA = 8; ///< see-through as much as its alpha times its texel's (a material "BLEND": the saucer's beam; THREE_D_GPU_EYE_TEXEL_ALPHA)
+static constexpr uint8_t CAB_ROAD = 16;       ///< the ground: a road's texels between their four, its white marks' edges sharp (CabRoadTexel(), THREE_D_GPU_EYE_ROAD)
+
+/**
+ * A texel of a road of the ground of the view from the eyes (DrawEyeRoad()), as the card's EYE_TRI_FRAGMENT takes it:
+ * between the four texels of the road about the point -- its surface as they blend, a white mark where the marks
+ * have two fifths of them or more (a mark of two texels touching at a corner one, not two), so that the mark's edge
+ * is sharp however near the eye is; any other texel as it is.
+ * @param u,v the point, texels
+ * @param p the texel there
+ */
+static uint32_t CabRoadTexel(const uint32_t *tex, int tw, int th, double u, double v, uint32_t p)
+{
+	const uint8_t pa = static_cast<uint8_t>(p >> 24);
+	if (pa != THREE_D_GPU_ROAD_SURFACE && pa != THREE_D_GPU_ROAD_MARK) return p;
+	const double fu = u - 0.5, fv = v - 0.5;
+	const int bu = static_cast<int>(std::floor(fu)), bv = static_cast<int>(std::floor(fv));
+	const double wu = fu - bu, wv = fv - bv;
+	double m = 0, r = 0, mark[3] = {}, surface[3] = {};
+	for (int k = 0; k < 4; k++) {
+		const int ou = k & 1, ov = k >> 1;
+		const uint32_t q = tex[static_cast<size_t>(std::clamp(bv + ov, 0, th - 1)) * tw + std::clamp(bu + ou, 0, tw - 1)];
+		const uint8_t qa = static_cast<uint8_t>(q >> 24);
+		const double wk = (ou == 1 ? wu : 1 - wu) * (ov == 1 ? wv : 1 - wv);
+		const Colour c(q);
+		if (qa == THREE_D_GPU_ROAD_MARK) {
+			m += wk;
+			mark[0] += wk * c.r;
+			mark[1] += wk * c.g;
+			mark[2] += wk * c.b;
+		} else if (qa == THREE_D_GPU_ROAD_SURFACE) {
+			surface[0] += wk * c.r;
+			surface[1] += wk * c.g;
+			surface[2] += wk * c.b;
+		}
+		if (qa == THREE_D_GPU_ROAD_MARK || qa == THREE_D_GPU_ROAD_SURFACE) r += wk;
+	}
+	if (r <= 0) return p;
+	const bool is_mark = m >= 0.4 * r;
+	const double *sum = is_mark ? mark : surface;
+	const double weight = std::max(is_mark ? m : r - m, 1e-4);
+	auto channel = [&](int k) { return static_cast<uint8_t>(std::clamp(std::lround(sum[k] / weight), 0L, 255L)); };
+	return Colour(channel(0), channel(1), channel(2)).data;
+}
 
 /**
  * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
@@ -10485,6 +10674,7 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 				}
 			}
 			if (p == 0) continue;
+			if ((fill_holes & CAB_ROAD) != 0) p = CabRoadTexel(tex, tw, th, uw * inv, vw * inv, p);
 			const uint32_t lit = light == 256 ? p : ShadedPixel(p, light);
 			if (alpha < 256) {
 				const uint a = (fill_holes & CAB_TEXEL_ALPHA) != 0 ? alpha * Colour(p).a / 255 : alpha;
@@ -14205,6 +14395,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
 			const bool grass = OurGrassOn(true);
 			for (const CabTile &t : tiles) {
+				if (EyeRoadTile(t.x, t.y)) {
+					std::vector<EyeRoadSprite> road;
+					for (size_t i = t.first; i < t.end; i++) {
+						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
+					}
+					DrawEyeRoad(road);
+					continue;
+				}
 				for (size_t i = t.first; i < t.end; i++) {
 					const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 					if (const OurGrassGround ours = grass && ts.sub == nullptr ? OurGrassGroundOf(ts.image, ts.pal) : OurGrassGround{}; ours.kind >= 0) {
@@ -14281,7 +14480,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				p[i] = CabToEye(eye, wx, wy, wz, cx * scale - gl, cy * scale - gt);
 			}
 			for (int i = 0; i < 4; i++) {
-				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, true);
+				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0)));
 			}
 		}
 	}
