@@ -31,6 +31,25 @@ nahoře. Commity jsou z větve `claude/github-connection-check-m6m898`.
   Hráčovy vlastní velikosti nechat: Pajda V3S, zastávka, socha, automat. Hospoda a pole: hráč neví, nechat jak jsou.
   Při přebírání objektů od kolegy velikost holek nepřebírat, změnu nedělat bez hráče.
 
+## 3. 11. (93) – Rostliny polí z očí kartou (GPU bod 4)
+
+Hráč: „4 asi je potřeba rostliny čtené zpátky z karty, mně to padalo mezi stromy.“
+
+- Rostliny polí (pšenice farem, marihuana plantáže, rostliny průmyslů, `AddCabPlant()`) byly z očí trojúhelníky
+  jen u nohou chodce (`CAB_PLANT_SOLID`, 0,6 dlaždice), dál plakáty z obrázků čtených z karty zpět
+  (`GetThreeDPlantPicture()`). S kartou (`figures_by_card && _eye_figures_by_card`) jsou teď trojúhelníky všechny,
+  stejná rostlina dávkou (instance), tvar podle vzdálenosti jako u figur. Rostlina, jejíž tvar se ještě čte, ten
+  snímek chybí – žádný plakát kvůli jednomu snímku. Bez karty dál plakáty.
+- Rig (llvmpipe, chodec uprostřed plantáže u pšeničných polí, `EXTRA=1` – plantáž je rozšířený průmysl):
+  čtení zpět z očí 0× (plakáty 2048×24), na obzoru už není zubatá stěna plakátů. Tvarů z očí 7200–7900 v ~400
+  dávkách (plakáty: 2000–2300). Kreslení z očí 193 ms (plakáty 104 ms) – llvmpipe kreslí procesorem, platí za
+  každý pixel; karta telefonu trojúhelníky zvládá jinak. Bez instancí (`gpu instance 0`) na llvmpipe stejně.
+- Řídnutí rostlin dál než 3 dlaždice (zkouška, nezapsáno) nepomohlo: 7191 tvarů místo 7524, skoro všechny jsou
+  blízko (plantáž kolem chodce). Kdyby byl telefon v polích pomalý, pomohla by jen řidší pole zblízka – domluvit.
+- **Slon (#280):** hráč šel pak k drakovi a přes draka obrys měst neprosvítal. Pás tedy není přes všechny figury
+  zblízka; jestli jde slon dávkou a drak po jednom (rozbitý dělitel by pak sedl jen na slona), ověřit na #324
+  s opravou dělitele.
+
 ## 2. 11. (92) – Stromy po #323: pouštní města 3D palmy, barvy mírných stromů, hliněná města
 
 Hráč (#323): „kolem pouštních měst jsou staré 8bpp palmy. kolem hliněných měst je příliš mnoho nových 3D palem a

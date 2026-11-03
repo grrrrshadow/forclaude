@@ -14223,8 +14223,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* By the card, a vehicle or a figure by its triangles however far (the player, 2. 11.: "try it again and
 		 * properly"): no picture of it made by the thread and read back from the card (a hundred in five seconds on
 		 * the phone, 86), those alike drawn at once (EyeObjectDraws::Batch of three_d_gpu.cpp), its shape as simple as
-		 * its distance allows (TrySimpler()) and its textures at that detail. The plants of the fields stay pictures far off. */
-		fg.solid = fg.own_cab || fg.missile || small || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels || (figures_by_card && _eye_figures_by_card));
+		 * its distance allows (TrySimpler()) and its textures at that detail. The plants of the fields so too (the
+		 * player, 3. 11.: "the plants read back from the card are needed, it fell down for me among the trees"): the
+		 * same plant everywhere, drawn at once by the hundred; without the card only those at the walker's feet. */
+		const bool all_by_card = figures_by_card && _eye_figures_by_card;
+		fg.solid = fg.own_cab || fg.missile || small || all_by_card || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels);
 		if (fg.solid) {
 			/* What it needs, if it is there (CabFigureReady()): drawn by its triangles as a job of the frame, after the
 			 * billboards, all of them at once on every core (the depth sorts them out). */
@@ -14235,6 +14238,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				camera.billboards++;
 				continue;
 			}
+			/* A plant not read yet with the card: nothing this frame, its shape on the way -- no picture of it made and
+			 * read back from the card for one frame. */
+			if (fg.plant && all_by_card) continue;
 		}
 		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);
