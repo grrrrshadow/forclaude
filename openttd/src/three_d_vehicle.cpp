@@ -1525,8 +1525,9 @@ static constexpr int SOLID_LEVELS = 4;
  * most squarely of those that see its voxels, so a side is the side's sprite and the top the roof all of them show;
  * the bottom, which none sees, the voxels' colour of all the views, darker. Its corners about the position of the
  * part's piece, as the turned map hangs the part (AddThreeDVehicleToViewport()).
+ * @param flat_roof its roof brought down to the true one (a road vehicle, an engine), else left round (a wagon)
  */
-static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeDVehicleModel &m, int part, int level)
+static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeDVehicleModel &m, int part, int level, bool flat_roof)
 {
 	auto solid = std::make_shared<ThreeDLikenessSolid>();
 	solid->object.name = "likeness";
@@ -1544,20 +1545,76 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 		if (part > 0) x_hi = m.part_cut[part - 1];
 		if (static_cast<size_t>(part) < m.part_cut.size()) x_lo = m.part_cut[part];
 	}
-	std::vector<uint8_t> in(static_cast<size_t>(n[0]) * n[1] * n[2], 0);
-	for (int z = 0; z < m.gnz; z++) {
-		for (int y = 0; y < m.gny; y++) {
-			for (int x = 0; x < m.gnx; x++) {
-				const size_t i = (static_cast<size_t>(z) * m.gny + y) * m.gnx + x;
-				if (((m.hull[i >> 6] >> (i & 63)) & 1) != 0) in[at(x / f, y / f, z / f)] = 1;
+	const int gx = m.gnx, gy = m.gny, gz = m.gnz;
+	auto fine_at = [&](int x, int y, int z) { return (static_cast<size_t>(z) * gy + y) * gx + x; };
+	std::vector<uint8_t> fine(static_cast<size_t>(gx) * gy * gz, 0);
+	for (int z = 0; z < gz; z++) {
+		for (int y = 0; y < gy; y++) {
+			for (int x = 0; x < gx; x++) {
+				const size_t i = fine_at(x, y, z);
+				const float mid = origin[0] + (x + 0.5f) * m.vox;
+				if (mid >= x_lo && mid < x_hi && ((m.hull[i >> 6] >> (i & 63)) & 1) != 0) fine[i] = 1;
 			}
 		}
 	}
-	for (int x = 0; x < n[0]; x++) {
-		const float mid = origin[0] + (x + 0.5f) * side;
-		if (mid >= x_lo && mid < x_hi) continue;
-		for (int z = 0; z < n[2]; z++) {
-			for (int y = 0; y < n[1]; y++) in[at(x, y, z)] = 0;
+
+	/* Its top and bottom as they are. The sprites are drawn from thirty degrees up: of a box, the hull is a tent over its
+	 * roof -- the views from either side (E, W) leave the middle of its width higher by tan 30 degrees times the way to the
+	 * nearer side, at most a third of its width -- and a tent upside down under its floor (the player, 3. 11.: "the
+	 * roofs could be flatter on the cars and engines"; "the 1203 is dug into the ground or a piece is missing below").
+	 * At its sides the hull is true: across each slice of its length, the top is the highest of the columns' tops less
+	 * that slope to the nearer side, the floor the lowest of their bottoms plus it. The floor goes up to the true one; the
+	 * roof of a car or an engine down to the true one but a quarter of the tent (a crown); a wagon's stays rounded, as a
+	 * coach's roof is (the player: "on the coaches the round roofs look good as they are"). It stands on its lowest
+	 * floor, the wheels on the ground. */
+	static constexpr float TAN30 = 0.57735027f;
+	std::vector<int> top(static_cast<size_t>(gx) * gy, -1), bottom(static_cast<size_t>(gx) * gy, -1);
+	for (int z = 0; z < gz; z++) {
+		for (int y = 0; y < gy; y++) {
+			for (int x = 0; x < gx; x++) {
+				if (fine[fine_at(x, y, z)] == 0) continue;
+				const size_t c = static_cast<size_t>(y) * gx + x;
+				if (bottom[c] < 0) bottom[c] = z;
+				top[c] = z;
+			}
+		}
+	}
+	float ground = std::numeric_limits<float>::infinity();
+	for (int x = 0; x < gx; x++) {
+		int y_lo = gy, y_hi = -1;
+		for (int y = 0; y < gy; y++) {
+			if (top[static_cast<size_t>(y) * gx + x] < 0) continue;
+			y_lo = std::min(y_lo, y);
+			y_hi = std::max(y_hi, y);
+		}
+		if (y_hi < 0) continue;
+		float roof = -std::numeric_limits<float>::infinity(), floor = std::numeric_limits<float>::infinity();
+		for (int y = y_lo; y <= y_hi; y++) {
+			const size_t c = static_cast<size_t>(y) * gx + x;
+			if (top[c] < 0) continue;
+			const float d = static_cast<float>(std::min(y - y_lo, y_hi - y));
+			roof = std::max(roof, top[c] - TAN30 * d);
+			floor = std::min(floor, bottom[c] + TAN30 * d);
+		}
+		ground = std::min(ground, floor);
+		for (int y = y_lo; y <= y_hi; y++) {
+			const size_t c = static_cast<size_t>(y) * gx + x;
+			if (top[c] < 0) continue;
+			const float cap = flat_roof ? roof + 0.25f * (top[c] - roof) : static_cast<float>(top[c]);
+			for (int z = 0; z < gz; z++) {
+				if (z > cap + 0.5f || z < floor - 0.5f) fine[fine_at(x, y, z)] = 0;
+			}
+		}
+	}
+	/* Raised (or lowered) so that its lowest floor is on the ground: a metre and a half at most. */
+	const float lift = std::isfinite(ground) ? std::clamp(-(origin[2] + ground * m.vox), -1.5f, 1.5f) : 0.0f;
+
+	std::vector<uint8_t> in(static_cast<size_t>(n[0]) * n[1] * n[2], 0);
+	for (int z = 0; z < gz; z++) {
+		for (int y = 0; y < gy; y++) {
+			for (int x = 0; x < gx; x++) {
+				if (fine[fine_at(x, y, z)] != 0) in[at(x / f, y / f, z / f)] = 1;
+			}
 		}
 	}
 
@@ -1580,6 +1637,7 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 	std::vector<Sum> sums;
 	for (size_t i = 0; i < m.count && i < m.cell.size(); i++) {
 		const uint32_t c = m.cell[i];
+		if (c >= fine.size() || fine[c] == 0) continue;
 		const int x = static_cast<int>(c % m.gnx), y = static_cast<int>((c / m.gnx) % m.gny), z = static_cast<int>(c / (static_cast<uint32_t>(m.gnx) * m.gny));
 		const size_t k = at(x / f, y / f, z / f);
 		if (in[k] == 0) continue;
@@ -1615,15 +1673,42 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 			s.w[face] += 1;
 		}
 	}
-	auto face_colour = [&](size_t k, int face) {
-		auto it = sum_of.find(k);
-		if (it == sum_of.end()) return Colour(90, 90, 90, 255).data;
-		const Sum &s = sums[it->second];
-		if (s.w[face] > 0) {
-			return Colour(static_cast<uint8_t>(s.r[face] / s.w[face] + 0.5f), static_cast<uint8_t>(s.g[face] / s.w[face] + 0.5f), static_cast<uint8_t>(s.b[face] / s.w[face] + 0.5f), 255).data;
+	/* A face no view saw on the hull (the roof brought down to the true one was inside the tent): the sprites' pixel
+	 * where its middle falls, of the view looking at it most squarely that has one there -- the roof is where the
+	 * sprites draw it. The kept views (ThreeDVehicleModel::views), their cameras as when the hull was made. */
+	std::array<ViewCamera, 8> cams;
+	for (int d = 0; d < 8; d++) cams[d].Set(d, m.squeeze);
+	const float kept_pxm = PXM_16X / (1 << to_underlying(m.views_zoom));
+	auto from_views = [&](int cx, int cy, int cz, int face, uint32_t &out) {
+		const int c[3] = {cx, cy, cz};
+		float p[3];
+		for (int k = 0; k < 3; k++) p[k] = origin[k] + (c[k] + 0.5f) * side + NORMAL[face][k] * (0.5f * side - 0.25f * m.vox);
+		std::array<int, 8> order;
+		std::iota(order.begin(), order.end(), 0);
+		auto facing = [&](int d) { return NORMAL[face][0] * cam[d][0] + NORMAL[face][1] * cam[d][1] + NORMAL[face][2] * cam[d][2]; };
+		std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return facing(a) > facing(b); });
+		for (int d : order) {
+			if (facing(d) <= 0) break;
+			const ThreeDVehicleView &v = m.views[d];
+			float sx, sy, depth;
+			cams[d].Project(p[0], p[1], p[2], kept_pxm, sx, sy, depth);
+			const Colour px = v.At(static_cast<int>(std::floor(m.view_ox[d] + sx)), static_cast<int>(std::floor(m.view_oy[d] + sy)));
+			if (px.a < OUTLINE_ALPHA) continue;
+			out = Colour(px.r, px.g, px.b, 255).data;
+			return true;
 		}
-		const float dark = 0.6f / std::max(1, s.all);
-		return Colour(static_cast<uint8_t>(s.all_r * dark), static_cast<uint8_t>(s.all_g * dark), static_cast<uint8_t>(s.all_b * dark), 255).data;
+		return false;
+	};
+	auto face_colour = [&](int cx, int cy, int cz, int face) {
+		auto it = sum_of.find(at(cx, cy, cz));
+		const Sum *s = it != sum_of.end() ? &sums[it->second] : nullptr;
+		if (s != nullptr && s->w[face] > 0) {
+			return Colour(static_cast<uint8_t>(s->r[face] / s->w[face] + 0.5f), static_cast<uint8_t>(s->g[face] / s->w[face] + 0.5f), static_cast<uint8_t>(s->b[face] / s->w[face] + 0.5f), 255).data;
+		}
+		if (uint32_t seen; from_views(cx, cy, cz, face, seen)) return seen;
+		if (s == nullptr) return Colour(60, 60, 60, 255).data;
+		const float dark = 0.6f / std::max(1, s->all);
+		return Colour(static_cast<uint8_t>(s->all_r * dark), static_cast<uint8_t>(s->all_g * dark), static_cast<uint8_t>(s->all_b * dark), 255).data;
 	};
 
 	/* The faces with no cell beyond, in each plane those side by side joined into rectangles (greedy). */
@@ -1713,7 +1798,7 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 				p[a] = r.layer;
 				p[ua] = r.u0 + std::clamp(tx, 0, r.w - 1);
 				p[va] = r.v0 + std::clamp(ty, 0, r.h - 1);
-				tex.px[static_cast<size_t>(by + 1 + ty) * width + bx + 1 + tx] = face_colour(at(p[0], p[1], p[2]), r.face);
+				tex.px[static_cast<size_t>(by + 1 + ty) * width + bx + 1 + tx] = face_colour(p[0], p[1], p[2], r.face);
 			}
 		}
 		/* Its corners going round its outer side (the right hand's rule): (u, v) round for +, the other way for -. */
@@ -1727,7 +1812,7 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 			q[a] = origin[a] + plane * side;
 			q[ua] = origin[ua] + (r.u0 + cu) * side;
 			q[va] = origin[va] + (r.v0 + cv) * side;
-			shape.pos.insert(shape.pos.end(), {q[0] - x_at, q[1], q[2]});
+			shape.pos.insert(shape.pos.end(), {q[0] - x_at, q[1], q[2] + lift});
 			shape.uv.push_back(static_cast<float>(bx + 1 + cu) / width);
 			shape.uv.push_back(static_cast<float>(by + 1 + cv) / height);
 		}
@@ -1742,7 +1827,7 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 	}
 	const float all[6] = {shape.x0, shape.x1, shape.y0, shape.y1, shape.z0, shape.z1};
 	std::copy(std::begin(all), std::end(all), shape.all);
-	Debug(misc, 3, "3D likeness solid of engine {} part {} level {}: {} rectangles, texture {}x{}", m.engine.base(), part, level, rects.size(), width, height);
+	Debug(misc, 3, "3D likeness solid of engine {} part {} level {}: {} rectangles, texture {}x{}, raised {:.2f} m{}", m.engine.base(), part, level, rects.size(), width, height, lift, flat_roof ? ", roof flattened" : "");
 	return solid;
 }
 
@@ -1807,7 +1892,9 @@ EyeLikeness GetThreeDEyeLikeness(const Vehicle *v, PaletteID pal, double cell_m,
 	int level = 0;
 	if (cell_m > model->vox) level = std::clamp(static_cast<int>(std::floor(std::log2(cell_m / model->vox))), 0, SOLID_LEVELS - 1);
 	std::shared_ptr<const ThreeDLikenessSolid> &kept = model->solids[{part, level}];
-	if (kept == nullptr) kept = MakeLikenessSolid(*model, part, level);
+	/* The roof brought down for a road vehicle and an engine; a wagon's left round (MakeLikenessSolid()). */
+	const bool flat_roof = front->type == VehicleType::Road || (front->type == VehicleType::Train && Train::From(front)->IsEngine());
+	if (kept == nullptr) kept = MakeLikenessSolid(*model, part, level, flat_roof);
 	if (kept->shape.tri.empty()) return EyeLikeness::None;
 	out.solid = kept;
 	double facing;
