@@ -1214,6 +1214,7 @@ public:
 	bool Missed() const;
 };
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night = false);
+std::span<const std::string> GetThreeDThemeGuestTrees(uint8_t theme, bool plants);
 std::span<const std::string> GetThreeDThemeUndergrowth(uint8_t theme);
 /** A tree drawn for a kind of tree of the map ("stromy_mapy"): its figure, and how many times bigger than it is ("meritko"). */
 struct ThreeDMapTree {

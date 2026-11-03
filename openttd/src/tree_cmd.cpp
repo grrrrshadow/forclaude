@@ -648,6 +648,14 @@ CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_t
 
 struct TreeListEnt : PalSpriteID, Coord2D<int8_t> {};
 
+/** Of 256 trees on a themed town's land so many are the add-ons that are trees there (the clay town's palms): now and
+ * then one (the player, #323: "about the clay towns too many new 3D palms and other trees. there we have mushrooms,
+ * there now and then a tree may be"). */
+static constexpr uint THEME_GUEST_TREES = 8;
+/** And so many the add-ons that are plants (banana plants, monsteras: "the plant with the flat leaves looks good among
+ * the mushrooms"); the rest the theme's own trees (the mushrooms). */
+static constexpr uint THEME_GUEST_PLANTS = 56;
+
 /**
  * The kind of tree a tree on the land of a desert town stands as (GetThemedLand()): palms, and a cactus now and then;
  * as its own kind elsewhere, and where it is a tree of the tropics already. Of the kinds of the tropics' grass the
@@ -667,7 +675,7 @@ static TreeType DesertTownTreeType(TileIndex tile, TreeType type)
 /**
  * The trees of a tile as 3D figures, in the turned view, from the eyes and facing north among the houses drawn as
  * objects: on the land of a themed town (GetTownThemeAt(); the clay town's giant mushrooms, the colleague's
- * hra/3d/PROSBA-MESTO-HLINENE.md, and with them palms, banana plants and monsteras) the theme's trees; elsewhere the
+ * hra/3d/PROSBA-MESTO-HLINENE.md, among them banana plants and monsteras and now and then a palm) the theme's trees; elsewhere the
  * trees standing for the tile's kind of tree (GetThreeDMapTrees(): the temperate forest of the colleague's
  * hra/3d/STROMY-LES-PACK-PRO-HRU.md, the palms, cacti and rainforest of hra/3d/TROPY-PLANTAZ-PRO-HRU.md; the player,
  * 1. 11.: "the trees replace all the trees of the game ... about the towns"). One where each tree stands, its kind by
@@ -685,12 +693,16 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	const TownTheme theme = GetTownThemeAt(ti->tile);
 	const TreeType type = GetTreeType(ti->tile);
-	/* The trees and the plants under them: by name and how many times bigger each is drawn. */
-	std::vector<ThreeDMapTree> trees_of, under_of;
+	/* The trees and the plants under them: by name and how many times bigger each is drawn; on a themed town's land
+	 * apart from its own trees the add-ons among them, plants and trees (THEME_GUEST_PLANTS, THEME_GUEST_TREES). */
+	std::vector<ThreeDMapTree> trees_of, under_of, guest_plants, guest_trees;
 	if (theme != TownTheme::None) {
 		/* At night each tree glowing (its "noc", the clay town's mushrooms under their caps) as its figure "<kind>/noc". */
 		for (const std::string &name : GetThreeDThemeTrees(to_underlying(theme), IsNightNow())) trees_of.push_back({name, 1.0f});
+		for (const std::string &name : GetThreeDThemeGuestTrees(to_underlying(theme), true)) guest_plants.push_back({name, 1.0f});
+		for (const std::string &name : GetThreeDThemeGuestTrees(to_underlying(theme), false)) guest_trees.push_back({name, 1.0f});
 		for (const std::string &name : GetThreeDThemeUndergrowth(to_underlying(theme))) under_of.push_back({name, 1.0f});
+		if (trees_of.empty()) trees_of = !guest_plants.empty() ? guest_plants : guest_trees;
 	} else {
 		/* On the desert towns' land their palms and cacti (DesertTownTreeType(); the player, #323: "about the desert
 		 * towns the old 8bpp palms"). */
@@ -750,7 +762,14 @@ static bool DrawThemedTrees(const TileInfo *ti)
 		/* A few sizes and turns, so that the trees of the map share a few pictures. */
 		size = std::round(size * (0.8f + 0.3f * static_cast<float>(GB(hash, 8, 8)) / 255.0f) * 20.0f) / 20.0f;
 		const float facing = static_cast<float>(GB(hash, 16, 9) % 24 * 15);
-		place(trees_of[GB(hash, 0, 8) % trees_of.size()], size, ti->x + d->x, ti->y + d->y, facing, GB(hash, 25, 7));
+		const std::vector<ThreeDMapTree> *kinds = &trees_of;
+		const uint guest = GB(hash * 2246822519u, 24, 8);
+		if (guest < THEME_GUEST_TREES && !guest_trees.empty()) {
+			kinds = &guest_trees;
+		} else if (guest < THEME_GUEST_TREES + THEME_GUEST_PLANTS && !guest_plants.empty()) {
+			kinds = &guest_plants;
+		}
+		place((*kinds)[GB(hash, 0, 8) % kinds->size()], size, ti->x + d->x, ti->y + d->y, facing, GB(hash, 25, 7));
 	}
 	/* The undergrowth: one or two plants, as they are, where the tile puts them; on the map only zoomed in (a fern of
 	 * 0.7 m is a few pixels further out, thousands of triangles each). */

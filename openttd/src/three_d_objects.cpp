@@ -108,6 +108,11 @@ static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_trees
 static std::array<std::vector<ThreeDMapTree>, MAP_TREE_KINDS> _three_d_map_undergrowth;
 /** The plants under the trees of each town theme's land ("stromy_mapy_dalsi" with "tema" and "podrost": the clay town's ferns). */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_undergrowth;
+/** The add-ons among the trees of each town theme's land ("stromy_mapy_dalsi" with "tema": the clay town's palms, banana
+ * plants and monsteras), apart from the theme's own trees (its mushrooms); split by SplitThemeGuests(). */
+static std::map<uint8_t, std::vector<std::string>> _three_d_theme_guests;
+/** Of those the plants ([1]: an undergrowth somewhere too, the banana plants and monsteras) and the trees ([0]: the palms). */
+static std::map<uint8_t, std::array<std::vector<std::string>, 2>> _three_d_theme_guests_split;
 /** The plants by some houses of the clay towns and the towns of the tropics (GetThreeDHousePlants()), made the first time asked for. */
 static std::vector<ThreeDMapTree> _three_d_house_plants;
 static std::vector<ThreeDMapTree> _three_d_house_palms; ///< of them the palms alone, for the desert
@@ -146,8 +151,7 @@ static void ReadMapTrees(const nlohmann::json &m, const std::string &name)
 		if (under) {
 			add(_three_d_theme_undergrowth[theme]);
 		} else {
-			add(_three_d_theme_trees[theme]);
-			add(_three_d_theme_trees_night[theme]);
+			add(_three_d_theme_guests[theme]);
 		}
 		return;
 	}
@@ -4425,6 +4429,28 @@ static void MakeHumanoidFigures()
 }
 
 /** Read the vehicles of the indices ("druh": "vozidlo"); their .glb are read when they are first drawn. */
+/**
+ * The add-ons among the trees of each town theme's land split into plants and trees (_three_d_theme_guests_split): a
+ * plant is one that stands under trees somewhere too ("podrost": the banana plants and monsteras), a tree one that does
+ * not (the palms). Once all the indices are read, as an add-on's records come in any order.
+ */
+static void SplitThemeGuests()
+{
+	auto under_somewhere = [](const std::string &name) {
+		for (const auto &plants : _three_d_map_undergrowth) {
+			if (std::ranges::any_of(plants, [&name](const ThreeDMapTree &t) { return t.name == name; })) return true;
+		}
+		for (const auto &[theme, plants] : _three_d_theme_undergrowth) {
+			if (std::ranges::find(plants, name) != plants.end()) return true;
+		}
+		return false;
+	};
+	for (const auto &[theme, guests] : _three_d_theme_guests) {
+		auto &split = _three_d_theme_guests_split[theme];
+		for (const std::string &name : guests) split[under_somewhere(name) ? 1 : 0].push_back(name);
+	}
+}
+
 static void ReadThreeDVehicleObjects()
 {
 	_vehicle_objects_read = true;
@@ -5537,6 +5563,7 @@ static void ReadThreeDVehicleObjects()
 		}
 	}
 	MakeHumanoidFigures();
+	SplitThemeGuests();
 	/* The vehicles that are animals of a set: the file of their figure (its textures, its margins). */
 	for (ThreeDVehicleObject &o : _vehicle_objects) {
 		if (o.body.empty()) continue;
@@ -5768,6 +5795,8 @@ void ResetThreeDVehicleObjects()
 	_three_d_theme_trees.clear();
 	_three_d_theme_trees_night.clear();
 	_three_d_theme_undergrowth.clear();
+	_three_d_theme_guests.clear();
+	_three_d_theme_guests_split.clear();
 	_three_d_house_plants.clear();
 	_three_d_house_palms.clear();
 	_three_d_house_plants_made = false;
@@ -8259,6 +8288,19 @@ const ThreeDObject *GetThreeDHouseObjectAt(HouseID north_house, TileIndex origin
 }
 
 /** The trees of a town theme (TownTheme, "druh": "strom" with its "tema"): the names of their figures, none for the plain towns. */
+/**
+ * The add-ons among the trees of a town theme's land (the clay town's tropical plants, "stromy_mapy_dalsi" with "tema").
+ * @param theme the town theme
+ * @param plants the plants (an undergrowth somewhere too: banana plants, monsteras), else the trees (palms)
+ */
+std::span<const std::string> GetThreeDThemeGuestTrees(uint8_t theme, bool plants)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_theme_guests_split.find(theme);
+	if (it == _three_d_theme_guests_split.end()) return {};
+	return it->second[plants ? 1 : 0];
+}
+
 std::span<const std::string> GetThreeDThemeTrees(uint8_t theme, bool night)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();

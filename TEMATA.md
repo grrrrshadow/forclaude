@@ -51,9 +51,11 @@ srovnání“.
 - „To jsou teď v arctic?“ Ne: les průmyslu má paletu `les` (tmavě zelenou) v mírném klimatu i v subarktickém pod
   sněžnou čarou; nad ní sníh.
 - **Hliněná města**: témata stromů hliněných měst jsou 4 obří houby + 3 palmy, 2 banánovníky, 4 monstery (tropické
-  přes `stromy_mapy_dalsi` `"tema": "hlinene"`), každý strom dlaždice vybírá rovnoměrně, takže houby jsou jen
-  třetina. Čeká se, kterou „kytku s placatými listy“ hráč myslí (monstera, nebo banánovník); pak houby většina,
-  ta kytka mezi nimi, palmy ojediněle.
+  přes `stromy_mapy_dalsi` `"tema": "hlinene"`), každý strom dlaždice vybíral rovnoměrně, takže houby byly jen
+  třetina. Hráč: kytka s placatými listy jsou „obě, bananstera i monsterník“. **Hotovo:** doplňky s tématem
+  jsou zvlášť od vlastních stromů tématu (`GetThreeDThemeGuestTrees()`); kytka = doplněk, který je někde i
+  podrostem (banánovníky, monstery), strom = ostatní (palmy). Na 256 stromů hliněné země 8 palem (~3 %),
+  56 kytek (~22 %), zbytek houby (`THEME_GUEST_TREES`, `THEME_GUEST_PLANTS` v `tree_cmd.cpp`).
 
 ## 2. 11. (91) – #323: z očí nic nejezdí, pády u lesa
 
