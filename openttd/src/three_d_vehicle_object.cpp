@@ -3758,11 +3758,14 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 	const double ta = StateTurn(ev.obj, ev.state) * M_PI / 180.0, tc = std::cos(ta), ts = std::sin(ta);
 	/* Its front in the world, turned as its state has it: where the headlights shine, the red lights the other way. */
 	const double ahead_x = tc * fx + ts * lx, ahead_y = tc * fy + ts * ly;
+	/* Raised up the hill as its model is drawn (CabDrawFigureModel(): turned by its state, sized, pitched, faced). */
+	const double pa = ev.pitch * M_PI / 180.0, pc = std::cos(pa), ps = std::sin(pa);
 	auto add = [&](float ox, float oy, float pz, ThreeDPictureLight::Kind kind, bool turned_round = false) {
 		const double px = ox * tc - oy * ts, py = ox * ts + oy * tc;
-		const double x = px * ev.scale * ev.along * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE;
+		const double mx = px * ev.scale * ev.along, mz = pz * ev.scale;
+		const double x = (pc * mx - ps * mz) * UNITS_PER_METRE, y = py * ev.scale * UNITS_PER_METRE, z = (ps * mx + pc * mz) * OBJECT_HEIGHT_PER_METRE;
 		const double way = (kind == ThreeDPictureLight::Kind::Front ? 1.0 : kind == ThreeDPictureLight::Kind::Back ? -1.0 : 0.0) * (turned_round ? -1.0 : 1.0);
-		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + pz * ev.scale * OBJECT_HEIGHT_PER_METRE, kind, ahead_x * way, ahead_y * way});
+		lights.push_back({ev.x + x * fx + y * lx, ev.y + x * fy + y * ly, ev.z + z, kind, ahead_x * way, ahead_y * way});
 	};
 	/* The lamps of the parts its state shows only (the cab's on the cab shown). */
 	const ThreeDParts parts = ev.obj->PartsOf(ev.state);
@@ -3809,12 +3812,13 @@ void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorl
 /**
  * The lights of a vehicle drawn as an object whose model has them, in the world (the view from the eyes,
  * GetThreeDEyeObjectLights()).
+ * @param[out] placed where its object stands (GetThreeDEyeVehicle()): the lights go up with it from the eyes, as its figure
  * @return whether its lights are its model's (none, for a piece drawn with its anchor piece); false: about its box as always
  */
-bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights)
+bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights, ThreeDEyeVehicle &placed)
 {
 	lights.clear();
-	ThreeDEyeVehicle ev;
+	ThreeDEyeVehicle &ev = placed;
 	if (!GetThreeDEyeVehicle(v, ev)) return false;
 	if (ev.obj == nullptr) return true;
 	const ThreeDVehicleShape *shape = ev.obj->GetShape();

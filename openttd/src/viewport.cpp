@@ -11880,7 +11880,10 @@ static double EyeBaseZ(double x, double y, double z)
 	}
 	const double ground = GetSlopePixelZ(ix, iy, true);
 	const double d = z - ground;
-	if (d < -TILE_HEIGHT / 2.0) return z;
+	/* Under the ground (in a tunnel): itself. In doubles: TILE_HEIGHT is unsigned, and its minus was four thousand
+	 * million -- everything counted as under the ground, the height of all over it stretched as the land's (the player,
+	 * 4. 11.: the glows of the cars' own lamps by their windscreens, 5/3 of the lamps' height). */
+	if (d < -static_cast<double>(TILE_HEIGHT) / 2.0) return z;
 	const double a = std::abs(d);
 	return ground + (a <= 1.0 ? d : a >= 2.0 ? 0.0 : std::copysign(2.0 - a, d));
 }
@@ -13868,8 +13871,13 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		/* A vehicle drawn from its object whose model has its lights: they shine from where they are in it (the
 		 * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md). Not the own one's, seen from inside. */
 		const bool own_one = own != nullptr && u->First() == own;
-		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights)) {
-			shine(model_lights, VehicleBrakeLightsOn(u), false);
+		ThreeDEyeVehicle placed;
+		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights, placed)) {
+			/* Lifted from the eyes as their vehicle's figure is (by the land under its origin), not each by the land under
+			 * it: a lamp ahead of it up a hill is raised by its model's pitch already. */
+			const double lift = (EYE_LEVEL_STRETCH - 1.0) * EyeBaseZ(placed.x, placed.y, placed.z);
+			for (ThreeDWorldLight &l : model_lights) l.z += lift;
+			shine(model_lights, VehicleBrakeLightsOn(u), true);
 			continue;
 		}
 		if (!front && !last) continue;

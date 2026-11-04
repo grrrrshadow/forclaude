@@ -58,7 +58,8 @@ bool ThreeDVehicleObjectLitAtNight(const Vehicle *v);
 struct ThreeDPictureLight;
 bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose, std::vector<ThreeDPictureLight> &lights, int &ax, int &ay, int &az);
 struct ThreeDWorldLight;
-bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights);
+struct ThreeDEyeVehicle;
+bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorldLight> &lights, ThreeDEyeVehicle &placed);
 
 /** A vehicle (or a car of the game's own) drawn from its object in the view from the eyes (GetThreeDEyeVehicle()). */
 struct ThreeDEyeVehicle {
