@@ -13806,7 +13806,14 @@ struct EyeGlow {
  * them): the vehicles' about -- headlights, red lights at the back, an aircraft's beacon --, the own cars', and from
  * the cab the pool of the own headlights on the way ahead.
  */
-static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicle *own)
+/**
+ * The glows of the night from the eyes.
+ * @param eye the eye
+ * @param own the vehicle the eye rides in, else nullptr
+ * @param body_fx,body_fy the way that vehicle faces as the eye rides it (CabViewCamera::heading: smooth, its model's facing
+ *        or turned there over a few frames), not the way the head looks
+ */
+static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicle *own, double body_fx, double body_fy)
 {
 	std::vector<EyeGlow> glows;
 	/* At a height from the eyes; glow() at one of the game's, lifted with the land under it (EyeStandZ()). */
@@ -13897,8 +13904,21 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		const double half = u->type == VehicleType::Ship ? 6 : 3.5;
 		if (front && (u->type != VehicleType::Train || Train::From(u)->IsEngine() || Train::From(u)->IsFrontEngine())) {
 			if (mine) {
-				/* From the own cab: the pool of the headlights on the way ahead. */
-				for (int k = 1; k <= 4; k++) glow(u->x_pos + fx * (half + 6 * k), u->y_pos + fy * (half + 6 * k), z, 3.0 + k, pool, 0.35, 0.35);
+				/* From the own cab: the pool of the headlights on the way ahead -- ahead of the eye the way the vehicle faces as
+				 * the eye rides it, each on the land under it. By the vehicle's eight directions and its steps over the tile
+				 * it jumped at each turn and shone elsewhere than the car went (the player, 4. 11.: "the lights before the car
+				 * move in jumps, so they sometimes shine elsewhere than where the car is heading"). */
+				auto ground = [](double wx, double wy) {
+					const int gx = std::clamp(static_cast<int>(wx), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+					const int gy = std::clamp(static_cast<int>(wy), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
+					return GetSlopePixelZ(gx, gy, true);
+				};
+				/* Over a bridge or in a tunnel the vehicle is not on the land under it: its own height there. */
+				const bool on_land = std::abs(u->z_pos - ground(u->x_pos, u->y_pos)) <= static_cast<int>(TILE_HEIGHT);
+				for (int k = 1; k <= 4; k++) {
+					const double px = eye.x + body_fx * (2 + 6 * k), py = eye.y + body_fy * (2 + 6 * k);
+					glow(px, py, on_land ? ground(px, py) : z, 3.0 + k, pool, 0.35, 0.35);
+				}
 			} else {
 				glow(u->x_pos + fx * (half + 8), u->y_pos + fy * (half + 8), z, 6, pool, 0.3, 0.4);
 				for (int side = -1; side <= 1; side += 2) {
@@ -16228,7 +16248,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	if (night) {
 		/* The dark and the glows of the vehicles' lights: collected now, drawn with the frame. */
 		const NightLight moon = GetNightLight();
-		auto glows = std::make_shared<std::vector<EyeGlow>>(CollectEyeNightGlows(eye, own));
+		auto glows = std::make_shared<std::vector<EyeGlow>>(CollectEyeNightGlows(eye, own, bfx, bfy));
 		out.Job([eye, width, height, moon, glows](uint32_t *dst, float *zb) { DrawEyeNight(eye, width, height, dst, zb, moon, *glows); }, [eye, moon, glows](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Night);
 			st.colour = {static_cast<float>(moon.r), static_cast<float>(moon.g), static_cast<float>(moon.b)};
