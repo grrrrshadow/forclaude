@@ -498,8 +498,8 @@
   },
   "meritko": 2,
   "rozmer_m": [
-   0.29,
-   0.89,
+   0.34,
+   0.33,
    0.65
   ],
   "kde": [
@@ -508,17 +508,12 @@
   ],
   "klima": "poust",
   "povaha": "mirumilovne",
-  "pozy": {
-   "klid": {
-    "animace": "klid",
-    "snimku": 1,
-    "tiku": 1
-   }
-  },
-  "trojuhelniku": 11709,
-  "autor": "Monkey (Madagascar), Guilherme Navarro (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-madagascar-ac75d17f2b464e49975d7b79a1f9d084), převod tvorove/par13_zvirata.py bez renderu",
-  "licence": "CC BY 4.0 (uvést Guilherme Navarro; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; kostra a animace modelu (pozy: animace v glb, snímky, tiky, u chůze a běhu krok_m za jedno kolo); ruce spuštěné z pózy T modelu o 45° pod vodorovnou (póza klid o jednom snímku)"
+  "kostra": "humanoid",
+  "vyska_kycli": 0.1936,
+  "trojuhelniku": 11456,
+  "autor": "Monkey (Madagascar), Guilherme Navarro (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-madagascar-ac75d17f2b464e49975d7b79a1f9d084), kostra postavy/kostra_hry.py (tvorove/opice_kostra.py), bez renderu",
+  "licence": "CC BY 4.0 (uvést Guilherme Navarro; změny: otočený, zmenšený na skutečnou velikost, bez kladiva, na kostře humanoid)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi chodidly na zemi; kostra humanoid jako holky (22 kostí, jména Mixamo bez mixamorig:, T-póza, klouby v klidu bez rotace, rám postavy: glTF +x dopředu, +y nahoru, +z doprava): pózy a chůze z humanoid_pohyby podle jmen kostí, Hips krát poměr vyska_kycli; rozmer_m ve stoji; vlastní kostra modelu (Unreal: pelvis, upperarm_l …) přejmenovaná a narovnaná do T-pózy, prsty s dlaní; kladivo modelu pryč (na ruce by při svěšené ruce trčelo do boku); dlouhé ruce: ve stoji konečky prstů u země"
  },
  {
   "soubor": "opice_sergio.glb",
@@ -531,7 +526,7 @@
   "meritko": 2,
   "rozmer_m": [
    0.31,
-   0.63,
+   0.22,
    0.6
   ],
   "kde": [
@@ -540,10 +535,12 @@
   ],
   "klima": "poust",
   "povaha": "mirumilovne",
-  "trojuhelniku": 28412,
-  "autor": "Monkey Sergio, FabianRetamal (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-sergio-42a1cfd5d17649f8ac4d6a835e21d6a7), převod tvorove/par13_zvirata.py bez renderu",
-  "licence": "CC BY 4.0 (uvést FabianRetamal; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+  "kostra": "humanoid",
+  "vyska_kycli": 0.2352,
+  "trojuhelniku": 19993,
+  "autor": "Monkey Sergio, FabianRetamal (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/monkey-sergio-42a1cfd5d17649f8ac4d6a835e21d6a7), kostra postavy/kostra_hry.py (tvorove/opice_kostra.py), bez renderu",
+  "licence": "CC BY 4.0 (uvést FabianRetamal; změny: otočený, zmenšený na skutečnou velikost, na kostře humanoid)",
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi chodidly na zemi; kostra humanoid jako holky (22 kostí, jména Mixamo bez mixamorig:, T-póza, klouby v klidu bez rotace, rám postavy: glTF +x dopředu, +y nahoru, +z doprava): pózy a chůze z humanoid_pohyby podle jmen kostí, Hips krát poměr vyska_kycli; rozmer_m ve stoji; model kostru neměl: kosti nalezené v síti (krátké nohy: rozkrok ve 34 % výšky, pas v 52 %, krk v 75 %), váhy podle vzdálenosti, ocas celý na Hips (jde s pánví), lýtko a chodidlo jedné nohy nic z druhé"
  },
  {
   "soubor": "opice_stylizovana.glb",
@@ -799,23 +796,7 @@
   "kde": "farma",
   "klima": "mirne",
   "povaha": "mirumilovne",
-  "trojuhelniku": 1012,
-  "animace": {
-   "pase": {
-    "uzly": "pase_",
-    "snimku": 8,
-    "tiku": 8,
-    "smycka": true,
-    "krok_m": 0.0
-   },
-   "kouka": {
-    "uzly": "pase_00",
-    "snimku": 1,
-    "tiku": 240,
-    "smycka": false,
-    "krok_m": 0.0
-   }
-  },
+  "trojuhelniku": 864,
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
   "rozmer_nakladu": [
    1.35,
@@ -833,7 +814,60 @@
   },
   "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): růžové prasátko: kulaté tělo, plochý rypák, uši sklopené dopředu, zatočený ocásek, tmavá kopýtka; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 10 kB, glb z gltfpacku"
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): růžové prasátko: kulaté tělo, plochý rypák, uši sklopené dopředu, zatočený ocásek, tmavá kopýtka; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; neplatí od 4. 11. (místo snímků je kostra): 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); od 4. 11. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py); uzel pase_00 je síť na kostře, v klidu (bez animace) stojí s hlavou nahoře jako dřív, na korbě se kreslí tak; kouka je stoji",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.5541,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.45
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 0.81
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.36
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.36
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "kouka": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   }
+  }
  },
  {
   "soubor": "krava.glb",
@@ -942,23 +976,7 @@
   "kde": "farma",
   "klima": "mirne",
   "povaha": "mirumilovne",
-  "trojuhelniku": 768,
-  "animace": {
-   "pase": {
-    "uzly": "pase_",
-    "snimku": 8,
-    "tiku": 8,
-    "smycka": true,
-    "krok_m": 0.0
-   },
-   "kouka": {
-    "uzly": "pase_00",
-    "snimku": 1,
-    "tiku": 240,
-    "smycka": false,
-    "krok_m": 0.0
-   }
-  },
+  "trojuhelniku": 672,
   "chovani": "střídá pase a kouka: většinou se pase, občas zvedne hlavu a chvíli kouká jako na korbě (hráč: „taky muž koukat občas jako když se veze hlavu nahoru“); začátek smyčky u každého zvířete jiný",
   "rozmer_nakladu": [
    1.13,
@@ -976,7 +994,60 @@
   },
   "autor": "grrrrf: vlastní model tvorove/farma_zvirata.py (stavebnice predmety/stavebnice3d.py)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): ovečka jako na korbě V3S: jedno hladké krémové rouno, tmavá hlava, uši a nohy; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); bez kostry; 9 kB, glb z gltfpacku"
+  "poznamka": "domácí zvíře na pastviny farmy (zvirata u pole pv_pole_pastvina, farma IT_FARM) a náklad dobytka LVST (sada naklady, uzel pase_00): ovečka jako na korbě V3S: jedno hladké krémové rouno, tmavá hlava, uši a nohy; skutečné metry, meritko 1 (ostatní zvířata 2): musí sedět k plotu pastviny a ke korbě, čelem k +x, počátek na zemi pod tělem; neplatí od 4. 11. (místo snímků je kostra): 8 snímků pase_00 až pase_07: tělo jako instance jedné sítě, hlava jako instance druhé otočená dolů kolem krku (pase_00 hlava nahoře = stojí, kouká, veze se), krok_m 0 (stojí na místě); od 4. 11. na kostře čtyřnožců (kostra ctyrnozec) s pohyby stoji, chuze, klus, cval, pase jako koně (tvorove/ctyrnozec.py); uzel pase_00 je síť na kostře, v klidu (bez animace) stojí s hlavou nahoře jako dřív, na korbě se kreslí tak; kouka je stoji",
+  "kostra": "ctyrnozec",
+  "vyska_kycli": 0.5858,
+  "pozy": {
+   "stoji": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "klid": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   },
+   "chuze": {
+    "animace": "chuze",
+    "snimku": 41,
+    "tiku": 1,
+    "krok_m": 0.47
+   },
+   "klus": {
+    "animace": "klus",
+    "snimku": 27,
+    "tiku": 1,
+    "krok_m": 0.86
+   },
+   "cval": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.43
+   },
+   "beh": {
+    "animace": "cval",
+    "snimku": 17,
+    "tiku": 1,
+    "krok_m": 1.43
+   },
+   "pase": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "zere": {
+    "animace": "pase",
+    "snimku": 30,
+    "tiku": 5
+   },
+   "kouka": {
+    "animace": "stoji",
+    "snimku": 32,
+    "tiku": 12
+   }
+  }
  },
  {
   "soubor": "kun_trampsky.glb",
