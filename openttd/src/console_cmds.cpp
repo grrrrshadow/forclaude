@@ -10677,7 +10677,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			for (const Vehicle *u = v; u->HasArticulatedPart(); u = u->GetNextArticulatedPart()) pieces++;
 			TileIndex vt = TileVirtXY(v->x_pos, v->y_pos);
 			bool hidden = v->vehstatus.Test(VehState::Hidden);
-			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} dlazdice {},{} typu {} smer {} dilu {} clanku {} {}{}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+			/* "z oci": its height on the plane of the slope from the eyes (ThreeDVehicleEyeZ()), finer than the game's. */
+			IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} typ {} na {},{},{} (z oci {:.2f}) dlazdice {},{} typu {} smer {} dilu {} clanku {} {}{}{}{}{}", v->unitnumber, to_underlying(v->type), v->x_pos, v->y_pos, v->z_pos,
+					ThreeDVehicleEyeZ(v, v->x_pos, v->y_pos),
 					TileX(vt), TileY(vt), to_underlying(GetTileType(vt)), to_underlying(v->direction), parts, pieces, hidden ? "skryte" : "videt",
 					hidden ? "" : fmt::format(" (vozidlo {})", seen), v->vehstatus.Test(VehState::Stopped) ? " stoji" : "",
 					v->type == VehicleType::Train && Train::From(v)->flags.Test(VehicleRailFlag::Flipped) ? " otocene" : "",

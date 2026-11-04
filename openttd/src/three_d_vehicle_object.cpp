@@ -3219,6 +3219,36 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
 }
 
+/**
+ * The height a vehicle stands at, finer than the game's whole units: on the land the plane of the slope under the point
+ * itself, not the game's height of the vehicle, which goes up a slope a unit every two steps -- from the eyes, a level
+ * 5 m, 0.6 m at once, and the cars went up and down a hill as up and down stairs (the player, 4. 11.: "the cars jump
+ * up and down hills as on stairs"). The mean of the game's heights of the ground at a step and the next, two by two, is
+ * the plane there (a slope rises a unit every two steps: the mean of two neighbours half a unit a step), between the
+ * steps in between. Over a bridge or in a tunnel, a ship or an aircraft, or off the land more than a unit: its own
+ * height.
+ * @param v the vehicle (a piece)
+ * @param x,y the point it stands at, world units (its middle from the eyes)
+ */
+double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
+{
+	if (v->type == VehicleType::Train) {
+		if (Train::From(v)->track == Track::Wormhole) return v->z_pos;
+	} else if (v->type == VehicleType::Road) {
+		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return v->z_pos;
+	} else {
+		return v->z_pos;
+	}
+	const int max_x = static_cast<int>(Map::SizeX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
+	auto ground = [&](int px, int py) { return GetSlopePixelZ(std::clamp(px, 0, max_x), std::clamp(py, 0, max_y), true); };
+	if (std::abs(v->z_pos - ground(v->x_pos, v->y_pos)) > 1) return v->z_pos;
+	auto block_mean = [&](int px, int py) { return (ground(px, py) + ground(px + 1, py) + ground(px, py + 1) + ground(px + 1, py + 1)) / 4.0; };
+	const double fx0 = std::floor(x), fy0 = std::floor(y), fx = x - fx0, fy = y - fy0;
+	const int ix = static_cast<int>(fx0), iy = static_cast<int>(fy0);
+	const double a = block_mean(ix, iy), b = block_mean(ix + 1, iy), c = block_mean(ix, iy + 1), d = block_mean(ix + 1, iy + 1);
+	return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+}
+
 /** Keep what the card drew of a vehicle: laid again by its key while its next look is not made yet (CardDrawnBefore()). */
 static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, const std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
@@ -3722,7 +3752,7 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	out.along = SqueezedType(obj->type) ? SqueezeAt(facing) : 1.0f;
 	out.x = x;
 	out.y = y;
-	out.z = v->z_pos;
+	out.z = ThreeDVehicleEyeZ(v, x, y);
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);
 	/* Up the slope as the eyes see it: a level 5 m (EYE_LEVEL_STRETCH), 19 degrees, not the map's 11. */
 	out.pitch = VehicleSlopePitch(obj, v, x, y, facing, EYE_LEVEL_STRETCH);

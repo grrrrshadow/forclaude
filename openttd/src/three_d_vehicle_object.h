@@ -76,6 +76,7 @@ struct ThreeDEyeVehicle {
 	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
+double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 
 /** Pieces of a kind of the shared loads a state of a vehicle object carries (ThreeDLoadPiece): the figure, its frame and colour, and where each lies. */

@@ -14814,8 +14814,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
-		/* The vehicle's height from the eyes. */
-		double vz = EyeStandZ(v->x_pos, v->y_pos, v->z_pos);
+		/* The vehicle's height from the eyes: up a hill on the plane of the slope, not the game's steps (ThreeDVehicleEyeZ()). */
+		double vz = EyeStandZ(v->x_pos, v->y_pos, ThreeDVehicleEyeZ(v, v->x_pos, v->y_pos));
 		double want = type_z;
 		if (!roof) {
 			/* On a round curve over the arc (round_track.h). */
@@ -15859,7 +15859,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const EyeLikeness likeness = GetThreeDEyeLikeness(u, pal, _cab_detail_pixels / pixels_per_metre, el);
 			if (likeness == EyeLikeness::WithOther) continue;
 			if (likeness == EyeLikeness::Solid) {
-				AddCabLikeness(el, uz);
+				/* Up a hill on the plane of the slope, not the game's steps of height (ThreeDVehicleEyeZ()). */
+				AddCabLikeness(el, ThreeDVehicleEyeZ(u, el.x, el.y));
 				continue;
 			}
 		}
