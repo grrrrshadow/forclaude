@@ -3190,8 +3190,9 @@ static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, dou
  * @param v its anchor piece
  * @param x,y its middle, world units
  * @param facing the way its front faces, radians
+ * @param stretch how much higher a level of the land is (EYE_LEVEL_STRETCH from the eyes, 1 on the map)
  */
-static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v, double x, double y, double facing)
+static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v, double x, double y, double facing, double stretch = 1.0)
 {
 	if (v->type == VehicleType::Train) {
 		if (Train::From(v)->track == Track::Wormhole) return 0;
@@ -3214,7 +3215,7 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 		return GetSlopePixelZ(gx, gy, true);
 	};
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
-	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE;
+	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * stretch;
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
 }
 
@@ -3723,7 +3724,8 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 	out.y = y;
 	out.z = v->z_pos;
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);
-	out.pitch = VehicleSlopePitch(obj, v, x, y, facing);
+	/* Up the slope as the eyes see it: a level 5 m (EYE_LEVEL_STRETCH), 19 degrees, not the map's 11. */
+	out.pitch = VehicleSlopePitch(obj, v, x, y, facing, EYE_LEVEL_STRETCH);
 	out.state = StateStep(obj, v->engine_type, v, EngineImageType::OnMap);
 	out.walk = WalkCode(obj, out.state, WalkedOf(v, obj), out.scale, v);
 	out.lights = VehicleObjectLightsOn(obj, front, last, reversed, ZoomLevel::Normal);

@@ -473,10 +473,21 @@ static void FirstPersonSettle(FirstPersonEye &w)
 	w.stand_y = w.y;
 }
 
+/**
+ * How much higher the land may be where the walker steps than where it stands, units of height: a foundation's side is
+ * a retaining wall, from the eyes a level of the land 5 m (EYE_LEVEL_STRETCH; the player, 4. 11.: "it will be a wall");
+ * the walker does not climb it, it goes round to where it is low. Over the game's whole units of the ground on a slope
+ * (a unit at a step now and then), less than a metre from the eyes; down from it, it jumps.
+ */
+static constexpr double FIRST_PERSON_WALL_UP = 1.5;
+
 /** Whether the walker can go to a world point from where it stands, at the height it would stand at there. */
 static bool FirstPersonFreeFrom(const FirstPersonEye &w, double x, double y)
 {
-	return FirstPersonFree(x, y, FirstPersonStandZ(x, y, FirstPersonFeetZ(w)));
+	const double feet = FirstPersonFeetZ(w);
+	const double stand = FirstPersonStandZ(x, y, feet);
+	if (stand - feet > FIRST_PERSON_WALL_UP) return false;
+	return FirstPersonFree(x, y, stand);
 }
 
 /**

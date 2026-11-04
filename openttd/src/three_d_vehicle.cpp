@@ -1835,8 +1835,9 @@ static std::shared_ptr<const ThreeDLikenessSolid> MakeLikenessSolid(const ThreeD
 }
 
 /**
- * How far a vehicle's front is raised over its back on a slope, degrees (VehicleSlopePitch() of the objects): the
- * ground under its two ends, its length apart. Level on a bridge and in a tunnel, and a ship or an aircraft.
+ * How far a vehicle's front is raised over its back on a slope as the eyes see it, degrees (VehicleSlopePitch() of the
+ * objects): the ground under its two ends, its length apart, a level 5 m (EYE_LEVEL_STRETCH). Level on a bridge and in
+ * a tunnel, and a ship or an aircraft.
  */
 static float LikenessPitch(const Vehicle *v, double x, double y, double facing, double length_m)
 {
@@ -1855,7 +1856,7 @@ static float LikenessPitch(const Vehicle *v, double x, double y, double facing, 
 		return GetSlopePixelZ(gx, gy, true);
 	};
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
-	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE;
+	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * EYE_LEVEL_STRETCH;
 	return static_cast<float>(std::atan2(rise_m, length_m) * 180.0 / M_PI);
 }
 

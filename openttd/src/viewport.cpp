@@ -11825,15 +11825,11 @@ static void CabDrawDressed(const CabCanvas &cv, const CabEye &eye, const CabText
 static constexpr int CAB_DECK = 2;
 
 /**
- * A level of the land (TILE_HEIGHT) from the eyes: 5 m, not the 3 m the game's projection gives it -- its slopes 19
- * degrees steep, not 11, the clearance under a bridge 4.25 m, the hill over a tunnel 5 m (the player, 4. 11.: "tak
- * dáme 5 m"). Only the land and what is built of it (the ground, foundations, bridges, ramps, tunnels, the far land);
- * what stands on it (houses, vehicles, figures, trees) keeps its metres, lifted with the land under it. The game
- * itself counts as ever: only what is drawn from the eyes is stretched.
+ * A height of the land (the ground, a bridge's deck, a tunnel's floor, the base of a house) from the eyes: a level 5 m
+ * (EYE_LEVEL_STRETCH) -- the clearance under a bridge 4.25 m, the hill over a tunnel 5 m. Only the land and what is
+ * built of it (the ground, foundations, bridges, ramps, tunnels, the far land); what stands on it (houses, vehicles,
+ * figures, trees) keeps its metres, lifted with the land under it (EyeStandZ()).
  */
-static constexpr double EYE_LEVEL_STRETCH = 5.0 / 3.0;
-
-/** A height of the land (the ground, a bridge's deck, a tunnel's floor, the base of a house) from the eyes. */
 static constexpr double EyeLevelZ(double z)
 {
 	return z * EYE_LEVEL_STRETCH;
@@ -14301,6 +14297,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	eye.rx = eye.fy;
 	eye.ry = -eye.fx;
 	/* The eye's height is the eyes' (EyeStandZ()): lifted with the land it is over, as all that stands on it. */
+	double cab_pitch = 0; ///< radians the cab the eye is in is tipped up a slope: the eye looks so much up with it
 	if (walker != nullptr) {
 		/* The walker's eyes over the ground where it stands. */
 		eye.x = walker->x;
@@ -14317,14 +14314,20 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const std::array<double, 3> cab = CabEyeOf(m).value_or(std::array<double, 3>{m.cab[0], m.cab[1], m.cab[2]});
 		const double kx = cab[0] + go * std::cos(ta), ky = cab[1] - go * std::sin(ta);
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
-		eye.x = own_model.x + cx * ahead * bfx - cy * across * bfy;
-		eye.y = own_model.y + cx * ahead * bfy + cy * across * bfx;
-		eye.z = EyeStandZ(own_model.x, own_model.y, own_model.z) + (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
+		/* Up a slope the cab tipped with the model about its middle (CabDrawFigureModel(): its front up, as steep as the
+		 * ground from the eyes, 19 degrees up a level), the eye in it: in metres along it and up. */
+		const double pa = own_model.pitch * M_PI / 180.0;
+		const double mx = cx * ahead / OBJECT_UNITS_PER_METRE, mz = (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale;
+		const double along = (mx * std::cos(pa) - mz * std::sin(pa)) * OBJECT_UNITS_PER_METRE;
+		eye.x = own_model.x + along * bfx - cy * across * bfy;
+		eye.y = own_model.y + along * bfy + cy * across * bfx;
+		eye.z = EyeStandZ(own_model.x, own_model.y, own_model.z) + (mx * std::sin(pa) + mz * std::cos(pa)) * OBJECT_HEIGHT_PER_METRE;
+		cab_pitch = pa;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
 		/* The vehicle's height from the eyes. */
-		const double vz = EyeStandZ(v->x_pos, v->y_pos, v->z_pos);
+		double vz = EyeStandZ(v->x_pos, v->y_pos, v->z_pos);
 		double want = type_z;
 		if (!roof) {
 			/* On a round curve over the arc (round_track.h). */
@@ -14332,6 +14335,21 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const bool on_arc = !v->cab_free && GetRoundTrackPose(v, pose);
 			eye.x = (on_arc ? pose.x : v->x_pos) + bfx * CAB_EYE_AHEAD;
 			eye.y = (on_arc ? pose.y : v->y_pos) + bfy * CAB_EYE_AHEAD;
+			/* Up a slope tipped with the vehicle, as a model's cab (above): the ground half a tile before it and behind it
+			 * from the eyes, a level 5 m; the eye ahead of its middle so much higher, looking so much up. Level on a bridge
+			 * and in a tunnel, and a ship or an aircraft. */
+			const bool on_ground = (v->type == VehicleType::Train && Train::From(v)->track != Track::Wormhole) || (v->type == VehicleType::Road && RoadVehicle::From(v)->state != RVSB_WORMHOLE);
+			if (on_ground) {
+				auto ground = [](double x, double y) {
+					const int gx = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
+					const int gy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
+					return static_cast<double>(GetSlopePixelZ(gx, gy, true));
+				};
+				const double half = TILE_SIZE / 2.0;
+				const double rise = EyeLevelZ(ground(v->x_pos + bfx * half, v->y_pos + bfy * half) - ground(v->x_pos - bfx * half, v->y_pos - bfy * half));
+				cab_pitch = std::atan2(rise * CAB_Z_SCALE, 2 * half);
+				vz += CAB_EYE_AHEAD * std::tan(cab_pitch) / CAB_Z_SCALE;
+			}
 		} else {
 			/* Over the roof (CabCamera::Roof; the player, 28. 10.: "the view on the roof of the car"): behind its back
 			 * and over its roof, looking at it and ahead a little down; the head turned goes round it -- not in a
@@ -14387,7 +14405,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	_cab_near = in_model_cab ? 0.15 : (walker != nullptr ? 0.25 : CAB_NEAR);
 	/* The walker looking up or down: the horizon moves the other way (the picture is sheared, not tilted: upright
 	 * lines stay upright, as the players of the old shooters knew it). */
-	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch + (roof ? CAB_ROOF_LOOK : 0.0)) * eye.focal;
+	/* In a cab tipped up a slope, up with it as far as the head looks ahead (turned aside, the slope is across the view). */
+	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch + (roof ? CAB_ROOF_LOOK : 0.0) + cab_pitch * std::cos(camera.head)) * eye.focal;
 	out.eye = eye;
 	out.near_plane = _cab_near;
 
@@ -15293,10 +15312,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	const Vehicle *own = v != nullptr ? v->First() : nullptr;
 	/* The cab the eye is in, round it -- unless the player chose the view without it (CabCamera::Bare). */
 	if (in_model_cab && cab_camera == CabCamera::Inside && !camera.msts) {
+		/* Tipped up a slope as the vehicle is, the eye in it with it (above). */
 		AddCabVehicle(own_model, false);
 		_cab_figures.back().own_cab = true;
-		/* (The eye sits in it level: its cab not tipped round the eye.) */
-		_cab_figures.back().pitch = 0;
 	}
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		/* The vehicle itself only seen from over its roof: all of it, its driver too. */

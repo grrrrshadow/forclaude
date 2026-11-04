@@ -60,6 +60,12 @@ static constexpr float THREE_D_MAP_CREATURE_SCALE = 3.0f;
 static constexpr float THREE_D_EYE_PEOPLE_SCALE = 1.15f;
 /** Units of height to a metre: a height level, 8 units, is 3 m (hra/3d/OBJEKTY-3D.md). */
 static constexpr double OBJECT_HEIGHT_PER_METRE = 8.0 / 3.0;
+/**
+ * A level of the land in the view from the eyes: 5 m, not the 3 m of the game's projection (the player, 4. 11.: "tak
+ * dáme 5 m") -- its slopes so much steeper there, 19 degrees not 11; what stands on the land keeps its metres. Only
+ * what is drawn from the eyes is stretched (EyeLevelZ() in viewport.cpp), the game counts as ever.
+ */
+static constexpr double EYE_LEVEL_STRETCH = 5.0 / 3.0;
 
 /** The glow of a lone light of an object ("svetlo_NN", a lit window's), its radius, world units. */
 static constexpr double THREE_D_GLOW_UNITS = 1.2;
