@@ -8986,18 +8986,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (GetIndustrySpec(it)->enabled && GetIndustrySpec(it)->name == STR_INDUSTRY_NAME_FOREST) forest = it;
 		}
 		if (argv[4] == "les") type = forest;
-		/* An industry of the original game by its number (the oil wells, 3D from the shared parts). */
+		/* An industry of the original game by its number (the oil wells, 3D from the shared parts); "typ<N>/<layout>" in
+		 * that layout of its tiles (the refinery's second, its yard twice). */
+		uint8_t layout = 0;
 		if (type == IT_INVALID && argv[4].starts_with("typ")) {
-			auto n = ParseInteger(argv[4].substr(3));
+			const std::string_view spec = std::string_view(argv[4]).substr(3);
+			const size_t slash = spec.find('/');
+			auto n = ParseInteger(spec.substr(0, slash));
 			if (n.has_value() && *n < NUM_INDUSTRYTYPES && GetIndustrySpec(static_cast<IndustryType>(*n))->enabled) type = static_cast<IndustryType>(*n);
+			if (type != IT_INVALID && slash != std::string_view::npos) {
+				auto l = ParseInteger(spec.substr(slash + 1));
+				if (l.has_value() && *l < GetIndustrySpec(type)->layouts.size()) layout = static_cast<uint8_t>(*l);
+			}
 		}
 		if (!x.has_value() || !y.has_value() || type == IT_INVALID) {
-			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]|palmy [random bits]|typ<N>>' (test3d objekty lists them; paseka the forest with a clearing, palmy the palm plantation; typ<N> an industry of the game by its number).");
+			IConsolePrint(CC_ERROR, "test3d: usage 'test3d postav <x> <y> <industry object|plantaz|brambory|les|paseka [random bits]|palmy [random bits]|typ<N>[/<layout>]>' (test3d objekty lists them; paseka the forest with a clearing, palmy the palm plantation; typ<N> an industry of the game by its number, in its layout so numbered).");
 			return true;
 		}
 		TileIndex tile = TileXY(*x, *y);
 		Backup<CompanyID> cur_company(_current_company, OWNER_DEITY);
-		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, 0, true, 0);
+		CommandCost cost = Command<Commands::BuildIndustry>::Do(DoCommandFlag::Execute, tile, type, layout, true, 0);
 		if (cost.Succeeded() && IsTileType(tile, TileType::Industry) && (obj != nullptr || type == IT_GAME_FOREST || type == IT_PALM_PLANTATION || argv[4].starts_with("typ"))) {
 			Industry *ind = Industry::GetByTile(tile);
 			/* The look asked for: the statue's bronze, or the second of two looks (the dragon farm's castle). */

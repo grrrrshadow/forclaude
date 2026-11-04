@@ -776,6 +776,7 @@ struct ThreeDVehicleObject {
 	int anchor = 0;                 ///< the piece it is drawn by: the middle one ("kotva": "stred")
 	bool states_of_anchor = false;  ///< its states name their piece ("clanek"): only the anchor's sets pick them (the colleague's wagons), else every piece's (StateStep())
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
+	bool lights_off = false;        ///< "svetla" "vychozi": "off": it has no lights, never lit (a horse, a barrow), VehicleLightsOn()
 	float cab[3] = {};              ///< x, y, z, metres
 	std::string msts_cab;           ///< an engine of MSTS: its cab's .cvf (SimtrainsCab), empty none
 	ThreeDVehiclePaint paint;       ///< "lak"; a tree's: its first part painted by its use (its crown, "barvy_casti"), the colour its state's
@@ -974,7 +975,8 @@ struct ThreeDLoadPiece {
 	bool quarter_turn = false;       ///< "otaceni" with 90: it may lie across the bed
 	std::vector<uint32_t> cargoes;   ///< the labels of its table ("naklady"), with a colour or without
 	std::vector<std::pair<uint32_t, int>> colours; ///< the labels of its table ("naklady") with a colour, each with the state of its figure in that colour
-	std::vector<std::pair<uint32_t, int>> own_colours; ///< the colours the vehicles' states give it ("naklad" "barva", Colour::data), each with the state of its figure in that colour
+	std::vector<std::pair<uint32_t, int>> own_colours; ///< the colours the vehicles' states give it ("naklad" "barva", Colour::data) and the yards of the industries ("barva_casti"), each with the state of its figure in that colour
+	std::string paint_part;          ///< "barvy" "cast": the part its colours paint (the drums of a pallet, "barely")
 	std::vector<ThreeDVehicleCrew> seats; ///< "posadka": the figures sitting on it (a bench of the girls), in its frame, filled in their order as the load is
 	std::string package;             ///< the package it is of: its seats' figures are looked for there first, then in the game's (GetThreeDFigure())
 };
@@ -987,6 +989,7 @@ struct ThreeDLoadPlace {
 };
 
 const ThreeDLoadPiece *GetThreeDLoadPiece(std::string_view name);
+std::optional<uint32_t> ParseIndexColour(std::string_view text);
 const ThreeDLoadPiece *GetThreeDLoadPieceOfCargo(uint32_t label, const ThreeDLoadBed &bed);
 int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed);
 void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out);
@@ -1191,8 +1194,10 @@ struct ThreeDIndustryTileParts {
 	bool member = false;                           ///< a tile of a block its anchor draws ("soucast_bloku"): its ground only
 	int anchor_dx = 0, anchor_dy = 0;              ///< "posun": this tile's place from the anchor's, tiles
 	bool at_once = false;                          ///< trees and plants alone, no building: they stand from the first, the industry being built or not (the forest)
-	std::vector<ThreeDObjectFigure> vehicles;      ///< "vozidla": vehicles of the sets standing on it, as figures "vozidlo:..." (GetThreeDStandingVehicle()); none without their package
+	std::vector<ThreeDObjectFigure> vehicles;      ///< "vozidla": vehicles of the sets standing on it, as figures "vozidlo:..." (GetThreeDStandingVehicle()), none without their package; and the pieces of the shared loads of its "dily" ("naklad:...")
+	std::vector<ThreeDObjectFigure> vehicles_again; ///< the same but those shown once an industry ("jednou_na_prumysl"), for its other tiles of the gfx (GetThreeDIndustryTileVehicles())
 };
+std::span<const ThreeDObjectFigure> GetThreeDIndustryTileVehicles(const ThreeDIndustryTileParts &parts, TileIndex anchor);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);

@@ -352,5 +352,15 @@
   "licence": "CC BY 4.0 (uvést Zizian1987; změny: zjednodušený z 173742 na 24322 trojúhelníků, otočený, zmenšený na skutečnou velikost)",
   "vyska_m": 1.75,
   "poza": "stojí, ruce u boků"
+ },
+ {
+  "soubor": "mat_vzv.glb",
+  "jmeno": "mat_vzv",
+  "druh": "postava",
+  "vyska_m": 1.62,
+  "poza": "Mat řídí vysokozdvižný vozík: sedí, stehna dopředu, lýtka dolů, trup předkloněný (24°), hlava na cestu, obě dlaně na věnci volantu 60° od jeho bližšího kraje na každou stranu (hráč: „mat i holky budou řidit vysokozdvižny vozik“); jedna póza",
+  "autor": "Mat, Armored Wave (Sketchfab, CC BY 4.0; postavička Mat ze seriálu Pat a Mat, model fanouškovský, jen do naší hry); póza postavy/postavy_animace.py mat_vzv (kostra modelu, IK obou rukou), bez renderu",
+  "licence": "CC BY 4.0 (uvést Armored Wave); postava Pat a Mat je chráněná (Lubomír Beneš / Patmat Film), nekomerčně",
+  "poznamka": "počátek v bodě sedu (mezi kyčlemi, zadek dole), čelem k +x, metry; při své velikosti (1,62 m) má chodidla 0,20 m pod sedem. Je udělaný pro vysokozdvižný vozík Specialu 3D (special_vzv) s meritko 1,25: sed na přední hraně polštáře sedačky, volant (věnec 0,195 m, sklon 29,8°) střed 0,489 m před sedem a 0,306 m nad ním. Kreslený Mat má na nízký volant vozíku krátké ruce, proto 1,25. Při jiném meritko ruce volant mine. Barvy bez textur, s normálami; nikdy nebledne"
  }
 ]

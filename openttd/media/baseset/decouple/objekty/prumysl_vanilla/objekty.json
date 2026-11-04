@@ -1310,24 +1310,231 @@
     "dil": "pv_kancelare",
     "poloha": [
      7.4,
-     4.9,
+     3.7,
      0.0
     ],
     "otoceni": 0,
-    "meritko": 0.9
+    "meritko": 0.8
    },
    {
-    "dil": "pv_potrubi",
+    "dil": "paleta_barely",
+    "sada": "naklady",
     "poloha": [
-     7.4,
-     11.9,
+     6.3,
+     12.0,
      0.0
     ],
     "otoceni": 0,
-    "meritko": 1.0
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "B03024"
+    },
+    "poznamka": "paleta barelů ze sady naklady, benzín, červené sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     7.7,
+     12.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "B03024"
+    },
+    "poznamka": "paleta barelů ze sady naklady, benzín, červené sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     6.3,
+     13.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "B03024"
+    },
+    "poznamka": "paleta barelů ze sady naklady, benzín, červené sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     6.3,
+     12.0,
+     1.024
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "B03024"
+    },
+    "poznamka": "paleta barelů ze sady naklady, benzín, červené sudy (druhá vrstva na paletě pod ní)"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     9.3,
+     12.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "2E2E30"
+    },
+    "poznamka": "paleta barelů ze sady naklady, nafta, černé sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     10.7,
+     12.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "2E2E30"
+    },
+    "poznamka": "paleta barelů ze sady naklady, nafta, černé sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     10.0,
+     13.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "2E2E30"
+    },
+    "poznamka": "paleta barelů ze sady naklady, nafta, černé sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     9.3,
+     12.0,
+     1.024
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "2E2E30"
+    },
+    "poznamka": "paleta barelů ze sady naklady, nafta, černé sudy (druhá vrstva na paletě pod ní)"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     12.6,
+     12.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "F0F0EA"
+    },
+    "poznamka": "paleta barelů ze sady naklady, chemikálie, bílé sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     13.95,
+     12.0,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "D8B030"
+    },
+    "poznamka": "paleta barelů ze sady naklady, chemikálie, žluté sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     12.6,
+     13.2,
+     0.0
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "D8B030"
+    },
+    "poznamka": "paleta barelů ze sady naklady, chemikálie, žluté sudy"
+   },
+   {
+    "dil": "paleta_barely",
+    "sada": "naklady",
+    "poloha": [
+     12.6,
+     12.0,
+     1.024
+    ],
+    "otoceni": 0,
+    "meritko": 1.0,
+    "barva_casti": {
+     "barely": "F0F0EA"
+    },
+    "poznamka": "paleta barelů ze sady naklady, chemikálie, bílé sudy (druhá vrstva na paletě pod ní)"
    }
   ],
-  "poznamka": "řídicí budova a potrubí"
+  "poznamka": "dvůr rafinerie (hráč 4. 11.: „překopej rafinerii, žadne budovy lihovaru, vysokozdvižny vozik a palety se sudy“): kanceláře u severního okraje, před nimi Tatra Benzina, u jižního okraje vysokozdvižný vozík a palety sudů ve skupinkách benzín, nafta, chemikálie („ruzne barvy sudů , skupinky nafta, chemikalie, benzin“); na asfaltu, ať má Tatra a vozík po čem jezdit (hráč 4. 11. večer). Vozidla jen jednou na průmysl (jednou_na_prumysl), na dalším políčku 19 jen kanceláře a palety",
+  "vozidla": [
+   {
+    "zaznam": "nt_t148",
+    "objekt": "nt_t148",
+    "sada_objektu": "nakladaky_tatra",
+    "sada": [
+     "kabina 148",
+     "mrizka 148 puvodni",
+     "nastavba phm",
+     "napis benzina_phm"
+    ],
+    "bez_posadky": true,
+    "poloha": [
+     7.4,
+     8.7,
+     0.0
+    ],
+    "otoceni": 0,
+    "jednou_na_prumysl": true,
+    "poznamka": "krátká Tatra 148 Benzina stojí prázdná na dvoře před kancelářemi (hráč 4. 11.: „tatra benzina na dvoře ne návěs, normalni kratka tatra“): záznam nt_t148 balíčku Nakladaky_Tatra_3D, oranžová kabina s původní mřížkou, cisterna PHM (barva nastavba phm) s nápisem BENZINA a červeným pruhem (sada bez GRF napis benzina_phm); jako hasičská Tatra na hřišti, bez řidičky. Bez balíčku Tater tu není"
+   },
+   {
+    "zaznam": "special_vzv",
+    "objekt": "special_vzv",
+    "sada_objektu": "special",
+    "bez_posadky": true,
+    "meritko": 1.0,
+    "poloha": [
+     3.3,
+     12.6,
+     0.0
+    ],
+    "otoceni": 0,
+    "jednou_na_prumysl": true,
+    "poznamka": "vysokozdvižný vozík ze Specialu 3D v7 stojí prázdný vidlemi k paletám se sudy (hráč 4. 11.: „na vozik nic nenakladej , jen okolo paletu a sudy“): záznam special_vzv, bez nákladu a bez řidiče, nasedne se E jako na kolečko; skutečná velikost (meritko 1). Bez balíčku Special 3D v7 tu není"
+   }
+  ]
  },
  {
   "jmeno": "pv_gfx_020",

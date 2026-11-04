@@ -3379,7 +3379,8 @@ struct OriginalIndustryTile {
 	bool member = false;         ///< "soucast_bloku"
 	int anchor_dx = 0, anchor_dy = 0;
 	bool buildings = false;      ///< a part of "dily" on it: built in the industry's stages; without, its trees stand at once
-	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla" (ThreeDIndustryTileParts::vehicles)
+	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla" and the pieces of the shared loads (ThreeDIndustryTileParts::vehicles)
+	std::vector<ThreeDObjectFigure> vehicles_again; ///< the same but those shown once an industry (ThreeDIndustryTileParts::vehicles_again)
 };
 /** The tiles of the original industries by their gfx (GetThreeDOriginalIndustryTile()). */
 static std::map<IndustryGfx, OriginalIndustryTile> _original_industry_tiles;
@@ -3581,8 +3582,10 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
  * sets ("sada") and add-ons ("doplnky", file: node), empty, as the fire Tatra on the pitch -- a figure
  * "vozidlo:<record>|<set>|+<file>=<node>|^<pitch>" (GetThreeDStandingVehicle()). Leaning ("naklon", degrees about the
  * axle "stred_naklonu" of its frame, its handles up): its front down so much, the axle where "poloha" says.
+ * @param again nullptr, or also into it each but those shown once an industry ("jednou_na_prumysl", the colleague's
+ *              hra/3d/RAFINERIE-PRO-HRU.md: the Tatra Benzina on the refinery's yard, which one layout has twice)
  */
-static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObjectFigure> &into)
+static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObjectFigure> &into, std::vector<ThreeDObjectFigure> *again = nullptr)
 {
 	if (!e.contains("vozidla") || !e.at("vozidla").is_array()) return;
 	for (const auto &v : e.at("vozidla")) {
@@ -3621,6 +3624,7 @@ static void ReadStandingVehicles(const nlohmann::json &e, std::vector<ThreeDObje
 			}
 		}
 		f.figure = std::move(figure);
+		if (again != nullptr && !v.value("jednou_na_prumysl", false)) again->push_back(f);
 		into.push_back(std::move(f));
 	}
 }
@@ -4035,6 +4039,25 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 			float at[3];
 			for (int k = 0; k < 3; k++) at[k] = d.at("poloha").at(k).get<float>();
 			auto it = parts.find(part);
+			if (it == parts.end() && d.value("sada", std::string()) == "naklady") {
+				/* A piece of the shared loads standing on the tile (the colleague's hra/3d/RAFINERIE-PRO-HRU.md: the pallets of
+				 * drums on the refinery's yard), the same the lorries carry: a figure as the vehicles of the sets stand,
+				 * "naklad:<piece>|<part>=<RRGGBB>" (GetThreeDStandingVehicle()), its part coloured as "barva_casti" says. */
+				ThreeDObjectFigure f;
+				for (int k = 0; k < 3; k++) f.at[k] = at[k];
+				f.facing = d.value("otoceni", 0.0f);
+				f.scale = std::clamp(d.value("meritko", 1.0f), 0.05f, 20.0f);
+				f.figure = "naklad:" + part;
+				if (d.contains("barva_casti") && d.at("barva_casti").is_object()) {
+					for (const auto &[cast, colour] : d.at("barva_casti").items()) {
+						if (colour.is_string()) f.figure += "|" + cast + "=" + colour.get<std::string>();
+					}
+				}
+				tile.vehicles.push_back(f);
+				tile.vehicles_again.push_back(std::move(f));
+				tile.buildings = true;
+				continue;
+			}
 			if (it == parts.end()) {
 				/* A part of another set, a whole tile as it is (the haystack, the shed of the fields): found by its name
 				 * when every set is read. Placed elsewhere or turned it would need its mesh, which is not kept. */
@@ -4066,7 +4089,7 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 			_three_d_objects.push_back(std::move(addons));
 		}
 	}
-	ReadStandingVehicles(e, tile.vehicles);
+	ReadStandingVehicles(e, tile.vehicles, &tile.vehicles_again);
 	ThreeDObject plants;
 	plants.name = name + "/rostliny";
 	plants.variants = 0; // no house's
@@ -4560,6 +4583,15 @@ static std::optional<uint32_t> ParseIndexNumber(const nlohmann::json &value)
 	return ParseInteger<uint32_t>(text, 10);
 }
 
+/** A colour an index gives as "RRGGBB" (or "#RRGGBB"), as Colour::data; nullopt not one. */
+std::optional<uint32_t> ParseIndexColour(std::string_view text)
+{
+	if (text.starts_with('#')) text.remove_prefix(1);
+	const std::optional<uint32_t> rgb = text.size() == 6 ? ParseInteger<uint32_t>(text, 16) : std::nullopt;
+	if (!rgb.has_value()) return std::nullopt;
+	return Colour(static_cast<uint8_t>(*rgb >> 16), static_cast<uint8_t>(*rgb >> 8), static_cast<uint8_t>(*rgb)).data;
+}
+
 /** The vehicle type an index names: "vlak", "auto", "lod", "letadlo" (or the game's own words). */
 static VehicleType ParseIndexVehicleType(const std::string &text)
 {
@@ -4635,6 +4667,7 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 			const auto &b = e.at("barvy").at(0);
 			if (b.contains("maska") && b.at("maska").is_string()) fig.paint.mask_file = folder + b.at("maska").get<std::string>();
 			fig.paint.start = std::clamp(b.value("zacatek", 0), 0, 255);
+			if (b.contains("cast") && b.at("cast").is_string()) piece.paint_part = b.at("cast").get<std::string>();
 		}
 		piece.figure = fig.name;
 	} else if (e.value("sada", std::string()) == "zvirata" && e.contains("objekt") && e.at("objekt").is_string()) {
@@ -4797,6 +4830,9 @@ static void ReadThreeDVehicleObjects()
 	_vehicle_objects_read = true;
 	ForgetMarginsFilled(MarginsOf::Vehicles);
 	GlbFilesScope files;
+	/* The colours the yards of the industries give the pieces of the loads standing there ("barva_casti" of a part of
+	 * "sada" "naklady", the colleague's hra/3d/RAFINERIE-PRO-HRU.md): the piece, its part, the colour (Colour::data). */
+	std::vector<std::tuple<std::string, std::string, uint32_t>> yard_colours;
 	for (const std::string &index : FindObjectIndices()) {
 		std::vector<uint8_t> text = ReadWholeFile(index);
 		std::string folder = index.substr(0, index.size() - std::string_view("objekty.json").size());
@@ -4804,6 +4840,15 @@ static void ReadThreeDVehicleObjects()
 		try {
 			nlohmann::json list = nlohmann::json::parse(text.begin(), text.end());
 			for (const auto &e : list) {
+				if (e.value("druh", std::string()) == "prumysl_dlazdice" && e.contains("dily") && e.at("dily").is_array()) {
+					for (const auto &d : e.at("dily")) {
+						if (!d.is_object() || d.value("sada", std::string()) != "naklady" || !d.contains("dil") || !d.at("dil").is_string() || !d.contains("barva_casti") || !d.at("barva_casti").is_object()) continue;
+						for (const auto &[cast, colour] : d.at("barva_casti").items()) {
+							const std::optional<uint32_t> c = colour.is_string() ? ParseIndexColour(colour.get<std::string>()) : std::nullopt;
+							if (c.has_value()) yard_colours.emplace_back(d.at("dil").get<std::string>(), cast, *c);
+						}
+					}
+				}
 				if (e.value("druh", std::string()) == "naklad") {
 					ReadLoadPiece(e, folder, package);
 					continue;
@@ -5445,6 +5490,12 @@ static void ReadThreeDVehicleObjects()
 					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
 					obj.has_cab = true;
 				}
+				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
+				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
+				if (e.contains("svetla") && e.at("svetla").is_object()) {
+					const auto &lights = e.at("svetla");
+					obj.lights_off = lights.contains("vychozi") && lights.at("vychozi").is_string() && lights.at("vychozi").get<std::string>() == "off";
+				}
 				/* The paint: its mask, how it fades with age, a colour by number. */
 				if (e.contains("lak") && e.at("lak").is_object()) {
 					const auto &lak = e.at("lak");
@@ -5933,6 +5984,15 @@ static void ReadThreeDVehicleObjects()
 			own_colour(s.load_piece, s.load_colour);
 			for (const ThreeDPlacedLoad &placed : s.placed_loads) own_colour(placed.piece, placed.colour);
 		}
+	}
+	/* And those of the yards, of the part its colours paint. */
+	for (const auto &[name, cast, colour] : yard_colours) {
+		auto piece = std::ranges::find(_load_pieces, name, &ThreeDLoadPiece::name);
+		if (piece == _load_pieces.end() || piece->paint_part != cast) {
+			Debug(misc, 0, "3D loads: no piece {} with part {} for a yard's colour", name, cast);
+			continue;
+		}
+		own_colour(name, colour);
 	}
 	MakeHumanoidFigures();
 	SplitThemeGuests();
@@ -8984,6 +9044,7 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
 			r.anchor_dy = t.anchor_dy;
 			r.at_once = !t.buildings;
 			r.vehicles = t.vehicles;
+			r.vehicles_again = t.vehicles_again;
 		}
 	}
 	auto it = resolved.find(gfx);
@@ -9004,6 +9065,23 @@ const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx)
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts)
 {
 	return parts.at_once || IsIndustryCompleted(tile);
+}
+
+/**
+ * The vehicles of the sets and pieces of the loads standing on a tile of an original industry, drawn from its anchor
+ * (ThreeDIndustryTileParts::vehicles): those shown once an industry ("jednou_na_prumysl", the colleague's
+ * hra/3d/RAFINERIE-PRO-HRU.md: the Tatra Benzina and the forklift on the refinery's yard) only on its first tile of
+ * these parts, as the tiles go -- the refinery's second layout has its yard twice, the player wants one Tatra.
+ */
+std::span<const ThreeDObjectFigure> GetThreeDIndustryTileVehicles(const ThreeDIndustryTileParts &parts, TileIndex anchor)
+{
+	if (parts.vehicles.size() == parts.vehicles_again.size() || !IsTileType(anchor, TileType::Industry)) return parts.vehicles;
+	const Industry *ind = Industry::GetByTile(anchor);
+	for (TileIndex t : ind->location) {
+		if (!IsTileType(t, TileType::Industry) || GetIndustryIndex(t) != ind->index || GetThreeDOriginalIndustryTileAt(t) != &parts) continue;
+		return t == anchor ? std::span<const ThreeDObjectFigure>(parts.vehicles) : std::span<const ThreeDObjectFigure>(parts.vehicles_again);
+	}
+	return parts.vehicles;
 }
 
 /**

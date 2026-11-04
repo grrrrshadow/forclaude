@@ -788,7 +788,7 @@ struct FirstPersonWindow : Window {
 				const TileIndex anchor = GetThreeDOriginalIndustryAnchor(tile, parts);
 				if (anchor == INVALID_TILE || std::ranges::find(seen, anchor) != seen.end()) continue;
 				seen.push_back(anchor);
-				consider(anchor, parts->vehicles, false);
+				consider(anchor, GetThreeDIndustryTileVehicles(*parts, anchor), false);
 			}
 		}
 		return best;

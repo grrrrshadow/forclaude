@@ -4457,11 +4457,39 @@ int ThreeDMapPose(std::string_view figure, int frame)
  * of its crew (the player, 18. 10.: "on the pitch stands an empty Tatra, without a driver"). "+<file>=<node>" its state
  * by its add-ons instead: the first of its states that shows that node of each add-on so named and nothing of the others
  * (the wheelbarrow of the Special by the cowshed: its frame, empty); "^<degrees>" its front raised so much, leaning.
+ * Or a piece of the shared loads standing so ("naklad:<piece>|<part>=<RRGGBB>"), its part in that colour.
  * @param[out] ev its object and state; its place, size and facing are the caller's
  * @return false: not such a name, or its package is not there
  */
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 {
+	if (name.starts_with("naklad:")) {
+		/* A piece of the shared loads standing on a yard ("naklad:<piece>|<part>=<RRGGBB>", the colleague's pallets of
+		 * drums on the refinery's yard): its figure as the lorries carry it, in the state of its colour (the reading of
+		 * the indices made it, ThreeDLoadPiece::own_colours), still. */
+		name.remove_prefix(std::string_view("naklad:").size());
+		const size_t bar = name.find('|');
+		const ThreeDLoadPiece *piece = GetThreeDLoadPiece(name.substr(0, bar));
+		const ThreeDVehicleObject *fig = piece != nullptr ? GetThreeDFigure(piece->figure, piece->package) : nullptr;
+		if (fig == nullptr) return false;
+		ev.obj = fig;
+		ev.state = 0;
+		ev.walk = 0;
+		ev.pitch = 0;
+		for (size_t at = bar; at != std::string_view::npos;) {
+			const size_t next = name.find('|', at + 1);
+			const std::string_view token = name.substr(at + 1, next == std::string_view::npos ? std::string_view::npos : next - at - 1);
+			const size_t eq = token.find('=');
+			if (eq != std::string_view::npos && token.substr(0, eq) == piece->paint_part) {
+				const std::optional<uint32_t> colour = ParseIndexColour(token.substr(eq + 1));
+				for (const auto &[c, step] : piece->own_colours) {
+					if (colour.has_value() && c == *colour) ev.state = step;
+				}
+			}
+			at = next;
+		}
+		return true;
+	}
 	if (!name.starts_with("vozidlo:")) return false;
 	name.remove_prefix(std::string_view("vozidlo:").size());
 	size_t bar = name.find('|');
@@ -4569,8 +4597,8 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 	if (up != nullptr) *up = 0;
 	later = false;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
-	if (name.starts_with("vozidlo:")) {
-		/* A vehicle standing as a figure: at its true size against the building, empty, still. */
+	if (name.starts_with("vozidlo:") || name.starts_with("naklad:")) {
+		/* A vehicle standing as a figure (or a piece of the loads): at its true size against the building, empty, still. */
 		ThreeDEyeVehicle ev;
 		if (!GetThreeDStandingVehicle(name, ev)) return std::nullopt;
 		const bool for_eye = ViewportDrawingEye();

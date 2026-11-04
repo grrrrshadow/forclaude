@@ -2047,13 +2047,7 @@
     "popis": "nádrže na líh"
    }
   ],
-  "okraje_textur": 16,
-  "sdili": [
-   {
-    "prumysl": "IT_OIL_REFINERY",
-    "poznamka": "rafinerie původní hry smí místo dílů z prumysl_vanilla ukázat celý lihovar (hráč 23. 10.: „rafinerie a lihovar mužou sdilet, to je stejny zařizeni“ – destilace je destilace): lihovar 3 × 3 na čtverci políček rafinerie nejblíž středu, barvy losuje hra jako u lihovaru; na zbylých políčkách vlastní díly rafinerie (pece, nádrže, kolony) na pv_dvur_hlina, asfalt ne (hra 23. 10. v noci, hráč: „dej to pryč ten asfalt kolem lihovaru, vypadá to blbě“); nápis LIHOVAR a brambory ve žlabu zůstávají, jsou v atlasu"
-   }
-  ]
+  "okraje_textur": 16
  },
  {
   "soubor": "hospoda.glb",

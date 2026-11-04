@@ -5317,12 +5317,13 @@ static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTilePart
 	 * more. */
 	std::vector<const ThreeDObject *> pieces(of->parts.begin(), of->parts.end());
 	if (of->plants != nullptr) pieces.push_back(of->plants);
-	if (pieces.empty() && of->vehicles.empty()) return;
+	const std::span<const ThreeDObjectFigure> vehicles = GetThreeDIndustryTileVehicles(*of, anchor);
+	if (pieces.empty() && vehicles.empty()) return;
 	const ThreeDObject *first = pieces.empty() ? nullptr : pieces.front();
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == anchor && to.obj == first) return;
 	}
-	TurnedObject &to = _turned_objects.emplace_back(first, anchor, z, nullptr, of->vehicles);
+	TurnedObject &to = _turned_objects.emplace_back(first, anchor, z, nullptr, vehicles);
 	if (pieces.size() > 1) to.with.assign(pieces.begin() + 1, pieces.end());
 }
 
@@ -7705,8 +7706,20 @@ float _title_night = 0;
  * Whether a vehicle's brake lights are on (the player, 27. 10.: "brake lights: as they slow down, by day the red ones
  * at the back light up, at night they light more"): it slowed down a moment ago (GroundVehicle::BrakeLightsOn()).
  */
+/**
+ * Whether a piece of a vehicle has no lights at all: its object says so (the colleague's
+ * hra/3d/SVETLA-SPECIAL-PRO-HRU.md, "svetla" "vychozi": "off" -- the horses, their cart, the barrow): neither lights
+ * about its box, nor the pool of its headlights, nor brake lights.
+ */
+static bool VehicleHasNoLights(const Vehicle *v)
+{
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v);
+	return obj != nullptr && obj->lights_off;
+}
+
 bool VehicleBrakeLightsOn(const Vehicle *v)
 {
+	if (VehicleHasNoLights(v)) return false;
 	const Vehicle *f = v->First();
 	if (f->type == VehicleType::Road) return RoadVehicle::From(f)->BrakeLightsOn();
 	if (f->type == VehicleType::Train) return Train::From(f)->BrakeLightsOn();
@@ -7716,7 +7729,8 @@ bool VehicleBrakeLightsOn(const Vehicle *v)
 bool VehicleLightsOn(const Vehicle *v)
 {
 	const uint8_t asked = v->First()->cab_lights;
-	return asked == Vehicle::CAB_LIGHTS_ON || (asked == Vehicle::CAB_LIGHTS_AUTO && IsNightNow());
+	if (asked != Vehicle::CAB_LIGHTS_ON && (asked != Vehicle::CAB_LIGHTS_AUTO || !IsNightNow())) return false;
+	return !VehicleHasNoLights(v);
 }
 
 bool IsNightNow()
@@ -15159,7 +15173,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const TileIndex anchor = ThreeDOriginalIndustryTileStands(_cur_ti.tile, *parts) ? GetThreeDOriginalIndustryAnchor(_cur_ti.tile, of) : INVALID_TILE;
 			if (anchor != INVALID_TILE) {
 				/* Its vehicles of the sets (the Zetor, the wheelbarrow of the farm) with its first part. */
-				for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], anchor, k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());
+				for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], anchor, k == 0 ? GetThreeDIndustryTileVehicles(*of, anchor) : std::span<const ThreeDObjectFigure>());
 				if (of->plants != nullptr && anchor == _cur_ti.tile) {
 					const double oz = GetTileMaxPixelZ(anchor);
 					const size_t from = _cab_figures.size();
