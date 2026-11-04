@@ -106,6 +106,8 @@ static std::set<std::string, std::less<>> _witches_replaced;
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees;
 /** And the same at night: each one glowing ("<jmeno>/noc") where it has its night. */
 static std::map<uint8_t, std::vector<std::string>> _three_d_theme_trees_night;
+/** The most states ("stavy") a vehicle's record keeps: a picture's key holds a step in 16 bits, the states made of them after them. */
+static constexpr size_t MAX_VEHICLE_STATES = 16384;
 /** The kinds of trees of the maps of all climates (TreeType 0x00-0x28). */
 static constexpr size_t MAP_TREE_KINDS = TREE_TOYLAND + TREE_COUNT_TOYLAND;
 /** The trees of the map by the kind of tree on a tile (TreeType): the add-ons that stand for it ("stromy_mapy" and
@@ -5820,8 +5822,12 @@ static void ReadThreeDVehicleObjects()
 							if (part > 0) state.parts.Set(part);
 							state.crew_part = part;
 						}
+						/* As many as the record has: the steps are ints, the key of a picture holds them in 16 bits with
+						 * the states made of them after them (PictureRequest()). Once read only 255: the colleague's
+						 * two-wheeled cart has 281 (hra/3d/CHYBA-SPECIAL-255-STAVU.md), and the cute cartoon girl
+						 * pushing it, its last 26, was never found -- the bare cart drawn as if pulled. */
 						obj.states.push_back(state);
-						if (obj.states.size() >= 255) break;
+						if (obj.states.size() >= MAX_VEHICLE_STATES) break;
 					}
 				}
 				/* The rust: a second mask over the body's texture, rusting with age after the paint has faded. */
