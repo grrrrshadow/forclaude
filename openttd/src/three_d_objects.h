@@ -1186,6 +1186,7 @@ struct ThreeDForestPlace {
  */
 struct ThreeDForestPart {
 	const ThreeDObject *ground = nullptr;     ///< the part's model with its trees and bushes ("doplnky") laid in; its night the cabin's windows, lantern, embers
+	bool whole_ground = false;                ///< its model is the tile's ground (the palm plantation's soil, path, clearing): the game's ground laid lower under it
 	std::vector<ThreeDObjectFigure> girls;    ///< "holky": after a delivery of studentky
 	std::vector<ThreeDObjectFigure> mushrooms; ///< "houby": where they grow, all the time (the kind drawn by the place)
 	std::vector<ThreeDForestPlace> animals;   ///< "zvirata"

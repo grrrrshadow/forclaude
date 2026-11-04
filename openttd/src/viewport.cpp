@@ -14353,6 +14353,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		int raw_z;       ///< its height before its foundation (TurnedTile::raw_z)
 		int found[2];    ///< its foundations' parent sprites (_vd.foundation), -1 none
 		bool round = false; ///< its track a round curve, drawn as a strip into the ground (round_track.h)
+		bool own_ground = false; ///< its ground a model's (ThreeDForestPart::whole_ground): the game's ground laid lower under it
 	};
 	std::vector<CabTile> tiles;
 	int tcx = static_cast<int>(v != nullptr ? v->x_pos : eye.x) / static_cast<int>(TILE_SIZE), tcy = static_cast<int>(v != nullptr ? v->y_pos : eye.y) / static_cast<int>(TILE_SIZE);
@@ -14572,7 +14573,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				/* The forester's cabin with its interior: near, as a house's (the colleague's les_paseka_srub). */
 				const ThreeDObject *in = GetThreeDInterior(obj);
 				const bool near = in != nullptr && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < (CAB_INTERIOR_TILES + 1) * TILE_SIZE;
-				objects.push_back({near ? GetThreeDOutsideOfInterior(obj) : obj, _cur_ti.tile, z, girls});
+				const ThreeDObject *drawn = near ? GetThreeDOutsideOfInterior(obj) : obj;
+				objects.push_back({drawn, _cur_ti.tile, z, girls});
+				/* The palm plantation's part is the tile's ground: the game's laid lower under it (at the same height it
+				 * showed through and flickered), once the part is drawn -- till its texture is read (the houses' wait,
+				 * below), the game's ground as it is. */
+				t.own_ground = forest->whole_ground && drawn->TryGetTexture(0) != nullptr;
 				if (near) {
 					objects.push_back({in, _cur_ti.tile, z});
 					for (size_t k = 0; k < obj->door_wings.size(); k++) objects.push_back({GetThreeDDoorWing(obj, _cur_ti.tile, k), _cur_ti.tile, z});
@@ -14897,9 +14903,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		static const int cys[4] = {0, TILE_SIZE, TILE_SIZE, 0};
 		std::deque<uint32_t> mark_colours; // the colours the marks' triangles point to (drawn at the end of the batch)
 		CabBatchScope ground_batch; // the ground texture stays as it is: on every core
+		/* Under a model that is its tile's ground (the palm plantation's, CabTile::own_ground) the game's ground lies lower:
+		 * not at its height, where the two fought and the game's showed through (the player, 3. 11.), yet there in the
+		 * seams between the models of the tiles, which showed the sky. */
+		static constexpr double OWN_GROUND_SINK = 0.25 * OBJECT_HEIGHT_PER_METRE;
 		for (const CabTile &t : tiles) {
 			if (t.first >= t.end && !t.foundation) continue;
 			Slope s = RemoveHalftileSlope(t.slope);
+			const double sink = t.own_ground ? OWN_GROUND_SINK : 0.0;
 			CabPoint p[5];
 			for (int i = 0; i < 5; i++) {
 				double wx = (i < 4) ? t.x * TILE_SIZE + cxs[i] : t.x * TILE_SIZE + TILE_SIZE / 2.0;
@@ -14907,7 +14918,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				double wz = t.z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
 				double cx, cy;
 				RemapCoordsF(wx, wy, wz, cx, cy);
-				p[i] = CabToEye(eye, wx, wy, wz, cx * scale - gl, cy * scale - gt);
+				p[i] = CabToEye(eye, wx, wy, wz - sink, cx * scale - gl, cy * scale - gt);
 			}
 			for (int i = 0; i < 4; i++) {
 				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0) | (eye_grass ? CAB_GRASS : 0)));

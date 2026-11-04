@@ -3625,6 +3625,11 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 		}
 	};
 	ThreeDForestPart as_read;
+	/* The palm plantation's parts are the ground of their tiles, each a face over the whole tile at its foot (the
+	 * colleague's hra/3d/TROPY-PLANTAZ-PRO-HRU.md: the red soil, the path, the clearing's grass): the game's ground under
+	 * them, at the same height, showed through it and flickered (the player, 3. 11.: "we do not need that underlay, we
+	 * have the meadow"). The forest's parts lie on the game's ground, their path not over the whole tile. */
+	as_read.whole_ground = kind == "plantaz";
 	figures("holky", as_read.girls);
 	figures("houby", as_read.mushrooms);
 	places("zvirata", "druhy", as_read.animals);
