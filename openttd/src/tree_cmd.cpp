@@ -786,6 +786,52 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	return drawn;
 }
 
+/**
+ * The trees of a town's avenue (Roadside::Trees, the game's sprite of a small tree where the road's table puts it) as
+ * the trees of the map, in the turned view, from the eyes and facing north among the houses drawn as objects (the
+ * player, #329, seeing them from the eyes as the old sprite, flat and in squares: "this tree we have not replaced, we
+ * have trees enough"): of the climate's kinds of trees (GetRandomTreeType(), GetThreeDMapTrees()), one kind along a
+ * tile, painted for the climate as the trees of the map are (DrawThemedTrees()).
+ * @param ti the road tile
+ * @param spots where each tree stands, units of the tile from its north corner
+ * @return whether they were drawn so, the sprites then left out
+ */
+bool DrawRoadsideTreeFigures(const TileInfo *ti, std::span<const Point> spots)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	const uint32_t tile_hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 40503u) ^ 0x51ED27u;
+	const TreeType kind = GetRandomTreeType(ti->tile, GB(tile_hash, 8, 8));
+	if (kind == TREE_INVALID) return false;
+	const auto trees = GetThreeDMapTrees(static_cast<uint8_t>(kind));
+	if (trees.empty()) return false;
+	TreeUse use = TreeUse::None;
+	switch (_settings_game.game_creation.landscape) {
+		case LandscapeType::Temperate: use = TreeUse::Temperate; break;
+		case LandscapeType::Arctic: use = IsOnSnowOrDesert(ti->tile) ? TreeUse::Snow : TreeUse::SubArctic; break;
+		default: break;
+	}
+	const ThreeDMapTree &tree = trees[GB(tile_hash, 0, 8) % trees.size()];
+	const ThreeDVehicleObject *fig = use != TreeUse::None ? GetThreeDFigure(tree.name) : nullptr;
+	bool drawn = false;
+	for (size_t i = 0; i < spots.size(); i++) {
+		const uint32_t hash = tile_hash ^ (static_cast<uint32_t>(i) * 2246822519u);
+		/* The game's avenue trees are small, a young tree: a few sizes and turns, so that they share a few pictures. */
+		const float size = std::round((0.6f + 0.2f * static_cast<float>(GB(hash, 16, 8)) / 255.0f) * 20.0f) / 20.0f;
+		const float facing = static_cast<float>(GB(hash, 4, 9) % 24 * 15);
+		const int x = ti->x + spots[i].x, y = ti->y + spots[i].y;
+		const int z = GetSlopePixelZ(x, y);
+		const int state = fig != nullptr ? fig->TreeState(use, GB(hash, 25, 7)) : 0;
+		if (eye) {
+			AddCabFigure(tree.name, size * tree.scale, x, y, z, facing, 0, state);
+			drawn = true;
+		} else {
+			drawn |= AddThreeDFigureToViewport(tree.name, size * tree.scale, x, y, z, facing, _cur_dpi->zoom, ti->tile, 0, -1, state);
+		}
+	}
+	return drawn;
+}
+
 static void DrawTile_Trees(TileInfo *ti)
 {
 	switch (GetTreeGround(ti->tile)) {

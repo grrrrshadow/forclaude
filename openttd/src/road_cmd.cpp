@@ -13,6 +13,7 @@
 #include "road.h"
 #include "road_internal.h"
 #include "viewport_func.h"
+#include "tree_cmd.h"
 #include "command_func.h"
 #include "company_func.h"
 #include "pathfinder/yapf/yapf_cache.h"
@@ -1708,6 +1709,15 @@ static void DrawRoadBits(TileInfo *ti)
 	}
 	if (roadside == Roadside::StreetLights && IsTransparencySet(TransparencyOption::Houses)) {
 		is_transparent = true;
+	}
+
+	/* A town's avenue as the trees of the map, in the turned view and from the eyes (DrawRoadsideTreeFigures()). */
+	if (roadside == Roadside::Trees && !is_transparent) {
+		std::vector<Point> spots;
+		for (const DrawRoadTileStruct *drts = _road_display_table[to_underlying(roadside)][(road | tram).base()]; drts->image != 0; drts++) {
+			spots.push_back({drts->subcoord_x + 1, drts->subcoord_y + 1});
+		}
+		if (DrawRoadsideTreeFigures(ti, spots)) return;
 	}
 
 	/* Draw extra details. */

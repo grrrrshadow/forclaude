@@ -11,8 +11,12 @@
 #define TREE_CMD_H
 
 #include "command_type.h"
+#include "core/geometry_type.hpp"
+#include <span>
 
 void PlaceTree(TileIndex tile, uint32_t r, bool keep_density = false);
+struct TileInfo;
+bool DrawRoadsideTreeFigures(const TileInfo *ti, std::span<const Point> spots);
 
 CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_tile, uint8_t tree_to_plant, bool diagonal);
 

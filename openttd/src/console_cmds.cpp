@@ -9935,6 +9935,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			first += fmt::format(" {},{} mesto {} {} barvy {:x};", TileX(tile), TileY(tile), GetTownIndex(tile).base(), lamp != nullptr ? lamp->name : "NENI", lamp != nullptr ? lamp->AddonPaintAt(tile, 1) : 0);
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: lampy {} dlazdic{}", count, first);
+	} else if (what == "stromoradi") {
+		/* 'stromoradi [X Y R]': the road tiles of the towns' avenues (Roadside::Trees), drawn turned and from the eyes as
+		 * the trees of the map (DrawRoadsideTreeFigures() of tree_cmd.cpp): how many; with X Y R the plain road tiles so
+		 * near that tile made avenues first. */
+		if (argv.size() > 4) {
+			const int cx = number(2).value_or(0), cy = number(3).value_or(0), r = number(4).value_or(0);
+			for (int y = cy - r; y <= cy + r; y++) {
+				for (int x = cx - r; x <= cx + r; x++) {
+					if (x < 0 || y < 0 || x >= static_cast<int>(Map::SizeX()) || y >= static_cast<int>(Map::SizeY())) continue;
+					const TileIndex t = TileXY(x, y);
+					if (!IsTileType(t, TileType::Road) || !IsNormalRoad(t) || IsBridgeAbove(t)) continue;
+					SetRoadside(t, Roadside::Trees);
+					MarkTileDirtyByTile(t);
+				}
+			}
+		}
+		int count = 0;
+		std::string first;
+		for (const auto tile : Map::Iterate()) {
+			if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::Trees) continue;
+			if (count++ < 8) first += fmt::format(" {},{}", TileX(tile), TileY(tile));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: stromoradi {} dlazdic{}", count, first);
 	} else if (what == "detail") {
 		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
 		 * whole shape); with 'textura' its textures at their full size. */
