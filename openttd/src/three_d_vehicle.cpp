@@ -781,18 +781,37 @@ static ViewMask HullOutline(const VoxelGrid &g, const ThreeDVehicleView &v, cons
 	return mask;
 }
 
-/** How well the hull's outline, moved by (tx, ty), covers the sprite's: intersection over union. */
-static float OutlineFit(const ViewMask &mask, const ThreeDVehicleView &v, int tx, int ty)
-{
-	uint both = 0, either = 0;
-	for (int y = -MASK_PAD; y < v.height + MASK_PAD; y++) {
-		for (int x = -MASK_PAD; x < v.width + MASK_PAD; x++) {
-			bool sprite = v.At(x, y).a >= FIT_ALPHA;
-			bool hull = mask.At(x - tx, y - ty);
-			both += sprite && hull;
-			either += sprite || hull;
+/** A hull's outline as its pixels and the sprite's firmer pixels counted, to try the outline at many places cheaply (OutlineFit()). */
+struct OutlinePixels {
+	std::vector<Point> hull; ///< the outline's pixels, by the view's own (its anchor not moved)
+	uint firm = 0;           ///< how many of the sprite's pixels are firm (FIT_ALPHA)
+
+	OutlinePixels(const ViewMask &mask, const ThreeDVehicleView &v)
+	{
+		for (int y = 0; y < mask.h; y++) {
+			for (int x = 0; x < mask.w; x++) {
+				if (mask.px[static_cast<size_t>(y) * mask.w + x] != 0) this->hull.push_back({x - MASK_PAD, y - MASK_PAD});
+			}
 		}
+		for (const Colour &c : v.pixels) this->firm += c.a >= FIT_ALPHA;
 	}
+};
+
+/**
+ * How well the hull's outline, moved by (tx, ty), covers the sprite's: intersection over union, over the sprite's box
+ * and MASK_PAD round it. Over the outline's pixels, not the whole box: the anchors are tried at 25 places twice for
+ * each view, a few times over (BuildVehicleModel()).
+ */
+static float OutlineFit(const OutlinePixels &o, const ThreeDVehicleView &v, int tx, int ty)
+{
+	uint both = 0, hull = 0;
+	for (const Point &p : o.hull) {
+		const int x = p.x + tx, y = p.y + ty;
+		if (x < -MASK_PAD || y < -MASK_PAD || x >= v.width + MASK_PAD || y >= v.height + MASK_PAD) continue;
+		hull++;
+		both += v.At(x, y).a >= FIT_ALPHA;
+	}
+	const uint either = o.firm + hull - both;
 	return either == 0 ? 0.0f : static_cast<float>(both) / either;
 }
 
@@ -886,6 +905,68 @@ static std::optional<float> MeasuredSqueeze(const std::array<ThreeDVehicleView, 
 	}
 	if (count == 0) return std::nullopt;
 	return std::clamp(sum / count, 0.6f, 1.0f);
+}
+
+/**
+ * The foreshortening of the directions along the track once more, from the hull. MeasuredSqueeze() takes the vehicle
+ * for a box, but a hull is none: where its length ends its width need not be the whole, so its outline in those views
+ * came out narrower than the sprites, and the views along the screen cut off what the diagonal ones show beyond -- the
+ * player's old 1203 bus (dodavky_BRYLE_v10) 4 pixels short at its front in all four (the player, 4. 11.: "the yellow
+ * bus has its sides at the front gnawed"). The foreshortening that widens the hull's outline in them by as much.
+ * @param squeeze the foreshortening the hull was cut with
+ * @param short_by by how many pixels the hull's outline is narrower than the sprite's, each diagonal view (odd)
+ * @return the foreshortening, or nothing when the hull is empty
+ */
+static std::optional<float> HullSqueeze(const VoxelGrid &g, const std::array<ViewCamera, 8> &cams, float squeeze, float pxm, const std::array<int, 8> &short_by)
+{
+	/* The hull across at each step along it: an outline's ends in a diagonal view are at one of the two sides. */
+	std::vector<float> lo(g.nx, std::numeric_limits<float>::max()), hi(g.nx, std::numeric_limits<float>::lowest());
+	bool any = false;
+	for (int iz = 0; iz < g.nz; iz++) {
+		for (int iy = 0; iy < g.ny; iy++) {
+			const uint8_t *row = &g.occ[g.Index(0, iy, iz)];
+			for (int ix = 0; ix < g.nx; ix++) {
+				if (row[ix] == 0) continue;
+				lo[ix] = std::min(lo[ix], g.Y(iy));
+				hi[ix] = std::max(hi[ix], g.Y(iy));
+				any = true;
+			}
+		}
+	}
+	if (!any) return std::nullopt;
+	/* The outline's width in a diagonal view, pixels, the vehicle foreshortened so (ViewCamera::Project()). */
+	auto width = [&](int d, float sq) {
+		const ViewCamera &cam = cams[d];
+		float left = std::numeric_limits<float>::max(), right = std::numeric_limits<float>::lowest();
+		for (int ix = 0; ix < g.nx; ix++) {
+			if (lo[ix] > hi[ix]) continue;
+			const float along = g.X(ix) * sq * cam.c;
+			for (float y : {lo[ix], hi[ix]}) {
+				left = std::min(left, along - y * cam.s);
+				right = std::max(right, along - y * cam.s);
+			}
+		}
+		return (right - left) * pxm;
+	};
+	std::array<float, 8> now{};
+	float best = squeeze, best_error = 0.0f;
+	for (int d = 1; d < 8; d += 2) {
+		now[d] = width(d, squeeze);
+		best_error += static_cast<float>(short_by[d] * short_by[d]);
+	}
+	for (int i = 0; i <= 80; i++) {
+		const float sq = 0.6f + i * 0.005f;
+		float error = 0.0f;
+		for (int d = 1; d < 8; d += 2) {
+			const float off = width(d, sq) - now[d] - short_by[d];
+			error += off * off;
+		}
+		if (error < best_error) {
+			best_error = error;
+			best = sq;
+		}
+	}
+	return best;
 }
 
 /**
@@ -1012,25 +1093,57 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 	}
 
 	/* Then the hull from the outlines as they are, each anchor refined by a pixel or two to where the hull's
-	 * outline covers the sprite's best. */
-	CarveHull(g, views, cams, pxm, nullptr);
-	for (int d = 0; d < 8; d++) {
-		ThreeDVehicleView &v = views[d];
-		ViewMask mask = HullOutline(g, v, cams[d], pxm);
-		int best_x = v.shift_x, best_y = v.shift_y;
-		float best = -1.0f;
-		for (int step : {2, 1}) {
-			int cx = best_x, cy = best_y, range = step * 2;
-			for (int ty = cy - range; ty <= cy + range; ty += step) {
-				for (int tx = cx - range; tx <= cx + range; tx += step) {
-					float fit = OutlineFit(mask, v, tx, ty);
-					if (fit > best) { best = fit; best_x = tx; best_y = ty; }
+	 * outline covers the sprite's best; again with the hull of the anchors refined, till none moves (at most a
+	 * few times): once, a view was moved for a hull still cut by the others' first anchors. */
+	int rounds = 0;
+	auto refine = [&]() {
+		for (int round = 0; round < 3; round++) {
+			CarveHull(g, views, cams, pxm, nullptr);
+			rounds++;
+			bool moved = false;
+			for (int d = 0; d < 8; d++) {
+				ThreeDVehicleView &v = views[d];
+				const OutlinePixels outline(HullOutline(g, v, cams[d], pxm), v);
+				int best_x = v.shift_x, best_y = v.shift_y;
+				float best = -1.0f;
+				for (int step : {2, 1}) {
+					int cx = best_x, cy = best_y, range = step * 2;
+					for (int ty = cy - range; ty <= cy + range; ty += step) {
+						for (int tx = cx - range; tx <= cx + range; tx += step) {
+							float fit = OutlineFit(outline, v, tx, ty);
+							if (fit > best) { best = fit; best_x = tx; best_y = ty; }
+						}
+					}
 				}
+				moved |= best_x != v.shift_x || best_y != v.shift_y;
+				v.shift_x = best_x;
+				v.shift_y = best_y;
 			}
+			if (!moved) break;
 		}
-		v.shift_x = best_x;
-		v.shift_y = best_y;
+	};
+	refine();
+
+	/* The foreshortening of the diagonal views from the hull (HullSqueeze()), and the anchors refined for it. */
+	{
+		std::array<int, 8> short_by{};
+		for (int d = 1; d < 8; d += 2) {
+			ViewMask mask = HullOutline(g, views[d], cams[d], pxm);
+			int hx0, hy0, hx1, hy1, sx0, sy0, sx1, sy1;
+			extents(&mask, views[d], hx0, hy0, hx1, hy1);
+			extents(nullptr, views[d], sx0, sy0, sx1, sy1);
+			if (hx0 > hx1 || sx0 > sx1) continue;
+			short_by[d] = (sx1 - sx0) - (hx1 - hx0);
+		}
+		const auto squeeze = HullSqueeze(g, cams, model->squeeze, pxm, short_by);
+		if (squeeze.has_value() && std::fabs(*squeeze - model->squeeze) > 0.001f) {
+			model->note += fmt::format("hull squeeze {:.3f} (short {} {} {} {}); ", *squeeze, short_by[1], short_by[3], short_by[5], short_by[7]);
+			model->squeeze = *squeeze;
+			for (int d = 1; d < 8; d += 2) cams[d].Set(d, model->squeeze, model->end_squeeze);
+			refine();
+		}
 	}
+	model->note += fmt::format("anchors refined {} times; ", rounds);
 	CarveHull(g, views, cams, pxm, nullptr);
 	OpenHull(g);
 	for (int d = 0; d < 8; d++) {
@@ -1040,7 +1153,7 @@ static std::unique_ptr<ThreeDVehicleModel> BuildVehicleModel(EngineID engine, Pa
 		int hx0, hy0, hx1, hy1, sx0, sy0, sx1, sy1;
 		extents(&mask, v, hx0, hy0, hx1, hy1);
 		extents(nullptr, v, sx0, sy0, sx1, sy1);
-		model->note += fmt::format("d{} fit {:.3f} shift {},{} sprite {}..{},{}..{} hull {}..{},{}..{}; ", d, OutlineFit(mask, v, v.shift_x, v.shift_y), v.shift_x, v.shift_y, sx0, sx1, sy0, sy1, hx0 + v.shift_x, hx1 + v.shift_x, hy0 + v.shift_y, hy1 + v.shift_y);
+		model->note += fmt::format("d{} fit {:.3f} shift {},{} sprite {}..{},{}..{} hull {}..{},{}..{}; ", d, OutlineFit(OutlinePixels(mask, v), v, v.shift_x, v.shift_y), v.shift_x, v.shift_y, sx0, sx1, sy0, sy1, hx0 + v.shift_x, hx1 + v.shift_x, hy0 + v.shift_y, hy1 + v.shift_y);
 		if (_debug_misc_level >= 5) {
 			/* The rig: the view and the hull's outline over it, as a PPM in the working directory, a margin round. */
 			const int pad = FIT_SHIFT;
