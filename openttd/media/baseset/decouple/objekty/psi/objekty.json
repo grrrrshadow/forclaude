@@ -779,6 +779,8 @@
  {
   "soubor": "liska_skace.glb",
   "jmeno": "liska_skace",
+  "bez_uzlu": ["snow"],
+  "na_zem": true,
   "druh": "pes",
   "nazev": {
    "cs": "skákající liška",

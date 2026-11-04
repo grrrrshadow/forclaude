@@ -5058,6 +5058,16 @@ static void ReadThreeDVehicleObjects()
 					fig.thing = figure_kind == "predmet";
 					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
 					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
+					/* Without some nodes of its file ("bez_uzlu", as a building's): the jumping fox's block of snow it
+					 * stood on in its model (the player, 4. 11.: "that is her ice, not ours, take the ice away"). */
+					if (e.contains("bez_uzlu") && e.at("bez_uzlu").is_array()) {
+						for (const auto &n : e.at("bez_uzlu")) {
+							if (n.is_string()) fig.skip_nodes.push_back(n.get<std::string>());
+						}
+					}
+					/* Standing on its lowest corner ("na_zem"): the fox's origin was the bottom of that snow, without it she
+					 * hung in the air. */
+					fig.to_ground = e.value("na_zem", false);
 					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
 					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
 					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
@@ -7441,6 +7451,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->night_glass) key += "|n";
 	if (this->frame_lights) key += "|f";
 	for (const std::string &n : this->skip_nodes) key += "|x" + n;
+	if (this->to_ground) key += "|g";
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
@@ -7936,9 +7947,14 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		made->y0 = std::min(made->y0, made->pos[i + 1]); made->y1 = std::max(made->y1, made->pos[i + 1]);
 		made->z0 = std::min(made->z0, made->pos[i + 2]); made->z1 = std::max(made->z1, made->pos[i + 2]);
 	}
-	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m, read in {} ms", this->name,
+	if (this->to_ground && made->z0 < made->z1) {
+		for (size_t i = 2; i < made->pos.size(); i += 3) made->pos[i] -= made->z0;
+		made->z1 -= made->z0;
+		made->z0 = 0;
+	}
+	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m (bottom {:.2f} m), read in {} ms", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
-			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0,
+			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0, made->z0,
 			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
 	ShrinkShape(*made);
 	ExtentOfAll(*made);
