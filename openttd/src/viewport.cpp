@@ -11660,15 +11660,16 @@ std::string WriteSpritePPM(SpriteID image, const std::string &name)
  * turned view does it (DrawTurnedBoxes()), but at any angle. Every face's corner takes the texture pixel of the
  * world point where the game draws it north-up (RemapCoords()).
  * @param ps the sprite with its box
+ * @param lift how much higher it stands from the eyes than in the game (EyeStandZ())
  */
-static void CabDrawBox(uint32_t *dst, float *zb, int w, int h, const CabTexture &tex, const CabEye &eye, const ParentSpriteToDraw &ps)
+static void CabDrawBox(uint32_t *dst, float *zb, int w, int h, const CabTexture &tex, const CabEye &eye, const ParentSpriteToDraw &ps, double lift)
 {
 	const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;
 	const double scale = 1.0 / ZOOM_BASE;
 	auto at = [&](double wx, double wy, double wz, double tx, double ty, double tz) {
 		double cx, cy;
 		RemapCoordsF(tx, ty, tz, cx, cy);
-		return CabToEye(eye, wx, wy, wz, (cx - tex.ox) * scale, (cy - tex.oy) * scale);
+		return CabToEye(eye, wx, wy, wz + lift, (cx - tex.ox) * scale, (cy - tex.oy) * scale);
 	};
 	auto same = [&](double x, double y, double z) { return at(x, y, z, x, y, z); };
 	auto face = [&](std::vector<CabPoint> poly) { CabDrawPolygon(dst, zb, w, h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, true); };
@@ -11685,7 +11686,7 @@ static void CabDrawBox(uint32_t *dst, float *zb, int w, int h, const CabTexture 
 /** A thing to draw standing: a sprite as a billboard facing the eye, a wall along a thin long box (a fence), or a box. */
 struct CabBillboard {
 	double f;          ///< its depth, for the order
-	double bx, by, bz; ///< the world point its foot stands on (z in the game's units)
+	double bx, by, bz; ///< the world point its foot stands on (z from the eyes, EyeStandZ())
 	int kind;          ///< 0 a billboard facing the eye; 1 a wall along x from w0 to w1; 2 a wall along y; 3 a box of its bounding box (a building, a platform)
 	double w0, w1;     ///< the wall's ends along its axis
 	ParentSpriteToDraw ps;
@@ -11824,6 +11825,49 @@ static void CabDrawDressed(const CabCanvas &cv, const CabEye &eye, const CabText
 static constexpr int CAB_DECK = 2;
 
 /**
+ * A level of the land (TILE_HEIGHT) from the eyes: 5 m, not the 3 m the game's projection gives it -- its slopes 19
+ * degrees steep, not 11, the clearance under a bridge 4.25 m, the hill over a tunnel 5 m (the player, 4. 11.: "tak
+ * dáme 5 m"). Only the land and what is built of it (the ground, foundations, bridges, ramps, tunnels, the far land);
+ * what stands on it (houses, vehicles, figures, trees) keeps its metres, lifted with the land under it. The game
+ * itself counts as ever: only what is drawn from the eyes is stretched.
+ */
+static constexpr double EYE_LEVEL_STRETCH = 5.0 / 3.0;
+
+/** A height of the land (the ground, a bridge's deck, a tunnel's floor, the base of a house) from the eyes. */
+static constexpr double EyeLevelZ(double z)
+{
+	return z * EYE_LEVEL_STRETCH;
+}
+
+/**
+ * The height of the land a thing at a place stands on or over, in the game's units: the deck of a bridge it is on, the
+ * floor of a tunnel it is in (itself, under the ground), else the ground there. On the ground its own height, which is
+ * finer than the game's whole units of the ground (a tuft of grass on a slope), fading into the ground's within two
+ * units over it -- so that what rises from it (a jump) rises smoothly.
+ */
+static double EyeBaseZ(double x, double y, double z)
+{
+	const int ix = std::clamp(static_cast<int>(std::floor(x)), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+	const int iy = std::clamp(static_cast<int>(std::floor(y)), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
+	const TileIndex tile = TileVirtXY(ix, iy);
+	if (IsBridgeAbove(tile)) {
+		const int deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+		if (z >= deck - CAB_DECK - 1 && z <= deck + 4 * TILE_HEIGHT) return deck;
+	}
+	const double ground = GetSlopePixelZ(ix, iy, true);
+	const double d = z - ground;
+	if (d < -TILE_HEIGHT / 2.0) return z;
+	const double a = std::abs(d);
+	return ground + (a <= 1.0 ? d : a >= 2.0 ? 0.0 : std::copysign(2.0 - a, d));
+}
+
+/** The height from the eyes of a thing at a place at a height of the game: lifted with the land it stands on (EyeBaseZ()), its own metres over it kept. */
+static inline double EyeStandZ(double x, double y, double z)
+{
+	return z + (EYE_LEVEL_STRETCH - 1.0) * EyeBaseZ(x, y, z);
+}
+
+/**
  * Where along and across a bridge or tunnel a point of a tile is, in world units: along its axis and across it.
  * @param axis the bridge's or tunnel's axis
  */
@@ -11849,6 +11893,8 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 {
 	const Axis axis = GetBridgeAxis(tile);
 	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	/* The deck at its height from the eyes (EyeLevelZ()), with its railings and its thickness as they are. */
+	const double lift = EyeLevelZ(bz) - bz;
 	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE;
 	std::vector<const ParentSpriteToDraw *> back, front, pillars;
 	for (const ParentSpriteToDraw *ps : sprites) {
@@ -11872,7 +11918,7 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 	auto pt = [&](double a, double c, double z, double tc, double tz) {
 		std::array<double, 6> p;
 		CabAlongAcross(axis, x0, y0, a, c, p[0], p[1]);
-		p[2] = z;
+		p[2] = z + lift;
 		CabAlongAcross(axis, x0, y0, a, tc, p[3], p[4]);
 		p[5] = tz;
 		return p;
@@ -11893,7 +11939,8 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 	CabAlongAcross(axis, x0, y0, TILE_SIZE, c_far, u[1][0], u[1][1]);
 	CabAlongAcross(axis, x0, y0, TILE_SIZE, c_near, u[2][0], u[2][1]);
 	CabAlongAcross(axis, x0, y0, 0, c_near, u[3][0], u[3][1]);
-	CabDrawSolid(cv, eye, {{u[0][0], u[0][1], under - 0.01}, {u[1][0], u[1][1], under - 0.01}, {u[2][0], u[2][1], under - 0.01}, {u[3][0], u[3][1], under - 0.01}}, below);
+	const double under_e = under + lift - 0.01;
+	CabDrawSolid(cv, eye, {{u[0][0], u[0][1], under_e}, {u[1][0], u[1][1], under_e}, {u[2][0], u[2][1], under_e}, {u[3][0], u[3][1], under_e}}, below);
 
 	/* The pillars: a column where the sprite's pixels are, along the bridge, as thick as the pillar's box across it. */
 	for (const ParentSpriteToDraw *ps : pillars) {
@@ -11922,13 +11969,15 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 		} else {
 			bx0 = cx0; bx1 = cx1; by0 = a_world - half; by1 = a_world + half;
 		}
-		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, z, x, y, z}; };
-		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, z, tx, ty, tz}; };
+		/* From the eyes from the ground to under the deck: the land's height at its foot, the deck's at its top. */
+		const double e0 = EyeLevelZ(z0), e1 = z1 + lift;
+		auto same = [&](double x, double y, bool high) { return std::array<double, 6>{x, y, high ? e1 : e0, x, y, high ? z1 : z0}; };
+		auto at = [&](double x, double y, bool high, double tx, double ty) { return std::array<double, 6>{x, y, high ? e1 : e0, tx, ty, high ? z1 : z0}; };
 		/* The two faces the sprite shows, the two others mirrored, as CabDrawBox() does. */
-		CabDrawDressed(cv, eye, *tex, {same(bx1, by0, z0), same(bx1, by1, z0), same(bx1, by1, z1), same(bx1, by0, z1)}, true);
-		CabDrawDressed(cv, eye, *tex, {same(bx0, by1, z0), same(bx1, by1, z0), same(bx1, by1, z1), same(bx0, by1, z1)}, true);
-		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, z0, bx1, by0, z0), at(bx0, by1, z0, bx1, by1, z0), at(bx0, by1, z1, bx1, by1, z1), at(bx0, by0, z1, bx1, by0, z1)}, true);
-		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, z0, bx0, by1, z0), at(bx1, by0, z0, bx1, by1, z0), at(bx1, by0, z1, bx1, by1, z1), at(bx0, by0, z1, bx0, by1, z1)}, true);
+		CabDrawDressed(cv, eye, *tex, {same(bx1, by0, false), same(bx1, by1, false), same(bx1, by1, true), same(bx1, by0, true)}, true);
+		CabDrawDressed(cv, eye, *tex, {same(bx0, by1, false), same(bx1, by1, false), same(bx1, by1, true), same(bx0, by1, true)}, true);
+		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, false, bx1, by0), at(bx0, by1, false, bx1, by1), at(bx0, by1, true, bx1, by1), at(bx0, by0, true, bx1, by0)}, true);
+		CabDrawDressed(cv, eye, *tex, {at(bx0, by0, false, bx0, by1), at(bx1, by0, false, bx1, by1), at(bx1, by0, true, bx1, by1), at(bx0, by0, true, bx0, by1)}, true);
 	}
 }
 
@@ -11961,10 +12010,11 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 	static CabTexture tex_scratch;
 	CabTexture &tex = EyeScratchTexture(tex_scratch);
 	CabCompositeTexture(tex, sprites);
+	/* The ramp is of the land: its heights from the eyes as the land's (EyeLevelZ()). */
 	auto pt = [&](double a, double c, double z, double tc, double tz) {
 		std::array<double, 6> p;
 		CabAlongAcross(axis, x0, y0, a, c, p[0], p[1]);
-		p[2] = z;
+		p[2] = EyeLevelZ(z);
 		CabAlongAcross(axis, x0, y0, a, tc, p[3], p[4]);
 		p[5] = tz;
 		return p;
@@ -11984,10 +12034,10 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 	CabAlongAcross(axis, x0, y0, a_in, c_near, w[1][0], w[1][1]);
 	CabAlongAcross(axis, x0, y0, a_out, c_far, w[2][0], w[2][1]);
 	CabAlongAcross(axis, x0, y0, a_out, c_near, w[3][0], w[3][1]);
-	double gi = std::min(ground(a_in, c_far), ground(a_in, c_near));
-	CabDrawSolid(cv, eye, {{w[0][0], w[0][1], gi}, {w[1][0], w[1][1], gi}, {w[1][0], w[1][1], deck_in}, {w[0][0], w[0][1], deck_in}}, wall);
-	double go = std::min(ground(a_out, c_far), ground(a_out, c_near));
-	if (deck_out > go + 1) CabDrawSolid(cv, eye, {{w[2][0], w[2][1], go}, {w[3][0], w[3][1], go}, {w[3][0], w[3][1], deck_out}, {w[2][0], w[2][1], deck_out}}, wall);
+	const double gi = EyeLevelZ(std::min(ground(a_in, c_far), ground(a_in, c_near))), di = EyeLevelZ(deck_in);
+	CabDrawSolid(cv, eye, {{w[0][0], w[0][1], gi}, {w[1][0], w[1][1], gi}, {w[1][0], w[1][1], di}, {w[0][0], w[0][1], di}}, wall);
+	const double go = std::min(ground(a_out, c_far), ground(a_out, c_near)), go_e = EyeLevelZ(go), do_e = EyeLevelZ(deck_out);
+	if (deck_out > go + 1) CabDrawSolid(cv, eye, {{w[2][0], w[2][1], go_e}, {w[3][0], w[3][1], go_e}, {w[3][0], w[3][1], do_e}, {w[2][0], w[2][1], do_e}}, wall);
 }
 
 /** A tunnel in the cab view: its two ends and where its portals stand. */
@@ -12002,16 +12052,16 @@ struct CabTunnel {
 
 /** Half the width of a tunnel's floor, world units. */
 static constexpr double CAB_TUNNEL_HALF = 6.0;
-/** The height of a tunnel's walls and of its vault, units of height above its floor. */
-static constexpr double CAB_TUNNEL_WALL = 10.0;
-static constexpr double CAB_TUNNEL_TOP = 20.5;
-/** The height of a portal's face above the floor; and how far it reaches beside the opening, world units. */
-static constexpr double CAB_PORTAL_TOP = 24.0;
+/** The height of a tunnel's walls (2.25 m) and of its vault (4.6 m), units of height above its floor: under the hill of a level (5 m) over it. */
+static constexpr double CAB_TUNNEL_WALL = 6.0;
+static constexpr double CAB_TUNNEL_TOP = 12.3;
+/** The height of a portal's face above the floor -- the hill's over it, a level of the land (the player, 4. 11.: "the top of the tunnel and the top of the land are different"); and how far it reaches beside the opening, world units. */
+static constexpr double CAB_PORTAL_TOP = EyeLevelZ(TILE_HEIGHT);
 static constexpr double CAB_PORTAL_HALF = 10.0;
 /** The cross-section of a tunnel: across from its middle (world units), up from its floor (units of height). */
 static const std::array<std::array<double, 2>, 9> _cab_tunnel_profile = {{
-	{-CAB_TUNNEL_HALF, 0}, {-CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {-5.2, 15.0}, {-3.0, 19.0}, {0.0, CAB_TUNNEL_TOP},
-	{3.0, 19.0}, {5.2, 15.0}, {CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {CAB_TUNNEL_HALF, 0},
+	{-CAB_TUNNEL_HALF, 0}, {-CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {-5.2, 9.0}, {-3.0, 11.4}, {0.0, CAB_TUNNEL_TOP},
+	{3.0, 11.4}, {5.2, 9.0}, {CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {CAB_TUNNEL_HALF, 0},
 }};
 
 /** The tunnel with an end on the tile, if there is one. */
@@ -12037,11 +12087,12 @@ static std::optional<CabTunnel> CabTunnelAt(TileIndex tile)
 	return t;
 }
 
-/** A world point of a tunnel: along its axis s, across c from its middle, dz above its floor. */
+/** A world point of a tunnel from the eyes: along its axis s, across c from its middle, dz above its floor (the floor of the land, EyeLevelZ(); the tube as it is). */
 static inline std::array<double, 3> CabTunnelPoint(const CabTunnel &t, double s, double c, double dz)
 {
-	if (t.axis == Axis::X) return {s, t.c_mid + c, t.z + dz};
-	return {t.c_mid + c, s, t.z + dz};
+	const double z = EyeLevelZ(t.z) + dz;
+	if (t.axis == Axis::X) return {s, t.c_mid + c, z};
+	return {t.c_mid + c, s, z};
 }
 
 /** The stones of portals and of the walls beside the way into a tunnel, 4 texture pixels to a world unit. */
@@ -12099,10 +12150,11 @@ static void CabDrawPortal(const CabCanvas &cv, const CabEye &eye, const CabTunne
 		const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
 		CabDrawStone(cv, eye, {face(p[0], p[1]), face(q[0], q[1]), face(q[0], CAB_PORTAL_TOP), face(p[0], CAB_PORTAL_TOP)});
 	}
-	/* The walls beside the way in: from the floor up to where the slope of the end tile was, on both sides. */
+	/* The walls beside the way in: from the floor up to where the slope of the end tile was (a level of the land), on both sides. */
+	const double level = EyeLevelZ(TILE_HEIGHT);
 	for (double c : {-(TILE_SIZE / 2.0), TILE_SIZE / 2.0}) {
-		std::array<double, 3> p0 = CabTunnelPoint(t, s_out, c, 0), p1 = CabTunnelPoint(t, s, c, 0), p2 = CabTunnelPoint(t, s, c, TILE_HEIGHT);
-		CabDrawStone(cv, eye, {{p0[0], p0[1], p0[2], 0, 10}, {p1[0], p1[1], p1[2], TILE_SIZE * k, 10}, {p2[0], p2[1], p2[2], TILE_SIZE * k, 10 - TILE_HEIGHT * CAB_Z_SCALE * k}});
+		std::array<double, 3> p0 = CabTunnelPoint(t, s_out, c, 0), p1 = CabTunnelPoint(t, s, c, 0), p2 = CabTunnelPoint(t, s, c, level);
+		CabDrawStone(cv, eye, {{p0[0], p0[1], p0[2], 0, 10}, {p1[0], p1[1], p1[2], TILE_SIZE * k, 10}, {p2[0], p2[1], p2[2], TILE_SIZE * k, 10 - level * CAB_Z_SCALE * k}});
 	}
 }
 
@@ -12145,7 +12197,7 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 		/* A lamp on each wall every few pieces. */
 		if (static_cast<int>(std::floor(sm / step)) % 6 == 0) {
 			for (double c : {-CAB_TUNNEL_HALF + 0.05, CAB_TUNNEL_HALF - 0.05}) {
-				auto m0 = CabTunnelPoint(t, sm - 0.6, c, 8.0), m1 = CabTunnelPoint(t, sm + 0.6, c, 8.0), m2 = CabTunnelPoint(t, sm + 0.6, c, 9.5), m3 = CabTunnelPoint(t, sm - 0.6, c, 9.5);
+				auto m0 = CabTunnelPoint(t, sm - 0.6, c, 4.6), m1 = CabTunnelPoint(t, sm + 0.6, c, 4.6), m2 = CabTunnelPoint(t, sm + 0.6, c, 5.6), m3 = CabTunnelPoint(t, sm - 0.6, c, 5.6);
 				CabDrawSolid(cv, eye, {m0, m1, m2, m3}, lamp);
 			}
 		}
@@ -12155,8 +12207,8 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 /**
  * A tunnel seen from outside, through the opening of a portal: its tube as far as the view reaches and the daylight
  * at its other end, only where the opening is seen. Drawn into a picture of its own first and put where the opening
- * shows, as the opening's plane, so the hill over a tunnel never shows in it -- a hill a level high is lower than
- * the vault -- and the vault never shows out of the hill.
+ * shows, as the opening's plane, so the hill over a tunnel never shows in it and the vault never shows out of the
+ * hill.
  * @param end the tunnel's end whose portal is seen
  */
 static void CabDrawTunnelSeenIn(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, TileIndex end)
@@ -12265,6 +12317,7 @@ struct CabFigure {
 	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
 	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
 	std::shared_ptr<const ThreeDLikenessSolid> likeness; ///< a vehicle of sprites only: its likeness's solid (AddCabLikeness()), kept till the frame is drawn
+	double base = std::numeric_limits<double>::quiet_NaN(); ///< the height of the land it stands on when known (a building's it is on), else found where it stands (EyeBaseZ())
 };
 static std::vector<CabFigure> _cab_figures;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
@@ -13297,8 +13350,12 @@ struct EyeGlow {
 static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicle *own)
 {
 	std::vector<EyeGlow> glows;
+	/* At a height from the eyes; glow() at one of the game's, lifted with the land under it (EyeStandZ()). */
+	auto glow_eye = [&](double wx, double wy, double ez, double radius, Colour colour, double strength, double squash, bool lamp, double before) {
+		glows.push_back({wx, wy, ez, radius, colour, strength, squash, lamp, before});
+	};
 	auto glow = [&](double wx, double wy, double wz, double radius, Colour colour, double strength, double squash, bool lamp = false, double before = 0) {
-		glows.push_back({wx, wy, wz, radius, colour, strength, squash, lamp, before});
+		glow_eye(wx, wy, EyeStandZ(wx, wy, wz), radius, colour, strength, squash, lamp, before);
 	};
 	/*
 	 * A lamp shining one way (a headlight ahead, a red light back) is seen from before it and from its side, not from
@@ -13316,29 +13373,32 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 	const Colour lamp(255, 236, 190), pool(255, 220, 150), tail(255, 30, 20), beacon(255, 40, 40);
 	const double reach = CAB_RANGE_TILES * TILE_SIZE;
 	std::vector<ThreeDWorldLight> model_lights;
-	auto shine = [&](const std::vector<ThreeDWorldLight> &lights, bool braking = false) {
+	/* The lights of a model: at heights of the game, or from the eyes already (eye_z). */
+	auto shine = [&](const std::vector<ThreeDWorldLight> &lights, bool braking, bool eye_z) {
 		for (const ThreeDWorldLight &l : lights) {
 			if (!faces_eye(l.x, l.y, l.fx, l.fy)) continue;
+			const double ez = eye_z ? l.z : EyeStandZ(l.x, l.y, l.z);
 			switch (l.kind) {
-				case ThreeDPictureLight::Kind::Front: glow(l.x, l.y, l.z, 0.35, lamp, 0.9, 1.0, true); break;
+				case ThreeDPictureLight::Kind::Front: glow_eye(l.x, l.y, ez, 0.35, lamp, 0.9, 1.0, true, 0); break;
 				case ThreeDPictureLight::Kind::Back:
 					/* Braking, more (VehicleBrakeLightsOn()). */
 					if (braking) {
-						glow(l.x, l.y, l.z, 0.45, tail, 1.0, 1.0, true);
+						glow_eye(l.x, l.y, ez, 0.45, tail, 1.0, 1.0, true, 0);
 					} else {
-						glow(l.x, l.y, l.z, 0.25, tail, 0.8, 1.0, true);
+						glow_eye(l.x, l.y, ez, 0.25, tail, 0.8, 1.0, true, 0);
 					}
 					break;
-				case ThreeDPictureLight::Kind::PoolNear: glow(l.x, l.y, l.z, 3, pool, 0.3, 0.4); break;
-				case ThreeDPictureLight::Kind::Pool: glow(l.x, l.y, l.z, 6, pool, 0.3, 0.4); break;
+				case ThreeDPictureLight::Kind::PoolNear: glow_eye(l.x, l.y, ez, 3, pool, 0.3, 0.4, false, 0); break;
+				case ThreeDPictureLight::Kind::Pool: glow_eye(l.x, l.y, ez, 6, pool, 0.3, 0.4, false, 0); break;
 			}
 		}
 	};
-	/* The cars of the game's own driving about (three_d_walkers.h): their lights as the vehicles' of their models. */
+	/* The cars of the game's own driving about (three_d_walkers.h): their lights as the vehicles' of their models -- the
+	 * figures' heights already from the eyes. */
 	for (const CabFigure &fg : _cab_figures) {
 		if (!fg.own_car || fg.lights == 0) continue;
 		GetThreeDEyeObjectLights(CabFigureVehicle(fg), model_lights);
-		shine(model_lights);
+		shine(model_lights, false, true);
 	}
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		if (u->vehstatus.Test(VehState::Hidden)) continue;
@@ -13353,7 +13413,7 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		 * colleague's hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md). Not the own one's, seen from inside. */
 		const bool own_one = own != nullptr && u->First() == own;
 		if (!own_one && ThreeDEnabled() && !u->vehstatus.Test(VehState::Crashed) && u->direction != Direction::Invalid && GetThreeDVehicleObjectWorldLights(u, model_lights)) {
-			shine(model_lights, VehicleBrakeLightsOn(u));
+			shine(model_lights, VehicleBrakeLightsOn(u), false);
 			continue;
 		}
 		if (!front && !last) continue;
@@ -14061,8 +14121,9 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 	std::vector<uint32_t> &colours = _eye_frame != nullptr ? _eye_frame->colours.emplace_back() : own_colours;
 	colours.assign(blocks.size(), 0);
 	const uint max_x = Map::MaxX(), max_y = Map::MaxY();
+	/* Its heights from the eyes, as the land's near (EyeLevelZ()). */
 	auto height_at = [&](int x, int y) {
-		return static_cast<double>(TileHeight(TileXY(std::clamp<int>(x, 0, max_x), std::clamp<int>(y, 0, max_y))) * TILE_HEIGHT);
+		return EyeLevelZ(TileHeight(TileXY(std::clamp<int>(x, 0, max_x), std::clamp<int>(y, 0, max_y))) * TILE_HEIGHT);
 	};
 	/* The light from the north-west, high, as the game's slopes are lit. */
 	const double lx = 0.0, ly = -0.55, lz = 0.835;
@@ -14125,7 +14186,7 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx0, wy0, h00), at(wx1, wy0, h10), at(wx1, wy1, h11), at(wx0, wy1, h01)}, eye, false, light);
 		if (b.size == 1) continue;
 		/* The skirt: down from each edge. */
-		const double drop = b.size * TILE_HEIGHT;
+		const double drop = EyeLevelZ(b.size * TILE_HEIGHT);
 		const uint dark = light * 3 / 4;
 		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx0, wy0, h00), at(wx1, wy0, h10), at(wx1, wy0, h10 - drop), at(wx0, wy0, h00 - drop)}, eye, false, dark);
 		CabDrawPolygon(dst, zb, width, height, colours.data(), static_cast<int>(colours.size()), 1, {at(wx1, wy0, h10), at(wx1, wy1, h11), at(wx1, wy1, h11 - drop), at(wx1, wy0, h10 - drop)}, eye, false, dark);
@@ -14239,11 +14300,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	eye.fy = std::sin(look);
 	eye.rx = eye.fy;
 	eye.ry = -eye.fx;
+	/* The eye's height is the eyes' (EyeStandZ()): lifted with the land it is over, as all that stands on it. */
 	if (walker != nullptr) {
 		/* The walker's eyes over the ground where it stands. */
 		eye.x = walker->x;
 		eye.y = walker->y;
-		eye.z = FirstPersonFeetZ(*walker) + walker->eye_z;
+		eye.z = EyeStandZ(walker->x, walker->y, FirstPersonFeetZ(*walker)) + walker->eye_z;
 	} else if (in_model_cab) {
 		/* In the driver's head of the model, as big as the model is drawn, turned as its state turns it. */
 		const double across = own_model.scale * OBJECT_UNITS_PER_METRE, ahead = across * own_model.along;
@@ -14257,10 +14319,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
 		eye.x = own_model.x + cx * ahead * bfx - cy * across * bfy;
 		eye.y = own_model.y + cx * ahead * bfy + cy * across * bfx;
-		eye.z = own_model.z + (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
+		eye.z = EyeStandZ(own_model.x, own_model.y, own_model.z) + (camera.msts ? m.cab[2] : CabEyeHeight(m)) * own_model.scale * OBJECT_HEIGHT_PER_METRE;
 		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
 	} else {
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
+		/* The vehicle's height from the eyes. */
+		const double vz = EyeStandZ(v->x_pos, v->y_pos, v->z_pos);
 		double want = type_z;
 		if (!roof) {
 			/* On a round curve over the arc (round_track.h). */
@@ -14288,7 +14352,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			eye.x = mid_x - behind * std::cos(round);
 			eye.y = mid_y - behind * std::sin(round);
 			/* In a tunnel under its vault. */
-			if (tunnel_in.has_value()) want = std::min(want, tunnel_in->z + CAB_TUNNEL_WALL - 2.0 - v->z_pos);
+			if (tunnel_in.has_value()) want = std::min(want, EyeLevelZ(tunnel_in->z) + CAB_TUNNEL_TOP - 3.0 - vz);
 		}
 		{
 			/* The eye's height over the vehicle: as the type has it (over the roof higher), bowed under a low bridge just
@@ -14301,7 +14365,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				if (!IsBridgeAbove(tile)) continue;
 				int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 				if (bz <= v->z_pos + 4) continue; // on the bridge, not under it
-				want = std::min(want, std::max(CAB_EYE_Z_LOWEST, bz - CAB_DECK - 1.5 - v->z_pos));
+				want = std::min(want, std::max(CAB_EYE_Z_LOWEST, EyeLevelZ(bz) - CAB_DECK - 1.5 - vz));
 				if (k <= 1) close = true;
 			}
 			if (camera.eye_dz < 0) {
@@ -14312,7 +14376,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				camera.eye_dz += (want - camera.eye_dz) * 0.2;
 			}
 		}
-		eye.z = v->z_pos + camera.eye_dz;
+		eye.z = vz + camera.eye_dz;
 	}
 	eye.focal = walker != nullptr ? (width / 2.0) / CAB_FOV_TAN : CabFocal(camera, width, height);
 	eye.cx = width / 2.0;
@@ -14340,7 +14404,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			std::optional<CabTunnel> t = CabTunnelAt(tile);
 			if (!t.has_value()) continue;
 			double s_e = t->axis == Axis::X ? eye.x : eye.y, c_e = (t->axis == Axis::X ? eye.y : eye.x) - t->c_mid;
-			if (s_e > t->s_lo && s_e < t->s_hi && std::abs(c_e) < TILE_SIZE / 2.0 && eye.z < t->z + CAB_PORTAL_TOP) {
+			if (s_e > t->s_lo && s_e < t->s_hi && std::abs(c_e) < TILE_SIZE / 2.0 && eye.z < EyeLevelZ(t->z) + CAB_PORTAL_TOP) {
 				in_tunnel = t;
 				break;
 			}
@@ -14448,6 +14512,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* What stands on a tile: 0 a billboard, 1 a building's box, 2 a station's box, 3 a bridge over the tile, 4 a
 	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
 	_cab_figures.clear();
+	/* The figures from one on: standing on what stands on the land at a height (a building, a field), not found where they stand (EyeBaseZ()). */
+	auto stand_on = [](size_t from, double base) {
+		for (size_t k = from; k < _cab_figures.size(); k++) _cab_figures[k].base = base;
+	};
 	_cab_bridge_sprites.clear();
 	std::vector<TileIndex> ramps, tunnel_ends;
 	/* The houses and the game's own industries that are real 3D objects (three_d_objects.h): drawn by their triangles,
@@ -14457,6 +14525,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		TileIndex origin;
 		int z;
 		std::span<const ThreeDObjectFigure> more = {}; ///< an industry's girls that are there now (GetThreeDIndustryGirls())
+		double ez = 0; ///< z from the eyes (EyeLevelZ()), once all are collected
 	};
 	std::vector<CabObject> objects;
 	AutoRestoreBackup collecting_backup(_cab_collecting, true);
@@ -14554,9 +14623,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				for (size_t k = 0; k < of->parts.size(); k++) add(of->parts[k], anchor, k == 0 ? std::span<const ThreeDObjectFigure>(of->vehicles) : std::span<const ThreeDObjectFigure>());
 				if (of->plants != nullptr && anchor == _cur_ti.tile) {
 					const double oz = GetTileMaxPixelZ(anchor);
+					const size_t from = _cab_figures.size();
 					for (const ThreeDObjectFigure &f : of->plants->plants) {
 						AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
 					}
+					stand_on(from, oz);
 				}
 			}
 		}
@@ -14568,9 +14639,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			/* A pasture (AddPastureTile()): its fences, its shelter or trough, its animals grazing, on the game's grass. */
 			if (const ThreeDPasture *p = GetThreeDPasture(); p != nullptr) {
 				for (const ThreeDObject *o : PastureTilePieces(_cur_ti.tile, *p)) objects.push_back({o, _cur_ti.tile, _cur_ti.z});
+				const size_t from = _cab_figures.size();
 				ForPastureAnimals(_cur_ti.tile, *p, true, [](const std::string &figure, int frame, const ThreeDObjectFigure &f) {
 					AddCabFigure(figure, f.scale, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z, f.facing, frame);
 				});
+				stand_on(from, _cur_ti.z);
 			}
 		} else if (tile_type == TileType::Clear && IsClearGround(_cur_ti.tile, ClearGround::Fields) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* Wheat on the farm's fields (AddFieldWheat()), near the eye: farther the field's ground says enough. */
@@ -14643,6 +14716,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				 * the haystack and the girls on the road tile behind. */
 				kind = 5;
 				const double ox = _cur_ti.x, oy = _cur_ti.y, oz = _cur_ti.z;
+				const size_t from = _cab_figures.size();
 				if (ft.plants != nullptr) {
 					objects.push_back({ft.plants, _cur_ti.tile, _cur_ti.z});
 					for (const ThreeDObjectFigure &f : ft.plants->plants) {
@@ -14650,14 +14724,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					}
 				}
 				for (const ThreeDObjectFigure &f : ft.worker) AddCabFigure(f.figure, CAB_FIGURE_SCALE, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
+				stand_on(from, oz);
 				if (ft.road != nullptr) {
 					const TileIndex road_tile = TileAddXY(_cur_ti.tile, 0, 1);
 					const int road_z = GetTilePixelZ(road_tile);
 					if (ft.shed != nullptr) objects.push_back({ft.shed, road_tile, road_z});
 					if (ft.hay != nullptr) objects.push_back({ft.hay, road_tile, road_z});
+					const size_t from_road = _cab_figures.size();
 					for (int edge = 0; edge < 2; edge++) {
 						for (const ThreeDObjectFigure &f : ft.girls[edge]) AddCabFigure(f.figure, CAB_FIGURE_SCALE, TileX(road_tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE, TileY(road_tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE, road_z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, -1);
 					}
+					stand_on(from_road, road_z);
 				}
 			}
 		}
@@ -14687,6 +14764,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * pub's spit over the grill) stays as big as the building it is on. */
 	for (const CabObject &co : objects) {
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+		const size_t from = _cab_figures.size();
 		/* Each figure's number on it, as the map counts them (DrawObjectInto(): its figures, its plants, those besides). */
 		uint32_t index = 0;
 		auto add = [&](const ThreeDObjectFigure &f) {
@@ -14720,6 +14798,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		for (const ThreeDObjectFigure &f : co.obj->plants) {
 			AddCabPlant(f.figure, f.scale, f.stretch, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE, oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
 		}
+		stand_on(from, oz);
 	}
 	/* The dragons about (three_d_dragons.h), among the figures; Mat walking in the town and the cars of the game's own
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
@@ -14938,7 +15017,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				double wz = t.z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
 				double cx, cy;
 				RemapCoordsF(wx, wy, wz, cx, cy);
-				p[i] = CabToEye(eye, wx, wy, wz - sink, cx * scale - gl, cy * scale - gt);
+				p[i] = CabToEye(eye, wx, wy, EyeLevelZ(wz) - sink, cx * scale - gl, cy * scale - gt);
 			}
 			for (int i = 0; i < 4; i++) {
 				CabDrawPolygon(dst, zb, width, height, gpx, gw, gh, {p[i], p[(i + 1) % 4], p[4]}, eye, static_cast<uint8_t>(CAB_FILL_HOLES | (_settings_client.gui.eye_roads ? CAB_ROAD : 0) | (eye_grass ? CAB_GRASS : 0)));
@@ -14953,7 +15032,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					mark_colours.push_back(m.colour.data);
 					const uint32_t *tex = EyeColour(mark_colours.back());
 					std::vector<CabPoint> poly;
-					for (const auto &c : m.corner) poly.push_back(CabToEye(eye, c[0], c[1], c[2] + LIFT, 0, 0));
+					for (const auto &c : m.corner) poly.push_back(CabToEye(eye, c[0], c[1], EyeLevelZ(c[2]) + LIFT, 0, 0));
 					CabDrawPolygon(dst, zb, width, height, tex, 1, 1, std::move(poly), eye, 0);
 				}
 			};
@@ -14981,6 +15060,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			objects.push_back({obj, origin, GetTileMaxPixelZ(origin), GetThreeDHouseEvent(obj, origin)});
 		});
 	}
+	/* All the objects collected: their heights from the eyes, on the land as it is from there. */
+	for (CabObject &co : objects) co.ez = EyeLevelZ(co.z);
 
 	eye_stage(3);
 	/* 4b. Bridges and tunnels as things of their own: decks, ramps and pillars from the bridges' sprites; portals of
@@ -14991,14 +15072,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
 		if (!is_foundation[i]) continue;
 		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-		CabPoint c = CabToEye(eye, (ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, ps.zmin, 0, 0);
+		CabPoint c = CabToEye(eye, (ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, EyeLevelZ(ps.zmin), 0, 0);
 		if (c.f < -static_cast<double>(TILE_SIZE)) continue;
 		static CabTexture found_scratch;
 		CabTexture &found = EyeScratchTexture(found_scratch);
 		CabCompositeTexture(found, {&ps});
 		const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;
-		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, z, x, y, z}; };
-		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, z, tx, ty, tz}; };
+		/* Of the land: its heights from the eyes as the land's (EyeLevelZ()), dressed in the sprite where the game draws it. */
+		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, EyeLevelZ(z), x, y, z}; };
+		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, EyeLevelZ(z), tx, ty, tz}; };
 		CabDrawDressed(cv, eye, found, {same(x1, y0, z0), same(x1, y1, z0), same(x1, y1, z1), same(x1, y0, z1)}, false);
 		CabDrawDressed(cv, eye, found, {same(x0, y1, z0), same(x1, y1, z0), same(x1, y1, z1), same(x0, y1, z1)}, false);
 		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x1, y0, z0), at(x0, y1, z0, x1, y1, z0), at(x0, y1, z1, x1, y1, z1), at(x0, y0, z1, x1, y0, z1)}, false);
@@ -15022,7 +15104,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	std::vector<ObjectJob> jobs;
 	for (const CabObject &co : objects) {
 		const ThreeDObject &o = *co.obj;
-		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.ez;
 		CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 		if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y)) continue;
 		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
@@ -15181,7 +15263,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 		if (ps.image == SPR_EMPTY_BOUNDING_BOX || is_foundation[i] || ps_kind[i] >= 3) continue;
 		double bx = (ps.xmin + ps.xmax + 1) * 0.5, by = (ps.ymin + ps.ymax + 1) * 0.5;
-		CabPoint c = CabToEye(eye, bx, by, ps.zmin, 0, 0);
+		/* Standing on the land: lifted with it (EyeStandZ()). */
+		const double bz = EyeStandZ(bx, by, ps.zmin);
+		CabPoint c = CabToEye(eye, bx, by, bz, 0, 0);
 		if (c.f < CAB_NEAR * 0.5) continue;
 		/* What stands on a house, industry, object or station tile with a footprint is a box of its sprite: a
 		 * building or a roof of a height, a platform or a bench low and flat (a slab). A thin long box (a fence
@@ -15201,7 +15285,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			w0 = ps.ymin;
 			w1 = ps.ymax + 1;
 		}
-		bills.push_back({c.f, bx, by, static_cast<double>(ps.zmin), kind, w0, w1, ps});
+		bills.push_back({c.f, bx, by, bz, kind, w0, w1, ps});
 	}
 	/* The other vehicles: their picture of the direction as seen from the eye, as the turned map shows them. */
 	double yaw_deg = std::atan2(eye.fy, eye.fx) * 180.0 / M_PI + 135.0;
@@ -15236,7 +15320,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			uy = static_cast<int>(std::lround(pose.y));
 			udir = static_cast<Direction>((2 - static_cast<int>(std::lround(pose.azimuth / 45.0))) & 7);
 		}
-		CabPoint c = CabToEye(eye, ux, uy, uz, 0, 0);
+		const double uz_eye = EyeStandZ(ux, uy, uz);
+		CabPoint c = CabToEye(eye, ux, uy, uz_eye, 0, 0);
 		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(c.r) > std::max(c.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
 		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the
 		 * sprites of its eight directions are only for what is drawn from them (the player, 16. 10.). */
@@ -15291,7 +15376,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			ps.xmax = ps.xmin + std::max<int>(u->bounds.extent.x, 2) - 1;
 			ps.ymax = ps.ymin + std::max<int>(u->bounds.extent.y, 2) - 1;
 			ps.zmax = ps.zmin + std::max<int>(u->bounds.extent.z, 5) - 1;
-			bills.push_back({c.f, static_cast<double>(ux), static_cast<double>(uy), static_cast<double>(uz), 0, 0.0, 0.0, ps});
+			bills.push_back({c.f, static_cast<double>(ux), static_cast<double>(uy), uz_eye, 0, 0.0, 0.0, ps});
 		}
 	}
 	/* The figures standing on the tiles (the clay town's mushrooms, the dragons): near the eye their triangles as they
@@ -15300,6 +15385,13 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* All of them drawn at once on every core with the frame: their pictures kept till it is taken (PinThreeDPictures()). */
 	std::vector<std::pair<CabFigure, CabFigureModel>> solid_figures;
 	const bool figures_by_card = ThreeDGpuAvailable();
+	/* Their heights from the eyes, all collected: lifted with the land they stand on (EyeStandZ()), on a building with
+	 * the building's; a tuft of grass sheared along the ground as the ground is from there. */
+	for (CabFigure &fg : _cab_figures) {
+		fg.z += (EYE_LEVEL_STRETCH - 1.0) * (std::isnan(fg.base) ? EyeBaseZ(fg.x, fg.y, fg.z) : fg.base);
+		fg.rise_x *= static_cast<float>(EYE_LEVEL_STRETCH);
+		fg.rise_y *= static_cast<float>(EYE_LEVEL_STRETCH);
+	}
 	for (CabFigure &fg : _cab_figures) {
 		const CabPoint foot = CabToEye(eye, fg.x, fg.y, fg.z, 0, 0);
 		if (foot.f > CAB_RANGE_TILES * TILE_SIZE || std::abs(foot.r) > std::max(foot.f, 0.0) * CAB_FOV_TAN + 2.0 * TILE_SIZE) continue;
@@ -15461,7 +15553,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		double bw_units = tex->w * CAB_PX_ACROSS, bh_units = tex->h * CAB_PX_UP;
 		if (b.kind == 3) {
 			if (_debug_misc_level >= 5) Debug(misc, 5, "cab box sprite {} box {}..{} {}..{} z {}..{} tex {}x{} at {},{} depth {:.0f}", b.ps.image & SPRITE_MASK, b.ps.xmin, b.ps.xmax, b.ps.ymin, b.ps.ymax, b.ps.zmin, b.ps.zmax, tex->w, tex->h, tex->ox, tex->oy, b.f);
-			CabDrawBox(dst, zb, width, height, *tex, eye, b.ps);
+			CabDrawBox(dst, zb, width, height, *tex, eye, b.ps, b.bz - b.ps.zmin);
 			camera.billboards++;
 			continue;
 		}
@@ -15522,7 +15614,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		for (const CabObject &co : objects) {
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
 			if (std::hypot(ox - eye.x, oy - eye.y) > CAB_SHADOW_TILES * TILE_SIZE) continue;
-			casters.push_back({co.obj, ox, oy, static_cast<double>(co.z), {}});
+			casters.push_back({co.obj, ox, oy, co.ez, {}});
 		}
 		if (!casters.empty()) {
 			const int level = ThreeDShapeLevel(OBJECT_UNITS_PER_METRE / CAB_SHADOW_TEXEL, 1.0);
@@ -15617,7 +15709,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * by its own means (DrawThreeDHeldThing()), from the thing's model, which stays. */
 	/* The smoke of the walker's rockets, before the night: the dark is over it too (DrawEyeBlasts()). */
 	auto blasts_job = [&](bool fire) {
-		out.Job([eye, width, height, blasts = walker->blasts, fire](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, fire); }, [eye, blasts = walker->blasts, fire](EyeCard &card) {
+		/* Their heights from the eyes (EyeStandZ()). */
+		std::vector<ThreeDBlast> seen = walker->blasts;
+		for (ThreeDBlast &b : seen) b.z = EyeStandZ(b.x, b.y, b.z);
+		out.Job([eye, width, height, blasts = seen, fire](uint32_t *dst, float *zb) { DrawEyeBlasts(eye, dst, zb, width, height, blasts, fire); }, [eye, blasts = seen, fire](EyeCard &card) {
 			card.Step(ThreeDGpuEyeStep::Kind::Blasts).blasts = EyeBlastsSeen(eye, blasts, fire);
 			return true;
 		});
@@ -15684,7 +15779,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			const ThreeDObject &o = *co.obj;
 			if (!o.IsRead()) continue; // read in the background, its lamps the next frames
 			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE;
-			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.z + o.lights[i + 2]});
+			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) lamps.push_back({ox + o.lights[i], oy + o.lights[i + 1], co.ez + o.lights[i + 2]});
 		}
 		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground (DrawEyeWitchLight()). */
 		const float zu_per_unit = static_cast<float>(CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE);
@@ -15723,6 +15818,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				l.colour = Colour(255, 160, 70);
 			}
 		}
+		/* Their heights from the eyes, over the land as it is from there (EyeStandZ()). */
+		for (ThreeDWitchLight &l : witch_lights) l.z = EyeStandZ(l.x, l.y, l.z);
 		if (!witch_lights.empty()) {
 			out.Job([eye, width, height, witch_lights](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights); }, [eye, width, height, witch_lights, lights_step](EyeCard &card) {
 				lights_step(card, EyeWitchLightsLit(eye, width, height, witch_lights));
@@ -15753,7 +15850,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		for (const CabObject &co : objects) {
 			const ThreeDObject &o = *co.obj;
 			if (!o.IsRead() || (o.night_tri.empty() && o.lights.empty())) continue;
-			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.z;
+			const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.ez;
 			const CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 			/* Near and on the far land: the lights of the towns on the horizon. */
 			if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y) || c.f > CAB_FAR_OBJECT_TILES * TILE_SIZE) continue;
