@@ -298,6 +298,8 @@ static std::vector<ThreeDVehicleObject> _vehicle_objects;
 static bool _vehicle_objects_read = false;
 /** The figures of the indices ("druh": "postava"), by their name: people riding in vehicles, standing at stops. */
 static std::vector<ThreeDVehicleObject> _figure_objects;
+/** The ivies among the add-ons ("popinavka" of a record), where they grow (GetThreeDIvies()). */
+static std::vector<ThreeDIvy> _three_d_ivies;
 
 /**
  * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
@@ -2111,15 +2113,22 @@ static std::vector<int8_t> TriangleFacing(const GlbMesh &mesh)
  */
 static std::vector<uint16_t> CornerLight(const std::vector<float> &nrm)
 {
-	static const double L[3] = {-0.55, 0.35, 0.75};
-	const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
 	std::vector<uint16_t> light;
 	light.reserve(nrm.size() / 3);
-	for (size_t i = 0; i + 2 < nrm.size(); i += 3) {
-		double d = (nrm[i] * L[0] + nrm[i + 1] * L[1] + nrm[i + 2] * L[2]) / ll;
-		light.push_back(static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d)))));
-	}
+	for (size_t i = 0; i + 2 < nrm.size(); i += 3) light.push_back(ThreeDLightOfNormal(nrm[i], nrm[i + 1], nrm[i + 2]));
 	return light;
+}
+
+/**
+ * The light of a face by its normal (a unit vector in the world's axes), as the buildings and the vehicles are lit: by
+ * one light fixed to the world, 256 its whole.
+ */
+uint16_t ThreeDLightOfNormal(double nx, double ny, double nz)
+{
+	static const double L[3] = {-0.55, 0.35, 0.75};
+	const double ll = std::sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2]);
+	const double d = (nx * L[0] + ny * L[1] + nz * L[2]) / ll;
+	return static_cast<uint16_t>(std::lround(256.0 * (0.55 + 0.45 * std::max(0.0, d))));
 }
 
 /**
@@ -2786,6 +2795,35 @@ static void ReadTreeFigurePaint(const nlohmann::json &e, const std::string &fold
 			if (parts.size() > 1 && !parts[1].palettes[u].empty()) st.second_colour = parts[1].palettes[u][n % parts[1].palettes[u].size()];
 			fig.states.push_back(std::move(st));
 		}
+	}
+}
+
+/**
+ * An add-on of the buildings as a figure painted a colour by number ("barvy" of its record, as the add-ons of the houses:
+ * the colleague's ivies, hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md; the player, 4. 11.: "one model, many greens"): its
+ * first part's mask over its first texture and its "zacatek" its paint, a state for each colour of its palette
+ * (PaletteState()). A tree painted by its use (ReadTreeFigurePaint()) is not painted so.
+ */
+static void ReadFigurePalette(const nlohmann::json &e, const std::string &folder, ThreeDVehicleObject &fig)
+{
+	if (!fig.paint.mask_file.empty() || !e.contains("barvy") || !e.at("barvy").is_array() || e.at("barvy").empty()) return;
+	const auto &b = e.at("barvy").at(0);
+	if (!b.is_object() || !b.contains("maska") || !b.at("maska").is_string() || !b.contains("paleta") || !b.at("paleta").is_array()) return;
+	std::vector<uint32_t> palette;
+	for (const auto &c : b.at("paleta")) {
+		auto rgb = c.is_string() ? ParseInteger<uint32_t>(c.get<std::string>(), 16) : std::nullopt;
+		if (rgb.has_value() && palette.size() < TREE_PALETTE_MAX) palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
+	}
+	if (palette.empty()) return;
+	fig.paint.mask_file = folder + b.at("maska").get<std::string>();
+	fig.paint.start = std::clamp(b.value("zacatek", 255), 1, 255);
+	fig.palette_states = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(palette.size())};
+	for (uint32_t colour : palette) {
+		ThreeDVehicleState st;
+		st.first = 1; // no sprite picks it
+		st.last = 0;
+		st.colour = colour;
+		fig.states.push_back(std::move(st));
 	}
 }
 
@@ -4719,11 +4757,14 @@ static void ReadThreeDVehicleObjects()
 					ReadMotionSet(e, folder, package);
 					continue;
 				}
-				if (figure_kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
+				if ((figure_kind == "doplnek" || figure_kind.starts_with("zed_")) && e.contains("soubor") && e.at("soubor").is_string()) {
 					/* An add-on of the buildings a figure too, a thing as big as the building it stands by: one of a
 					 * building's event stands only on its days ("akce" "doplnky": the new stadium's grill and barrel by
 					 * the fire Tatra, the player 29. 10.: "Mat with the grill in the middle of the pitch by the Tatra",
-					 * "and the barrel of beer too"); one laid into the building ("doplnky") is always there. */
+					 * "and the barrel of beer too"); one laid into the building ("doplnky") is always there. A piece of
+					 * a retaining wall ("zed_lic", "zed_koruna", "zed_pilir", "zed_zabradli", the colleague's
+					 * objekty/vyplne) so too: its shape and texture laid along the walls of the foundations
+					 * (DrawEyeRetainingWalls() of viewport.cpp). */
 					ThreeDVehicleObject fig;
 					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
@@ -4736,6 +4777,24 @@ static void ReadThreeDVehicleObjects()
 					 * "stromy_mapy_dalsi", drawn on their tiles (DrawThemedTrees() of tree_cmd.cpp). */
 					if (e.contains("stromy_mapy")) ReadMapTrees(e.at("stromy_mapy"), fig.name);
 					ReadTreeFigurePaint(e, folder, fig);
+					ReadFigurePalette(e, folder, fig);
+					/* An ivy (the colleague's hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md): on the faces of the retaining walls
+					 * ("kde" "zed_lic") and on the walls of the houses ("zed_domu"), hanging from the wall's top edge
+					 * ("uchyceni" "visi_od_hrany") or anywhere on it ("kdekoli"). */
+					if (e.contains("popinavka") && e.at("popinavka").is_object()) {
+						const auto &p = e.at("popinavka");
+						ThreeDIvy ivy;
+						ivy.name = fig.name;
+						ivy.hangs = p.value("uchyceni", std::string()) == "visi_od_hrany";
+						if (p.contains("kde") && p.at("kde").is_array()) {
+							for (const auto &where : p.at("kde")) {
+								if (!where.is_string()) continue;
+								if (where.get<std::string>() == "zed_lic") ivy.on_retaining_walls = true;
+								if (where.get<std::string>() == "zed_domu") ivy.on_houses = true;
+							}
+						}
+						if (ivy.on_retaining_walls || ivy.on_houses) _three_d_ivies.push_back(std::move(ivy));
+					}
 					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
 						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
@@ -6030,6 +6089,7 @@ void ResetThreeDVehicleObjects()
 	_mushrooms.clear();
 	_thing_sounds.clear();
 	_thing_places.clear();
+	_three_d_ivies.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -6117,6 +6177,13 @@ std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_v
 	if (path.starts_with(IN_TAR)) return GetGameOwnSound(path.substr(IN_TAR.size()), Subdirectory::NewGrf);
 	if (path.starts_with(IN_BASESET_TAR)) return GetGameOwnSound(path.substr(IN_BASESET_TAR.size()), Subdirectory::Baseset);
 	return GetGameOwnSound(path, Subdirectory::None);
+}
+
+/** The ivies of the add-ons (ThreeDIvy), read with the figures. */
+std::span<const ThreeDIvy> GetThreeDIvies()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_ivies;
 }
 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
@@ -8235,6 +8302,17 @@ const ThreeDVehicleState *ThreeDVehicleObject::State(int step) const
 int ThreeDVehicleObject::TreeState(TreeUse use, uint32_t n) const
 {
 	const auto [first, count] = this->tree_states[to_underlying(use)];
+	return count == 0 ? 0 : first + static_cast<int>(n % count);
+}
+
+/**
+ * The state of an add-on painted a colour of its palette ("barvy", ReadFigurePalette()): palette[n % its length].
+ * @param n the number of its place (a hash of where it is)
+ * @return its step; 0 as its texture is (none painted so)
+ */
+int ThreeDVehicleObject::PaletteState(uint32_t n) const
+{
+	const auto [first, count] = this->palette_states;
 	return count == 0 ? 0 : first + static_cast<int>(n % count);
 }
 

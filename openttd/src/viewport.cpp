@@ -12431,6 +12431,438 @@ static void AddCabPlant(std::string_view name, float scale, float stretch, doubl
 	f.rise_y = rise_y;
 }
 
+/** A tile with a foundation in the view from the eyes (DrawEyeRetainingWalls()). */
+struct EyeFoundationTile {
+	TileIndex tile;
+	Slope top_slope; ///< the slope of its ground on top of the foundation
+	int top_z;       ///< and the height of that ground's lowest corner
+};
+
+/** The ground of the tiles in the view from the eyes by their place (x | y << 16): its slope and the height of its lowest corner, on a foundation its top's. */
+using EyeTileGrounds = std::unordered_map<uint32_t, std::pair<Slope, int>>;
+
+/** The corner of a tile at a point of its square, x and y 0 or TILE_SIZE from its north corner (the ground's corners, 4. of CollectEyeFrame()). */
+static Corner TileCornerAt(int cx, int cy)
+{
+	if (cx == 0) return cy == 0 ? CORNER_N : CORNER_E;
+	return cy == 0 ? CORNER_W : CORNER_S;
+}
+
+/** The height of a tile's ground at a corner, as the ground of the view from the eyes lies (its half-tile taken off). */
+static int TileGroundCornerZ(Slope slope, int z, Corner c)
+{
+	return z + GetSlopePixelZInCorner(RemoveHalftileSlope(slope), c);
+}
+
+/** A number of a place spread over all its bits (where the ivies grow, which and what green). */
+static uint32_t EyeWallHash(uint32_t a)
+{
+	a ^= a >> 16;
+	a *= 0x7FEB352Du;
+	a ^= a >> 15;
+	a *= 0x846CA68Bu;
+	a ^= a >> 16;
+	return a;
+}
+
+/**
+ * A piece of a retaining wall (the coping, the railing, a pier) by its triangles, each in its texture at a level of
+ * detail, lit by its face as the buildings are (ThreeDLightOfNormal()).
+ * @param place a corner of the piece, metres in its frame, to the world: x, y world units, z from the eyes
+ */
+template <typename Place>
+static void DrawEyeWallPiece(const CabCanvas &cv, const CabEye &eye, const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, Place &&place)
+{
+	const size_t corners = shape.pos.size() / 3;
+	if (shape.uv.size() != corners * 2) return;
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		const uint8_t k = t / 3 < shape.tri_tex.size() ? shape.tri_tex[t / 3] : 0;
+		const ThreeDObjectTexture *tex = obj.TryGetTexture(level, k);
+		if (tex == nullptr || tex->px.empty()) continue;
+		std::array<std::array<double, 3>, 3> w;
+		for (int c = 0; c < 3; c++) {
+			const uint32_t i = shape.tri[t + c];
+			if (i >= corners) return;
+			w[c] = place(shape.pos[i * 3], shape.pos[i * 3 + 1], shape.pos[i * 3 + 2]);
+		}
+		/* Its face's normal in the world (z from the eyes in world units). */
+		const double ax = w[1][0] - w[0][0], ay = w[1][1] - w[0][1], az = (w[1][2] - w[0][2]) * CAB_Z_SCALE;
+		const double bx = w[2][0] - w[0][0], by = w[2][1] - w[0][1], bz = (w[2][2] - w[0][2]) * CAB_Z_SCALE;
+		double nx = ay * bz - az * by, ny = az * bx - ax * bz, nz = ax * by - ay * bx;
+		const double nl = std::sqrt(nx * nx + ny * ny + nz * nz);
+		if (nl < 1e-12) continue;
+		nx /= nl;
+		ny /= nl;
+		nz /= nl;
+		std::vector<CabPoint> poly;
+		for (int c = 0; c < 3; c++) {
+			const uint32_t i = shape.tri[t + c];
+			poly.push_back(CabToEye(eye, w[c][0], w[c][1], w[c][2], shape.uv[i * 2] * tex->w, shape.uv[i * 2 + 1] * tex->h));
+		}
+		if (_eye_frame != nullptr) _eye_frame->kept[tex->px.data()] = tex->uid.value;
+		CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, std::move(poly), eye, CAB_REPEAT, ThreeDLightOfNormal(nx, ny, nz));
+	}
+}
+
+/** How high a level of the land is from the eyes, metres (5 m, EYE_LEVEL_STRETCH). */
+static constexpr double EYE_LEVEL_M = EYE_LEVEL_STRETCH * TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+/** How near a retaining wall has its coping, railing and ivies, world units: farther the face alone. */
+static constexpr double EYE_WALL_DETAIL_UNITS = 12.0 * TILE_SIZE;
+/** How many of the retaining walls have ivies on them, of a hundred. */
+static constexpr uint32_t EYE_WALL_IVY_PERCENT = 45;
+
+/**
+ * The retaining walls of the foundations in the view from the eyes (the player, 4. 11.: "the fills on the slopes under
+ * the tracks and under the houses", "a brick wall and a stone one ... a plain board and a nice texture of a wall on
+ * it"; our hra/3d/PROSBA-VYPLNE-ZDI.md, the colleague's objekty/vyplne): where a tile levelled on a slope stands above
+ * the land beside it, a wall straight down from its edge to that land -- or to the ground of the tile beside, raised
+ * by a foundation of its own. Its face is our board (objekty/nase, zdi_5m.py), of bricks under the houses and of stone
+ * else, its texture a level (5 m) high and three times along a tile's edge, so the bricks go on round the corners, cut
+ * by the land below to a triangle or a trapezium. Near, on its top the colleague's coping, over a road his railing,
+ * and on some walls the ivies, each its own green (ThreeDVehicleObject::PaletteState()).
+ * @param tiles the tiles with a foundation
+ * @param grounds the ground of the tiles collected (EyeTileGrounds); one not among them from the map
+ */
+static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::span<const EyeFoundationTile> tiles, const EyeTileGrounds &grounds)
+{
+	if (tiles.empty()) return;
+	/* The corners of a tile as the ground's (4. of CollectEyeFrame()), the edge e from corner e to corner e + 1, its normal out. */
+	static const Corner CORNERS[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
+	static const int CX[4] = {0, 0, TILE_SIZE, TILE_SIZE}, CY[4] = {0, TILE_SIZE, TILE_SIZE, 0};
+	static const int NX[4] = {-1, 0, 1, 0}, NY[4] = {0, 1, 0, -1};
+	/* The faces: of bricks [0], of stone [1]; without them in a colour of their own. */
+	const ThreeDVehicleObject *faces[2] = {GetThreeDFigure("zed_lic_cihly"), GetThreeDFigure("zed_lic_kamen")};
+	const ThreeDVehicleObject *coping = GetThreeDFigure("zed_koruna"), *railing = GetThreeDFigure("zed_zabradli");
+	const ThreeDVehicleShape *coping_shape = coping != nullptr ? coping->TryGetShape() : nullptr;
+	const ThreeDVehicleShape *railing_shape = railing != nullptr ? railing->TryGetShape() : nullptr;
+	static const Colour FACE_COLOUR[2] = {Colour(140, 88, 58), Colour(112, 112, 116)};
+	const double edge_m = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	const double coping_h = coping_shape != nullptr ? std::max(0.0f, coping_shape->z1) : 0.0;
+	std::vector<const ThreeDIvy *> ivies;
+	for (const ThreeDIvy &ivy : GetThreeDIvies()) {
+		if (ivy.on_retaining_walls) ivies.push_back(&ivy);
+	}
+	auto ground_of = [&grounds](int x, int y) -> std::pair<Slope, int> {
+		auto it = grounds.find(static_cast<uint32_t>(x) | static_cast<uint32_t>(y) << 16);
+		if (it != grounds.end()) return it->second;
+		auto [s, z] = GetFoundationPixelSlope(TileXY(x, y));
+		return {s, z};
+	};
+	for (const EyeFoundationTile &ft : tiles) {
+		const int tx = TileX(ft.tile), ty = TileY(ft.tile);
+		const auto [raw_slope, raw_z] = GetTilePixelSlope(ft.tile);
+		const int mat = IsTileType(ft.tile, TileType::House) ? 0 : 1;
+		const bool road = IsNormalRoadTile(ft.tile);
+		int top[4], raw[4];
+		for (int c = 0; c < 4; c++) {
+			top[c] = TileGroundCornerZ(ft.top_slope, ft.top_z, CORNERS[c]);
+			raw[c] = TileGroundCornerZ(raw_slope, raw_z, CORNERS[c]);
+		}
+		/* Each edge's wall: its foot at its two corners, on the land or on the ground of the tile beside, whichever is higher. */
+		struct Wall {
+			bool is = false;
+			int foot[2] = {}; ///< at the corners e and e + 1
+		};
+		Wall walls[4];
+		for (int e = 0; e < 4; e++) {
+			const int a = e, b = (e + 1) % 4;
+			int foot[2] = {raw[a], raw[b]};
+			const int nx = tx + NX[e], ny = ty + NY[e];
+			if (IsInsideBS(nx, 0, Map::SizeX()) && IsInsideBS(ny, 0, Map::SizeY())) {
+				const auto [ns, nz] = ground_of(nx, ny);
+				for (int k = 0; k < 2; k++) {
+					const int c = k == 0 ? a : b;
+					foot[k] = std::max(foot[k], TileGroundCornerZ(ns, nz, TileCornerAt(CX[c] - NX[e] * static_cast<int>(TILE_SIZE), CY[c] - NY[e] * static_cast<int>(TILE_SIZE))));
+				}
+			}
+			foot[0] = std::min(foot[0], top[a]);
+			foot[1] = std::min(foot[1], top[b]);
+			walls[e] = {top[a] > foot[0] || top[b] > foot[1], {foot[0], foot[1]}};
+		}
+		for (int e = 0; e < 4; e++) {
+			if (!walls[e].is) continue;
+			const int a = e, b = (e + 1) % 4;
+			/* Its ends left and right as one sees its face from outside (its texture's u from the left). */
+			const double rx = -NY[e], ry = NX[e];
+			const bool a_left = (CX[b] - CX[a]) * rx + (CY[b] - CY[a]) * ry > 0;
+			const int l = a_left ? a : b, r = a_left ? b : a;
+			const int foot_l = walls[e].foot[a_left ? 0 : 1], foot_r = walls[e].foot[a_left ? 1 : 0];
+			const double lx = tx * TILE_SIZE + CX[l], ly = ty * TILE_SIZE + CY[l];
+			const double rwx = tx * TILE_SIZE + CX[r], rwy = ty * TILE_SIZE + CY[r];
+			const CabPoint ends[4] = {CabToEye(eye, lx, ly, EyeLevelZ(foot_l), 0, 0), CabToEye(eye, rwx, rwy, EyeLevelZ(foot_r), 0, 0),
+					CabToEye(eye, rwx, rwy, EyeLevelZ(top[r]), 0, 0), CabToEye(eye, lx, ly, EyeLevelZ(top[l]), 0, 0)};
+			double fmin = ends[0].f, fmax = ends[0].f;
+			for (const CabPoint &p : ends) {
+				fmin = std::min(fmin, p.f);
+				fmax = std::max(fmax, p.f);
+			}
+			if (fmax < CAB_NEAR) continue;
+			/* The face: one of its texture's repeats the colleague's board (its shape, metres; the player, 4. 11.: "one row of
+			 * the texture one level of the game's height"), repeated along the wall by the world's place, so the walls
+			 * of the tiles beside go on, and up by the levels of the land. Its texture at the level of detail of its
+			 * nearest end, about a texel to a pixel. */
+			const ThreeDVehicleShape *board = faces[mat] != nullptr ? faces[mat]->TryGetShape() : nullptr;
+			/* A whole number of repeats along a tile's edge: the texture begins and ends at every corner of the tiles, so the
+			 * bricks go on round the corners where two walls meet (the player, 4. 11.: "the bricks to go on at the corner"). */
+			const double board_w_m = board != nullptr && board->x1 - board->x0 > 0.5f ? board->x1 - board->x0 : edge_m;
+			const double repeat_w_m = edge_m / std::max(1L, std::lround(edge_m / board_w_m));
+			const double repeat_h_m = board != nullptr && board->z1 - board->z0 > 0.5f ? board->z1 - board->z0 : EYE_LEVEL_M;
+			int tw0 = 1, th0 = 1;
+			if (faces[mat] != nullptr) faces[mat]->TextureSize(0, tw0, th0);
+			const double texels_per_unit = tw0 / (repeat_w_m * OBJECT_UNITS_PER_METRE);
+			const double pixels_per_unit = eye.focal / std::max(fmin, CAB_NEAR * 4);
+			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
+			const ThreeDObjectTexture *tex = faces[mat] != nullptr ? faces[mat]->TryGetTexture(level) : nullptr;
+			const uint light = ThreeDLightOfNormal(NX[e], NY[e], 0);
+			{
+				/* Its texture not made yet (in the background): in its colour meanwhile. */
+				const bool textured = tex != nullptr && !tex->px.empty();
+				uint32_t flat = FACE_COLOUR[mat].data;
+				const uint32_t *px = textured ? tex->px.data() : EyeColour(flat);
+				const int tw = textured ? tex->w : 1, th = textured ? tex->h : 1;
+				if (textured && _eye_frame != nullptr) _eye_frame->kept[px] = tex->uid.value;
+				/* Up: a level of the land EYE_LEVEL_M high, its rows from the top of each repeat down. Along: from the
+				 * world's place on the wall's line, its whole repeats taken off (the numbers small for the card). */
+				const double per_level = EYE_LEVEL_M / repeat_h_m;
+				auto v_of = [th, per_level](int z) { return (64.0 * TILE_HEIGHT - z) / TILE_HEIGHT * per_level * th; };
+				const double u_l_m = (lx * rx + ly * ry) / OBJECT_UNITS_PER_METRE;
+				const double u_l = (u_l_m / repeat_w_m - std::floor(u_l_m / repeat_w_m)) * tw;
+				const double u_r = u_l + edge_m / repeat_w_m * tw;
+				std::vector<CabPoint> poly;
+				poly.push_back(CabToEye(eye, lx, ly, EyeLevelZ(foot_l), u_l, v_of(foot_l)));
+				poly.push_back(CabToEye(eye, rwx, rwy, EyeLevelZ(foot_r), u_r, v_of(foot_r)));
+				if (top[r] > foot_r) poly.push_back(CabToEye(eye, rwx, rwy, EyeLevelZ(top[r]), u_r, v_of(top[r])));
+				if (top[l] > foot_l) poly.push_back(CabToEye(eye, lx, ly, EyeLevelZ(top[l]), u_l, v_of(top[l])));
+				CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, std::move(poly), eye, CAB_REPEAT, light);
+			}
+			if (fmin > EYE_WALL_DETAIL_UNITS) continue;
+			/* Along it from the left: a fraction of its length to the world, and its top and its foot there (the game's z). */
+			auto along_x = [&](double f) { return lx + (rwx - lx) * f; };
+			auto along_y = [&](double f) { return ly + (rwy - ly) * f; };
+			auto top_at = [&](double f) { return top[l] + (top[r] - top[l]) * f; };
+			auto foot_at = [&](double f) { return foot_l + (foot_r - foot_l) * f; };
+			/* The coping on its top, pieces of it the edge's length. */
+			if (coping_shape != nullptr && coping_shape->x1 > 0.1f) {
+				const double piece_m = coping_shape->x1;
+				const int n = std::max(1, static_cast<int>(std::lround(edge_m / piece_m)));
+				const double s = edge_m / (n * piece_m);
+				for (int i = 0; i < n; i++) {
+					DrawEyeWallPiece(cv, eye, *coping, *coping_shape, level, [&](float px, float py, float pz) {
+						const double f = (i * piece_m + px) * s / edge_m;
+						return std::array<double, 3>{along_x(f) - NX[e] * py * OBJECT_UNITS_PER_METRE, along_y(f) - NY[e] * py * OBJECT_UNITS_PER_METRE, EyeLevelZ(top_at(f)) + pz * OBJECT_HEIGHT_PER_METRE};
+					});
+				}
+			}
+			/* The railing over a road, on the coping where the wall is high enough to fall from. */
+			if (road && railing_shape != nullptr && railing_shape->x1 > 0.1f) {
+				static constexpr double RAILING_FROM_M = 1.5;
+				static constexpr double RAILING_IN_M = 0.15;
+				const double piece_m = railing_shape->x1;
+				const int n = std::max(1, static_cast<int>(std::lround(edge_m / piece_m)));
+				const double s = edge_m / (n * piece_m);
+				for (int i = 0; i < n; i++) {
+					const double mid = (i + 0.5) / n;
+					if ((EyeLevelZ(top_at(mid)) - EyeLevelZ(foot_at(mid))) / OBJECT_HEIGHT_PER_METRE < RAILING_FROM_M) continue;
+					DrawEyeWallPiece(cv, eye, *railing, *railing_shape, level, [&](float px, float py, float pz) {
+						const double f = (i * piece_m + px) * s / edge_m;
+						const double in = (RAILING_IN_M + py) * OBJECT_UNITS_PER_METRE;
+						return std::array<double, 3>{along_x(f) - NX[e] * in, along_y(f) - NY[e] * in, EyeLevelZ(top_at(f)) + (coping_h + pz) * OBJECT_HEIGHT_PER_METRE};
+					});
+				}
+			}
+			/* The ivies: on some walls one to three, each where the wall is high enough for it. */
+			const uint32_t h = EyeWallHash(static_cast<uint32_t>(tx) * 4 + static_cast<uint32_t>(ty) * 0x10000u * 4 + e);
+			if (ivies.empty() || h % 100 >= EYE_WALL_IVY_PERCENT) continue;
+			const int count = 1 + static_cast<int>((h >> 8) % 3);
+			for (int k = 0; k < count; k++) {
+				const uint32_t hk = EyeWallHash(h + static_cast<uint32_t>(k) * 0x9E3779B9u);
+				const ThreeDIvy &ivy = *ivies[hk % ivies.size()];
+				const ThreeDVehicleObject *fig = GetThreeDFigure(ivy.name);
+				const ThreeDVehicleShape *shape = fig != nullptr ? fig->TryGetShape() : nullptr;
+				if (shape == nullptr) continue;
+				const double width_m = shape->y1 - shape->y0, height_m = shape->z1;
+				const double lo = width_m / 2 + 0.3, hi = edge_m - width_m / 2 - 0.3;
+				if (hi < lo) continue;
+				const double f = (lo + (hi - lo) * ((hk >> 8) % 1000) / 999.0) / edge_m;
+				const double top_eye = EyeLevelZ(top_at(f)), foot_eye = EyeLevelZ(foot_at(f));
+				const double room_m = (top_eye - foot_eye) / OBJECT_HEIGHT_PER_METRE - height_m;
+				if (room_m < 0.2) continue;
+				/* Hanging from under the coping; else anywhere on it, mostly low (the heaps to the wall's foot). */
+				const double r = ((hk >> 18) % 1000) / 999.0;
+				const double z_eye = ivy.hangs ? top_eye - height_m * OBJECT_HEIGHT_PER_METRE : foot_eye + r * r * room_m * OBJECT_HEIGHT_PER_METRE;
+				static constexpr double IVY_OFF_M = 0.02; // off the face, not in it
+				const double wx = along_x(f) + NX[e] * IVY_OFF_M * OBJECT_UNITS_PER_METRE, wy = along_y(f) + NY[e] * IVY_OFF_M * OBJECT_UNITS_PER_METRE;
+				const float facing = static_cast<float>(std::atan2(NY[e], NX[e]) * 180.0 / M_PI);
+				/* Its height from the eyes as it is: a base of the land that gives it (EyeStandZ()). */
+				const double base = z_eye / EYE_LEVEL_STRETCH;
+				AddCabFigure(ivy.name, 1.0f, wx, wy, base, facing, 0, fig->PaletteState(hk >> 22));
+				_cab_figures.back().base = base;
+			}
+		}
+	}
+}
+
+/** A wall of a house an ivy may grow up from its foot (EyeHouseIvyWalls()): its plane and where it stands on the ground. */
+struct EyeHouseWall {
+	float nx, ny; ///< its normal out of the house, level
+	float d;      ///< its plane: nx * x + ny * y = d, metres in the house's frame (from its north corner)
+	float top;    ///< its highest point, metres over the house's ground
+	std::vector<std::pair<float, float>> feet; ///< the stretches along it (along (-ny, nx), metres) where it stands on the ground, its doors left out
+};
+
+/** How many of the houses have ivies on their walls, of a hundred. */
+static constexpr uint32_t EYE_HOUSE_IVY_PERCENT = 35;
+
+/**
+ * The walls of a house's shape an ivy may grow on (the colleague's ivies, "kde" "zed_domu"): its upright faces, joined
+ * by their plane, at least 2 m high, the stretches of them that stand on the ground, without its doors -- once for each
+ * shape.
+ */
+static const std::vector<EyeHouseWall> &EyeHouseIvyWalls(const ThreeDObject &o, const ThreeDObjectShapeView &shape)
+{
+	static std::unordered_map<uint64_t, std::vector<EyeHouseWall>> kept;
+	if (kept.size() > 4096) kept.clear();
+	auto [it, made] = kept.try_emplace(shape.uid);
+	std::vector<EyeHouseWall> &walls = it->second;
+	if (!made) return walls;
+	const size_t corners = shape.pos.size() / 3;
+	if (corners == 0) return walls;
+	auto at = [&shape](uint32_t i) {
+		return std::array<double, 3>{shape.pos[i * 3] / OBJECT_UNITS_PER_METRE, shape.pos[i * 3 + 1] / OBJECT_UNITS_PER_METRE, shape.pos[i * 3 + 2] / OBJECT_HEIGHT_PER_METRE};
+	};
+	double x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+	for (uint32_t i = 0; i < corners; i++) {
+		const auto p = at(i);
+		x0 = std::min(x0, p[0]);
+		x1 = std::max(x1, p[0]);
+		y0 = std::min(y0, p[1]);
+		y1 = std::max(y1, p[1]);
+	}
+	const double mid_x = (x0 + x1) / 2, mid_y = (y0 + y1) / 2;
+	/* The upright faces by their plane: its direction by 5 degrees, its distance by 30 cm. */
+	struct Plane {
+		double nx = 0, ny = 0, d = 0, weight = 0, top = 0;
+		std::vector<std::pair<float, float>> feet;
+	};
+	std::map<std::pair<int, int>, Plane> planes;
+	static constexpr double GROUND_M = 0.3;
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		if (shape.tri[t] >= corners || shape.tri[t + 1] >= corners || shape.tri[t + 2] >= corners) continue;
+		const auto a = at(shape.tri[t]), b = at(shape.tri[t + 1]), c = at(shape.tri[t + 2]);
+		const double ex = b[0] - a[0], ey = b[1] - a[1], ez = b[2] - a[2], fx = c[0] - a[0], fy = c[1] - a[1], fz = c[2] - a[2];
+		double nx = ey * fz - ez * fy, ny = ez * fx - ex * fz;
+		const double nz = ex * fy - ey * fx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		if (len < 0.04 || std::abs(nz) > 0.15 * len) continue; // too small, or not upright
+		const double hl = std::hypot(nx, ny);
+		nx /= hl;
+		ny /= hl;
+		const double gx = (a[0] + b[0] + c[0]) / 3, gy = (a[1] + b[1] + c[1]) / 3;
+		/* Its normal out of the house: away from its middle. */
+		if ((gx - mid_x) * nx + (gy - mid_y) * ny < 0) {
+			nx = -nx;
+			ny = -ny;
+		}
+		const double d = gx * nx + gy * ny;
+		const auto key = std::pair{static_cast<int>(std::lround(std::atan2(ny, nx) * 180.0 / M_PI / 5.0)), static_cast<int>(std::lround(d / 0.3))};
+		Plane &p = planes[key];
+		const double w = len / 2;
+		p.nx += nx * w;
+		p.ny += ny * w;
+		p.d += d * w;
+		p.weight += w;
+		p.top = std::max({p.top, a[2], b[2], c[2]});
+		if (std::min({a[2], b[2], c[2]}) < GROUND_M) {
+			auto along = [nx, ny](const std::array<double, 3> &q) { return -ny * q[0] + nx * q[1]; };
+			const double t0 = std::min({along(a), along(b), along(c)}), t1 = std::max({along(a), along(b), along(c)});
+			if (t1 - t0 > 0.05) p.feet.emplace_back(static_cast<float>(t0), static_cast<float>(t1));
+		}
+	}
+	static constexpr double MIN_TOP_M = 2.0, MIN_STRETCH_M = 1.0, DOOR_ROOM_M = 0.5;
+	for (auto &[key, p] : planes) {
+		if (p.weight <= 0 || p.top < MIN_TOP_M || p.feet.empty()) continue;
+		const double hl = std::hypot(p.nx, p.ny);
+		if (hl < 1e-9) continue;
+		EyeHouseWall wall{static_cast<float>(p.nx / hl), static_cast<float>(p.ny / hl), static_cast<float>(p.d / p.weight), static_cast<float>(p.top), {}};
+		/* Its stretches on the ground joined, its doors cut out of them. */
+		std::sort(p.feet.begin(), p.feet.end());
+		std::vector<std::pair<float, float>> joined;
+		for (const auto &s : p.feet) {
+			if (!joined.empty() && s.first <= joined.back().second + 0.1f) {
+				joined.back().second = std::max(joined.back().second, s.second);
+			} else {
+				joined.push_back(s);
+			}
+		}
+		for (const ThreeDObjectDoor &door : o.doors) {
+			if (std::abs(door.at[0] * wall.nx + door.at[1] * wall.ny - wall.d) > 0.8f) continue;
+			const float dt = -wall.ny * door.at[0] + wall.nx * door.at[1];
+			const float lo = dt - door.width / 2 - static_cast<float>(DOOR_ROOM_M), hi = dt + door.width / 2 + static_cast<float>(DOOR_ROOM_M);
+			std::vector<std::pair<float, float>> cut;
+			for (const auto &s : joined) {
+				if (s.second <= lo || s.first >= hi) {
+					cut.push_back(s);
+					continue;
+				}
+				if (s.first < lo) cut.emplace_back(s.first, lo);
+				if (s.second > hi) cut.emplace_back(hi, s.second);
+			}
+			joined = std::move(cut);
+		}
+		for (const auto &s : joined) {
+			if (s.second - s.first >= MIN_STRETCH_M) wall.feet.push_back(s);
+		}
+		if (!wall.feet.empty()) walls.push_back(std::move(wall));
+	}
+	Debug(misc, 4, "3D house {}: {} planes upright, {} walls for ivies", o.name, planes.size(), walls.size());
+	return walls;
+}
+
+/**
+ * The ivies on the walls of a house in the view from the eyes (the player, 4. 11.: "the ivies on the walls of the fills
+ * and on the walls of the houses ... one model, many greens"): on some houses one or two, from the foot of a wall that
+ * stands on the ground (EyeHouseIvyWalls()), each its own green (ThreeDVehicleObject::PaletteState()).
+ * @param ox,oy,oz the house's north corner, world units, z from the eyes
+ */
+static void AddEyeHouseIvies(const ThreeDObject &o, TileIndex origin, double ox, double oy, double oz)
+{
+	const uint32_t h = EyeWallHash(TileX(origin) * 7919u + TileY(origin) * 104729u);
+	if (h % 100 >= EYE_HOUSE_IVY_PERCENT) return;
+	const ThreeDObjectShapeView shape = o.TryGetShape(0);
+	if (shape.tri.empty() || shape.uid == 0) return;
+	const std::vector<EyeHouseWall> &walls = EyeHouseIvyWalls(o, shape);
+	if (walls.empty()) return;
+	/* From the foot of the wall: the ivies that grow anywhere on it, not those hanging from its top edge. */
+	std::vector<const ThreeDIvy *> ivies;
+	for (const ThreeDIvy &ivy : GetThreeDIvies()) {
+		if (ivy.on_houses && !ivy.hangs) ivies.push_back(&ivy);
+	}
+	if (ivies.empty()) return;
+	const int count = 1 + static_cast<int>((h >> 8) % 2);
+	for (int k = 0; k < count; k++) {
+		const uint32_t hk = EyeWallHash(h + static_cast<uint32_t>(k) * 0x9E3779B9u);
+		const EyeHouseWall &wall = walls[hk % walls.size()];
+		const auto &stretch = wall.feet[(hk >> 4) % wall.feet.size()];
+		const ThreeDIvy &ivy = *ivies[(hk >> 8) % ivies.size()];
+		const ThreeDVehicleObject *fig = GetThreeDFigure(ivy.name);
+		const ThreeDVehicleShape *fs = fig != nullptr ? fig->TryGetShape() : nullptr;
+		if (fs == nullptr) continue;
+		const double width_m = fs->y1 - fs->y0, height_m = fs->z1;
+		if (height_m > wall.top - 0.2) continue;
+		const double lo = stretch.first + width_m / 2 + 0.2, hi = stretch.second - width_m / 2 - 0.2;
+		if (hi < lo) continue;
+		const double t = lo + (hi - lo) * ((hk >> 12) % 1000) / 999.0;
+		static constexpr double IVY_OFF_M = 0.02; // off the wall, not in it
+		const double px = -wall.ny * t + wall.nx * (wall.d + IVY_OFF_M), py = wall.nx * t + wall.ny * (wall.d + IVY_OFF_M);
+		const float facing = static_cast<float>(std::atan2(wall.ny, wall.nx) * 180.0 / M_PI);
+		/* At the house's ground from the eyes as it is: a base of the land that gives it (EyeStandZ()). */
+		const double base = oz / EYE_LEVEL_STRETCH;
+		AddCabFigure(ivy.name, 1.0f, ox + px * OBJECT_UNITS_PER_METRE, oy + py * OBJECT_UNITS_PER_METRE, base, facing, 0, fig->PaletteState(hk >> 20));
+		_cab_figures.back().base = base;
+		Debug(misc, 5, "3D house {} at {}x{}: ivy {} at {:.1f}, {:.1f} m", o.name, TileX(origin), TileY(origin), ivy.name, px, py);
+	}
+}
+
 /** What a figure drawn by its triangles needs, resolved while collecting (CabFigureReady(), the Try... getters): drawn as a job of the frame (CabDrawFigureModel()). */
 struct CabFigureModel {
 	const ThreeDVehicleObject *fig = nullptr;
@@ -15086,24 +15518,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* 4b. Bridges and tunnels as things of their own: decks, ramps and pillars from the bridges' sprites; portals of
 	 * stones, and the tube of the tunnel the eye is in. */
 	const CabCanvas cv{dst, zb, width, height};
-	/* The sides of foundations: walls round the box of the foundation's sprite, dressed in it where it shows them
-	 * (the two it never shows mirrored), open where the sprite has nothing -- where the slope stands higher. */
-	for (size_t i = 0; i < _vd.parent_sprites_to_draw.size(); i++) {
-		if (!is_foundation[i]) continue;
-		const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
-		CabPoint c = CabToEye(eye, (ps.xmin + ps.xmax + 1) * 0.5, (ps.ymin + ps.ymax + 1) * 0.5, EyeLevelZ(ps.zmin), 0, 0);
-		if (c.f < -static_cast<double>(TILE_SIZE)) continue;
-		static CabTexture found_scratch;
-		CabTexture &found = EyeScratchTexture(found_scratch);
-		CabCompositeTexture(found, {&ps});
-		const double x0 = ps.xmin, x1 = ps.xmax + 1, y0 = ps.ymin, y1 = ps.ymax + 1, z0 = ps.zmin, z1 = ps.zmax + 1;
-		/* Of the land: its heights from the eyes as the land's (EyeLevelZ()), dressed in the sprite where the game draws it. */
-		auto same = [&](double x, double y, double z) { return std::array<double, 6>{x, y, EyeLevelZ(z), x, y, z}; };
-		auto at = [&](double x, double y, double z, double tx, double ty, double tz) { return std::array<double, 6>{x, y, EyeLevelZ(z), tx, ty, tz}; };
-		CabDrawDressed(cv, eye, found, {same(x1, y0, z0), same(x1, y1, z0), same(x1, y1, z1), same(x1, y0, z1)}, false);
-		CabDrawDressed(cv, eye, found, {same(x0, y1, z0), same(x1, y1, z0), same(x1, y1, z1), same(x0, y1, z1)}, false);
-		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x1, y0, z0), at(x0, y1, z0, x1, y1, z0), at(x0, y1, z1, x1, y1, z1), at(x0, y0, z1, x1, y0, z1)}, false);
-		CabDrawDressed(cv, eye, found, {at(x0, y0, z0, x0, y1, z0), at(x1, y0, z0, x1, y1, z0), at(x1, y0, z1, x1, y1, z1), at(x0, y0, z1, x0, y1, z1)}, false);
+	/* The sides of the foundations: retaining walls of bricks and of stone (DrawEyeRetainingWalls()). */
+	{
+		std::vector<EyeFoundationTile> founded;
+		EyeTileGrounds grounds;
+		grounds.reserve(tiles.size());
+		for (const CabTile &t : tiles) {
+			grounds.emplace(static_cast<uint32_t>(t.x) | static_cast<uint32_t>(t.y) << 16, std::pair{t.slope, t.z});
+			if (t.foundation) founded.push_back({TileXY(t.x, t.y), t.slope, t.z});
+		}
+		DrawEyeRetainingWalls(cv, eye, founded, grounds);
 	}
 	/* The houses that are real 3D objects: their triangles with their texture, at the level of detail of their
 	 * distance -- about a texture pixel to a pixel of the picture. Their textures stay: on every core. */
@@ -15126,6 +15550,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double ox = TileX(co.origin) * TILE_SIZE, oy = TileY(co.origin) * TILE_SIZE, oz = co.ez;
 		CabPoint c = CabToEye(eye, ox + o.tiles_x * TILE_SIZE / 2.0, oy + o.tiles_y * TILE_SIZE / 2.0, oz, 0, 0);
 		if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y)) continue;
+		/* Near, the ivies on its walls: a house's own, not its interior's nor its doors'. */
+		if (c.f < EYE_WALL_DETAIL_UNITS && IsTileType(co.origin, TileType::House) && !o.is_interior && o.door_node.empty()) AddEyeHouseIvies(o, co.origin, ox, oy, oz);
 		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
 		const ThreeDObjectTexture *full = o.TryGetTexture(0);
 		if (full == nullptr) continue;

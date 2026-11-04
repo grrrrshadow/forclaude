@@ -123,6 +123,7 @@ using ThreeDTextureBytes = std::shared_ptr<const std::vector<uint8_t>>;
  */
 using ThreeDTextureLevels = std::shared_ptr<const std::vector<ThreeDObjectTexture>>;
 ThreeDTextureBytes InternThreeDTextureBytes(std::span<const uint8_t> bytes);
+uint16_t ThreeDLightOfNormal(double nx, double ny, double nz);
 
 /**
  * What a tree is painted for (the colleague's hra/3d/STROMY-BARVY-POUZITI-PRO-HRU.md; the player, 2. 11.: "one tree, one
@@ -779,6 +780,8 @@ struct ThreeDVehicleObject {
 	ThreeDVehiclePaint second_paint; ///< a tree's second part painted by its use (its snow over the crown): its mask and "zacatek", the colour its state's (second_colour)
 	/** A tree's states by its use (TreeUse): the step of the first and how many, one for each colour of its palettes there (TreeState()). */
 	std::array<std::pair<uint16_t, uint16_t>, TREE_USES> tree_states{};
+	/** An add-on's states for the colours of its palette ("barvy" of its record, an ivy's leaves): the step of the first and how many (PaletteState()). */
+	std::pair<uint16_t, uint16_t> palette_states{};
 	ThreeDVehicleRust rust;         ///< "rez"
 	ThreeDVehicleSize size;         ///< "velikost"
 	std::vector<ThreeDVehicleState> states; ///< "stavy": what the sets its GRF picks mean; none, the object as it is
@@ -883,6 +886,7 @@ struct ThreeDVehicleObject {
 	static constexpr int BODY_GAIT_FRAMES = 64;    ///< the frames of a gait at most (a pose's "snimku")
 	const ThreeDVehicleState *State(int step) const;
 	int TreeState(TreeUse use, uint32_t n) const;
+	int PaletteState(uint32_t n) const;
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
@@ -938,6 +942,19 @@ const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece = 
 std::vector<struct VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine);
 const ThreeDVehicleObject *ThreeDVehicleObjectOf(const Vehicle *v, int *piece = nullptr);
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package = {});
+
+/**
+ * An ivy among the add-ons of the buildings (the colleague's hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md, "popinavka" of its
+ * record): a figure painted a colour of its palette (ThreeDVehicleObject::PaletteState()), its foot in the plane of
+ * the wall, its leaves towards +x, along the wall y.
+ */
+struct ThreeDIvy {
+	std::string name;               ///< the figure (GetThreeDFigure())
+	bool hangs = false;             ///< its top at the wall's top edge ("visi_od_hrany"); else anywhere on it, its foot down ("kdekoli")
+	bool on_retaining_walls = false; ///< on the faces of the retaining walls ("zed_lic")
+	bool on_houses = false;         ///< on the walls of the houses ("zed_domu")
+};
+std::span<const ThreeDIvy> GetThreeDIvies();
 
 /**
  * A piece of the shared loads (the colleague's objekty/naklady, hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md): a pallet of

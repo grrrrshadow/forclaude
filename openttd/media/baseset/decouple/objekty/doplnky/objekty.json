@@ -6280,5 +6280,285 @@
   "autor": "Cacti, evolveduk (Sketchfab, licence Free Standard, https://sketchfab.com/3d-models/cacti-e4b031f9ad75497986a28d59ced81f2c); převod domy/kaktusy.py",
   "licence": "Sketchfab Free Standard (https://sketchfab.com/licenses): smí se použít a upravit jako součást hry, samostatně se model nešíří; změny: kaktus zvlášť z balíčku, zjednodušený, textury 512 px, průhlednost MASK, bez normálových map",
   "poznamka": "kulatý kaktus, 0,5 m; kaktus (hráč 1. 11.: „vem ten kvetoucí kaktus bíle, žluto oranžově a kulatej“): počátek pod patou, metry; textura s průhledností (alphaMode MASK), barvu dává textura, ne paleta; za kaktus subtropické mapy (0x1B) se tři střídají"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_previs",
+  "soubor": "popinavka_previs.glb",
+  "nazev": {
+   "cs": "popínavka (převis)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_previs_maska_listi.png",
+    "zacatek": 98,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.35
+   ],
+   "y": [
+    -1.26,
+    1.26
+   ],
+   "z": [
+    0.0,
+    1.65
+   ]
+  },
+  "trojuhelniku": 209,
+  "atlas_px": [
+   522,
+   293
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "visi_od_hrany",
+   "popis": "široký převis břečťanu přes horní hranu zdi: nahoře hustý, prameny visí dolů"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_kupa",
+  "soubor": "popinavka_kupa.glb",
+  "nazev": {
+   "cs": "popínavka (kupa)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_kupa_maska_listi.png",
+    "zacatek": 163,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.35
+   ],
+   "y": [
+    -1.21,
+    1.21
+   ],
+   "z": [
+    0.0,
+    1.19
+   ]
+  },
+  "trojuhelniku": 292,
+  "atlas_px": [
+   307,
+   492
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "hustá kupa břečťanu, spodní listy převislé; na zeď, na římsu nebo k patě zdi"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_0",
+  "soubor": "popinavka_pramen_0.glb",
+  "nazev": {
+   "cs": "popínavka (pramen)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_0_maska_listi.png",
+    "zacatek": 90,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.19
+   ],
+   "y": [
+    -0.35,
+    0.35
+   ],
+   "z": [
+    0.0,
+    1.79
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   307,
+   132
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "visi_od_hrany",
+   "popis": "pramen břečťanu visící dolů, nahoře hustší"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_1",
+  "soubor": "popinavka_pramen_1.glb",
+  "nazev": {
+   "cs": "popínavka (pramen podél)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_1_maska_listi.png",
+    "zacatek": 136,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.22
+   ],
+   "y": [
+    -0.88,
+    0.88
+   ],
+   "z": [
+    0.0,
+    0.9
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   201,
+   83
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "pramen břečťanu podél zdi"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "popinavka_pramen_2",
+  "soubor": "popinavka_pramen_2.glb",
+  "nazev": {
+   "cs": "popínavka (sloupek)"
+  },
+  "barvy": [
+   {
+    "cast": "listi",
+    "maska": "popinavka_pramen_2_maska_listi.png",
+    "zacatek": 119,
+    "paleta": [
+     "A6D86E",
+     "B4DE7C",
+     "98CF66",
+     "C2E58C",
+     "8CC860",
+     "B0DA92",
+     "CCE79A",
+     "9ED27E"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    0.0,
+    0.22
+   ],
+   "y": [
+    -0.45,
+    0.45
+   ],
+   "z": [
+    0.0,
+    2.07
+   ]
+  },
+  "trojuhelniku": 12,
+  "atlas_px": [
+   378,
+   132
+  ],
+  "pouziti": 0,
+  "popinavka": {
+   "kde": [
+    "zed_domu",
+    "zed_lic"
+   ],
+   "uchyceni": "kdekoli",
+   "popis": "vysoký hustý sloupek břečťanu"
+  },
+  "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
+  "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
+  "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
  }
 ]
