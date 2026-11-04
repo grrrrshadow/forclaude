@@ -244,17 +244,18 @@
     "maska": "lampy_mesto_maska_sokl.png",
     "zacatek": 204,
     "paleta": [
-     "D9C47E",
-     "E0CE92",
-     "CDB979",
-     "D97C76",
-     "E3938C",
-     "CC6E6A",
-     "C8CCCA",
-     "B9B8B0",
-     "A9C3D6",
-     "B9D0E0",
-     "98B4CA"
+     "B9584F",
+     "C2645A",
+     "AD5049",
+     "C96F63",
+     "CDB46C",
+     "C2A85E",
+     "D4BE7E",
+     "B4B3AB",
+     "A5A49C",
+     "C2C3BE",
+     "8FA9BC",
+     "9DB4C4"
     ],
     "nahoda": "mesto"
    },
@@ -263,10 +264,10 @@
     "maska": "lampy_mesto_maska_trubka.png",
     "zacatek": 204,
     "paleta": [
-     "E2C65C",
-     "D6B54A",
-     "EFEFEA",
-     "DEDED8",
+     "CBB262",
+     "BFA55A",
+     "E4E2DA",
+     "D8D6CC",
      "A4A8AC",
      "8B8F94",
      "70747A"
@@ -310,7 +311,7 @@
   },
   "autor": "Ondřej H. (Lampa_sadovka, SketchUp 19, ondrej_h_lampa_socik.zip od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
   "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
-  "poznamka": "parková lampa socík 5,35 m: tenký ocelový sloup, nahoře plochý kulatý talíř 0,72 m (béžový difuzor, který v noci svítí, bílá stříška a šedé víko), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře); tvary změřené ze souboru Ondřeje H. a znovu vysoustružené s méně trojúhelníky (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá žlutá, bledá červená, šedá starých nenatřených krytů, bledě modrá; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
+  "poznamka": "parková lampa socík 5,35 m: tenký ocelový sloup, nahoře plochý kulatý talíř 0,72 m (béžový difuzor, který v noci svítí, bílá stříška a šedé víko), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře); tvary změřené ze souboru Ondřeje H. a znovu vysoustružené s méně trojúhelníky (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá červená jako červená 1203, ne růžová, vybledlá žlutá, šedá starých nenatřených krytů, bledě modrá; hráč 4. 11.: „dej těm lampam vybledlý ne vyblitý barvy … v pozadí je 1203 a tam se mi podobná barva líbí. barva na spodku lampy má málo červené“; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; vybledlá žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
  },
  {
   "druh": "doplnek",
@@ -325,17 +326,18 @@
     "maska": "lampy_mesto_maska_sokl.png",
     "zacatek": 204,
     "paleta": [
-     "D9C47E",
-     "E0CE92",
-     "CDB979",
-     "D97C76",
-     "E3938C",
-     "CC6E6A",
-     "C8CCCA",
-     "B9B8B0",
-     "A9C3D6",
-     "B9D0E0",
-     "98B4CA"
+     "B9584F",
+     "C2645A",
+     "AD5049",
+     "C96F63",
+     "CDB46C",
+     "C2A85E",
+     "D4BE7E",
+     "B4B3AB",
+     "A5A49C",
+     "C2C3BE",
+     "8FA9BC",
+     "9DB4C4"
     ],
     "nahoda": "mesto"
    },
@@ -344,10 +346,10 @@
     "maska": "lampy_mesto_maska_trubka.png",
     "zacatek": 204,
     "paleta": [
-     "E2C65C",
-     "D6B54A",
-     "EFEFEA",
-     "DEDED8",
+     "CBB262",
+     "BFA55A",
+     "E4E2DA",
+     "D8D6CC",
      "A4A8AC",
      "8B8F94",
      "70747A"
@@ -387,6 +389,6 @@
   },
   "autor": "David H. (david_h_lampa.skp, SketchUp od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
   "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
-  "poznamka": "pouliční lampa 5,5 m s obloukovým ramenem (rameno k +x, světlo na jeho konci 2,8 m od sloupu), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře), u sloupu 8 cm každý bod o 2 cm dál od osy; tam, kam nejde socík: do center měst a k dálnicím (klima hráč neřekl, tedy všude) (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá žlutá, bledá červená, šedá starých nenatřených krytů, bledě modrá; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
+  "poznamka": "pouliční lampa 5,5 m s obloukovým ramenem (rameno k +x, světlo na jeho konci 2,8 m od sloupu), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře), u sloupu 8 cm každý bod o 2 cm dál od osy; tam, kam nejde socík: do center měst a k dálnicím (klima hráč neřekl, tedy všude) (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“, hře „lampy budou mít v každým městě svoji barvu spodku, některý město bledě červený spodky lamp, jiný město šedý, jiný bledě modrý, třeba, a zbytek horní trubka lampy taky můžou být žluté bílé šedé.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá červená jako červená 1203, ne růžová, vybledlá žlutá, šedá starých nenatřených krytů, bledě modrá; hráč 4. 11.: „dej těm lampam vybledlý ne vyblitý barvy … v pozadí je 1203 a tam se mi podobná barva líbí. barva na spodku lampy má málo červené“; nahoda mesto: v každém městě jiná barva krytu); horní trubka barvou číslem (část trubka: sloup nad krytem, u lampy Davida H. i rameno až po hlavu; vybledlá žlutá, bílá, šedá; nahoda mesto); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
  }
 ]
