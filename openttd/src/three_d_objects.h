@@ -34,6 +34,7 @@
 #include "vehicle_type.h"
 #include "zoom_type.h"
 #include "sound_type.h"
+#include "gfx_type.h"
 
 #include <algorithm>
 #include <array>
@@ -1147,6 +1148,7 @@ const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles);
 const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy);
 const ThreeDObject *GetThreeDEdgeLamp(TileIndex tile, int &dx, int &dy);
+const ThreeDObject *GetThreeDBusStop(TileIndex tile, SpriteID image);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);

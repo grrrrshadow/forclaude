@@ -1385,6 +1385,7 @@ static bool _north_house_objects = false;
 static void AddNorthHouseObject(size_t first_parent);
 static void AddIndustryObjects(size_t first_parent, bool north);
 static void AddStreetLamps(size_t first_parent);
+static void AddBusStopObjects(size_t first_parent);
 static void AddFieldWheat();
 static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTileParts &parts, bool built);
 
@@ -1498,6 +1499,7 @@ static void ViewportAddLandscape()
 				if (_north_house_objects && tile_type == TileType::House) AddNorthHouseObject(first_parent);
 				if (_north_house_objects && tile_type == TileType::Industry) AddIndustryObjects(first_parent, true);
 				if (_north_house_objects && tile_type == TileType::Road) AddStreetLamps(first_parent);
+				if (_north_house_objects && tile_type == TileType::Station) AddBusStopObjects(first_parent);
 				if (_north_house_objects && tile_type == TileType::Clear) AddFieldWheat();
 				if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
 			}
@@ -5435,6 +5437,25 @@ static void AddStreetLamps(size_t first_parent)
 }
 
 /**
+ * The shelters of a drive-through bus stop the tile just added as the bench and the BUS sign of its pavement
+ * (GetThreeDBusStop()): each shelter's sprite left out (box_kind 4), its pavement's objects drawn among the standing
+ * things as a street lamp (box_kind 7). See-through buildings leave the game's sprites as they are.
+ * @param first_parent the first of the sprites the tile added
+ */
+static void AddBusStopObjects(size_t first_parent)
+{
+	if (!ObjectsIndexReadOrOwed()) return;
+	if (_cur_ti.tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings)) return;
+	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+		const ThreeDObject *stop = GetThreeDBusStop(_cur_ti.tile, ps.image);
+		if (stop == nullptr) continue;
+		ps.box_kind = 4;
+		_turned_objects.push_back({stop, _cur_ti.tile, ps.zmin});
+	}
+}
+
+/**
  * Facing north in a small view, a house that is a real 3D object drawn as in the turned view (the player, 28. 10.:
  * "3D without the choice of the old way"; the main view is drawn turned at angle 0 too): the sprites the house's tile
  * just added are left out (box_kind 4) and its object is drawn once, whole, among the standing things (box_kind 7,
@@ -7290,6 +7311,8 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		if (tile_type == TileType::Industry) AddIndustryObjects(first_parent, false);
 		/* The street lights of the towns' streets as lamps (AddStreetLamps()). */
 		if (tile_type == TileType::Road) AddStreetLamps(first_parent);
+		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
+		if (tile_type == TileType::Station) AddBusStopObjects(first_parent);
 		/* Wheat on the farm's fields (AddFieldWheat()). */
 		if (tile_type == TileType::Clear) AddFieldWheat();
 		/* A house of the original graphics with a hand table: its sprite is drawn as boxes, not as a billboard. */
@@ -15209,6 +15232,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			int dx, dy;
 			if (const ThreeDObject *lamp = GetThreeDEdgeLamp(_cur_ti.tile, dx, dy); lamp != nullptr) {
 				objects.push_back({lamp, _cur_ti.tile, GetSlopePixelZ(TileX(_cur_ti.tile) * TILE_SIZE + dx, TileY(_cur_ti.tile) * TILE_SIZE + dy)});
+			}
+		}
+		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
+		if (tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings)) {
+			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
+				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+				const ThreeDObject *stop = GetThreeDBusStop(_cur_ti.tile, ps.image);
+				if (stop == nullptr) continue;
+				ps_kind[i] = 5;
+				objects.push_back({stop, _cur_ti.tile, ps.zmin});
 			}
 		}
 		/* A bridge over the tile is built from its own sprites. */

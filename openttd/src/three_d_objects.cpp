@@ -39,6 +39,9 @@
 #include "town_map.h"
 #include "road_map.h"
 #include "bridge_map.h"
+#include "station_map.h"
+#include "newgrf_roadstop.h"
+#include "table/sprites.h"
 #include "tree_map.h"
 #include "tile_map.h"
 #include "viewport_func.h"
@@ -195,6 +198,8 @@ static std::map<std::string, size_t, std::less<>> _three_d_field_parts;
 static std::map<std::string, size_t, std::less<>> _three_d_addons;
 /** The street lamps (MakeStreetLamps()) by the place of the game's street light on its tile, dx * 16 + dy: objects in _three_d_objects. */
 static std::map<int, size_t> _three_d_street_lamps;
+/** The pavements of a drive-through bus stop with their bench and sign (MakeBusStops()), by the shelter's sprite they stand for: objects in _three_d_objects. */
+static std::map<SpriteID, size_t> _three_d_bus_stops;
 
 /*
  * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
@@ -4212,6 +4217,64 @@ static void MakeStreetLamps()
 	}
 }
 
+/** The communist bench at a bus stop (the colleague's lavicka_parkova of "doplnky"). */
+static constexpr std::string_view BUS_STOP_BENCH = "lavicka_parkova";
+/** The sign of a bus stop (the colleague's zastavka_znacka of "zastavky"). */
+static constexpr std::string_view BUS_STOP_SIGN = "zastavka_znacka";
+
+/**
+ * The bus stops (the player, 4. 11.: "we'll put it at the bus stop with the BUS sign, that will be the stop"; "the
+ * shelters aren't there, they needn't be"): for each pavement of a drive-through bus stop -- where the game draws a
+ * shelter, 3 of 16 units deep along the tile's edge -- the communist bench with its back to the outer edge, facing
+ * the road, and the BUS sign by the road's edge beside it, facing the road too (its plate seen along the road). An
+ * object of the two add-ons alone for each of the four shelters (no file of its own), drawn as the street lamps.
+ */
+static void MakeBusStops()
+{
+	_three_d_bus_stops.clear();
+	const bool bench = _three_d_addons.contains(BUS_STOP_BENCH);
+	const bool sign = _three_d_addons.contains(BUS_STOP_SIGN);
+	if (!bench && !sign) return;
+	/* Along the pavement and from its outer edge, units: the bench in the middle of its strip a little aside of the
+	 * girls' places (DrawBusStopWithGirls()), the sign at the road's edge towards the pavement's other end. */
+	static constexpr double BENCH_ALONG = 9.5, BENCH_IN = 1.2, SIGN_ALONG = 3.5, SIGN_IN = 2.5;
+	static constexpr struct {
+		SpriteID shelter;
+		int ax, ay; ///< a place's x and y from (along, in): +1 along, -1 the other way, 2 in, -2 in from the far edge
+		float facing;
+	} PAVEMENTS[] = {
+		{SPR_BUS_STOP_DT_X_W, 1, 2, 90.0f},   // road along x, the pavement at y 0..3
+		{SPR_BUS_STOP_DT_X_E, -1, -2, 270.0f}, // road along x, the pavement at y 13..16
+		{SPR_BUS_STOP_DT_Y_W, -2, 1, 180.0f},  // road along y, the pavement at x 13..16
+		{SPR_BUS_STOP_DT_Y_E, 2, -1, 0.0f},    // road along y, the pavement at x 0..3
+	};
+	auto coordinate = [](int how, double along, double in) {
+		switch (how) {
+			case 1: return along;
+			case -1: return TILE_SIZE - along;
+			case 2: return in;
+			default: return TILE_SIZE - in;
+		}
+	};
+	for (const auto &p : PAVEMENTS) {
+		ThreeDObject stop;
+		stop.name = fmt::format("zastavka {}", p.shelter);
+		stop.variants = 0;
+		stop.street = true;
+		auto place = [&](std::string_view name, double along, double in) {
+			ThreeDObjectFigure &f = stop.addon_places.emplace_back();
+			f.figure = std::string(name);
+			f.at[0] = static_cast<float>(coordinate(p.ax, along, in) / OBJECT_UNITS_PER_METRE);
+			f.at[1] = static_cast<float>(coordinate(p.ay, along, in) / OBJECT_UNITS_PER_METRE);
+			f.facing = p.facing;
+		};
+		if (bench) place(BUS_STOP_BENCH, BENCH_ALONG, BENCH_IN);
+		if (sign) place(BUS_STOP_SIGN, SIGN_ALONG, SIGN_IN);
+		_three_d_bus_stops.emplace(p.shelter, _three_d_objects.size());
+		_three_d_objects.push_back(std::move(stop));
+	}
+}
+
 /**
  * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
  * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
@@ -4310,9 +4373,11 @@ static void ReadThreeDObjectsNow()
 					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
 					continue;
 				}
-				if (kind == "doplnek" && e.contains("soubor") && e.at("soubor").is_string()) {
+				if ((kind == "doplnek" || kind == "objekt") && e.contains("soubor") && e.at("soubor").is_string()) {
 					/* An add-on of the buildings (a parasol, a bench): one file, its foot at the origin, facing +x, read
-					 * the first time a building with it is drawn (LayAddons()); never a house of its own (variants 0). */
+					 * the first time a building with it is drawn (LayAddons()); never a house of its own (variants 0).
+					 * An object of the colleague's on its own ("objekt": the sign of a bus stop) in the same frame, as
+					 * one the game places itself (MakeBusStops()). */
 					ThreeDObject addon;
 					addon.file = e.at("soubor").get<std::string>();
 					addon.name = e.value("jmeno", addon.file);
@@ -4404,6 +4469,7 @@ static void ReadThreeDObjectsNow()
 		}
 	}
 	MakeStreetLamps();
+	MakeBusStops();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
@@ -8847,6 +8913,21 @@ const ThreeDObject *GetThreeDEdgeLamp(TileIndex tile, int &dx, int &dy)
 		return &_three_d_objects[it->second];
 	}
 	return nullptr;
+}
+
+/**
+ * The bench and the BUS sign standing for a shelter of a drive-through bus stop (MakeBusStops()): the game's own stop
+ * of buses, not a NewGRF's (that draws its own). Asked as the map is collected, under the game's lock.
+ * @param tile the tile
+ * @param image a sprite the tile drew
+ * @return the pavement's object, nullptr where the sprite is no shelter of such a stop
+ */
+const ThreeDObject *GetThreeDBusStop(TileIndex tile, SpriteID image)
+{
+	if (!IsTileType(tile, TileType::Station) || !IsDriveThroughStopTile(tile) || GetStationType(tile) != StationType::Bus || GetRoadStopSpec(tile) != nullptr) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	auto it = _three_d_bus_stops.find(image & SPRITE_MASK);
+	return it == _three_d_bus_stops.end() ? nullptr : &_three_d_objects[it->second];
 }
 
 /** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */

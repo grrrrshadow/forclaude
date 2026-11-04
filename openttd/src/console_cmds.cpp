@@ -10799,8 +10799,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (!x.has_value() || !y.has_value()) return true;
 		const TileIndex tile = TileXY(static_cast<uint>(*x), static_cast<uint>(*y));
 		AutoRestoreBackup cur_company(_current_company, _local_company);
-		if (argv.size() == 4) {
-			CommandCost r = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, tile, 1, 1, RoadStopType::Truck, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+		if (argv.size() == 4 || (argv.size() == 5 && argv[4] == "bus")) {
+			/* 'zastavka <x> <y> bus': a stop of buses, along the road there whichever way it goes (MakeBusStops()). */
+			const RoadStopType type = argv.size() == 5 ? RoadStopType::Bus : RoadStopType::Truck;
+			CommandCost r = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, tile, 1, 1, type, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+			if (r.Failed() && type == RoadStopType::Bus) r = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, tile, 1, 1, type, true, DiagDirection::NW, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
 			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: zastavka {},{}: {}", *x, *y, r.Succeeded() ? fmt::format("stanice {}", GetStationIndex(tile)) : RefusalReason(r));
 			return true;
 		}

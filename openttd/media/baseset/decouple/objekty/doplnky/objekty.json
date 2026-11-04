@@ -6560,5 +6560,104 @@
   "autor": "spicybamer (https://sketchfab.com/smitecraft.swe): low poly Ivy (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/low-poly-ivy-695e4b177a884b318e21c084f66c3a6c); převod domy/popinavky.py",
   "licence": "CC BY 4.0 (uvést spicybamer; změny: kusy zvlášť jen v nejvyšší podrobnosti, otočené na zeď, textury oříznuté, bez normálové mapy, maska listí na barvení)",
   "poznamka": "společná popínavka (hráč 4. 11.: „pak společné popínavky, hra je bude dávat na zdi domů a na tyhle výplně a budem jim dávat víc světle zelených barev“): na zeď domu nebo na líc opěrné zdi (výplně, sada vyplne); počátek u paty uprostřed kusu v rovině zdi, listy k +x (zeď je rovina x = 0 za nimi), y podél zdi, z nahoru, skutečné metry; jen barva bez světla, bez noci; barva číslem jako doplňky domů: maska jsou zelené listy (hnědé stonky mají barvu textury), paleta světle zelená, každé místo jinou barvu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lavicka_parkova",
+  "soubor": "lavicka_parkova.glb",
+  "nazev": {
+   "cs": "lavička (sovětská parková)"
+  },
+  "barvy": [
+   {
+    "cast": "prkna_bila",
+    "maska": "lavicka_parkova_maska_prkna_bila.png",
+    "zacatek": 232,
+    "paleta": [
+     "F2F0E8",
+     "EAE8DE",
+     "F5F3EC",
+     "A8402F"
+    ]
+   },
+   {
+    "cast": "prkna_barevna",
+    "maska": "lavicka_parkova_maska_prkna_barevna.png",
+    "zacatek": 200,
+    "paleta": [
+     "C8322A",
+     "B5281F",
+     "D94A3A",
+     "E8B830",
+     "F0C640",
+     "D9A520",
+     "A8402F"
+    ]
+   },
+   {
+    "cast": "nohy",
+    "maska": "lavicka_parkova_maska_nohy.png",
+    "zacatek": 74,
+    "paleta": [
+     "2E2E2E",
+     "4A4A4A",
+     "2F4A33",
+     "5A3E2C"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -0.471,
+    0.471
+   ],
+   "y": [
+    -1.198,
+    1.198
+   ],
+   "z": [
+    0.0,
+    0.989
+   ]
+  },
+  "trojuhelniku": 456,
+  "atlas_px": [
+   48,
+   16
+  ],
+  "okraje_textur": 16,
+  "pouziti": 0,
+  "mista_sedu": [
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     -0.7,
+     0.451
+    ],
+    "otoceni": 0
+   },
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     0.0,
+     0.451
+    ],
+    "otoceni": 0
+   },
+   {
+    "poza": "sedi",
+    "poloha": [
+     0.14,
+     0.7,
+     0.451
+    ],
+    "otoceni": 0
+   }
+  ],
+  "autor": "Nikita Filimonov (https://sketchfab.com/nikita3dvisions): Bench 6 USSR (Game ready) (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/bench-6-ussr-game-ready-12e4fb18364a4590862eb871c60c6b45); převod domy/lavicka_parkova.py",
+  "licence": "CC BY 4.0 (uvést Nikita Filimonov; změny: otočená předkem k +x, bez textur, jen barva po částech na barvení číslem)",
+  "poznamka": "společná lavička (hráč 4. 11.: „udělej lavičku společnou“, „takhle to je lepši bez textury, budem ji barvit“, „prkna zvlašť barvit , ty prkna na kterych se sedi, o ktere se opiraj“, „střidavě ty prkna musi byt komunisticky natřený. jedno bíle  , další červeně nebo žlutě. , bila žluta červena“, „kontrola_barvy png , ta celá červena by šla taky.  s barvama si mužem vyhrát, to nestojí mb“): sovětská parková lavička, dřevěná prkna ohnutá ze sedáku do opěradla na dvou litých nohách, 2,4 m; pro všechny sady tam, kde má být lavička (park, ulice, zastávka, u domu); bez textury, barva číslem po částech: 13 prken sedáku a opěradla střídavě od přední hrany sedáku prkna_bila (bílá, 1., 3., … 13.) a prkna_barevna (červená nebo žlutá, 2., 4., … 12.; A8402F v obou paletách: celá lavička červená), nohy (lité nohy, rám za opěradlem a příčka pod sedákem); s barvami si hra smí hrát; počátek na zemi uprostřed půdorysu, předek (kam se sedí a kouká) k +x, délka podél y, z nahoru, skutečné metry; mista_sedu: body sedu na sedáku pro pózu sedi kostry (otoceni 0 = kouká k +x), 0,7 m od sebe; jen barva bez světla, bez noci"
  }
 ]
