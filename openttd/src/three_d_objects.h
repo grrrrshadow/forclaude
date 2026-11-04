@@ -1198,6 +1198,19 @@ struct ThreeDIndustryTileParts {
 	std::vector<ThreeDObjectFigure> vehicles_again; ///< the same but those shown once an industry ("jednou_na_prumysl"), for its other tiles of the gfx (GetThreeDIndustryTileVehicles())
 };
 std::span<const ThreeDObjectFigure> GetThreeDIndustryTileVehicles(const ThreeDIndustryTileParts &parts, TileIndex anchor);
+
+/** A piece of a 3D bridge (the colleague's set "mosty", hra/3d/MOSTY-3D-PRO-HRU.md): a named node of its model. */
+enum class ThreeDBridgePiece : uint8_t {
+	Middle,     ///< "stred": a tile of the bridge
+	MiddleA,    ///< "stred_a": an inner tile, in turn with MiddleB (the suspension bridge's pylon)
+	MiddleB,    ///< "stred_b": the other inner tile (its cables)
+	End,        ///< "konec": the first tile past a head
+	Head,       ///< "hlava": the ramp of a head on the level, 5 m up along the tile
+	Pillar,     ///< "pilir": 5 m of a pillar, a level of the land
+	PillarFoot, ///< "pilir_pata": the lowest piece of a pillar, on the ground
+	Count,
+};
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);

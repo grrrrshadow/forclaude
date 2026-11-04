@@ -94,6 +94,8 @@
 #include "bridge_map.h"
 #include "tunnel_map.h"
 #include "tunnelbridge_map.h"
+#include "tunnelbridge.h"
+#include "bridge.h"
 #include "rail.h"
 #include "rail_map.h"
 #include "road_map.h"
@@ -11955,10 +11957,92 @@ static inline void CabAlongAcross(Axis axis, int x0, int y0, double a, double c,
 	}
 }
 
+/** The game's bridge type of a bridge (its end) with 3D pieces (GetThreeDBridgePiece()); nullopt none, an aqueduct none. */
+static std::optional<uint> EyeBridgeType(TileIndex end)
+{
+	if (GetTunnelBridgeTransportType(end) == TransportType::Water) return std::nullopt;
+	const uint type = GetBridgeType(end);
+	if (GetThreeDBridgePiece(type, ThreeDBridgePiece::Middle, 0) == nullptr) return std::nullopt;
+	return type;
+}
+
+/** Whether a bridge's head rises from the land to the bridge (a ramp along the tile), not level with it on a foundation. */
+static bool CabBridgeRampRises(TileIndex head)
+{
+	const DiagDirection dir = GetTunnelBridgeDirection(head);
+	const bool inner_low = dir == DiagDirection::NE || dir == DiagDirection::NW;
+	double sx, sy;
+	CabAlongAcross(DiagDirToAxis(dir), TileX(head) * TILE_SIZE, TileY(head) * TILE_SIZE, inner_low ? TILE_SIZE - 1 : 0, TILE_SIZE / 2, sx, sy);
+	return GetBridgePixelHeight(head) - GetSlopePixelZ(static_cast<int>(sx), static_cast<int>(sy), true) >= static_cast<int>(TILE_HEIGHT) / 2;
+}
+
+/** How much higher the road or the track on a bridge of 3D pieces is laid than their deck (their z 0), units of height: seen over it. */
+static constexpr double CAB_DECK_OVER_PIECES = 0.3;
+
+/**
+ * The 3D pieces of a bridge (the colleague's set "mosty", hra/3d/MOSTY-3D-PRO-HRU.md) on a tile, for the view from the
+ * eyes. Over a tile under it its piece: at each end the end piece facing into the bridge; between them the two inner
+ * ones in turn from the north, "konec, a, b, a, ..., a, konec" (the colleague), the one before the south end an a, so
+ * that an even count has two a's side by side. Where the game puts pillars (BridgeTileHasPillars()) and nothing passes
+ * under the bridge (the land, trees, the shore -- a pillar stands in the middle of the tile, where the rails, the roads
+ * and the ships go), a pillar under it of pieces of 5 m, a level each, down to the land, its foot the lowest. On a head
+ * its ramp, 5 m up along the tile; on a foundation level with the bridge its middle piece.
+ * @param add given each piece and the height it stands at, units (a piece's z 0 the top of the deck; a ramp's and a
+ *            pillar's piece's a level lower, ReadBridge() of three_d_objects.cpp)
+ * @return whether the bridge on the tile has its 3D pieces: its sprites then draw only its deck
+ */
+template <typename F>
+static bool EyeBridgePieces(TileIndex tile, F add)
+{
+	if (IsBridgeAbove(tile)) {
+		const TileIndex north = GetNorthernBridgeEnd(tile), south = GetSouthernBridgeEnd(tile);
+		const std::optional<uint> type = EyeBridgeType(south);
+		if (!type.has_value()) return false;
+		const int along = GetBridgeAxis(tile) == Axis::X ? 0 : 1;
+		const uint len = GetTunnelBridgeLength(north, south), i = GetTunnelBridgeLength(north, tile);
+		ThreeDBridgePiece piece = ThreeDBridgePiece::End;
+		int turn = along;
+		if (i != 0 && i + 1 == len) {
+			turn += 2;
+		} else if (i != 0) {
+			const uint k = i - 1, inner = len - 2;
+			piece = (k % 2 == 0 || k + 1 == inner) ? ThreeDBridgePiece::MiddleA : ThreeDBridgePiece::MiddleB;
+		}
+		const int bz = GetBridgePixelHeight(south);
+		if (const ThreeDObject *o = GetThreeDBridgePiece(*type, piece, turn); o != nullptr) add(o, bz);
+		const TileType under = GetTileType(tile);
+		const bool free = under == TileType::Clear || under == TileType::Trees || (under == TileType::Water && IsCoast(tile));
+		if (free && BridgeTileHasPillars(tile)) {
+			const int levels = bz / static_cast<int>(TILE_HEIGHT) - GetTileZ(tile);
+			for (int k = 0; k < levels; k++) {
+				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along);
+				if (o != nullptr) add(o, bz - (k + 1) * static_cast<int>(TILE_HEIGHT));
+			}
+		}
+		return true;
+	}
+	if (!IsTileType(tile, TileType::TunnelBridge) || !IsBridge(tile)) return false;
+	const std::optional<uint> type = EyeBridgeType(tile);
+	if (!type.has_value()) return false;
+	const DiagDirection dir = GetTunnelBridgeDirection(tile);
+	/* The north head's bridge goes on to the south-west or the south-east: its pieces unturned. */
+	const int turn = (DiagDirToAxis(dir) == Axis::X ? 0 : 1) + (dir == DiagDirection::SW || dir == DiagDirection::SE ? 0 : 2);
+	const int bz = GetBridgePixelHeight(tile);
+	if (CabBridgeRampRises(tile)) {
+		const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Head, turn);
+		if (o == nullptr) return false;
+		add(o, bz - static_cast<int>(TILE_HEIGHT));
+	} else if (const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Middle, turn); o != nullptr) {
+		add(o, bz);
+	}
+	return true;
+}
+
 /**
  * The part of a bridge over a tile, built from the sprites the game draws for it: the deck at the bridge's height
  * dressed in the floor sprite, the railings standing on its edges in the sprites of the far and the near side, the
- * deck's edges and its underside, and the pillars as columns where the game draws them.
+ * deck's edges and its underside, and the pillars as columns where the game draws them. A bridge of 3D pieces
+ * (EyeBridgePieces()) only its deck, the road or the track on it, a little over theirs.
  * @param tile the tile under the bridge
  * @param sprites the bridge's sprites on that tile (DrawBridgeMiddle())
  */
@@ -11997,6 +12081,12 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 		return p;
 	};
 	const double c_far = 1, c_near = TILE_SIZE - 1, top = bz + 40, under = bz - CAB_DECK;
+	if (EyeBridgePieces(tile, [](const ThreeDObject *, int) {})) {
+		/* Of 3D pieces: only the road or the track on their deck. */
+		const double deck = bz + CAB_DECK_OVER_PIECES;
+		CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, deck, c_far, bz), pt(TILE_SIZE, c_far, deck, c_far, bz), pt(TILE_SIZE, c_near, deck, c_near, bz), pt(0, c_near, deck, c_near, bz)}, true);
+		return;
+	}
 	/* The near railing first: on its plane the deck's edge only fills what the railing leaves. */
 	CabDrawDressed(cv, eye, front_tex, {pt(0, c_near, under, c_near, under), pt(TILE_SIZE, c_near, under, c_near, under), pt(TILE_SIZE, c_near, top, c_near, top), pt(0, c_near, top, c_near, top)}, false);
 	CabDrawDressed(cv, eye, back_tex, {pt(0, c_near, under, c_near, under), pt(TILE_SIZE, c_near, under, c_near, under), pt(TILE_SIZE, c_near, bz, c_near, bz), pt(0, c_near, bz, c_near, bz)}, true);
@@ -12093,6 +12183,16 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 		return p;
 	};
 	const double c_far = 1, c_near = TILE_SIZE - 1;
+	if (EyeBridgePieces(head, [](const ThreeDObject *, int) {})) {
+		/* Of 3D pieces (its ramp, EyeBridgePieces()): only the road or the track on the ramp's deck, a little over it. */
+		auto over = [&](double a, double c, double z) {
+			std::array<double, 6> p = pt(a, c, z, c, z);
+			p[2] += CAB_DECK_OVER_PIECES;
+			return p;
+		};
+		CabDrawDressed(cv, eye, tex, {over(a_out, c_far, deck_out), over(a_in, c_far, deck_in), over(a_in, c_near, deck_in), over(a_out, c_near, deck_out)}, true);
+		return;
+	}
 	/* The deck. */
 	CabDrawDressed(cv, eye, tex, {pt(a_out, c_far, deck_out, c_far, deck_out), pt(a_in, c_far, deck_in, c_far, deck_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_out, c_near, deck_out, c_near, deck_out)}, true);
 	/* Its sides down to the ground: the near one as the sprite shows it, the far one mirrored. */
@@ -15318,6 +15418,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				objects.push_back({stop, _cur_ti.tile, ps.zmin});
 			}
 		}
+		/* The 3D pieces of a bridge over the tile, or of a bridge's head (EyeBridgePieces()). */
+		EyeBridgePieces(_cur_ti.tile, [&](const ThreeDObject *o, int z) { objects.push_back({o, _cur_ti.tile, z}); });
 		/* A bridge over the tile is built from its own sprites. */
 		for (auto it = _cab_bridge_sprites.rbegin(); it != _cab_bridge_sprites.rend() && it->from >= first_parent; ++it) {
 			if (it->to == SIZE_MAX) it->to = _vd.parent_sprites_to_draw.size();

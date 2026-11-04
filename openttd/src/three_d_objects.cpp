@@ -4105,6 +4105,113 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 	}
 }
 
+/** The nodes of the pieces of a 3D bridge's model, by ThreeDBridgePiece. */
+static constexpr std::string_view BRIDGE_PIECE_NODES[] = {"stred", "stred_a", "stred_b", "konec", "hlava", "pilir", "pilir_pata"};
+static_assert(std::size(BRIDGE_PIECE_NODES) == to_underlying(ThreeDBridgePiece::Count));
+
+/** The pieces of the 3D bridges by the game's bridge type, piece and quarter turn: their objects in _three_d_objects, SIZE_MAX none. */
+using BridgePieceObjects = std::array<std::array<std::array<size_t, 4>, to_underlying(ThreeDBridgePiece::Count)>, MAX_BRIDGES>;
+static BridgePieceObjects _three_d_bridge_pieces = [] {
+	BridgePieceObjects none;
+	for (auto &type : none) {
+		for (auto &piece : type) piece.fill(SIZE_MAX);
+	}
+	return none;
+}();
+
+/** How much higher a ramp's and a pillar's piece of a bridge stand than their model: a level of the land, 5 m (EYE_LEVEL_STRETCH). */
+static constexpr float BRIDGE_LEVEL_M = 5.0f;
+
+/**
+ * A 3D bridge ("druh": "most", the colleague's hra/3d/MOSTY-3D-PRO-HRU.md): one model whose named nodes are its pieces
+ * (BRIDGE_PIECE_NODES), in true metres, +x along the bridge from x 0 to a tile's length, y across from its middle, z 0
+ * the top of the deck; one texture, its part "barva" painted the colour of each of the game's bridges it is ("mosty",
+ * "barva_mostu"). Each piece an object of its own for each of those bridges and each quarter turn about the middle of
+ * its tile: its texture the model's, its paint that bridge's colour of the palette (ThreeDObject::variant_paint). A
+ * ramp ("hlava", z -5 to 0) and a pillar's pieces (0 to -5) stand a level higher, their foot at z 0: where they stand
+ * is a level lower (EyeBridgePieces()).
+ */
+static void ReadBridge(const nlohmann::json &e, const std::string &folder)
+{
+	if (!e.contains("soubor") || !e.at("soubor").is_string() || !e.contains("mosty") || !e.at("mosty").is_array()) return;
+	const std::string file = e.at("soubor").get<std::string>();
+	const std::string path = folder + file;
+	ThreeDObject holder;
+	holder.file = file;
+	holder.name = e.value("jmeno", file);
+	holder.variants = 0; // no house's
+	if (!ReadGlb(path, holder)) {
+		Debug(misc, 0, "3D bridge {}: {} not read", holder.name, path);
+		return;
+	}
+	ReadColourParts(e, folder, holder);
+	const size_t holder_at = _three_d_objects.size();
+	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> meshes;
+	for (size_t p = 0; p < meshes.size(); p++) {
+		IndustryPartMesh pm;
+		if (!ReadGlbMesh(path, pm.mesh, true, {}, 0, BRIDGE_PIECE_NODES[p]) || pm.mesh.tri.empty()) continue;
+		pm.facing = TriangleFacing(pm.mesh);
+		pm.holder = holder_at;
+		meshes[p] = std::move(pm);
+	}
+	if (!meshes[to_underlying(ThreeDBridgePiece::Middle)].has_value()) {
+		Debug(misc, 0, "3D bridge {}: no node stred", holder.name);
+		return;
+	}
+	const std::string name = holder.name;
+	const std::vector<ThreeDObjectColourPart> colours = holder.colours;
+	_three_d_objects.push_back(std::move(holder));
+	const double half = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2;
+	for (const auto &n : e.at("mosty")) {
+		if (!n.is_number_integer() || n.get<int>() < 0 || n.get<int>() >= static_cast<int>(MAX_BRIDGES)) continue;
+		const int type = n.get<int>();
+		/* Its colour of the palette: the one "barva_mostu" gives it. */
+		int8_t paint = 0;
+		if (!colours.empty() && e.contains("barva_mostu") && e.at("barva_mostu").is_object()) {
+			const auto &by = e.at("barva_mostu");
+			const std::string key = fmt::format("{}", type);
+			const std::optional<uint32_t> c = by.contains(key) && by.at(key).is_string() ? ParseIndexColour(by.at(key).get<std::string>()) : std::nullopt;
+			const auto at = c.has_value() ? std::ranges::find(colours[0].palette, *c) : colours[0].palette.end();
+			if (at != colours[0].palette.end()) {
+				paint = static_cast<int8_t>(at - colours[0].palette.begin());
+			} else {
+				Debug(misc, 0, "3D bridge {}: the colour of bridge {} is not in its palette", name, type);
+			}
+		}
+		for (size_t p = 0; p < meshes.size(); p++) {
+			if (!meshes[p].has_value()) continue;
+			const bool lower = p == to_underlying(ThreeDBridgePiece::Head) || p == to_underlying(ThreeDBridgePiece::Pillar) || p == to_underlying(ThreeDBridgePiece::PillarFoot);
+			for (int q = 0; q < 4; q++) {
+				/* Turned about the middle of the tile: the point (half, 0) of the model there. */
+				const double a = q * M_PI / 2;
+				const float at[3] = {static_cast<float>(half - half * std::cos(a)), static_cast<float>(half - half * std::sin(a)), lower ? BRIDGE_LEVEL_M : 0.0f};
+				ThreeDObject piece = PlaceIndustryPart(*meshes[p], fmt::format("{}/{} {} {}", name, BRIDGE_PIECE_NODES[p], type, q * 90), at, q * 90.0f, 1.0f, 1, 1);
+				piece.colours = colours;
+				piece.variant_paint = {paint, paint};
+				_three_d_bridge_pieces[type][p][q] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(piece));
+			}
+		}
+	}
+}
+
+/**
+ * A piece of the 3D bridge of one of the game's bridge types (ReadBridge()), turned by quarters about the middle of its
+ * tile; never waiting for the indices (ThreeDObjectsIndexRead()). The inner pieces and the end without their own the
+ * middle piece, the pillar's foot without its own the pillar's.
+ * @return nullptr when that bridge has no 3D pieces, or not that one
+ */
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns)
+{
+	if (type >= MAX_BRIDGES || !ThreeDObjectsIndexRead()) return nullptr;
+	const auto &pieces = _three_d_bridge_pieces[type];
+	const int q = quarter_turns & 3;
+	size_t k = pieces[to_underlying(piece)][q];
+	if (k == SIZE_MAX && (piece == ThreeDBridgePiece::MiddleA || piece == ThreeDBridgePiece::MiddleB || piece == ThreeDBridgePiece::End)) k = pieces[to_underlying(ThreeDBridgePiece::Middle)][q];
+	if (k == SIZE_MAX && piece == ThreeDBridgePiece::PillarFoot) k = pieces[to_underlying(ThreeDBridgePiece::Pillar)][q];
+	return k < _three_d_objects.size() ? &_three_d_objects[k] : nullptr;
+}
+
 /** A pasture's parts as read (ReadPasture()), by their places in _three_d_objects; resolved by GetThreeDPasture(). */
 static struct {
 	size_t ground = SIZE_MAX;
@@ -4387,6 +4494,10 @@ static void ReadThreeDObjectsNow()
 				}
 				if (kind == "prumysl_dlazdice") {
 					ReadOriginalIndustryTile(e, parts);
+					continue;
+				}
+				if (kind == "most") {
+					ReadBridge(e, folder);
 					continue;
 				}
 				if (kind == "les" || kind == "plantaz") {

@@ -1608,6 +1608,17 @@ static BridgePillarFlags GetBridgeTilePillarFlags(TileIndex tile, TileIndex ramp
 }
 
 /**
+ * Whether the game puts pillars under a tile of a bridge (GetBridgeTilePillarFlags(), by its type and its piece): the
+ * view from the eyes stands a 3D pillar there (EyeBridgePieces() of viewport.cpp).
+ * @param tile a tile with a bridge over it
+ */
+bool BridgeTileHasPillars(TileIndex tile)
+{
+	const TileIndex north = GetNorthernBridgeEnd(tile), south = GetSouthernBridgeEnd(tile);
+	return GetBridgeTilePillarFlags(tile, north, south, GetBridgeType(south), GetTunnelBridgeTransportType(south)).Any();
+}
+
+/**
  * Draw the middle bits of a bridge.
  * @param ti Tile information of the tile to draw it on.
  * @param blocked_pillars Mask of pillar corners and edges blocked by tile below the bridge.
