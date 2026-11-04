@@ -2199,6 +2199,9 @@ struct TurnedTimes {
 	uint64_t standing_triangles = 0; ///< and their triangles
 	double standing_card_ms = 0; ///< the card's laying them, waited for
 	int standing_processor[2] = {}; ///< blocks whose standing things the processor drew: no ground of the card under them, the card gave them back
+	double models_small = 0;   ///< of the buildings drawn (models), those of the small views facing north drawn as the game drew them
+	int small_old = 0;         ///< blocks of the small views (vehicle windows, extra views) drawn as the game drew them while the 3D is on
+	int small_old_why[7] = {}; ///< and why not by the card (SmallViewsOffCardWhy())
 	int tiles = 0;      ///< tiles looked at
 	int drawn = 0;      ///< tiles drawn
 };
@@ -2216,6 +2219,10 @@ void TurnedTimingsPrint()
 	IConsolePrint(CC_DEFAULT, "test3d: dlazdic {} kresleno {}; ms: sprity do textur {:.1f}, stopy domu {:.1f}, polozeni {:.1f}, sber {:.1f}, plakaty {:.1f}, modely {:.1f} (body a razeni {:.1f}, pixely {:.1f}, {} kresleni)",
 			t.tiles, t.drawn, t.texture, t.widen, t.warp, t.collect, t.standing, t.models, t.models_project, t.models_raster, t.models_drawn);
 	IConsolePrint(CC_DEFAULT, "test3d: stojici kartou: bloku {}, spritu {}, budov {}, vozidel obrazkem {}, vozidel kartou {}, krabic {}, zvlast procesorem {}, karta {:.1f} ms", t.standing_card, t.standing_sprites, t.standing_objects, t.standing_likeness, t.standing_vehicles, t.standing_faces, t.standing_apart, t.standing_card_ms);
+	if (t.small_old > 0) {
+		const int *w = t.small_old_why;
+		IConsolePrint(CC_DEFAULT, "test3d: male okna postaru {} bloku (vypnuto {}, mapa otocena {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {}), modely v nich {:.1f} ms", t.small_old, w[0], w[1], w[2], w[3], w[4], w[5], w[6], t.models_small);
+	}
 	/* With a window the console is not written out: the diary too (the rig). */
 	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2];
 	Debug(misc, 1, "test3d cas: kresleno {}, plakaty {:.1f} ms, modely {:.1f} ms; stojici kartou: bloku {} (celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}), spritu {}, budov {} ({} trojuhelniku), vozidel obrazkem {}, vozidel kartou {}, krabic {}, zvlast procesorem {}, karta {:.1f} ms",
@@ -2487,11 +2494,15 @@ std::string TakeTurnedTimesForDiary(int frames)
 	extern uint64_t _turned_card_dirty_parts;
 	extern double _turned_card_dirty_area[2];
 	const uint64_t *why = _turned_card_dirty_why;
-	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek; zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), po kouscich {} ({:.0f} % plochy kusu), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
-			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
+	std::string s = blocks == 0 && t.tiles == 0 && t.models_drawn == 0 && t.small_old == 0 ? std::string("-") : fmt::format("sprity {:.0f}, stopy {:.0f}, polozeni {:.0f}, sber {:.0f}, plakaty {:.0f} (karta {:.0f}), modely {:.0f} ms na snimek (z toho v malych oknech postaru {:.0f}); zem z pohledu {} z {} bloku; celych pohledu {}, posunu {}, kusu okraje {}, odkrytych bloku z okraje {} z {}, zmen naraz {} (ne: vypnuto {}, kamera {}, zem {}, mimo {}, beze zmen {}, karta {}, pod oci {}), po kouscich {} ({:.0f} % plochy kusu), v malych oknech {}; stojici procesorem {} bloku (bez zeme karty {}, karta vratila {})",
+			t.texture / n, t.widen / n, t.warp / n, t.collect / n, t.standing / n, t.standing_card_ms / n, t.models / n, t.models_small / n, _turned_ground_times.view_blocks, blocks, _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[1], _turned_card_band_blocks[0], _turned_card_dirty_passes,
 			why[0], why[1], why[2], why[3], why[4], why[5], why[6], _turned_card_dirty_parts,
 			_turned_card_dirty_area[1] > 0 ? 100.0 * _turned_card_dirty_area[0] / _turned_card_dirty_area[1] : 0.0, _small_card_dirty_passes,
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
+	if (t.small_old > 0) {
+		const int *w = t.small_old_why;
+		s += fmt::format("; male okna postaru {} bloku (vypnuto {}, mapa otocena {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {})", t.small_old, w[0], w[1], w[2], w[3], w[4], w[5], w[6]);
+	}
 	std::fill(std::begin(_turned_card_dirty_why), std::end(_turned_card_dirty_why), 0);
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
 	extern std::string TakeCardReachForRig();
@@ -5043,6 +5054,7 @@ static void DrawTurnedObject(const DrawPixelInfo &frame, const ParentSpriteToDra
 		OweThreeDPictureBox(ps.xmin - over, ps.ymin - over, ps.xmax + over, ps.ymax + over, ps.zmin, ps.zmax + figures);
 	}
 	_turned_times.models += TurnedNow() - t0;
+	if (_north_house_objects_now) _turned_times.models_small += TurnedNow() - t0;
 }
 
 /**
@@ -8418,6 +8430,22 @@ static bool SmallViewsOnCardNow()
 }
 
 /**
+ * For the diary of the frames: why a small view facing north is not drawn by the card (SmallViewsOnCardNow()) -- 0 switched
+ * off, 1 the main view turned, 2 drawn for a screenshot or the like, 3 the card's ground or standing things off, 4 not the
+ * blitter the card shows through, 5 the card not showing or not ready, 6 the card's views all taken.
+ */
+static int SmallViewsOffCardWhy()
+{
+	if (!_small_views_on_card_on) return 0;
+	if (IsViewTurned()) return 1;
+	if (_screen_disable_anim) return 2;
+	if (!_turned_card_ground_on || !_turned_card_standing_on || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return 3;
+	if (BlitterFactory::GetCurrentBlitter()->GetName() != "40bpp-anim") return 4;
+	if (!ThreeDGpuShows() || !ThreeDGpuReady()) return 5;
+	return 6;
+}
+
+/**
  * Whether a small view the card draws shows its picture from it, followed as it moves (SetViewportPosition(): the card
  * moves what it laid, the move laid with what else changed in it at once).
  * @param vp the view
@@ -8568,6 +8596,10 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 			HideTurnedCardGround();
 		}
 		_north_house_objects = ThreeDEnabled() && !IsViewTurned() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ObjectsIndexReadOrOwed();
+		if (IsViewDrawnTurned()) {
+			_turned_times.small_old++;
+			_turned_times.small_old_why[SmallViewsOffCardWhy()]++;
+		}
 		_turned_objects.clear();
 		_turned_vehicle_pictures.clear();
 		AutoRestoreBackup north_objects_backup(_north_house_objects_now, _north_house_objects);
