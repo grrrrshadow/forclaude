@@ -44,8 +44,12 @@ extern uint64_t _object_pictures_made, _object_pictures_made_thread, _likeness_p
  */
 static std::string TakePicturesForDiary()
 {
-	std::string s = fmt::format("objektu {} ({:.0f} ms), na vlakne {} ({:.0f} ms), podoby {} ({:.0f} ms); {}", _object_pictures_made, _object_picture_ms,
-			_object_pictures_made_thread, _object_picture_thread_ms, _likeness_pictures_made, _likeness_picture_ms, ThreeDGpuTimes());
+	/* What the main thread read itself (a shape, a texture of a 3D object) or waited for: a click held up by it (#329). */
+	extern std::atomic<uint64_t> _three_d_main_made;
+	extern std::atomic<int64_t> _three_d_main_made_us, _three_d_main_waited_us, _three_d_main_longest_us;
+	std::string s = fmt::format("objektu {} ({:.0f} ms), na vlakne {} ({:.0f} ms), podoby {} ({:.0f} ms); nacteno hlavnim vlaknem {} ({:.0f} ms, cekani {:.0f} ms, nejdel {:.0f} ms); {}", _object_pictures_made, _object_picture_ms,
+			_object_pictures_made_thread, _object_picture_thread_ms, _likeness_pictures_made, _likeness_picture_ms,
+			_three_d_main_made.exchange(0), _three_d_main_made_us.exchange(0) / 1000.0, _three_d_main_waited_us.exchange(0) / 1000.0, _three_d_main_longest_us.exchange(0) / 1000.0, ThreeDGpuTimes());
 	_object_picture_ms = _object_picture_thread_ms = _likeness_picture_ms = 0;
 	_object_pictures_made = _object_pictures_made_thread = _likeness_pictures_made = 0;
 	return s;
@@ -149,7 +153,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
 				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; zmen naraz = zmeny hlavni mapy polozene kartou jednim kusem (a proc ne), po kouscich = v kolika obdelnicich z nich karta kreslila (a kolik procent plochy kusu), v malych oknech = totez v oknech vozidel a dalsich pohledech; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
-				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta;"
+				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta, nacteno hlavnim vlaknem = tvary a textury 3D objektu, ktere si hlavni vlakno nacetlo samo nebo na ne cekalo (to drzi klik i snimek);"
 				" pamet 3d = co drzi 3D objekty (tvary, textury, domy) a obrazky, zapomenuti = kolikrat se pustilo, co se 2 minuty nekreslilo, odlozeno = kolikrat to muselo pockat.\n");
 	}
 	const std::time_t t = std::time(nullptr);

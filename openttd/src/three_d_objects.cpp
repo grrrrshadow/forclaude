@@ -6517,6 +6517,12 @@ const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_vi
  */
 static std::mutex _lazy_mutex;
 static std::condition_variable _lazy_made;
+/** The thread the game started on (the statics are made on it): what MakeOnce() does there holds a frame up. */
+static const std::thread::id _three_d_main_thread = std::this_thread::get_id();
+std::atomic<uint64_t> _three_d_main_made{0};        ///< The diary: the things the main thread made itself (MakeOnce()), a millisecond or more
+std::atomic<int64_t> _three_d_main_made_us{0};      ///< and how long, microseconds
+std::atomic<int64_t> _three_d_main_waited_us{0};    ///< how long it waited for another thread making one
+std::atomic<int64_t> _three_d_main_longest_us{0};   ///< the longest of either
 
 /** The next number of a shape or a texture (ThreeDUniqueId): never 0, never one given before. */
 uint64_t ThreeDUniqueId::Next()
@@ -6581,6 +6587,18 @@ bool ThreeDLazyNoWait::Missed() const
 template <typename Made, typename Make, typename Store>
 static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
 {
+	/* The diary of the frames: what the main thread made itself or waited for (the player's #329: a click 2 s and more). */
+	const bool main_thread = std::this_thread::get_id() == _three_d_main_thread;
+	const auto started = std::chrono::steady_clock::now();
+	auto note_main = [&](bool made_here) {
+		if (!main_thread) return;
+		const int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
+		if (us < 1000) return;
+		(made_here ? _three_d_main_made_us : _three_d_main_waited_us) += us;
+		if (made_here) _three_d_main_made++;
+		int64_t longest = _three_d_main_longest_us.load();
+		while (us > longest && !_three_d_main_longest_us.compare_exchange_weak(longest, us)) {}
+	};
 	const std::pair<const void *, int> key(of, thing);
 	if (_lazy_no_wait > 0 && !_three_d_load_at_once) {
 		/* Not waited for (ThreeDLazyNoWait): asked of the thread in the background, once, unless it is being made. */
@@ -6596,8 +6614,11 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 		return;
 	}
 	std::unique_lock lock(_lazy_mutex);
-	for (;;) {
-		if (made()) return;
+	for (bool waited = false;; waited = true) {
+		if (made()) {
+			if (waited) note_main(false);
+			return;
+		}
 		if (_lazy_making.insert(key).second) break;
 		/* Another thread is making it: wait for it. */
 		_lazy_made.wait(lock);
@@ -6617,6 +6638,7 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 	_lazy_making.erase(key);
 	_lazy_asked.erase(key);
 	_lazy_made.notify_all();
+	note_main(true);
 }
 
 /**
