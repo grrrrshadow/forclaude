@@ -118,6 +118,9 @@ constexpr double CARER_HEALS_M = 15.0;     ///< and heals it this near, metres
 constexpr uint64_t STILL_TICKS = 20;       ///< the walker not moving so long: standing
 constexpr double PAVEMENT = 5.5;           ///< the pavement from the middle of a road tile, world units (as Mat's)
 constexpr float EYE_OF_MAP = 0.5f;         ///< the eye sees them at their true size, the map at "meritko" (2 as the girls)
+constexpr float EYE_SMALL_FROM_M = 0.4f;   ///< an animal this tall at its true size or taller ...
+constexpr float EYE_SMALL_TO_M = 0.9f;     ///< ... up to this, seen from the eyes twice as big (EyeScaleOf())
+float EyeScaleOf(const ThreeDAnimal &a);
 
 /** Where one lives. */
 enum class Place : uint8_t {
@@ -947,7 +950,8 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 		return;
 	}
 	const double dist_m = walker ? std::hypot(wx - b.x, wy - b.y) / OBJECT_UNITS_PER_METRE : 1e9;
-	const double reach_m = std::max(a.size[0], a.size[1]) / 2 + GAP_M;
+	/* As far as it reaches as the eyes see it (EyeScaleOf()). */
+	const double reach_m = std::max(a.size[0], a.size[1]) / 2 * EyeScaleOf(a) + GAP_M;
 	/* The hare and the squirrel hop ("skok", the colleague's hra/3d/LES-PRO-HRU.md: up and down on the spot, moved on
 	 * "krok_m" a round by the game) where others walk. */
 	const std::string_view walk = PoseOf(a, {"chuze", "skok", "beh"}), run = PoseOf(a, {"beh", "skok", "chuze"});
@@ -1731,12 +1735,28 @@ void Strike(Beast &b, int damage)
 	b.until = now + 300;
 }
 
-/** Its body: about as wide as it is long, as high as it is tall, from its feet. */
+/**
+ * How many times its model one is seen from the eyes: at its true size ("meritko" halved: the girls' 2 is their true
+ * size), people a head taller as the girls; a dog or an animal between 0.4 and 0.9 m tall twice that (the player,
+ * 4. 11.: "all from 0.4 to 0.9 twice as big, because they are not seen" -- the dogs, the monkeys, the foxes, the hare).
+ * Not one its index made bigger already ("meritko" over the girls' 2: the fennec and the stylized wolf two and a half
+ * times), the smaller ones (the cats, the rats, the hedgehog, the squirrel) nor the ghosts (the gnome, Papa Smurf).
+ */
+float EyeScaleOf(const ThreeDAnimal &a)
+{
+	const float scale = a.scale * EYE_OF_MAP * (a.People() ? THREE_D_EYE_PEOPLE_SCALE : 1.0f);
+	if ((a.kind != ThreeDAnimal::Kind::Dog && a.kind != ThreeDAnimal::Kind::Animal) || a.scale > 2.0f) return scale;
+	const float tall = a.size[2] * scale;
+	return tall >= EYE_SMALL_FROM_M && tall <= EYE_SMALL_TO_M ? scale * 2.0f : scale;
+}
+
+/** Its body as the eyes see it (EyeScaleOf()): about as wide as it is long, as high as it is tall, from its feet. */
 bool InBody(const Beast &b, const ThreeDAnimal &a, double x, double y, double z, double more_m)
 {
-	const double r = (std::max(0.4, static_cast<double>(std::max(a.size[0], a.size[1])) * 0.5) + more_m) * OBJECT_UNITS_PER_METRE;
+	const double k = EyeScaleOf(a);
+	const double r = (std::max(0.4, static_cast<double>(std::max(a.size[0], a.size[1])) * 0.5 * k) + more_m) * OBJECT_UNITS_PER_METRE;
 	if (std::hypot(b.x - x, b.y - y) > r) return false;
-	return z >= b.z - (0.3 + more_m) * OBJECT_HEIGHT_PER_METRE && z <= b.z + (a.size[2] + more_m) * OBJECT_HEIGHT_PER_METRE;
+	return z >= b.z - (0.3 + more_m) * OBJECT_HEIGHT_PER_METRE && z <= b.z + (a.size[2] * k + more_m) * OBJECT_HEIGHT_PER_METRE;
 }
 
 } // namespace
@@ -1761,7 +1781,7 @@ void AddThreeDAnimalsToViewport(ZoomLevel zoom)
 	}
 }
 
-/** And in the view from an eye, at their true size; the sellers, people, a head taller as the girls (AddCabFigure()). */
+/** And in the view from an eye, at their true size, the small twice; the sellers, people, a head taller as the girls (EyeScaleOf()). */
 void AddThreeDAnimalsToEye()
 {
 	for (const Beast &b : _beasts) {
@@ -1769,8 +1789,7 @@ void AddThreeDAnimalsToEye()
 		if (a == nullptr || b.inside) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
-		const float people = a->People() ? THREE_D_EYE_PEOPLE_SCALE : 1.0f;
-		AddCabFigure(figure, a->scale * EYE_OF_MAP * people, static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
+		AddCabFigure(figure, EyeScaleOf(*a), static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
 	}
 }
 
