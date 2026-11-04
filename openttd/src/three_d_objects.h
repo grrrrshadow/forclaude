@@ -864,6 +864,7 @@ struct ThreeDVehicleObject {
 	std::shared_ptr<const ThreeDBonesFrame> GetBones(int frame) const;
 	std::shared_ptr<const ThreeDBonesFrame> TryGetBones(int frame) const;
 	bool ShapeKnown() const;
+	std::optional<bool> ShapeLights() const;
 	bool KnownExtent(float extent[6], uint32_t *version = nullptr) const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;

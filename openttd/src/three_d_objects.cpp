@@ -6868,6 +6868,17 @@ bool ThreeDVehicleObject::ShapeKnown() const
 	return this->shape != nullptr || this->shape_tried;
 }
 
+/**
+ * Whether the object's shape as it is read has its lights (ThreeDVehicleShape::HasLights()); nothing when it is not read
+ * yet. Never reads it: the night lights ask on the main thread, the shape is read for the drawing on its own thread.
+ */
+std::optional<bool> ThreeDVehicleObject::ShapeLights() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	if (this->shape == nullptr) return this->shape_tried ? std::optional<bool>(false) : std::nullopt;
+	return this->shape->HasLights();
+}
+
 /** The object's shape (a frame of it) if it is read already; else nullptr, and it is read in the background (TryGetShape(int, uint64_t)). */
 const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
 {
