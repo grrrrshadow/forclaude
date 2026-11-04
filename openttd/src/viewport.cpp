@@ -7735,25 +7735,6 @@ static bool VehicleHasNoLights(const Vehicle *v)
 	return obj != nullptr && obj->lights_off;
 }
 
-/**
- * Whether a piece of the vehicle is drawn from its object whose model has its lights (GetThreeDVehicleObjectLights()):
- * then the vehicle's lights are the model's, none about the box of any of its pieces. The colleague's Tatras have their
- * lights in their parts, and the GRF's pieces behind them are spacers of no object (CZTR_Truck_SetBRYLE1-rozestupy):
- * the last of them had the red lights of a vehicle without its own, on the road a lorry's length behind it (the player,
- * #329: "behind the Tatras the lights are red, those lights are for 2D without lights defined, the Tatra has them").
- */
-static bool VehicleHasModelLights(const Vehicle *v)
-{
-	if (!ThreeDEnabled()) return false;
-	for (const Vehicle *u = v->First(); u != nullptr; u = u->Next()) {
-		const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(u);
-		if (obj == nullptr || obj->lights_off) continue;
-		/* Its shape not asked for here (ShapeLights()): not read yet, the vehicle is not drawn yet either. */
-		if (obj->ShapeLights().value_or(true)) return true;
-	}
-	return false;
-}
-
 bool VehicleBrakeLightsOn(const Vehicle *v)
 {
 	if (VehicleHasNoLights(v)) return false;
@@ -8052,7 +8033,6 @@ static void DrawNight(bool turned)
 			}
 		}
 		if (!front && !last) continue;
-		if (VehicleHasModelLights(v)) continue;
 		const int d = to_underlying(v->direction) & 7;
 		double fx = dir_dx[d], fy = dir_dy[d];
 		const double len = std::sqrt(fx * fx + fy * fy);
@@ -14134,8 +14114,6 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		const double sx = -fy, sy = fx;
 		const double z = u->z_pos;
 		const bool mine = own != nullptr && u->First() == own;
-		/* Its lights its model's (VehicleHasModelLights()): none about a spacer's box; the own one's pool ahead from its cab. */
-		if (!mine && VehicleHasModelLights(u)) continue;
 		if (u->type == VehicleType::Aircraft) {
 			glow(u->x_pos + fx * 6, u->y_pos + fy * 6, z + 2, 1.5, lamp, 0.9, 1.0);
 			if ((TimerGameTick::counter + u->index.base() * 7) % 32 < 6) glow(u->x_pos, u->y_pos, z + 6, 1.0, beacon, 1.0, 1.0);

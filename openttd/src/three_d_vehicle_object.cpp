@@ -3056,8 +3056,10 @@ static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	const bool leads = front->Previous() == nullptr;
 	/* Its red lights when nothing follows it, or nothing seen: a lorry of the colleague's without its trailer has the
-	 * trailer's pieces behind it, drawn as nothing. */
-	const bool last_one = last->Next() == nullptr || NothingSeenAfter(last, zoom);
+	 * trailer's pieces behind it, drawn as nothing. A lorry's always, a trailer behind it or not (the player, 4. 11.:
+	 * "they must shine with the trailer too, then the trailer shines at the back and the Tatra that pulls it"); of a
+	 * train only its last car's. */
+	const bool last_one = front->type == VehicleType::Road || last->Next() == nullptr || NothingSeenAfter(last, zoom);
 	/* Turned round, going back first (the colleague's hra/3d/VAGONY-3D-V5-PRO-HRU.md): the headlights on its back end
 	 * when it leads, the red lights on its front end when nothing follows; without those, none. */
 	if (reversed) return (shape->HasLightsGoingBack() ? (leads ? LIGHTS_FRONT_AT_BACK : 0) | (last_one ? LIGHTS_BACK_AT_FRONT : 0) : 0) & (on ? ~0 : red);
@@ -3363,11 +3365,31 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	return obj;
 }
 
+/**
+ * Whether an object shows nothing in this state: of the colleague's packages, whose own file is its length alone (two
+ * invisible triangles, PROSBA-NAKLADAKY-TATRA-3D.md point 4), a state of no part -- the trailer of a lorry that pulls
+ * none ("without the trailer's subtype the article is empty, a set of no state, nothing is drawn"). The card draws
+ * those two triangles all the same (CardVehicle()). Its shape not made yet: not known, as if it showed something.
+ */
+static bool ShowsNothing(const ThreeDVehicleObject *obj, int state)
+{
+	if (obj->states.empty()) return false;
+	const ThreeDParts parts = obj->PartsOf(state);
+	const ThreeDVehicleShape *shape = obj->TryGetShape(0, parts);
+	if (shape == nullptr) return false;
+	size_t seen = 0;
+	for (size_t t = 0; t * 3 + 2 < shape->tri.size(); t++) {
+		if (ThreeDVehicleShape::Shown(t < shape->tri_part.size() ? shape->tri_part[t] : 0, parts) && ++seen > 2) return false;
+	}
+	return true;
+}
+
 /** Whether the object a piece of a vehicle is a piece of draws nothing now (not a pixel of its picture, RasterObject()). */
 static bool ObjectDrawsNothing(const ThreeDVehicleObject *obj, const Vehicle *v, int piece, ZoomLevel zoom)
 {
 	const Vehicle *anchor = PieceAway(v, obj->anchor - piece);
 	if (anchor == nullptr) return false;
+	if (ShowsNothing(obj, StateStep(obj, anchor->engine_type, anchor, EngineImageType::OnMap))) return true;
 	VehicleObjectPlace place;
 	PlaceVehicleObject(anchor, zoom, nullptr, place, ViewportVehiclesOnCard());
 	return place.on_card ? place.card == nullptr : place.pic == nullptr;
@@ -3851,6 +3873,8 @@ bool GetThreeDVehicleObjectWorldLights(const Vehicle *v, std::vector<ThreeDWorld
 	ThreeDEyeVehicle &ev = placed;
 	if (!GetThreeDEyeVehicle(v, ev)) return false;
 	if (ev.obj == nullptr) return true;
+	/* An empty trailer (ShowsNothing()): no lights, none about its box either. */
+	if (ShowsNothing(ev.obj, ev.state)) return true;
 	const ThreeDVehicleShape *shape = ev.obj->GetShape();
 	if (shape == nullptr || !shape->HasLights()) return false;
 	GetThreeDEyeObjectLights(ev, lights);
