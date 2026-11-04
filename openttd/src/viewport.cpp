@@ -2505,6 +2505,11 @@ std::string TakeTurnedTimesForDiary(int frames)
 		const int *w = t.small_old_why;
 		s += fmt::format("; male okna postaru {} bloku (vypnuto {}, mapa otocena {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {})", t.small_old, w[0], w[1], w[2], w[3], w[4], w[5], w[6]);
 	}
+	/* The small views with their pictures on the card, and how many gave theirs up to another (SmallViewOnCardOf()). */
+	extern size_t SmallViewsOnCardCount();
+	extern uint64_t _small_views_given_up;
+	if (s != "-" && (SmallViewsOnCardCount() > 0 || _small_views_given_up > 0)) s += fmt::format("; malych oken na karte {}, dano jinemu {}x", SmallViewsOnCardCount(), _small_views_given_up);
+	_small_views_given_up = 0;
 	std::fill(std::begin(_turned_card_dirty_why), std::end(_turned_card_dirty_why), 0);
 	/* The vehicles the card drew past what their moves draw again (NoteCardReach()): left behind as they drive on. */
 	extern std::string TakeCardReachForRig();
@@ -5834,9 +5839,20 @@ struct SmallViewOnCard {
 	TurnedCardGround card;  ///< its picture on the card
 	TurnedGround ground;    ///< its kept ground (_turned_ground the main view's)
 	uint64_t version = 0;   ///< the changes of its ground (_turned_ground_version the main view's)
+	std::chrono::steady_clock::time_point drawn_at{}; ///< when it was last drawn: the longest not drawn gives its picture up first (SmallViewOnCardOf())
 };
+/** How long a small view is not drawn before it gives its picture on the card up to another: the views drawn meanwhile (a vehicle's window following it) keep theirs. */
+static constexpr std::chrono::seconds SMALL_VIEW_GIVES_UP_AFTER{2};
 static std::map<const Viewport *, std::unique_ptr<SmallViewOnCard>> _small_views_on_card;
 bool _small_views_on_card_on = true; ///< Rig: the small views facing north drawn by the card (test3d male); else as the game drew them
+uint64_t _small_views_given_up = 0; ///< The diary: how many times a small view gave its picture on the card up to another (SmallViewOnCardOf())
+void ForgetViewportOnCard(const Viewport *vp);
+
+/** The diary: how many small views have their pictures on the card. */
+size_t SmallViewsOnCardCount()
+{
+	return _small_views_on_card.size();
+}
 static constexpr size_t SMALL_VIEW_GROUND_PIXELS = static_cast<size_t>(4) << 20; ///< a small view's kept ground at most so many pixels (16 MB)
 static constexpr uint64_t SMALL_VIEW_GROUND_KEY = 0x100; ///< its texture on the card by this key and the number of its pictures
 
@@ -8509,14 +8525,40 @@ static void TurnedCardLaySmallViewsDirty(int left, int top, int right, int botto
 static SmallViewOnCard *SmallViewOnCardOf(const Viewport &vp)
 {
 	if (!SmallViewsOnCardNow()) return nullptr;
+	const auto now = std::chrono::steady_clock::now();
 	auto it = _small_views_on_card.find(&vp);
-	if (it != _small_views_on_card.end()) return it->second.get();
+	if (it != _small_views_on_card.end()) {
+		it->second->drawn_at = now;
+		return it->second.get();
+	}
 	std::array<bool, THREE_D_GPU_VIEWS> taken{};
 	taken[0] = true;
 	for (const auto &[other, small] : _small_views_on_card) taken[small->card.view] = true;
-	const auto unused = std::ranges::find(taken, false);
-	if (unused == taken.end()) return nullptr;
+	auto unused = std::ranges::find(taken, false);
+	if (unused == taken.end()) {
+		/* The card's pictures all taken (the player's #329: a vehicle window drawn the old way, the windows that had them
+		 * drawn no more for long): the one drawn the longest ago, and not for a while, gives its picture up, its window
+		 * drawn again (by the card if another gives its up, else the old way). Those drawn meanwhile keep theirs, else
+		 * the views seen all at once took them from each other every frame. */
+		auto oldest = _small_views_on_card.end();
+		for (auto o = _small_views_on_card.begin(); o != _small_views_on_card.end(); ++o) {
+			if (now - o->second->drawn_at < SMALL_VIEW_GIVES_UP_AFTER) continue;
+			if (oldest == _small_views_on_card.end() || o->second->drawn_at < oldest->second->drawn_at) oldest = o;
+		}
+		if (oldest == _small_views_on_card.end()) return nullptr;
+		const int view = oldest->second->card.view;
+		const Viewport *gone = oldest->first;
+		Debug(misc, 1, "3D: the small view {}x{} gives its view {} on the graphics card up to a small view {}x{}", gone->width, gone->height, view, vp.width, vp.height);
+		ForgetViewportOnCard(gone);
+		for (Window *w : Window::Iterate()) {
+			if (w->viewport != nullptr && w->viewport.get() == gone) w->SetDirty();
+		}
+		taken[view] = false;
+		unused = taken.begin() + view;
+		_small_views_given_up++;
+	}
 	auto small = std::make_unique<SmallViewOnCard>();
+	small->drawn_at = now;
 	small->card.view = static_cast<int>(unused - taken.begin());
 	small->card.ground_key = SMALL_VIEW_GROUND_KEY + small->card.view;
 	Debug(misc, 1, "3D: a small view {}x{} drawn by the graphics card as its view {}", vp.width, vp.height, small->card.view);

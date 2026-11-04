@@ -1378,10 +1378,11 @@ static void DoDrawVehicle(const Vehicle *v)
 	/* A disaster's UFO in the 3D views: the flying saucer (three_d_ufo.h), not its sprite nor its shadow's. */
 	if ((ViewportDrawingTurned() || ViewportDrawingNorthObjects()) && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && ThreeDUfoDrawsDisaster(v)) return;
 
-	/* At night a vehicle drawn from its object whose model has its lights is drawn so facing north too: its picture
-	 * keeps the glass of its lights lit through the night (ThreeDModelPicture::lit), a sprite would not. */
+	/* A vehicle drawn from its 3D object is drawn so facing north too, as on the turned map: its sprite is made only for
+	 * the depot and the purchase list (a view the card does not draw showed none of them, the player's #329: "the car
+	 * not seen in the vehicle window"); by night its picture keeps the glass of its lights lit (ThreeDModelPicture::lit). */
 	if (!ViewportDrawingTurned() && ThreeDEnabled() && BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && !shadowed && v->direction != Direction::Invalid &&
-			!v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked() && v->type != VehicleType::Effect && v->type != VehicleType::Disaster && ThreeDVehicleObjectLitAtNight(v)) {
+			!v->vehstatus.Test(VehState::Crashed) && !v->IsWrecked() && v->type != VehicleType::Effect && v->type != VehicleType::Disaster) {
 		if (AddThreeDVehicleObjectToViewport(v, _cur_dpi->zoom, nullptr)) return;
 	}
 
