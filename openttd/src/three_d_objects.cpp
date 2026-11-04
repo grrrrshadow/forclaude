@@ -4121,9 +4121,13 @@ static BridgePieceObjects _three_d_bridge_pieces = [] {
 	}
 	return none;
 }();
+/** The same pieces for the map (GetThreeDBridgePiece(), map): a level of the map's land is 3 m, not the eyes' 5. */
+static BridgePieceObjects _three_d_bridge_map_pieces = _three_d_bridge_pieces;
 
 /** How much higher a ramp's and a pillar's piece of a bridge stand than their model: a level of the land, 5 m (EYE_LEVEL_STRETCH). */
 static constexpr float BRIDGE_LEVEL_M = 5.0f;
+/** A level of the map's land, metres (TILE_HEIGHT of OBJECT_HEIGHT_PER_METRE): the pieces for the map squashed to it. */
+static constexpr float BRIDGE_MAP_LEVEL_M = static_cast<float>(TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE);
 
 /**
  * A 3D bridge ("druh": "most", the colleague's hra/3d/MOSTY-3D-PRO-HRU.md): one model whose named nodes are its pieces
@@ -4165,6 +4169,22 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 		Debug(misc, 0, "3D bridge {}: no node stred", holder.name);
 		return;
 	}
+	/* For the map (the player, 4. 11.: "bridges and aqueducts from above and at 0 too"): each piece squashed from the
+	 * eyes' level of 5 m to the map's of 3, its normals as squashed (a slope steeper, its normal flatter). */
+	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> map_meshes;
+	const float squash = BRIDGE_MAP_LEVEL_M / BRIDGE_LEVEL_M;
+	for (size_t p = 0; p < meshes.size(); p++) {
+		if (!meshes[p].has_value()) continue;
+		IndustryPartMesh pm = *meshes[p];
+		for (size_t i = 2; i < pm.mesh.pos.size(); i += 3) pm.mesh.pos[i] *= squash;
+		for (size_t i = 0; i + 2 < pm.mesh.nrm.size(); i += 3) {
+			float *n = &pm.mesh.nrm[i];
+			n[2] /= squash;
+			const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+			if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
+		}
+		map_meshes[p] = std::move(pm);
+	}
 	const std::string name = holder.name;
 	const std::vector<ThreeDObjectColourPart> colours = holder.colours;
 	_three_d_objects.push_back(std::move(holder));
@@ -4198,6 +4218,14 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				piece.variant_paint = {paint, paint};
 				_three_d_bridge_pieces[type][p][q] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(piece));
+				/* The map's: every piece a map's level higher, stood a level lower (EyeBridgePieces() of viewport.cpp,
+				 * map), so that its box on the map reaches down to the arches under its deck. */
+				const float map_at[3] = {at[0], at[1], BRIDGE_MAP_LEVEL_M};
+				ThreeDObject map_piece = PlaceIndustryPart(*map_meshes[p], fmt::format("{}/{} {} {} mapa", name, BRIDGE_PIECE_NODES[p], type, q * 90), map_at, q * 90.0f, 1.0f, 1, 1);
+				map_piece.colours = colours;
+				map_piece.variant_paint = {paint, paint};
+				_three_d_bridge_map_pieces[type][p][q] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(map_piece));
 			}
 		}
 	}
@@ -4207,15 +4235,16 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
  * A piece of the 3D bridge of one of the game's bridge types (ReadBridge()), turned by quarters about the middle of its
  * tile; never waiting for the indices (ThreeDObjectsIndexRead()). The inner pieces and the end without their own the
  * middle piece, the pillar's foot without its own the pillar's.
+ * @param map the map's piece: squashed to the map's level of 3 m, each a map's level higher than the eyes' piece
  * @return nullptr when that bridge has no 3D pieces, or not that one
  */
-const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns)
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map)
 {
 	if (type > THREE_D_AQUEDUCT || !ThreeDObjectsIndexRead()) return nullptr;
 	/* With the original houses wanted (gui.three_d_houses) the original bridges too (the player, 4. 11.: "when the 3D
 	 * houses are switched off, the 3D bridges are off too"). */
 	if (_settings_client.gui.three_d_houses != 0) return nullptr;
-	const auto &pieces = _three_d_bridge_pieces[type];
+	const auto &pieces = (map ? _three_d_bridge_map_pieces : _three_d_bridge_pieces)[type];
 	const int q = quarter_turns & 3;
 	size_t k = pieces[to_underlying(piece)][q];
 	if (k == SIZE_MAX && (piece == ThreeDBridgePiece::MiddleA || piece == ThreeDBridgePiece::MiddleB || piece == ThreeDBridgePiece::End)) k = pieces[to_underlying(ThreeDBridgePiece::Middle)][q];

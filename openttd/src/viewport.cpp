@@ -4000,10 +4000,69 @@ static inline ThreeDPart BridgePart(Axis axis, double a0, double a1, double c0, 
 	return {static_cast<float>(c0), static_cast<float>(c1), static_cast<float>(a0), static_cast<float>(a1), static_cast<float>(h), ThreeDRoof::Flat, 0.0f};
 }
 
+/* A bridge of 3D pieces on the map (AddTurnedBridgePieces()): of its sprites only its floor -- the road or the track on
+ * it, an aqueduct's water -- a little over the pieces' deck (box_dy of a deck and of a ramp, these bits). */
+static constexpr int16_t TURNED_DECK_ON_PIECES = 1; ///< the floor alone, no sides, over the pieces' deck
+static constexpr int16_t TURNED_DECK_WATER = 2;     ///< an aqueduct's: only between the walls of its trough
+/** How far over the 3D pieces' deck their bridge's floor is laid on the map, units of height. */
+static constexpr int TURNED_OVER_PIECES = 1;
+/** Half the width of an aqueduct's water between the walls of its 3D trough, metres (the colleague's hra/3d/PROSBA-AKVADUKTY.md: "y ±5.5 m"). */
+static constexpr double AQUEDUCT_WATER_HALF_M = 5.5;
+
+/** Across a bridge's tile, where its floor lies: the whole deck, or an aqueduct's water between its 3D walls (TURNED_DECK_WATER). */
+static void TurnedDeckAcross(int16_t bits, double &c0, double &c1)
+{
+	c0 = 1;
+	c1 = TILE_SIZE - 1;
+	if ((bits & TURNED_DECK_WATER) == 0) return;
+	const double half = AQUEDUCT_WATER_HALF_M * OBJECT_UNITS_PER_METRE;
+	c0 = TILE_SIZE / 2.0 - half;
+	c1 = TILE_SIZE / 2.0 + half;
+}
+
+/** Across an aqueduct's trough sprite, the band of its water alone, not its walls: where its water on 3D pieces is dressed from. */
+static constexpr double TURNED_WATER_TEXTURE_C0 = TILE_SIZE / 2.0 - 3, TURNED_WATER_TEXTURE_C1 = TILE_SIZE / 2.0 + 3;
+
+/**
+ * An aqueduct's water on its 3D pieces (box_kind 8, TURNED_DECK_WATER): one face between the walls of their trough at
+ * the top of the deck's slab, dressed in the middle band of the trough's sprite alone -- its water, the sprite's walls
+ * and railings left to the pieces' (the 2D trough's stones and posts showed over the 3D one).
+ */
+static void DrawTurnedAqueductWater(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const Axis axis = static_cast<Axis>(ps.box_dx);
+	auto world = [&](double a, double c, double &wx, double &wy) {
+		wx = axis == Axis::X ? a : c;
+		wy = axis == Axis::X ? c : a;
+	};
+	auto pt = [&](double a, double c, double z, double tc) {
+		BoxVertex v;
+		world(a, c, v.x, v.y);
+		v.z = z;
+		world(a, tc, v.tx, v.ty);
+		v.tz = z;
+		return v;
+	};
+	TurnedTexture tex;
+	if (!MakeTurnedTexture(frame, ps, tex)) return;
+	double c0, c1;
+	TurnedDeckAcross(ps.box_dy, c0, c1);
+	const double z = TURNED_DECK, t0 = TURNED_WATER_TEXTURE_C0, t1 = TURNED_WATER_TEXTURE_C1;
+	std::vector<BoxFace> faces;
+	faces.push_back({{pt(0, c0, z, t0), pt(TILE_SIZE, c0, z, t0), pt(TILE_SIZE, c1, z, t1), pt(0, c1, z, t1)}, 0.0});
+	DrawTurnedFaces(frame, ps, faces, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0, tex);
+}
+
 /** The deck of a bridge over a tile (box_kind 8): a slab across the tile at the bridge's height, its top the floor sprite's. */
 static void DrawTurnedBridgeDeck(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
-	ThreeDPart part = BridgePart(static_cast<Axis>(ps.box_dx), 0, TILE_SIZE, 1, TILE_SIZE - 1, TURNED_DECK);
+	if ((ps.box_dy & TURNED_DECK_WATER) != 0) {
+		DrawTurnedAqueductWater(frame, ps);
+		return;
+	}
+	double c0, c1;
+	TurnedDeckAcross(ps.box_dy, c0, c1);
+	ThreeDPart part = BridgePart(static_cast<Axis>(ps.box_dx), 0, TILE_SIZE, c0, c1, TURNED_DECK);
 	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0);
 }
 
@@ -4084,17 +4143,26 @@ static void DrawTurnedBridgeRamp(const DrawPixelInfo &frame, const ParentSpriteT
 		TurnWorldPoint(x0 + cx / poly.size(), y0 + cy / poly.size(), xr, yr);
 		faces.push_back({std::move(poly), xr + yr + 2 * cz / poly.size()});
 	};
-	const double c_far = 1, c_near = TILE_SIZE - 1;
-	/* The deck. */
-	add({pt(a_out, c_far, deck_out, c_far, deck_out), pt(a_in, c_far, deck_in, c_far, deck_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_out, c_near, deck_out, c_near, deck_out)});
+	double c_far, c_near;
+	TurnedDeckAcross(ps.box_dy, c_far, c_near);
+	/* The deck; over a 3D head's (TURNED_DECK_ON_PIECES) a little, dressed in the pixels where it lies, no sides. */
+	const bool on_pieces = (ps.box_dy & TURNED_DECK_ON_PIECES) != 0;
+	const double lift = on_pieces ? TURNED_OVER_PIECES : 0;
+	/* An aqueduct's water dressed from the middle of its trough's sprite alone (DrawTurnedAqueductWater()). */
+	const bool water = (ps.box_dy & TURNED_DECK_WATER) != 0;
+	const double t_far = water ? TURNED_WATER_TEXTURE_C0 : c_far, t_near = water ? TURNED_WATER_TEXTURE_C1 : c_near;
+	add({pt(a_out, c_far, deck_out + lift, t_far, deck_out), pt(a_in, c_far, deck_in + lift, t_far, deck_in), pt(a_in, c_near, deck_in + lift, t_near, deck_in), pt(a_out, c_near, deck_out + lift, t_near, deck_out)});
 	/* Its sides down to the ground: the near one as the sprite shows it, the far one in the near one's pixels. */
 	for (double c : {c_near, c_far}) {
+		if (on_pieces) break;
 		double g_out = std::min(ground(a_out, c), deck_out), g_in = std::min(ground(a_in, c), deck_in - TURNED_DECK);
 		add({pt(a_out, c, g_out, c_near, g_out), pt(a_in, c, g_in, c_near, g_in), pt(a_in, c, deck_in, c_near, deck_in), pt(a_out, c, deck_out, c_near, deck_out)});
 	}
 	/* The end under the bridge, in the near side's pixels. */
-	double g_in = std::min({ground(a_in, c_far), ground(a_in, c_near), deck_in - TURNED_DECK});
-	add({pt(a_in, c_far, g_in, c_near, g_in), pt(a_in, c_near, g_in, c_near, g_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_in, c_far, deck_in, c_near, deck_in)});
+	if (!on_pieces) {
+		double g_in = std::min({ground(a_in, c_far), ground(a_in, c_near), deck_in - TURNED_DECK});
+		add({pt(a_in, c_far, g_in, c_near, g_in), pt(a_in, c_near, g_in, c_near, g_in), pt(a_in, c_near, deck_in, c_near, deck_in), pt(a_in, c_far, deck_in, c_near, deck_in)});
+	}
 	std::sort(faces.begin(), faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
 	DrawTurnedFaces(frame, ps, faces, TILE_SIZE / 2.0, TILE_SIZE / 2.0, 360.0, tex);
 }
@@ -4106,10 +4174,12 @@ static void DrawTurnedBridgeRamp(const DrawPixelInfo &frame, const ParentSpriteT
  * railing; a surface laid on the deck (a rail type's deck, a reservation) a slab a step above it; a pillar piece a
  * column where its pixels stand; anything else of the bridge a box of its bounding box.
  */
-static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
+static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to, bool pieces)
 {
 	const Axis axis = GetBridgeAxis(tile);
 	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	/* Of 3D pieces (AddTurnedBridgePieces()): only the floor, a little over theirs; their pillars and railings theirs. */
+	const int16_t on_pieces = pieces ? TURNED_DECK_ON_PIECES | (GetTunnelBridgeTransportType(GetSouthernBridgeEnd(tile)) == TransportType::Water ? TURNED_DECK_WATER : 0) : 0;
 	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE;
 	const int corner_x = RemapCoords(x0, y0, 0).x;
 	std::vector<ParentSpriteToDraw> railings;
@@ -4121,6 +4191,10 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 		int c_ext = axis == Axis::X ? ey : ex;
 		ps.box = nullptr;
 		if (ps.zmin < bz - TURNED_DECK) {
+			if (pieces) {
+				ps.box_kind = 4;
+				continue;
+			}
 			/* A piece of a pillar. Its box tells only whether it is the near pillar (on the tile) or the far one (the game
 			 * draws that one so many units back that its pixels land at the far edge); where along the bridge it stands is
 			 * read off the sprite's middle, the pillar standing a few units in from the deck's edge. */
@@ -4137,6 +4211,17 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 			ps.box_dy = static_cast<int16_t>(std::lround((axis == Axis::X ? c : a) * 16));
 			continue;
 		}
+		if (ex >= static_cast<int>(TILE_SIZE) && ey >= static_cast<int>(TILE_SIZE) && (on_pieces & TURNED_DECK_WATER) != 0) {
+			/* An aqueduct's trough on 3D pieces: only its water, between the walls of theirs (TURNED_DECK_WATER). */
+			ps.box_kind = 8;
+			ps.box_ox = x0;
+			ps.box_oy = y0;
+			ps.box_oz = bz - TURNED_DECK + TURNED_OVER_PIECES;
+			ps.box_dx = static_cast<int16_t>(axis);
+			ps.box_dy = on_pieces;
+			ps.zmin = ps.box_oz;
+			continue;
+		}
 		if (ex >= static_cast<int>(TILE_SIZE) && ey >= static_cast<int>(TILE_SIZE)) {
 			/* A surface laid on the deck: a slab a step above it, sorted under what runs on it. */
 			ps.box_kind = 6;
@@ -4147,10 +4232,19 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 			ps.box_dy = static_cast<int16_t>(ey);
 			ps.zmax = ps.zmin;
 			ps.zmin--;
+			if (pieces) {
+				ps.box_oz += TURNED_OVER_PIECES;
+				ps.zmin += TURNED_OVER_PIECES;
+				ps.zmax += TURNED_OVER_PIECES;
+			}
 			continue;
 		}
 		if (c_ext <= 2) {
 			int16_t across = static_cast<int16_t>((c_min & 0xFF) | (c_ext << 8));
+			if (c_min >= static_cast<int>(TILE_SIZE) / 2 && pieces) {
+				ps.box_kind = 4;
+				continue;
+			}
 			if (c_min >= static_cast<int>(TILE_SIZE) / 2) {
 				/* The near railing. */
 				ps.box_kind = 9;
@@ -4169,18 +4263,22 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 			railing.box_oz = ps.zmin;
 			railing.box_dx = static_cast<int16_t>(axis);
 			railing.box_dy = across;
-			railings.push_back(railing);
+			if (!pieces) railings.push_back(railing);
 			ps.box_kind = 8;
 			ps.box_ox = x0;
 			ps.box_oy = y0;
-			ps.box_oz = bz - TURNED_DECK;
+			ps.box_oz = bz - TURNED_DECK + (pieces ? TURNED_OVER_PIECES : 0);
 			ps.box_dx = static_cast<int16_t>(axis);
-			ps.box_dy = 0;
+			ps.box_dy = on_pieces;
 			ps.xmin = x0;
 			ps.xmax = x0 + TILE_SIZE - 1;
 			ps.ymin = y0;
 			ps.ymax = y0 + TILE_SIZE - 1;
-			ps.zmin = bz - TURNED_DECK;
+			ps.zmin = ps.box_oz;
+			continue;
+		}
+		if (pieces) {
+			ps.box_kind = 4;
 			continue;
 		}
 		/* Anything else of the bridge: a box of its bounding box. */
@@ -4193,6 +4291,12 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to)
 	}
 	for (const ParentSpriteToDraw &r : railings) _vd.parent_sprites_to_draw.push_back(r);
 	if (!railings.empty()) _vd.last_child = LAST_CHILD_NONE;
+	if (_turned_debug_tile == tile) {
+		for (size_t i = from; i < to && i < _vd.parent_sprites_to_draw.size(); i++) {
+			const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
+			IConsolePrint(CC_DEFAULT, "ladeni:   most nad [{} z {}..{}] {} box x {}..{} y {}..{} z {}..{} -> druh {} dy {} bz {}{}", i, from, to, ps.image, ps.xmin, ps.xmax, ps.ymin, ps.ymax, ps.zmin, ps.zmax, ps.box_kind, ps.box_dy, bz, pieces ? " (3D dily)" : "");
+		}
+	}
 }
 
 /*
@@ -4332,20 +4436,27 @@ static void TurnedDepot(TileIndex tile, size_t first_parent)
 	shed.zmax = z + height - 1;
 }
 
-/** The sprites of a bridge's end on its tile: the ramp and whatever lies on it (a road, rails) as the rising deck (box_kind 10). */
-static void TurnedBridgeHead(TileIndex head, size_t first_parent)
+/**
+ * The sprites of a bridge's end on its tile: the ramp and whatever lies on it (a road, rails) as the rising deck (box_kind
+ * 10). Of 3D pieces (AddTurnedBridgePieces()): only the deck a little over theirs, the rest of its sprites theirs.
+ */
+static void TurnedBridgeHead(TileIndex head, size_t first_parent, bool pieces)
 {
+	const int16_t on_pieces = pieces ? TURNED_DECK_ON_PIECES | (GetTunnelBridgeTransportType(head) == TransportType::Water ? TURNED_DECK_WATER : 0) : 0;
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
-		if (ps.xmax - ps.xmin + 1 < static_cast<int>(TILE_SIZE) || ps.ymax - ps.ymin + 1 < static_cast<int>(TILE_SIZE)) continue;
+		if (ps.xmax - ps.xmin + 1 < static_cast<int>(TILE_SIZE) || ps.ymax - ps.ymin + 1 < static_cast<int>(TILE_SIZE)) {
+			if (pieces) ps.box_kind = 4;
+			continue;
+		}
 		ps.box_kind = 10;
 		ps.box = nullptr;
 		ps.box_ox = TileX(head) * TILE_SIZE;
 		ps.box_oy = TileY(head) * TILE_SIZE;
 		ps.box_oz = 0;
 		ps.box_dx = 0;
-		ps.box_dy = 0;
+		ps.box_dy = on_pieces;
 	}
 }
 
@@ -5421,6 +5532,27 @@ static void AddPastureTile()
 		AddThreeDFigureToViewport(figure, f.scale, static_cast<int>(std::lround(_cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE)), static_cast<int>(std::lround(_cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE)),
 				_cur_ti.z, f.facing, _vd.dpi.zoom, INVALID_TILE, 0, ThreeDMapPose(figure, frame));
 	});
+}
+
+template <typename F>
+static bool EyeBridgePieces(TileIndex tile, F add, bool map = false);
+
+/**
+ * A bridge of 3D pieces on the map (the player, 4. 11.: "bridges and aqueducts from above and at 0 too"): the pieces
+ * over the tile, or its head's, as the eyes have them (EyeBridgePieces()), the map's squashed to its level of 3 m; its
+ * sprites then only its floor (TurnedBridgeOverTile(), TurnedBridgeHead()). Sorted under the floor laid over their deck
+ * and under what runs on it: their boxes end below it. See-through bridges keep the game's sprites.
+ * @return whether the tile has them
+ */
+static bool AddTurnedBridgePieces(TileIndex tile)
+{
+	if (IsTransparencySet(TransparencyOption::Bridges)) return false;
+	const int bz = IsBridgeAbove(tile) ? GetBridgePixelHeight(GetSouthernBridgeEnd(tile)) : IsBridgeTile(tile) ? GetBridgePixelHeight(tile) : 0;
+	const int floor = bz - TURNED_DECK + TURNED_OVER_PIECES;
+	return EyeBridgePieces(tile, [tile, floor](const ThreeDObject *o, int z) {
+		const int top = static_cast<int>(std::ceil(o->top));
+		_turned_objects.emplace_back(o, tile, z, nullptr, std::span<const ThreeDObjectFigure>{}, std::min(0, floor - 1 - (z + top)));
+	}, true);
 }
 
 /** Whether a sprite is one of the game's own street lights (Roadside::StreetLights: the table _roadside_lamps of road_cmd.cpp). */
@@ -7298,11 +7430,14 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 
 		/* A bridge over the tile, and a bridge's end on it: built from their sprites (TurnedBridgeOverTile()). */
 		if (_cur_ti.tile != INVALID_TILE) {
+			/* Of 3D pieces (AddTurnedBridgePieces()): the pieces of the bridge over it, or of its head. */
+			const bool pieces = AddTurnedBridgePieces(_cur_ti.tile);
+			const bool under = IsBridgeAbove(_cur_ti.tile);
 			for (const CabBridgeSprites &bs : _cab_bridge_sprites) {
-				if (bs.tile == _cur_ti.tile && bs.to != SIZE_MAX) TurnedBridgeOverTile(_cur_ti.tile, bs.from, bs.to);
+				if (bs.tile == _cur_ti.tile && bs.to != SIZE_MAX) TurnedBridgeOverTile(_cur_ti.tile, bs.from, bs.to, pieces && under);
 			}
 			_cab_bridge_sprites.clear();
-			if (tile_type == TileType::TunnelBridge && IsBridge(_cur_ti.tile)) TurnedBridgeHead(_cur_ti.tile, first_parent);
+			if (tile_type == TileType::TunnelBridge && IsBridge(_cur_ti.tile)) TurnedBridgeHead(_cur_ti.tile, first_parent, pieces && !under);
 			/* A depot: one box over its tile (TurnedDepot()); see-through, its sprites as they are. */
 			if ((tile_type == TileType::Railway || tile_type == TileType::Road || tile_type == TileType::Water) && !IsTransparencySet(TransparencyOption::Buildings)) {
 				TurnedDepot(_cur_ti.tile, first_parent);
@@ -12030,11 +12165,13 @@ static constexpr double CAB_DECK_OVER_PIECES = 0.3;
  * its ramp, 5 m up along the tile; on a foundation level with the bridge its middle piece.
  * @param add given each piece and the height it stands at, units (a piece's z 0 the top of the deck; a ramp's and a
  *            pillar's piece's a level lower, ReadBridge() of three_d_objects.cpp)
+ * @param map the map's pieces (AddTurnedBridgePieces()): each stands a level lower, a map's level higher in itself
  * @return whether the bridge on the tile has its 3D pieces: its sprites then draw only its deck
  */
 template <typename F>
-static bool EyeBridgePieces(TileIndex tile, F add)
+static bool EyeBridgePieces(TileIndex tile, F add, bool map)
 {
+	const int deck_lower = map ? static_cast<int>(TILE_HEIGHT) : 0;
 	if (IsBridgeAbove(tile)) {
 		const TileIndex north = GetNorthernBridgeEnd(tile), south = GetSouthernBridgeEnd(tile);
 		const std::optional<uint> type = EyeBridgeType(south);
@@ -12050,13 +12187,13 @@ static bool EyeBridgePieces(TileIndex tile, F add)
 			piece = (k % 2 == 0 || k + 1 == inner) ? ThreeDBridgePiece::MiddleA : ThreeDBridgePiece::MiddleB;
 		}
 		const int bz = GetBridgePixelHeight(south);
-		if (const ThreeDObject *o = GetThreeDBridgePiece(*type, piece, turn); o != nullptr) add(o, bz);
+		if (const ThreeDObject *o = GetThreeDBridgePiece(*type, piece, turn, map); o != nullptr) add(o, bz - deck_lower);
 		const TileType under = GetTileType(tile);
 		const bool free = under == TileType::Clear || under == TileType::Trees || (under == TileType::Water && IsCoast(tile));
 		if (free && BridgeTileHasPillars(tile)) {
 			const int levels = bz / static_cast<int>(TILE_HEIGHT) - GetTileZ(tile);
 			for (int k = 0; k < levels; k++) {
-				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along);
+				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along, map);
 				if (o != nullptr) add(o, bz - (k + 1) * static_cast<int>(TILE_HEIGHT));
 			}
 		}
@@ -12070,15 +12207,15 @@ static bool EyeBridgePieces(TileIndex tile, F add)
 	const int turn = (DiagDirToAxis(dir) == Axis::X ? 0 : 1) + (dir == DiagDirection::SW || dir == DiagDirection::SE ? 0 : 2);
 	const int bz = GetBridgePixelHeight(tile);
 	if (CabBridgeRampRises(tile)) {
-		const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Head, turn);
+		const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Head, turn, map);
 		if (o == nullptr) return false;
 		add(o, bz - static_cast<int>(TILE_HEIGHT));
-	} else if (const ThreeDObject *o = *type == THREE_D_AQUEDUCT ? GetThreeDBridgePiece(*type, ThreeDBridgePiece::HeadSlope, turn) : nullptr; o != nullptr) {
+	} else if (const ThreeDObject *o = *type == THREE_D_AQUEDUCT ? GetThreeDBridgePiece(*type, ThreeDBridgePiece::HeadSlope, turn, map) : nullptr; o != nullptr) {
 		/* An aqueduct's head always on its slope, the bridge level with its top (the colleague's
 		 * hra/3d/PROSBA-AKVADUKTY.md): its trough and the abutment down the slope, at the bridge's height. */
-		add(o, bz);
-	} else if (const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Middle, turn); o != nullptr) {
-		add(o, bz);
+		add(o, bz - deck_lower);
+	} else if (const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Middle, turn, map); o != nullptr) {
+		add(o, bz - deck_lower);
 	}
 	return true;
 }
@@ -12091,7 +12228,7 @@ static bool EyeBridgePieces(TileIndex tile, F add)
  */
 static void CabDrawAqueductWater(const CabCanvas &cv, const CabEye &eye, Axis axis, int x0, int y0, double ez)
 {
-	const double half = 5.5 * OBJECT_UNITS_PER_METRE, c0 = TILE_SIZE / 2.0 - half, c1 = TILE_SIZE / 2.0 + half;
+	const double half = AQUEDUCT_WATER_HALF_M * OBJECT_UNITS_PER_METRE, c0 = TILE_SIZE / 2.0 - half, c1 = TILE_SIZE / 2.0 + half;
 	const double z = ez + CAB_DECK_OVER_PIECES;
 	double p[4][2];
 	CabAlongAcross(axis, x0, y0, 0, c0, p[0][0], p[0][1]);
