@@ -1204,7 +1204,7 @@
   "trojuhelniku": 108,
   "atlas_px": 256,
   "okraje_textur": 16,
-  "pouziti": 25,
+  "pouziti": 18,
   "tvar": {},
   "autor": "grrrrf: vlastní model domy/render_dum.py (stavebnice), doplněk domy/doplnky_okraje.py, domy/doplnky.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
@@ -6626,7 +6626,7 @@
    16
   ],
   "okraje_textur": 16,
-  "pouziti": 0,
+  "pouziti": 7,
   "mista_sedu": [
    {
     "poza": "sedi",

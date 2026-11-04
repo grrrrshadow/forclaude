@@ -10116,6 +10116,52 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 			IConsolePrint(CC_DEFAULT, "test3d:   {}", line);
 		}
+	} else if (what == "misto" && argv.size() > 9) {
+		/* 'misto <objekt> <x> <y> <otoceni> <x0> <x1> <y0> <y1> [<ix0> <ix1> <iy0> <iy1>]': is there room in the house
+		 * (or industry) object for a piece standing at x, y (metres in its frame) turned so ("otoceni", as its
+		 * "doplnky"), its box x0..x1, y0..y1 (metres of the piece)? What of it stands as high as a body (Blocks(): its
+		 * walls, fences, trees, laid add-ons) under the box, each 5 cm, out of its tiles counted as taken; samples in the
+		 * second box (the piece it would replace) left out. The communist bench for the old one (hra/3d/PROSBA-ZASTAVKA-LAVICKA.md). */
+		const ThreeDObject *obj = GetThreeDObjectByName(argv[2]);
+		if (obj == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: misto: objekt {} neni", argv[2]);
+			return true;
+		}
+		auto real = [&](size_t i) { return i < argv.size() ? std::strtod(std::string(argv[i]).c_str(), nullptr) : 0.0; };
+		const double px = real(3), py = real(4), turn = real(5) * M_PI / 180.0, c = std::cos(turn), s = std::sin(turn);
+		const double x0 = real(6), x1 = real(7), y0 = real(8), y1 = real(9);
+		const bool skip = argv.size() > 13;
+		const double ix0 = real(10), ix1 = real(11), iy0 = real(12), iy1 = real(13);
+		const double w = obj->tiles_x * static_cast<double>(TILE_SIZE), h = obj->tiles_y * static_cast<double>(TILE_SIZE);
+		/* '... mapa' last: each 10 cm a character, rows along the piece (y), its back (x0) left: # taken, o out of the
+		 * tiles, - the left out box, . free. */
+		const bool map = argv.back() == "mapa";
+		int samples = 0, taken = 0;
+		std::vector<std::string> rows;
+		for (double ly = y0; ly <= y1 + 1e-9; ly += 0.05) {
+			std::string row;
+			for (double lx = x0; lx <= x1 + 1e-9; lx += 0.05) {
+				if (skip && lx >= ix0 && lx <= ix1 && ly >= iy0 && ly <= iy1) {
+					row += '-';
+					continue;
+				}
+				samples++;
+				const double ux = (px + lx * c - ly * s) * OBJECT_UNITS_PER_METRE, uy = (py + lx * s + ly * c) * OBJECT_UNITS_PER_METRE;
+				const bool out = ux < 0 || uy < 0 || ux >= w || uy >= h;
+				const bool block = !out && obj->Blocks(ux, uy);
+				if (out || block) taken++;
+				row += out ? 'o' : block ? '#' : '.';
+			}
+			rows.push_back(std::move(row));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: misto {} {:.2f},{:.2f} {:.0f}: {} z {} zabrano", obj->name, px, py, real(5), taken, samples);
+		if (map) {
+			for (size_t r = 0; r < rows.size(); r += 2) {
+				std::string half;
+				for (size_t k = 0; k < rows[r].size(); k += 2) half += rows[r][k];
+				IConsolePrint(CC_DEFAULT, "test3d:   {}", half);
+			}
+		}
 	} else if (what == "pamet") {
 		/* 'pamet': how much memory the 3D objects (glb) and the pictures made of them take. */
 		extern std::string DescribeThreeDObjectMemory();

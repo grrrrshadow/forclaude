@@ -6333,10 +6333,10 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
      2.294,
-     12.752,
+     12.983,
      0.0
     ],
     "otoceni": 90.0,
@@ -6652,29 +6652,29 @@
   "okraje_textur": 16,
   "doplnky": [
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
      7.4,
-     1.696,
+     1.465,
      0.0
     ],
     "otoceni": 270.0,
     "meritko": 1.0
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
      7.4,
-     13.104,
+     13.335,
      0.0
     ],
     "otoceni": 90.0,
     "meritko": 1.0
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
-     1.756,
+     1.525,
      7.4,
      0.0
     ],
@@ -6682,9 +6682,9 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
-     13.104,
+     13.335,
      7.4,
      0.0
     ],
@@ -7100,9 +7100,9 @@
     "meritko": 0.527
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
-     12.767,
+     12.998,
      9.752,
      0.0
     ],
@@ -7110,9 +7110,9 @@
     "meritko": 1.0
    },
    {
-    "jmeno": "lavicka_99914b93",
+    "jmeno": "lavicka_parkova",
     "poloha": [
-     12.767,
+     12.998,
      4.952,
      0.0
     ],
