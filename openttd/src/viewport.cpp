@@ -11154,6 +11154,33 @@ struct EyeFrame {
 /** The frame being collected: what is drawn goes into it (CabRasterTriangle()); nullptr: drawn at once, as before. */
 static EyeFrame *_eye_frame = nullptr;
 
+/** The haze of the view from the eyes: the sky at the horizon, what is far fades into it. */
+static Colour EyeHaze()
+{
+	return Colour(165, 200, 240);
+}
+
+/**
+ * A frame's picture and depth before the processor draws it (DrawEyeFrame()): the sky down to the horizon, the far ground
+ * under it, nothing drawn yet. On the frame's thread, not while collecting on the main thread.
+ */
+static void ClearEyeFrame(EyeFrame &f)
+{
+	std::fill(f.depth.begin(), f.depth.end(), 0.0f);
+	const Colour haze = EyeHaze();
+	uint32_t *dst = f.pixels.data();
+	for (int y = 0; y < f.height && static_cast<size_t>(y + 1) * f.width <= f.pixels.size(); y++) {
+		Colour c;
+		if (y < f.eye.cy) {
+			const double t = y / f.eye.cy;
+			c = Colour(static_cast<uint8_t>(60 + (haze.r - 60) * t), static_cast<uint8_t>(110 + (haze.g - 110) * t), static_cast<uint8_t>(210 + (haze.b - 210) * t));
+		} else {
+			c = Colour(84, 120, 64);
+		}
+		std::fill_n(dst + static_cast<size_t>(y) * f.width, f.width, c.data);
+	}
+}
+
 /**
  * A frame of the view from an eye as the graphics card draws it whole (the player, 20. 10.: "draw as it is to be
  * drawn, so that it does not jerk"; ThreeDGpuEyeFrame): made of the frame's passes in their order when it is drawn --
@@ -14151,8 +14178,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	};
 	out.width = width;
 	out.height = height;
-	out.pixels.assign(static_cast<size_t>(width) * height, 0);
-	out.depth.assign(static_cast<size_t>(width) * height, 0.0f);
+	/* Its picture and depth as big as the view, what they hold left as it is: nothing is drawn into them here, only on the
+	 * frame's thread -- their sky and their depth too, and only when the processor draws the frame (ClearEyeFrame(); the
+	 * card draws its own sky). Filled here, the main thread wrote the picture three times over every frame. */
+	out.pixels.resize(static_cast<size_t>(width) * height);
+	out.depth.resize(static_cast<size_t>(width) * height);
 	uint32_t *dst = out.pixels.data();
 	float *zb = out.depth.data();
 
@@ -14297,18 +14327,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	out.eye = eye;
 	out.near_plane = _cab_near;
 
-	/* The sky down to the horizon, the far ground under it. */
-	const Colour haze(165, 200, 240);
-	for (int y = 0; y < height; y++) {
-		Colour c;
-		if (y < eye.cy) {
-			double t = y / eye.cy;
-			c = Colour(static_cast<uint8_t>(60 + (haze.r - 60) * t), static_cast<uint8_t>(110 + (haze.g - 110) * t), static_cast<uint8_t>(210 + (haze.b - 210) * t));
-		} else {
-			c = Colour(84, 120, 64);
-		}
-		std::fill_n(dst + static_cast<size_t>(y) * width, width, c.data);
-	}
+	/* The sky down to the horizon, the far ground under it: drawn with the frame (ClearEyeFrame()). */
+	const Colour haze = EyeHaze();
 
 	/* A tunnel the eye is in: its tube is drawn round the eye, and the hill over it is left out. */
 	std::optional<CabTunnel> in_tunnel;
@@ -15864,6 +15884,8 @@ static void DrawEyeFrame(EyeFrame &f)
 	const bool on_card = DrawEyeFrameOnCard(f);
 	if (!on_card) {
 		FrameDiaryEyeCard(false, 0, 0, 0);
+		/* Its sky and depth first (a frame hidden in a depot was filled while collecting). */
+		if (!f.depot) ClearEyeFrame(f);
 		for (EyePass &p : f.passes) {
 			if (p.work) {
 				p.work(f.pixels.data(), f.depth.data());
