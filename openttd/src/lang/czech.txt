@@ -2349,7 +2349,7 @@ STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a 
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vozidla (vlaky, auta, lodě, letadla) ve velikosti původní hry, větší (BRÝLE); vypnuto menší (CZTR): {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Všechna vozidla, která hra kreslí z jejich 3D objektu (GRF s objekty, ne z obrázků), najednou: velikost původní hry jako větší sady (BRÝLE), o 20 % větší; vypnuto menší, v měřítku CZTR. Délku vlaků a aut určuje objekt, takže vlak je dlouhý, jak vypadá. Pro novou hru: nastav v hlavním menu před založením hry
 STR_CONFIG_SETTING_THREE_D_HOUSES                               :Domy ve městech: {STRING}
-STR_CONFIG_SETTING_THREE_D_HOUSES_HELPTEXT                      :Jak vypadají domy ve městech: jako 3D objekty (domy, které hra používá teď), nebo jako originální domy OpenTTD tak, jak je hra kreslila před 3D objekty – jednoduché krabice při otáčení a v pohledu z očí, původní obrázky při pohledu na sever
+STR_CONFIG_SETTING_THREE_D_HOUSES_HELPTEXT                      :Jak vypadají domy ve městech: jako 3D objekty (domy, které hra používá teď), nebo jako originální domy OpenTTD tak, jak je hra kreslila před 3D objekty – jednoduché krabice při otáčení a v pohledu z očí, původní obrázky při pohledu na sever. Mosty a akvadukty jdou s nimi: 3D s 3D domy, původní s původními domy
 STR_CONFIG_SETTING_THREE_D_HOUSES_OBJECTS                       :3D domy
 STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :originální domy OpenTTD (jednoduché krabice)
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}

@@ -2801,6 +2801,16 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 	w->SetDirty();
 }
 
+/** The rig: the walker looking the way given, degrees from the map's x towards its y (as RigFirstPersonWalk() turns it). */
+void RigFirstPersonFace(double degrees)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return;
+	w->walker.heading = std::remainder(degrees * M_PI / 180.0, 2 * M_PI);
+	w->MakePicture();
+	w->SetDirty();
+}
+
 /** The rig: so many steps of the view's timer with no key held, as the walker stands (FirstPersonWindow::Step()). */
 void RigFirstPersonStand(uint steps)
 {

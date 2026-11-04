@@ -9358,6 +9358,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			auto x = number(3), y = number(4);
 			auto real = [&](size_t i) { auto v = ParseInteger<int>(argv[i].substr(0, argv[i].find('.')), 10); double f = v.value_or(0); if (auto dot = argv[i].find('.'); dot != std::string_view::npos) { auto d = argv[i].substr(dot + 1); auto frac = ParseInteger<int>(d, 10); if (frac.has_value()) f += (f < 0 || argv[i].starts_with("-") ? -1 : 1) * *frac / std::pow(10.0, d.size()); } return f; };
 			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: {}", RigFirstPersonAtHouse(TileXY(*x, *y), real(5), real(6), real(7)));
+		} else if (argv.size() > 3 && argv[2] == "smer") {
+			/* 'chodec smer <degrees>': the walker looking that way, from the map's x towards its y. */
+			extern void RigFirstPersonFace(double degrees);
+			RigFirstPersonFace(number(3).value_or(0));
 		} else if (argv.size() > 6 && argv[2] == "krok") {
 			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
 			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
@@ -9958,6 +9962,58 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (count++ < 8) first += fmt::format(" {},{}", TileX(tile), TileY(tile));
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: stromoradi {} dlazdic{}", count, first);
+	} else if (what == "akvadukt") {
+		/* 'akvadukt': on the first flat clear piece of land 14x8 a valley a level deep across x, an aqueduct over it along
+		 * x with canals at both ends, the main view on it; where it is (its pieces drawn from the eyes, EyeBridgePieces() of viewport.cpp). */
+		if (_game_mode != GameMode::Normal) {
+			IConsolePrint(CC_ERROR, "test3d akvadukt: only in a running game.");
+			return true;
+		}
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) {
+				IConsolePrint(CC_ERROR, "test3d akvadukt: no company to build as.");
+				return true;
+			}
+			SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		const uint need_x = 14, need_y = 8;
+		std::optional<TileIndex> at;
+		for (uint ty = 2; ty + need_y + 2 < Map::SizeY() && !at.has_value(); ty++) {
+			for (uint tx = 2; tx + need_x + 2 < Map::SizeX() && !at.has_value(); tx++) {
+				const int h = TileHeight(TileXY(tx, ty));
+				bool good = h >= 1;
+				for (uint dy = 0; dy < need_y && good; dy++) {
+					for (uint dx = 0; dx < need_x && good; dx++) {
+						const TileIndex t = TileXY(tx + dx, ty + dy);
+						if (!(IsTileType(t, TileType::Clear) || IsTileType(t, TileType::Trees)) || TileHeight(t) < h || TileHeight(t) > h + 1) good = false;
+					}
+				}
+				if (good) at = TileXY(tx, ty);
+			}
+		}
+		if (!at.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d akvadukt: no flat clear piece of land {}x{} on the map.", need_x, need_y);
+			return true;
+		}
+		const uint x0 = TileX(*at), y0 = TileY(*at), ry = y0 + 3;
+		auto err = [](const CommandCost &r) { return r.GetErrorMessage() == INVALID_STRING_ID ? std::string("?") : GetString(r.GetErrorMessage()); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 1, y0 + need_y - 1), *at, false, LevelMode::Level);
+		/* The corners x 5..8 a level lower: the tiles 5..7 the valley, the tiles at 4 and 8 sloping into it, the heads of the
+		 * aqueduct on them (CheckBridgeSlope()). */
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, y0 + need_y - 2), TileXY(x0 + 5, y0 + 1), false, LevelMode::Lower);
+		const CommandCost r = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, ry), TileXY(x0 + 4, ry), TransportType::Water, 0, INVALID_RAILTYPE, INVALID_ROADTYPE);
+		if (r.Failed()) {
+			IConsolePrint(CC_ERROR, "test3d akvadukt: the aqueduct at {},{}: {}", x0 + 4, ry, err(r));
+			return true;
+		}
+		Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(x0 + 1, ry), TileXY(x0 + 3, ry), WaterClass::Canal, false);
+		Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(x0 + 12, ry), TileXY(x0 + 9, ry), WaterClass::Canal, false);
+		ScrollMainWindowToTile(TileXY(x0 + 6, ry), true);
+		IConsolePrint(CC_DEFAULT, "test3d: akvadukt z {},{} na {},{}, udoli x {}..{}", x0 + 4, ry, x0 + 8, ry, x0 + 5, x0 + 7);
 	} else if (what == "detail") {
 		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
 		 * whole shape); with 'textura' its textures at their full size. */

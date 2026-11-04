@@ -1209,8 +1209,11 @@ enum class ThreeDBridgePiece : uint8_t {
 	Head,       ///< "hlava": the ramp of a head on the level, 5 m up along the tile
 	Pillar,     ///< "pilir": 5 m of a pillar, a level of the land
 	PillarFoot, ///< "pilir_pata": the lowest piece of a pillar, on the ground
+	HeadSlope,  ///< "hlava_svah": an aqueduct's head on its slope, at the bridge's height, its abutment down the slope
 	Count,
 };
+/** The "type" of the aqueducts' 3D pieces (a record with "akvadukt": true; the colleague's hra/3d/PROSBA-AKVADUKTY.md): past the game's bridge types. */
+static constexpr uint THREE_D_AQUEDUCT = 13; // MAX_BRIDGES of bridge.h (a static_assert in three_d_objects.cpp)
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);

@@ -498,19 +498,19 @@
   ],
   "dily": {
    "stred": {
-    "trojuhelniku": 120,
+    "trojuhelniku": 288,
     "rozmer_m": {
      "x": [
       -0.09,
-      14.84
+      14.89
      ],
      "y": [
-      -5.9,
-      5.9
+      -6.9,
+      6.9
      ],
      "z": [
-      -0.8,
-      1.1
+      -1.0,
+      24.0
      ]
     }
    },
@@ -549,18 +549,35 @@
     }
    },
    "konec": {
-    "trojuhelniku": 312,
+    "trojuhelniku": 216,
     "rozmer_m": {
      "x": [
       -0.09,
       14.9
      ],
      "y": [
+      -6.47,
+      6.47
+     ],
+     "z": [
+      -0.8,
+      10.21
+     ]
+    }
+   },
+   "hlava": {
+    "trojuhelniku": 300,
+    "rozmer_m": {
+     "x": [
+      -0.09,
+      14.89
+     ],
+     "y": [
       -6.9,
       6.9
      ],
      "z": [
-      -1.0,
+      -5.6,
       24.0
      ]
     }
@@ -598,23 +615,6 @@
       -0.8
      ]
     }
-   },
-   "hlava": {
-    "trojuhelniku": 132,
-    "rozmer_m": {
-     "x": [
-      -0.09,
-      14.87
-     ],
-     "y": [
-      -6.3,
-      6.3
-     ],
-     "z": [
-      -5.6,
-      1.1
-     ]
-    }
    }
   },
   "rozmer_m": {
@@ -631,7 +631,7 @@
     24.0
    ]
   },
-  "trojuhelniku": 1236,
+  "trojuhelniku": 1476,
   "atlas_px": [
    32,
    32
@@ -639,7 +639,7 @@
   "okraje_textur": 16,
   "autor": "grrrrf: vlastní geometrie podle 2D mostů OpenTTD (OpenGFX), mosty/mosty.py",
   "licence": "GPL-2.0 (vlastní geometrie)",
-  "poznamka": "zavěšený: konec je vysoká věž 24 m s vějířem lan, stred_a pylon 18 m uprostřed dlaždice s lany na obě strany, stred_b dlouhá lana obou sousedních pylonů křížem dolů k mostovce, stred jen mostovka; tenké pilíře v barvě mostu; díly jsou pojmenované uzly (stred, konec, hlava, pilir, pilir_pata, u zavěšeného i stred_a a stred_b); osy hry: +x podél mostu (díl od x 0 do 14,84), y napříč (0 uprostřed), z 0 je vrch mostovky (silnici nebo koleje položí hra), pod mostovkou nejvýš 1 m, nad jízdní dráhou (y ±5,5 m) volno aspoň 5 m; hlava: nájezd z z −5 v x 0 na z 0 v x 14,84 s opěrou; pilir: článek 5 m (vrch z 0, x 7,42, y 0), pilir_pata: nejspodnější článek s patkou (z −5 je zem); barva číslem: buňka barva podle čísla mostu (barva_mostu)"
+  "poznamka": "zavěšený: vysoké věže 24 m stojí na začátku mostu, na hlavě (hlava na nájezdu i stred na hlavě v rovině s mostem; hráč 4. 11.: „tomu mostu posuň sloupy pro lana až na začátek mostu“) s vějířem lan dolů na mostovku hlavy a dvěma dlouhými lany do dílu konec; konec mostovka s těmi lany a s lany pylonu za ním, stred_a pylon 18 m uprostřed dlaždice s lany na obě strany, stred_b dlouhá lana obou sousedních pylonů křížem dolů k mostovce; tenké pilíře v barvě mostu; díly jsou pojmenované uzly (stred, konec, hlava, pilir, pilir_pata, u zavěšeného i stred_a a stred_b); osy hry: +x podél mostu (díl od x 0 do 14,84), y napříč (0 uprostřed), z 0 je vrch mostovky (silnici nebo koleje položí hra), pod mostovkou nejvýš 1 m, nad jízdní dráhou (y ±5,5 m) volno aspoň 5 m; hlava: nájezd z z −5 v x 0 na z 0 v x 14,84 s opěrou; pilir: článek 5 m (vrch z 0, x 7,42, y 0), pilir_pata: nejspodnější článek s patkou (z −5 je zem); barva číslem: buňka barva podle čísla mostu (barva_mostu)"
  },
  {
   "druh": "most",
@@ -920,5 +920,107 @@
   "autor": "grrrrf: vlastní geometrie podle 2D mostů OpenTTD (OpenGFX), mosty/mosty.py",
   "licence": "GPL-2.0 (vlastní geometrie)",
   "poznamka": "trubka z žeber nad mostovkou (potrubní ve 2D): stred tři žebra (nohy u kraje do 5,6 m, zploštělý vršek do 8,1 m) a podélné pásy; konec začátek trubky: nohy rostou, první celé žebro v 9,9 m; betonové pilíře; díly jsou pojmenované uzly (stred, konec, hlava, pilir, pilir_pata, u zavěšeného i stred_a a stred_b); osy hry: +x podél mostu (díl od x 0 do 14,84), y napříč (0 uprostřed), z 0 je vrch mostovky (silnici nebo koleje položí hra), pod mostovkou nejvýš 1 m, nad jízdní dráhou (y ±5,5 m) volno aspoň 5 m; hlava: nájezd z z −5 v x 0 na z 0 v x 14,84 s opěrou; pilir: článek 5 m (vrch z 0, x 7,42, y 0), pilir_pata: nejspodnější článek s patkou (z −5 je zem); barva číslem: buňka barva podle čísla mostu (barva_mostu)"
+ },
+ {
+  "druh": "most",
+  "jmeno": "most_akvadukt",
+  "soubor": "most_akvadukt.glb",
+  "nazev": {
+   "cs": "akvadukt"
+  },
+  "akvadukt": true,
+  "dily": {
+   "stred": {
+    "trojuhelniku": 96,
+    "rozmer_m": {
+     "x": [
+      0.0,
+      14.84
+     ],
+     "y": [
+      -6.05,
+      6.05
+     ],
+     "z": [
+      -1.0,
+      1.4
+     ]
+    }
+   },
+   "pilir": {
+    "trojuhelniku": 172,
+    "rozmer_m": {
+     "x": [
+      0.0,
+      14.84
+     ],
+     "y": [
+      -5.88,
+      5.88
+     ],
+     "z": [
+      -5.02,
+      -0.02
+     ]
+    }
+   },
+   "pilir_pata": {
+    "trojuhelniku": 208,
+    "rozmer_m": {
+     "x": [
+      0.0,
+      14.84
+     ],
+     "y": [
+      -6.18,
+      6.18
+     ],
+     "z": [
+      -5.5,
+      -0.02
+     ]
+    }
+   },
+   "hlava_svah": {
+    "trojuhelniku": 108,
+    "rozmer_m": {
+     "x": [
+      0.0,
+      14.84
+     ],
+     "y": [
+      -6.05,
+      6.05
+     ],
+     "z": [
+      -5.6,
+      1.4
+     ]
+    }
+   }
+  },
+  "rozmer_m": {
+   "x": [
+    0.0,
+    14.84
+   ],
+   "y": [
+    -6.18,
+    6.18
+   ],
+   "z": [
+    -5.6,
+    1.4
+   ]
+  },
+  "trojuhelniku": 584,
+  "atlas_px": [
+   32,
+   32
+  ],
+  "okraje_textur": 16,
+  "autor": "grrrrf: vlastní geometrie podle 2D mostů OpenTTD (OpenGFX), mosty/mosty.py",
+  "licence": "GPL-2.0 (vlastní geometrie)",
+  "poznamka": "akvadukt (hráč 4. 11.: „uděláme akvadukty“), kamenný jako 2D akvadukt hry: stred je koryto (kamenná deska, dno pod vodou v z 0, zídky 1,2 m nad ním s římsou, volná šířka y ±5,5 m jako jízdní dráha mostu; vodu kreslí hra); pilir a pilir_pata jsou patro arkády, 3 oblouky na políčko na 3 pilířích, vrcholy oblouků na hranách políček, takže patra sousedních políček dají jednu arkádu a hluboké údolí dostane arkádu nad arkádou jako římský akvadukt (pilir_pata navíc s patkami pilířů); hlava_svah je hlava na svahu, jak ji hra u akvaduktu staví vždycky (most v rovině s horní hranou svahu, na straně kanálu): koryto a pod ním opěra dolů do svahu (zem z 0 v x 0 až z −5 v x 14,84), stojí ve výšce mostu jako stred; hlava (nájezd) ani konec není. Záznam nemá mosty: akvadukt hra pozná podle akvadukt (hra/3d/PROSBA-AKVADUKTY.md); osy jako u mostů, z 0 vrch mostovky (hladina), pod mostovkou nejvýš 1 m, pilir: článek 5 m (vrch z 0)"
  }
 ]

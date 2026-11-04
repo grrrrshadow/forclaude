@@ -4108,11 +4108,12 @@ static void ReadOriginalIndustryTile(const nlohmann::json &e, const std::map<std
 }
 
 /** The nodes of the pieces of a 3D bridge's model, by ThreeDBridgePiece. */
-static constexpr std::string_view BRIDGE_PIECE_NODES[] = {"stred", "stred_a", "stred_b", "konec", "hlava", "pilir", "pilir_pata"};
+static constexpr std::string_view BRIDGE_PIECE_NODES[] = {"stred", "stred_a", "stred_b", "konec", "hlava", "pilir", "pilir_pata", "hlava_svah"};
 static_assert(std::size(BRIDGE_PIECE_NODES) == to_underlying(ThreeDBridgePiece::Count));
+static_assert(THREE_D_AQUEDUCT == MAX_BRIDGES);
 
-/** The pieces of the 3D bridges by the game's bridge type, piece and quarter turn: their objects in _three_d_objects, SIZE_MAX none. */
-using BridgePieceObjects = std::array<std::array<std::array<size_t, 4>, to_underlying(ThreeDBridgePiece::Count)>, MAX_BRIDGES>;
+/** The pieces of the 3D bridges by the game's bridge type (the aqueducts' after them, THREE_D_AQUEDUCT), piece and quarter turn: their objects in _three_d_objects, SIZE_MAX none. */
+using BridgePieceObjects = std::array<std::array<std::array<size_t, 4>, to_underlying(ThreeDBridgePiece::Count)>, MAX_BRIDGES + 1>;
 static BridgePieceObjects _three_d_bridge_pieces = [] {
 	BridgePieceObjects none;
 	for (auto &type : none) {
@@ -4135,7 +4136,11 @@ static constexpr float BRIDGE_LEVEL_M = 5.0f;
  */
 static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 {
-	if (!e.contains("soubor") || !e.at("soubor").is_string() || !e.contains("mosty") || !e.at("mosty").is_array()) return;
+	/* An aqueduct's record ("akvadukt": true, the colleague's hra/3d/PROSBA-AKVADUKTY.md) stands for all aqueducts,
+	 * unpainted; another for the game's bridges it names ("mosty"). */
+	const bool aqueduct = e.value("akvadukt", false);
+	if (!e.contains("soubor") || !e.at("soubor").is_string()) return;
+	if (!aqueduct && (!e.contains("mosty") || !e.at("mosty").is_array())) return;
 	const std::string file = e.at("soubor").get<std::string>();
 	const std::string path = folder + file;
 	ThreeDObject holder;
@@ -4164,8 +4169,9 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 	const std::vector<ThreeDObjectColourPart> colours = holder.colours;
 	_three_d_objects.push_back(std::move(holder));
 	const double half = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2;
-	for (const auto &n : e.at("mosty")) {
-		if (!n.is_number_integer() || n.get<int>() < 0 || n.get<int>() >= static_cast<int>(MAX_BRIDGES)) continue;
+	const nlohmann::json types = aqueduct ? nlohmann::json::array({THREE_D_AQUEDUCT}) : e.at("mosty");
+	for (const auto &n : types) {
+		if (!n.is_number_integer() || n.get<int>() < 0 || n.get<int>() > static_cast<int>(aqueduct ? THREE_D_AQUEDUCT : MAX_BRIDGES - 1)) continue;
 		const int type = n.get<int>();
 		/* Its colour of the palette: the one "barva_mostu" gives it. */
 		int8_t paint = 0;
@@ -4205,7 +4211,10 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
  */
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns)
 {
-	if (type >= MAX_BRIDGES || !ThreeDObjectsIndexRead()) return nullptr;
+	if (type > THREE_D_AQUEDUCT || !ThreeDObjectsIndexRead()) return nullptr;
+	/* With the original houses wanted (gui.three_d_houses) the original bridges too (the player, 4. 11.: "when the 3D
+	 * houses are switched off, the 3D bridges are off too"). */
+	if (_settings_client.gui.three_d_houses != 0) return nullptr;
 	const auto &pieces = _three_d_bridge_pieces[type];
 	const int q = quarter_turns & 3;
 	size_t k = pieces[to_underlying(piece)][q];

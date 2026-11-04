@@ -12019,11 +12019,10 @@ static inline void CabAlongAcross(Axis axis, int x0, int y0, double a, double c,
 	}
 }
 
-/** The game's bridge type of a bridge (its end) with 3D pieces (GetThreeDBridgePiece()); nullopt none, an aqueduct none. */
+/** The game's bridge type of a bridge (its end) with 3D pieces (GetThreeDBridgePiece()), an aqueduct's THREE_D_AQUEDUCT; nullopt none. */
 static std::optional<uint> EyeBridgeType(TileIndex end)
 {
-	if (GetTunnelBridgeTransportType(end) == TransportType::Water) return std::nullopt;
-	const uint type = GetBridgeType(end);
+	const uint type = GetTunnelBridgeTransportType(end) == TransportType::Water ? THREE_D_AQUEDUCT : GetBridgeType(end);
 	if (GetThreeDBridgePiece(type, ThreeDBridgePiece::Middle, 0) == nullptr) return std::nullopt;
 	return type;
 }
@@ -12094,10 +12093,32 @@ static bool EyeBridgePieces(TileIndex tile, F add)
 		const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Head, turn);
 		if (o == nullptr) return false;
 		add(o, bz - static_cast<int>(TILE_HEIGHT));
+	} else if (const ThreeDObject *o = *type == THREE_D_AQUEDUCT ? GetThreeDBridgePiece(*type, ThreeDBridgePiece::HeadSlope, turn) : nullptr; o != nullptr) {
+		/* An aqueduct's head always on its slope, the bridge level with its top (the colleague's
+		 * hra/3d/PROSBA-AKVADUKTY.md): its trough and the abutment down the slope, at the bridge's height. */
+		add(o, bz);
 	} else if (const ThreeDObject *o = GetThreeDBridgePiece(*type, ThreeDBridgePiece::Middle, turn); o != nullptr) {
 		add(o, bz);
 	}
 	return true;
+}
+
+/**
+ * An aqueduct's water in its 3D trough over a tile (the colleague's hra/3d/PROSBA-AKVADUKTY.md: "the surface at z 0
+ * between the walls, y ±5.5 m, a little over the bottom"; the game's middle sprite not laid there, its walls are drawn
+ * in it), the colour of the game's water.
+ * @param ez the trough's bottom, the eyes' height (EyeLevelZ())
+ */
+static void CabDrawAqueductWater(const CabCanvas &cv, const CabEye &eye, Axis axis, int x0, int y0, double ez)
+{
+	const double half = 5.5 * OBJECT_UNITS_PER_METRE, c0 = TILE_SIZE / 2.0 - half, c1 = TILE_SIZE / 2.0 + half;
+	const double z = ez + CAB_DECK_OVER_PIECES;
+	double p[4][2];
+	CabAlongAcross(axis, x0, y0, 0, c0, p[0][0], p[0][1]);
+	CabAlongAcross(axis, x0, y0, TILE_SIZE, c0, p[1][0], p[1][1]);
+	CabAlongAcross(axis, x0, y0, TILE_SIZE, c1, p[2][0], p[2][1]);
+	CabAlongAcross(axis, x0, y0, 0, c1, p[3][0], p[3][1]);
+	CabDrawSolid(cv, eye, {{p[0][0], p[0][1], z}, {p[1][0], p[1][1], z}, {p[2][0], p[2][1], z}, {p[3][0], p[3][1], z}}, CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160)));
 }
 
 /**
@@ -12144,7 +12165,11 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 	};
 	const double c_far = 1, c_near = TILE_SIZE - 1, top = bz + 40, under = bz - CAB_DECK;
 	if (EyeBridgePieces(tile, [](const ThreeDObject *, int) {})) {
-		/* Of 3D pieces: only the road or the track on their deck. */
+		/* Of 3D pieces: only the road or the track on their deck; an aqueduct's water in its trough. */
+		if (GetTunnelBridgeTransportType(GetSouthernBridgeEnd(tile)) == TransportType::Water) {
+			CabDrawAqueductWater(cv, eye, axis, x0, y0, bz + lift);
+			return;
+		}
 		const double deck = bz + CAB_DECK_OVER_PIECES;
 		CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, deck, c_far, bz), pt(TILE_SIZE, c_far, deck, c_far, bz), pt(TILE_SIZE, c_near, deck, c_near, bz), pt(0, c_near, deck, c_near, bz)}, true);
 		return;
@@ -12246,6 +12271,11 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 	};
 	const double c_far = 1, c_near = TILE_SIZE - 1;
 	if (EyeBridgePieces(head, [](const ThreeDObject *, int) {})) {
+		/* An aqueduct's head (its trough on the slope): its water. */
+		if (GetTunnelBridgeTransportType(head) == TransportType::Water) {
+			CabDrawAqueductWater(cv, eye, axis, x0, y0, EyeLevelZ(bz));
+			return;
+		}
 		/* Of 3D pieces (its ramp, EyeBridgePieces()): only the road or the track on the ramp's deck, a little over it. */
 		auto over = [&](double a, double c, double z) {
 			std::array<double, 6> p = pt(a, c, z, c, z);
