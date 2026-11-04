@@ -16342,6 +16342,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			float iw;
 		};
 		std::vector<WindowGlow> window_glows;
+		/* The houses whose lit windows are seen, with their textures: their triangles made off the lock with the frame
+		 * (the player's #327 diary: at night the eyes' collecting on the main thread went up by its third -- every
+		 * triangle of the windows of every house to the horizon put to the eye one by one under the lock). */
+		struct WindowHouse {
+			const ThreeDObject *o;
+			double ox, oy, oz;
+			std::vector<const ThreeDObjectTexture *> texs; ///< by the texture of its triangles (ThreeDObject::NightTexture()); nullptr not this frame
+		};
+		std::vector<WindowHouse> window_houses;
 		for (const CabObject &co : objects) {
 			const ThreeDObject &o = *co.obj;
 			if (!o.IsRead() || (o.night_tri.empty() && o.lights.empty())) continue;
@@ -16354,20 +16363,22 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (full == nullptr) continue;
 			const double texels_per_unit = full->w / static_cast<double>(TILE_SIZE), pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 			const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
-			const ThreeDObjectTexture *tex = o.TryGetTexture(level, o.PaintAt(co.origin));
-			for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
-				/* An add-on's lamp in the add-on's texture, in its colour at this place. */
-				const uint8_t n = o.NightTexture(t);
-				const ThreeDObjectTexture *nt = n == 0 ? tex : o.TryGetTextureOf(n, level, o.AddonPaintAt(co.origin, n));
-				if (nt == nullptr) continue;
-				std::vector<CabPoint> poly;
-				for (int k = 0; k < 3; k++) {
-					const uint32_t i = o.night_tri[t + k];
-					poly.push_back(CabToEye(eye, ox + o.night_pos[i * 3], oy + o.night_pos[i * 3 + 1], oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * nt->w, o.night_uv[i * 2 + 1] * nt->h));
+			if (!o.night_tri.empty()) {
+				/* An add-on's lamp in the add-on's texture, in its colour at this place: those of its windows only. */
+				WindowHouse &wh = window_houses.emplace_back(WindowHouse{&o, ox, oy, oz, {}});
+				std::vector<bool> used;
+				for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
+					const uint8_t n = o.NightTexture(t);
+					if (n >= used.size()) used.resize(n + 1, false);
+					used[n] = true;
 				}
-				/* (The texture the house's: kept by the card.) */
-				out.kept[nt->px.data()] = nt->uid.value;
-				CabDrawPolygon(dst, zb, width, height, nt->px.data(), nt->w, nt->h, std::move(poly), eye, false);
+				wh.texs.assign(used.size(), nullptr);
+				for (size_t n = 0; n < used.size(); n++) {
+					if (!used[n]) continue;
+					wh.texs[n] = n == 0 ? o.TryGetTexture(level, o.PaintAt(co.origin)) : o.TryGetTextureOf(static_cast<uint8_t>(n), level, o.AddonPaintAt(co.origin, static_cast<uint8_t>(n)));
+					/* (The texture the house's: kept by the card.) */
+					if (wh.texs[n] != nullptr) out.kept[wh.texs[n]->px.data()] = wh.texs[n]->uid.value;
+				}
 			}
 			for (size_t i = 0; i + 2 < o.lights.size(); i += 3) {
 				const CabPoint p = CabToEye(eye, ox + o.lights[i], oy + o.lights[i + 1], oz + o.lights[i + 2], 0, 0);
@@ -16375,6 +16386,54 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				const CabVertex v = CabProject(eye, p);
 				window_glows.push_back({v.sx, v.sy, std::max(1.0, THREE_D_GLOW_UNITS * ThreeDGlowShare(o.lights, i) * eye.focal / p.f), static_cast<float>(v.iw)});
 			}
+		}
+		/* The windows' triangles: each house on a core of its own, every corner to the eye, cut at the near plane, those
+		 * off the picture left out; drawn by bands of rows, or given to the card. The houses, their windows and their
+		 * textures stay as they are till the frame is taken (EyeFrameDrawing()). */
+		if (!window_houses.empty()) {
+			auto houses = std::make_shared<std::vector<WindowHouse>>(std::move(window_houses));
+			auto windows = [eye, width, height, near = _cab_near](const std::vector<WindowHouse> &houses, uint32_t *dst, float *zb) {
+				std::vector<std::vector<CabBatchTriangle>> lists(houses.size());
+				std::atomic<size_t> next = 0;
+				ParallelRows(static_cast<int>(houses.size()) * 16, [&](int, int) {
+					std::vector<CabPoint> poly;
+					for (size_t j; (j = next++) < houses.size();) {
+						const WindowHouse &wh = houses[j];
+						const ThreeDObject &o = *wh.o;
+						for (size_t t = 0; t + 2 < o.night_tri.size(); t += 3) {
+							const uint8_t n = o.NightTexture(t);
+							const ThreeDObjectTexture *nt = n < wh.texs.size() ? wh.texs[n] : nullptr;
+							if (nt == nullptr) continue;
+							poly.clear();
+							for (int k = 0; k < 3; k++) {
+								const uint32_t i = o.night_tri[t + k];
+								poly.push_back(CabToEye(eye, wh.ox + o.night_pos[i * 3], wh.oy + o.night_pos[i * 3 + 1], wh.oz + o.night_pos[i * 3 + 2], o.night_uv[i * 2] * nt->w, o.night_uv[i * 2 + 1] * nt->h));
+							}
+							CabClipNear(poly, near);
+							if (poly.size() < 3) continue;
+							const CabVertex v0 = CabProject(eye, poly[0]);
+							CabVertex prev = CabProject(eye, poly[1]);
+							for (size_t k = 2; k < poly.size(); k++) {
+								const CabVertex cur = CabProject(eye, poly[k]);
+								if (std::max({v0.sx, prev.sx, cur.sx}) >= 0 && std::min({v0.sx, prev.sx, cur.sx}) < width && std::max({v0.sy, prev.sy, cur.sy}) >= 0 && std::min({v0.sy, prev.sy, cur.sy}) < height) {
+									lists[j].push_back({dst, zb, width, height, nt->px.data(), nt->w, nt->h, v0, prev, cur, 0, 256});
+								}
+								prev = cur;
+							}
+						}
+					}
+				}, houses.size() >= 2);
+				return lists;
+			};
+			out.Job([houses, windows](uint32_t *dst, float *zb) {
+				const std::vector<std::vector<CabBatchTriangle>> lists = windows(*houses, dst, zb);
+				std::vector<const std::vector<CabBatchTriangle> *> drawn;
+				for (const std::vector<CabBatchTriangle> &l : lists) drawn.push_back(&l);
+				CabRasterLists(drawn);
+			}, [houses, windows](EyeCard &card) {
+				for (const std::vector<CabBatchTriangle> &l : windows(*houses, nullptr, nullptr)) card.Triangles(l);
+				return true;
+			});
 		}
 		if (!window_glows.empty()) out.Job([width, height, window, window_glows](uint32_t *dst, float *zb) {
 			for (const WindowGlow &g : window_glows) {

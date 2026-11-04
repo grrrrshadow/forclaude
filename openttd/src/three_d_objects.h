@@ -852,6 +852,7 @@ struct ThreeDVehicleObject {
 	std::string detail_file;        ///< "maska_podrobnosti": the mask of details of its body's texture (ThreeDDetailMask), its path; empty none
 	std::string body;               ///< a vehicle that is an animal of a set ("sada_objektu", "objekt": the colleague's horses of the Special): its figure, drawn in a gait ("<body>/stoji", "chuze", "klus", "cval") at its frame (ShapeFrame())
 
+	size_t HeldBytes() const;
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
 	const ThreeDVehicleShape *GetShape(int frame, const ThreeDParts &parts) const;

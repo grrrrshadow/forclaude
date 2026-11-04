@@ -10856,6 +10856,26 @@ size_t ThreeDVehicleShape::Bytes() const
  * textures halved for each level of detail, the pictures of the textures as they are in the files, the .glb files kept
  * a moment, the buildings' textures (painted too) and simplified shapes.
  */
+/**
+ * How much the object holds now: its shapes and its textures (DescribeThreeDObjectMemory(): which hold the most). A
+ * texture shared with another counts with each. Under _lazy_mutex.
+ */
+size_t ThreeDVehicleObject::HeldBytes() const
+{
+	auto levels_of = [](const ThreeDTextureLevels &lv) {
+		size_t b = 0;
+		if (lv != nullptr) {
+			for (const ThreeDObjectTexture &t : *lv) b += VectorBytes(t.px);
+		}
+		return b;
+	};
+	size_t b = this->shape != nullptr ? this->shape->Bytes() : 0;
+	for (const auto &s : this->frame_shapes) b += s != nullptr ? s->Bytes() : 0;
+	for (const ThreeDTextureLevels &lv : this->levels) b += levels_of(lv);
+	for (const ThreeDTextureLevels &lv : this->addon_mask_levels) b += levels_of(lv);
+	return b + levels_of(this->mask_levels) + levels_of(this->rust_levels) + levels_of(this->second_levels);
+}
+
 std::string DescribeThreeDObjectMemory()
 {
 	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
@@ -10879,6 +10899,10 @@ std::string DescribeThreeDObjectMemory()
 	}
 	/* The frames the card poses: their joints' matrices (ThreeDBonesFrame). */
 	size_t bones = 0, bones_count = 0;
+	/* The vehicles and figures holding the most, by name: their shapes and their textures (the player, 4. 11.: "can't
+	 * you see from the log what object it was?" -- the sums above name nothing). A texture two of them share counts
+	 * with each. */
+	std::vector<std::pair<size_t, std::string>> biggest;
 	{
 		std::lock_guard lock(_lazy_mutex);
 		auto count_bones = [&](const ThreeDVehicleObject &v) {
@@ -10888,8 +10912,15 @@ std::string DescribeThreeDObjectMemory()
 				bones_count++;
 			}
 		};
+		auto held_by = [&](const ThreeDVehicleObject &v) {
+			const size_t b = v.HeldBytes();
+			if (b >= (1u << 20)) biggest.emplace_back(b, v.name);
+		};
 		for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
-			for (const ThreeDVehicleObject &v : *list) count_bones(v);
+			for (const ThreeDVehicleObject &v : *list) {
+				count_bones(v);
+				held_by(v);
+			}
 		}
 		for (const auto &[name, passage] : _passages) count_bones(*passage);
 	}
@@ -10933,10 +10964,14 @@ std::string DescribeThreeDObjectMemory()
 			if (b == 0) continue;
 			houses += b;
 			house_count++;
+			if (b >= (1u << 20)) biggest.emplace_back(b, o.name);
 		}
 	}
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({})",
-			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read);
+	std::ranges::sort(biggest, std::greater{});
+	std::string most;
+	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a textury) {}",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most);
 }
 
 /** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */
