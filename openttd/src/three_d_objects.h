@@ -151,6 +151,7 @@ struct ThreeDObjectColourPart {
 	std::vector<uint8_t> mask_png;  ///< "maska": a grey PNG of the texture's layout, 255 where it is the part
 	int start = 255;                ///< "zacatek": the texture's lightness the colour is at its own
 	std::vector<uint32_t> palette;  ///< "paleta": the colours it may be (Colour::data), the first as it is built
+	bool per_town = false;          ///< "nahoda": "mesto": one colour a town (the colour of a lamp's foot), not one a place
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
 	/** A tree's part ("barvy_casti"): the colours it may be in each use ("barvy_pouziti"), none its texture's own there; palette unused. */
 	std::array<std::vector<uint32_t>, TREE_USES> use_palettes;
@@ -1144,7 +1145,7 @@ TileIndex GetThreeDIndustryObjectOrigin(const Industry *ind);
 std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, const ThreeDObject *obj);
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles);
-const ThreeDObject *GetThreeDStreetLamp(int dx, int dy);
+const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);

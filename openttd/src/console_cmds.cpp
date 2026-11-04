@@ -9904,14 +9904,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: naklad {}", _three_d_rig_cargo != 0 ? l : "0");
 	} else if (what == "lampy") {
 		/* 'lampy': the road tiles with the game's street lights (Roadside::StreetLights), where the 3D views stand
-		 * the colleague's lamps (GetThreeDStreetLamp()); how many and the first few. */
+		 * the colleague's lamps (GetThreeDStreetLamp()); how many, and of each town's first tile the lamp and its
+		 * colours (one a town, ThreeDObject::AddonPaintAt()). */
 		int count = 0;
 		std::string first;
+		std::set<TownID> towns;
 		for (const auto tile : Map::Iterate()) {
 			if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::StreetLights) continue;
-			if (count++ < 5) first += fmt::format(" {},{}", TileX(tile), TileY(tile));
+			count++;
+			if (!towns.insert(GetTownIndex(tile)).second || towns.size() > 8) continue;
+			const ThreeDObject *lamp = GetThreeDStreetLamp(tile, 1, 8);
+			first += fmt::format(" {},{} mesto {} {} barvy {:x};", TileX(tile), TileY(tile), GetTownIndex(tile).base(), lamp != nullptr ? lamp->name : "NENI", lamp != nullptr ? lamp->AddonPaintAt(tile, 1) : 0);
 		}
-		IConsolePrint(CC_DEFAULT, "test3d: lampy {} dlazdic{}, lampa {}", count, first, GetThreeDStreetLamp(1, 8) != nullptr ? "je" : "NENI");
+		IConsolePrint(CC_DEFAULT, "test3d: lampy {} dlazdic{}", count, first);
 	} else if (what == "detail") {
 		/* 'detail <px> [textura]': how many pixels apart the corners of a model of the view from the eyes are (0 the
 		 * whole shape); with 'textura' its textures at their full size. */

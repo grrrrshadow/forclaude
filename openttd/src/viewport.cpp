@@ -5422,7 +5422,7 @@ static void AddStreetLamps(size_t first_parent)
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 		if (!IsStreetLightSprite(ps.image)) continue;
-		const ThreeDObject *lamp = GetThreeDStreetLamp(ps.xmin & 0xF, ps.ymin & 0xF);
+		const ThreeDObject *lamp = GetThreeDStreetLamp(_cur_ti.tile, ps.xmin & 0xF, ps.ymin & 0xF);
 		if (lamp == nullptr) continue;
 		ps.box_kind = 4;
 		_turned_objects.push_back({lamp, _cur_ti.tile, ps.zmin});
@@ -15195,7 +15195,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 				if (!IsStreetLightSprite(ps.image)) continue;
-				const ThreeDObject *lamp = GetThreeDStreetLamp(ps.xmin & 0xF, ps.ymin & 0xF);
+				const ThreeDObject *lamp = GetThreeDStreetLamp(_cur_ti.tile, ps.xmin & 0xF, ps.ymin & 0xF);
 				if (lamp == nullptr) continue;
 				ps_kind[i] = 5;
 				objects.push_back({lamp, _cur_ti.tile, ps.zmin});

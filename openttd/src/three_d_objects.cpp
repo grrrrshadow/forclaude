@@ -2674,6 +2674,7 @@ static void ReadColourParts(const nlohmann::json &e, const std::string &folder, 
 			auto rgb = ParseInteger<uint32_t>(c.get<std::string>(), 16);
 			if (rgb.has_value()) part.palette.push_back(Colour(GB(*rgb, 16, 8), GB(*rgb, 8, 8), GB(*rgb, 0, 8)).data);
 		}
+		part.per_town = b.value("nahoda", std::string()) == "mesto";
 		if (part.mask_png.empty() || part.palette.empty()) {
 			Debug(misc, 0, "3D object {}: the colour part {} has no mask or no colours", obj.name, part.name);
 			continue;
@@ -4168,33 +4169,41 @@ const ThreeDPasture *GetThreeDPasture()
 }
 
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
-/** The lamp of the colleague's set "lampy" standing where the game has its street lights. */
-static constexpr std::string_view STREET_LAMP = "lampa_na_sloupu";
+/**
+ * The lamps of the colleague's set "lampy" standing where the game has its street lights (GetThreeDStreetLamp()): the
+ * lamp on its wooden post in the clay towns, David H.'s lamp with its arm elsewhere (the colleague's
+ * hra/3d/LAMPY-MESTO-PRO-HRU.md; the player, 4. 11.: "the other lamp goes where the socialist one does not, into the
+ * centre"; the game's street lights are in the towns' centres).
+ */
+static constexpr std::string_view STREET_LAMPS[] = {"lampa_na_sloupu", "lampa_david_h"};
 
 /**
  * The street lamps (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 4: "lamps along the roads and
  * streets, where exactly the game decides"): where the game has its own street lights -- the roadside of the towns'
  * paved streets (Roadside::StreetLights), at the four places of a tile its sprites stand at, by the middle of an edge --
  * the lamp on its post, its arm over the street towards the tile's middle. An object of that add-on alone at each of
- * the places (no file of its own: Read() lays the add-on into it), drawn as the buildings are (GetThreeDStreetLamp()).
+ * the places, for each lamp (no file of its own: Read() lays the add-on into it), drawn as the buildings are.
  */
 static void MakeStreetLamps()
 {
 	_three_d_street_lamps.clear();
-	if (!_three_d_addons.contains(STREET_LAMP)) return;
 	static constexpr int PLACES[][2] = {{1, 8}, {14, 8}, {8, 1}, {8, 14}};
-	for (const auto &[dx, dy] : PLACES) {
-		ThreeDObject lamp;
-		lamp.name = fmt::format("{} {},{}", STREET_LAMP, dx, dy);
-		lamp.variants = 0;
-		lamp.street = true;
-		ThreeDObjectFigure &place = lamp.addon_places.emplace_back();
-		place.figure = std::string(STREET_LAMP);
-		place.at[0] = static_cast<float>(dx / OBJECT_UNITS_PER_METRE);
-		place.at[1] = static_cast<float>(dy / OBJECT_UNITS_PER_METRE);
-		place.facing = static_cast<float>(std::atan2(8.0 - dy, 8.0 - dx) * 180.0 / M_PI);
-		_three_d_street_lamps.emplace(dx * 16 + dy, _three_d_objects.size());
-		_three_d_objects.push_back(std::move(lamp));
+	for (int kind = 0; kind < static_cast<int>(std::size(STREET_LAMPS)); kind++) {
+		const std::string_view name = STREET_LAMPS[kind];
+		if (!_three_d_addons.contains(name)) continue;
+		for (const auto &[dx, dy] : PLACES) {
+			ThreeDObject lamp;
+			lamp.name = fmt::format("{} {},{}", name, dx, dy);
+			lamp.variants = 0;
+			lamp.street = true;
+			ThreeDObjectFigure &place = lamp.addon_places.emplace_back();
+			place.figure = std::string(name);
+			place.at[0] = static_cast<float>(dx / OBJECT_UNITS_PER_METRE);
+			place.at[1] = static_cast<float>(dy / OBJECT_UNITS_PER_METRE);
+			place.facing = static_cast<float>(std::atan2(8.0 - dy, 8.0 - dx) * 180.0 / M_PI);
+			_three_d_street_lamps.emplace(kind * 256 + dx * 16 + dy, _three_d_objects.size());
+			_three_d_objects.push_back(std::move(lamp));
+		}
 	}
 }
 
@@ -8777,15 +8786,28 @@ std::optional<double> ThreeDObject::FloorAt(double x, double y, double up_to) co
 	return best;
 }
 
-/** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
-/** The street lamp standing where the game has a street light on a tile (MakeStreetLamps()): its place there, world units; nullptr none. */
-const ThreeDObject *GetThreeDStreetLamp(int dx, int dy)
+/**
+ * The street lamp standing where the game has a street light on a tile (MakeStreetLamps()): in a clay town the lamp
+ * on its wooden post, elsewhere David H.'s lamp (the game's street lights are in the towns' centres); the other where
+ * one of them is not in the sets. Asked as the map is collected, under the game's lock (the town of the tile).
+ * @param tile the road tile
+ * @param dx its place on the tile, world units
+ * @param dy its place on the tile, world units
+ * @return the lamp, nullptr none
+ */
+const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy)
 {
 	if (!_three_d_objects_read) ReadThreeDObjects();
-	auto it = _three_d_street_lamps.find(dx * 16 + dy);
-	return it == _three_d_street_lamps.end() ? nullptr : &_three_d_objects[it->second];
+	const int place = dx * 16 + dy;
+	const int first = GetTownThemeAt(tile) == TownTheme::Clay ? 0 : 1;
+	for (int kind : {first, 1 - first}) {
+		auto it = _three_d_street_lamps.find(kind * 256 + place);
+		if (it != _three_d_street_lamps.end()) return &_three_d_objects[it->second];
+	}
+	return nullptr;
 }
 
+/** A part of the fields by its name ("dil": "zem", "cesta", "mari_vzrostle", ...), or nullptr. */
 const ThreeDObject *GetThreeDFieldPart(std::string_view part)
 {
 	if (!_three_d_objects_read) ReadThreeDObjects();
@@ -9476,8 +9498,41 @@ static uint8_t PaintBits(size_t parts)
 }
 
 /**
+ * The town of a tile for the colours that are one a town ("nahoda": "mesto"; the player, 4. 11.: "the lamps in each
+ * town their own colour of the foot"): the town a road or a house tile keeps (GetTownIndex()), as the map has it now --
+ * the frames paint on threads of their own (as TreeUseAt() reads the height), so read without GetTownIndex()'s check
+ * of the tile; UINT32_MAX on another tile.
+ */
+static uint32_t PaintTownAt(TileIndex t)
+{
+	if (t >= Map::Size()) return UINT32_MAX;
+	const TileType type = GetTileType(t);
+	return type == TileType::House || type == TileType::Road ? static_cast<uint32_t>(Tile(t).m2()) : UINT32_MAX;
+}
+
+/**
+ * The number of a part's colour in its palette: by a hash of the place -- each part another bit of it --, or for a
+ * part that is one colour a town (ThreeDObjectColourPart::per_town) by its town, the same at every place of the town.
+ * @param h the hash of the place
+ * @param town the town of the place (PaintTownAt()), UINT32_MAX none
+ * @param k the part's number
+ */
+static uint32_t PartColourNumber(uint32_t h, uint32_t town, size_t k, const ThreeDObjectColourPart &part, uint8_t bits)
+{
+	if (part.per_town && town != UINT32_MAX) h = town * 0x9E3779B1u ^ 0x5BD1E995u;
+	uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
+	x ^= x >> 15;
+	x *= 0x2C1B3C6Du;
+	x ^= x >> 12;
+	x *= 0x297A2D39u;
+	x ^= x >> 15;
+	return x % std::min<size_t>(part.palette.size(), 1u << bits);
+}
+
+/**
  * The colours of the house whose north tile is a tile ("barvy", the colleague: "each house another"): for each part
- * a colour of its palette by a hash of the tile, another bit of it for each part; 0 for a house without parts.
+ * a colour of its palette by a hash of the tile, another bit of it for each part, or by its town (PartColourNumber());
+ * 0 for a house without parts.
  * @return the colours' numbers, four bits a part, with the top bit set
  */
 uint32_t ThreeDObject::PaintAt(TileIndex origin) const
@@ -9487,15 +9542,8 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 	uint32_t h = TileX(origin) * 0x9E3779B1u ^ TileY(origin) * 0x85EBCA77u;
 	uint32_t paint = 1u << 31;
 	const uint8_t bits = PaintBits(this->colours.size());
-	for (size_t k = 0; k < this->colours.size(); k++) {
-		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
-		x ^= x >> 15;
-		x *= 0x2C1B3C6Du;
-		x ^= x >> 12;
-		x *= 0x297A2D39u;
-		x ^= x >> 15;
-		paint |= (x % std::min<size_t>(this->colours[k].palette.size(), 1u << bits)) << (bits * k);
-	}
+	const uint32_t town = PaintTownAt(origin);
+	for (size_t k = 0; k < this->colours.size(); k++) paint |= PartColourNumber(h, town, k, this->colours[k], bits) << (bits * k);
 	/* The statue of stone or of bronze (variant_paint): its first part the colour of its variant, by a bit of the
 	 * tile's hash -- of the tile only, as the rest: the frame from the eyes paints on threads of its own. */
 	if (this->variant_paint[0] >= 0 || this->variant_paint[1] >= 0) {
@@ -9508,7 +9556,8 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 /**
  * The colours of an add-on's texture of the house whose north tile is a tile (GetTextureOf()): of an add-on painted a
  * colour by number ("barvy" of its record) a colour of its palette for each part by a hash of the tile and of its place
- * in the house -- the parasols of a café each another, those of the next house others --; 0 for one not painted so.
+ * in the house -- the parasols of a café each another, those of the next house others -- or, a part one colour a town,
+ * by its town (PartColourNumber(): a street lamp's foot); 0 for one not painted so.
  * @param texture the add-on's texture, 1, 2, ... (ThreeDObjectShapeView::TriangleTexture())
  */
 uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
@@ -9537,15 +9586,9 @@ uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
 		}
 		return any ? paint : 0;
 	}
-	for (size_t k = 0; k < a.colours.size(); k++) {
-		uint32_t x = h ^ static_cast<uint32_t>(k + 1) * 0x27D4EB2Fu;
-		x ^= x >> 15;
-		x *= 0x2C1B3C6Du;
-		x ^= x >> 12;
-		x *= 0x297A2D39u;
-		x ^= x >> 15;
-		paint |= (x % std::min<size_t>(a.colours[k].palette.size(), 1u << bits)) << (bits * k);
-	}
+	/* A street lamp's foot one colour a town (ThreeDObjectColourPart::per_town), whichever lamp it is. */
+	const uint32_t town = PaintTownAt(origin);
+	for (size_t k = 0; k < a.colours.size(); k++) paint |= PartColourNumber(h, town, k, a.colours[k], bits) << (bits * k);
 	return paint;
 }
 

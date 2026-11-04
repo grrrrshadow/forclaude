@@ -230,5 +230,127 @@
   "autor": "grrrrf: vlastní model ve stylu Morrowindu (predmety/lampy.py)",
   "licence": "GPL-2.0 (vlastní geometrie)",
   "poznamka": "železný koš na třech nohách s uhlíky a ohněm, 1,0 m (k bránám, na náměstí, k tábořišti); uhlíky a oheň v uzlu noc; uzel noc v noci svítí (emissive, plameny bez normál), prázdné uzly svetlo_NN jsou místa záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_socik",
+  "soubor": "lampa_socik.glb",
+  "nazev": {
+   "cs": "lampa socík (sadovka s talířem)"
+  },
+  "barvy": [
+   {
+    "cast": "sokl",
+    "maska": "lampy_mesto_maska_sokl.png",
+    "zacatek": 204,
+    "paleta": [
+     "D9C47E",
+     "E0CE92",
+     "CDB979",
+     "D97C76",
+     "E3938C",
+     "CC6E6A",
+     "C8CCCA",
+     "B9B8B0"
+    ],
+    "nahoda": "mesto"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.36,
+    0.36
+   ],
+   "y": [
+    -0.36,
+    0.36
+   ],
+   "z": [
+    0.0,
+    5.35
+   ]
+  },
+  "trojuhelniku": 800,
+  "atlas_px": [
+   128,
+   80
+  ],
+  "okraje_textur": 16,
+  "pouziti_lampy": {
+   "klima": [
+    "mirne",
+    "subarkticke"
+   ],
+   "kde": [
+    "okraj_mesta",
+    "park"
+   ]
+  },
+  "autor": "Ondřej H. (Lampa_sadovka, SketchUp 19, ondrej_h_lampa_socik.zip od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
+  "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
+  "poznamka": "parková lampa socík 5,35 m: tenký ocelový sloup, nahoře plochý kulatý talíř 0,72 m (béžový difuzor, který v noci svítí, bílá stříška a šedé víko), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře); tvary změřené ze souboru Ondřeje H. a znovu vysoustružené s méně trojúhelníky (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá žlutá, bledá červená, šedá starých nenatřených krytů; nahoda mesto: v každém městě jiná barva krytu); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "lampa_david_h",
+  "soubor": "lampa_david_h.glb",
+  "nazev": {
+   "cs": "pouliční lampa s ramenem"
+  },
+  "barvy": [
+   {
+    "cast": "sokl",
+    "maska": "lampy_mesto_maska_sokl.png",
+    "zacatek": 204,
+    "paleta": [
+     "D9C47E",
+     "E0CE92",
+     "CDB979",
+     "D97C76",
+     "E3938C",
+     "CC6E6A",
+     "C8CCCA",
+     "B9B8B0"
+    ],
+    "nahoda": "mesto"
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "rozmer_m": {
+   "x": [
+    -0.207,
+    3.068
+   ],
+   "y": [
+    -0.207,
+    0.207
+   ],
+   "z": [
+    0.0,
+    5.486
+   ]
+  },
+  "trojuhelniku": 502,
+  "atlas_px": [
+   128,
+   80
+  ],
+  "okraje_textur": 16,
+  "pouziti_lampy": {
+   "kde": [
+    "centrum",
+    "dalnice"
+   ]
+  },
+  "autor": "David H. (david_h_lampa.skp, SketchUp od hráče), kryt patky lampa_01.stp od hráče; převod predmety/lampy_mesto.py",
+  "licence": "modely od hráče, licence neuvedena (jen pro tuto hru)",
+  "poznamka": "pouliční lampa 5,5 m s obloukovým ramenem (rameno k +x, světlo na jeho konci 2,8 m od sloupu), dole kryt patky z lampa_01.stp od hráče (1:10, 0,91 m: kužel, zaoblené rameno, nahoře zavřený, sloup z něj vychází; dvířka k −x, švy obou půlek se šrouby v kapsách a zářez na kabel pod dvířky jsou jen v textuře), u sloupu 8 cm každý bod o 2 cm dál od osy; tam, kam nejde socík: do center měst a k dálnicím (klima hráč neřekl, tedy všude) (hráč 4. 11.: „tu budem použivat na okrajich temperate a  arctic měst a v parcích . ten válec dole bude vybledlá žlutá a červená a ten spodek budem používat i pro tu první lanpu davida h“, pak „spodek cervenou bledou , to maš hnědou skoro. zjednoduš co je zbytecně moc trojuhelníků. tady je spodek lampy“ (lampa_01.stp) a k fotkám starých krytů „ale to už jsou hodně starý bez barvy ale je to autentický realistická barva“, pak „budem střidat barvy spodku , to nic nestoji, v každym městě jiny spodky . ta druhá lampa pujde tam kam nejde socialistická. do centra. na dálnici.“); počátek na zemi uprostřed sloupu, z nahoru; kryt barvou číslem (barvy, část sokl, celá jeho textura: vybledlá žlutá, bledá červená, šedá starých nenatřených krytů; nahoda mesto: v každém městě jiná barva krytu); uzel noc v noci svítí (emissive, bez normál), prázdný uzel svetlo_00 je místo záře"
  }
 ]
