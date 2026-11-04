@@ -13374,16 +13374,19 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 		const size_t shown = slot++;
 		std::shared_ptr<const ThreeDBonesFrame> crew_bones;
 		const ThreeDVehicleShape *crew_posed = nullptr;
-		const ThreeDVehicleShape *frame_shape = by_card ? ThreeDCardFrame(*w.figure, fig->CrewFrame(fg.walk, shown), true, crew_bones, crew_posed) : w.figure->TryGetShape(fig->CrewFrame(fg.walk, shown));
+		int frame = fig->CrewFrame(fg.walk, shown);
+		const ThreeDVehicleObject *wf = w.FigureAt(frame);
+		const ThreeDVehicleShape *frame_shape = by_card ? ThreeDCardFrame(*wf, frame, true, crew_bones, crew_posed) : wf->TryGetShape(frame);
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
 		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}, {}, std::move(crew_bones)};
-		const float *at = w.on_seat && posed->has_seat ? posed->seat : w.at;
+		float at[3];
+		w.At(*posed, w.behind ? fig->TryGetShape() : nullptr, at);
 		crew.at = {at[0], at[1], at[2]};
 		crew.texs.assign(std::max<size_t>(1, frame_shape->pngs.size()), nullptr);
 		bool ready = true;
 		for (size_t i = 0; i < crew.texs.size() && ready; i++) {
-			crew.texs[i] = TryGetThreeDEyeVehicleTexture(w.figure, 0, _cab_full_textures ? 1e9 : crew_ppm, static_cast<int>(i));
+			crew.texs[i] = TryGetThreeDEyeVehicleTexture(wf, 0, _cab_full_textures ? 1e9 : crew_ppm, static_cast<int>(i));
 			ready = crew.texs[i] != nullptr;
 		}
 		if (ready) model.crew.push_back(std::move(crew));

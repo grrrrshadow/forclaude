@@ -9895,18 +9895,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowToTile(TileXY(x0 + len / 2, y0), true);
 		IConsolePrint(CC_DEFAULT, "test3d: vagony {} '{}' za '{}' na trati {},{}..{},{}", units.size(), GetString(STR_ENGINE_NAME, asked->index), asked_wagon && loco != nullptr ? GetString(STR_ENGINE_NAME, loco->index) : std::string("-"), x0, y0, x0 + len, y0);
 	} else if (what == "stav") {
-		/* 'stav <n> [<n> ...]': every vehicle object with states drawn in its state n, 0 as its GRF picks (the rig: a
-		 * state the cars do not get here); several, the states of its layers made one (the first layer first). */
+		/* 'stav [jen <jmeno>] <n> [<n> ...]': every vehicle object with states drawn in its state n, 0 as its GRF picks
+		 * (the rig: a state the cars do not get here); several, the states of its layers made one (the first layer
+		 * first); 'jen <jmeno>' only the object of that name, the others as their GRF picks (the horse with an animal
+		 * behind it, its length-only wagon not shown as a wagon). */
 		extern std::vector<int> _three_d_rig_states;
+		extern std::string _three_d_rig_states_of;
 		_three_d_rig_states.clear();
-		for (size_t i = 2; i < argv.size(); i++) _three_d_rig_states.push_back(std::max(0, number(i).value_or(0)));
+		size_t first = 2;
+		_three_d_rig_states_of.clear();
+		if (argv.size() > 3 && argv[2] == "jen") {
+			_three_d_rig_states_of = argv[3];
+			first = 4;
+		}
+		for (size_t i = first; i < argv.size(); i++) _three_d_rig_states.push_back(std::max(0, number(i).value_or(0)));
 		if (_three_d_rig_states.size() == 1 && _three_d_rig_states[0] == 0) _three_d_rig_states.clear();
 		/* The vehicles' pictures anew as they next move. */
 		for (Vehicle *v : Vehicle::Iterate()) v->sprite_cache.last_direction = Direction::Invalid;
 		MarkWholeScreenDirty();
 		std::string list;
 		for (int s : _three_d_rig_states) list += fmt::format(" {}", s);
-		IConsolePrint(CC_DEFAULT, "test3d: stav{}", list.empty() ? " 0" : list);
+		IConsolePrint(CC_DEFAULT, "test3d: stav{}{}", list.empty() ? " 0" : list, _three_d_rig_states_of.empty() ? std::string() : " jen " + _three_d_rig_states_of);
 	} else if (what == "naklad" && argv.size() > 2) {
 		/* 'naklad <LABEL>|0': the cargo the load is of in a drawing of no vehicle ('kresli', the purchase list), 0 the
 		 * engine's own (the flatbed of the 1203 with the pieces of its cargo). */

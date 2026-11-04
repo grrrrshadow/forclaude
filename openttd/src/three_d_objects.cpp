@@ -5731,6 +5731,28 @@ static void ReadThreeDVehicleObjects()
 				}
 				/* The record's own crew a part too: drawn in every state but one standing empty (EmptyStateOf()). */
 				if (!obj.crew.empty()) obj.part_names.push_back("posadka");
+				/* The animals running behind it ("doprovod" of a state, the colleague's hra/3d/PROSBA-KUN-DOBYTEK.md): a
+				 * part each, the same animal at the same place one part however many states name it. Its "sada_objektu"
+				 * is where the horse's own figure is looked for too: the vehicle's package, else the game's sets. */
+				auto companion_of = [](const nlohmann::json &d) -> std::optional<ThreeDVehicleCompanion> {
+					if (!d.is_object() || !d.contains("objekt") || !d.at("objekt").is_string()) return std::nullopt;
+					ThreeDVehicleCompanion c;
+					c.animal = d.at("objekt").get<std::string>();
+					c.behind = std::clamp(d.value("za_m", 1.0f), -20.0f, 20.0f);
+					c.aside = std::clamp(d.value("bok_m", 0.0f), -20.0f, 20.0f);
+					c.scale = std::clamp(d.value("meritko", 1.0f), 0.05f, 20.0f);
+					c.key = fmt::format("doprovod/{}/{}/{}/{}", c.animal, c.behind, c.aside, c.scale);
+					return c;
+				};
+				if (e.contains("stavy") && e.at("stavy").is_array()) {
+					for (const auto &st : e.at("stavy")) {
+						if (!st.is_object() || !st.contains("doprovod")) continue;
+						auto c = companion_of(st.at("doprovod"));
+						if (!c.has_value() || std::ranges::find(obj.part_names, c->key) != obj.part_names.end()) continue;
+						obj.part_names.push_back(c->key);
+						obj.companions.push_back(std::move(*c));
+					}
+				}
 				if (obj.part_names.size() > ThreeDParts::COUNT) {
 					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only {} can be", obj.name, obj.part_names.size() - 1, ThreeDParts::COUNT - 1);
 					obj.part_names.resize(ThreeDParts::COUNT);
@@ -5746,6 +5768,8 @@ static void ReadThreeDVehicleObjects()
 					if (part > 0 && std::ranges::any_of(list, [](const ThreeDVehicleCrew &c) { return c.driver_seat; })) obj.seat_groups.Set(part);
 				}
 				obj.crew_record_part = part_of("posadka");
+				for (ThreeDVehicleCompanion &c : obj.companions) c.part = static_cast<uint8_t>(part_of(c.key));
+				std::erase_if(obj.companions, [](const ThreeDVehicleCompanion &c) { return c.part == 0; });
 				/* The wheels of its own model that turn as it goes, the front ones steering. */
 				if (e.contains("kola_v_modelu") && e.at("kola_v_modelu").is_array()) {
 					for (const auto &k : e.at("kola_v_modelu")) {
@@ -5859,6 +5883,11 @@ static void ReadThreeDVehicleObjects()
 							const int part = part_of("posadky/" + st.at("posadka").get<std::string>());
 							if (part > 0) state.parts.Set(part);
 							state.crew_part = part;
+						}
+						if (st.contains("doprovod")) {
+							if (auto c = companion_of(st.at("doprovod")); c.has_value()) {
+								if (const int part = part_of(c->key); part > 0) state.parts.Set(part);
+							}
 						}
 						/* As many as the record has: the steps are ints, the key of a picture holds them in 16 bits with
 						 * the states made of them after them (PictureRequest()). Once read only 255: the colleague's
@@ -8695,6 +8724,10 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
 		}
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+		/* The animal running behind it of any layer (the colleague's horse: its layer 1). */
+		for (const ThreeDVehicleCompanion &c : this->companions) {
+			if (s.parts.Has(c.part)) made.parts.Set(c.part);
+		}
 		if (!s.load_piece.empty()) {
 			made.load_piece = s.load_piece;
 			made.load_colour = s.load_colour;
@@ -8748,12 +8781,41 @@ const std::vector<ThreeDWalkingCrew> &ThreeDVehicleObject::WalkingCrew() const
 			if (p == this->part_names.end() || p == this->part_names.begin() || p - this->part_names.begin() >= ThreeDParts::COUNT) continue;
 			for (const ThreeDVehicleCrew &c : list) add(c, static_cast<uint8_t>(p - this->part_names.begin()));
 		}
+		/* The animals running behind it: their figure in each gait, the standing one the figure when it has none. */
+		for (const ThreeDVehicleCompanion &c : this->companions) {
+			ThreeDWalkingCrew w;
+			for (size_t g = 0; g < BODY_GAITS.size(); g++) w.gaits[g] = GetThreeDFigure(c.animal + "/" + std::string(BODY_GAITS[g]), this->package);
+			w.figure = w.gaits[0] != nullptr ? w.gaits[0] : GetThreeDFigure(c.animal, this->package);
+			if (w.figure == nullptr) {
+				Debug(misc, 0, "3D vehicle {}: no figure {} running behind it", this->name, c.animal);
+				continue;
+			}
+			w.at[0] = -c.behind;
+			w.at[1] = c.aside;
+			w.scale = c.scale;
+			w.part = c.part;
+			w.behind = true;
+			found.push_back(w);
+		}
 		return found;
 	}, [this](std::vector<ThreeDWalkingCrew> made) {
 		this->walking = std::move(made);
 		this->walking_found = true;
 	});
 	return this->walking;
+}
+
+/**
+ * The figure of this walking one in a frame of its code (ThreeDVehicleObject::CrewFrame()). An animal running behind
+ * the vehicle has its gait in the code too (gait times BODY_GAIT_FRAMES and the frame, as the body's own BodyCode()):
+ * the figure of that gait, the frame left of it; the standing figure when the gait has none.
+ */
+const ThreeDVehicleObject *ThreeDWalkingCrew::FigureAt(int &frame) const
+{
+	if (!this->behind) return this->figure;
+	const size_t gait = static_cast<size_t>(std::max(0, frame)) / ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	frame = std::max(0, frame) % ThreeDVehicleObject::BODY_GAIT_FRAMES;
+	return gait < this->gaits.size() && this->gaits[gait] != nullptr ? this->gaits[gait] : this->figure;
 }
 
 /** The rig: the vehicle objects of the indices, a line each. */

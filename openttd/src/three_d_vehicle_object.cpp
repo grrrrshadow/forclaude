@@ -174,6 +174,8 @@ static float ObjectScale(const ThreeDVehicleObject *obj)
 
 /** The rig: 'test3d stav <n> [<n> ...]' draws every vehicle object with states in its state n, several the states of its layers made one (empty: as its GRF picks). */
 std::vector<int> _three_d_rig_states;
+/** The rig: the name of the only vehicle object _three_d_rig_states are of ('test3d stav jen'), empty every one. */
+std::string _three_d_rig_states_of;
 uint32_t _three_d_rig_cargo = 0; ///< the rig's cargo ('test3d naklad'): its label the load of a drawing of no vehicle (the purchase list, 'kresli') is of, 0 the engine's own
 
 /**
@@ -238,7 +240,7 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 	 * point 2): as its 2D pictures are painted (GetCustomEngineSprite()), the default ones in the purchase list. */
 	const uint16_t colours = obj->HasDetails() ? (v != nullptr ? GetVehicleTrueColours(v) : GetEngineTrueColours(engine, {})) : 0;
 	if (obj->states.empty() && colours == 0) return 0;
-	if (!_three_d_rig_states.empty()) {
+	if (!_three_d_rig_states.empty() && (_three_d_rig_states_of.empty() || obj->name == _three_d_rig_states_of)) {
 		std::vector<int> layers;
 		for (int s : _three_d_rig_states) layers.push_back(s > 0 && static_cast<size_t>(s) <= obj->states.size() ? s : 0);
 		return obj->ComposeState(layers, colours, LoadCode(obj, layers, nullptr, engine));
@@ -498,18 +500,20 @@ static EyeTrail &TrailOf(const Vehicle *v, double by_direction, bool squeezed)
 }
 
 /**
- * The gait and the frame of a vehicle that is an animal (ThreeDVehicleObject::body, the colleague's horses of the Special
- * 3D v4: "the game makes them move by the way gone"): its gait times BODY_GAIT_FRAMES and its frame. Standing
+ * The gait and the frame of an animal by its vehicle's speed (a vehicle that is one, ThreeDVehicleObject::body, the colleague's
+ * horses of the Special 3D v4: "the game makes them move by the way gone"; one running behind it, ThreeDWalkingCrew::behind):
+ * its gait times BODY_GAIT_FRAMES and its frame. Standing
  * still it stands ("stoji"), its frames as the game's ticks go; moving, the gait whose own pace -- a round of its frames
  * walking its "krok_m", as big as it is drawn -- is nearest its speed, its frame by the way gone.
+ * @param gait_of the animal's figure in the k-th of BODY_GAITS, nullptr none
  * @param walked the way gone as drawn (EyeTrail::walked), world units
- * @param scale the object's metres to the game's
+ * @param scale the animal's metres to the game's
  * @param v the vehicle, nullptr none (the purchase list, one standing as a figure: standing)
  * @param phase how far its standing frames are from those of the others (a figure's number, phase)
  */
-static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float scale, const Vehicle *v, uint32_t phase = 0)
+template <typename F>
+static uint64_t GaitCode(F gait_of, double walked, float scale, const Vehicle *v, uint32_t phase)
 {
-	auto gait_of = [&obj](size_t k) { return GetThreeDFigure(obj.body + "/" + std::string(BODY_GAITS[k]), obj.package); };
 	const double kmh = v != nullptr ? v->GetDisplaySpeed() : 0.0;
 	size_t gait = 0;
 	if (kmh > 0) {
@@ -539,6 +543,12 @@ static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float sc
 	return static_cast<uint64_t>(gait) * per_gait + static_cast<uint64_t>(std::min(frame, per_gait - 1));
 }
 
+/** The gait and the frame of a vehicle that is an animal (GaitCode() of its body's figures). */
+static uint64_t BodyCode(const ThreeDVehicleObject &obj, double walked, float scale, const Vehicle *v, uint32_t phase = 0)
+{
+	return GaitCode([&obj](size_t k) { return GetThreeDFigure(obj.body + "/" + std::string(BODY_GAITS[k]), obj.package); }, walked, scale, v, phase);
+}
+
 /**
  * The frames of the crew that walks (ThreeDVehicleObject::WalkingCrew()) the state shows, the way gone so far (the
  * colleague's hra/3d/PROSBA-SPECIAL-3D.md): a round of a figure's frames each "krok_m" of its own as big as it is drawn,
@@ -562,13 +572,19 @@ static uint64_t WalkCode(const ThreeDVehicleObject *obj, int state, double walke
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
+		const size_t bit = (obj->body.empty() ? 0 : ThreeDVehicleObject::BODY_FRAME_BITS) + 8 * shown;
+		/* An animal running behind it: its gait by the speed, as the vehicle's own animal (BodyCode()). */
+		if (w.behind) {
+			code |= GaitCode([&w](size_t g) { return w.gaits[g]; }, walked, scale * w.scale, v, static_cast<uint32_t>(7 * shown + 3)) << bit;
+			continue;
+		}
 		const ThreeDVehicleObject &f = *w.figure;
 		const double step = f.walk_step * scale * w.scale * UNITS_PER_METRE;
 		if (w.on_seat || step <= 0 || f.frames < 2) continue;
 		/* Facing back as it goes (turned round in the vehicle, or the vehicle turned round), it walks back. */
 		const double rounds = (std::cos((turn + w.turn) * M_PI / 180.0) < 0 ? -walked : walked) / step;
 		const int frame = std::clamp(static_cast<int>((rounds - std::floor(rounds)) * f.frames), 0, f.frames - 1);
-		code |= static_cast<uint64_t>(std::min(frame, 255)) << ((obj->body.empty() ? 0 : ThreeDVehicleObject::BODY_FRAME_BITS) + 8 * shown);
+		code |= static_cast<uint64_t>(std::min(frame, 255)) << bit;
 	}
 	return code;
 }
@@ -1457,8 +1473,12 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(obj.CrewFrame(walk, shown));
-		if (fs != nullptr) add_piece(w.figure, fs, w.on_seat && whole->has_seat ? whole->seat : w.at, w.turn, w.scale, 0);
+		int frame = obj.CrewFrame(walk, shown);
+		const ThreeDVehicleObject *wf = w.FigureAt(frame);
+		const ThreeDVehicleShape *fs = wf->GetShape(frame);
+		float at[3];
+		w.At(*whole, w.behind ? obj.GetShape() : nullptr, at);
+		if (fs != nullptr) add_piece(wf, fs, at, w.turn, w.scale, 0);
 	}
 	/* The pieces of the shared loads on its bed (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): each where it
 	 * lies in the vehicle's frame, then as the vehicle; in the colour of the cargo. */
@@ -2055,11 +2075,14 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		/* Posed by the card where it is on bones and the vehicle is (by_bones). */
 		std::shared_ptr<const ThreeDBonesFrame> crew_bones;
 		const ThreeDVehicleShape *crew_posed = nullptr;
-		const ThreeDVehicleShape *fs = by_bones ? ThreeDCardFrame(*w.figure, obj.CrewFrame(walk, shown), false, crew_bones, crew_posed) : w.figure->GetShape(obj.CrewFrame(walk, shown));
+		int frame = obj.CrewFrame(walk, shown);
+		const ThreeDVehicleObject *wf = w.FigureAt(frame);
+		const ThreeDVehicleShape *fs = by_bones ? ThreeDCardFrame(*wf, frame, false, crew_bones, crew_posed) : wf->GetShape(frame);
 		if (fs == nullptr) continue;
 		if (crew_posed == nullptr) crew_posed = fs;
 		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
-		const float *at = w.on_seat && frame_of.has_seat ? frame_of.seat : w.at;
+		std::array<float, 3> at;
+		w.At(frame_of, w.behind ? obj.GetShape() : nullptr, at.data());
 		auto crew_to = [&cam, &w, at, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
 			cam.Place(at[0] + (fx0 * wc - fy0 * ws) * w.scale, at[1] + (fx0 * ws + fy0 * wc) * w.scale, at[2] + fz0 * w.scale, ox, oy, od);
 		};
@@ -2072,10 +2095,10 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		light_of([&cam, wc, ws](float nx, float ny, float nz) { return cam.LightAt(nx * wc - ny * ws, nx * ws + ny * wc, nz); }, m.light);
 		box(*crew_posed, crew_to);
 		int crew_level = 0;
-		for (float d = TexelsPerMetre(*w.figure, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
+		for (float d = TexelsPerMetre(*wf, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
 		m.textures.assign(m.triangles->used.size(), nullptr);
 		for (size_t i = 0; i < m.textures.size(); i++) {
-			if (m.triangles->used[i]) m.textures[i] = w.figure->GetTexture(crew_level, static_cast<int>(i));
+			if (m.triangles->used[i]) m.textures[i] = wf->GetTexture(crew_level, static_cast<int>(i));
 		}
 	}
 	/* The pieces of the shared loads on its bed, each where it lies, as the vehicle; in the cargo's colour over the

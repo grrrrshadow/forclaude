@@ -703,6 +703,38 @@ struct ThreeDWalkingCrew {
 	float scale = 1.0f;         ///< "meritko"
 	uint8_t part = 0;           ///< the part that shows it: 0 always ("posadka"), else its group of the crew ("posadky")
 	bool on_seat = false;       ///< sitting on the body's seat (ThreeDVehicleCrew::on_seat): there in each pose, not at "poloha"; it does not walk
+	/* An animal running behind the vehicle (ThreeDVehicleCompanion, a state's "doprovod"): its figure in each gait, its
+	 * frame code the gait times BODY_GAIT_FRAMES and the frame (FigureAt()), its place from the body's rear (At()). */
+	std::array<const struct ThreeDVehicleObject *, BODY_GAITS.size()> gaits{}; ///< a companion's figure in each gait (BODY_GAITS)
+	bool behind = false;        ///< a companion: "poloha" x from the rear of the vehicle's body, not from its origin
+
+	const struct ThreeDVehicleObject *FigureAt(int &frame) const;
+	/**
+	 * Where its feet stand in the vehicle's frame: on the seat of the body's pose, behind the vehicle's rear, or at its place.
+	 * @param body the vehicle's shape in this pose
+	 * @param standing its shape standing (its rear not moving with the legs of a galloping horse), nullptr the pose's
+	 */
+	void At(const ThreeDVehicleShape &body, const ThreeDVehicleShape *standing, float out[3]) const
+	{
+		const float *from = this->on_seat && body.has_seat ? body.seat : this->at;
+		for (int k = 0; k < 3; k++) out[k] = from[k];
+		if (this->behind) out[0] += (standing != nullptr ? standing : &body)->x0;
+	}
+};
+
+/**
+ * An animal running behind a vehicle in a state of it ("doprovod", the colleague's hra/3d/PROSBA-KUN-DOBYTEK.md: the
+ * horse carrying livestock, a sheep, a pig or a cow running behind it): a figure of the sets ("objekt") in its gaits,
+ * "za_m" metres behind the rear of the vehicle's body, "bok_m" aside (to the left), "meritko" times the vehicle's
+ * size; a part the state shows, drawn as its crew that walks (ThreeDVehicleObject::WalkingCrew()).
+ */
+struct ThreeDVehicleCompanion {
+	std::string key;            ///< its part's name ("doprovod/<objekt>/<za_m>/<bok_m>/<meritko>")
+	std::string animal;         ///< "objekt"
+	float behind = 1.0f;        ///< "za_m"
+	float aside = 0.0f;         ///< "bok_m"
+	float scale = 1.0f;         ///< "meritko"
+	uint8_t part = 0;           ///< the part of the states that shows it
 };
 
 /**
@@ -800,6 +832,7 @@ struct ThreeDVehicleObject {
 	std::vector<ThreeDVehicleWheels> wheels; ///< "kola"
 	std::vector<ThreeDVehicleCrew> crew;     ///< "posadka": never fading, lit as the vehicle
 	std::vector<std::pair<std::string, std::vector<ThreeDVehicleCrew>>> crew_groups; ///< "posadky": named groups of the crew, each shown by the states naming it ("posadka")
+	std::vector<ThreeDVehicleCompanion> companions; ///< the animals running behind it in its states ("doprovod")
 	ThreeDParts seat_groups;  ///< by part, the groups of the crew one of which sits at the driver's seat ("misto_ridicky"): the record's driver not drawn where they are shown
 	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
 	mutable std::map<int, int> empty_steps; ///< the step of each state standing empty (EmptyStateOf()), made the first time
