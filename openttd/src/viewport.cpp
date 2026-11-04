@@ -5427,6 +5427,11 @@ static void AddStreetLamps(size_t first_parent)
 		ps.box_kind = 4;
 		_turned_objects.push_back({lamp, _cur_ti.tile, ps.zmin});
 	}
+	/* Socík by a town's outer street, where the game has no street light (GetThreeDEdgeLamp()). */
+	int dx, dy;
+	if (const ThreeDObject *lamp = GetThreeDEdgeLamp(_cur_ti.tile, dx, dy); lamp != nullptr) {
+		_turned_objects.push_back({lamp, _cur_ti.tile, GetSlopePixelZ(TileX(_cur_ti.tile) * TILE_SIZE + dx, TileY(_cur_ti.tile) * TILE_SIZE + dy)});
+	}
 }
 
 /**
@@ -15199,6 +15204,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				if (lamp == nullptr) continue;
 				ps_kind[i] = 5;
 				objects.push_back({lamp, _cur_ti.tile, ps.zmin});
+			}
+			/* Socík by a town's outer street (GetThreeDEdgeLamp()). */
+			int dx, dy;
+			if (const ThreeDObject *lamp = GetThreeDEdgeLamp(_cur_ti.tile, dx, dy); lamp != nullptr) {
+				objects.push_back({lamp, _cur_ti.tile, GetSlopePixelZ(TileX(_cur_ti.tile) * TILE_SIZE + dx, TileY(_cur_ti.tile) * TILE_SIZE + dy)});
 			}
 		}
 		/* A bridge over the tile is built from its own sprites. */

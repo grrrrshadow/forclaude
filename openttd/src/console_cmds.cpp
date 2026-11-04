@@ -9909,6 +9909,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		int count = 0;
 		std::string first;
 		std::set<TownID> towns;
+		/* Socík by the outer streets (GetThreeDEdgeLamp()): how many, the first few with their colours. */
+		int edge = 0;
+		std::string edge_first;
+		for (const auto tile : Map::Iterate()) {
+			int dx, dy;
+			const ThreeDObject *lamp = GetThreeDEdgeLamp(tile, dx, dy);
+			if (lamp == nullptr) continue;
+			if (edge++ < 6) edge_first += fmt::format(" {},{} mesto {} {} barvy {:x};", TileX(tile), TileY(tile), GetTownIndex(tile).base(), lamp->name, lamp->AddonPaintAt(tile, 1));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: socik {} dlazdic{}", edge, edge_first);
 		for (const auto tile : Map::Iterate()) {
 			if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::StreetLights) continue;
 			count++;

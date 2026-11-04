@@ -37,6 +37,8 @@
 #include "three_d_gpu.h"
 #include "town.h"
 #include "town_map.h"
+#include "road_map.h"
+#include "bridge_map.h"
 #include "tree_map.h"
 #include "tile_map.h"
 #include "viewport_func.h"
@@ -4170,12 +4172,15 @@ const ThreeDPasture *GetThreeDPasture()
 
 /** Look for the buildings under baseset/decouple/objekty/<set>/objekty.json, in every place the game reads its data from. */
 /**
- * The lamps of the colleague's set "lampy" standing where the game has its street lights (GetThreeDStreetLamp()): the
- * lamp on its wooden post in the clay towns, David H.'s lamp with its arm elsewhere (the colleague's
- * hra/3d/LAMPY-MESTO-PRO-HRU.md; the player, 4. 11.: "the other lamp goes where the socialist one does not, into the
- * centre"; the game's street lights are in the towns' centres).
+ * The lamps of the colleague's set "lampy" by the towns' streets: where the game has its street lights
+ * (GetThreeDStreetLamp()) the lamp on its wooden post in the clay towns, David H.'s lamp with its arm elsewhere (the
+ * colleague's hra/3d/LAMPY-MESTO-PRO-HRU.md; the player, 4. 11.: "the other lamp goes where the socialist one does
+ * not, into the centre"; the game's street lights are in the towns' centres); the socialist one, socík, on the outer
+ * streets (GetThreeDEdgeLamp()).
  */
-static constexpr std::string_view STREET_LAMPS[] = {"lampa_na_sloupu", "lampa_david_h"};
+static constexpr std::string_view STREET_LAMPS[] = {"lampa_na_sloupu", "lampa_david_h", "lampa_socik"};
+/** Socík's place in STREET_LAMPS. */
+static constexpr int EDGE_LAMP_KIND = 2;
 
 /**
  * The street lamps (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 4: "lamps along the roads and
@@ -8803,6 +8808,43 @@ const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy)
 	for (int kind : {first, 1 - first}) {
 		auto it = _three_d_street_lamps.find(kind * 256 + place);
 		if (it != _three_d_street_lamps.end()) return &_three_d_objects[it->second];
+	}
+	return nullptr;
+}
+
+/**
+ * The lamp of a town's outer street, where the game has no street light (the player, 4. 11.: socík "on the edges of
+ * the temperate and arctic towns"; "yes, socík for the temperate and the sub-arctic" to the game's proposal: on the
+ * paved streets of the towns' outer parts, every other tile, on one side of the street): a road tile with a paved
+ * roadside (Roadside::Paved: a town's outskirts, TileLoop_Road()) in the temperate or the sub-arctic climate, on no
+ * themed town's land, without a bridge over it, every other tile; at the middle of the first of its edges the road
+ * does not leave by -- south-east, south-west, north-west, north-east --, so a straight street's lamps stand on one
+ * side. Asked as the map is collected, under the game's lock.
+ * @param tile the tile
+ * @param[out] dx where on the tile, world units
+ * @param[out] dy where on the tile, world units
+ * @return socík, nullptr none
+ */
+const ThreeDObject *GetThreeDEdgeLamp(TileIndex tile, int &dx, int &dy)
+{
+	const LandscapeType climate = _settings_game.game_creation.landscape;
+	if (climate != LandscapeType::Temperate && climate != LandscapeType::Arctic) return nullptr;
+	if (((TileX(tile) + TileY(tile)) & 1) != 0) return nullptr;
+	if (!IsTileType(tile, TileType::Road) || !IsNormalRoad(tile) || GetRoadside(tile) != Roadside::Paved || IsBridgeAbove(tile)) return nullptr;
+	if (GetThemedLand(tile) != ThemedLand::None) return nullptr;
+	if (!_three_d_objects_read) ReadThreeDObjects();
+	static constexpr struct {
+		RoadBit edge;
+		int dx, dy;
+	} SIDES[] = {{RoadBit::SE, 8, 14}, {RoadBit::SW, 14, 8}, {RoadBit::NW, 8, 1}, {RoadBit::NE, 1, 8}};
+	const RoadBits bits = GetAllRoadBits(tile);
+	for (const auto &side : SIDES) {
+		if (bits.Test(side.edge)) continue;
+		auto it = _three_d_street_lamps.find(EDGE_LAMP_KIND * 256 + side.dx * 16 + side.dy);
+		if (it == _three_d_street_lamps.end()) return nullptr;
+		dx = side.dx;
+		dy = side.dy;
+		return &_three_d_objects[it->second];
 	}
 	return nullptr;
 }

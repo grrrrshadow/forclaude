@@ -1146,6 +1146,7 @@ std::span<const ThreeDObjectFigure> GetThreeDIndustryGirls(const Industry *ind, 
 const ThreeDObject *GetThreeDFieldPart(std::string_view part);
 ThreeDTextureLevels GetThreeDSurface(std::string_view surface, int &tiles);
 const ThreeDObject *GetThreeDStreetLamp(TileIndex tile, int dx, int dy);
+const ThreeDObject *GetThreeDEdgeLamp(TileIndex tile, int &dx, int &dy);
 const ThreeDObject *GetThreeDObjectByName(std::string_view name);
 const ThreeDObject *GetThreeDObjectNumbered(size_t index);
 const ThreeDObject *GetThreeDInterior(const ThreeDObject *house);
