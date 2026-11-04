@@ -470,6 +470,12 @@ struct ThreeDVehicleShape {
 	std::vector<uint8_t> night_part;    ///< each triangle of the glass of the lights: its part (0 always: the body's "noc")
 	std::vector<uint8_t> front_part;    ///< each headlight: its part (0 always)
 	std::vector<uint8_t> back_part;     ///< each light at the back: its part (0 always)
+	/* A figure on bones as the graphics card poses it (ThreeDBonesFrame; the player, 3. 11.: "2 bones"): its shape at
+	 * rest, each corner moved by up to four of its joints, as much as each weighs. */
+	std::vector<uint8_t> corner_joints; ///< four a corner: its joints (ThreeDBonesFrame::joints); empty, not posed by bones
+	std::vector<float> corner_weights;  ///< four a corner: how much each of them moves it
+	/** How many joints at most a figure posed by the card has (ThreeDBonesFrame): its corners name them by a byte. */
+	static constexpr size_t MAX_JOINTS = 256;
 	bool HasPart(uint8_t part) const { return std::ranges::find(this->tri_part, part) != this->tri_part.end(); }
 	bool HasLights() const { return !this->night_tri.empty() || !this->front_lights.empty() || !this->back_lights.empty() || this->HasLightsGoingBack(); }
 	/** Whether it has lights of its own for going back first (front_back_lights). */
@@ -543,6 +549,20 @@ private:
 	};
 	SimplerShapes simpler;
 };
+
+/**
+ * A frame of a figure on bones as the graphics card draws it (ThreeDVehicleObject::TryGetBones(); the player, 3. 11.:
+ * "2 bones"): its shape at rest, one for all its frames, and the matrices of its joints in the frame's pose, by which
+ * the card moves each corner -- not a shape of each frame posed by the processor, kept in memory and put on the card
+ * frame by frame. Of the frame posed, what is asked of its shape: its extent and its seat.
+ */
+struct ThreeDBonesFrame {
+	std::shared_ptr<const ThreeDVehicleShape> rest; ///< the shape at rest (ThreeDVehicleShape::corner_joints)
+	std::vector<float> joints; ///< each joint's matrix, its three rows of four: from the shape at rest to the pose, metres in the figure's frame
+	ThreeDVehicleShape posed;  ///< the frame posed as the processor would have it, without its corners: its extent (x0 ... z1, all) and its seat
+};
+
+std::shared_ptr<const ThreeDVehicleShape> ThreeDPoseOnProcessor(const ThreeDVehicleShape &rest, const ThreeDBonesFrame &bones);
 
 /** The paint of a vehicle object ("lak"): which pixels of the body's texture are paint, how they fade with age, a colour by number. */
 struct ThreeDVehiclePaint {
@@ -826,11 +846,15 @@ struct ThreeDVehicleObject {
 	const ThreeDVehicleShape *GetShape(int frame, const ThreeDParts &parts) const;
 	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
 	const ThreeDVehicleShape *TryGetShape(int frame, const ThreeDParts &parts) const;
+	bool OnBones() const;
+	std::shared_ptr<const ThreeDBonesFrame> GetBones(int frame) const;
+	std::shared_ptr<const ThreeDBonesFrame> TryGetBones(int frame) const;
 	bool ShapeKnown() const;
 	bool KnownExtent(float extent[6], uint32_t *version = nullptr) const;
 	int FrameAt(uint64_t tick, uint32_t phase) const;
 	const ThreeDObjectTexture *GetTexture(int level, int index = 0) const;
 	const ThreeDObjectTexture *TryGetTexture(int level, int index = 0) const;
+	const ThreeDVehicleShape *TextureShape(bool wait) const;
 	bool TextureSize(int index, int &w, int &h) const;
 	const ThreeDObjectTexture *GetPaintMask(int level) const;
 	const ThreeDObjectTexture *GetRustMask(int level) const;
@@ -870,6 +894,7 @@ struct ThreeDVehicleObject {
 	mutable bool extent_known = false;
 	mutable uint32_t extent_version = 0; ///< each time the extent grew (a part added to the shape)
 	mutable std::vector<std::shared_ptr<const ThreeDVehicleShape>> frame_shapes; ///< the frames of a figure that moves, read as drawn
+	mutable std::vector<std::shared_ptr<const ThreeDBonesFrame>> frame_bones;   ///< the frames of a figure on bones as the card poses them, made as drawn (GetBones())
 	mutable std::deque<ThreeDVehicleState> composed; ///< the states made of the states of layers (ComposeState()), steps after those of "stavy"
 	mutable std::map<std::tuple<std::vector<int>, uint16_t, uint64_t>, int> composed_steps; ///< the step each was made for, by the steps of its layers, the vehicle's colours and its load (ThreeDLoadCode())
 	mutable std::vector<ThreeDWalkingCrew> walking; ///< its crew that walks (WalkingCrew()), found the first time asked for
@@ -878,6 +903,7 @@ struct ThreeDVehicleObject {
 private:
 	std::shared_ptr<const ThreeDVehicleShape> MakeShape(int frame, const ThreeDParts &parts = ThreeDParts::All()) const;
 	std::shared_ptr<const ThreeDVehicleShape> MakePosedShape(int frame) const;
+	std::shared_ptr<const ThreeDBonesFrame> MakeBones(int frame) const;
 	mutable std::vector<ThreeDTextureLevels> levels; ///< the textures, each halved for each level of detail
 	mutable ThreeDTextureLevels mask_levels;         ///< the paint mask likewise (its grey in the red)
 	mutable bool mask_tried = false;

@@ -10161,6 +10161,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _eye_figures_by_card;
 		_eye_figures_by_card = number(3).value_or(0) == 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu plakaty {}", _eye_figures_by_card ? "ne, trojuhelniky kartou" : "ano");
+	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "kosti") {
+		/* 'gpu kosti 0|1': the figures on bones posed by the card by their joints (1), or their frames posed by the
+		 * processor (0), to compare (ThreeDGpuPosesBones()). */
+		extern std::atomic<bool> _card_poses_bones;
+		_card_poses_bones = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: gpu kosti {}, {}", _card_poses_bones ? "kartou" : "procesorem", ThreeDGpuPosesBones() ? "pozuje karta" : "pozuje procesor");
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "snimek") {
 		/* 'gpu snimek 0|1': the frames of the view from the eyes drawn whole by the graphics card (1), or by the
 		 * processor with only the objects on the card (0). */

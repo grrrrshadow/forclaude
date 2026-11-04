@@ -231,6 +231,8 @@ std::shared_ptr<const ThreeDGpuTriangles> ThreeDGpuTrianglesOf(const ThreeDVehic
 bool _clear_by_drawing = false;
 /** The rig ('test3d gpu instance 0'): the meshes alike of the view from the eyes drawn at once by instances (EyeObjectDraws::Batch); off, each on its own. */
 bool _eye_instances_on = true;
+/** The rig ('test3d gpu kosti 0|1'): the card poses the figures on bones where it can (true), or the processor their frames (false), to compare. */
+std::atomic<bool> _card_poses_bones = true;
 
 #if defined(THREE_D_GPU_WGL) || defined(THREE_D_GPU_EGL)
 
@@ -522,9 +524,10 @@ uint64_t _gpu_grounds_failed = 0;   ///< and how many it could not lay (the proc
 /* What the card keeps, by the thing's number (ThreeDUniqueId): the corners of the shapes, their triangles, the
  * textures; let go of the longest not drawn when it holds more than GPU_BYTES_KEPT. Only the card's thread uses these. */
 struct GpuShape {
-	GLuint vao = 0, pos = 0, nrm = 0, uv = 0, wheel = 0;
+	GLuint vao = 0, pos = 0, nrm = 0, uv = 0, wheel = 0, joints = 0, weights = 0;
 	bool has_nrm = false;
 	bool has_wheel = false; ///< each corner's turning wheel (ThreeDVehicleShape::corner_wheel) as attribute 3
+	bool has_bones = false; ///< a figure on bones at rest: each corner's joints as attribute 9, their weights as 10 (ThreeDVehicleShape::corner_joints)
 	size_t corners = 0;   ///< how many corners it has: no triangle drawn may name one beyond
 	size_t bytes = 0;
 	uint64_t used = 0;
@@ -608,6 +611,7 @@ struct GpuProgram {
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
 	GLint instanced = -1;   ///< the view from the eyes' meshes alike drawn at once: each instance's matrix and light in attributes 4-8 (EyeMeshSource())
+	GLint bones = -1, bone_row = -1; ///< a figure on bones: its joints' matrices and their row of them (MESH_VERTEX)
 };
 GpuProgram _mesh_program, _night_program, _eye_building_program, _eye_mesh_program, _ground_program, _standing_program;
 GpuProgram _standing_building_program; ///< the buildings among what stands on the turned map (DrawStandingOnCard())
@@ -726,6 +730,15 @@ bool _clear_program_ok = false;
 static bool _scissored_clear_ok = true;
 /** Whether the card divides an attribute by instance (TestInstancedArrays()); else the meshes alike drawn each on its own. */
 static bool _instanced_arrays_ok = true;
+/* The matrices of the joints of the figures on bones the card poses (ThreeDGpuMesh::bones): a row of a texture each
+ * figure, three texels a joint, its rows; the rows written in turn, so that one is not written over while a figure
+ * drawn before may still read it. On a unit of its own (BONE_UNIT), apart from the textures and the paint's masks. */
+static constexpr int BONE_UNIT = 6;
+static constexpr int BONE_ROWS = 256;
+static GLuint _bones_texture = 0;
+static int _bones_next_row = 0;
+/** Whether the card poses the figures on bones (TestBones()); else the processor poses their frames. */
+static std::atomic<bool> _bones_ok = false;
 GLuint _frame_vao = 0, _frame_vbo = 0, _frame_empty_vao = 0, _frame_glow_vao = 0, _frame_glow_vbo = 0, _frame_star_vao = 0, _frame_star_vbo = 0;
 GLuint _frame_list = 0, _frame_lay = 0, _frame_lay_z = 0, _frame_shadow_map = 0;
 uint64_t _frame_shadow_key = 0;
@@ -748,20 +761,44 @@ void EndEyeFrame();
  * texture's texel under it, as the processor picks it, a hole where the texel is 0. The glass laid over what is behind
  * by its alpha, the colour with its alpha multiplied in (as the processor's "over"). A material's own light added
  * unshaded, its pixels marked lit. */
+/* A figure on bones (ThreeDGpuMesh::bones, u_bone_row 0 or more): each corner moved by its joints (attribute 9) as much
+ * as each weighs (10), as GlbSkeleton::Skin() moves it -- their matrices summed so, its corner and its normal by them,
+ * the normal made a unit again; each joint's matrix three texels of the row u_bone_row of u_bones, its rows. */
 const char *const MESH_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec3 a_nrm;
 layout(location = 2) in vec2 a_uv;
+layout(location = 9) in vec4 a_joints;
+layout(location = 10) in vec4 a_weights;
 uniform mat4 u_matrix;
 uniform vec3 u_light;
 uniform float u_lit;
+uniform sampler2D u_bones;
+uniform int u_bone_row;
 noperspective out vec2 v_uv;
 noperspective out float v_light;
 void main()
 {
-	gl_Position = u_matrix * vec4(a_pos, 1.0);
+	vec3 pos = a_pos, nrm = a_nrm;
+	if (u_bone_row >= 0) {
+		vec4 r0 = vec4(0.0), r1 = vec4(0.0), r2 = vec4(0.0);
+		for (int k = 0; k < 4; k++) {
+			float w = a_weights[k];
+			if (w == 0.0) continue;
+			int j = int(a_joints[k] + 0.5) * 3;
+			r0 += w * texelFetch(u_bones, ivec2(j, u_bone_row), 0);
+			r1 += w * texelFetch(u_bones, ivec2(j + 1, u_bone_row), 0);
+			r2 += w * texelFetch(u_bones, ivec2(j + 2, u_bone_row), 0);
+		}
+		vec4 at = vec4(a_pos, 1.0);
+		pos = vec3(dot(r0, at), dot(r1, at), dot(r2, at));
+		vec3 n = vec3(dot(r0.xyz, a_nrm), dot(r1.xyz, a_nrm), dot(r2.xyz, a_nrm));
+		float l = length(n);
+		nrm = l > 0.0 ? n / l : n;
+	}
+	gl_Position = u_matrix * vec4(pos, 1.0);
 	v_uv = a_uv;
-	v_light = u_lit > 0.5 ? 0.55 + 0.45 * max(0.0, dot(a_nrm, u_light)) : 1.0;
+	v_light = u_lit > 0.5 ? 0.55 + 0.45 * max(0.0, dot(nrm, u_light)) : 1.0;
 }
 )";
 
@@ -1196,8 +1233,8 @@ std::string EyeMeshSource(const char *source, bool fragment)
 	} else {
 		/* A wheel that turns (its corners' wheel in attribute 3): its corners and normals moved by its matrix first. */
 		s.insert(s.find('\n') + 1, "layout(location = 3) in float a_wheel;\nuniform mat4 u_wheels[32];\nuniform int u_wheel_count;\n");
-		replace("gl_Position = u_matrix * vec4(a_pos, 1.0);", "int k = int(a_wheel + 0.5);\n\tvec3 p = a_pos, n = a_nrm;\n\tif (k > 0 && k <= u_wheel_count) {\n\t\tp = (u_wheels[k - 1] * vec4(p, 1.0)).xyz;\n\t\tn = mat3(u_wheels[k - 1]) * n;\n\t}\n\tgl_Position = u_matrix * vec4(p, 1.0);");
-		replace("dot(a_nrm, u_light)", "dot(n, u_light)");
+		replace("gl_Position = u_matrix * vec4(pos, 1.0);", "int k = int(a_wheel + 0.5);\n\tvec3 p = pos, n = nrm;\n\tif (k > 0 && k <= u_wheel_count) {\n\t\tp = (u_wheels[k - 1] * vec4(p, 1.0)).xyz;\n\t\tn = mat3(u_wheels[k - 1]) * n;\n\t}\n\tgl_Position = u_matrix * vec4(p, 1.0);");
+		replace("dot(nrm, u_light)", "dot(n, u_light)");
 		/* Many of a shape at once (EyeObjectDraws::Batch): each instance's matrix (its rows) and light in attributes
 		 * 4-8 when u_instanced is set, else the uniforms as for one. */
 		s.insert(s.find('\n') + 1, "layout(location = 4) in vec4 a_m0;\nlayout(location = 5) in vec4 a_m1;\nlayout(location = 6) in vec4 a_m2;\nlayout(location = 7) in vec4 a_m3;\nlayout(location = 8) in vec4 a_light;\nuniform int u_instanced;\n");
@@ -2335,8 +2372,12 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.wheel_count = gl.glGetUniformLocation(p.program, "u_wheel_count");
 	p.depth_range = gl.glGetUniformLocation(p.program, "u_depth_range");
 	p.instanced = gl.glGetUniformLocation(p.program, "u_instanced");
+	p.bones = gl.glGetUniformLocation(p.program, "u_bones");
+	p.bone_row = gl.glGetUniformLocation(p.program, "u_bone_row");
 	return true;
 }
+
+static bool TestBones();
 
 /** The context, the functions, the programs: whether the card draws, and what it is. */
 bool StartCard(std::string &why, std::string &describe)
@@ -2473,6 +2514,8 @@ bool StartCard(std::string &why, std::string &describe)
 	Step("zkouska instanci (glVertexAttribDivisor)");
 	_instanced_arrays_ok = TestInstancedArrays();
 	if (!_instanced_arrays_ok) Diary("karta neumi atributy po instancich (ARB_instanced_arrays): z oci kazdy objekt zvlast", true);
+	Step("zkouska kosti na karte");
+	_bones_ok = TestBones();
 	Step("preklad programu snimku z oci (shader)");
 	StartEyeFrame();
 	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
@@ -2570,6 +2613,9 @@ void EndCard()
 		if (_night_program.program != 0) gl.glDeleteProgram(_night_program.program);
 		if (_eye_building_program.program != 0) gl.glDeleteProgram(_eye_building_program.program);
 		if (_eye_mesh_program.program != 0) gl.glDeleteProgram(_eye_mesh_program.program);
+		if (_bones_texture != 0) gl.glDeleteTextures(1, &_bones_texture);
+		_bones_texture = 0;
+		_bones_ok = false;
 		EndEyeFrame();
 	}
 	EndContext();
@@ -2597,7 +2643,7 @@ void TrimCard()
 		if (h.kind == 0) {
 			GpuShape &s = _card_shapes[h.uid];
 			gl.glDeleteVertexArrays(1, &s.vao);
-			const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel};
+			const GLuint buffers[] = {s.pos, s.nrm, s.uv, s.wheel, s.joints, s.weights};
 			for (GLuint b : buffers) if (b != 0) gl.glDeleteBuffers(1, &b);
 			_card_bytes -= s.bytes;
 			_card_bytes_of[0] -= s.bytes;
@@ -2660,8 +2706,19 @@ const GpuShape *ShapeOnCard(const ThreeDVehicleShape &s)
 		gl.glVertexAttribPointer(3, 1, GL_UNSIGNED_BYTE, GL_FALSE, 0, nullptr);
 		gl.glEnableVertexAttribArray(3);
 	}
+	/* A figure on bones at rest (ThreeDBonesFrame): each corner's four joints, bytes read as whole numbers in floats,
+	 * and how much each moves it -- the card poses it by its frame's joints (MESH_VERTEX). */
+	g.has_bones = s.corner_joints.size() == corners * 4 && s.corner_weights.size() == corners * 4;
+	if (g.has_bones) {
+		gl.glGenBuffers(1, &g.joints);
+		gl.glBindBuffer(GL_ARRAY_BUFFER, g.joints);
+		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners * 4), s.corner_joints.data(), GL_STATIC_DRAW);
+		gl.glVertexAttribPointer(9, 4, GL_UNSIGNED_BYTE, GL_FALSE, 0, nullptr);
+		gl.glEnableVertexAttribArray(9);
+		buffer(g.weights, s.corner_weights, corners * 4, 10, 4);
+	}
 	gl.glBindVertexArray(0);
-	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0));
+	g.bytes = corners * (sizeof(float) * (g.has_nrm ? 8 : 5) + (g.has_wheel ? 1 : 0) + (g.has_bones ? 4 + 4 * sizeof(float) : 0));
 	g.used = _card_clock;
 	_card_bytes += g.bytes;
 	_card_bytes_of[0] += g.bytes;
@@ -2892,7 +2949,43 @@ static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, con
 	gl.glActiveTexture(GL_TEXTURE0);
 }
 
-/** A program's samplers of the paint's masks to units 1 to 5 (SetPaint()), its texture's to 0. */
+/**
+ * A frame's joints on the card (BONE_UNIT): their row of the texture, -1 when they cannot be (more than a corner names).
+ * Its texture made the first time.
+ */
+static int BonesOnCard(const ThreeDBonesFrame &b)
+{
+	const size_t texels = b.joints.size() / 4;
+	if (texels == 0 || texels > ThreeDVehicleShape::MAX_JOINTS * 3) return -1;
+	gl.glActiveTexture(GL_TEXTURE0 + BONE_UNIT);
+	if (_bones_texture == 0) {
+		gl.glGenTextures(1, &_bones_texture);
+		gl.glBindTexture(GL_TEXTURE_2D, _bones_texture);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, static_cast<GLsizei>(ThreeDVehicleShape::MAX_JOINTS * 3), BONE_ROWS, 0, GL_RGBA, GL_FLOAT, nullptr);
+	} else {
+		gl.glBindTexture(GL_TEXTURE_2D, _bones_texture);
+	}
+	const int row = _bones_next_row;
+	_bones_next_row = (_bones_next_row + 1) % BONE_ROWS;
+	gl.glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	gl.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, row, static_cast<GLsizei>(texels), 1, GL_RGBA, GL_FLOAT, b.joints.data());
+	gl.glActiveTexture(GL_TEXTURE0);
+	return row;
+}
+
+/** The row of a mesh's joints for the program drawing it next (u_bone_row): -1, not a figure on bones (its shape as it is). */
+static void SetBones(const GpuProgram &program, const ThreeDGpuMesh &m, const GpuShape &shape)
+{
+	gl.glUniform1i(program.bone_row, m.bones != nullptr && shape.has_bones ? BonesOnCard(*m.bones) : -1);
+}
+
+/** A program's samplers of the paint's masks to units 1 to 5 (SetPaint()), its texture's to 0, its joints' to BONE_UNIT. */
 static void PaintUnits(const GpuProgram &program)
 {
 	gl.glUniform1i(program.tex, 0);
@@ -2901,6 +2994,8 @@ static void PaintUnits(const GpuProgram &program)
 	gl.glUniform1i(program.paint_mask, 3);
 	gl.glUniform1i(program.addon_mask, 4);
 	gl.glUniform1i(program.rust_mask, 5);
+	gl.glUniform1i(program.bones, BONE_UNIT);
+	gl.glUniform1i(program.bone_row, -1);
 }
 
 /**
@@ -2935,6 +3030,8 @@ bool PictureOnCard(const ThreeDGpuPicture &pic, std::vector<MeshOnCard> &draws)
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
 		MeshOnCard d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), {}, {}};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
+		/* A figure on bones whose shape at rest has not its joints: the processor poses it. */
+		if (m.bones != nullptr && !d.shape->has_bones) return false;
 		/* A triangle naming a corner the shape has not would have the card read beyond its corners: a phone's card
 		 * does not forgive that. The processor draws such a picture. */
 		if (d.indices->largest >= d.shape->corners) {
@@ -2990,6 +3087,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 		gl.glUniform3f(_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
 		gl.glUniform1f(_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
 		gl.glUniform1i(_mesh_program.glass, glass ? 1 : 0);
+		SetBones(_mesh_program, *d.mesh, *d.shape);
 		gl.glBindVertexArray(d.shape->vao);
 		gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, d.indices->ibo);
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
@@ -3144,6 +3242,51 @@ void DrawPicturesOnCard(std::span<ThreeDGpuPicture *const> pics)
 		at = end;
 	}
 	TrimCard();
+}
+
+/**
+ * Whether the card poses a figure by its bones as MESH_VERTEX has it (ThreeDBonesFrame): a square of one joint drawn
+ * as a picture, the joint moving it aside, read back where it went and where it stood. The player's phone refused
+ * before what its OpenGL names (TestInstancedArrays()); where the card does not pose it, the processor poses the frames.
+ */
+static bool TestBones()
+{
+	ThreeDVehicleShape square;
+	square.pos = {0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0};
+	square.uv = {0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f, 0.5f};
+	square.tri = {0, 1, 2, 0, 2, 3};
+	square.tri_tex = {0, 0};
+	square.corner_joints.assign(16, 0);
+	square.corner_weights = {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0};
+	ThreeDObjectTexture white;
+	white.w = white.h = 1;
+	white.px = {0xFFFFFFFFu};
+	auto bones = std::make_shared<ThreeDBonesFrame>();
+	bones->joints = {1, 0, 0, 2, 0, 1, 0, 0, 0, 0, 1, 0}; // two metres along x
+	ThreeDGpuPicture pic;
+	pic.width = 8;
+	pic.height = 4;
+	pic.depth_near = -1;
+	pic.depth_far = 1;
+	ThreeDGpuMesh &m = pic.meshes.emplace_back();
+	m.shape = &square;
+	m.triangles = ThreeDGpuTrianglesOf(square, 0, false, 1);
+	m.matrix = {2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1}; // two pixels a metre
+	m.textures.assign(m.triangles->used.size(), &white);
+	m.bones = bones;
+	ThreeDGpuPicture *const one[] = {&pic};
+	DrawPicturesOnCard(one);
+	if (!pic.drawn || pic.pixels.size() != 32) {
+		Diary("kosti na karte: obrazek se nenakreslil, snimky postav pozuje procesor", true);
+		return false;
+	}
+	const uint32_t went = pic.pixels[8 + 5], stood = pic.pixels[8 + 1];
+	const bool ok = (went >> 24) == 255 && (stood >> 24) == 0;
+	const std::string line = fmt::format("kosti na karte: ctverec posunuty {} ({}), na miste {} ({}){}", (went >> 24) == 255 ? "je" : "NENI", went >> 24,
+			(stood >> 24) == 0 ? "neni" : "JE", stood >> 24, ok ? "" : "; snimky postav pozuje procesor");
+	Diary(line, true);
+	Debug(misc, 1, "3D on the graphics card: {}", line);
+	return ok;
 }
 
 /**
@@ -4579,6 +4722,7 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
 		EyeObjectDraws::MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0), std::vector<PaintOnCard>(m.textures.size())};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
+		if (m.bones != nullptr && !d.shape->has_bones) return false;
 		/* As DrawOnCard(): a triangle naming a corner the shape has not, the processor draws. */
 		if (d.indices->largest >= d.shape->corners) return false;
 		for (size_t i = 0; i < m.textures.size(); i++) {
@@ -4588,8 +4732,8 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			d.textures[i] = t->name;
 			if (i < m.paints.size() && m.paints[i].Any() && !PaintMasksOnCard(m.paints[i], d.paints[i])) return false;
 		}
-		/* Among those alike, drawn at once (Batch); one with wheels that turn on its own. */
-		if (_eye_instances_on && _instanced_arrays_ok && (m.wheels.empty() || !d.shape->has_wheel)) {
+		/* Among those alike, drawn at once (Batch); one with wheels that turn, or posed by its bones, on its own. */
+		if (_eye_instances_on && _instanced_arrays_ok && (m.wheels.empty() || !d.shape->has_wheel) && m.bones == nullptr) {
 			const double det = Determinant(m.matrix);
 			const float mirrored = det > 0 ? 1.0f : (det < 0 ? -1.0f : 0.0f);
 			const bool lit = m.lit && d.shape->has_nrm;
@@ -4672,6 +4816,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		gl.glUniform3f(_eye_mesh_program.light, d.mesh->light[0], d.mesh->light[1], d.mesh->light[2]);
 		gl.glUniform1f(_eye_mesh_program.lit, d.mesh->lit && d.shape->has_nrm ? 1.0f : 0.0f);
 		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
+		SetBones(_eye_mesh_program, *d.mesh, *d.shape);
 		gl.glBindVertexArray(d.shape->vao);
 		gl.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, d.indices->ibo);
 		if (!d.shape->has_nrm) gl.glVertexAttrib3f(1, 0, 0, 1);
@@ -4701,6 +4846,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		if (_eye_instance_vbo == 0) gl.glGenBuffers(1, &_eye_instance_vbo);
 		gl.glUniform1i(_eye_mesh_program.instanced, 1);
 		gl.glUniform1i(_eye_mesh_program.wheel_count, 0);
+		gl.glUniform1i(_eye_mesh_program.bone_row, -1);
 		gl.glUniform1i(_eye_mesh_program.glass, glass ? 1 : 0);
 		for (const EyeObjectDraws::Batch &b : o.batches) {
 			const std::vector<ThreeDGpuTriangles::Run> &runs = glass ? b.mesh->triangles->glass : b.mesh->triangles->opaque;
@@ -5667,6 +5813,15 @@ bool ThreeDGpuAvailable(bool wait)
 }
 
 /**
+ * Whether the card poses the figures on bones (ThreeDBonesFrame; the player, 3. 11.: "2 bones"), as its start tried
+ * it (TestBones()): their shapes at rest and their frames' joints put on it, no frame posed by the processor.
+ */
+bool ThreeDGpuPosesBones()
+{
+	return _bones_ok && _card_poses_bones && ThreeDGpuAvailable();
+}
+
+/**
  * Draw a picture on the card, on whichever thread asks (it waits): its pixels and the lit ones read back.
  * @return false: not drawn (no card, or a picture it cannot hold): the processor draws it
  */
@@ -5997,6 +6152,7 @@ std::string ThreeDGpuTimes()
 #else /* no card */
 
 bool ThreeDGpuAvailable(bool) { return false; }
+bool ThreeDGpuPosesBones() { return false; }
 bool ThreeDGpuSmoothsRoads() { return false; }
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &) { return false; }
 bool ThreeDGpuRenderEyeFrame(ThreeDGpuEyeFrame &) { return false; }

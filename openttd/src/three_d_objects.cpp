@@ -34,6 +34,7 @@
 #include "effectvehicle_func.h"
 #include "core/string_consumer.hpp"
 #include "three_d.h"
+#include "three_d_gpu.h"
 #include "town.h"
 #include "town_map.h"
 #include "tree_map.h"
@@ -6210,6 +6211,7 @@ enum LazyThing : int {
 	LAZY_HOUSE_MATERIAL = 8000, ///< + its other material (ThreeDObject::MaterialTexture())
 	LAZY_HOUSE_READY = 9000,    ///< read and painted to be drawn on the map (ThreeDObjectReadyToDraw())
 	LAZY_HOUSE_PAINT = 1 << 20, ///< + the level + 16 times the paint (its halves mixed into sixteen bits)
+	LAZY_BONES = 1 << 24,       ///< + the frame: a figure's frame as the card poses it (ThreeDVehicleObject::GetBones())
 };
 
 /**
@@ -6343,6 +6345,8 @@ static void ShrinkShape(ThreeDVehicleShape &s)
 	s.torch_aims.shrink_to_fit();
 	s.front_part.shrink_to_fit();
 	s.back_part.shrink_to_fit();
+	s.corner_joints.shrink_to_fit();
+	s.corner_weights.shrink_to_fit();
 }
 
 /** The extent of all the corners of a shape read (ThreeDVehicleShape::all). */
@@ -6599,8 +6603,19 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 	 * speckled from a few metres on (the player, 17. 10.). Within an island they join: it is one piece of the texture.
 	 * (It was a 128th of the texture before: the colleague's lorries, their corners far apart in their atlases, kept
 	 * 374 of 692 thousand triangles at the farthest zoom.) */
+	/* A figure on bones at rest (ThreeDVehicleShape::corner_joints): corners moved most by other joints apart too -- one
+	 * joined from the arm and the body would be torn between them as the card poses it. */
+	const bool on_bones = shape.corner_joints.size() == corners * 4 && shape.corner_weights.size() == corners * 4;
+	auto main_joint = [&](size_t i) -> uint64_t {
+		if (!on_bones) return 0;
+		int best = 0;
+		for (int k = 1; k < 4; k++) {
+			if (shape.corner_weights[i * 4 + k] > shape.corner_weights[i * 4 + best]) best = k;
+		}
+		return shape.corner_joints[i * 4 + best];
+	};
 	auto apart_of = [&](size_t i) {
-		return static_cast<uint64_t>(part[i]) | static_cast<uint64_t>(i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | static_cast<uint64_t>(root(static_cast<uint32_t>(i))) << 16;
+		return static_cast<uint64_t>(part[i]) | static_cast<uint64_t>(i < shape.corner_wheel.size() ? shape.corner_wheel[i] : 0u) << 8 | static_cast<uint64_t>(root(static_cast<uint32_t>(i))) << 16 | main_joint(i) << 48;
 	};
 	/* The cell of a corner: where it is, which way it faces (the axis it faces most along), its texture. */
 	auto key_of = [&](size_t i) {
@@ -6631,6 +6646,11 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 			if (has_nrm) out->nrm.insert(out->nrm.end(), 3, 0.0f);
 			if (has_uv) out->uv.insert(out->uv.end(), 2, 0.0f);
 			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[i]);
+			/* Its joints its first corner's (they are all moved most by the same one). */
+			if (on_bones) {
+				out->corner_joints.insert(out->corner_joints.end(), shape.corner_joints.begin() + i * 4, shape.corner_joints.begin() + i * 4 + 4);
+				out->corner_weights.insert(out->corner_weights.end(), shape.corner_weights.begin() + i * 4, shape.corner_weights.begin() + i * 4 + 4);
+			}
 		}
 		const uint32_t c = it->second;
 		count[c]++;
@@ -6792,59 +6812,81 @@ static void AddHeldThing(const ThreeDVehicleObject &f, const GlbSkeleton &sk, co
 }
 
 /**
- * A frame of a creature with bones (skeleton_file): the mesh posed by its animation at the frame's time -- a round of
- * the frames is the animation from its first key to its last; one that does not go round ends on its last. A
- * passage (blend_from) mixes the pose it comes from and the one it goes to, bone by bone, more of the latter each
- * tick. Kept for the creatures of the same bones (the brown and the black dragon).
+ * The pose of a frame of a creature with bones (skeleton_file), as the processor poses its shape (MakePosedShape()) and
+ * the card its bones (MakeBones()): its animation at the frame's time -- a round of the frames is the animation from its
+ * first key to its last; one that does not go round ends on its last. A passage (blend_from) mixes the pose it comes
+ * from and the one it goes to, bone by bone, more of the latter each tick.
+ * @param[out] pose each node's place against its parent
+ * @return its bones, nullptr when they cannot be read
  */
-std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(int frame) const
+static const GlbSkeleton *PoseOfFrame(const ThreeDVehicleObject &f, int frame, std::vector<BonePose> &pose)
 {
-	GlbFilesScope files;
-	std::string key = fmt::format("{}#{}#{}/{}{}", this->skeleton_file, this->skeleton_anim, frame, this->frames, this->loop ? "o" : "-");
-	if (!this->motion_file.empty()) key += fmt::format("#{}x{:.4f}#{}", this->motion_file, this->motion_scale, this->held_file);
-	if (this->blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", this->blend_from->skeleton_anim, this->blend_from_frame, this->blend_from->frames, this->blend_ticks);
-	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
-	const GlbSkeleton *sk = ReadGlbSkeleton(this->skeleton_file);
+	const GlbSkeleton *sk = ReadGlbSkeleton(f.skeleton_file);
 	if (sk == nullptr) return nullptr;
 	/* The animations: its own, or a humanoid's motions, put on its bones by their names. */
-	const GlbSkeleton *moves = this->motion_file.empty() ? sk : ReadGlbSkeleton(this->motion_file, false);
+	const GlbSkeleton *moves = f.motion_file.empty() ? sk : ReadGlbSkeleton(f.motion_file, false);
 	if (moves == nullptr) return nullptr;
-	float scale = this->motion_scale;
-	if (this->motion_file.empty() && !this->bone_kind.empty() && sk->Find(this->skeleton_anim) == nullptr) {
+	float scale = f.motion_scale;
+	if (f.motion_file.empty() && !f.bone_kind.empty() && sk->Find(f.skeleton_anim) == nullptr) {
 		/* A motion its own file lacks: the kind's of its bones, put on them by their names (the four-legged ones'
 		 * "ctyrnozec_pohyby", as the humanoids'). */
 		for (const ThreeDMotionSet &set : _motion_sets) {
-			if (set.kind != this->bone_kind) continue;
+			if (set.kind != f.bone_kind) continue;
 			const GlbSkeleton *kind = ReadGlbSkeleton(set.file, false);
-			if (kind == nullptr || kind->Find(this->skeleton_anim) == nullptr) continue;
+			if (kind == nullptr || kind->Find(f.skeleton_anim) == nullptr) continue;
 			moves = kind;
-			scale = this->hips / set.hips;
+			scale = f.hips / set.hips;
 			break;
 		}
 	}
 	/* The time of a frame of a figure, seconds. */
-	auto time_of = [](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
+	auto time_of = [](const ThreeDVehicleObject &of, const GlbSkeleton::Animation *a, int fr) {
 		if (a == nullptr) return 0.0;
-		if (f.frames < 2) return a->start;
-		const double phase = f.loop ? static_cast<double>(fr) / f.frames : static_cast<double>(fr) / (f.frames - 1);
+		if (of.frames < 2) return a->start;
+		const double phase = of.loop ? static_cast<double>(fr) / of.frames : static_cast<double>(fr) / (of.frames - 1);
 		return a->start + (a->end - a->start) * std::clamp(phase, 0.0, 1.0);
 	};
-	auto pose_of = [&](const ThreeDVehicleObject &f, const GlbSkeleton::Animation *a, int fr) {
-		std::vector<BonePose> p = moves->Pose(a, time_of(f, a, fr));
+	auto pose_of = [&](const ThreeDVehicleObject &of, const GlbSkeleton::Animation *a, int fr) {
+		std::vector<BonePose> p = moves->Pose(a, time_of(of, a, fr));
 		return moves == sk ? p : sk->Retarget(*moves, p, a, scale);
 	};
-	std::vector<BonePose> pose;
-	if (this->blend_from != nullptr && this->blend_to != nullptr && this->blend_ticks > 0) {
-		const int own = frame / this->blend_ticks, tick = frame % this->blend_ticks;
-		const GlbSkeleton::Animation *from = moves->Find(this->blend_from->skeleton_anim), *to = moves->Find(this->blend_to->skeleton_anim);
-		const std::vector<BonePose> a = pose_of(*this->blend_from, from, this->blend_from_frame);
-		const std::vector<BonePose> b = pose_of(*this->blend_to, to, own);
-		const double k = (tick + 1.0) / (this->blend_ticks + 1.0);
+	pose.clear();
+	if (f.blend_from != nullptr && f.blend_to != nullptr && f.blend_ticks > 0) {
+		const int own = frame / f.blend_ticks, tick = frame % f.blend_ticks;
+		const GlbSkeleton::Animation *from = moves->Find(f.blend_from->skeleton_anim), *to = moves->Find(f.blend_to->skeleton_anim);
+		const std::vector<BonePose> a = pose_of(*f.blend_from, from, f.blend_from_frame);
+		const std::vector<BonePose> b = pose_of(*f.blend_to, to, own);
+		const double k = (tick + 1.0) / (f.blend_ticks + 1.0);
 		pose.reserve(a.size());
 		for (size_t i = 0; i < a.size(); i++) pose.push_back(a[i].Mix(b[i], k));
 	} else {
-		pose = pose_of(*this, moves->Find(this->skeleton_anim), frame);
+		pose = pose_of(f, moves->Find(f.skeleton_anim), frame);
 	}
+	return sk;
+}
+
+/** The key a frame of a creature with bones is kept by (MakePosedShape()): the creatures of the same bones and motion share it. */
+static std::string PosedShapeKey(const ThreeDVehicleObject &f, int frame)
+{
+	std::string key = fmt::format("kostra|{}#{}#{}/{}{}", f.skeleton_file, f.skeleton_anim, frame, f.frames, f.loop ? "o" : "-");
+	if (!f.motion_file.empty()) key += fmt::format("#{}x{:.4f}#{}", f.motion_file, f.motion_scale, f.held_file);
+	if (f.blend_from != nullptr) key += fmt::format("<{}#{}/{}x{}", f.blend_from->skeleton_anim, f.blend_from_frame, f.blend_from->frames, f.blend_ticks);
+	return key;
+}
+
+/**
+ * A frame of a creature with bones (skeleton_file) posed by the processor: the mesh in the frame's pose (PoseOfFrame()).
+ * Kept for the creatures of the same bones (the brown and the black dragon). Where the card draws, it poses the frames
+ * itself (MakeBones()): this one is made only where the processor draws them.
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(int frame) const
+{
+	GlbFilesScope files;
+	const std::string key = PosedShapeKey(*this, frame);
+	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
+	std::vector<BonePose> pose;
+	const GlbSkeleton *sk = PoseOfFrame(*this, frame, pose);
+	if (sk == nullptr) return nullptr;
 	auto made = std::make_shared<ThreeDVehicleShape>();
 	sk->Skin(pose, made->pos, made->nrm);
 	/* Its seat (the colleague's horses: the node "sedlo" under the bone Spine1) where it is in the pose, the game's axes. */
@@ -6882,7 +6924,327 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakePosedShape(in
 	return made;
 }
 
-/** Read the object's shape (a frame of it), or the one read already for the same file, wheels, crew and frame. */
+/**
+ * A matrix of glTF's axes in the game's (GlbSkeleton::Skin(): the game's x, y, z are glTF's x, -z, y): a point of the
+ * game's turned into glTF's, placed by the matrix, turned back; its three rows of four.
+ */
+static void GameRowsOf(const BoneMatrix &m, double out[12])
+{
+	static constexpr double TO_GAME[3][3] = {{1, 0, 0}, {0, 0, -1}, {0, 1, 0}};
+	static constexpr double TO_GLTF[3][3] = {{1, 0, 0}, {0, 0, 1}, {0, -1, 0}};
+	for (int r = 0; r < 3; r++) {
+		for (int c = 0; c < 3; c++) {
+			double s = 0;
+			for (int a = 0; a < 3; a++) {
+				for (int b = 0; b < 3; b++) s += TO_GAME[r][a] * m[b * 4 + a] * TO_GLTF[b][c];
+			}
+			out[r * 4 + c] = s;
+		}
+		double t = 0;
+		for (int a = 0; a < 3; a++) t += TO_GAME[r][a] * m[12 + a];
+		out[r * 4 + 3] = t;
+	}
+}
+
+/** The inverse of a matrix that moves, turns and scales (its last row 0, 0, 0, 1); none (a flat one): as it is not, the identity. */
+static BoneMatrix AffineInverse(const BoneMatrix &m)
+{
+	const double a = m[0], b = m[4], c = m[8], d = m[1], e = m[5], f = m[9], g = m[2], h = m[6], i = m[10];
+	const double det = a * (e * i - f * h) - b * (d * i - f * g) + c * (d * h - e * g);
+	BoneMatrix out{};
+	if (det == 0 || !std::isfinite(det)) {
+		out[0] = out[5] = out[10] = out[15] = 1;
+		return out;
+	}
+	const double inv[3][3] = {
+		{(e * i - f * h) / det, (c * h - b * i) / det, (b * f - c * e) / det},
+		{(f * g - d * i) / det, (a * i - c * g) / det, (c * d - a * f) / det},
+		{(d * h - e * g) / det, (b * g - a * h) / det, (a * e - b * d) / det},
+	};
+	for (int r = 0; r < 3; r++) {
+		for (int col = 0; col < 3; col++) out[col * 4 + r] = inv[r][col];
+		out[12 + r] = -(inv[r][0] * m[12] + inv[r][1] * m[13] + inv[r][2] * m[14]);
+	}
+	out[15] = 1;
+	return out;
+}
+
+/**
+ * Where the numbers of a creature's mesh stand at rest, in metres, glTF's axes: its joint that moves the most of it
+ * at rest (its node's place unanimated, by its matrix from the mesh). A mesh packed smaller (gltfpack: its corners
+ * whole numbers to 16383) has its numbers made metres again by the joints' matrices alone -- its shape at rest for the
+ * card (RestShapeOf()) in metres as the shapes posed by the processor, its textures and its detail chosen by its size
+ * (TexelsPerMetre(), Simpler()), the joints moving it from there (MakeBones()) as from the numbers: the same pose.
+ */
+static BoneMatrix RestUnits(const GlbSkeleton &sk)
+{
+	BoneMatrix identity{};
+	identity[0] = identity[5] = identity[10] = identity[15] = 1;
+	if (sk.joints.empty() || sk.inverse_bind.size() < sk.joints.size()) return identity;
+	std::vector<double> weight(sk.joints.size(), 0.0);
+	for (size_t i = 0; i < sk.joint_of.size() && i < sk.weight_of.size(); i++) {
+		for (int k = 0; k < 4; k++) {
+			if (sk.joint_of[i][k] < weight.size()) weight[sk.joint_of[i][k]] += sk.weight_of[i][k];
+		}
+	}
+	const size_t most = std::max_element(weight.begin(), weight.end()) - weight.begin();
+	const std::vector<BoneMatrix> global = sk.Globals(sk.Pose(nullptr, 0));
+	const BoneMatrix d = BoneMultiply(global[sk.joints[most]], sk.inverse_bind[most]);
+	/* Flat (a joint scaled to nothing at rest): the numbers as they are. */
+	const double det = d[0] * (d[5] * d[10] - d[9] * d[6]) - d[4] * (d[1] * d[10] - d[9] * d[2]) + d[8] * (d[1] * d[6] - d[5] * d[2]);
+	return det == 0 || !std::isfinite(det) ? identity : d;
+}
+
+/**
+ * The shape at rest of a creature with bones as the card poses it (ThreeDBonesFrame::rest): its mesh as it is bound to
+ * its joints, in metres as it stands at rest (RestUnits()), the game's axes, each corner with its joints and how much
+ * each moves it (GlbSkeleton::Skin()); a thing it holds (AddHeldThing()) as it is in its own frame, all of it moved by
+ * a joint of its own after the others. One for all the creatures of the same bones and thing.
+ * @param[out] holds whether it holds a thing (its joint after the bones')
+ * @return nullptr: more joints than a corner names (ThreeDVehicleShape::MAX_JOINTS)
+ */
+static std::shared_ptr<const ThreeDVehicleShape> RestShapeOf(const ThreeDVehicleObject &f, const GlbSkeleton &sk, bool &holds)
+{
+	const size_t corners = sk.pos.size() / 3, joints = sk.joints.size();
+	holds = false;
+	if (joints >= ThreeDVehicleShape::MAX_JOINTS) return nullptr;
+	std::string key = fmt::format("kostra-klid|{}", f.skeleton_file);
+	if (!f.held_file.empty()) key += fmt::format("#{}#{}#{},{},{}#{},{},{},{}", f.held_file, f.held_bone, f.held_at[0], f.held_at[1], f.held_at[2], f.held_turn[0], f.held_turn[1], f.held_turn[2], f.held_turn[3]);
+	if (auto known = KnownVehicleShape(key); known != nullptr) {
+		holds = known->pos.size() / 3 > corners;
+		return known;
+	}
+	auto made = std::make_shared<ThreeDVehicleShape>();
+	const bool normals = sk.nrm.size() == corners * 3;
+	made->pos.resize(corners * 3);
+	if (normals) made->nrm.resize(corners * 3);
+	/* In metres as it stands at rest (RestUnits()), not in the numbers of the file. */
+	const BoneMatrix d = RestUnits(sk);
+	for (size_t i = 0; i < corners; i++) {
+		const double X = sk.pos[i * 3], Y = sk.pos[i * 3 + 1], Z = sk.pos[i * 3 + 2];
+		made->pos[i * 3] = static_cast<float>(d[0] * X + d[4] * Y + d[8] * Z + d[12]);
+		made->pos[i * 3 + 1] = static_cast<float>(-(d[2] * X + d[6] * Y + d[10] * Z + d[14]));
+		made->pos[i * 3 + 2] = static_cast<float>(d[1] * X + d[5] * Y + d[9] * Z + d[13]);
+		if (!normals) continue;
+		const double nx = sk.nrm[i * 3], ny = sk.nrm[i * 3 + 1], nz = sk.nrm[i * 3 + 2];
+		double hx = d[0] * nx + d[4] * ny + d[8] * nz, hy = d[1] * nx + d[5] * ny + d[9] * nz, hz = d[2] * nx + d[6] * ny + d[10] * nz;
+		const double l = std::sqrt(hx * hx + hy * hy + hz * hz);
+		if (l > 0) {
+			hx /= l;
+			hy /= l;
+			hz /= l;
+		}
+		made->nrm[i * 3] = static_cast<float>(hx);
+		made->nrm[i * 3 + 1] = static_cast<float>(-hz);
+		made->nrm[i * 3 + 2] = static_cast<float>(hy);
+	}
+	made->uv.assign(sk.uv.begin(), sk.uv.end());
+	made->tri = sk.tri;
+	made->tri_tex = sk.tri_tex;
+	for (const GlbTexture &t : sk.textures) {
+		made->pngs.push_back(t.png);
+		made->flats.push_back(t.flat);
+		made->tex_names.push_back(t.name);
+		made->tex_glow.push_back(t.glow);
+		made->tex_alpha.push_back(t.alpha);
+	}
+	/* Each corner's joints, as Skin() moves it: a joint of no weight, or one the bones have not, none. */
+	made->corner_joints.assign(corners * 4, 0);
+	made->corner_weights.assign(corners * 4, 0.0f);
+	for (size_t i = 0; i < corners && i < sk.joint_of.size() && i < sk.weight_of.size(); i++) {
+		for (int k = 0; k < 4; k++) {
+			const float w = sk.weight_of[i][k];
+			const uint16_t j = sk.joint_of[i][k];
+			if (w == 0 || j >= joints) continue;
+			made->corner_joints[i * 4 + k] = static_cast<uint8_t>(j);
+			made->corner_weights[i * 4 + k] = w;
+		}
+	}
+	/* The thing held, as AddHeldThing() adds it: its corners in its own frame, the game's axes, all of them its joint's. */
+	GlbMesh thing;
+	if (!f.held_file.empty() && sk.NodeNamed(f.held_bone) >= 0 && ReadGlbMesh(f.held_file, thing, true) && !thing.pos.empty() && made->pngs.size() + thing.textures.size() <= 255) {
+		holds = true;
+		const uint32_t base = static_cast<uint32_t>(corners);
+		const uint8_t first_texture = static_cast<uint8_t>(made->pngs.size());
+		const size_t n = thing.pos.size() / 3;
+		made->pos.insert(made->pos.end(), thing.pos.begin(), thing.pos.begin() + n * 3);
+		if (normals) {
+			if (thing.nrm.size() == thing.pos.size()) {
+				made->nrm.insert(made->nrm.end(), thing.nrm.begin(), thing.nrm.end());
+			} else {
+				for (size_t i = 0; i < n; i++) made->nrm.insert(made->nrm.end(), {0.0f, 0.0f, 1.0f});
+			}
+		}
+		if (thing.uv.size() == n * 2) {
+			made->uv.insert(made->uv.end(), thing.uv.begin(), thing.uv.end());
+		} else {
+			made->uv.resize(made->uv.size() + n * 2, 0.0f);
+		}
+		for (uint32_t c : thing.tri) made->tri.push_back(base + c);
+		for (size_t t = 0; t < thing.tri.size() / 3; t++) made->tri_tex.push_back(static_cast<uint8_t>(first_texture + (t < thing.tri_tex.size() ? thing.tri_tex[t] : 0)));
+		for (const GlbTexture &t : thing.textures) {
+			made->pngs.push_back(t.png);
+			made->flats.push_back(t.flat);
+			made->tex_names.push_back(t.name);
+			made->tex_glow.push_back(t.glow);
+			made->tex_alpha.push_back(t.alpha);
+		}
+		for (size_t i = 0; i < n; i++) {
+			made->corner_joints.insert(made->corner_joints.end(), {static_cast<uint8_t>(joints), 0, 0, 0});
+			made->corner_weights.insert(made->corner_weights.end(), {1.0f, 0.0f, 0.0f, 0.0f});
+		}
+	}
+	ShrinkShape(*made);
+	ExtentOfAll(*made);
+	made->x0 = made->all[0]; made->x1 = made->all[1];
+	made->y0 = made->all[2]; made->y1 = made->all[3];
+	made->z0 = made->all[4]; made->z1 = made->all[5];
+	KeepVehicleShape(key, made);
+	return made;
+}
+
+/**
+ * A frame of a creature with bones as the card poses it (GetBones()): the matrices of its joints in the frame's pose
+ * (PoseOfFrame()), and of its shape as the processor would pose it its extent and its seat -- each corner placed as
+ * Skin() places it, nothing kept of them. Its rest nullptr: the card cannot pose it (its frames posed by the processor).
+ */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::MakeBones(int frame) const
+{
+	GlbFilesScope files;
+	auto made = std::make_shared<ThreeDBonesFrame>();
+	std::vector<BonePose> pose;
+	const GlbSkeleton *sk = PoseOfFrame(*this, frame, pose);
+	if (sk == nullptr) return made;
+	bool holds = false;
+	made->rest = RestShapeOf(*this, *sk, holds);
+	if (made->rest == nullptr) return made;
+	const std::vector<BoneMatrix> global = sk->Globals(pose);
+	const size_t joints = sk->joints.size();
+	std::vector<std::array<double, 12>> rows(joints + (holds ? 1 : 0));
+	/* Its rest in metres (RestUnits()): the joints move it from there, as they would move the numbers of the file. */
+	const BoneMatrix from_metres = AffineInverse(RestUnits(*sk));
+	for (size_t k = 0; k < joints; k++) GameRowsOf(BoneMultiply(BoneMultiply(global[sk->joints[k]], sk->inverse_bind[k]), from_metres), rows[k].data());
+	if (holds) {
+		BonePose on;
+		std::copy_n(this->held_at, 3, on.t);
+		std::copy_n(this->held_turn, 4, on.r);
+		GameRowsOf(BoneMultiply(global[sk->NodeNamed(this->held_bone)], on.Matrix()), rows[joints].data());
+	}
+	made->joints.reserve(rows.size() * 12);
+	for (const auto &r : rows) {
+		for (double v : r) made->joints.push_back(static_cast<float>(v));
+	}
+	/* Its extent as posed: each corner where its joints move it. */
+	const ThreeDVehicleShape &rest = *made->rest;
+	const size_t corners = rest.pos.size() / 3;
+	ThreeDVehicleShape &posed = made->posed;
+	if (corners > 0 && rest.corner_joints.size() == corners * 4 && rest.corner_weights.size() == corners * 4) {
+		float e[6] = {std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity(), std::numeric_limits<float>::infinity(), -std::numeric_limits<float>::infinity()};
+		for (size_t i = 0; i < corners; i++) {
+			double m[12] = {};
+			for (int k = 0; k < 4; k++) {
+				const float w = rest.corner_weights[i * 4 + k];
+				const size_t j = rest.corner_joints[i * 4 + k];
+				if (w == 0 || j >= rows.size()) continue;
+				for (int a = 0; a < 12; a++) m[a] += rows[j][a] * w;
+			}
+			const double x = rest.pos[i * 3], y = rest.pos[i * 3 + 1], z = rest.pos[i * 3 + 2];
+			for (int a = 0; a < 3; a++) {
+				const float v = static_cast<float>(m[a * 4] * x + m[a * 4 + 1] * y + m[a * 4 + 2] * z + m[a * 4 + 3]);
+				e[a * 2] = std::min(e[a * 2], v);
+				e[a * 2 + 1] = std::max(e[a * 2 + 1], v);
+			}
+		}
+		posed.x0 = e[0]; posed.x1 = e[1];
+		posed.y0 = e[2]; posed.y1 = e[3];
+		posed.z0 = e[4]; posed.z1 = e[5];
+		std::copy_n(e, 6, posed.all);
+	}
+	/* Its seat (the colleague's horses: the node "sedlo") where it is in the pose, as MakePosedShape() has it. */
+	if (const int seat = sk->NodeNamed("sedlo"); seat >= 0) {
+		const BoneMatrix &m = global[seat];
+		posed.has_seat = true;
+		posed.seat[0] = static_cast<float>(m[12]);
+		posed.seat[1] = static_cast<float>(-m[14]);
+		posed.seat[2] = static_cast<float>(m[13]);
+	}
+	posed.glass_alpha = rest.glass_alpha;
+	return made;
+}
+
+/** Whether it is a figure on bones (skeleton_file): its frames posed by the card where it draws them (GetBones()). */
+bool ThreeDVehicleObject::OnBones() const
+{
+	return !this->skeleton_file.empty();
+}
+
+/**
+ * A frame of a figure on bones as the card poses it (ThreeDBonesFrame; the player, 3. 11.: "2 bones"), made the first
+ * time it is drawn (MakeOnce()) -- no shape of the frame posed by the processor.
+ * @return nullptr: not on bones, or not made yet (ThreeDLazyNoWait); its rest nullptr: the card cannot pose it, the
+ *         processor's frames (GetShape(int)) instead
+ */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::GetBones(int frame) const
+{
+	if (!this->OnBones()) return nullptr;
+	MarkThreeDUsed(this->used);
+	const size_t count = static_cast<size_t>(std::max(1, this->frames));
+	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
+	MakeOnce(this, LAZY_BONES + static_cast<int>(at), [this, count, at] {
+		if (this->frame_bones.size() < count) this->frame_bones.resize(count);
+		return this->frame_bones[at] != nullptr;
+	}, [this, at] { return this->MakeBones(static_cast<int>(at)); }, [this, count, at](std::shared_ptr<const ThreeDBonesFrame> made) {
+		if (this->frame_bones.size() < count) this->frame_bones.resize(count);
+		this->frame_bones[at] = std::move(made);
+	});
+	std::lock_guard lock(_lazy_mutex);
+	return at < this->frame_bones.size() ? this->frame_bones[at] : nullptr;
+}
+
+/** A frame of a figure on bones as the card poses it (GetBones()) if it is made already; else nullptr, and it is made in the background. */
+std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::TryGetBones(int frame) const
+{
+	if (!this->OnBones()) return nullptr;
+	MarkThreeDUsed(this->used);
+	const size_t count = static_cast<size_t>(std::max(1, this->frames));
+	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
+	if (!MadeOrAsked(this, LAZY_BONES + static_cast<int>(at), [this, at] { return at < this->frame_bones.size() && this->frame_bones[at] != nullptr; }, [this, at] { this->GetBones(static_cast<int>(at)); })) return nullptr;
+	std::lock_guard lock(_lazy_mutex);
+	return at < this->frame_bones.size() ? this->frame_bones[at] : nullptr;
+}
+
+/**
+ * A shape at rest of a figure on bones (or a simpler one of it) posed by the processor by a frame's joints, as the card
+ * poses it (MESH_VERTEX of three_d_gpu.cpp): where something meant for the card is drawn by the processor after all.
+ */
+std::shared_ptr<const ThreeDVehicleShape> ThreeDPoseOnProcessor(const ThreeDVehicleShape &rest, const ThreeDBonesFrame &bones)
+{
+	auto made = std::make_shared<ThreeDVehicleShape>(rest);
+	const size_t corners = rest.pos.size() / 3, joints = bones.joints.size() / 12;
+	if (rest.corner_joints.size() != corners * 4 || rest.corner_weights.size() != corners * 4) return made;
+	const bool normals = rest.nrm.size() == rest.pos.size();
+	for (size_t i = 0; i < corners; i++) {
+		float m[12] = {};
+		for (int k = 0; k < 4; k++) {
+			const float w = rest.corner_weights[i * 4 + k];
+			const size_t j = rest.corner_joints[i * 4 + k];
+			if (w == 0 || j >= joints) continue;
+			for (int a = 0; a < 12; a++) m[a] += bones.joints[j * 12 + a] * w;
+		}
+		const float x = rest.pos[i * 3], y = rest.pos[i * 3 + 1], z = rest.pos[i * 3 + 2];
+		for (int a = 0; a < 3; a++) made->pos[i * 3 + a] = m[a * 4] * x + m[a * 4 + 1] * y + m[a * 4 + 2] * z + m[a * 4 + 3];
+		if (!normals) continue;
+		const float nx = rest.nrm[i * 3], ny = rest.nrm[i * 3 + 1], nz = rest.nrm[i * 3 + 2];
+		float n[3];
+		for (int a = 0; a < 3; a++) n[a] = m[a * 4] * nx + m[a * 4 + 1] * ny + m[a * 4 + 2] * nz;
+		const float l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+		for (int a = 0; a < 3; a++) made->nrm[i * 3 + a] = l > 0 ? n[a] / l : n[a];
+	}
+	made->corner_joints.clear();
+	made->corner_weights.clear();
+	return made;
+}
+
 /**
  * Make the object's shape (a frame of it): its file, its wheels, its crew, and of its add-ons the nodes of the parts
  * asked for (GetShape(int, uint64_t)) -- the textures of all its add-ons all the same, in the same order whatever parts
@@ -7489,6 +7851,46 @@ static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, 
 }
 
 /**
+ * The shape whose textures are a figure's on bones the card poses (ThreeDGpuPosesBones()): its shape at rest, the
+ * textures of all its frames -- no frame of it posed by the processor for its textures.
+ * @param wait made now if it is not yet, else not waited for (asked in the background)
+ * @param[out] posed_by_card whether it is so (else the object's shape has its textures)
+ * @return nullptr when posed by the card and not made yet
+ */
+static const ThreeDVehicleShape *RestForTextures(const ThreeDVehicleObject &o, bool wait, bool &posed_by_card)
+{
+	posed_by_card = false;
+	if (!o.OnBones() || !ThreeDGpuPosesBones()) return nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		for (const auto &b : o.frame_bones) {
+			if (b != nullptr && b->rest != nullptr) {
+				posed_by_card = true;
+				return b->rest.get();
+			}
+		}
+	}
+	const std::shared_ptr<const ThreeDBonesFrame> b = wait ? o.GetBones(0) : o.TryGetBones(0);
+	if (b != nullptr && b->rest == nullptr) return nullptr; // the card cannot pose it: its frames the processor's
+	posed_by_card = true;
+	return b != nullptr ? b->rest.get() : nullptr;
+}
+
+/**
+ * The shape the object's textures are of, as its textures are chosen and painted by it (the level of detail, the
+ * paint of its state): a figure on bones the card poses its shape at rest (RestForTextures()), else its shape.
+ * @param wait made now if it is not yet (ThreeDLazyNoWait: asked in the background), else only if it is made already
+ * @return nullptr when there is none yet
+ */
+const ThreeDVehicleShape *ThreeDVehicleObject::TextureShape(bool wait) const
+{
+	bool by_card = false;
+	const ThreeDVehicleShape *rest = RestForTextures(*this, wait, by_card);
+	if (by_card) return rest;
+	return wait ? this->GetShape() : this->TryGetShape();
+}
+
+/**
  * One of the object's textures at a level of detail, made the first time and again when a finer level is wanted than it
  * has (the textures by need): the body's (0) is the paint ("textura") when there is one, else the file's; the others
  * the file's and the wheels'.
@@ -7496,7 +7898,11 @@ static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, 
 const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index) const
 {
 	MarkThreeDUsed(this->used);
-	const ThreeDVehicleShape *s = this->GetShape();
+	bool by_card = false;
+	const ThreeDVehicleShape *s = RestForTextures(*this, true, by_card);
+	/* Not made yet (ThreeDLazyNoWait): not made of nothing now -- it is asked of the thread in the background. */
+	if (by_card && s == nullptr) return nullptr;
+	if (!by_card) s = this->GetShape();
 	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
 	level = std::max(level, 0);
@@ -7528,8 +7934,13 @@ const ThreeDObjectTexture *ThreeDVehicleObject::GetTexture(int level, int index)
 const ThreeDObjectTexture *ThreeDVehicleObject::TryGetTexture(int level, int index) const
 {
 	MarkThreeDUsed(this->used);
-	const ThreeDVehicleShape *s = this->TryGetShape();
-	if (s == nullptr && !this->ShapeKnown()) return nullptr;
+	bool by_card = false;
+	const ThreeDVehicleShape *s = RestForTextures(*this, false, by_card);
+	if (by_card && s == nullptr) return nullptr;
+	if (!by_card) {
+		s = this->TryGetShape();
+		if (s == nullptr && !this->ShapeKnown()) return nullptr;
+	}
 	const size_t count = s != nullptr ? std::max<size_t>(1, s->pngs.size()) : 1;
 	if (index < 0 || static_cast<size_t>(index) >= count) index = 0;
 	level = std::max(level, 0);
@@ -7557,6 +7968,8 @@ bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
 		/* The shape read: a figure that moves has its frames' only (they share their pictures). */
 		const ThreeDVehicleShape *s = this->shape.get();
 		for (size_t f = 0; s == nullptr && f < this->frame_shapes.size(); f++) s = this->frame_shapes[f].get();
+		/* A figure on bones the card poses: its shape at rest (the same pictures). */
+		for (size_t f = 0; s == nullptr && f < this->frame_bones.size(); f++) s = this->frame_bones[f] != nullptr ? this->frame_bones[f]->rest.get() : nullptr;
 		if (s != nullptr && index >= 0 && static_cast<size_t>(index) < s->pngs.size()) png = s->pngs[index];
 	}
 	std::vector<uint8_t> head;
@@ -10038,6 +10451,8 @@ void ThreeDVehicleObject::Forget() const
 	this->detail_tried.clear();
 	this->frame_shapes.clear();
 	this->frame_shapes.shrink_to_fit();
+	this->frame_bones.clear();
+	this->frame_bones.shrink_to_fit();
 	this->shape.reset();
 	this->shape_tried = false;
 	this->shape_parts = {};
@@ -10086,7 +10501,7 @@ static void ForgetUnusedThreeDObjectsNow()
 	}
 	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
 		for (const ThreeDVehicleObject &v : *list) {
-			if (v.used >= before || v.frame_shapes.empty()) continue;
+			if (v.used >= before || (v.frame_shapes.empty() && v.frame_bones.empty())) continue;
 			v.Forget();
 			forgotten++;
 		}
@@ -10146,6 +10561,7 @@ size_t ThreeDVehicleShape::Bytes() const
 	b += VectorBytes(this->tri_part) + VectorBytes(this->corner_wheel) + VectorBytes(this->tri_glass) + VectorBytes(this->night_part);
 	b += VectorBytes(this->lanterns) + VectorBytes(this->torches) + VectorBytes(this->torch_aims);
 	b += VectorBytes(this->tex_glow) + VectorBytes(this->tex_alpha);
+	b += VectorBytes(this->corner_joints) + VectorBytes(this->corner_weights);
 	for (const auto &simpler : this->simpler.shapes) {
 		if (simpler != nullptr) b += simpler->Bytes();
 	}
@@ -10160,14 +10576,39 @@ size_t ThreeDVehicleShape::Bytes() const
 std::string DescribeThreeDObjectMemory()
 {
 	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
-	size_t shapes = 0, shape_count = 0;
+	size_t shapes = 0, shape_count = 0, posed = 0, posed_count = 0, rest = 0, rest_count = 0;
 	{
 		std::lock_guard lock(_vehicle_shapes_mutex);
 		for (const auto &[key, shape] : _vehicle_shapes) {
 			if (shape == nullptr) continue;
 			shapes += shape->Bytes();
 			shape_count++;
+			/* The frames of the figures on bones, each posed by the processor (MakePosedShape()); their shapes at rest
+			 * the card poses (RestShapeOf()). */
+			if (key.starts_with("kostra|")) {
+				posed += shape->Bytes();
+				posed_count++;
+			} else if (key.starts_with("kostra-klid|")) {
+				rest += shape->Bytes();
+				rest_count++;
+			}
 		}
+	}
+	/* The frames the card poses: their joints' matrices (ThreeDBonesFrame). */
+	size_t bones = 0, bones_count = 0;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto count_bones = [&](const ThreeDVehicleObject &v) {
+			for (const auto &b : v.frame_bones) {
+				if (b == nullptr) continue;
+				bones += sizeof(ThreeDBonesFrame) + VectorBytes(b->joints);
+				bones_count++;
+			}
+		};
+		for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+			for (const ThreeDVehicleObject &v : *list) count_bones(v);
+		}
+		for (const auto &[name, passage] : _passages) count_bones(*passage);
 	}
 	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0;
 	{
@@ -10211,8 +10652,8 @@ std::string DescribeThreeDObjectMemory()
 			house_count++;
 		}
 	}
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({})",
-			mb(shapes), shape_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read);
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({})",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read);
 }
 
 /** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */

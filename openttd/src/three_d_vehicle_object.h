@@ -87,6 +87,9 @@ struct ThreeDLoadPieces {
 bool GetThreeDLoadPieces(const struct ThreeDVehicleState *st, std::vector<ThreeDLoadPieces> &out);
 void GetThreeDEyeObjectLights(const ThreeDEyeVehicle &ev, std::vector<ThreeDWorldLight> &lights);
 struct ThreeDObjectTexture;
+struct ThreeDVehicleShape;
+struct ThreeDBonesFrame;
+const ThreeDVehicleShape *ThreeDCardFrame(const struct ThreeDVehicleObject &fig, int frame, bool try_only, std::shared_ptr<const ThreeDBonesFrame> &bones, const ThreeDVehicleShape *&posed);
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index);
 bool TryGetThreeDEyeVehiclePaints(const struct ThreeDVehicleObject *obj, int state, double pixels_per_metre, size_t count, std::vector<const ThreeDObjectTexture *> &textures, std::vector<struct ThreeDGpuPaint> &paints, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held);

@@ -12367,12 +12367,14 @@ struct CabFigureModel {
 	ThreeDParts parts = 1; ///< the parts its state shows
 	double turn = 0;      ///< how far its state turns the whole model, degrees
 	std::array<double, 9> spin{1, 0, 0, 0, 1, 0, 0, 0, 1}; ///< a thing that turns (the spit): how far it turns now about its axis (ThreeDVehicleObject::spin_axis)
+	std::shared_ptr<const ThreeDBonesFrame> bones; ///< a figure on bones the card poses (ThreeDCardFrame()): its frame's joints, whole its shape at rest
 	/** Its crew that walks, each at its frame. */
 	struct Crew {
 		const ThreeDWalkingCrew *w;
 		const ThreeDVehicleShape *shape; ///< as simple as its distance allows
 		std::vector<const ThreeDObjectTexture *> texs;
 		std::array<float, 3> at{};       ///< where it stands in the model's frame: its place, or the body's seat in this pose
+		std::shared_ptr<const ThreeDBonesFrame> bones; ///< as CabFigureModel::bones
 	};
 	std::vector<Crew> crew;
 	/** The pieces of its load on its bed (GetThreeDLoadPieces()), a kind each, each piece where it lies in its frame. */
@@ -12383,6 +12385,7 @@ struct CabFigureModel {
 		std::vector<const ThreeDObjectTexture *> texs;
 		std::vector<ThreeDGpuPaint> paints; ///< as CabFigureModel::paints
 		std::vector<ThreeDLoadPlace> places;
+		std::shared_ptr<const ThreeDBonesFrame> bones; ///< as CabFigureModel::bones
 	};
 	std::vector<Load> loads;
 };
@@ -12419,7 +12422,15 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	}
 	const ThreeDVehicleObject *fig = fg.obj != nullptr ? fg.obj : GetThreeDFigure(fg.name);
 	if (fig == nullptr) return false;
-	const ThreeDVehicleShape *whole = fig->TryGetShape(fig->ShapeFrame(fg.frame, fg.walk), fig->PartsOf(fg.state));
+	/* A figure on bones drawn by the card: posed by it (ThreeDCardFrame()), its shape at rest and its frame's joints. */
+	const ThreeDVehicleShape *whole = nullptr, *posed = nullptr;
+	model.bones = nullptr;
+	if (by_card && fig->OnBones()) {
+		whole = ThreeDCardFrame(*fig, fig->ShapeFrame(fg.frame, fg.walk), true, model.bones, posed);
+	} else {
+		whole = fig->TryGetShape(fig->ShapeFrame(fg.frame, fg.walk), fig->PartsOf(fg.state));
+		posed = whole;
+	}
 	if (whole == nullptr || whole->tri.empty()) return false;
 	const double across = fg.size * OBJECT_UNITS_PER_METRE;
 	/* As detailed as it is big on the picture: its corners joined about two pixels apart (Simpler()); the cab the eye
@@ -12467,11 +12478,13 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, model.parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *frame_shape = w.figure->TryGetShape(fig->CrewFrame(fg.walk, shown));
+		std::shared_ptr<const ThreeDBonesFrame> crew_bones;
+		const ThreeDVehicleShape *crew_posed = nullptr;
+		const ThreeDVehicleShape *frame_shape = by_card ? ThreeDCardFrame(*w.figure, fig->CrewFrame(fg.walk, shown), true, crew_bones, crew_posed) : w.figure->TryGetShape(fig->CrewFrame(fg.walk, shown));
 		if (frame_shape == nullptr || frame_shape->tri.empty()) continue;
 		const double crew_ppm = pixels_per_metre * w.scale;
-		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}};
-		const float *at = w.on_seat && whole->has_seat ? whole->seat : w.at;
+		CabFigureModel::Crew crew{&w, fg.own_cab ? frame_shape : frame_shape->TrySimpler(_cab_detail_pixels / crew_ppm), {}, {}, std::move(crew_bones)};
+		const float *at = w.on_seat && posed->has_seat ? posed->seat : w.at;
 		crew.at = {at[0], at[1], at[2]};
 		crew.texs.assign(std::max<size_t>(1, frame_shape->pngs.size()), nullptr);
 		bool ready = true;
@@ -12487,7 +12500,9 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	std::vector<ThreeDLoadPieces> loads;
 	GetThreeDLoadPieces(st, loads);
 	for (ThreeDLoadPieces &load : loads) {
-		const ThreeDVehicleShape *ls = load.fig->TryGetShape(load.frame);
+		std::shared_ptr<const ThreeDBonesFrame> load_bones;
+		const ThreeDVehicleShape *load_posed = nullptr;
+		const ThreeDVehicleShape *ls = by_card ? ThreeDCardFrame(*load.fig, load.frame, true, load_bones, load_posed) : load.fig->TryGetShape(load.frame);
 		if (ls == nullptr || ls->tri.empty()) continue;
 		std::vector<const ThreeDObjectTexture *> texs(std::max<size_t>(1, ls->pngs.size()), nullptr);
 		std::vector<ThreeDGpuPaint> paints;
@@ -12500,7 +12515,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 				ready = texs[i] != nullptr;
 			}
 		}
-		if (ready) model.loads.push_back({load.fig, load.state, fg.own_cab ? ls : ls->TrySimpler(_cab_detail_pixels / pixels_per_metre), std::move(texs), std::move(paints), std::move(load.places)});
+		if (ready) model.loads.push_back({load.fig, load.state, fg.own_cab ? ls : ls->TrySimpler(_cab_detail_pixels / pixels_per_metre), std::move(texs), std::move(paints), std::move(load.places), std::move(load_bones)});
 	}
 	return true;
 }
@@ -12512,7 +12527,9 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, const CabEye &eye, const CabFigure &fg, const CabFigureModel &model, bool wheels_turn)
 {
 	const ThreeDVehicleObject *fig = model.fig;
-	const ThreeDVehicleShape *shape = model.shape;
+	/* Meant for the card, which poses a figure on bones (CabFigureModel::bones), and drawn here after all: posed here. */
+	const std::shared_ptr<const ThreeDVehicleShape> posed_here = model.bones != nullptr ? ThreeDPoseOnProcessor(*model.shape, *model.bones) : nullptr;
+	const ThreeDVehicleShape *shape = posed_here != nullptr ? posed_here.get() : model.shape;
 	/* Meant for the card, which paints the textures as it draws them (CabFigureModel::paints), and drawn here after all
 	 * (something the card could not hold): painted here. */
 	auto painted = [&model](const ThreeDVehicleObject *obj, int state, const std::vector<const ThreeDObjectTexture *> &texs, const std::vector<ThreeDGpuPaint> &paints) {
@@ -12713,7 +12730,8 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	 * model's frame, as detailed as it is big on the picture. */
 	for (const CabFigureModel::Crew &crew : model.crew) {
 		const ThreeDWalkingCrew &w = *crew.w;
-		const ThreeDVehicleShape &cs = *crew.shape;
+		const std::shared_ptr<const ThreeDVehicleShape> crew_posed = crew.bones != nullptr ? ThreeDPoseOnProcessor(*crew.shape, *crew.bones) : nullptr;
+		const ThreeDVehicleShape &cs = crew_posed != nullptr ? *crew_posed : *crew.shape;
 		const double wa = w.turn * M_PI / 180.0, wc = std::cos(wa), ws = std::sin(wa);
 		const bool crew_lit = cs.nrm.size() == cs.pos.size();
 		auto crew_place = [&](size_t i, double &px, double &py, double &pz, double &nx, double &ny, double &nz) {
@@ -12732,7 +12750,8 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 	}
 	/* The pieces of its load, each where it lies on the bed, turned as it lies. */
 	for (const CabFigureModel::Load &load : model.loads) {
-		const ThreeDVehicleShape &ls = *load.shape;
+		const std::shared_ptr<const ThreeDVehicleShape> load_posed = load.bones != nullptr ? ThreeDPoseOnProcessor(*load.shape, *load.bones) : nullptr;
+		const ThreeDVehicleShape &ls = load_posed != nullptr ? *load_posed : *load.shape;
 		const bool load_lit = ls.nrm.size() == ls.pos.size();
 		const std::vector<const ThreeDObjectTexture *> load_texs = painted(load.fig, load.state, load.texs, load.paints);
 		for (const ThreeDLoadPlace &at : load.places) {
@@ -12822,7 +12841,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 	const std::array<double, 16> clip = EyeClip(eye, width, height, fg.x, fg.y, fg.z, near);
 	static constexpr double L[3] = {-0.45, 0.35, 0.82};
 	/* A shape whose corners are first placed in the model's frame by local and at (a figure of its crew). */
-	auto mesh = [&](const ThreeDVehicleShape &s, const std::vector<const ThreeDObjectTexture *> &texs, const std::vector<ThreeDGpuPaint> &paints, const M3 &local, const std::array<double, 3> &at, const M3 &local_turn) {
+	auto mesh = [&](const ThreeDVehicleShape &s, const std::vector<const ThreeDObjectTexture *> &texs, const std::vector<ThreeDGpuPaint> &paints, const M3 &local, const std::array<double, 3> &at, const M3 &local_turn, const std::shared_ptr<const ThreeDBonesFrame> &bones) {
 		const M3 m3 = mul(place, local);
 		std::array<double, 16> m4{};
 		for (int r = 0; r < 3; r++) {
@@ -12840,24 +12859,25 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		g.lit = s.nrm.size() == s.pos.size();
 		g.textures = texs;
 		g.paints = paints;
+		g.bones = bones;
 	};
 	/* A thing that turns, about its axis through its centre (CabFigureModel::spin): its corners at R (p - c) + c. */
 	const M3 &spin = model.spin;
 	const float *sc = model.fig->spin_centre;
 	const std::array<double, 3> spun = model.fig->spin_ticks > 0 ? std::array<double, 3>{sc[0] - (spin[0] * sc[0] + spin[1] * sc[1] + spin[2] * sc[2]),
 			sc[1] - (spin[3] * sc[0] + spin[4] * sc[1] + spin[5] * sc[2]), sc[2] - (spin[6] * sc[0] + spin[7] * sc[1] + spin[8] * sc[2])} : std::array<double, 3>{0, 0, 0};
-	mesh(*shape, model.texs, model.paints, spin, spun, spin);
+	mesh(*shape, model.texs, model.paints, spin, spun, spin, model.bones);
 	out.back().wheels = std::move(wheels);
 	for (const CabFigureModel::Crew &crew : model.crew) {
 		const ThreeDWalkingCrew &w = *crew.w;
 		const M3 wt = about_z(w.turn);
 		const M3 local = mul(wt, M3{w.scale, 0, 0, 0, w.scale, 0, 0, 0, w.scale});
-		mesh(*crew.shape, crew.texs, {}, local, {crew.at[0], crew.at[1], crew.at[2]}, wt);
+		mesh(*crew.shape, crew.texs, {}, local, {crew.at[0], crew.at[1], crew.at[2]}, wt, crew.bones);
 	}
 	for (const CabFigureModel::Load &load : model.loads) {
 		for (const ThreeDLoadPlace &at : load.places) {
 			const M3 lt = about_z(at.turn);
-			mesh(*load.shape, load.texs, load.paints, mul(lt, M3{at.scale, 0, 0, 0, at.scale, 0, 0, 0, at.scale}), {at.at[0], at.at[1], at.at[2]}, lt);
+			mesh(*load.shape, load.texs, load.paints, mul(lt, M3{at.scale, 0, 0, 0, at.scale, 0, 0, 0, at.scale}), {at.at[0], at.at[1], at.at[2]}, lt, load.bones);
 		}
 	}
 	return true;
@@ -15268,7 +15288,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* How big it is: its longest side, world units (a field's plant: hundreds of them, only at the walker's feet);
 		 * a shape not read yet is read in the background, the figure a billboard or nothing this frame. */
 		const ThreeDVehicleObject *model = fg.obj != nullptr ? fg.obj : (fg.plant ? nullptr : GetThreeDFigure(fg.name));
-		const ThreeDVehicleShape *model_shape = model != nullptr ? model->TryGetShape(fg.frame) : nullptr;
+		/* A figure on bones the card poses: the extent of its pose (ThreeDCardFrame()), no shape of its frame posed here. */
+		std::shared_ptr<const ThreeDBonesFrame> model_bones;
+		const ThreeDVehicleShape *model_shape = nullptr;
+		if (model != nullptr) {
+			if (figures_by_card) {
+				ThreeDCardFrame(*model, fg.frame, true, model_bones, model_shape);
+			} else {
+				model_shape = model->TryGetShape(fg.frame);
+			}
+		}
 		const double extent = model_shape == nullptr ? 0.0 : std::max({(model_shape->x1 - model_shape->x0) * fg.along, model_shape->y1 - model_shape->y0, model_shape->z1 - model_shape->z0}) * fg.size * OBJECT_UNITS_PER_METRE;
 		if (foot.f < -extent) continue; // all of it behind the eye
 		/* Near, a finer picture: about a pixel of it to a pixel of the view; a big one far, a coarser one. */
@@ -15298,9 +15327,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				camera.billboards++;
 				continue;
 			}
-			/* A plant not read yet with the card: nothing this frame, its shape on the way -- no picture of it made and
-			 * read back from the card for one frame. */
-			if (fg.plant && all_by_card) continue;
+			/* Not read yet with the card (a plant, a figure, a vehicle): nothing this frame, its shape on the way -- no
+			 * picture of it made and read back from the card for one frame, nor a figure on bones posed by the processor
+			 * for that picture alone (the card poses it, ThreeDCardFrame()). */
+			if (all_by_card) continue;
 		}
 		if (foot.f < CAB_NEAR) continue;
 		const float side = static_cast<float>(std::round(yaw_deg / 15.0) * 15.0);

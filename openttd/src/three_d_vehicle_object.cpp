@@ -1335,7 +1335,7 @@ static void ObjectLightsOn(const ThreeDVehicleShape &whole, const ThreeDParts &p
 }
 
 struct GpuObjectPicture;
-static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp);
+static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp, const std::shared_ptr<const ThreeDBonesFrame> &bones = nullptr, bool by_bones = false);
 static bool FinishGpuObject(const GpuObjectPicture &gp, ObjectRaster &out);
 static std::optional<bool> GpuRasterObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, ObjectRaster &out, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk);
 
@@ -1881,6 +1881,34 @@ static void ShapeExtent(const ThreeDVehicleShape &s, float e[6])
 }
 
 /**
+ * A frame of a figure as the card draws it: posed by the card by its bones (ThreeDBonesFrame) where it is a figure on
+ * bones and the card poses them (ThreeDGpuPosesBones()) -- no shape of the frame posed by the processor --, else the
+ * shape of the frame.
+ * @param try_only not waited for: what is not made yet is made in the background (TryGetBones(), TryGetShape())
+ * @param[out] bones the frame's joints; nullptr: the shape returned is the frame's own
+ * @param[out] posed what the frame's shape has as it is posed: its extent, its seat (ThreeDBonesFrame::posed, or the shape)
+ * @return the shape to draw -- its shape at rest, or the frame's --; nullptr, not made yet (or none)
+ */
+const ThreeDVehicleShape *ThreeDCardFrame(const ThreeDVehicleObject &fig, int frame, bool try_only, std::shared_ptr<const ThreeDBonesFrame> &bones, const ThreeDVehicleShape *&posed)
+{
+	bones = nullptr;
+	posed = nullptr;
+	if (fig.OnBones() && ThreeDGpuPosesBones()) {
+		std::shared_ptr<const ThreeDBonesFrame> b = try_only ? fig.TryGetBones(frame) : fig.GetBones(frame);
+		if (b == nullptr) return nullptr;
+		if (b->rest != nullptr) {
+			bones = std::move(b);
+			posed = &bones->posed;
+			return bones->rest.get();
+		}
+		/* The card cannot pose it (more joints than a corner names): the processor's frames. */
+	}
+	const ThreeDVehicleShape *s = try_only ? fig.TryGetShape(frame) : fig.GetShape(frame);
+	posed = s;
+	return s;
+}
+
+/**
  * A figure's picture for the map no more pixels across than this as it is drawn (SUPERSAMPLE times its own): one bigger
  * is made at a coarser zoom and its pixels doubled on the map (FigurePictureZoom()), as the map's sprites at 16x are
  * doubled from 8x. A dragon three times its size zoomed 16 times in was 5608 x 4188, some 90 MB read back from the
@@ -1926,8 +1954,10 @@ struct GpuObjectPicture {
  * the card with the others asked for at once (ThreeDGpuRender()).
  * @return whether there is a picture to draw
  */
-static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp)
+static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, float scale, float cam_az, float world_az, float along, float pxm, float fade, float rust_time, uint32_t tint, uint32_t paint_colour, float stretch, float spin, float pitch, float roll, int lights, int state, uint64_t walk, GpuObjectPicture &gp, const std::shared_ptr<const ThreeDBonesFrame> &bones, bool by_bones)
 {
+	/* A figure on bones posed by the card (bones): whole its shape at rest, the frame's extent and seat its pose's. */
+	const ThreeDVehicleShape &frame_of = bones != nullptr ? bones->posed : whole;
 	const ThreeDParts parts = obj.PartsOf(state);
 	const ThreeDVehicleState *st = obj.State(state);
 	const int ss = SUPERSAMPLE;
@@ -1985,6 +2015,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	{
 		ThreeDGpuMesh &m = pic.meshes.emplace_back();
 		m.shape = &shape;
+		m.bones = bones;
 		m.triangles = ThreeDGpuTrianglesOf(shape, parts, true, whole.pngs.size());
 		matrix_of(vehicle_to, m.matrix);
 		m.lit = lit;
@@ -1992,7 +2023,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			if (spin != 0.0f) cam.Spin(nx, ny, nz);
 			return cam.LightAt(nx, ny, nz);
 		}, m.light);
-		box(whole, vehicle_to);
+		box(frame_of, vehicle_to);
 		int level = 0;
 		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
 		/* Its textures as they are, each at its own level, painted by the card as they are drawn (GpuPaintOf()). */
@@ -2021,20 +2052,25 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		const ThreeDWalkingCrew &w = walking[k];
 		if (!ThreeDVehicleShape::Shown(w.part, parts)) continue;
 		const size_t shown = slot++;
-		const ThreeDVehicleShape *fs = w.figure->GetShape(obj.CrewFrame(walk, shown));
+		/* Posed by the card where it is on bones and the vehicle is (by_bones). */
+		std::shared_ptr<const ThreeDBonesFrame> crew_bones;
+		const ThreeDVehicleShape *crew_posed = nullptr;
+		const ThreeDVehicleShape *fs = by_bones ? ThreeDCardFrame(*w.figure, obj.CrewFrame(walk, shown), false, crew_bones, crew_posed) : w.figure->GetShape(obj.CrewFrame(walk, shown));
 		if (fs == nullptr) continue;
+		if (crew_posed == nullptr) crew_posed = fs;
 		const float wa = w.turn * static_cast<float>(M_PI) / 180.0f, wc = std::cos(wa), ws = std::sin(wa);
-		const float *at = w.on_seat && whole.has_seat ? whole.seat : w.at;
+		const float *at = w.on_seat && frame_of.has_seat ? frame_of.seat : w.at;
 		auto crew_to = [&cam, &w, at, wc, ws](float fx0, float fy0, float fz0, float &ox, float &oy, float &od) {
 			cam.Place(at[0] + (fx0 * wc - fy0 * ws) * w.scale, at[1] + (fx0 * ws + fy0 * wc) * w.scale, at[2] + fz0 * w.scale, ox, oy, od);
 		};
 		ThreeDGpuMesh &m = pic.meshes.emplace_back();
 		m.shape = fs;
+		m.bones = crew_bones;
 		m.triangles = ThreeDGpuTrianglesOf(*fs, 0, false, fs->pngs.size());
 		matrix_of(crew_to, m.matrix);
 		m.lit = lit && fs->nrm.size() == fs->pos.size();
 		light_of([&cam, wc, ws](float nx, float ny, float nz) { return cam.LightAt(nx * wc - ny * ws, nx * ws + ny * wc, nz); }, m.light);
-		box(*fs, crew_to);
+		box(*crew_posed, crew_to);
 		int crew_level = 0;
 		for (float d = TexelsPerMetre(*w.figure, *fs); d >= 2.0f * p * w.scale && crew_level < 12; d /= 2.0f) crew_level++;
 		m.textures.assign(m.triangles->used.size(), nullptr);
@@ -2047,7 +2083,10 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 	std::vector<ThreeDLoadPieces> loads;
 	GetThreeDLoadPieces(st, loads);
 	for (const ThreeDLoadPieces &load : loads) {
-		if (const ThreeDVehicleShape *ls = load.fig->GetShape(load.frame); ls != nullptr) {
+		std::shared_ptr<const ThreeDBonesFrame> load_bones;
+		const ThreeDVehicleShape *load_posed = nullptr;
+		if (const ThreeDVehicleShape *ls = by_bones ? ThreeDCardFrame(*load.fig, load.frame, false, load_bones, load_posed) : load.fig->GetShape(load.frame); ls != nullptr) {
+			if (load_posed == nullptr) load_posed = ls;
 			/* Its textures as fine as its biggest one needs (a girl on a bench twice her size). */
 			float biggest = 1.0f;
 			for (const ThreeDLoadPlace &at : load.places) biggest = std::max(biggest, at.scale);
@@ -2074,11 +2113,12 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 				};
 				ThreeDGpuMesh &m = pic.meshes.emplace_back();
 				m.shape = ls;
+				m.bones = load_bones;
 				m.triangles = triangles;
 				matrix_of(piece_to, m.matrix);
 				m.lit = lit && ls->nrm.size() == ls->pos.size();
 				light_of([&cam, wc, ws](float nx, float ny, float nz) { return cam.LightAt(nx * wc - ny * ws, nx * ws + ny * wc, nz); }, m.light);
-				box(*ls, piece_to);
+				box(*load_posed, piece_to);
 				m.textures = textures;
 				m.paints = paints;
 			}
@@ -3086,8 +3126,19 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	bool drawn = false;
 	{
 		ThreeDLazyNoWait no_wait;
-		const ThreeDVehicleShape *whole = p.obj->GetShape(p.obj->ShapeFrame(p.frame, p.walk), p.obj->PartsOf(p.state));
-		if (!no_wait.Missed()) drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp);
+		/* A figure on bones posed by the card (ThreeDCardFrame()): its shape at rest and its frame's joints, no shape of
+		 * the frame posed by the processor; so its crew and its loads. */
+		const bool by_bones = ThreeDGpuPosesBones();
+		const int shape_frame = p.obj->ShapeFrame(p.frame, p.walk);
+		std::shared_ptr<const ThreeDBonesFrame> bones;
+		const ThreeDVehicleShape *whole = nullptr;
+		if (by_bones && p.obj->OnBones()) {
+			const ThreeDVehicleShape *posed = nullptr;
+			whole = ThreeDCardFrame(*p.obj, shape_frame, false, bones, posed);
+		} else {
+			whole = p.obj->GetShape(shape_frame, p.obj->PartsOf(p.state));
+		}
+		if (!no_wait.Missed()) drawn = whole != nullptr && PrepareGpuObject(*p.obj, *whole, p.scale, p.cam_az, p.world_az, p.along, p.pxm, p.fade, p.rust_time, p.tint, p.paint_colour, p.stretch, p.spin, p.pitch, p.roll, p.lights, p.state, p.walk, gp, bones, by_bones);
 		if (no_wait.Missed()) {
 			_stand_ins_given++;
 			return CardMade::NotYet;
@@ -3833,7 +3884,7 @@ static int EyeTextureLevel(const ThreeDVehicleObject *obj, const ThreeDVehicleSh
  */
 const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index)
 {
-	const ThreeDVehicleShape *shape = obj->GetShape();
+	const ThreeDVehicleShape *shape = obj->TextureShape(true);
 	if (shape == nullptr) return nullptr;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->GetTexture(level, index);
@@ -3930,7 +3981,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
  */
 const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, int index)
 {
-	const ThreeDVehicleShape *shape = obj->TryGetShape();
+	const ThreeDVehicleShape *shape = obj->TextureShape(false);
 	if (shape == nullptr) return nullptr;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	const ThreeDObjectTexture *raw = obj->TryGetTexture(level, index);
@@ -3977,7 +4028,7 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 {
 	ThreeDLazyNoWait no_wait;
 	paints.clear();
-	const ThreeDVehicleShape *shape = obj->GetShape();
+	const ThreeDVehicleShape *shape = obj->TextureShape(true);
 	if (shape == nullptr) return false;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	textures.assign(count, nullptr);
@@ -4477,7 +4528,7 @@ static void NoteMovingFigure(TileIndex tile, int ticks, const ThreeDVehicleShape
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
@@ -4514,7 +4565,15 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 	 * made on the thread (the colleague's Marisa has 41 000 triangles a frame). */
 	const bool for_eye = ViewportDrawingEye();
 	later = for_eye || fig->frame_lights;
-	const ThreeDVehicleShape *shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
+	/* Drawn by the card, a figure on bones posed by it (ThreeDCardFrame()): of its frame only the extent of its pose,
+	 * no shape of it posed by the processor. */
+	std::shared_ptr<const ThreeDBonesFrame> bones;
+	const ThreeDVehicleShape *shape = nullptr;
+	if (for_card && fig->OnBones() && ThreeDGpuPosesBones()) {
+		if (ThreeDCardFrame(*fig, frame, later, bones, shape) == nullptr) return std::nullopt;
+	} else {
+		shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
+	}
 	if (shape == nullptr) return std::nullopt;
 	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
@@ -4560,7 +4619,7 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
 std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
 	bool later = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later);
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, 0, true);
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
@@ -4589,7 +4648,7 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
-		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state);
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true);
 		if (!p.has_value()) return false;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 		std::vector<ThreeDPictureLight> lights;

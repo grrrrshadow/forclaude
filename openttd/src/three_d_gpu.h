@@ -32,6 +32,7 @@
 #include <vector>
 
 struct ThreeDVehicleShape;
+struct ThreeDBonesFrame;
 struct ThreeDObjectTexture;
 struct ThreeDDetailMask;
 struct ThreeDParts;
@@ -103,6 +104,9 @@ struct ThreeDGpuMesh {
 	/** The view from the eyes' (THREE_D_GPU_EYE_WHEELS at most): each turning wheel's corners moved so in the shape's own
 	 * frame (ThreeDVehicleShape::corner_wheel n: wheels[n - 1]); empty, they stand. */
 	std::vector<ThreeDGpuMatrix> wheels;
+	/** A figure on bones posed by the card (ThreeDGpuPosesBones()): its frame's joints, the shape its shape at rest
+	 * (ThreeDVehicleShape::corner_joints); nullptr, the shape as it is. */
+	std::shared_ptr<const ThreeDBonesFrame> bones;
 };
 static constexpr size_t THREE_D_GPU_EYE_WHEELS = 32;
 
@@ -462,6 +466,7 @@ struct ThreeDGpuStanding {
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
+bool ThreeDGpuPosesBones();
 /** Whether the card smooths the roads of the ground of the view from the eyes (ThreeDGpuGroundTexture::smooth_roads): not when found it cannot. */
 bool ThreeDGpuSmoothsRoads();
 bool ThreeDGpuReady();

@@ -12,6 +12,7 @@
 #include "stdafx.h"
 #include "three_d_dragons.h"
 #include "three_d_objects.h"
+#include "three_d_gpu.h"
 #include "three_d_navigation.h"
 #include "three_d_vehicle_object.h"
 #include "cab_view.h"
@@ -932,7 +933,15 @@ std::string DescribeThreeDDragons()
 		const std::string figure = Figure(d, frame);
 		const ThreeDVehicleObject *f = GetThreeDFigure(figure);
 		if (f != nullptr && f->blend_from != nullptr) out += fmt::format(", prechod {} snimek {}", figure, frame);
-		if (f != nullptr && !f->skeleton_file.empty() && f->GetShape(frame) != nullptr) out += fmt::format(", kostra ({} snimku)", f->frames);
+		/* On bones: posed by the card where it poses them (no shape of the frame posed by the processor for this line). */
+		if (f != nullptr && f->OnBones()) {
+			const std::shared_ptr<const ThreeDBonesFrame> bones = ThreeDGpuPosesBones() ? f->GetBones(frame) : nullptr;
+			if (bones != nullptr && bones->rest != nullptr) {
+				out += fmt::format(", kostra na karte ({} snimku, {} kosti)", f->frames, bones->joints.size() / 12);
+			} else if (f->GetShape(frame) != nullptr) {
+				out += fmt::format(", kostra ({} snimku)", f->frames);
+			}
+		}
 	}
 	/* And the farms' (ForFarmDragons()): where, how high over the land there, flying or standing. */
 	ForFarmDragons([&](const FarmDragon &d) {
