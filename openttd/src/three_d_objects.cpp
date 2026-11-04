@@ -4226,7 +4226,7 @@ static constexpr std::string_view BUS_STOP_SIGN = "zastavka_znacka";
  * The bus stops (the player, 4. 11.: "we'll put it at the bus stop with the BUS sign, that will be the stop"; "the
  * shelters aren't there, they needn't be"): for each pavement of a drive-through bus stop -- where the game draws a
  * shelter, 3 of 16 units deep along the tile's edge -- the communist bench with its back to the outer edge, facing
- * the road, and the BUS sign behind it, facing the road too (its plate seen along the road). An
+ * the road, and the BUS sign by the road past its end, facing the road too (its plate seen along the road). An
  * object of the two add-ons alone for each of the four shelters (no file of its own), drawn as the street lamps.
  */
 static void MakeBusStops()
@@ -4236,9 +4236,9 @@ static void MakeBusStops()
 	const bool sign = _three_d_addons.contains(BUS_STOP_SIGN);
 	if (!bench && !sign) return;
 	/* Along the pavement and from its outer edge, units: the bench a little aside of the girls' places
-	 * (DrawBusStopWithGirls()), its back 1 m from the outer edge; the sign behind it (the player, 4. 11.: "the bus stop
-	 * sign goes behind the bench"), between its back and the outer edge. */
-	static constexpr double BENCH_ALONG = 9.5, BENCH_IN = 1.6, SIGN_ALONG = BENCH_ALONG, SIGN_IN = 0.5;
+	 * (DrawBusStopWithGirls()); the sign by the road's edge just past the bench's end (the player, 4. 11.: "the bus stop
+	 * sign goes past the bench", "along the road past the bench"), not before it nor behind its back. */
+	static constexpr double BENCH_ALONG = 9.5, BENCH_IN = 1.2, SIGN_ALONG = 12.0, SIGN_IN = 2.5;
 	static constexpr struct {
 		SpriteID shelter;
 		int ax, ay; ///< a place's x and y from (along, in): +1 along, -1 the other way, 2 in, -2 in from the far edge
