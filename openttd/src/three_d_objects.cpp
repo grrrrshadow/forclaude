@@ -2279,9 +2279,11 @@ static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 	 * moved past its add-ons' when those are laid in (LayAddons()). All of them drew the first material's: the forest's
 	 * grass and ferns the ground's picture, its stumps a stripe of it (the player, 25. 10.: "two boards through each
 	 * other all over the clearing, and one trunk is red"). */
-	if (mesh.png_texture < 0 || mesh.tri_tex.size() != obj.tri.size() / 3) return;
+	/* Its first material without a picture (the colleague's BUS sign: only a colour), all of them its other materials,
+	 * each its picture or its colour; they drew in the grey of no picture. */
+	if (mesh.tri_tex.size() != obj.tri.size() / 3 || mesh.textures.size() < (mesh.png_texture < 0 ? 1u : 2u)) return;
 	std::vector<int> number(mesh.textures.size(), -1);
-	number[mesh.png_texture] = 0;
+	if (mesh.png_texture >= 0) number[mesh.png_texture] = 0;
 	std::vector<uint8_t> tri_tex(mesh.tri_tex.size(), 0);
 	for (size_t t = 0; t < mesh.tri_tex.size(); t++) {
 		const uint8_t k = mesh.tri_tex[t];
@@ -9822,6 +9824,25 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 	const size_t own_tris = read.tri.size() / 3, own_corners = read.pos.size() / 3, own_night_tris = read.night_tex.size();
 	read.tri_tex.resize(own_tris, 0);
 	read.corner_tex.resize(own_corners, 0);
+	/* An add-on's triangles and corners of its other materials (TakeGlbMesh()): each with its material's texture, put
+	 * among the building's other materials -- the colleague's BUS sign has its yellow roof, its red posts, its grey
+	 * frame and its plate each a material of its own; all of them drew in its first one's grey (the player, 4. 11.:
+	 * "why has the sign no colours?"). Their numbers in the building's other materials (1, 2, ...), past the add-ons'
+	 * once all are laid. */
+	std::vector<std::pair<size_t, size_t>> material_tris, material_corners;
+	auto material_of = [&](const ThreeDObject &a, uint8_t own) -> size_t {
+		if (own == 0 || own > a.material_pngs.size()) return 0;
+		const ThreeDTextureBytes &png = a.material_pngs[own - 1];
+		const uint32_t flat = own <= a.material_flats.size() ? a.material_flats[own - 1] : 0;
+		for (size_t k = 0; k < read.material_pngs.size(); k++) {
+			if (read.material_pngs[k] == png && (k >= read.material_flats.size() || read.material_flats[k] == flat)) return k + 1;
+		}
+		if (read.material_pngs.size() >= UINT8_MAX / 2) return 0;
+		read.material_pngs.push_back(png);
+		read.material_flats.resize(read.material_pngs.size() - 1, 0);
+		read.material_flats.push_back(flat);
+		return read.material_pngs.size();
+	};
 	size_t laid = 0;
 	for (const ThreeDObjectFigure &place : house.addon_places) {
 		auto found = _three_d_addons.find(place.figure);
@@ -9888,7 +9909,12 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 			if (beyond > 0 && !kept(t)) continue;
 			read.tri.insert(read.tri.end(), {base + a.tri[t], base + a.tri[t + 1], base + a.tri[t + 2]});
 			read.facing.push_back(t / 3 < a.facing.size() ? a.facing[t / 3] : 0);
-			read.tri_tex.push_back(tex);
+			/* Its own texture, or one of its other materials' (material_tris). */
+			const size_t material = t / 3 < a.tri_tex.size() ? material_of(a, a.tri_tex[t / 3]) : 0;
+			read.tri_tex.push_back(material == 0 ? tex : 0);
+			if (material == 0) continue;
+			material_tris.emplace_back(read.tri_tex.size() - 1, material);
+			for (size_t k = 0; k < 3; k++) material_corners.emplace_back(base + a.tri[t + k], material);
 		}
 		/* A tree ("kmen_r", the colleague's STROMY-SPOLECNE-PRO-HRU.md): its crown in no one's way, only its trunk. */
 		if (a.trunk_r > 0) {
@@ -9929,6 +9955,13 @@ static void LayAddons(const ThreeDObject &house, ThreeDObject &read)
 		for (size_t t = 0; t < own_tris; t++) past(read.tri_tex[t]);
 		for (size_t i = 0; i < own_corners; i++) past(read.corner_tex[i]);
 		for (size_t t = 0; t < own_night_tris; t++) past(read.night_tex[t]);
+	}
+	/* The add-ons' other materials past the add-ons too. */
+	const size_t shift = read.addon_objects.size();
+	auto numbered = [shift](size_t material) { return shift + material <= UINT8_MAX ? static_cast<uint8_t>(shift + material) : static_cast<uint8_t>(0); };
+	for (const auto &[t, material] : material_tris) read.tri_tex[t] = numbered(material);
+	for (const auto &[i, material] : material_corners) {
+		if (i < read.corner_tex.size()) read.corner_tex[i] = numbered(material);
 	}
 	Debug(misc, 2, "3D object {}: {} of its {} add-ons laid, {} textures of add-ons", house.name, laid, house.addon_places.size(), read.addon_objects.size());
 }
