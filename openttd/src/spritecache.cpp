@@ -31,6 +31,7 @@
 #include "table/palette_convert.h"
 
 #include <array>
+#include <chrono>
 #include <cmath>
 
 #include "safeguards.h"
@@ -67,6 +68,35 @@ size_t GetThreeDObjectSpriteBytes(size_t &count)
 }
 static uint32_t _sprite_lru_counter;
 static std::vector<std::unique_ptr<SpriteFile>> _sprite_files;
+
+/**
+ * What the full sprite memory cost since the diary last asked (TakeSpriteCacheChurn()): the sprites thrown out of it to
+ * make room, and those of them loaded again -- the player, 5. 11.: "how many MB am I to set the sprite cache to? I put
+ * it back to 512 MB and you say it is full"; full it always is after a while, too small only when it throws out what
+ * is drawn again soon.
+ */
+static struct {
+	uint64_t dropped = 0;       ///< sprites thrown out
+	uint64_t dropped_bytes = 0; ///< their bytes
+	uint64_t reloaded = 0;      ///< of the thrown out, loaded again
+	double reload_ms = 0;       ///< and how long that took
+} _sprite_churn;
+
+/**
+ * For the diary of the frames: what the full sprite memory cost since the last time (_sprite_churn), counted anew.
+ * @param[out] dropped the sprites thrown out to make room
+ * @param[out] dropped_mb their megabytes
+ * @param[out] reloaded those thrown out (now or before) loaded again
+ * @param[out] reload_ms how long loading them again took
+ */
+void TakeSpriteCacheChurn(uint64_t &dropped, double &dropped_mb, uint64_t &reloaded, double &reload_ms)
+{
+	dropped = _sprite_churn.dropped;
+	dropped_mb = _sprite_churn.dropped_bytes / (1024.0 * 1024.0);
+	reloaded = _sprite_churn.reloaded;
+	reload_ms = _sprite_churn.reload_ms;
+	_sprite_churn = {};
+}
 
 static inline SpriteCache *GetSpriteCache(uint index)
 {
@@ -1729,7 +1759,11 @@ static void DeleteEntriesFromSpriteCache(size_t to_remove)
 	}
 
 	for (const auto &it : candidates) {
-		GetSpriteCache(it.id)->ClearSpriteData();
+		SpriteCache *sc = GetSpriteCache(it.id);
+		sc->ClearSpriteData();
+		sc->dropped = true;
+		_sprite_churn.dropped++;
+		_sprite_churn.dropped_bytes += it.size;
 	}
 
 	Debug(sprite, 3, "DeleteEntriesFromSpriteCache, deleted: {}, freed: {}, in use: {} --> {}, requested: {}",
@@ -1862,6 +1896,7 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 				if (stand_in != 0) return GetRawSprite(stand_in, type, allocator, encoder);
 			}
 			UniquePtrSpriteAllocator cache_allocator;
+			const auto started = std::chrono::steady_clock::now();
 			if (sc->type == SpriteType::Recolour) {
 				ReadRecolourSprite(*sc->file, sc->file_pos, sc->length, cache_allocator);
 			} else {
@@ -1870,6 +1905,11 @@ void *GetRawSprite(SpriteID sprite, SpriteType type, SpriteAllocator *allocator,
 			sc->ptr = std::move(cache_allocator.data);
 			sc->length = static_cast<uint32_t>(cache_allocator.size);
 			_spritecache_bytes_used += sc->length;
+			if (sc->dropped) {
+				sc->dropped = false;
+				_sprite_churn.reloaded++;
+				_sprite_churn.reload_ms += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started).count();
+			}
 		}
 
 		return static_cast<void *>(sc->ptr.get());

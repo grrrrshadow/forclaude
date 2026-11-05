@@ -69,7 +69,12 @@ static std::string TakeThreeDMemoryForDiary()
 	extern std::string DescribeThreeDObjectMemory();
 	extern std::string DescribeThreeDPictureMemory();
 	extern uint64_t _three_d_forgets_done, _three_d_forgets_put_off;
-	std::string s = fmt::format("{}; {}; zapomenuti {}, odlozeno {}", DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory(), _three_d_forgets_done, _three_d_forgets_put_off);
+	extern void TakeSpriteCacheChurn(uint64_t &dropped, double &dropped_mb, uint64_t &reloaded, double &reload_ms);
+	uint64_t dropped = 0, reloaded = 0;
+	double dropped_mb = 0, reload_ms = 0;
+	TakeSpriteCacheChurn(dropped, dropped_mb, reloaded, reload_ms);
+	std::string s = fmt::format("{}; {}, vyhozeno {} ({:.1f} MB), znovu nacteno {} ({:.0f} ms); zapomenuti {}, odlozeno {}", DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory(),
+			dropped, dropped_mb, reloaded, reload_ms, _three_d_forgets_done, _three_d_forgets_put_off);
 	_three_d_forgets_done = _three_d_forgets_put_off = 0;
 	return s;
 }
@@ -202,7 +207,8 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
 				" otocena = kresleni otocene mapy na snimek: sprity do textur, stopy domu, polozeni zeme, sber, plakaty, modely (domy kreslene procesorem), a kolik bloku vzalo zem z drzeneho pohledu; zmen naraz = zmeny hlavni mapy polozene kartou jednim kusem (a proc ne), po kouscich = v kolika obdelnicich z nich karta kreslila (a kolik procent plochy kusu), v malych oknech = totez v oknech vozidel a dalsich pohledech; stojici procesorem = bloky, kde co stoji kreslil procesor (bez zeme karty, nebo karta vratila; proc v obrazky: what stands on);"
 				" obrazky = kolik obrazku 3D objektu se udelalo (vozidla, podoby) a co delala karta, nacteno hlavnim vlaknem = tvary a textury 3D objektu, ktere si hlavni vlakno nacetlo samo nebo na ne cekalo (to drzi klik i snimek);"
-				" pamet 3d = co drzi 3D objekty (tvary, textury, domy) a obrazky, zapomenuti = kolikrat se pustilo, co se 2 minuty nekreslilo, odlozeno = kolikrat to muselo pockat.\n");
+				" pamet 3d = co drzi 3D objekty (tvary, textury, domy) a obrazky; cache spritu: kolik drzi z nastavenych MB, vyhozeno = sprity vyhozene z plne cache, znovu nacteno = kolik z vyhozenych se muselo nacist znovu a jak dlouho (cache je mala, kdyz je to hodne);"
+				" zapomenuti = kolikrat se pustilo, co se 2 minuty nekreslilo, odlozeno = kolikrat to muselo pockat.\n");
 	}
 	const std::time_t t = std::time(nullptr);
 	char clock[16];
