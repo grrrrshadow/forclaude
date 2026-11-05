@@ -89,6 +89,7 @@ struct Window;
 void BlitEyePicture(const Window &w, const CabViewPicture &pic, int px, int py, uint32_t tint = 0);
 bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 void ShowCabViewWindow(const Vehicle *v);
+bool CabViewCoversMap();
 Window *ArrowsWindow();
 
 /* What the cab does to its vehicle (cab_view_gui.cpp): its buttons, its arrows, the walker riding in it. */

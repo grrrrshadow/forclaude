@@ -620,6 +620,27 @@ struct CabViewWindow : Window {
 		this->FinishInitNested(number);
 		const Vehicle *v = Vehicle::GetIfValid(number);
 		if (v != nullptr) this->owner = v->owner;
+		/* Opened over the whole screen as boarding with E opens it (the player, 5. 11.); the button makes it a window. */
+		this->ToggleFull();
+	}
+
+	/** Over the whole screen between the toolbar and the status bar, as the view from the first person; or back where it was. */
+	void ToggleFull()
+	{
+		if (!this->full) {
+			this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
+			this->full = true;
+			const int top = GetMainViewTop(), bottom = GetMainViewBottom();
+			this->left = 0;
+			this->top = top;
+			ResizeWindow(this, _screen.width - this->width, bottom - top - this->height, false);
+		} else {
+			this->full = false;
+			this->left = this->before_full.left;
+			this->top = this->before_full.top;
+			ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
+		}
+		MarkWholeScreenDirty();
 	}
 
 	void Close(int data = 0) override
@@ -864,23 +885,10 @@ struct CabViewWindow : Window {
 			case WID_CV_STOP:
 				CabStartStop(v);
 				break;
-			case WID_CV_FULL: {
-				/* Over the whole screen, and back where it was (the player: a button beside the pin, as big as the screen). */
-				if (!this->full) {
-					this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
-					this->full = true;
-					this->left = 0;
-					this->top = 0;
-					ResizeWindow(this, _screen.width - this->width, _screen.height - this->height, false);
-				} else {
-					this->full = false;
-					this->left = this->before_full.left;
-					this->top = this->before_full.top;
-					ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
-				}
-				MarkWholeScreenDirty();
+			case WID_CV_FULL:
+				/* Over the whole screen, and back where it was (the player: a button beside the pin). */
+				this->ToggleFull();
 				break;
-			}
 			case WID_CV_AUTO:
 				CabToggleRoute(v, this->arrows);
 				this->SetDirty();
@@ -932,6 +940,15 @@ void ShowCabViewWindow(const Vehicle *v)
 {
 	if (v == nullptr) return;
 	AllocateWindowDescFront<CabViewWindow>(_cab_view_desc, v->index);
+}
+
+/** Whether a view from a cab is open over the whole screen: the map under it is then not drawn (FirstPersonCoversMap()). */
+bool CabViewCoversMap()
+{
+	for (const Window *w : Window::Iterate()) {
+		if (w->window_class == WindowClass::CabView && static_cast<const CabViewWindow *>(w)->full) return true;
+	}
+	return false;
 }
 
 /** The rig: every cab view open, with how long its last picture took and what was in it. */

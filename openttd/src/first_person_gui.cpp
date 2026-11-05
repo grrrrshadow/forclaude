@@ -2381,11 +2381,11 @@ TileIndex FirstPersonShopNearby()
 	return best;
 }
 
-/** Whether the view from the first person is open over the whole screen: the map under it is then not drawn (widget.cpp). */
+/** Whether the view from the first person, or one from a cab (cab_view_gui.cpp), is open over the whole screen: the map under it is then not drawn (widget.cpp). */
 bool FirstPersonCoversMap()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
-	return w != nullptr && w->full;
+	return (w != nullptr && w->full) || CabViewCoversMap();
 }
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */
