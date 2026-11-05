@@ -42,6 +42,7 @@ struct ThreeDSpriteShape {
 	float fit = 0;                  ///< how well the shape covers the sprite in the game's view: intersection over union (a pixel left outside twice), 0..1
 	float box_fit = 0;              ///< the same of the box drawn before (the bounding box narrowed to the sprite's width)
 	float flat_fit = 0;             ///< the same of the best box with a flat top
+	float one_fit = 0;              ///< the same of the best one box with its roof
 	float kept = 0;                 ///< the share of the sprite's pixels inside the shape: drawn on its faces (the rest is not drawn)
 	float box_kept = 0;             ///< the same of the box drawn before
 	float ms = 0;                   ///< how long finding it took (the thread in the background)

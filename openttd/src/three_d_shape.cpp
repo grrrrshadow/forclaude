@@ -15,7 +15,10 @@
  * covers the sprite's pixels best is kept: the most of the sprite inside, the least of the empty around it
  * (intersection over union, a pixel of the sprite left outside counted twice: it is not drawn at all). It is found by moving one number at a time while that helps, by 2, 1, 1/2 and 1/4 of a
  * world unit, from a few starts: the bounding box, the box drawn before, a smaller box in the middle. A sloping roof is
- * kept only where it fits clearly better than a flat top and is no steeper than 2.5 : 1, else roofs come out as spikes.
+ * kept only where it fits clearly better than a flat top and is no steeper than 2.5 : 1, else roofs come out as spikes
+ * (a tower's, three units across or less, may be a spire).
+ * Where one box does not fit well (a tower on a base, a church, a house in an L), more boxes are added the same way,
+ * one at a time, up to four, each kept only where it fits clearly better.
  * A shape is read once per sprite and where it hangs in its bounding box, and kept: the sprite's pixels here, the
  * shape by the thread in the background (ThreeDLoadInBackground()).
  */
@@ -51,8 +54,15 @@ constexpr double MARGIN = 0.25;
 /** The steepest roof kept: its rise over half its span (2.5 : 1). */
 constexpr double STEEPEST_ROOF = 2.5;
 
+/** A part this narrow (half its narrower side, units) is a tower: its roof may be a spire, up to STEEPEST_SPIRE. */
+constexpr double SPIRE_HALF = 1.5;
+constexpr double STEEPEST_SPIRE = 12.0;
+
 /** How much better than a flat top a sloping roof must fit to be kept. */
 constexpr double ROOF_BETTER = 0.01;
+
+/** The same of a box added to the first (a tower's spire covers few pixels of the whole sprite). */
+constexpr double ADDED_ROOF_BETTER = 0.003;
 
 /** The share of the sprite's pixels a shape must keep (draw on its faces), or as much as the box drawn before keeps. */
 constexpr double KEPT_AT_LEAST = 0.90;
@@ -63,8 +73,20 @@ constexpr double KEPT_AT_LEAST = 0.90;
  */
 constexpr double LOST_WEIGHT = 2.0;
 
-/** At most this many boxes in a shape (the hand tables have up to five). */
+/** At most this many boxes scored together (the hand tables have up to five). */
 constexpr size_t MAX_PARTS = 6;
+
+/** At most this many boxes in a shape read off a sprite (a base, a body, a tower, a chimney). */
+constexpr size_t MAX_SHAPE_PARTS = 4;
+
+/** A shape fitting this well gets no more boxes. */
+constexpr double GOOD_ENOUGH = 0.95;
+
+/** How much better a shape must fit with another box for it to be kept. */
+constexpr double PART_BETTER = 0.02;
+
+/** How many of the boxes looked at once are moved into place (Descend()) when another is sought. */
+constexpr size_t CANDIDATES_MOVED = 2;
 
 /** a / b rounded down, for any sign of a. */
 inline int FloorDivide(int a, int b)
@@ -310,30 +332,32 @@ bool Sane(const Target &t, const ThreeDPart &p, int ex, int ey)
 	if (p.x0 < -2 || p.y0 < -2 || p.x1 > ex + 2 || p.y1 > ey + 2) return false;
 	if (p.h + p.rise > t.top_z) return false;
 	const double half_x = (p.x1 - p.x0) / 2, half_y = (p.y1 - p.y0) / 2;
+	const double steepest = std::min(half_x, half_y) <= SPIRE_HALF ? STEEPEST_SPIRE : STEEPEST_ROOF;
 	switch (p.roof) {
 		case ThreeDRoof::Flat: return p.rise == 0;
-		case ThreeDRoof::GableX: return p.rise <= STEEPEST_ROOF * half_y;
-		case ThreeDRoof::GableY: return p.rise <= STEEPEST_ROOF * half_x;
-		case ThreeDRoof::Hip: return p.rise <= STEEPEST_ROOF * std::min(half_x, half_y);
+		case ThreeDRoof::GableX: return p.rise <= steepest * half_y;
+		case ThreeDRoof::GableY: return p.rise <= steepest * half_x;
+		case ThreeDRoof::Hip: return p.rise <= steepest * std::min(half_x, half_y);
 	}
 	return false;
 }
 
 /**
- * Move the numbers of a part one at a time, and the footprint whole, while that fits the sprite better: by 2, 1,
- * 1/2 and 1/4 of a unit.
- * @return how well the part fits at the end
+ * Move the numbers of one part of a shape one at a time, and its footprint whole, while the shape fits the sprite
+ * better: by 2, 1, 1/2 and 1/4 of a unit (or the steps given). The other parts stay where they are.
+ * @return how well the shape fits at the end
  */
-double Descend(const Target &t, ThreeDPart &p, int ex, int ey, int &tried)
+double Descend(const Target &t, std::vector<ThreeDPart> &parts, size_t idx, int ex, int ey, int &tried, std::initializer_list<float> steps = {2.0f, 1.0f, 0.5f, 0.25f})
 {
-	double best = Score(t, std::span<const ThreeDPart>(&p, 1));
+	double best = Score(t, parts);
 	tried++;
-	for (float step : {2.0f, 1.0f, 0.5f, 0.25f}) {
+	for (float step : steps) {
 		for (int round = 0; round < 64; round++) {
 			bool better = false;
 			for (int what = 0; what < 9; what++) {
-				if (what == 8 && p.roof == ThreeDRoof::Flat) continue;
+				if (what >= 7 && parts[idx].roof == ThreeDRoof::Flat) continue;
 				for (float s : {step, -step}) {
+					const ThreeDPart p = parts[idx];
 					ThreeDPart q = p;
 					switch (what) {
 						case 0: q.x0 += s; break;
@@ -347,20 +371,55 @@ double Descend(const Target &t, ThreeDPart &p, int ex, int ey, int &tried)
 						case 8: q.rise += s; break;
 					}
 					if (!Sane(t, q, ex, ey)) continue;
-					const double v = Score(t, std::span<const ThreeDPart>(&q, 1));
+					parts[idx] = q;
+					const double v = Score(t, parts);
 					tried++;
 					if (v > best + 1e-9) {
 						best = v;
-						p = q;
 						better = true;
 						break;
 					}
+					parts[idx] = p;
 				}
 			}
 			if (!better) break;
 		}
 	}
 	return best;
+}
+
+/**
+ * A sloping roof on one part of a shape, kept where it fits clearly better than the flat top (ROOF_BETTER, an added
+ * part ADDED_ROOF_BETTER): a gable
+ * along X or along Y, a hip, each from the rises given (shares of the walls' height).
+ * @return how well the shape fits with the roof kept
+ */
+double FitRoof(const Target &t, std::vector<ThreeDPart> &parts, size_t idx, double fit, int ex, int ey, int &tried, std::initializer_list<float> shares)
+{
+	const double roof_better = idx == 0 ? ROOF_BETTER : ADDED_ROOF_BETTER;
+	const ThreeDPart flat = parts[idx];
+	ThreeDPart best = flat;
+	double best_fit = fit;
+	for (ThreeDRoof roof : {ThreeDRoof::GableX, ThreeDRoof::GableY, ThreeDRoof::Hip}) {
+		for (float share : shares) {
+			ThreeDPart p = flat;
+			p.roof = roof;
+			const float half = roof == ThreeDRoof::GableX ? (p.y1 - p.y0) / 2 : roof == ThreeDRoof::GableY ? (p.x1 - p.x0) / 2 : std::min(p.x1 - p.x0, p.y1 - p.y0) / 2;
+			/* A tower's roof starts as a spire, any other as steep as wide. */
+			const bool tower = std::min(p.x1 - p.x0, p.y1 - p.y0) / 2 <= SPIRE_HALF;
+			p.rise = std::min(half * static_cast<float>(tower ? STEEPEST_SPIRE / 2 : 1.0), p.h * share);
+			p.h -= p.rise / 2;
+			if (!Sane(t, p, ex, ey)) continue;
+			parts[idx] = p;
+			const double v = Descend(t, parts, idx, ex, ey, tried);
+			if (v > best_fit + (best.roof == ThreeDRoof::Flat ? roof_better : 0.0)) {
+				best_fit = v;
+				best = parts[idx];
+			}
+		}
+	}
+	parts[idx] = best;
+	return best_fit;
 }
 
 /** The kept shapes, by what they were read from. */
@@ -400,51 +459,95 @@ void FindShape(ThreeDSpriteShape &shape, const Target &t, int narrow_x0, int nar
 		{0.0f, static_cast<float>(ex), 0.0f, static_cast<float>(ey), fez, ThreeDRoof::Flat, 0.0f},
 		{ex * 0.25f, ex * 0.75f, ey * 0.25f, ey * 0.75f, fez * 0.75f, ThreeDRoof::Flat, 0.0f},
 	};
+	std::vector<ThreeDPart> parts(1);
 	ThreeDPart flat = before;
-	double flat_fit = -1;
-	for (ThreeDPart p : starts) {
+	double fit = -1;
+	for (const ThreeDPart &p : starts) {
 		if (!Sane(t, p, ex, ey)) continue;
-		const double v = Descend(t, p, ex, ey, shape.tried);
-		if (v > flat_fit) {
-			flat_fit = v;
-			flat = p;
+		parts[0] = p;
+		const double v = Descend(t, parts, 0, ex, ey, shape.tried);
+		if (v > fit) {
+			fit = v;
+			flat = parts[0];
 		}
 	}
-	if (flat_fit < 0) return;
-	shape.flat_fit = static_cast<float>(flat_fit);
+	if (fit < 0) return;
+	shape.flat_fit = static_cast<float>(fit);
+	parts[0] = flat;
 
 	/* A sloping roof over the walls, where it fits clearly better. */
-	ThreeDPart best = flat;
-	double best_fit = flat_fit;
-	for (ThreeDRoof roof : {ThreeDRoof::GableX, ThreeDRoof::GableY, ThreeDRoof::Hip}) {
-		for (float share : {0.25f, 0.6f}) {
-			ThreeDPart p = flat;
-			p.roof = roof;
-			const float half = roof == ThreeDRoof::GableX ? (p.y1 - p.y0) / 2 : roof == ThreeDRoof::GableY ? (p.x1 - p.x0) / 2 : std::min(p.x1 - p.x0, p.y1 - p.y0) / 2;
-			p.rise = std::min(half, p.h * share);
-			p.h -= p.rise / 2;
-			if (!Sane(t, p, ex, ey)) continue;
-			const double v = Descend(t, p, ex, ey, shape.tried);
-			if (v > best_fit + (best.roof == ThreeDRoof::Flat ? ROOF_BETTER : 0.0)) {
-				best_fit = v;
-				best = p;
+	fit = FitRoof(t, parts, 0, fit, ex, ey, shape.tried, {0.25f, 0.6f});
+	shape.one_fit = static_cast<float>(fit);
+
+	/* Where one box does not fit well -- a tower on a base, a church, a house in an L -- another, as the hand tables
+	 * have them: the best few of boxes of four sizes at nine places and three heights by one look each, then moved
+	 * as the first was, with a roof, and the boxes before moved a little again. Kept only where it fits better by
+	 * PART_BETTER; at most MAX_SHAPE_PARTS. */
+	const float top = std::max(fez, static_cast<float>(t.top_z) - static_cast<float>(TILE_HEIGHT));
+	while (parts.size() < MAX_SHAPE_PARTS && fit < GOOD_ENOUGH) {
+		struct Candidate {
+			ThreeDPart p;
+			double v;
+		};
+		std::vector<Candidate> candidates;
+		for (float size : {0.15f, 0.3f, 0.5f, 0.7f}) {
+			for (float cx : {0.25f, 0.5f, 0.75f}) {
+				for (float cy : {0.25f, 0.5f, 0.75f}) {
+					for (float hs : {0.35f, 0.65f, 1.0f}) {
+						const float w = size * ex, d = size * ey;
+						const ThreeDPart p{cx * ex - w / 2, cx * ex + w / 2, cy * ey - d / 2, cy * ey + d / 2, hs * top, ThreeDRoof::Flat, 0.0f};
+						if (!Sane(t, p, ex, ey)) continue;
+						parts.push_back(p);
+						candidates.push_back({p, Score(t, parts)});
+						parts.pop_back();
+						shape.tried++;
+					}
+				}
 			}
 		}
+		std::sort(candidates.begin(), candidates.end(), [](const Candidate &a, const Candidate &b) { return a.v > b.v; });
+		if (candidates.size() > CANDIDATES_MOVED) candidates.resize(CANDIDATES_MOVED);
+
+		std::vector<ThreeDPart> best_parts;
+		double best_fit = fit;
+		for (const Candidate &c : candidates) {
+			std::vector<ThreeDPart> q = parts;
+			q.push_back(c.p);
+			const size_t last = q.size() - 1;
+			double v = Descend(t, q, last, ex, ey, shape.tried);
+			v = FitRoof(t, q, last, v, ex, ey, shape.tried, {0.4f, 1.5f});
+			for (size_t i = 0; i < last; i++) v = Descend(t, q, i, ex, ey, shape.tried, {0.5f, 0.25f});
+			if (v > best_fit) {
+				best_fit = v;
+				best_parts = std::move(q);
+			}
+		}
+		if (best_parts.empty() || best_fit < fit + PART_BETTER) break;
+		parts = std::move(best_parts);
+		fit = best_fit;
 	}
 
-	shape.parts = {best};
-	shape.fit = static_cast<float>(best_fit);
+	shape.parts = parts;
+	shape.fit = static_cast<float>(fit);
 	double kept, box_kept;
-	Score(t, std::span<const ThreeDPart>(&best, 1), 0, 0, 0, &kept);
+	Score(t, parts, 0, 0, 0, &kept);
 	Score(t, std::span<const ThreeDPart>(&before, 1), 0, 0, 0, &box_kept);
 	shape.kept = static_cast<float>(kept);
 	shape.box_kept = static_cast<float>(box_kept);
-	shape.centre_x = (best.x0 + best.x1) / 2.0;
-	shape.centre_y = (best.y0 + best.y1) / 2.0;
-	shape.period = std::abs((best.x1 - best.x0) - (best.y1 - best.y0)) < 1.0 ? 90.0 : 180.0;
+	/* The middle of all the footprints together, what the front snaps about. */
+	float fx0 = parts[0].x0, fx1 = parts[0].x1, fy0 = parts[0].y0, fy1 = parts[0].y1;
+	for (const ThreeDPart &p : parts) {
+		fx0 = std::min(fx0, p.x0);
+		fx1 = std::max(fx1, p.x1);
+		fy0 = std::min(fy0, p.y0);
+		fy1 = std::max(fy1, p.y1);
+	}
+	shape.centre_x = (fx0 + fx1) / 2.0;
+	shape.centre_y = (fy0 + fy1) / 2.0;
+	shape.period = std::abs((fx1 - fx0) - (fy1 - fy0)) < 1.0 ? 90.0 : 180.0;
 	/* What the sprite has outside the shape is not drawn, facing north neither: no more lost than the box loses and a
-	 * little (a mast, a crane, a tree in the garden: another box or a picture of its own, the plan's points 2 and 6). */
-	shape.ok = best_fit > shape.box_fit && kept >= std::min(box_kept, KEPT_AT_LEAST);
+	 * little (a mast, a crane, a tree in the garden: a picture of its own, the plan's point 6). */
+	shape.ok = fit > shape.box_fit && kept >= std::min(box_kept, KEPT_AT_LEAST);
 }
 
 const char *RoofName(ThreeDRoof r)
@@ -533,8 +636,8 @@ std::string DescribeThreeDSpriteShapes()
 	std::sort(all.begin(), all.end(), [](const ThreeDSpriteShape *a, const ThreeDSpriteShape *b) { return a->image < b->image || (a->image == b->image && a->origin_x < b->origin_x); });
 	std::string s;
 	for (const ThreeDSpriteShape *sh : all) {
-		s += fmt::format("tvar spritu {} (visi {},{}): obal {}x{}x{}, shoda {:.0f} % (krabice predtim {:.0f} %, plocha {:.0f} %), drzi {:.0f} % spritu (krabice {:.0f} %), {} zkousek, pixely {:.1f} ms, tvar {:.1f} ms, {}", sh->image, sh->origin_x, sh->origin_y,
-				sh->ex, sh->ey, sh->ez, sh->fit * 100, sh->box_fit * 100, sh->flat_fit * 100, sh->kept * 100, sh->box_kept * 100, sh->tried, sh->read_ms, sh->ms, sh->ok ? "lepsi nez krabice" : "krabice jako predtim");
+		s += fmt::format("tvar spritu {} (visi {},{}): obal {}x{}x{}, {} dilu, shoda {:.0f} % (jeden kvadr {:.0f} %, krabice predtim {:.0f} %, plocha {:.0f} %), drzi {:.0f} % spritu (krabice {:.0f} %), {} zkousek, pixely {:.1f} ms, tvar {:.1f} ms, {}", sh->image, sh->origin_x, sh->origin_y,
+				sh->ex, sh->ey, sh->ez, sh->parts.size(), sh->fit * 100, sh->one_fit * 100, sh->box_fit * 100, sh->flat_fit * 100, sh->kept * 100, sh->box_kept * 100, sh->tried, sh->read_ms, sh->ms, sh->ok ? "lepsi nez krabice" : "krabice jako predtim");
 		for (const ThreeDPart &p : sh->parts) {
 			s += fmt::format("; x {:.2f}..{:.2f} y {:.2f}..{:.2f} vyska {:.2f} strecha {} {:.2f}", p.x0, p.x1, p.y0, p.y1, p.h, RoofName(p.roof), p.rise);
 		}
@@ -546,7 +649,7 @@ std::string DescribeThreeDSpriteShapes()
 /** The rig and the diary: how many shapes are kept, drawn, and the time it took to read them. */
 std::string DescribeThreeDSpriteShapeTotals()
 {
-	int ready = 0, better = 0;
+	int ready = 0, better = 0, several = 0;
 	double fit = 0, box = 0, ms = 0, read_ms = 0;
 	for (const auto &[key, shape] : _shapes) {
 		read_ms += shape->read_ms;
@@ -555,9 +658,10 @@ std::string DescribeThreeDSpriteShapeTotals()
 		ms += shape->ms;
 		if (!shape->ok) continue;
 		better++;
+		if (shape->parts.size() > 1) several++;
 		fit += shape->fit;
 		box += shape->box_fit;
 	}
-	return fmt::format("tvary spritu: {} chteno, {} nalezeno, {} lepsich nez krabice (shoda prumerne {:.0f} %, krabice predtim {:.0f} %); pixely {:.0f} ms (hlavni vlakno), tvary {:.0f} ms (na pozadi)",
-			_shapes.size(), ready, better, better > 0 ? fit * 100 / better : 0.0, better > 0 ? box * 100 / better : 0.0, read_ms, ms);
+	return fmt::format("tvary spritu: {} chteno, {} nalezeno, {} lepsich nez krabice, z toho {} z vic kvadru (shoda prumerne {:.0f} %, krabice predtim {:.0f} %); pixely {:.0f} ms (hlavni vlakno), tvary {:.0f} ms (na pozadi)",
+			_shapes.size(), ready, better, several, better > 0 ? fit * 100 / better : 0.0, better > 0 ? box * 100 / better : 0.0, read_ms, ms);
 }
