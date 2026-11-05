@@ -4129,6 +4129,196 @@ static constexpr float BRIDGE_LEVEL_M = 5.0f;
 /** A level of the map's land, metres (TILE_HEIGHT of OBJECT_HEIGHT_PER_METRE): the pieces for the map squashed to it. */
 static constexpr float BRIDGE_MAP_LEVEL_M = static_cast<float>(TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE);
 
+/** The pillars of the bridges in the bricks [0] or the stone [1] of the retaining walls (BridgeHasMasonryPillars()): their pieces as _three_d_bridge_pieces, only the pillar's and its foot's. */
+static std::array<BridgePieceObjects, 2> _three_d_bridge_wall_pieces = {_three_d_bridge_pieces, _three_d_bridge_pieces};
+/** The same pieces for the map. */
+static std::array<BridgePieceObjects, 2> _three_d_bridge_wall_map_pieces = _three_d_bridge_wall_pieces;
+
+/**
+ * Whether the pillars of one of the game's bridge types are of masonry, in the bricks or the stone of the retaining walls
+ * (the player, 5. 11.: "a texture on the bridges' pillars, the bricks and the stone of the fills of the slopes", the
+ * aqueducts' too): not the wooden bridge's, nor the suspension bridges' ("the suspension ones have steel pillars").
+ */
+static bool BridgeHasMasonryPillars(uint type)
+{
+	return type != 0 && (type < 3 || type > 5);
+}
+
+static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h);
+
+/** A face of the retaining walls (zed_lic_cihly, zed_lic_kamen of our set objekty/nase, zdi_5m.py) as the material of a bridge's pillars. */
+struct BridgeWallPicture {
+	ThreeDTextureBytes png;  ///< its picture, shared with the walls' (InternThreeDTextureBytes())
+	uint32_t flat = 0;       ///< its material's colour
+	int w = 0;               ///< the picture's width, texels
+	double w_m = BRIDGE_LEVEL_M; ///< how wide the picture is in the world, metres (the board's width)
+	double h_m = BRIDGE_LEVEL_M; ///< and how high: a level of the land from the eyes
+};
+
+/**
+ * The faces of the retaining walls, bricks [0] and stone [1], read once for all the bridges: from our set beside the
+ * bridges' (".../objekty/mosty/" -> ".../objekty/nase/"); one not there, those pillars as their model has them.
+ */
+static const std::array<std::optional<BridgeWallPicture>, 2> &BridgeWallPictures(const std::string &bridges_folder)
+{
+	static std::array<std::optional<BridgeWallPicture>, 2> pictures;
+	static bool read = false;
+	if (read) return pictures;
+	read = true;
+	std::string_view f = bridges_folder;
+	if (!f.empty() && f.back() == PATHSEPCHAR) f.remove_suffix(1);
+	const size_t sep = f.find_last_of(PATHSEPCHAR);
+	if (sep == std::string_view::npos) return pictures;
+	const std::string ours = fmt::format("{}nase{}", f.substr(0, sep + 1), PATHSEPCHAR);
+	static constexpr std::string_view FILES[2] = {"zed_lic_cihly.glb", "zed_lic_kamen.glb"};
+	for (size_t k = 0; k < pictures.size(); k++) {
+		GlbMesh mesh;
+		if (!ReadGlbMesh(ours + std::string(FILES[k]), mesh) || mesh.textures.empty()) {
+			Debug(misc, 0, "3D bridges: {}{} not read, the pillars without it", ours, FILES[k]);
+			continue;
+		}
+		const size_t t = mesh.png_texture >= 0 ? static_cast<size_t>(mesh.png_texture) : (mesh.tri_tex.empty() ? 0 : mesh.tri_tex[0]);
+		if (t >= mesh.textures.size() || mesh.textures[t].png == nullptr) continue;
+		BridgeWallPicture p;
+		p.png = mesh.textures[t].png;
+		p.flat = mesh.textures[t].flat;
+		int h = 0;
+		if (!ImageSizeOfHead(std::span<const uint8_t>(*p.png).first(std::min<size_t>(p.png->size(), 32)), p.w, h) || p.w <= 0) continue;
+		/* The board: a picture over it (its UV 0 to 1), its width along x and its height up z. */
+		float x0 = std::numeric_limits<float>::max(), x1 = -x0, z0 = x0, z1 = -x0;
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+			x0 = std::min(x0, mesh.pos[i]);
+			x1 = std::max(x1, mesh.pos[i]);
+			z0 = std::min(z0, mesh.pos[i + 2]);
+			z1 = std::max(z1, mesh.pos[i + 2]);
+		}
+		if (x1 - x0 > 0.5f) p.w_m = x1 - x0;
+		if (z1 - z0 > 0.5f) p.h_m = z1 - z0;
+		pictures[k] = std::move(p);
+	}
+	return pictures;
+}
+
+/**
+ * A pillar's piece of a bridge in the picture of a face of the retaining walls: each face laid with it by its own axis
+ * as the walls are -- on the sides along the face from the left as one looks at it from outside (DrawEyeRetainingWalls()
+ * of viewport.cpp), from the top of the level down, a picture a level high; on the tops and the bottoms along x and
+ * y --, the picture again every w_m and h_m metres, so a pillar's pieces stacked go on into each other. A building's
+ * texture is not repeated (off it nothing, EYE_BUILDING_FRAGMENT of three_d_gpu.cpp): each triangle cut where the
+ * picture begins again, every piece's u and v within it, a hair from its edges. Its corners its own, the normals with
+ * them.
+ */
+static GlbMesh MasonryMesh(const GlbMesh &from, double w_m, double h_m)
+{
+	struct Corner {
+		float p[3];
+		float n[3];
+		double u, v;
+	};
+	auto mix = [](const Corner &a, const Corner &b, double f) {
+		Corner c;
+		for (int k = 0; k < 3; k++) {
+			c.p[k] = static_cast<float>(a.p[k] + (b.p[k] - a.p[k]) * f);
+			c.n[k] = static_cast<float>(a.n[k] + (b.n[k] - a.n[k]) * f);
+		}
+		c.u = a.u + (b.u - a.u) * f;
+		c.v = a.v + (b.v - a.v) * f;
+		return c;
+	};
+	/* A polygon's part on one side of the line u (or v) = at, the side above it or below. */
+	auto cut = [&mix](const std::vector<Corner> &poly, bool v, double at, bool above) {
+		std::vector<Corner> out;
+		for (size_t k = 0; k < poly.size(); k++) {
+			const Corner &a = poly[k], &b = poly[(k + 1) % poly.size()];
+			const double da = ((v ? a.v : a.u) - at) * (above ? 1 : -1), db = ((v ? b.v : b.u) - at) * (above ? 1 : -1);
+			if (da >= 0) out.push_back(a);
+			if ((da >= 0) != (db >= 0)) out.push_back(mix(a, b, da / (da - db)));
+		}
+		return out;
+	};
+	/* Within the picture a hair from its edges: a texel past them is none. */
+	static constexpr double EDGE = 1.0 / 1024;
+	auto inside = [](double t) { return static_cast<float>(EDGE + std::clamp(t, 0.0, 1.0) * (1 - 2 * EDGE)); };
+	static constexpr double EPS = 1e-6;
+	const bool normals = from.nrm.size() == from.pos.size();
+	GlbMesh out;
+	for (size_t t = 0; t + 2 < from.tri.size(); t += 3) {
+		std::vector<Corner> poly(3);
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = from.tri[t + k];
+			for (int a = 0; a < 3; a++) {
+				poly[k].p[a] = from.pos[i * 3 + a];
+				poly[k].n[a] = normals ? from.nrm[i * 3 + a] : 0.0f;
+			}
+		}
+		/* Its face's normal: by its corners' order, the other way where its normals say so (TriangleFacing()). */
+		const float *a = poly[0].p, *b = poly[1].p, *c = poly[2].p;
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		if (gx * gx + gy * gy + gz * gz < 1e-12) continue;
+		if (normals) {
+			double s = 0;
+			for (const Corner &k : poly) s += gx * k.n[0] + gy * k.n[1] + gz * k.n[2];
+			if (s < 0) {
+				gx = -gx;
+				gy = -gy;
+			}
+		}
+		const bool flat = std::abs(gz) >= std::abs(gx) && std::abs(gz) >= std::abs(gy);
+		for (Corner &k : poly) {
+			if (flat) {
+				k.u = k.p[0] / w_m;
+				k.v = k.p[1] / w_m;
+			} else {
+				/* To the right of a face facing (nx, ny) is (-ny, nx), as the walls'. */
+				k.u = (std::abs(gx) >= std::abs(gy) ? (gx > 0 ? k.p[1] : -k.p[1]) : (gy > 0 ? -k.p[0] : k.p[0])) / w_m;
+				k.v = -k.p[2] / h_m;
+			}
+		}
+		double u0 = std::numeric_limits<double>::max(), u1 = -u0, v0 = u0, v1 = -u0;
+		for (const Corner &k : poly) {
+			u0 = std::min(u0, k.u);
+			u1 = std::max(u1, k.u);
+			v0 = std::min(v0, k.v);
+			v1 = std::max(v1, k.v);
+		}
+		const double i0 = std::floor(u0 + EPS), i1 = std::max(i0 + 1, std::ceil(u1 - EPS));
+		const double j0 = std::floor(v0 + EPS), j1 = std::max(j0 + 1, std::ceil(v1 - EPS));
+		for (double i = i0; i < i1; i++) {
+			const std::vector<Corner> strip = cut(cut(poly, false, i, true), false, i + 1, false);
+			if (strip.size() < 3) continue;
+			for (double j = j0; j < j1; j++) {
+				const std::vector<Corner> piece = cut(cut(strip, true, j, true), true, j + 1, false);
+				if (piece.size() < 3) continue;
+				const uint32_t first = static_cast<uint32_t>(out.pos.size() / 3);
+				for (const Corner &k : piece) {
+					out.pos.insert(out.pos.end(), k.p, k.p + 3);
+					if (normals) {
+						const float len = std::sqrt(k.n[0] * k.n[0] + k.n[1] * k.n[1] + k.n[2] * k.n[2]);
+						for (int m = 0; m < 3; m++) out.nrm.push_back(len > 0 ? k.n[m] / len : 0.0f);
+					}
+					out.uv.push_back(inside(k.u - i));
+					out.uv.push_back(inside(k.v - j));
+				}
+				for (uint32_t k = 1; k + 1 < piece.size(); k++) out.tri.insert(out.tri.end(), {first, first + k, first + k + 1});
+			}
+		}
+	}
+	return out;
+}
+
+/** A pillar's piece placed (PlaceIndustryPart() of a MasonryMesh()) dressed in a face of the walls: its other material, the only one. */
+static void DressInMasonry(ThreeDObject &piece, const BridgeWallPicture &wall)
+{
+	piece.texture_of = SIZE_MAX;
+	piece.material_pngs = {wall.png};
+	piece.material_flats = {wall.flat};
+	piece.material_levels.assign(1, nullptr);
+	piece.tri_tex.assign(piece.tri.size() / 3, 1);
+	piece.corner_tex.assign(piece.pos.size() / 3, 1);
+	piece.texels_per_unit = static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE));
+}
+
 /**
  * A 3D bridge ("druh": "most", the colleague's hra/3d/MOSTY-3D-PRO-HRU.md): one model whose named nodes are its pieces
  * (BRIDGE_PIECE_NODES), in true metres, +x along the bridge from x 0 to a tile's length, y across from its middle, z 0
@@ -4173,9 +4363,7 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 	 * eyes' level of 5 m to the map's of 3, its normals as squashed (a slope steeper, its normal flatter). */
 	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> map_meshes;
 	const float squash = BRIDGE_MAP_LEVEL_M / BRIDGE_LEVEL_M;
-	for (size_t p = 0; p < meshes.size(); p++) {
-		if (!meshes[p].has_value()) continue;
-		IndustryPartMesh pm = *meshes[p];
+	auto squashed = [squash](IndustryPartMesh pm) {
 		for (size_t i = 2; i < pm.mesh.pos.size(); i += 3) pm.mesh.pos[i] *= squash;
 		for (size_t i = 0; i + 2 < pm.mesh.nrm.size(); i += 3) {
 			float *n = &pm.mesh.nrm[i];
@@ -4183,13 +4371,38 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 			const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
 			if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
 		}
-		map_meshes[p] = std::move(pm);
+		return pm;
+	};
+	for (size_t p = 0; p < meshes.size(); p++) {
+		if (meshes[p].has_value()) map_meshes[p] = squashed(*meshes[p]);
+	}
+	/* Its pillar and the pillar's foot of masonry (BridgeHasMasonryPillars()): in the bricks [0] and the stone [1] of the
+	 * walls, the eyes' [0] and the map's [1] -- the map's squashed as laid, a picture still a level of the land high. */
+	static constexpr ThreeDBridgePiece PILLAR_PIECES[2] = {ThreeDBridgePiece::Pillar, ThreeDBridgePiece::PillarFoot};
+	std::array<std::array<std::array<std::optional<IndustryPartMesh>, 2>, 2>, 2> masonry;
+	const nlohmann::json types = aqueduct ? nlohmann::json::array({THREE_D_AQUEDUCT}) : e.at("mosty");
+	bool any_masonry = false;
+	for (const auto &n : types) any_masonry |= n.is_number_integer() && n.get<int>() >= 0 && BridgeHasMasonryPillars(n.get<int>());
+	if (any_masonry) {
+		const auto &walls = BridgeWallPictures(folder);
+		for (size_t w = 0; w < walls.size(); w++) {
+			if (!walls[w].has_value()) continue;
+			for (size_t k = 0; k < 2; k++) {
+				const auto &from = meshes[to_underlying(PILLAR_PIECES[k])];
+				if (!from.has_value()) continue;
+				IndustryPartMesh pm;
+				pm.mesh = MasonryMesh(from->mesh, walls[w]->w_m, walls[w]->h_m);
+				if (pm.mesh.tri.empty()) continue;
+				pm.facing = TriangleFacing(pm.mesh);
+				masonry[w][k][1] = squashed(pm);
+				masonry[w][k][0] = std::move(pm);
+			}
+		}
 	}
 	const std::string name = holder.name;
 	const std::vector<ThreeDObjectColourPart> colours = holder.colours;
 	_three_d_objects.push_back(std::move(holder));
 	const double half = TILE_SIZE / OBJECT_UNITS_PER_METRE / 2;
-	const nlohmann::json types = aqueduct ? nlohmann::json::array({THREE_D_AQUEDUCT}) : e.at("mosty");
 	for (const auto &n : types) {
 		if (!n.is_number_integer() || n.get<int>() < 0 || n.get<int>() > static_cast<int>(aqueduct ? THREE_D_AQUEDUCT : MAX_BRIDGES - 1)) continue;
 		const int type = n.get<int>();
@@ -4228,6 +4441,25 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				_three_d_objects.push_back(std::move(map_piece));
 			}
 		}
+		/* Its pillars of masonry: in each of the walls' pictures, unpainted. */
+		if (!BridgeHasMasonryPillars(type)) continue;
+		const auto &walls = BridgeWallPictures(folder);
+		for (size_t w = 0; w < walls.size(); w++) {
+			for (size_t k = 0; k < 2; k++) {
+				const size_t p = to_underlying(PILLAR_PIECES[k]);
+				for (int map = 0; map < 2; map++) {
+					if (!walls[w].has_value() || !masonry[w][k][map].has_value()) continue;
+					for (int q = 0; q < 4; q++) {
+						const double a = q * M_PI / 2;
+						const float at[3] = {static_cast<float>(half - half * std::cos(a)), static_cast<float>(half - half * std::sin(a)), map != 0 ? BRIDGE_MAP_LEVEL_M : BRIDGE_LEVEL_M};
+						ThreeDObject piece = PlaceIndustryPart(*masonry[w][k][map], fmt::format("{}/{} {} {} {}{}", name, BRIDGE_PIECE_NODES[p], type, q * 90, w == 0 ? "cihly" : "kamen", map != 0 ? " mapa" : ""), at, q * 90.0f, 1.0f, 1, 1);
+						DressInMasonry(piece, *walls[w]);
+						(map != 0 ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[w][type][p][q] = _three_d_objects.size();
+						_three_d_objects.push_back(std::move(piece));
+					}
+				}
+			}
+		}
 	}
 }
 
@@ -4236,16 +4468,24 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
  * tile; never waiting for the indices (ThreeDObjectsIndexRead()). The inner pieces and the end without their own the
  * middle piece, the pillar's foot without its own the pillar's.
  * @param map the map's piece: squashed to the map's level of 3 m, each a map's level higher than the eyes' piece
+ * @param wall a pillar's piece of masonry (BridgeHasMasonryPillars()) in the bricks 0 or the stone 1 of the retaining
+ *             walls; -1, or a bridge whose pillars are not, as its model has it
  * @return nullptr when that bridge has no 3D pieces, or not that one
  */
-const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map)
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map, int wall)
 {
 	if (type > THREE_D_AQUEDUCT || !ThreeDObjectsIndexRead()) return nullptr;
 	/* With the original houses wanted (gui.three_d_houses) the original bridges too (the player, 4. 11.: "when the 3D
 	 * houses are switched off, the 3D bridges are off too"). */
 	if (_settings_client.gui.three_d_houses != 0) return nullptr;
-	const auto &pieces = (map ? _three_d_bridge_map_pieces : _three_d_bridge_pieces)[type];
 	const int q = quarter_turns & 3;
+	if ((wall == 0 || wall == 1) && (piece == ThreeDBridgePiece::Pillar || piece == ThreeDBridgePiece::PillarFoot)) {
+		const auto &walled = (map ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[wall][type];
+		size_t k = walled[to_underlying(piece)][q];
+		if (k == SIZE_MAX) k = walled[to_underlying(ThreeDBridgePiece::Pillar)][q];
+		if (k < _three_d_objects.size()) return &_three_d_objects[k];
+	}
+	const auto &pieces = (map ? _three_d_bridge_map_pieces : _three_d_bridge_pieces)[type];
 	size_t k = pieces[to_underlying(piece)][q];
 	if (k == SIZE_MAX && (piece == ThreeDBridgePiece::MiddleA || piece == ThreeDBridgePiece::MiddleB || piece == ThreeDBridgePiece::End)) k = pieces[to_underlying(ThreeDBridgePiece::Middle)][q];
 	if (k == SIZE_MAX && piece == ThreeDBridgePiece::PillarFoot) k = pieces[to_underlying(ThreeDBridgePiece::Pillar)][q];

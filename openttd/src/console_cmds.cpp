@@ -11462,11 +11462,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		std::string failed;
 		TileIndex depot;
 		VehicleType vtype;
+		uint bridge_end = 13;
 		if (rail) {
 			const uint ry = y0 + 4;
+			/* The bridge's south end at x0 + <end> ('test3d trat <type> <end>', 8 to 13): a bridge of a type not so long
+			 * (the steel girder's, two tiles) over the flat land, the dip only under one of 11 and more. */
+			bridge_end = static_cast<uint>(std::clamp(number(3).value_or(13), 8, 13));
 			/* A hill a level high for the tunnel; a dip a level deep under the bridge. */
 			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 22, y0 + need_y - 1), TileXY(x0 + 16, y0), false, LevelMode::Raise);
-			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 10, ry + 2), TileXY(x0 + 8, ry - 2), false, LevelMode::Lower);
+			if (bridge_end >= 11) Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 10, ry + 2), TileXY(x0 + 8, ry - 2), false, LevelMode::Lower);
 			depot = TileXY(x0 + 1, ry);
 			CommandCost r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW);
 			if (r.Failed()) failed = fmt::format("depot: {}", err(r));
@@ -11479,19 +11483,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			track(2, 5);
 			if (failed.empty()) {
 				CommandCost best = CMD_ERROR;
-				/* The bridge's type as asked ('test3d trat <type>'), else the first of these that can be built. */
+				/* The bridge's type as asked ('test3d trat <type> [<end>]'), else the first of these that can be built. */
 				std::vector<BridgeType> types{5, 4, 3, 2, 1, 0};
 				if (auto asked = number(2); asked.has_value()) types = {static_cast<BridgeType>(*asked)};
 				for (BridgeType b : types) {
-					best = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + 13, ry), TileXY(x0 + 6, ry), TransportType::Rail, b, RAILTYPE_RAIL, INVALID_ROADTYPE);
+					best = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end, ry), TileXY(x0 + 6, ry), TransportType::Rail, b, RAILTYPE_RAIL, INVALID_ROADTYPE);
 					if (best.Succeeded()) {
-						IConsolePrint(CC_DEFAULT, "test3d: most typu {} z {},{} na {},{}", b, x0 + 6, ry, x0 + 13, ry);
+						IConsolePrint(CC_DEFAULT, "test3d: most typu {} z {},{} na {},{}", b, x0 + 6, ry, x0 + bridge_end, ry);
 						break;
 					}
 				}
 				if (best.Failed()) failed = fmt::format("bridge: {}", err(best));
 			}
-			track(14, 14);
+			track(bridge_end + 1, 14);
 			if (failed.empty()) {
 				CommandCost r2 = Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, ry), TransportType::Rail, RAILTYPE_RAIL, INVALID_ROADTYPE);
 				if (r2.Failed()) failed = fmt::format("tunnel at {},{}: {}", x0 + 15, ry, err(r2));
