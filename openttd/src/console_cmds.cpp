@@ -8667,6 +8667,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		return ParseInteger<int>(argv[i]);
 	};
 
+	/* The words are one chain of 'else if' in two halves: each 'else if' nests a block, and MSVC stops at 128 deep
+	 * (C1061, build #332). Whatever the first half does not know, the second half looks at. */
+	bool handled = true;
 	if (what == "uhel" && argv.size() > 2) {
 		float degrees = std::strtof(std::string(argv[2]).c_str(), nullptr);
 		SetViewYaw(degrees);
@@ -10402,6 +10405,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern bool _eye_frame_on_card;
 		_eye_frame_on_card = number(3).value_or(1) != 0;
 		IConsolePrint(CC_DEFAULT, "test3d: gpu snimek {}", _eye_frame_on_card ? "cely na karte" : "procesor, objekty na karte");
+	} else {
+		handled = false;
+	}
+	/* The second half of the chain (handled: see above). */
+	if (handled) {
+		/* done by the first half */
 	} else if (what == "kanal" && argv.size() > 5) {
 		/* 'kanal <x1> <y1> <x2> <y2>': a canal over the tiles (under a bridge of 'trat': the walker over water). */
 		auto x1 = number(2), y1 = number(3), x2 = number(4), y2 = number(5);
