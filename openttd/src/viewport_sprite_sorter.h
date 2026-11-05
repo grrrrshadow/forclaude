@@ -40,13 +40,16 @@ struct ParentSpriteToDraw {
 	int32_t ax;                       ///< world X of the point the sprite hangs from (x, y are RemapCoords() of it plus the pixel offset); the turned view draws it there turned (three_d.h)
 	int32_t ay;                       ///< world Y of that point
 	int32_t az;                       ///< world Z of that point
-	const struct ThreeDHouse *box = nullptr; ///< the hand table of the house this sprite belongs to, for box_kind 1
+	union {
+		const struct ThreeDHouse *box = nullptr; ///< the hand table of the house this sprite belongs to, for box_kind 1
+		const struct ThreeDSpriteShape *shape;   ///< the shape read off the sprite (three_d_shape.h), for box_kind 13
+	};
 	int32_t box_ox;                   ///< world X of the origin of the boxes: the north corner of a house's north tile, or of the bounding box
 	int32_t box_oy;                   ///< world Y of it
 	int32_t box_oz;                   ///< world Z of the ground the thing stands on
 	int16_t box_dx;                   ///< box_kind 1: this tile's place in the house, tiles along X from its north tile; box_kind 2: the box's extent along X (world units)
 	int16_t box_dy;                   ///< and along Y
-	int32_t box_kind = 0;             ///< how the turned view draws this sprite (three_d.h): 0 a billboard, 1 the boxes of a house's hand table, 2 one box of its bounding box, 3 unused (the buildings rendered from eight directions are gone), 4 nothing: a tile of a building drawn whole as a 3D object (7), 5 a vehicle's likeness (an entry of its own), 6 a slab: a low flat thing of a station as its whole box, never snapping, 7 a building as a real 3D object, whole (an entry of its own, three_d_objects.h), 8 the deck of a bridge over the tile, 9 a railing of it, 10 the ramp of a bridge's end, 11 a piece of a bridge's pillar, 12 a depot as one box over its tile. The struct stays a multiple of 16 bytes for the SSE4 sorter.
+	int32_t box_kind = 0;             ///< how the turned view draws this sprite (three_d.h): 0 a billboard, 1 the boxes of a house's hand table, 2 one box of its bounding box, 3 unused (the buildings rendered from eight directions are gone), 4 nothing: a tile of a building drawn whole as a 3D object (7), 5 a vehicle's likeness (an entry of its own), 6 a slab: a low flat thing of a station as its whole box, never snapping, 7 a building as a real 3D object, whole (an entry of its own, three_d_objects.h), 8 the deck of a bridge over the tile, 9 a railing of it, 10 the ramp of a bridge's end, 11 a piece of a bridge's pillar, 12 a depot as one box over its tile, 13 the shape read off the sprite (three_d_shape.h): a building without a hand table. The struct stays a multiple of 16 bytes for the SSE4 sorter.
 };
 
 typedef std::vector<ParentSpriteToDraw*> ParentSpriteToSortVector;

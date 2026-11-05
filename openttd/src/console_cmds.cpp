@@ -181,6 +181,7 @@
 #include "disaster_vehicle.h"
 #include "thread.h"
 
+#include "three_d_shape.h"
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -10447,6 +10448,37 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_standing_on = number(3).value_or(0) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici {}", _turned_card_standing_on ? "karta" : "procesor");
+	} else if (what == "tvary") {
+		/* 'tvary': the shapes read off the sprites of the buildings without a hand table (three_d_shape.h), and the
+		 * comparisons of the hand tables with them; 'tvary 0|1' draws the buildings as those shapes (1) or as their
+		 * narrowed bounding boxes as before (0); 'tvary srovnej' compares each house of one tile with a hand table that
+		 * is drawn from now on with the shape read off its sprite; 'tvary znovu' forgets the shapes, they are read anew. */
+		extern bool _three_d_shape_compare;
+		extern std::string DescribeThreeDShapeComparisons();
+		if (argv.size() > 2 && argv[2] == "srovnej") {
+			_three_d_shape_compare = true;
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary srovnej");
+		} else if (argv.size() > 2 && argv[2] == "znovu") {
+			ForgetThreeDSpriteShapes();
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary znovu");
+		} else if (argv.size() > 2) {
+			_three_d_sprite_shapes_on = number(2).value_or(1) != 0;
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary {}", _three_d_sprite_shapes_on ? "ze spritu" : "krabice postaru");
+		} else {
+			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDSpriteShapeTotals());
+			for (const std::string_view line : {DescribeThreeDSpriteShapes(), DescribeThreeDShapeComparisons()}) {
+				size_t start = 0;
+				while (start < line.size()) {
+					size_t end = line.find('\n', start);
+					if (end == std::string_view::npos) end = line.size();
+					if (end > start) IConsolePrint(CC_DEFAULT, "test3d: {}", line.substr(start, end - start));
+					start = end + 1;
+				}
+			}
+		}
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "krabice") {
 		/* 'stojici krabice 0|1': the boxes among what the card lays (houses of the original game, bridges, depots) drawn
 		 * by it (1; ThreeDGpuStandingFaces), or by the processor apart (0). */

@@ -111,6 +111,7 @@
 #include "three_d.h"
 #include "three_d_objects.h"
 #include "three_d_gpu.h"
+#include "three_d_shape.h"
 #include "video/video_driver.hpp"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
@@ -2457,6 +2458,8 @@ static inline uint32_t TurnedGroundTileKey(int x, int y)
 void ResetTurnedGround()
 {
 	ForgetTurnedSpritePictures();
+	/* The shapes read off the sprites (three_d_shape.h): a set's sprites may be others now. */
+	ForgetThreeDSpriteShapes();
 	_turned_ground = TurnedGround();
 	_turned_ground_version++;
 	ForgetSmallViewGrounds();
@@ -3983,6 +3986,73 @@ static void DrawTurnedGenericBox(const DrawPixelInfo &frame, const ParentSpriteT
 	ThreeDPart part{0.0f, static_cast<float>(ps.box_dx), 0.0f, static_cast<float>(ps.box_dy), static_cast<float>(ps.zmax - ps.zmin + 1), ThreeDRoof::Flat, 0.0f};
 	double period = (ps.box_dx == ps.box_dy) ? 90.0 : 180.0;
 	DrawTurnedBoxes(frame, ps, &part, 1, false, 0, 0, 0, 0, ps.box_dx / 2.0, ps.box_dy / 2.0, period);
+}
+
+/**
+ * A building without a hand table as the shape read off its sprite (box_kind 13, three_d_shape.h): its boxes in the
+ * frame of its bounding box, the front snapping about the middle of the footprint.
+ */
+/** The rig (test3d tvary srovnej): the hand tables of the houses of one tile compared with the shapes read off their sprites. */
+bool _three_d_shape_compare = false;
+/** A hand table compared with the shape read off the same sprite (the shape found in the background, said when it is). */
+struct ThreeDShapeCompared {
+	int parts;                       ///< the hand table's boxes
+	float table;                     ///< how well the hand table fits the sprite
+	const ThreeDSpriteShape *shape;  ///< the shape read off it
+};
+static std::map<std::pair<HouseID, SpriteID>, ThreeDShapeCompared> _three_d_shape_compared;
+
+/** The box the turned view draws a building without a shape in (box_kind 2): its bounding box narrowed to the sprite's width (a tower on a wide base). */
+static void TurnedNarrowedBox(const ParentSpriteToDraw &ps, int &nx, int &ny)
+{
+	const int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1;
+	const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
+	const double footprint = 2.0 * ZOOM_BASE * (ex + ey);
+	const double f = std::min(1.0, spr->width / footprint);
+	nx = std::max(2, static_cast<int>(std::lround(ex * f)));
+	ny = std::max(2, static_cast<int>(std::lround(ey * f)));
+}
+
+/** The rig: how well a house's hand table fits its sprite, and the shape read off it (test3d tvary srovnej). */
+static void CompareThreeDHouseWithShape(HouseID house, const ThreeDHouse &model, const ParentSpriteToDraw &ps, TileIndex north_tile, int ground_z)
+{
+	const auto key = std::make_pair(house, ps.image & SPRITE_MASK);
+	if (_three_d_shape_compared.contains(key) || ps.sub != nullptr) return;
+	const int ex = ps.xmax - ps.xmin + 1, ey = ps.ymax - ps.ymin + 1, ez = ps.zmax - ps.zmin + 1;
+	int nx, ny;
+	TurnedNarrowedBox(ps, nx, ny);
+	const Point corner = RemapCoords(ps.xmin, ps.ymin, ps.zmin);
+	const int ox = ps.x - corner.x, oy = ps.y - corner.y;
+	const float table = ThreeDSpriteShapeFit(ps.image & SPRITE_MASK, ox, oy, std::span<const ThreeDPart>(GetThreeDHouseParts(&model), model.count),
+			static_cast<double>(TileX(north_tile) * TILE_SIZE) - ps.xmin, static_cast<double>(TileY(north_tile) * TILE_SIZE) - ps.ymin, static_cast<double>(ground_z) - ps.zmin);
+	const ThreeDSpriteShape *shape = GetThreeDSpriteShape(ps.image & SPRITE_MASK, ox, oy, ex, ey, ez, (ex - nx) / 2, (ey - ny) / 2, nx, ny);
+	_three_d_shape_compared[key] = {static_cast<int>(model.count), table, shape};
+}
+
+/** The rig: the comparisons made (test3d tvary). */
+std::string DescribeThreeDShapeComparisons()
+{
+	std::string s;
+	double table = 0, automat = 0;
+	int n = 0;
+	for (const auto &[key, c] : _three_d_shape_compared) {
+		if (!c.shape->ready.load(std::memory_order_acquire)) {
+			s += fmt::format("dum {:#x} sprite {}: tvar se jeste hleda\n", key.first, key.second);
+			continue;
+		}
+		s += fmt::format("dum {:#x} sprite {}: tabulka ({} dilu) {:.0f} %, automat {:.0f} % (krabice {:.0f} %)\n", key.first, key.second, c.parts, c.table * 100, c.shape->fit * 100, c.shape->box_fit * 100);
+		table += c.table;
+		automat += c.shape->fit;
+		n++;
+	}
+	if (n > 0) s += fmt::format("srovnani {} spritu domu s tabulkou: tabulky prumerne {:.0f} %, automat {:.0f} %\n", n, table * 100 / n, automat * 100 / n);
+	return s;
+}
+
+static void DrawTurnedSpriteShape(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
+{
+	const ThreeDSpriteShape &shape = *ps.shape;
+	DrawTurnedBoxes(frame, ps, shape.parts.data(), static_cast<uint>(shape.parts.size()), false, 0, 0, 0, 0, shape.centre_x, shape.centre_y, shape.period);
 }
 
 /**
@@ -6644,6 +6714,7 @@ static void DrawTurnedStandingByProcessor(const DrawPixelInfo &frame, const Pare
 		case 10: DrawTurnedBridgeRamp(frame, ps); return;
 		case 11: DrawTurnedBridgePillar(frame, ps); return;
 		case 12: DrawTurnedDepot(frame, ps); return;
+		case 13: DrawTurnedSpriteShape(frame, ps); return;
 		default: break;
 	}
 	if (ps.image != SPR_EMPTY_BOUNDING_BOX) DrawSpriteViewport(ps.image, ps.pal, ps.x, ps.y, ps.sub);
@@ -7232,8 +7303,8 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 bool _standing_faces_on_card = true;
 
 /**
- * A box of the block among what stands on it for the card (box_kind 1, 2, 6, 8-12: a house of the original game, a
- * building as its box, a slab, a bridge, a depot): its sprites drawn north-up into its texture once (kept by what is
+ * A box of the block among what stands on it for the card (box_kind 1, 2, 6, 8-13: a house of the original game, a
+ * building as its box or the shape read off its sprite, a slab, a bridge, a depot): its sprites drawn north-up into its texture once (kept by what is
  * drawn into it, MakeTurnedTexture()), its faces' triangles as the processor would lay them (DrawTurnedFaces()).
  * @return false: the card cannot draw it so (the processor draws it apart)
  */
@@ -7265,7 +7336,7 @@ static void AddTurnedStandingThing(ThreeDGpuStanding &out, const DrawPixelInfo &
 	switch (ps.box_kind) {
 		case 4: return;
 		case 5: AddTurnedStandingLikeness(out, frame, ps); return;
-		case 1: case 2: case 6: case 8: case 9: case 10: case 11: case 12:
+		case 1: case 2: case 6: case 8: case 9: case 10: case 11: case 12: case 13:
 			if (AddTurnedStandingFaces(out, frame, ps)) return;
 			[[fallthrough]];
 		case 7: {
@@ -7629,6 +7700,9 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 						ps.box_oz = _cur_ti.z;
 						ps.box_dx = static_cast<int16_t>(static_cast<int>(TileX(_cur_ti.tile)) - static_cast<int>(TileX(north_tile)));
 						ps.box_dy = static_cast<int16_t>(static_cast<int>(TileY(_cur_ti.tile)) - static_cast<int>(TileY(north_tile)));
+						if (_three_d_shape_compare && model->tiles_x == 1 && model->tiles_y == 1 && ps.zmax - ps.zmin + 1 >= static_cast<int>(TILE_HEIGHT)) {
+							CompareThreeDHouseWithShape(north, *model, ps, north_tile, _cur_ti.z);
+						}
 					}
 				}
 			}
@@ -7669,10 +7743,25 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 					ps.box_dy = static_cast<int16_t>(ey);
 					continue;
 				}
-				const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
-				double footprint = 2.0 * ZOOM_BASE * (ex + ey);
-				double f = std::min(1.0, spr->width / footprint);
-				int nx = std::max(2, static_cast<int>(std::lround(ex * f))), ny = std::max(2, static_cast<int>(std::lround(ey * f)));
+				int nx, ny;
+				TurnedNarrowedBox(ps, nx, ny);
+				/* The shape read off the sprite (three_d_shape.h): a box and a roof where the building is, not the
+				 * bounding box the game sorts it by. Where none fits better, the narrowed box as before. */
+				if (_three_d_sprite_shapes_on && ps.sub == nullptr) {
+					const Point corner = RemapCoords(ps.xmin, ps.ymin, ps.zmin);
+					const ThreeDSpriteShape *shape = GetThreeDSpriteShape(ps.image & SPRITE_MASK, ps.x - corner.x, ps.y - corner.y, ex, ey, ez, (ex - nx) / 2, (ey - ny) / 2, nx, ny);
+					if (!shape->ready.load(std::memory_order_acquire)) {
+						/* Found in the background: its place drawn again when it comes (the box as before meanwhile). */
+						OweThreeDPictureBox(ps.xmin, ps.ymin, ps.xmax + 1, ps.ymax + 1, ps.zmin, ps.zmax + 1);
+					} else if (shape->ok) {
+						ps.box_kind = 13;
+						ps.shape = shape;
+						ps.box_ox = ps.xmin;
+						ps.box_oy = ps.ymin;
+						ps.box_oz = ps.zmin;
+						continue;
+					}
+				}
 				ps.box_kind = 2;
 				ps.box = nullptr;
 				ps.box_ox = ps.xmin + (ex - nx) / 2;
