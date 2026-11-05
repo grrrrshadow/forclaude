@@ -10453,11 +10453,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * comparisons of the hand tables with them; 'tvary 0|1' draws the buildings as those shapes (1) or as their
 		 * narrowed bounding boxes as before (0); 'tvary srovnej' compares each house of one tile with a hand table that
 		 * is drawn from now on with the shape read off its sprite; 'tvary znovu' forgets the shapes, they are read anew;
-		 * 'tvary pas 0|1' the bottom band of the buildings' walls, 'tvary jas 0|1' their walls evened (no shadows). */
+		 * 'tvary pas 0|1' the bottom band of the buildings' walls, 'tvary jas 0|1' their walls evened (no shadows),
+		 * 'tvary zada 0|1' their hidden walls from the pattern of the walls the sprites show, turning all round (1), or
+		 * mirrored, the front snapping (0). */
 		extern bool _three_d_shape_compare;
 		extern std::string DescribeThreeDShapeComparisons();
-		extern bool _turned_wall_band, _turned_even_walls;
-		if (argv.size() > 3 && argv[2] == "pas") {
+		extern bool _turned_wall_band, _turned_even_walls, _turned_back_walls;
+		if (argv.size() > 3 && argv[2] == "zada") {
+			/* 'tvary zada 0|1': the buildings' hidden walls from the pattern of those the sprites show, turning all round. */
+			_turned_back_walls = number(3).value_or(1) != 0;
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary zada {}", _turned_back_walls ? 1 : 0);
+		} else if (argv.size() > 3 && argv[2] == "pas") {
 			/* 'tvary pas 0|1': the bottom band of the buildings' walls from the row of the sprite above it. */
 			_turned_wall_band = number(3).value_or(1) != 0;
 			MarkWholeScreenDirty();
@@ -10481,7 +10488,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: tvary {}", _three_d_sprite_shapes_on ? "ze spritu" : "krabice postaru");
 		} else {
 			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDSpriteShapeTotals());
-			for (const std::string_view line : {DescribeThreeDSpriteShapes(), DescribeThreeDShapeComparisons()}) {
+			for (const std::string &text : {DescribeThreeDSpriteShapes(), DescribeThreeDShapeComparisons(), DescribeThreeDWallPatterns()}) {
+				const std::string_view line = text;
 				size_t start = 0;
 				while (start < line.size()) {
 					size_t end = line.find('\n', start);
