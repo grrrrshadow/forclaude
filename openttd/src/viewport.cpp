@@ -3651,7 +3651,17 @@ static void ClipBoxPolygon(std::vector<BoxVertex> &poly, int axis, double limit,
 }
 
 /** The faces of one box of a house (ThreeDPart), each cut to the tile being drawn. */
-static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, bool cut, double cx0, double cx1, double cy0, double cy1, double ox, double oy)
+/**
+ * The height of the lowest band of a building's walls (DrawTurnedBoxes(), building): it takes the row of the sprite just
+ * above it, all the way down. The sprite's bottom edge is a line of steps (2:1) with the ground and the outline under it;
+ * laid on a turned wall it shows as teeth and specks of ground. (Václav Loubek's cab view does it so too.)
+ */
+static constexpr double BUILDING_WALL_BAND = 1.5;
+
+/** Rig (test3d tvary pas 0|1): the bottom band of the buildings' walls (BUILDING_WALL_BAND). */
+bool _turned_wall_band = true;
+
+static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, bool cut, double cx0, double cx1, double cy0, double cy1, double ox, double oy, bool building = false)
 {
 	/* The sprite's outline pixels sit half a pixel outside the box's true edges. */
 	const double margin = 0.25;
@@ -3660,14 +3670,17 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 	double mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
 
 	auto same = [](double x, double y, double z) { return BoxVertex{x, y, z, x, y, z}; };
-	auto add = [&](std::vector<BoxVertex> poly) {
+	auto clip = [&](std::vector<BoxVertex> &poly) {
 		if (cut) {
 			ClipBoxPolygon(poly, 0, cx0, true);
 			ClipBoxPolygon(poly, 0, cx1, false);
 			ClipBoxPolygon(poly, 1, cy0, true);
 			ClipBoxPolygon(poly, 1, cy1, false);
 		}
-		if (poly.size() < 3) return;
+		return poly.size() >= 3;
+	};
+	/* How near a face is: its middle turned. */
+	auto near_of = [&](const std::vector<BoxVertex> &poly) {
 		double sx = 0, sy = 0, sz = 0;
 		for (const BoxVertex &v : poly) {
 			sx += v.x;
@@ -3676,24 +3689,54 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 		}
 		double xr, yr;
 		TurnWorldPoint(ox + sx / poly.size(), oy + sy / poly.size(), xr, yr);
-		faces.push_back({std::move(poly), xr + yr + 2 * sz / poly.size()});
+		return xr + yr + 2 * sz / poly.size();
+	};
+	auto add = [&](std::vector<BoxVertex> poly) {
+		if (!clip(poly)) return;
+		const double near = near_of(poly);
+		faces.push_back({std::move(poly), near});
+	};
+	/* A wall on its bottom band (BUILDING_WALL_BAND): both sorted as the whole wall is, the band just before the rest,
+	 * so the order of the faces stays as without the band (a band's middle lower than its wall's sorted a house of
+	 * several boxes wrong: a back wall over the front's roof). */
+	auto add_wall = [&](std::vector<BoxVertex> whole, std::vector<BoxVertex> bottom, std::vector<BoxVertex> rest) {
+		if (!clip(whole)) return;
+		const double near = near_of(whole);
+		if (clip(bottom)) faces.push_back({std::move(bottom), near - 1e-6});
+		if (clip(rest)) faces.push_back({std::move(rest), near});
 	};
 
-	/* The walls: +X and +Y are the ones the sprite shows; -X and -Y take theirs mirrored to them. */
+	/* The walls: +X and +Y are the ones the sprite shows; -X and -Y take theirs mirrored to them. A building's walls
+	 * stand on a band from the row of the sprite above it (BUILDING_WALL_BAND). */
+	const double band = building && _turned_wall_band && h > 3 * BUILDING_WALL_BAND ? BUILDING_WALL_BAND : 0.0;
 	std::vector<BoxVertex> wall;
 	for (int side = 0; side < 2; side++) {
 		double x = side == 0 ? x1 : x0, tx = x1;
 		wall = {{x, y0, 0, tx, y0, 0}, {x, y1, 0, tx, y1, 0}, {x, y1, h, tx, y1, h}};
 		if (part.roof == ThreeDRoof::GableX) wall.push_back({x, my, h + rise, tx, my, h + rise});
 		wall.push_back({x, y0, h, tx, y0, h});
-		add(wall);
+		if (band > 0) {
+			std::vector<BoxVertex> rest = wall;
+			rest[0] = {x, y0, band, tx, y0, band};
+			rest[1] = {x, y1, band, tx, y1, band};
+			add_wall(wall, {{x, y0, 0, tx, y0, band}, {x, y1, 0, tx, y1, band}, {x, y1, band, tx, y1, band}, {x, y0, band, tx, y0, band}}, rest);
+		} else {
+			add(wall);
+		}
 	}
 	for (int side = 0; side < 2; side++) {
 		double y = side == 0 ? y1 : y0, ty = y1;
 		wall = {{x0, y, 0, x0, ty, 0}, {x1, y, 0, x1, ty, 0}, {x1, y, h, x1, ty, h}};
 		if (part.roof == ThreeDRoof::GableY) wall.push_back({mx, y, h + rise, mx, ty, h + rise});
 		wall.push_back({x0, y, h, x0, ty, h});
-		add(wall);
+		if (band > 0) {
+			std::vector<BoxVertex> rest = wall;
+			rest[0] = {x0, y, band, x0, ty, band};
+			rest[1] = {x1, y, band, x1, ty, band};
+			add_wall(wall, {{x0, y, 0, x0, ty, band}, {x1, y, 0, x1, ty, band}, {x1, y, band, x1, ty, band}, {x0, y, band, x0, ty, band}}, rest);
+		} else {
+			add(wall);
+		}
 	}
 
 	/* The roof. */
@@ -3734,6 +3777,145 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 }
 
 static std::vector<BoxFace> _box_faces; ///< The faces of the house being drawn.
+
+/**
+ * A face of a building's box as the sprite shows it, whose pixels are evened with the others of its pair
+ * (EvenTurnedTexture()): the corners in the frame of the boxes (as AddBoxFaces() lays them), and its group.
+ */
+struct EvenRegion {
+	std::array<std::array<double, 3>, 5> p; ///< x, y, z of the corners
+	int n = 0;                              ///< how many
+	int group = 0;                          ///< 0 the wall facing +X, 1 the wall facing +Y, 2 a hip roof's slope facing +X, 3 facing +Y
+	double depth = 0;                       ///< how near it is in the sprite (x + y of its middle): the nearest owns a pixel
+};
+
+/** Rig (test3d tvary jas 0|1): the buildings' walls evened, no side lit and no side in shadow (EvenTurnedTexture()). */
+bool _turned_even_walls = true;
+
+/** The faces of a building's box the sprite shows, for evening its texture (EvenTurnedTexture()), as AddBoxFaces() lays them. */
+static void AddEvenRegions(std::vector<EvenRegion> &regions, const ThreeDPart &part)
+{
+	const double margin = 0.25;
+	const double x0 = part.x0 - margin, x1 = part.x1 + margin, y0 = part.y0 - margin, y1 = part.y1 + margin;
+	const double h = part.h + 2 * margin, rise = part.rise;
+	const double mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+	auto add = [&](int group, std::initializer_list<std::array<double, 3>> pts) {
+		EvenRegion &r = regions.emplace_back();
+		r.group = group;
+		double sx = 0, sy = 0;
+		for (const auto &q : pts) {
+			if (r.n >= static_cast<int>(r.p.size())) break;
+			r.p[r.n++] = q;
+			sx += q[0];
+			sy += q[1];
+		}
+		r.depth = (sx + sy) / std::max(r.n, 1);
+	};
+	if (part.roof == ThreeDRoof::GableX) {
+		add(0, {{x1, y0, 0}, {x1, y1, 0}, {x1, y1, h}, {x1, my, h + rise}, {x1, y0, h}});
+	} else {
+		add(0, {{x1, y0, 0}, {x1, y1, 0}, {x1, y1, h}, {x1, y0, h}});
+	}
+	if (part.roof == ThreeDRoof::GableY) {
+		add(1, {{x0, y1, 0}, {x1, y1, 0}, {x1, y1, h}, {mx, y1, h + rise}, {x0, y1, h}});
+	} else {
+		add(1, {{x0, y1, 0}, {x1, y1, 0}, {x1, y1, h}, {x0, y1, h}});
+	}
+	if (part.roof == ThreeDRoof::Hip && rise > 0) {
+		const double hx = (x1 - x0) / 2, hy = (y1 - y0) / 2;
+		if (hx >= hy) {
+			const double rx0 = mx - (hx - hy), rx1 = mx + (hx - hy);
+			add(3, {{x0, y1, h}, {x1, y1, h}, {rx1, my, h + rise}, {rx0, my, h + rise}});
+			add(2, {{x1, y0, h}, {x1, y1, h}, {rx1, my, h + rise}});
+		} else {
+			const double ry0 = my - (hy - hx), ry1 = my + (hy - hx);
+			add(2, {{x1, y0, h}, {x1, y1, h}, {mx, ry1, h + rise}, {mx, ry0, h + rise}});
+			add(3, {{x0, y1, h}, {x1, y1, h}, {mx, ry1, h + rise}});
+		}
+	}
+}
+
+/**
+ * Even a building's texture (the sprite north-up, MakeTurnedTexture()): the walls the sprite shows lit from one side
+ * and in shadow on the other made as bright as each other, the mean of the two; the same of a hip roof's two slopes.
+ * The player: "we do not want shadows" -- turned, the lit wall comes round to the side the sun is not on.
+ * Each pixel belongs to the nearest face over it in the sprite; only the pixels of the faces count, a chimney or a
+ * tree outside the boxes keeps its own.
+ */
+static void EvenTurnedTexture(uint32_t *pixels, int tw, int th, int tleft, int ttop, ZoomLevel zoom, const ParentSpriteToDraw &ps, const std::vector<EvenRegion> &regions)
+{
+	const double scale = 1.0 / (1 << to_underlying(zoom));
+	std::vector<int8_t> owner(static_cast<size_t>(tw) * th, -1);
+	std::vector<float> nearest(static_cast<size_t>(tw) * th, -1e30f);
+	for (const EvenRegion &r : regions) {
+		std::array<std::pair<double, double>, 5> q;
+		double ymin = 1e30, ymax = -1e30;
+		for (int i = 0; i < r.n; i++) {
+			double vx, vy;
+			RemapCoordsF(ps.box_ox + r.p[i][0], ps.box_oy + r.p[i][1], ps.box_oz + r.p[i][2], vx, vy);
+			q[i] = {(vx - tleft) * scale, (vy - ttop) * scale};
+			ymin = std::min(ymin, q[i].second);
+			ymax = std::max(ymax, q[i].second);
+		}
+		const int row0 = std::max(0, static_cast<int>(std::ceil(ymin - 0.5))), row1 = std::min(th - 1, static_cast<int>(std::floor(ymax - 0.5)));
+		for (int row = row0; row <= row1; row++) {
+			const double y = row + 0.5;
+			double xl = 1e30, xr = -1e30;
+			for (int i = 0; i < r.n; i++) {
+				const auto &a = q[i], &b = q[(i + 1) % r.n];
+				if ((y < a.second && y < b.second) || (y > a.second && y > b.second) || a.second == b.second) continue;
+				const double x = a.first + (y - a.second) * (b.first - a.first) / (b.second - a.second);
+				xl = std::min(xl, x);
+				xr = std::max(xr, x);
+			}
+			if (xl > xr) continue;
+			const int i0 = std::max(0, static_cast<int>(std::ceil(xl - 0.5))), i1 = std::min(tw - 1, static_cast<int>(std::floor(xr - 0.5)));
+			for (int i = i0; i <= i1; i++) {
+				const size_t k = static_cast<size_t>(row) * tw + i;
+				if (r.depth >= nearest[k]) {
+					nearest[k] = static_cast<float>(r.depth);
+					owner[k] = static_cast<int8_t>(r.group);
+				}
+			}
+		}
+	}
+
+	/* The mean brightness of each group's pixels, by their alpha. */
+	std::array<double, 4> sum{}, weight{};
+	std::array<int, 4> count{};
+	for (size_t k = 0; k < owner.size(); k++) {
+		if (owner[k] < 0) continue;
+		Colour c;
+		c.data = pixels[k];
+		if (c.a == 0) continue;
+		sum[owner[k]] += (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) * c.a;
+		weight[owner[k]] += c.a;
+		count[owner[k]]++;
+	}
+	std::array<double, 4> factor{1, 1, 1, 1};
+	bool any = false;
+	for (int pair = 0; pair < 4; pair += 2) {
+		if (count[pair] < 16 || count[pair + 1] < 16) continue;
+		const double m0 = sum[pair] / weight[pair], m1 = sum[pair + 1] / weight[pair + 1];
+		if (m0 <= 1 || m1 <= 1) continue;
+		const double target = (m0 + m1) / 2;
+		factor[pair] = std::clamp(target / m0, 0.5, 2.0);
+		factor[pair + 1] = std::clamp(target / m1, 0.5, 2.0);
+		any = true;
+	}
+	if (!any) return;
+	for (size_t k = 0; k < owner.size(); k++) {
+		if (owner[k] < 0 || factor[owner[k]] == 1.0) continue;
+		Colour c;
+		c.data = pixels[k];
+		if (c.a == 0) continue;
+		const double f = factor[owner[k]];
+		c.r = static_cast<uint8_t>(std::min(255.0, c.r * f + 0.5));
+		c.g = static_cast<uint8_t>(std::min(255.0, c.g * f + 0.5));
+		c.b = static_cast<uint8_t>(std::min(255.0, c.b * f + 0.5));
+		pixels[k] = c.data;
+	}
+}
 
 /**
  * Draw a sprite of the turned view as boxes (ParentSpriteToDraw::box_kind):
@@ -3779,7 +3961,7 @@ struct TurnedTexture {
  * over faces (DrawTurnedFaces()).
  * @return whether there is anything to lay
  */
-static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, TurnedTexture &tex)
+static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, TurnedTexture &tex, const std::vector<EvenRegion> *even = nullptr)
 {
 	ZoomLevel zoom = frame.zoom;
 	int mask = ScaleByZoom(-1, zoom);
@@ -3829,6 +4011,15 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 		mix(static_cast<uint32_t>(tw));
 		mix(static_cast<uint32_t>(th));
 		sprite(ps.image, ps.pal, ps.sub, sx, sy);
+		/* A building's texture evened by its faces (EvenTurnedTexture()). */
+		if (even != nullptr) {
+			mix(0x45564E00u | static_cast<uint32_t>(even->size()));
+			for (const EvenRegion &r : *even) {
+				for (int i = 0; i < r.n; i++) {
+					for (double v : r.p[i]) mix(static_cast<uint32_t>(std::lround(v * 64)));
+				}
+			}
+		}
 		for (int child_idx = ps.first_child; child_idx >= 0;) {
 			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
 			child_idx = cs.next;
@@ -3869,6 +4060,7 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 			}
 		}
 	}
+	if (even != nullptr) EvenTurnedTexture(_turned_texture.data(), tw, th, tleft, ttop, zoom, ps, *even);
 	_turned_times.texture += TurnedNow() - t0;
 	tex = {tleft, ttop, tw, th};
 	if (_turned_faces_out != nullptr) {
@@ -3953,14 +4145,20 @@ static void DrawTurnedFaces(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	_turned_times.warp += TurnedNow() - t1;
 }
 
-static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const ThreeDPart *parts, uint count, bool cut, double cx0, double cx1, double cy0, double cy1, double centre_x, double centre_y, double period, bool fill = true)
+static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, const ThreeDPart *parts, uint count, bool cut, double cx0, double cx1, double cy0, double cy1, double centre_x, double centre_y, double period, bool fill = true, bool building = false)
 {
+	/* A building (a hand table, a shape read off its sprite): its texture evened, no wall lit and none in shadow. */
+	static std::vector<EvenRegion> even;
+	even.clear();
+	if (building && _turned_even_walls) {
+		for (uint i = 0; i < count; i++) AddEvenRegions(even, parts[i]);
+	}
 	TurnedTexture tex;
-	if (!MakeTurnedTexture(frame, ps, tex)) return;
+	if (!MakeTurnedTexture(frame, ps, tex, even.empty() ? nullptr : &even)) return;
 
 	/* The faces of the boxes. */
 	_box_faces.clear();
-	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy);
+	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy, building);
 	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
 	DrawTurnedFaces(frame, ps, _box_faces, centre_x, centre_y, period, tex, fill);
 }
@@ -3972,7 +4170,7 @@ static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToD
 	bool cut = house.tiles_x > 1 || house.tiles_y > 1;
 	double cx0 = ps.box_dx * TILE_SIZE - 0.5, cx1 = cx0 + TILE_SIZE + 1, cy0 = ps.box_dy * TILE_SIZE - 0.5, cy1 = cy0 + TILE_SIZE + 1;
 	double period = (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
-	DrawTurnedBoxes(frame, ps, GetThreeDHouseParts(&house), house.count, cut, cx0, cx1, cy0, cy1, house.tiles_x * TILE_SIZE / 2.0, house.tiles_y * TILE_SIZE / 2.0, period);
+	DrawTurnedBoxes(frame, ps, GetThreeDHouseParts(&house), house.count, cut, cx0, cx1, cy0, cy1, house.tiles_x * TILE_SIZE / 2.0, house.tiles_y * TILE_SIZE / 2.0, period, true, true);
 }
 
 /**
@@ -4052,7 +4250,7 @@ std::string DescribeThreeDShapeComparisons()
 static void DrawTurnedSpriteShape(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
 	const ThreeDSpriteShape &shape = *ps.shape;
-	DrawTurnedBoxes(frame, ps, shape.parts.data(), static_cast<uint>(shape.parts.size()), false, 0, 0, 0, 0, shape.centre_x, shape.centre_y, shape.period);
+	DrawTurnedBoxes(frame, ps, shape.parts.data(), static_cast<uint>(shape.parts.size()), false, 0, 0, 0, 0, shape.centre_x, shape.centre_y, shape.period, true, true);
 }
 
 /**

@@ -10452,10 +10452,22 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'tvary': the shapes read off the sprites of the buildings without a hand table (three_d_shape.h), and the
 		 * comparisons of the hand tables with them; 'tvary 0|1' draws the buildings as those shapes (1) or as their
 		 * narrowed bounding boxes as before (0); 'tvary srovnej' compares each house of one tile with a hand table that
-		 * is drawn from now on with the shape read off its sprite; 'tvary znovu' forgets the shapes, they are read anew. */
+		 * is drawn from now on with the shape read off its sprite; 'tvary znovu' forgets the shapes, they are read anew;
+		 * 'tvary pas 0|1' the bottom band of the buildings' walls, 'tvary jas 0|1' their walls evened (no shadows). */
 		extern bool _three_d_shape_compare;
 		extern std::string DescribeThreeDShapeComparisons();
-		if (argv.size() > 2 && argv[2] == "srovnej") {
+		extern bool _turned_wall_band, _turned_even_walls;
+		if (argv.size() > 3 && argv[2] == "pas") {
+			/* 'tvary pas 0|1': the bottom band of the buildings' walls from the row of the sprite above it. */
+			_turned_wall_band = number(3).value_or(1) != 0;
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary pas {}", _turned_wall_band ? 1 : 0);
+		} else if (argv.size() > 3 && argv[2] == "jas") {
+			/* 'tvary jas 0|1': the buildings' walls evened, no side lit and no side in shadow. */
+			_turned_even_walls = number(3).value_or(1) != 0;
+			MarkWholeScreenDirty();
+			IConsolePrint(CC_DEFAULT, "test3d: tvary jas {}", _turned_even_walls ? 1 : 0);
+		} else if (argv.size() > 2 && argv[2] == "srovnej") {
 			_three_d_shape_compare = true;
 			MarkWholeScreenDirty();
 			IConsolePrint(CC_DEFAULT, "test3d: tvary srovnej");
