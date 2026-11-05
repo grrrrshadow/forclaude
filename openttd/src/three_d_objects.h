@@ -353,6 +353,9 @@ struct ThreeDObject {
 	std::array<std::vector<ThreeDObjectFigure>, 2> work;    ///< "prace" of the soil: the girls at work on a tile of marijuana [0], of potatoes [1]
 	std::array<std::vector<ThreeDObjectFigure>, 2> by_road; ///< "u_cesty" of the field road: the girls by its north-west edge [0], its south-east one [1]
 	size_t texture_of = SIZE_MAX; ///< a part of the original industries placed on a tile ("dily"): the object of the part, whose texture it shares
+	/** Its texture's texels to a unit of the world, where its texture is not one picture over its tiles (a bridge's pillar
+	 * in the bricks of the retaining walls: a picture to 5 m, MasonryMesh()); 0 so: the level of detail from the eyes by it. */
+	float texels_per_unit = 0;
 
 	bool Read() const;
 	bool TryRead() const;
@@ -1249,7 +1252,7 @@ enum class ThreeDBridgePiece : uint8_t {
 };
 /** The "type" of the aqueducts' 3D pieces (a record with "akvadukt": true; the colleague's hra/3d/PROSBA-AKVADUKTY.md): past the game's bridge types. */
 static constexpr uint THREE_D_AQUEDUCT = 13; // MAX_BRIDGES of bridge.h (a static_assert in three_d_objects.cpp)
-const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map = false);
+const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map = false, int wall = -1);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);

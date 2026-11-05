@@ -12796,8 +12796,11 @@ static bool EyeBridgePieces(TileIndex tile, F add, bool map)
 		const bool free = under == TileType::Clear || under == TileType::Trees || (under == TileType::Water && IsCoast(tile));
 		if (free && BridgeTileHasPillars(tile)) {
 			const int levels = bz / static_cast<int>(TILE_HEIGHT) - GetTileZ(tile);
+			/* Its pillars of masonry in the bricks of the retaining walls in a town (as the walls under the houses are),
+			 * else in their stone (the player, 5. 11.); the whole bridge alike, by its south end. */
+			const int wall = ClosestTownFromTile(south, _settings_game.economy.dist_local_authority) != nullptr ? 0 : 1;
 			for (int k = 0; k < levels; k++) {
-				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along, map);
+				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along, map, wall);
 				if (o != nullptr) add(o, bz - (k + 1) * static_cast<int>(TILE_HEIGHT));
 			}
 		}
@@ -16593,7 +16596,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
 		const ThreeDObjectTexture *full = o.TryGetTexture(0);
 		if (full == nullptr) continue;
-		double texels_per_unit = full->w / static_cast<double>(TILE_SIZE);
+		double texels_per_unit = o.texels_per_unit > 0 ? o.texels_per_unit : full->w / static_cast<double>(TILE_SIZE);
 		double pixels_per_unit = eye.focal / std::max(c.f, CAB_NEAR * 4);
 		int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
 		/* Its shape as simple as its nearest part allows (ThreeDShapeLevel()). */
