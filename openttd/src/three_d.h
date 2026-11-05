@@ -235,7 +235,15 @@ struct DirtyPlace {
 	double x0 = 0, y0 = 0, x1 = 0, y1 = 0; ///< Box: the ground it is over, world units
 	double z0 = 0, z1 = 0;                 ///< Box: the heights it is between, world units
 	double ax = 0, ay = 0, az = 0;         ///< Anchored: the point, world units
+	/** A thing that moves (a vehicle, a walker, a creature) and nothing about it: the turned main view lays such things
+	 * over what stands each frame anyway (the moving layer, ThreeDGpuStanding::moving), what stands there stays. */
+	bool mover = false;
+	/** Only what the processor draws over the card's picture of the turned view: a sign, a floating text -- nothing
+	 * that stands is laid again for it, only the screen there drawn again. */
+	bool screen_only = false;
 };
+bool DirtyPlaceIsMover();
+bool DirtyPlaceIsScreenOnly();
 
 /** While it lives, what the game marks dirty is at this place (DirtyPlace). */
 class DirtyPlaceScope {

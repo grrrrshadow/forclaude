@@ -2266,6 +2266,7 @@ static DirtyPlace VehicleDirtyPlace(const Vehicle *v)
 	place.ax = v->x_pos;
 	place.ay = v->y_pos;
 	place.az = v->z_pos;
+	place.mover = true;
 	return place;
 }
 
@@ -2283,7 +2284,7 @@ static void MarkVehicleLightPoolDirty(const Vehicle *v)
 	auto it = _light_pools.find(v->index.base());
 	if (!lit) {
 		if (it != _light_pools.end()) {
-			MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8);
+			MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true);
 			_light_pools.erase(it);
 		}
 		return;
@@ -2295,8 +2296,8 @@ static void MarkVehicleLightPoolDirty(const Vehicle *v)
 	const int ahead = v->type == VehicleType::Ship ? 20 : 15, half = 12;
 	const int cx = v->x_pos + dir_dx[d] * ahead, cy = v->y_pos + dir_dy[d] * ahead;
 	const std::array<int, 4> box{cx - half, cy - half, cx + half, cy + half};
-	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8);
-	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8);
+	if (it != _light_pools.end() && it->second != box) MarkWorldBoxDirty(it->second[0], it->second[1], it->second[2], it->second[3], v->z_pos - 8, v->z_pos + 8, true);
+	MarkWorldBoxDirty(box[0], box[1], box[2], box[3], v->z_pos - 8, v->z_pos + 8, true);
 	_light_pools[v->index.base()] = box;
 }
 
@@ -2326,7 +2327,9 @@ void Vehicle::UpdateViewport(bool dirty)
 			const int jump = 32 * ZOOM_BASE;
 			const bool near = std::abs(this->sprite_cache.old_coord.left - this->coord.left) <= jump && std::abs(this->sprite_cache.old_coord.top - this->coord.top) <= jump &&
 					std::abs(this->sprite_cache.old_coord.right - this->coord.right) <= jump && std::abs(this->sprite_cache.old_coord.bottom - this->coord.bottom) <= jump;
-			DirtyPlaceScope place(near ? VehicleDirtyPlace(this) : DirtyPlace{});
+			DirtyPlace jumped;
+			jumped.mover = true;
+			DirtyPlaceScope place(near ? VehicleDirtyPlace(this) : jumped);
 			this->sprite_cache.is_viewport_candidate = ::MarkAllViewportsDirty(
 				std::min(this->sprite_cache.old_coord.left, this->coord.left),
 				std::min(this->sprite_cache.old_coord.top, this->coord.top),
@@ -2344,6 +2347,9 @@ void Vehicle::UpdateViewport(bool dirty)
 				pt.x += this->draw_offs.x;
 				pt.y += this->draw_offs.y;
 				const int m = 8 * ZOOM_BASE;
+				DirtyPlace smoke;
+				smoke.mover = true;
+				DirtyPlaceScope smoke_place(smoke);
 				::MarkAllViewportsDirty(pt.x + b.left - m, pt.y + b.top - m, pt.x + b.right + m, pt.y + b.bottom + m);
 			}
 		}

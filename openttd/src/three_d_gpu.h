@@ -445,7 +445,13 @@ struct ThreeDGpuStandingItem {
 	std::shared_ptr<const ThreeDGpuStandingVehicle> vehicle = nullptr; ///< not a picture: this vehicle (or figure) drawn here, laid as a picture is (depth)
 	int up = 0;       ///< the vehicle laid so many times doubled (a big figure drawn at a coarser zoom)
 	int faces = -1;   ///< not a picture: the box of ThreeDGpuStanding::faces drawn here
+	/** Its place in the order what stands is laid in, far first (THREE_D_GPU_ORDER_BITS; 0 none): kept on the card in
+	 * a picture of its own by each pixel it covers, the moving things laid over it each frame only where they come
+	 * later (ThreeDGpuStanding::moving). */
+	uint32_t order = 0;
 };
+/** The bits of ThreeDGpuStandingItem::order: kept in three channels of 8 bits on the card. */
+static constexpr int THREE_D_GPU_ORDER_BITS = 24;
 
 /**
  * What stands on a block of the turned map, laid by the card into the picture of the view's standing things, far
@@ -468,6 +474,15 @@ struct ThreeDGpuStanding {
 	 * seen, DrawNight() of viewport.cpp), read back into lit, a byte a pixel, top row first. */
 	bool read_lit = false;
 	std::vector<uint8_t> lit;
+	/**
+	 * The things that move -- the vehicles, the walkers, the creatures -- laid over all of the view at once, each frame,
+	 * apart from what stands still (the player, 5. 11.: a Tatra driving through a town laid the town's houses again
+	 * wherever it went, 2.6 million triangles in 5 s, the map 3 to 5 frames a second): into a picture of their own of
+	 * the view, what stands on it copied there first where they were the frame before and where they are now (and where
+	 * what stands changed since), each of them laid only where it comes later in the order than what stands there
+	 * (ThreeDGpuStandingItem::order). Shown instead of what stands from then on (ThreeDGpuMovingLayer()).
+	 */
+	bool moving = false;
 };
 
 bool ThreeDGpuAvailable(bool wait = false);
@@ -483,6 +498,8 @@ bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
 uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr);
+void ThreeDGpuMovingLayer(int view, bool on);
+std::string ThreeDGpuMovingTimes();
 void ThreeDGpuForgetView(int view, uint64_t ground_key);
 void ThreeDGpuViewPicturesWait(void (*wait)(void *fence));
 bool ThreeDGpuRenderEye(ThreeDGpuEyePicture &pic);

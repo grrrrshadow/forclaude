@@ -258,6 +258,7 @@ void MarkDirty(const Witch &w, const ThreeDWitch &c)
 	}
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
+	place.mover = true;
 	place.x0 = x0;
 	place.x1 = x1;
 	place.y0 = y0;

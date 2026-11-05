@@ -329,6 +329,9 @@ constexpr GLenum GL_DEPTH_COMPONENT32F = 0x8CAC;
 constexpr GLenum GL_FRAMEBUFFER_COMPLETE = 0x8CD5;
 constexpr GLenum GL_COLOR_ATTACHMENT0 = 0x8CE0;
 constexpr GLenum GL_COLOR_ATTACHMENT1 = 0x8CE1;
+constexpr GLenum GL_COLOR_ATTACHMENT2 = 0x8CE2;
+/** What stands on a view drawn into (ViewPictures::standing_fbo): its colours, which are lit, its order. */
+constexpr GLenum STANDING_DRAW_BUFFERS[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
 constexpr GLenum GL_DEPTH_ATTACHMENT = 0x8D00;
 constexpr GLenum GL_FRAMEBUFFER = 0x8D40;
 constexpr GLenum GL_READ_FRAMEBUFFER = 0x8CA8;
@@ -670,6 +673,16 @@ struct ViewPictures {
 	GLuint standing = 0, standing_lit = 0, standing_fbo = 0;
 	GLuint standing_depth = 0;             ///< the depth of the building being drawn among them (ThreeDGpuStandingBuilding)
 	std::atomic<uint32_t> standing_name = 0, standing_lit_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
+	GLuint standing_order = 0;             ///< the order of what stands there by each pixel (ThreeDGpuStandingItem::order), its third picture
+	/* What stands with the moving things laid over it (ThreeDGpuStanding::moving): its colours and which are lit,
+	 * shown instead while the moving layer is on (ThreeDGpuMovingLayer()). */
+	GLuint moving = 0, moving_lit = 0, moving_fbo = 0;
+	std::atomic<uint32_t> moving_name = 0, moving_lit_name = 0;
+	std::atomic<bool> moving_on = false;
+	std::atomic<bool> moving_anew = false;              ///< switched on again: all of it copied first
+	bool moving_whole = true;                           ///< all of it to be copied from what stands (made anew, the view moved)
+	std::vector<std::array<int, 4>> moving_were;        ///< where the moving things were laid last, x, y, w, h of the picture
+	std::vector<std::array<int, 4>> moving_stood_since; ///< where what stands was laid since
 };
 static std::array<ViewPictures, THREE_D_GPU_VIEWS> _views;
 
@@ -677,6 +690,20 @@ static std::array<ViewPictures, THREE_D_GPU_VIEWS> _views;
 static ViewPictures &ViewPicturesOf(int view)
 {
 	return _views[view >= 0 && view < THREE_D_GPU_VIEWS ? view : 0];
+}
+
+/** A view's pictures of the moving things let go of: made anew of the view's size when next laid. */
+static void ForgetMovingPictures(ViewPictures &v)
+{
+	v.moving_name = v.moving_lit_name = 0;
+	if (v.moving != 0) {
+		gl.glDeleteTextures(1, &v.moving);
+		gl.glDeleteTextures(1, &v.moving_lit);
+	}
+	v.moving = v.moving_lit = 0;
+	v.moving_whole = true;
+	v.moving_were.clear();
+	v.moving_stood_since.clear();
 }
 
 /** A view's pictures let go of (ForgetCard(), ThreeDGpuForgetView()): what they held is gone. */
@@ -698,6 +725,9 @@ static void ForgetViewPictures(ViewPictures &v)
 	v.standing_name = v.standing_lit_name = 0;
 	if (v.standing_depth != 0) gl.glDeleteRenderbuffers(1, &v.standing_depth);
 	v.standing_depth = 0;
+	if (v.standing_order != 0) gl.glDeleteTextures(1, &v.standing_order);
+	v.standing_order = 0;
+	ForgetMovingPictures(v);
 }
 /* The pictures laid: a sprite's kept by its key in the atlas, the block's others in the stream; started over when full. */
 GLuint _standing_atlas = 0, _standing_stream = 0;
@@ -726,6 +756,12 @@ GpuProgram _standing_shrink_program;
 bool _standing_shrink_ok = false;
 GpuProgram _clear_program;
 bool _clear_program_ok = false;
+GpuProgram _standing_copy_program; ///< what stands copied under the moving things (COPY_FRAGMENT)
+bool _standing_copy_ok = false;
+GLuint _standing_order_vao = 0;    ///< the pictures laid with their order (ThreeDGpuStandingItem::order): x, y, z, u, v, order
+/** The diary: the moving things laid over the views (ThreeDGpuStanding::moving) -- times, things, pixels copied, card ms. */
+std::atomic<uint64_t> _gpu_moving_passes = 0, _gpu_moving_things = 0, _gpu_moving_copied = 0;
+std::atomic<double> _gpu_moving_ms = 0;
 /** Whether the card's glClear() keeps to the scissor's rect (TestScissoredClear()); else ClearInScissor() draws over it. */
 static bool _scissored_clear_ok = true;
 /** Whether the card divides an attribute by instance (TestInstancedArrays()); else the meshes alike drawn each on its own. */
@@ -1049,28 +1085,53 @@ void main()
 const char *const STANDING_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
+layout(location = 2) in float a_order;
 uniform vec2 u_size;
 noperspective out vec2 v_uv;
+flat out float v_order;
 void main()
 {
 	gl_Position = vec4(a_pos.xy / u_size * 2.0 - 1.0, a_pos.z * 2.0 - 1.0, 1.0);
 	v_uv = a_uv;
+	v_order = a_order;
 }
 )";
 
-const char *const STANDING_FRAGMENT = R"(#version 330 core
+/* The order of what stands on the turned map (ThreeDGpuStandingItem::order) kept by the pixels it covers: its 24 bits
+ * in red, green and blue, whole -- laid with what is laid (ONE, ONE_MINUS_SRC_ALPHA), all of it or nothing (alpha 0). */
+#define STANDING_ORDER_GLSL \
+	"vec4 OrderColour(float order)\n" \
+	"{\n" \
+	"\tfloat k = floor(order + 0.5);\n" \
+	"\tfloat r = floor(k / 65536.0);\n" \
+	"\tfloat g = floor((k - r * 65536.0) / 256.0);\n" \
+	"\treturn vec4(r, g, k - r * 65536.0 - g * 256.0, 255.0) / 255.0;\n" \
+	"}\n"
+
+const char *const STANDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
 uniform sampler2D u_texture;
+uniform int u_moving;
+uniform sampler2D u_orders;
 noperspective in vec2 v_uv;
+flat in float v_order;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
+layout(location = 2) out vec4 o_order;
 void main()
 {
 	vec4 t = texelFetch(u_texture, ivec2(floor(v_uv)), 0);
 	if (t.a == 0.0) discard;
+	/* A thing that moves (ThreeDGpuStanding::moving): hidden where what stands there comes later. */
+	if (u_moving != 0) {
+		vec4 o = texelFetch(u_orders, ivec2(gl_FragCoord.xy), 0);
+		float under = floor(o.r * 255.0 + 0.5) * 65536.0 + floor(o.g * 255.0 + 0.5) * 256.0 + floor(o.b * 255.0 + 0.5);
+		if (v_order < under) discard;
+	}
 	float lit = abs(t.a * 255.0 - 254.0) < 0.5 ? 1.0 : 0.0;
 	float a = lit > 0.5 ? 1.0 : t.a;
 	o_colour = vec4(t.rgb, a);
 	o_lit = vec4(lit, 0.0, 0.0, a);
+	o_order = a >= 0.5 ? OrderColour(v_order) : vec4(0.0);
 }
 )";
 
@@ -1115,10 +1176,27 @@ void main()
 const char *const CLEAR_FRAGMENT = R"(#version 330 core
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
+layout(location = 2) out vec4 o_order;
 void main()
 {
 	o_colour = vec4(0.0);
 	o_lit = vec4(0.0);
+	o_order = vec4(0.0);
+}
+)";
+
+/* What stands on the view copied under the moving things (ThreeDGpuStanding::moving), with STANDING_VERTEX: each pixel
+ * of the rects drawn its colour and whether it is lit, as they are. */
+const char *const COPY_FRAGMENT = R"(#version 330 core
+uniform sampler2D u_colour;
+uniform sampler2D u_lit;
+layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_lit;
+void main()
+{
+	ivec2 at = ivec2(gl_FragCoord.xy);
+	o_colour = texelFetch(u_colour, at, 0);
+	o_lit = texelFetch(u_lit, at, 0);
 }
 )";
 
@@ -1138,13 +1216,15 @@ void main()
 }
 )";
 
-const char *const STANDING_FACES_FRAGMENT = R"(#version 330 core
+const char *const STANDING_FACES_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
 uniform sampler2D u_texture;
 uniform vec4 u_bounds;
 uniform int u_fill;
+uniform float u_order;
 noperspective in vec2 v_uv;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
+layout(location = 2) out vec4 o_order;
 const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
 		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
 		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
@@ -1165,6 +1245,7 @@ void main()
 	if (t == vec4(0.0)) discard;
 	o_colour = vec4(t.rgb, 1.0);
 	o_lit = vec4(0.0, 0.0, 0.0, 1.0);
+	o_order = OrderColour(u_order);
 }
 )";
 
@@ -1173,13 +1254,15 @@ void main()
  * processor (DrawTexturedTriangle() of viewport.cpp) --, as see-through as its texel (a yard's grass with the paths of the ground through it,
  * the colleague's pv_dvur_trava), not lit; or its lit glass at night (u_night), each pixel its texel as it is where the
  * texture has one, whole, marked lit. */
-const char *const STANDING_BUILDING_FRAGMENT = R"(#version 330 core
+const char *const STANDING_BUILDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
 uniform sampler2D u_tex;
 uniform int u_night;
+uniform float u_order;
 noperspective in vec2 v_uv;
 noperspective in float v_light;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
+layout(location = 2) out vec4 o_order;
 const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
 		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
 		ivec2(3, 0), ivec2(-3, 0), ivec2(0, 3), ivec2(0, -3), ivec2(3, 1), ivec2(-3, 1), ivec2(3, -1), ivec2(-3, -1));
@@ -1208,6 +1291,7 @@ void main()
 	}
 	o_colour = vec4(c / 255.0 * a, a);
 	o_lit = vec4(u_night != 0 ? 1.0 : 0.0, 0.0, 0.0, a);
+	o_order = a >= 0.5 ? OrderColour(u_order) : vec4(0.0);
 }
 )";
 
@@ -2424,6 +2508,9 @@ bool StartCard(std::string &why, std::string &describe)
 		std::string clear_why;
 		_clear_program_ok = MakeProgram(_clear_program, STANDING_VERTEX, CLEAR_FRAGMENT, clear_why);
 		if (!_clear_program_ok) Diary("mazani kreslenim nejde: " + clear_why, true);
+		std::string copy_why;
+		_standing_copy_ok = _standing_program_ok && MakeProgram(_standing_copy_program, STANDING_VERTEX, COPY_FRAGMENT, copy_why);
+		if (_standing_program_ok && !_standing_copy_ok) Diary("vrstva aut nejde, auta s tim, co stoji: " + copy_why, true);
 	}
 	Step("preklad programu postav z oci (shader)");
 	const std::string eye_vertex = EyeMeshSource(MESH_VERTEX, false), eye_fragment = EyeMeshSource(MESH_FRAGMENT, true);
@@ -2464,6 +2551,17 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glEnableVertexAttribArray(0);
 	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
+	gl.glBindVertexArray(0);
+	/* The same corners with their order after them (ThreeDGpuStandingItem::order), for the pictures laid. */
+	gl.glGenVertexArrays(1, &_standing_order_vao);
+	gl.glBindVertexArray(_standing_order_vao);
+	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	gl.glEnableVertexAttribArray(0);
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glEnableVertexAttribArray(1);
+	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glEnableVertexAttribArray(2);
 	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_standing_faces_vao);
 	gl.glGenBuffers(1, &_standing_faces_vbo);
@@ -2585,7 +2683,7 @@ void EndCard()
 		if (_road_smooth_vao != 0) gl.glDeleteVertexArrays(1, &_road_smooth_vao);
 		if (_road_smooth_program.program != 0) gl.glDeleteProgram(_road_smooth_program.program);
 		for (ViewPictures &v : _views) {
-			for (GLuint *fbo : {&v.ground_fbo, &v.ground_tmp_fbo, &v.standing_fbo}) {
+			for (GLuint *fbo : {&v.ground_fbo, &v.ground_tmp_fbo, &v.standing_fbo, &v.moving_fbo}) {
 				if (*fbo != 0) gl.glDeleteFramebuffers(1, fbo);
 				*fbo = 0;
 			}
@@ -2595,6 +2693,8 @@ void EndCard()
 		if (_ground_program.program != 0) gl.glDeleteProgram(_ground_program.program);
 		if (_standing_vbo != 0) gl.glDeleteBuffers(1, &_standing_vbo);
 		if (_standing_vao != 0) gl.glDeleteVertexArrays(1, &_standing_vao);
+		if (_standing_order_vao != 0) gl.glDeleteVertexArrays(1, &_standing_order_vao);
+		if (_standing_copy_program.program != 0) gl.glDeleteProgram(_standing_copy_program.program);
 		if (_standing_tri_vbo != 0) gl.glDeleteBuffers(1, &_standing_tri_vbo);
 		if (_standing_tri_vao != 0) gl.glDeleteVertexArrays(1, &_standing_tri_vao);
 		if (_standing_program.program != 0) gl.glDeleteProgram(_standing_program.program);
@@ -3655,10 +3755,13 @@ bool ViewGroundOfSize(ViewPictures &v, int w, int h)
 		gl.glDeleteTextures(1, &v.standing);
 		gl.glDeleteTextures(1, &v.standing_lit);
 	}
+	if (v.standing_order != 0) gl.glDeleteTextures(1, &v.standing_order);
+	ForgetMovingPictures(v);
 	v.ground = NewGroundTexture(w, h);
 	v.ground_tmp = NewGroundTexture(w, h);
 	v.standing = NewGroundTexture(w, h);
 	v.standing_lit = NewGroundTexture(w, h);
+	v.standing_order = NewGroundTexture(w, h);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
 	bool complete = true;
@@ -3680,9 +3783,9 @@ bool ViewGroundOfSize(ViewPictures &v, int w, int h)
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, v.standing_fbo);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v.standing, 0);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, v.standing_lit, 0);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, v.standing_order, 0);
 	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, v.standing_depth);
-	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glDrawBuffers(2, colour_and_lit);
+	gl.glDrawBuffers(3, STANDING_DRAW_BUFFERS);
 	const bool standing_complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 	gl.glClearColor(0, 0, 0, 0);
 	gl.glClear(GL_COLOR_BUFFER_BIT);
@@ -3724,18 +3827,20 @@ void MoveViewGround(ViewPictures &v, int dx, int dy)
 	gl.glReadBuffer(GL_COLOR_ATTACHMENT0);
 	const int x0 = std::max(0, dx), y0 = std::max(0, dy), x1 = std::min(w, w + dx), y1 = std::min(h, h + dy);
 	if (x0 < x1 && y0 < y1) gl.glBlitFramebuffer(x0 - dx, y0 - dy, x1 - dx, y1 - dy, x0, y0, x1, y1, GL_COLOR_BUFFER_BIT, GL_NEAREST);
-	/* And what stands on it, its colours and which are lit, each through the same picture; nothing where nothing comes. */
+	/* And what stands on it, its colours, which are lit and its order, each through the same picture; nothing where
+	 * nothing comes. The moving things over it laid anew over all of it. */
+	v.moving_whole = true;
 	if (v.standing_name != 0) {
-		for (int k = 0; k < 2; k++) {
-			const GLenum attachment = k == 0 ? GL_COLOR_ATTACHMENT0 : GL_COLOR_ATTACHMENT1;
-			const GLenum only[2] = {k == 0 ? GL_COLOR_ATTACHMENT0 : GL_NONE, k == 0 ? GL_NONE : GL_COLOR_ATTACHMENT1};
+		for (int k = 0; k < 3; k++) {
+			const GLenum attachment = STANDING_DRAW_BUFFERS[k];
+			const GLenum only[3] = {k == 0 ? GL_COLOR_ATTACHMENT0 : GL_NONE, k == 1 ? GL_COLOR_ATTACHMENT1 : GL_NONE, k == 2 ? GL_COLOR_ATTACHMENT2 : GL_NONE};
 			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.standing_fbo);
 			gl.glReadBuffer(attachment);
 			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.ground_tmp_fbo);
 			gl.glDrawBuffers(1, colour_only);
 			gl.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 			gl.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.standing_fbo);
-			gl.glDrawBuffers(2, only);
+			gl.glDrawBuffers(3, only);
 			gl.glClearColor(0, 0, 0, 0);
 			gl.glClear(GL_COLOR_BUFFER_BIT);
 			gl.glBindFramebuffer(GL_READ_FRAMEBUFFER, v.ground_tmp_fbo);
@@ -4031,17 +4136,51 @@ static void ClearInScissor(GLbitfield mask, int x, int y, int w, int h, float de
 	gl.glUseProgram(static_cast<GLuint>(program));
 }
 
+/** The pictures of the moving things over what stands on a view (ThreeDGpuStanding::moving), of its size: made the first time, all of what stands copied into them then. */
+static bool MovingPicturesOfSize(ViewPictures &v)
+{
+	if (v.moving != 0) return true;
+	Step(fmt::format("vrstva aut pohledu {} na karte {}x{}", &v - _views.data(), v.w, v.h));
+	v.moving = NewGroundTexture(v.w, v.h);
+	v.moving_lit = NewGroundTexture(v.w, v.h);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	if (v.moving_fbo == 0) gl.glGenFramebuffers(1, &v.moving_fbo);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, v.moving_fbo);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, v.moving, 0);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, v.moving_lit, 0);
+	gl.glDrawBuffers(2, STANDING_DRAW_BUFFERS);
+	const bool complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	v.moving_whole = true;
+	v.moving_were.clear();
+	v.moving_stood_since.clear();
+	if (!complete) {
+		ForgetMovingPictures(v);
+		return false;
+	}
+	v.moving_name = v.moving;
+	v.moving_lit_name = v.moving_lit;
+	return true;
+}
+
 /**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
  * (ThreeDGpuStanding): the block cleared, each picture laid over those before it, far first; a building drawn through
- * a depth of its own (ThreeDGpuStandingBuilding), the figures on it in its depth. Not all laid (one bigger than the
- * card's textures, a texture it cannot hold, an error), the block left clear: the processor draws what stands on it.
+ * a depth of its own (ThreeDGpuStandingBuilding), the figures on it in its depth; the order of each laid with it. Not
+ * all laid (one bigger than the card's textures, a texture it cannot hold, an error), the block left clear: the
+ * processor draws what stands on it. Or the moving things of the view laid over what stands (ThreeDGpuStanding::moving).
  */
 bool DrawStandingOnCard(ThreeDGpuStanding &s)
 {
 	ViewPictures &pics = ViewPicturesOf(s.view);
 	if (!_standing_program_ok || !ViewGroundOfSize(pics, s.view_w, s.view_h) || pics.standing_name == 0) return false;
 	if (s.width <= 0 || s.height <= 0) return false;
+	if (s.moving && (!_standing_copy_ok || !MovingPicturesOfSize(pics))) return false;
+	if (s.moving && pics.moving_anew.exchange(false)) pics.moving_whole = true;
+	const auto moving_started = std::chrono::steady_clock::now();
+	/* Laid into: what stands (its colours, which are lit, its order), or the picture of the moving things over it. */
+	const GLuint target = s.moving ? pics.moving_fbo : pics.standing_fbo;
+	const GLsizei target_buffers = s.moving ? 2 : 3;
 	_card_clock++;
 	if (_standing_atlas == 0) {
 		_standing_atlas_size = std::min(4096, _max_texture);
@@ -4063,10 +4202,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (x1 > x0 && y1 > y0) clips.push_back({s.view_x + x0, s.view_y + y0, x1 - x0, y1 - y0});
 		}
 	}
-	Step(fmt::format("co stoji na plose {}x{} v {} kusech: {} obrazku, {} budov", s.width, s.height, clips.size(), s.items.size(), s.buildings.size()));
+	Step(fmt::format("{} na plose {}x{} v {} kusech: {} obrazku, {} budov", s.moving ? "vrstva aut" : "co stoji", s.width, s.height, clips.size(), s.items.size(), s.buildings.size()));
 	static const GLenum colour_and_lit[2] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1};
-	gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
-	gl.glDrawBuffers(2, colour_and_lit);
+	gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
+	gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
 	gl.glDisable(GL_DITHER);
 	gl.glDisable(GL_DEPTH_TEST);
 	gl.glDisable(GL_CULL_FACE);
@@ -4074,7 +4213,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glViewport(0, 0, s.view_w, s.view_h);
 	gl.glEnable(GL_SCISSOR_TEST);
 	gl.glClearColor(0, 0, 0, 0);
+	/* What stands cleared where it is laid (its order with it); the moving things' picture is copied into below. */
 	for (const std::array<int, 4> &c : clips) {
+		if (s.moving) break;
 		gl.glScissor(c[0], c[1], c[2], c[3]);
 		ClearInScissor(GL_COLOR_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
 	}
@@ -4116,6 +4257,56 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		}
 		reach[k] = r;
 		in_some[k] = std::ranges::any_of(clips, [&](const std::array<int, 4> &c) { return reaches(c, r); }) ? 1 : 0;
+		if (s.moving && item.picture == nullptr && item.vehicle == nullptr) in_some[k] = 0;
+	}
+	/* The moving things' picture: what stands copied into it where they were laid the frame before, where what stands
+	 * was laid since, and where they are now -- all of it when made anew or the view moved. */
+	std::vector<std::array<int, 4>> moved_to;
+	if (s.moving) {
+		std::vector<float> quads;
+		uint64_t copied = 0;
+		auto copy = [&](int x0, int y0, int x1, int y1) {
+			x0 = std::max(x0, 0);
+			y0 = std::max(y0, 0);
+			x1 = std::min(x1, pics.w);
+			y1 = std::min(y1, pics.h);
+			if (x1 <= x0 || y1 <= y0) return;
+			const float fx0 = static_cast<float>(x0), fy0 = static_cast<float>(y0), fx1 = static_cast<float>(x1), fy1 = static_cast<float>(y1);
+			quads.insert(quads.end(), {fx0, fy0, 0, 0, 0, fx1, fy0, 0, 0, 0, fx1, fy1, 0, 0, 0, fx0, fy0, 0, 0, 0, fx1, fy1, 0, 0, 0, fx0, fy1, 0, 0, 0});
+			copied += static_cast<uint64_t>(x1 - x0) * (y1 - y0);
+		};
+		for (size_t k = 0; k < s.items.size(); k++) {
+			if (in_some[k] != 0) moved_to.push_back({reach[k][0], reach[k][1], reach[k][2] - reach[k][0], reach[k][3] - reach[k][1]});
+		}
+		if (pics.moving_whole) {
+			copy(0, 0, pics.w, pics.h);
+		} else {
+			for (const auto *rects : {&pics.moving_were, &pics.moving_stood_since, &moved_to}) {
+				for (const std::array<int, 4> &r : *rects) copy(r[0], r[1], r[0] + r[2], r[1] + r[3]);
+			}
+		}
+		if (!quads.empty()) {
+			const GLuint cp = _standing_copy_program.program;
+			gl.glDisable(GL_SCISSOR_TEST);
+			gl.glUseProgram(cp);
+			gl.glUniform2f(gl.glGetUniformLocation(cp, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
+			gl.glUniform1i(gl.glGetUniformLocation(cp, "u_colour"), 0);
+			gl.glUniform1i(gl.glGetUniformLocation(cp, "u_lit"), 1);
+			gl.glActiveTexture(GL_TEXTURE1);
+			gl.glBindTexture(GL_TEXTURE_2D, pics.standing_lit);
+			gl.glActiveTexture(GL_TEXTURE0);
+			gl.glBindTexture(GL_TEXTURE_2D, pics.standing);
+			gl.glBindVertexArray(_standing_vao);
+			gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
+			gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(quads.size() * sizeof(float)), quads.data(), GL_STREAM_DRAW);
+			gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(quads.size() / 5));
+			gl.glActiveTexture(GL_TEXTURE1);
+			gl.glBindTexture(GL_TEXTURE_2D, 0);
+			gl.glActiveTexture(GL_TEXTURE0);
+			gl.glBindTexture(GL_TEXTURE_2D, 0);
+			gl.glEnable(GL_SCISSOR_TEST);
+		}
+		_gpu_moving_copied += copied;
 	}
 	gl.glEnable(GL_BLEND);
 	gl.glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
@@ -4128,8 +4319,13 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUseProgram(p);
 		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
+		/* The moving things laid only where they come later than what stands there (its order). */
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_moving"), s.moving ? 1 : 0);
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_orders"), 1);
+		gl.glActiveTexture(GL_TEXTURE1);
+		gl.glBindTexture(GL_TEXTURE_2D, s.moving ? pics.standing_order : 0);
 		gl.glActiveTexture(GL_TEXTURE0);
-		gl.glBindVertexArray(_standing_vao);
+		gl.glBindVertexArray(_standing_order_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
 	};
 	use_pictures();
@@ -4153,7 +4349,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		}
 		gl.glBindTexture(GL_TEXTURE_2D, drawing);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 5));
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 6));
 		corners.clear();
 	};
 	/* A building: its depth cleared over its rectangle, its triangles by texture and side, at night its lit glass. */
@@ -4163,7 +4359,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	std::vector<GLint> firsts;
 	std::vector<GLsizei> counts;
 	int building_failed = 0; ///< why the last building could not be laid: 1 its shape, 2 a texture of it
-	auto draw_building = [&](const ThreeDGpuStandingBuilding &b) {
+	auto draw_building = [&](const ThreeDGpuStandingBuilding &b, uint32_t order) {
 		const GpuBuilding *on = MapBuildingOnCard(b.building);
 		if (on == nullptr) {
 			building_failed = 1;
@@ -4234,6 +4430,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform1i(bp.tex, 0);
 		const GLint night_at = gl.glGetUniformLocation(bp.program, "u_night");
 		gl.glUniform1i(night_at, 0);
+		gl.glUniform1f(gl.glGetUniformLocation(bp.program, "u_order"), static_cast<float>(order));
 		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
 		gl.glEnable(GL_DEPTH_TEST);
 		gl.glBindVertexArray(on->vao);
@@ -4355,8 +4552,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glDisable(GL_SCISSOR_TEST);
 		for (const Placed &p : placed) DrawPictureAt(s.items[p.item].vehicle->pic, p.draws, vehicle_at[p.item][0], vehicle_at[p.item][1]);
 		/* Back to what stands on the view, as it was. */
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
-		gl.glDrawBuffers(2, colour_and_lit);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
+		gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
 		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
@@ -4407,8 +4604,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		/* Back to what stands on the view, as it was. */
-		gl.glBindFramebuffer(GL_FRAMEBUFFER, pics.standing_fbo);
-		gl.glDrawBuffers(2, colour_and_lit);
+		gl.glBindFramebuffer(GL_FRAMEBUFFER, target);
+		gl.glDrawBuffers(target_buffers, STANDING_DRAW_BUFFERS);
 		gl.glViewport(0, 0, s.view_w, s.view_h);
 		gl.glEnable(GL_SCISSOR_TEST);
 		gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
@@ -4420,7 +4617,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	};
 	/* A box: its texture among the pictures (kept by its key), its faces' triangles over what is there. */
 	std::vector<float> face_corners;
-	auto draw_faces = [&](const ThreeDGpuStandingFaces &f) {
+	auto draw_faces = [&](const ThreeDGpuStandingFaces &f, uint32_t order) {
 		if (f.texture == nullptr || f.corners.empty()) return true;
 		ThreeDGpuStandingItem as_picture;
 		as_picture.picture = f.texture;
@@ -4434,6 +4631,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_texture"), 0);
 		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_bounds"), static_cast<float>(place[0]), static_cast<float>(place[1]), static_cast<float>(f.texture->width), static_cast<float>(f.texture->height));
 		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_fill"), f.fill ? 1 : 0);
+		gl.glUniform1f(gl.glGetUniformLocation(fp, "u_order"), static_cast<float>(order));
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, texture);
 		gl.glDisable(GL_DEPTH_TEST);
@@ -4459,7 +4657,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (in_some[k] == 0 || !reaches(clip, reach[k])) continue;
 			if (item.faces >= 0) {
 				flush();
-				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces])) {
+				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces], item.order)) {
 					_gpu_standing_failed[0]++;
 					if (_gpu_standing_failed_told < 40) {
 						_gpu_standing_failed_told++;
@@ -4493,7 +4691,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					if (!shrunk) continue;
 				}
 				/* Among the triangles of the building before it (a figure on it) where it is nearer, as a picture is. */
-				const bool depth = item.depth >= 0;
+				const bool depth = !s.moving && item.depth >= 0;
 				if (_standing_atlas != drawing || depth != in_depth) {
 					flush();
 					drawing = _standing_atlas;
@@ -4503,13 +4701,14 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				const float times = static_cast<float>(1 << std::clamp(item.up, 0, 3));
 				const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w * times, y1 = y0 + h * times;
 				const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-				const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
-				corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
+				const float z = depth ? std::min(1.0f, item.depth) : 0.0f, o = static_cast<float>(item.order);
+				corners.insert(corners.end(), {x0, y0, z, u0, v0, o, x1, y0, z, u1, v0, o, x1, y1, z, u1, v1, o, x0, y0, z, u0, v0, o, x1, y1, z, u1, v1, o, x0, y1, z, u0, v1, o});
+				if (s.moving) _gpu_moving_things++;
 				continue;
 			}
 			if (item.building >= 0) {
 				flush();
-				if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building])) {
+				if (static_cast<size_t>(item.building) >= s.buildings.size() || !draw_building(s.buildings[item.building], item.order)) {
 					_gpu_standing_failed[building_failed == 2 ? 2 : 1]++;
 					all = false;
 					break;
@@ -4527,10 +4726,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					_gpu_standing_failed_told++;
 					Diary(fmt::format("obrazek plochy procesorem: {}x{}, pixelu {}, atlas {}", item.picture->width, item.picture->height, item.picture->pixels.size(), _standing_atlas_size), true);
 				}
+				/* A moving thing the card cannot lay is left out, the others laid. */
+				if (s.moving) continue;
 				all = false;
 				break;
 			}
-			const bool depth = item.depth >= 0;
+			const bool depth = !s.moving && item.depth >= 0;
 			if (texture != drawing || depth != in_depth) {
 				flush();
 				drawing = texture;
@@ -4539,14 +4740,18 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			const float w = static_cast<float>(item.picture->width), h = static_cast<float>(item.picture->height);
 			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
 			const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-			const float z = depth ? std::min(1.0f, item.depth) : 0.0f;
-			corners.insert(corners.end(), {x0, y0, z, u0, v0, x1, y0, z, u1, v0, x1, y1, z, u1, v1, x0, y0, z, u0, v0, x1, y1, z, u1, v1, x0, y1, z, u0, v1});
+			const float z = depth ? std::min(1.0f, item.depth) : 0.0f, o = static_cast<float>(item.order);
+			corners.insert(corners.end(), {x0, y0, z, u0, v0, o, x1, y0, z, u1, v0, o, x1, y1, z, u1, v1, o, x0, y0, z, u0, v0, o, x1, y1, z, u1, v1, o, x0, y1, z, u0, v1, o});
+			if (s.moving) _gpu_moving_things++;
 		}
 		flush();
 		if (!all) break;
 	}
 	flush();
 	gl.glBindVertexArray(0);
+	gl.glActiveTexture(GL_TEXTURE1);
+	gl.glBindTexture(GL_TEXTURE_2D, 0);
+	gl.glActiveTexture(GL_TEXTURE0);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
 	gl.glDisable(GL_BLEND);
 	gl.glDisable(GL_DEPTH_TEST);
@@ -4557,6 +4762,21 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		}
 	}
 	gl.glDisable(GL_SCISSOR_TEST);
+	if (s.moving) {
+		/* Where they are now, copied over the next time; what stands laid since, all in it now. */
+		pics.moving_were = std::move(moved_to);
+		pics.moving_stood_since.clear();
+		pics.moving_whole = false;
+		_gpu_moving_passes++;
+		_gpu_moving_ms = _gpu_moving_ms + std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - moving_started).count();
+	} else if (pics.moving != 0) {
+		/* What stands laid here: copied under the moving things the next time they are laid; too many, all of it. */
+		for (const std::array<int, 4> &c : clips) pics.moving_stood_since.push_back(c);
+		if (pics.moving_stood_since.size() > 512) {
+			pics.moving_stood_since.clear();
+			pics.moving_whole = true;
+		}
+	}
 	/* At night which of its pixels are lit, for the glows by them. */
 	if (s.read_lit && all) {
 		Step(fmt::format("svitici body plochy zpet (glReadPixels), {}x{}", s.width, s.height));
@@ -6067,8 +6287,36 @@ uint32_t ThreeDGpuViewGround(int view, uint64_t *made)
 uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit)
 {
 	const ViewPictures &v = ViewPicturesOf(view);
+	/* With the moving things over it, once they were laid (ThreeDGpuMovingLayer()). */
+	if (v.moving_on && v.moving_name != 0 && v.moving_lit_name != 0) {
+		if (lit != nullptr) *lit = v.moving_lit_name;
+		return v.moving_name;
+	}
 	if (lit != nullptr) *lit = v.standing_lit_name;
 	return v.standing_name;
+}
+
+/**
+ * Whether what stands on a view is shown with its moving things laid over it each frame (ThreeDGpuStanding::moving):
+ * then what stands is laid without them, and the picture of them over it shown once they were laid; else as before,
+ * what stands with them.
+ * @param view the view (ThreeDGpuGround::view)
+ * @param on the moving layer on
+ */
+void ThreeDGpuMovingLayer(int view, bool on)
+{
+	ViewPictures &v = ViewPicturesOf(view);
+	if (on && !v.moving_on) v.moving_anew = true;
+	v.moving_on = on;
+}
+
+/** For the diary: the moving things laid over the views since the last time (ThreeDGpuStanding::moving), counted anew. */
+std::string ThreeDGpuMovingTimes()
+{
+	const uint64_t passes = _gpu_moving_passes.exchange(0), things = _gpu_moving_things.exchange(0), copied = _gpu_moving_copied.exchange(0);
+	const double ms = _gpu_moving_ms.exchange(0);
+	if (passes == 0) return "-";
+	return fmt::format("{}x, veci {}, kopie {:.1f} Mpx, karta {:.0f} ms", passes, things, copied / 1e6, ms);
 }
 
 /**
@@ -6162,6 +6410,8 @@ void *ThreeDGpuOwnContext() { return nullptr; }
 bool ThreeDGpuShows() { return false; }
 uint32_t ThreeDGpuViewGround(int, uint64_t *made) { if (made != nullptr) *made = 0; return 0; }
 uint32_t ThreeDGpuViewStanding(int, uint32_t *lit) { if (lit != nullptr) *lit = 0; return 0; }
+void ThreeDGpuMovingLayer(int, bool) {}
+std::string ThreeDGpuMovingTimes() { return "-"; }
 void ThreeDGpuForgetView(int, uint64_t) {}
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &) { return false; }
 void ThreeDGpuViewPicturesWait(void (*)(void *)) {}

@@ -148,7 +148,7 @@ void MarkStandingDirty(const ThreeDVehicleObject *o, double x, double y, int z, 
 		reach = std::hypot(rx, ry) * WalkerScale() * OBJECT_UNITS_PER_METRE + 2;
 		if (lit) reach = std::max(reach, 2.0 * TILE_SIZE);
 	}
-	MarkWorldBoxDirty(x - reach, y - reach, x + reach, y + reach, z - TILE_HEIGHT, z + DrawnTall(o) + TILE_HEIGHT);
+	MarkWorldBoxDirty(x - reach, y - reach, x + reach, y + reach, z - TILE_HEIGHT, z + DrawnTall(o) + TILE_HEIGHT, true);
 }
 
 /** World units a round of the frames walks. */

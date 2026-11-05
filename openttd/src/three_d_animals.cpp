@@ -387,6 +387,7 @@ void MarkDirty(const Beast &b, const ThreeDAnimal &a)
 	const int up = static_cast<int>(tall_m * OBJECT_HEIGHT_PER_METRE * ZOOM_BASE) + r;
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
+	place.mover = true;
 	const double reach = len_m * OBJECT_UNITS_PER_METRE + TILE_SIZE / 2.0;
 	place.x0 = b.x - reach;
 	place.x1 = b.x + reach;

@@ -469,6 +469,7 @@ void MarkDirty(const Pose &p)
 	const double mid = MiddleZ(p, s);
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
+	place.mover = true;
 	place.x0 = p.x - reach;
 	place.x1 = p.x + reach;
 	place.y0 = p.y - reach;

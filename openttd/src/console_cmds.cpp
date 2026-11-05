@@ -10481,6 +10481,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_turned_card_band_on = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici okraj {}", _turned_card_band_on ? "ano" : "ne");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "vrstva") {
+		/* 'stojici vrstva 0|1': the things that move on the turned main view laid by the card over what stands each
+		 * frame, what stands without them (1; the moving layer, TurnedCardLayMovers()), or with what stands (0). */
+		extern bool _turned_moving_layer_on;
+		_turned_moving_layer_on = number(3).value_or(1) != 0;
+		IConsolePrint(CC_DEFAULT, "test3d: stojici vrstva {}", _turned_moving_layer_on ? "ano" : "ne");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "naraz") {
 		/* 'stojici naraz 0|1': what changed on the turned main view (the cars that moved) laid by the card at once before
 		 * the dirty blocks are drawn (1; TurnedCardLayDirty()), or each block laid on its own (0). */

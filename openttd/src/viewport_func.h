@@ -122,7 +122,7 @@ inline void MarkTileDirtyByTile(TileIndex tile, int bridge_level_offset = 0)
 }
 
 void MarkTileDirtyBetween(TileIndex tile, int z0, int z1, int reach = 0);
-void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1);
+void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z1, bool mover = false);
 
 Point GetViewportStationMiddle(const Viewport &vp, const Station *st);
 
@@ -159,5 +159,7 @@ inline void SetViewportCatchmentSpecializedStation(const Waypoint *st, bool sel)
 }
 
 void TurnedCardLayDirty(int left, int top, int right, int bottom);
+void TurnedMovingLayerUpdate();
+void TurnedCardLayMovers();
 
 #endif /* VIEWPORT_FUNC_H */

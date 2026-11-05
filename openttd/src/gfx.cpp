@@ -1469,6 +1469,8 @@ uint64_t _dirty_blocks_pass = 0;
 void DrawDirtyBlocks()
 {
 	_dirty_blocks_pass++;
+	/* The moving things of the turned main view laid apart from what stands, or not (TurnedMovingLayerUpdate()). */
+	TurnedMovingLayerUpdate();
 	/* What changed on the turned main view laid by the card at once: each of its dirty blocks only a hole then. */
 	if (_invalid_rect.left < _invalid_rect.right && _invalid_rect.top < _invalid_rect.bottom) {
 		TurnedCardLayDirty(_invalid_rect.left, _invalid_rect.top, _invalid_rect.right, _invalid_rect.bottom);
@@ -1515,6 +1517,9 @@ void DrawDirtyBlocks()
 			}
 		}
 	}
+
+	/* The moving things laid over what stands, as they are now (TurnedCardLayMovers()). */
+	TurnedCardLayMovers();
 
 	++_dirty_block_colour;
 	_invalid_rect.left = _screen.width;

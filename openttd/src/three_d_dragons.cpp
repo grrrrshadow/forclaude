@@ -168,6 +168,7 @@ void MarkDirty(const Dragon &d)
 	/* Turned (three_d.h): the box it flies in, down to the ground for its shadow. */
 	DirtyPlace place;
 	place.kind = DirtyPlace::Kind::Box;
+	place.mover = true;
 	const double reach = length_m * OBJECT_UNITS_PER_METRE + TILE_SIZE;
 	place.x0 = d.x - reach;
 	place.x1 = d.x + reach;

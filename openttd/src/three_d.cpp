@@ -210,6 +210,18 @@ DirtyPlaceScope::~DirtyPlaceScope()
 	_dirty_place = this->was;
 }
 
+/** Whether what the game marks dirty now is a thing that moves and nothing about it (DirtyPlace::mover). */
+bool DirtyPlaceIsMover()
+{
+	return _dirty_place.mover;
+}
+
+/** Whether what the game marks dirty now is only what the processor draws over the card's picture (DirtyPlace::screen_only). */
+bool DirtyPlaceIsScreenOnly()
+{
+	return _dirty_place.screen_only;
+}
+
 /**
  * Where a rectangle of the view facing north lands in the turned view: the
  * game marks what to repaint in the coordinates of the view facing north
