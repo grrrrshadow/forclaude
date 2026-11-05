@@ -26,6 +26,7 @@
 
 #include "stdafx.h"
 #include "three_d_shape.h"
+#include "gfx_func.h"
 #include "spritecache.h"
 #include "three_d_objects.h"
 #include "tile_type.h"
@@ -551,6 +552,370 @@ void FindShape(ThreeDSpriteShape &shape, const Target &t, int narrow_x0, int nar
 	shape.ok = fit > shape.box_fit && kept >= std::min(box_kept, KEPT_AT_LEAST);
 }
 
+/*
+ * The walls a building's sprite never shows (facing -X and -Y; the plan's point 3). The game draws them from a wall the
+ * sprite shows: where that wall repeats a pattern -- a window and the wall beside it -- one repeat, the one most like
+ * the others, laid along the hidden wall as many times as fit; a door or a shop's sign is on the front only. The
+ * pattern is read on the sprite's own pixels, in world units, the same at every zoom.
+ */
+
+/** How far apart the columns of a wall are looked at, units along it (half a pixel of the normal zoom). */
+constexpr double WALL_STEP = 0.25;
+
+/** How far apart the rows, units of height (half a pixel). */
+constexpr double WALL_ROW = 0.5;
+
+/** The rows from this height up only: below, the sprite's bottom edge steps with the ground (BUILDING_WALL_BAND, viewport.cpp). */
+constexpr double WALL_FROM = 1.5;
+
+/** The shortest repeat looked for: one unit, two pixels. */
+constexpr int SHORTEST_REPEAT = 4;
+
+/**
+ * The shortest piece laid on a hidden wall: two units, four pixels, as many repeats as make it up. A shorter piece holds
+ * no window and the wall beside it: the floors' bands match at any shift, a repeat of one unit is found on them, and
+ * the hidden wall came out as stripes.
+ */
+constexpr int SHORTEST_PIECE = 8;
+
+/**
+ * A repeat is the wall's pattern when its columns differ from those one repeat on by at most this share of what any two
+ * of the wall's pixels differ by (the 8bpp walls' dithering keeps windows that match well above nothing).
+ */
+constexpr double REPEATS = 0.6;
+
+/** A wall whose pixels differ this little (the squares of red, green and blue together, on average) is plain: any piece of it repeats. */
+constexpr double PLAIN_WALL = 200.0;
+
+/** A sprite's pixels as they are, the finest level its file has: the patterns of its walls are read on them. */
+struct Picture {
+	int x0 = 0, y0 = 0;        ///< screen units (ZoomLevel::Min) of its top left corner from the screen point of the boxes' origin
+	int scale = 1;             ///< screen units per pixel
+	int w = 0, h = 0;
+	std::vector<uint32_t> px;  ///< alpha << 24 | red << 16 | green << 8 | blue
+};
+
+/** Read a sprite's pixels, the finest level its file has (8bpp in the colours of the palette). */
+bool ReadPicture(SpriteID image, int origin_x, int origin_y, Picture &p)
+{
+	SpriteLoader::SpriteCollection collection;
+	bool is_32bpp;
+	const ZoomLevels levels = ReadRawSprite(image, collection, is_32bpp);
+	ZoomLevel use = ZoomLevel::End;
+	for (ZoomLevel z : levels) {
+		if (use == ZoomLevel::End || z < use) use = z;
+	}
+	if (use == ZoomLevel::End) return false;
+	const SpriteLoader::Sprite &s = collection[use];
+	if (s.width == 0 || s.height == 0 || s.data == nullptr) return false;
+	p.scale = 1 << to_underlying(use);
+	p.x0 = origin_x + s.x_offs * p.scale;
+	p.y0 = origin_y + s.y_offs * p.scale;
+	p.w = s.width;
+	p.h = s.height;
+	p.px.assign(static_cast<size_t>(p.w) * p.h, 0);
+	for (size_t i = 0; i < p.px.size(); i++) {
+		const SpriteLoader::CommonPixel &c = s.data[i];
+		uint32_t a, r, g, b;
+		if (is_32bpp) {
+			a = c.a;
+			if (c.m != 0) {
+				const Colour &pal = _cur_palette.palette[c.m];
+				r = pal.r;
+				g = pal.g;
+				b = pal.b;
+			} else {
+				r = c.r;
+				g = c.g;
+				b = c.b;
+			}
+		} else {
+			if (c.m == 0) continue;
+			const Colour &pal = _cur_palette.palette[c.m];
+			a = 255;
+			r = pal.r;
+			g = pal.g;
+			b = pal.b;
+		}
+		p.px[i] = a << 24 | r << 16 | g << 8 | b;
+	}
+	return true;
+}
+
+/** The pixel of the sprite the game draws a world point of the boxes' frame at; 0 outside the sprite. */
+inline uint32_t PixelAt(const Picture &p, double x, double y, double z)
+{
+	const double sx = (y - x) * 2 * ZOOM_BASE, sy = (x + y - z) * ZOOM_BASE;
+	const int i = static_cast<int>(std::floor((sx - p.x0) / p.scale)), j = static_cast<int>(std::floor((sy - p.y0) / p.scale));
+	if (i < 0 || j < 0 || i >= p.w || j >= p.h) return 0;
+	return p.px[static_cast<size_t>(j) * p.w + i];
+}
+
+/** How far apart two colours are: the squares of the differences of red, green and blue together. */
+inline int ColourDiff(uint32_t a, uint32_t b)
+{
+	const int dr = static_cast<int>((a >> 16) & 0xFF) - static_cast<int>((b >> 16) & 0xFF);
+	const int dg = static_cast<int>((a >> 8) & 0xFF) - static_cast<int>((b >> 8) & 0xFF);
+	const int db = static_cast<int>(a & 0xFF) - static_cast<int>(b & 0xFF);
+	return dr * dr + dg * dg + db * db;
+}
+
+/** How high a part's roof is over a point of its footprint, above its walls (as AddBoxFaces() draws it, MARGIN outside its numbers). */
+double RoofOver(const ThreeDPart &p, double x, double y)
+{
+	const double x0 = p.x0 - MARGIN, x1 = p.x1 + MARGIN, y0 = p.y0 - MARGIN, y1 = p.y1 + MARGIN;
+	const double hx = (x1 - x0) / 2, hy = (y1 - y0) / 2, dx = hx - std::abs(x - (x0 + x1) / 2), dy = hy - std::abs(y - (y0 + y1) / 2);
+	double share = 0;
+	switch (p.roof) {
+		case ThreeDRoof::Flat: return 0;
+		case ThreeDRoof::GableX: share = dy / hy; break;
+		case ThreeDRoof::GableY: share = dx / hx; break;
+		case ThreeDRoof::Hip: share = std::min(dx, dy) / std::min(hx, hy); break;
+	}
+	return p.rise * std::clamp(share, 0.0, 1.0);
+}
+
+/**
+ * Whether another part stands in front of a point of a part's wall in the game's view: the line from the point to the
+ * eye ((1, 1, 2) in the world: the game's view moves no pixel along it) passes through it.
+ */
+bool HiddenByOther(std::span<const ThreeDPart> parts, size_t idx, double x, double y, double z)
+{
+	for (size_t j = 0; j < parts.size(); j++) {
+		if (j == idx) continue;
+		const ThreeDPart &p = parts[j];
+		const double x0 = p.x0 - MARGIN, x1 = p.x1 + MARGIN, y0 = p.y0 - MARGIN, y1 = p.y1 + MARGIN, h = p.h + 2 * MARGIN;
+		/* Where the line is over the part's footprint and below its top. */
+		const double t0 = std::max({0.0, x0 - x, y0 - y, -z / 2}), t1 = std::min({x1 - x, y1 - y, (h + p.rise - z) / 2});
+		if (t0 > t1) continue;
+		if (p.rise <= 0 || z + 2 * t0 <= h) return true;
+		for (double t = t0; t <= t1; t += WALL_STEP / 2) {
+			if (z + 2 * t <= h + RoofOver(p, x + t, y + t)) return true;
+		}
+	}
+	return false;
+}
+
+/** What a wall the sprite shows looks like (LookAtWall()). */
+struct WallLook {
+	bool seen = false;     ///< whether the sprite shows enough of it
+	bool periodic = false; ///< whether it repeats a pattern
+	double start = 0;      ///< the piece to lay on a hidden wall: one repeat, else all of it the sprite shows (units along it)
+	double length = 0;
+	double whole = 0;      ///< the share of it the sprite shows
+	double ratio = 1;      ///< how the repeat found differs, of how any two of its pixels do (the rig)
+	int tried = 0;         ///< the repeat looked at last, columns (the rig)
+};
+
+/**
+ * Read a wall of a part the sprite shows (axis 0 the wall facing +X, 1 facing +Y): its columns, the longest run of them
+ * the sprite shows, the repeat of its pattern and the repeat most like the others.
+ */
+WallLook LookAtWall(const Picture &pic, std::span<const ThreeDPart> parts, size_t idx, int axis, bool cut, double cx0, double cx1, double cy0, double cy1)
+{
+	WallLook look;
+	const ThreeDPart &p = parts[idx];
+	const double x1 = p.x1 + MARGIN, y1 = p.y1 + MARGIN, h = p.h + 2 * MARGIN;
+	const double c0 = axis == 0 ? p.y0 - MARGIN : p.x0 - MARGIN, c1 = axis == 0 ? y1 : x1;
+	const int cols = static_cast<int>((c1 - c0) / WALL_STEP), rows = static_cast<int>((h - WALL_FROM) / WALL_ROW);
+	if (cols < SHORTEST_REPEAT || rows < 2) return look;
+	/* A house of several tiles: this tile's sprite shows only what is on this tile. */
+	const double lo = !cut ? -1e9 : (axis == 0 ? cy0 : cx0), hi = !cut ? 1e9 : (axis == 0 ? cy1 : cx1);
+	if (cut && (axis == 0 ? (x1 < cx0 || x1 > cx1) : (y1 < cy0 || y1 > cy1))) return look;
+
+	/* The pixels of its columns, 0 where the sprite does not show it (empty, or another part in front). */
+	std::vector<uint32_t> s(static_cast<size_t>(cols) * rows, 0);
+	std::vector<uint8_t> shown(cols, 0);
+	int shown_cols = 0;
+	for (int k = 0; k < cols; k++) {
+		const double c = c0 + (k + 0.5) * WALL_STEP;
+		if (c < lo || c > hi) continue;
+		const double x = axis == 0 ? x1 : c, y = axis == 0 ? c : y1;
+		int valid = 0;
+		for (int j = 0; j < rows; j++) {
+			const double z = WALL_FROM + (j + 0.5) * WALL_ROW;
+			const uint32_t v = PixelAt(pic, x, y, z);
+			if ((v >> 24) < 128 || HiddenByOther(parts, idx, x, y, z)) continue;
+			s[static_cast<size_t>(k) * rows + j] = v | 0xFF000000u;
+			valid++;
+		}
+		if (valid * 10 >= rows * 6) {
+			shown[k] = 1;
+			shown_cols++;
+		}
+	}
+	look.whole = static_cast<double>(shown_cols) / cols;
+
+	/* The longest run of columns it shows. */
+	int k0 = 0, k1 = 0;
+	for (int k = 0; k < cols;) {
+		if (!shown[k]) {
+			k++;
+			continue;
+		}
+		int e = k;
+		while (e < cols && shown[e]) e++;
+		if (e - k > k1 - k0) {
+			k0 = k;
+			k1 = e;
+		}
+		k = e;
+	}
+	const int n = k1 - k0;
+	if (n < SHORTEST_REPEAT) return look;
+	look.seen = true;
+	look.start = c0 + k0 * WALL_STEP;
+	look.length = n * WALL_STEP;
+
+	/* How much columns a and b on differ, len of them: the mean over the pixels both show; -1 where none. */
+	auto differ = [&](int a, int b, int len) {
+		double sum = 0;
+		int count = 0;
+		for (int i = 0; i < len; i++) {
+			const uint32_t *ca = &s[static_cast<size_t>(a + i) * rows], *cb = &s[static_cast<size_t>(b + i) * rows];
+			for (int j = 0; j < rows; j++) {
+				if (ca[j] == 0 || cb[j] == 0) continue;
+				sum += ColourDiff(ca[j], cb[j]);
+				count++;
+			}
+		}
+		return count > 0 ? sum / count : -1.0;
+	};
+
+	/* What any two of its pixels differ by: twice the variance of red, green and blue together. */
+	double mean[3] = {0, 0, 0}, sq[3] = {0, 0, 0};
+	int count = 0;
+	for (int k = k0; k < k1; k++) {
+		for (int j = 0; j < rows; j++) {
+			const uint32_t v = s[static_cast<size_t>(k) * rows + j];
+			if (v == 0) continue;
+			for (int ch = 0; ch < 3; ch++) {
+				const double c = (v >> (16 - 8 * ch)) & 0xFF;
+				mean[ch] += c;
+				sq[ch] += c * c;
+			}
+			count++;
+		}
+	}
+	if (count == 0) return look;
+	double any = 0;
+	for (int ch = 0; ch < 3; ch++) {
+		const double m = mean[ch] / count;
+		any += 2 * std::max(0.0, sq[ch] / count - m * m);
+	}
+
+	/* The repeat: the shift its columns differ least by from the columns that far on; of that, a half, a third ... where
+	 * that differs hardly more (two repeats of the windows match as well as one); as many of it as make SHORTEST_PIECE. */
+	int repeat = 0;
+	if (any < PLAIN_WALL) {
+		repeat = std::min(n, SHORTEST_PIECE);
+		look.ratio = 0;
+	} else if (n >= 2 * SHORTEST_REPEAT) {
+		std::vector<double> d(n / 2 + 2, -1.0);
+		int best = 0;
+		for (int lag = SHORTEST_REPEAT; lag <= n / 2; lag++) {
+			d[lag] = differ(k0, k0 + lag, n - lag);
+			if (d[lag] >= 0 && (best == 0 || d[lag] < d[best])) best = lag;
+		}
+		if (best != 0) {
+			for (int div = best / SHORTEST_REPEAT; div >= 2; div--) {
+				const int around = static_cast<int>(std::lround(static_cast<double>(best) / div));
+				int fit = 0;
+				for (int lag = std::max(SHORTEST_REPEAT, around - 1); lag <= std::min(n / 2, around + 1); lag++) {
+					if (d[lag] >= 0 && (fit == 0 || d[lag] < d[fit])) fit = lag;
+				}
+				if (fit != 0 && d[fit] <= d[best] * 1.08 + 0.005 * any) {
+					best = fit;
+					break;
+				}
+			}
+			look.ratio = d[best] / any;
+			look.tried = best;
+			if (look.ratio <= REPEATS) {
+				repeat = best;
+				while (repeat < SHORTEST_PIECE && repeat + best <= n) repeat += best;
+			}
+		}
+	}
+	if (repeat == 0) return look;
+
+	/* The repeat most like the others: a door or a sign differs from the windows beside it. */
+	int best = -1;
+	double best_cost = 1e30;
+	const double middle = (k0 + k1 - repeat) / 2.0;
+	for (int a = k0; a + repeat <= k1; a++) {
+		double sum = 0;
+		int compared = 0;
+		for (int r = -3; r <= 3; r++) {
+			const int b = a + r * repeat;
+			if (r == 0 || b < k0 || b + repeat > k1) continue;
+			const double v = differ(a, b, repeat);
+			if (v < 0) continue;
+			sum += v;
+			compared++;
+		}
+		if (compared == 0) continue;
+		/* Of two alike, the one nearer the middle (away from the corners). */
+		const double cost = sum / compared + 1e-3 * std::abs(a - middle);
+		if (cost < best_cost) {
+			best_cost = cost;
+			best = a;
+		}
+	}
+	if (best < 0) return look;
+	look.periodic = true;
+	look.start = c0 + best * WALL_STEP;
+	look.length = repeat * WALL_STEP;
+	return look;
+}
+
+/** Read the walls of a building's boxes its sprite shows, and choose where each hidden wall takes its pixels from (the thread in the background). */
+void FindWallPatterns(ThreeDWallPatterns &w, const Picture &pic, std::span<const ThreeDPart> parts, bool cut, double cx0, double cx1, double cy0, double cy1)
+{
+	w.back.assign(parts.size(), {});
+	for (size_t i = 0; i < parts.size(); i++) {
+		const WallLook look[2] = {
+			LookAtWall(pic, parts, i, 0, cut, cx0, cx1, cy0, cy1),
+			LookAtWall(pic, parts, i, 1, cut, cx0, cx1, cy0, cy1),
+		};
+		for (int axis = 0; axis < 2; axis++) {
+			const WallLook &l = look[axis];
+			if (!l.seen) {
+				w.said += fmt::format(" dil {} stena {}: neni videt ({:.0f} %);", i, axis == 0 ? "+X" : "+Y", l.whole * 100);
+			} else if (l.periodic) {
+				w.said += fmt::format(" dil {} stena {}: vzor {:.2f} od {:.2f} (lisi se {:.0f} %, videt {:.0f} %);", i, axis == 0 ? "+X" : "+Y", l.length, l.start, l.ratio * 100, l.whole * 100);
+			} else {
+				w.said += fmt::format(" dil {} stena {}: bez vzoru (nejblizsi {:.2f} lisi se {:.0f} %), cela {:.2f} od {:.2f} (videt {:.0f} %);", i, axis == 0 ? "+X" : "+Y", l.tried * WALL_STEP, l.ratio * 100, l.length, l.start, l.whole * 100);
+			}
+		}
+		/* Each hidden wall: from its opposite where that repeats, else from the other where that does, else from all of
+		 * the opposite the sprite shows, else of the other. */
+		for (int back = 0; back < 2; back++) {
+			const WallLook &opposite = look[back], &other = look[1 - back];
+			int from = -1;
+			if (opposite.periodic) {
+				from = back;
+			} else if (other.periodic) {
+				from = 1 - back;
+			} else if (opposite.seen) {
+				from = back;
+			} else if (other.seen) {
+				from = 1 - back;
+			}
+			ThreeDWallSource &src = w.back[i][back];
+			src.mirror = opposite.whole >= 0.9;
+			if (from < 0) continue;
+			src.axis = static_cast<int8_t>(from);
+			src.periodic = look[from].periodic;
+			src.start = static_cast<float>(look[from].start);
+			src.length = static_cast<float>(look[from].length);
+		}
+	}
+}
+
+/** The kept wall patterns, by what they were read from (GetThreeDWallPatterns()). */
+std::unordered_map<uint64_t, std::shared_ptr<ThreeDWallPatterns>> _wall_patterns;
+
 const char *RoofName(ThreeDRoof r)
 {
 	switch (r) {
@@ -620,11 +985,94 @@ float ThreeDSpriteShapeFit(SpriteID image, int origin_x, int origin_y, std::span
 	return static_cast<float>(Score(t, parts, dx, dy, dz));
 }
 
-/** Forget the kept shapes: the sprites are read anew (GfxClearSpriteCache(), GfxInitSpriteMem()), or the rig asks. */
+/**
+ * Where the walls a building's sprite never shows (facing -X and -Y) take their pixels from, read the first time and
+ * kept: the sprite's pixels here (the sprite loader is the main thread's), the walls in the background.
+ * @param image the sprite
+ * @param origin_x,origin_y where the sprite hangs (its x, y before the offsets), screen units from the screen point of the boxes' origin
+ * @param parts the boxes, in their frame (world units, heights up from its ground)
+ * @param cut whether the boxes are cut to the rectangle cx0..cx1, cy0..cy1 (one tile of a house of several: the sprite shows that tile only)
+ * @return the walls; used only once read (ThreeDWallPatterns::ready), mirrored as before meanwhile
+ */
+const ThreeDWallPatterns *GetThreeDWallPatterns(SpriteID image, int origin_x, int origin_y, std::span<const ThreeDPart> parts, bool cut, double cx0, double cx1, double cy0, double cy1)
+{
+	uint64_t key = 1469598103934665603ULL;
+	auto mix = [&key](int64_t v) {
+		key ^= static_cast<uint64_t>(v);
+		key *= 1099511628211ULL;
+	};
+	mix(image);
+	mix(origin_x);
+	mix(origin_y);
+	mix(cut ? 1 : 0);
+	if (cut) {
+		for (double v : {cx0, cx1, cy0, cy1}) mix(std::lround(v * 64));
+	}
+	for (const ThreeDPart &p : parts) {
+		for (float v : {p.x0, p.x1, p.y0, p.y1, p.h, p.rise}) mix(std::lround(v * 64));
+		mix(static_cast<int64_t>(p.roof));
+	}
+	auto it = _wall_patterns.find(key);
+	if (it == _wall_patterns.end()) {
+		auto w = std::make_shared<ThreeDWallPatterns>();
+		w->image = image;
+		const auto t0 = std::chrono::steady_clock::now();
+		auto pic = std::make_shared<Picture>();
+		const bool read = ReadPicture(image, origin_x, origin_y, *pic);
+		w->read_ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - t0).count();
+		if (!read) {
+			w->ready.store(true, std::memory_order_release);
+		} else {
+			ThreeDLoadInBackground([w, pic, boxes = std::vector<ThreeDPart>(parts.begin(), parts.end()), cut, cx0, cx1, cy0, cy1] {
+				const auto t1 = std::chrono::steady_clock::now();
+				FindWallPatterns(*w, *pic, boxes, cut, cx0, cx1, cy0, cy1);
+				w->ms = std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - t1).count();
+				w->ready.store(true, std::memory_order_release);
+			});
+		}
+		it = _wall_patterns.emplace(key, std::move(w)).first;
+	}
+	return it->second.get();
+}
+
+/** Forget the kept shapes and wall patterns: the sprites are read anew (GfxClearSpriteCache(), GfxInitSpriteMem()), or the rig asks. */
 void ForgetThreeDSpriteShapes()
 {
 	/* A shape the thread is finding still is its own (shared): it is dropped when found. */
 	_shapes.clear();
+	_wall_patterns.clear();
+}
+
+/** The rig (test3d tvary): the walls the sprites show, what was found on them, and where the hidden ones take their pixels from. */
+std::string DescribeThreeDWallPatterns()
+{
+	std::vector<const ThreeDWallPatterns *> all;
+	for (const auto &[key, w] : _wall_patterns) {
+		if (w->ready.load(std::memory_order_acquire)) all.push_back(w.get());
+	}
+	std::sort(all.begin(), all.end(), [](const ThreeDWallPatterns *a, const ThreeDWallPatterns *b) { return a->image < b->image; });
+	std::string s;
+	int walls = 0, periodic = 0, whole = 0, mirrored = 0;
+	double ms = 0, read_ms = 0;
+	for (const ThreeDWallPatterns *w : all) {
+		s += fmt::format("zadni steny spritu {}:{} pixely {:.1f} ms, steny {:.1f} ms\n", w->image, w->said, w->read_ms, w->ms);
+		ms += w->ms;
+		read_ms += w->read_ms;
+		for (const auto &part : w->back) {
+			for (const ThreeDWallSource &src : part) {
+				walls++;
+				if (src.axis < 0) {
+					mirrored++;
+				} else if (src.periodic) {
+					periodic++;
+				} else {
+					whole++;
+				}
+			}
+		}
+	}
+	s += fmt::format("zadni steny: {} spritu, {} sten: vzorem {}, celou viditelnou {}, zrcadlem {}; pixely {:.0f} ms (hlavni vlakno), steny {:.0f} ms (na pozadi)\n", all.size(), walls, periodic, whole, mirrored, read_ms, ms);
+	return s;
 }
 
 /** The rig (test3d tvary): every kept shape, with what it was read from and how well it fits. */

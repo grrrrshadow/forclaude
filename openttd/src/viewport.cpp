@@ -3661,7 +3661,10 @@ static constexpr double BUILDING_WALL_BAND = 1.5;
 /** Rig (test3d tvary pas 0|1): the bottom band of the buildings' walls (BUILDING_WALL_BAND). */
 bool _turned_wall_band = true;
 
-static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, bool cut, double cx0, double cx1, double cy0, double cy1, double ox, double oy, bool building = false)
+/** Rig (test3d tvary zada 0|1): the buildings' hidden walls from the pattern of the walls their sprites show, turning all round (1), or mirrored and snapping as before (0). */
+bool _turned_back_walls = true;
+
+static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, bool cut, double cx0, double cx1, double cy0, double cy1, double ox, double oy, bool building = false, const std::array<ThreeDWallSource, 2> *back = nullptr)
 {
 	/* The sprite's outline pixels sit half a pixel outside the box's true edges. */
 	const double margin = 0.25;
@@ -3709,8 +3712,57 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 	/* The walls: +X and +Y are the ones the sprite shows; -X and -Y take theirs mirrored to them. A building's walls
 	 * stand on a band from the row of the sprite above it (BUILDING_WALL_BAND). */
 	const double band = building && _turned_wall_band && h > 3 * BUILDING_WALL_BAND ? BUILDING_WALL_BAND : 0.0;
+
+	/* A building's hidden wall (axis 0 facing -X at x0, 1 facing -Y at y0) from a piece of a wall the sprite shows
+	 * (GetThreeDWallPatterns()): one repeat of its pattern, laid along as many times as fit, each squeezed or stretched
+	 * a little so that they fill it. All of it is sorted as the whole wall is (as add_wall()). A gable over it is mirrored
+	 * from the gable opposite as before; where the sprite does not show that, it takes the top row of the piece. */
+	auto add_back_wall = [&](int axis, const ThreeDWallSource &src) {
+		const bool gable = axis == 0 ? part.roof == ThreeDRoof::GableX : part.roof == ThreeDRoof::GableY;
+		const double w0 = axis == 0 ? y0 : x0, w1 = axis == 0 ? y1 : x1, wm = (w0 + w1) / 2;
+		/* A point of this wall at w along it, which the sprite shows at t along the wall the piece is from, at height tz. */
+		auto at = [&](double w, double z, double t, double tz) {
+			const double px = axis == 0 ? x0 : w, py = axis == 0 ? w : y0;
+			const double tx = src.axis == 0 ? x1 : t, ty = src.axis == 0 ? t : y1;
+			return BoxVertex{px, py, z, tx, ty, tz};
+		};
+		/* The same point mirrored from the wall opposite, as before. */
+		auto mirrored = [&](double w, double z) {
+			return axis == 0 ? BoxVertex{x0, w, z, x1, w, z} : BoxVertex{w, y0, z, w, y1, z};
+		};
+		std::vector<BoxVertex> whole = {mirrored(w0, 0), mirrored(w1, 0), mirrored(w1, h)};
+		if (gable) whole.push_back(mirrored(wm, h + rise));
+		whole.push_back(mirrored(w0, h));
+		if (!clip(whole)) return;
+		const double near = near_of(whole);
+		const int n = std::max(1, static_cast<int>(std::lround((w1 - w0) / src.length)));
+		const double q = (w1 - w0) / n, ta = src.start, tb = src.start + src.length;
+		for (int k = 0; k < n; k++) {
+			const double wa = w0 + k * q, wb = k == n - 1 ? w1 : wa + q;
+			if (band > 0) {
+				std::vector<BoxVertex> bottom = {at(wa, 0, ta, band), at(wb, 0, tb, band), at(wb, band, tb, band), at(wa, band, ta, band)};
+				if (clip(bottom)) faces.push_back({std::move(bottom), near - 1e-6});
+			}
+			std::vector<BoxVertex> rest = {at(wa, band, ta, band), at(wb, band, tb, band), at(wb, h, tb, h), at(wa, h, ta, h)};
+			if (clip(rest)) faces.push_back({std::move(rest), near});
+		}
+		if (gable) {
+			std::vector<BoxVertex> top;
+			if (src.mirror) {
+				top = {mirrored(w0, h), mirrored(w1, h), mirrored(wm, h + rise)};
+			} else {
+				top = {at(w0, h, ta, h - 0.5), at(w1, h, tb, h - 0.5), at(wm, h + rise, (ta + tb) / 2, h - 0.5)};
+			}
+			if (clip(top)) faces.push_back({std::move(top), near});
+		}
+	};
+
 	std::vector<BoxVertex> wall;
 	for (int side = 0; side < 2; side++) {
+		if (side == 1 && back != nullptr && (*back)[0].axis >= 0 && (*back)[0].length > 0) {
+			add_back_wall(0, (*back)[0]);
+			continue;
+		}
 		double x = side == 0 ? x1 : x0, tx = x1;
 		wall = {{x, y0, 0, tx, y0, 0}, {x, y1, 0, tx, y1, 0}, {x, y1, h, tx, y1, h}};
 		if (part.roof == ThreeDRoof::GableX) wall.push_back({x, my, h + rise, tx, my, h + rise});
@@ -3725,6 +3777,10 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 		}
 	}
 	for (int side = 0; side < 2; side++) {
+		if (side == 1 && back != nullptr && (*back)[1].axis >= 0 && (*back)[1].length > 0) {
+			add_back_wall(1, (*back)[1]);
+			continue;
+		}
 		double y = side == 0 ? y1 : y0, ty = y1;
 		wall = {{x0, y, 0, x0, ty, 0}, {x1, y, 0, x1, ty, 0}, {x1, y, h, x1, ty, h}};
 		if (part.roof == ThreeDRoof::GableY) wall.push_back({mx, y, h + rise, mx, ty, h + rise});
@@ -3923,7 +3979,9 @@ static void EvenTurnedTexture(uint32_t *pixels, int tw, int th, int tleft, int t
  * boxes, far to near. Only the front of the thing turns, by up to half the
  * period either way; past that it snaps back by a quarter turn (or a half)
  * and its front turns again, so the back of a thing of one sprite is never on
- * show (the player: it is only background).
+ * show (the player: it is only background). A building turns all round
+ * (period 360): its hidden walls take the pattern of the walls its sprite
+ * shows (GetThreeDWallPatterns()).
  * @param frame the block of the screen being drawn
  * @param ps the sprite, already moved to where the turn puts it
  * @param parts the boxes, in the frame of the thing (tile units from box_ox, box_oy; pixels up from box_oz)
@@ -4156,9 +4214,25 @@ static void DrawTurnedBoxes(const DrawPixelInfo &frame, const ParentSpriteToDraw
 	TurnedTexture tex;
 	if (!MakeTurnedTexture(frame, ps, tex, even.empty() ? nullptr : &even)) return;
 
+	/* A building's walls its sprite never shows: from the pattern of those it shows (GetThreeDWallPatterns()), read in
+	 * the background, mirrored as before till then (its place drawn again when they come). */
+	const ThreeDWallPatterns *walls = nullptr;
+	if (building && _turned_back_walls && ps.sub == nullptr) {
+		/* Where the sprite hangs from the screen point of the boxes' origin, the turn's shift taken off (MakeTurnedTexture()). */
+		const Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az), o = RemapCoords(ps.box_ox, ps.box_oy, ps.box_oz);
+		walls = GetThreeDWallPatterns(ps.image & SPRITE_MASK, ps.x - (t.x - c.x) - o.x, ps.y - (t.y - c.y) - o.y, std::span<const ThreeDPart>(parts, count), cut, cx0, cx1, cy0, cy1);
+		if (!walls->ready.load(std::memory_order_acquire)) {
+			OweThreeDPictureBox(ps.xmin, ps.ymin, ps.xmax + 1, ps.ymax + 1, ps.zmin, ps.zmax + 1);
+			walls = nullptr;
+		}
+	}
+
 	/* The faces of the boxes. */
 	_box_faces.clear();
-	for (uint i = 0; i < count; i++) AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy, building);
+	for (uint i = 0; i < count; i++) {
+		const std::array<ThreeDWallSource, 2> *back = walls != nullptr && i < walls->back.size() ? &walls->back[i] : nullptr;
+		AddBoxFaces(_box_faces, parts[i], cut, cx0, cx1, cy0, cy1, ps.box_ox, ps.box_oy, building, back);
+	}
 	std::sort(_box_faces.begin(), _box_faces.end(), [](const BoxFace &a, const BoxFace &b) { return a.near < b.near; });
 	DrawTurnedFaces(frame, ps, _box_faces, centre_x, centre_y, period, tex, fill);
 }
@@ -4169,7 +4243,8 @@ static void DrawTurnedHouseBox(const DrawPixelInfo &frame, const ParentSpriteToD
 	const ThreeDHouse &house = *ps.box;
 	bool cut = house.tiles_x > 1 || house.tiles_y > 1;
 	double cx0 = ps.box_dx * TILE_SIZE - 0.5, cx1 = cx0 + TILE_SIZE + 1, cy0 = ps.box_dy * TILE_SIZE - 0.5, cy1 = cy0 + TILE_SIZE + 1;
-	double period = (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
+	/* Its hidden walls from the pattern of those the sprite shows: it turns all round. Else only its front turns and snaps. */
+	double period = _turned_back_walls ? 360.0 : (house.tiles_x == house.tiles_y) ? 90.0 : 180.0;
 	DrawTurnedBoxes(frame, ps, GetThreeDHouseParts(&house), house.count, cut, cx0, cx1, cy0, cy1, house.tiles_x * TILE_SIZE / 2.0, house.tiles_y * TILE_SIZE / 2.0, period, true, true);
 }
 
@@ -4250,7 +4325,7 @@ std::string DescribeThreeDShapeComparisons()
 static void DrawTurnedSpriteShape(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps)
 {
 	const ThreeDSpriteShape &shape = *ps.shape;
-	DrawTurnedBoxes(frame, ps, shape.parts.data(), static_cast<uint>(shape.parts.size()), false, 0, 0, 0, 0, shape.centre_x, shape.centre_y, shape.period, true, true);
+	DrawTurnedBoxes(frame, ps, shape.parts.data(), static_cast<uint>(shape.parts.size()), false, 0, 0, 0, 0, shape.centre_x, shape.centre_y, _turned_back_walls ? 360.0 : shape.period, true, true);
 }
 
 /**

@@ -13,6 +13,8 @@
  * building without a hand table so (box_kind 13), instead of the box the game sorts the sprite by, which is often much
  * bigger than the building and has no roof. The sprite's pixels are read on the main thread, the shape is found by the
  * thread in the background; till then the building is drawn as before and its place is drawn again when it comes.
+ * The walls a building's sprite never shows take the pattern of those it shows the same way (ThreeDWallPatterns), for
+ * the hand tables too, and the building turns all round.
  */
 
 #ifndef THREE_D_SHAPE_H
@@ -21,6 +23,7 @@
 #include "three_d.h"
 #include "gfx_type.h"
 
+#include <array>
 #include <atomic>
 #include <span>
 #include <string>
@@ -50,12 +53,40 @@ struct ThreeDSpriteShape {
 	int tried = 0;                  ///< how many shapes were tried
 };
 
+/**
+ * Where a wall of a building the sprite never shows (facing -X or -Y) takes its pixels from (GetThreeDWallPatterns()):
+ * a piece of a wall of the same box the sprite shows, laid along it as many times as fit. Where the wall it takes them
+ * from repeats a pattern (a window and the wall beside it), the piece is one repeat, the one most like the others: a
+ * door or a shop's sign is on the front only.
+ */
+struct ThreeDWallSource {
+	int8_t axis = -1;      ///< the wall it takes them from: 0 the box's wall facing +X, 1 facing +Y; -1 none (mirrored from the wall opposite, as before)
+	bool periodic = false; ///< whether the piece is one repeat of that wall's pattern, else all of that wall the sprite shows
+	bool mirror = false;   ///< whether the wall opposite is shown nearly whole: a gable over this wall is mirrored from its gable as before
+	float start = 0;       ///< where the piece begins along that wall: world units along Y (the wall facing +X) or X (facing +Y), in the frame of the boxes
+	float length = 0;      ///< how long it is
+};
+
+/** The walls a building's sprite never shows, for each of its boxes (GetThreeDWallPatterns()). */
+struct ThreeDWallPatterns {
+	std::vector<std::array<ThreeDWallSource, 2>> back; ///< for each box: [0] its wall facing -X, [1] facing -Y
+	std::atomic<bool> ready = false;                   ///< whether they are read: the thread in the background reads them, the walls are mirrored meanwhile
+
+	/* For the rig (test3d tvary). */
+	SpriteID image = 0;
+	float ms = 0;      ///< how long reading them took (the thread in the background)
+	float read_ms = 0; ///< how long reading the sprite's pixels took (the main thread)
+	std::string said;  ///< what was found on each wall the sprite shows
+};
+
 extern bool _three_d_sprite_shapes_on;
 
 const ThreeDSpriteShape *GetThreeDSpriteShape(SpriteID image, int origin_x, int origin_y, int ex, int ey, int ez, int narrow_x0, int narrow_y0, int narrow_dx, int narrow_dy);
 float ThreeDSpriteShapeFit(SpriteID image, int origin_x, int origin_y, std::span<const ThreeDPart> parts, double dx, double dy, double dz);
+const ThreeDWallPatterns *GetThreeDWallPatterns(SpriteID image, int origin_x, int origin_y, std::span<const ThreeDPart> parts, bool cut, double cx0, double cx1, double cy0, double cy1);
 void ForgetThreeDSpriteShapes();
 std::string DescribeThreeDSpriteShapes();
 std::string DescribeThreeDSpriteShapeTotals();
+std::string DescribeThreeDWallPatterns();
 
 #endif /* THREE_D_SHAPE_H */
