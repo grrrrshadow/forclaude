@@ -6191,6 +6191,14 @@ static void ReadThreeDVehicleObjects()
 		o.file = fig->file;
 		/* Its shape a frame of a gait (GetShape(int)): BODY_GAITS of BODY_GAIT_FRAMES each. */
 		o.frames = static_cast<int>(BODY_GAITS.size()) * ThreeDVehicleObject::BODY_GAIT_FRAMES;
+		/* Posed by the card as its gaits' figures where they all are on bones (OnBones()): else each frame of each gait
+		 * was posed by the processor and kept, 1.6 MB a frame (the player's #331: 386 of them, 604 MB). */
+		o.body_on_bones = true;
+		for (int gait = 0; gait < static_cast<int>(BODY_GAITS.size()); gait++) {
+			int frame = gait * ThreeDVehicleObject::BODY_GAIT_FRAMES;
+			const ThreeDVehicleObject *g = o.BodyAt(frame);
+			if (g == nullptr || g->skeleton_file.empty()) o.body_on_bones = false;
+		}
 	}
 	Debug(misc, 1, "3D vehicles: {} in the indices, {} figures, {} pieces of loads", _vehicle_objects.size(), _figure_objects.size(), _load_pieces.size());
 }
@@ -7606,7 +7614,23 @@ std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::MakeBones(int frame
 /** Whether it is a figure on bones (skeleton_file): its frames posed by the card where it draws them (GetBones()). */
 bool ThreeDVehicleObject::OnBones() const
 {
-	return !this->skeleton_file.empty();
+	return !this->skeleton_file.empty() || this->body_on_bones;
+}
+
+/**
+ * An animal of a set (body): its figure in the gait (BODY_GAITS) at the frame (WalkCode() of three_d_vehicle_object.cpp),
+ * and the frame in that gait.
+ * @param[in,out] frame the animal's frame; the figure's
+ * @return the figure; itself when it is no animal of a set; nullptr when the set has no figure of it
+ */
+const ThreeDVehicleObject *ThreeDVehicleObject::BodyAt(int &frame) const
+{
+	if (this->body.empty()) return this;
+	const size_t gait = std::min<size_t>(static_cast<size_t>(std::max(frame, 0)) / BODY_GAIT_FRAMES, BODY_GAITS.size() - 1);
+	const ThreeDVehicleObject *fig = GetThreeDFigure(this->body + "/" + std::string(BODY_GAITS[gait]), this->package);
+	if (fig == nullptr) fig = GetThreeDFigure(this->body, this->package);
+	frame = std::max(frame, 0) % BODY_GAIT_FRAMES;
+	return fig;
 }
 
 /**
@@ -7618,6 +7642,11 @@ bool ThreeDVehicleObject::OnBones() const
 std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::GetBones(int frame) const
 {
 	if (!this->OnBones()) return nullptr;
+	/* An animal of a set: the frame of its gait's figure (BodyAt()). */
+	if (!this->body.empty()) {
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr && fig != this ? fig->GetBones(frame) : nullptr;
+	}
 	MarkThreeDUsed(this->used);
 	const size_t count = static_cast<size_t>(std::max(1, this->frames));
 	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
@@ -7636,6 +7665,10 @@ std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::GetBones(int frame)
 std::shared_ptr<const ThreeDBonesFrame> ThreeDVehicleObject::TryGetBones(int frame) const
 {
 	if (!this->OnBones()) return nullptr;
+	if (!this->body.empty()) {
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr && fig != this ? fig->TryGetBones(frame) : nullptr;
+	}
 	MarkThreeDUsed(this->used);
 	const size_t count = static_cast<size_t>(std::max(1, this->frames));
 	const size_t at = static_cast<size_t>(std::max(frame, 0)) % count;
@@ -7687,11 +7720,9 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	GlbFilesScope files;
 	if (!this->skeleton_file.empty()) return this->MakePosedShape(frame);
 	if (!this->body.empty()) {
-		/* An animal of a set: its figure in the gait (BODY_GAITS) at the frame (WalkCode() of three_d_vehicle_object.cpp). */
-		const size_t gait = std::min<size_t>(static_cast<size_t>(std::max(frame, 0)) / BODY_GAIT_FRAMES, BODY_GAITS.size() - 1);
-		const ThreeDVehicleObject *fig = GetThreeDFigure(this->body + "/" + std::string(BODY_GAITS[gait]), this->package);
-		if (fig == nullptr) fig = GetThreeDFigure(this->body, this->package);
-		return fig != nullptr ? fig->MakeShape(std::max(frame, 0) % BODY_GAIT_FRAMES, ThreeDParts{}) : nullptr;
+		/* An animal of a set: its figure in the gait at the frame (BodyAt()). */
+		const ThreeDVehicleObject *fig = this->BodyAt(frame);
+		return fig != nullptr ? fig->MakeShape(frame, ThreeDParts{}) : nullptr;
 	}
 	const auto started = std::chrono::steady_clock::now();
 	std::string key = this->file;
