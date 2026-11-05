@@ -34,6 +34,8 @@
 #include <chrono>
 #include <cmath>
 
+#include "three_d_shape.h"
+
 #include "safeguards.h"
 
 
@@ -1936,6 +1938,7 @@ void GfxInitSpriteMem()
 	ResetShiftedSprites();
 	ResetThreeDVehicleObjectSprites();
 	ForgetTurnedSpritePictures();
+	ForgetThreeDSpriteShapes();
 }
 
 /**
