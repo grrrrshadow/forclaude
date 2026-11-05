@@ -18,11 +18,15 @@
 #include "three_d_gpu.h"
 #include "3rdparty/fmt/format.h"
 
+#include <algorithm>
+#include <array>
 #include <atomic>
 #include <charconv>
 #include <chrono>
 #include <ctime>
 #include <optional>
+#include <string>
+#include <vector>
 
 #if defined(_WIN32)
 #	include <windows.h>
@@ -114,6 +118,12 @@ Times _eye_collected; ///< the view from the eyes collected (the main thread)
 Times _eye_drawn;     ///< and drawn (its thread)
 Times _eye_prepared;  ///< of that on the card: its steps and triangles made ready by the processor
 Times _eye_card;      ///< and the card's own work (ThreeDGpuRenderEyeFrame(): sent, drawn, shown)
+/* The dirty pieces drawn by the kind of their window (the player's log of 5. 11.: buying in a depot with twenty
+ * windows of vehicles open, "okna" 100 to 600 ms a frame, the map's blocks a millisecond -- which windows it was, not
+ * written): the pieces each kind painted and how long (Window::OnPaint() in DrawOverlappedWindow()). */
+constexpr size_t PAINT_KINDS = 1024;
+std::array<uint32_t, PAINT_KINDS> _paint_count{};
+std::array<double, PAINT_KINDS> _paint_ms{};
 std::atomic<uint64_t> _eye_corners{0};   ///< the triangles' corners sent to the card, all the frames together
 std::atomic<uint32_t> _eye_by_cpu{0};    ///< frames the processor drew (no card, or one the card could not)
 
@@ -125,6 +135,44 @@ FrameDiaryParts _longest{};
 std::chrono::steady_clock::time_point _since{};
 std::optional<FileHandle> _diary;
 int _lines = 0;
+
+/** The name of a kind of window in the diary: the ones a slow frame was seen in by name, the others by number. */
+std::string KindName(size_t kind)
+{
+	switch (static_cast<WindowClass>(kind)) {
+		case WindowClass::MainWindow: return "mapa";
+		case WindowClass::VehicleView: return "vozidlo";
+		case WindowClass::VehicleDepot: return "depo";
+		case WindowClass::BuildVehicle: return "nakup";
+		case WindowClass::VehicleDetails: return "podrobnosti";
+		case WindowClass::VehicleRefit: return "prestavba";
+		case WindowClass::VehicleOrders: return "rozkazy";
+		case WindowClass::VehicleTimetable: return "jizdni rad";
+		case WindowClass::MainToolbar: return "lista";
+		case WindowClass::Statusbar: return "stav";
+		case WindowClass::News: return "zpravy";
+		case WindowClass::FirstPerson: return "oci";
+		case WindowClass::CabView: return "kabina";
+		default: return fmt::format("druh {}", kind);
+	}
+}
+
+/** The kinds of windows that painted the longest since the last line (the five longest), started again. */
+std::string TakeWindowPaints()
+{
+	std::vector<size_t> kinds;
+	for (size_t k = 0; k < PAINT_KINDS; k++) {
+		if (_paint_count[k] > 0) kinds.push_back(k);
+	}
+	std::ranges::sort(kinds, [](size_t a, size_t b) { return _paint_ms[a] > _paint_ms[b]; });
+	std::string out;
+	for (size_t i = 0; i < kinds.size() && i < 5; i++) {
+		out += fmt::format("{}{} {}x {:.0f} ms", i == 0 ? "" : ", ", KindName(kinds[i]), _paint_count[kinds[i]], _paint_ms[kinds[i]]);
+	}
+	_paint_count.fill(0);
+	_paint_ms.fill(0);
+	return out.empty() ? std::string("-") : out;
+}
 
 /** What the player looks at: the view from the eyes, from a cab, or the map. */
 const char *Looking()
@@ -148,7 +196,7 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 				" buffer = cekani na obrazovku, zamek = cekani na tik hry, klavesy, okna = okna a jejich kresleni (i sber pohledu z oci), obraz = predani obrazu karte;"
 				" zpravy = zpravy systemu (mys, klavesy) v klavesach: kolik na snimek a za kolik ms, odlozeno = snimky, ktere zbytek zprav nechaly dalsimu (jejich cas vyprsel);"
 				" rozpad okna: hodiny = hodiny oken (i krok chodce z oci se sberem), bloky = spinave kusy obrazovky kreslene, mapa = bloky herni plochy,"
-				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy;"
+				" okno oci = vykresleni platna z oci do okna, zem = cekani na kartu u zeme otocene plochy; druhy oken = ktera okna kreslila nejdel (kusu a ms za 5 s, mapa i s herni plochou);"
 				" tiky hry na svem vlakne; oci sber = sber pohledu z oci na hlavnim vlakne, oci kresleni = na jeho vlakne;"
 				" z toho na karte: priprava = procesor chysta trojuhelniky, karta = posilani a kresleni kartou, rohu = kolik rohu trojuhelniku na snimek jde na kartu;"
 				" procesorem = snimky kreslene bez karty; pamet = kolik pameti si hra vzala, karta = kolik drzi graficka karta;"
@@ -162,11 +210,11 @@ void WriteLine(std::chrono::steady_clock::time_point now)
 	const int n = std::max(1, _frames);
 	const uint32_t card_frames = _eye_card.count.load();
 	const uint64_t corners = _eye_corners.exchange(0);
-	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | zpravy {:.1f} na snimek {:.1f} ms, nejvic {}, nejdelsi snimek {} za {:.0f} ms, odlozeno {}x | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {} | pamet 3d {}\n",
+	fmt::print(*_diary, "{} {} | snimku {:.1f}/s | nejdelsi {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | prumer {:.0f} ms (buffer {:.0f}, zamek {:.0f}, klavesy {:.0f}, okna {:.0f}, obraz {:.0f}) | zpravy {:.1f} na snimek {:.1f} ms, nejvic {}, nejdelsi snimek {} za {:.0f} ms, odlozeno {}x | hodiny {} | bloky {} | mapa {} | okno oci {} | zem {} | druhy oken {} | tiky hry {} | oci sber {} | oci kresleni {} | priprava {} | karta {} | rohu {} | procesorem {}x | pamet {} MB | karta {} MB | otocena {} | obrazky {} | pamet 3d {}\n",
 			clock, Looking(), _frames / secs, _longest.total, _longest.buffer, _longest.lock, _longest.input, _longest.windows, _longest.paint,
 			_sum.total / n, _sum.buffer / n, _sum.lock / n, _sum.input / n, _sum.windows / n, _sum.paint / n,
 			static_cast<double>(_sum.messages) / n, _sum.messages_ms / n, _most_messages, _longest.messages, _longest.messages_ms, _sum.messages_cut,
-			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(),
+			_windows_timers.Take(), _windows_blocks.Take(), _map_blocks.Take(), _eye_window.Take(), _ground_waits.Take(), TakeWindowPaints(),
 			_game_ticks.Take(), _eye_collected.Take(), _eye_drawn.Take(), _eye_prepared.Take(), _eye_card.Take(),
 			card_frames > 0 ? corners / card_frames : 0, _eye_by_cpu.exchange(0), FrameDiaryMemoryMB(), ThreeDGpuHeldMB(), TakeTurnedTimesForDiary(_frames), TakePicturesForDiary(), TakeThreeDMemoryForDiary());
 	fflush(*_diary);
@@ -259,6 +307,20 @@ void FrameDiaryWindowsTimers(double ms)
 void FrameDiaryWindowsBlocks(double ms)
 {
 	_windows_blocks.Add(ms);
+}
+
+/** A dirty piece of a window painted (DrawOverlappedWindow(); the main thread), milliseconds. */
+void FrameDiaryWindowPaint(uint16_t window_class, double ms)
+{
+	if (window_class >= PAINT_KINDS) return;
+	_paint_count[window_class]++;
+	_paint_ms[window_class] += ms;
+}
+
+/** The kinds of windows that painted the longest since it was last asked (the rig's 'smycka'), started again. */
+std::string FrameDiaryTakeWindowPaints()
+{
+	return TakeWindowPaints();
 }
 
 /** A block of the map drawn (ViewportDoDraw(); the main thread), milliseconds. */

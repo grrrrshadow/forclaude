@@ -19,6 +19,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <string>
 
 /** The parts of a frame of the drawing (VideoDriver::Tick()), milliseconds. */
 struct FrameDiaryParts {
@@ -43,6 +44,8 @@ void FrameDiaryWindowsBlocks(double ms);
 void FrameDiaryMapBlock(double ms);
 void FrameDiaryEyeWindow(double ms);
 void FrameDiaryGroundWait(double ms);
+void FrameDiaryWindowPaint(uint16_t window_class, double ms);
+std::string FrameDiaryTakeWindowPaints();
 size_t FrameDiaryMemoryMB();
 
 #endif /* FRAME_DIARY_H */

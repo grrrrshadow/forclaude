@@ -196,8 +196,13 @@ struct ThreeDGpuGround {
 	uint64_t forget_key = 0;
 };
 
-/** The views whose pictures the card shows straight from it: the turned main view (0) and so many small views less one (ThreeDGpuGround::view). */
-static constexpr int THREE_D_GPU_VIEWS = 8;
+/**
+ * The views whose pictures the card shows straight from it: the turned main view (0) and so many small views less one
+ * (ThreeDGpuGround::view). Once 8: the player's log of 5. 11., buying in a depot with twenty vehicles' windows open, had
+ * the seven on the card and the other thirteen drawn the old way by the processor at every change in them ("karta
+ * plna"), 2 to 10 frames a second on the phone. A vehicle's window's pictures are a few hundred kilobytes.
+ */
+static constexpr int THREE_D_GPU_VIEWS = 32;
 
 /**
  * A building of the view from the eyes on the card (ThreeDGpuEyePicture): its triangles as the processor draws them for

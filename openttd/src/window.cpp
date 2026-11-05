@@ -943,7 +943,9 @@ static void DrawOverlappedWindow(Window *w, int left, int top, int right, int bo
 	dp->pitch = _screen.pitch;
 	dp->dst_ptr = BlitterFactory::GetCurrentBlitter()->MoveTo(_screen.dst_ptr, left, top);
 	dp->zoom = ZoomLevel::Min;
+	const auto painting = std::chrono::steady_clock::now();
 	w->OnPaint();
+	FrameDiaryWindowPaint(to_underlying(w->window_class), std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - painting).count());
 }
 
 /**

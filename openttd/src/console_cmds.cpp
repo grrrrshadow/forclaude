@@ -94,6 +94,8 @@
 #include "order_base.h"
 #include "order_func.h"
 #include "depot_map.h"
+#include "depot_func.h"
+#include "frame_diary.h"
 #include "station_map.h"
 #include "tilehighlight_func.h"
 #include "newgrf_station.h"
@@ -9063,6 +9065,74 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: vystavba {}, uhel {} -> {}", tb != nullptr ? "otevrena" : "NEOTEVRENA", before, GetViewYaw());
 			return true;
 		}
+		if (argv[2] == "kup" && argv.size() > 3) {
+			/* 'okno kup <pocet>': so many more of the first road vehicle's engine bought into its depot, standing in it
+			 * as the player's new ones do (the player's log of 5. 11.: twenty bought, their windows open). */
+			const Vehicle *first = nullptr;
+			for (const Vehicle *v : Vehicle::Iterate()) {
+				if (v->IsPrimaryVehicle() && v->type == VehicleType::Road) {
+					first = v;
+					break;
+				}
+			}
+			TileIndex depot = INVALID_TILE;
+			for (TileIndex t : Map::Iterate()) {
+				if (IsDepotTile(t) && GetDepotVehicleType(t) == VehicleType::Road) {
+					depot = t;
+					break;
+				}
+			}
+			if (first == nullptr || depot == INVALID_TILE) {
+				IConsolePrint(CC_ERROR, "test3d: okno kup: no road vehicle or depot");
+				return true;
+			}
+			AutoRestoreBackup cur_company(_current_company, first->owner);
+			int bought = 0;
+			for (int i = 0; i < ParseInteger<int>(argv[3]).value_or(0); i++) {
+				auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, first->engine_type, true, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Succeeded()) bought++;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: okno kup {} do depa {},{}", bought, TileX(depot), TileY(depot));
+			return true;
+		}
+		if (argv[2] == "vozidla" || argv[2] == "depo") {
+			/* 'okno vozidla [pocet]': the windows of so many vehicles (all without), each where the game opens it;
+			 * 'okno depo': the window of the depot of the first road vehicle (the player's log of 5. 11.: buying in a
+			 * depot with twenty windows of vehicles open, a frame a second). */
+			if (_local_company == COMPANY_SPECTATOR) {
+				extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+				Company *made = Company::IsValidID(CompanyID::Begin()) ? Company::Get(CompanyID::Begin()) : DoStartupNewCompany(false, CompanyID::Invalid());
+				if (made != nullptr) SetLocalCompany(made->index);
+			}
+			const int most = argv.size() > 3 ? ParseInteger<int>(argv[3]).value_or(1000) : 1000;
+			int opened = 0;
+			for (const Vehicle *v : Vehicle::Iterate()) {
+				if (!v->IsPrimaryVehicle() || opened >= most) continue;
+				if (argv[2] == "depo") {
+					TileIndex depot = INVALID_TILE;
+					for (TileIndex t : Map::Iterate()) {
+						if (IsDepotTile(t) && GetDepotVehicleType(t) == v->type) {
+							depot = t;
+							break;
+						}
+					}
+					if (depot == INVALID_TILE) continue;
+					ShowDepotWindow(depot, v->type);
+					opened = most;
+					break;
+				}
+				/* 'okno vozidla <pocet> depo': only of those standing in a depot. */
+				if (argv.size() > 4 && argv[4] == "depo" && !v->IsInDepot()) continue;
+				ShowVehicleViewWindow(v);
+				opened++;
+			}
+			int windows = 0;
+			for (const Window *w : Window::Iterate()) {
+				if (w->window_class == WindowClass::VehicleView || w->window_class == WindowClass::VehicleDepot) windows++;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: okno {} {}, oken vozidel a dep {}", argv[2], opened, windows);
+			return true;
+		}
 		if (argv[2] == "nakup") {
 			/* The purchase window needs a company; the null driver's game starts as a spectator. */
 			if (_local_company == COMPANY_SPECTATOR) {
@@ -10721,6 +10791,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				}
 				_redrawn_rects = _redrawn_pixels = 0;
 				TurnedTimingsPrint();
+				FrameDiaryTakeWindowPaints();
 			}
 			const uint64_t px_before = _redrawn_pixels, rects_before = _redrawn_rects;
 			const Clock::time_point start = Clock::now();
@@ -10761,6 +10832,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				_turned_dirty_count[0] / static_cast<double>(times.size()), _turned_dirty_area[0] / times.size(), _turned_dirty_count[1] / static_cast<double>(times.size()),
 				_turned_dirty_area[1] / times.size(), _turned_dirty_count[2] / static_cast<double>(times.size()), _turned_dirty_area[2] / times.size());
 		TurnedTimingsPrint();
+		/* Which windows painted the longest (frame_diary.cpp): the player's purchase with twenty windows of vehicles open. */
+		IConsolePrint(CC_DEFAULT, "test3d: smycka druhy oken: {}", FrameDiaryTakeWindowPaints());
 		if (!slow_frames.empty()) IConsolePrint(CC_DEFAULT, "test3d: smycka pomale snimky{}", slow_frames.substr(0, 400));
 		return true;
 	} else if (what == "vozidla") {
