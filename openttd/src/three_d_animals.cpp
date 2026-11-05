@@ -88,7 +88,7 @@ constexpr uint64_t CHURCH_INSIDE_TICKS = 600; ///< and is in it, or gone, at lea
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
 /** The dogs of the farms (the player, 27. 10.: "put the little dogs on the farm"): the true dogs of the streets, not the
  * cats, the foxes, the wolves the index has as dogs too. */
-constexpr std::string_view FARM_DOGS[] = {"pes_lovecky", "pes_hnedy", "pes_veseli", "pes_ulicni", "pes_nafoceny", "pes_roztomily", "pes_maly", "baset", "malamut", "jack_russell", "bulmastif", "bulterier"};
+constexpr std::string_view FARM_DOGS[] = {"pes_lovecky", "pes_hnedy", "pes_veseli", "pes_ulicni", "pes_roztomily", "pes_maly", "baset", "malamut", "jack_russell", "bulmastif", "bulterier"};
 constexpr uint FARM_DOGS_KEPT = 2;         ///< so many about each farm's yard ...
 constexpr uint FARMS_KEPT = 4;             ///< ... of so many farms about the middle at most
 constexpr double YARD_DOG_M = 0.3;         ///< a dog of a yard keeps so far from the walls of its buildings, metres

@@ -133,8 +133,8 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
   skutečnou velikost, kostra a animace modelu ve formátu `pozy`). Všechno ze Sketchfabu. **CC BY 4.0**: gepard,
   žirafa a mamut (planeta-elefante), somálská kočka (DreamNoms), kreslená kočka (Omabuarts Studio), liška
   (dragonsnap), fenek (Dylan Martínez Sánchez), Falkor (sharksie), roztomilý pes (Tech developers), šedý vlk a veselý
-  pes (Stakler), malý pes (samuelsgr art), lovecký pes (Jurassic Radassic), pouliční pes (MAROUANE), nafocený pes
-  (3DigitalArtist), skákající liška (sheana), šedá kočka (savounited), rezavá kočka (ilhamtr),
+  pes (Stakler), malý pes (samuelsgr art), lovecký pes (Jurassic Radassic), pouliční pes (MAROUANE),
+  skákající liška (sheana), šedá kočka (savounited), rezavá kočka (ilhamtr),
   dvoubarevná kočka (kenchoo), stylizovaný vlk (ESO), pohyby ležení psů z vlka u dveří (victory_mirosya),
   prodavač Bodi (Jacob Quintana), prodavač dalmatin (iRahulRajput), los, wapiti, jelen, laň, vidloroh, ovce
   tlustorohá a medvěd (Stylized Animals BIG PACK, WildMesh 3D), slon (GremorySaiyan), opice (Guilherme Navarro,

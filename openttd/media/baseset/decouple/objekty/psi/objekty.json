@@ -756,27 +756,6 @@
   "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
  },
  {
-  "soubor": "pes_nafoceny.glb",
-  "jmeno": "pes_nafoceny",
-  "druh": "pes",
-  "nazev": {
-   "cs": "pes",
-   "en": "dog"
-  },
-  "meritko": 2,
-  "rozmer_m": [
-   0.48,
-   0.29,
-   0.45
-  ],
-  "kde": "ulice",
-  "povaha": "mirumilovne",
-  "trojuhelniku": 20006,
-  "autor": "Dog 3D Capture, 3DigitalArtist (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/dog-3d-capture-ee8d0281536a472c9b0bf6ad4ce880c8), převod tvorove/par13_zvirata.py bez renderu",
-  "licence": "CC BY 4.0 (uvést 3DigitalArtist; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
- },
- {
   "soubor": "liska_skace.glb",
   "jmeno": "liska_skace",
   "bez_uzlu": ["snow"],
