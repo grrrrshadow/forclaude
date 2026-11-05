@@ -11216,30 +11216,33 @@ size_t ThreeDVehicleShape::Bytes() const
 }
 
 /**
+ * The textures the object holds now (DescribeThreeDObjectMemory(): which hold the most): each with what it is to the
+ * object. Under _lazy_mutex.
+ */
+void ThreeDVehicleObject::ForHeldTextures(const std::function<void(const ThreeDTextureLevels &, const char *)> &fn) const
+{
+	for (const ThreeDTextureLevels &lv : this->levels) fn(lv, "textura");
+	for (const ThreeDTextureLevels &lv : this->addon_mask_levels) fn(lv, "maska doplnku");
+	fn(this->mask_levels, "maska laku");
+	fn(this->rust_levels, "maska rzi");
+	fn(this->second_levels, "maska druhe barvy");
+}
+
+/** The bytes of a texture's levels that have their pixels. */
+static size_t LevelsBytes(const ThreeDTextureLevels &lv)
+{
+	size_t b = 0;
+	if (lv != nullptr) {
+		for (const ThreeDObjectTexture &t : *lv) b += VectorBytes(t.px);
+	}
+	return b;
+}
+
+/**
  * The rig ('test3d pamet'): how much memory what was made of the 3D objects takes -- the vehicles' shapes, their
  * textures halved for each level of detail, the pictures of the textures as they are in the files, the .glb files kept
  * a moment, the buildings' textures (painted too) and simplified shapes.
  */
-/**
- * How much the object holds now: its shapes and its textures (DescribeThreeDObjectMemory(): which hold the most). A
- * texture shared with another counts with each. Under _lazy_mutex.
- */
-size_t ThreeDVehicleObject::HeldBytes() const
-{
-	auto levels_of = [](const ThreeDTextureLevels &lv) {
-		size_t b = 0;
-		if (lv != nullptr) {
-			for (const ThreeDObjectTexture &t : *lv) b += VectorBytes(t.px);
-		}
-		return b;
-	};
-	size_t b = this->shape != nullptr ? this->shape->Bytes() : 0;
-	for (const auto &s : this->frame_shapes) b += s != nullptr ? s->Bytes() : 0;
-	for (const ThreeDTextureLevels &lv : this->levels) b += levels_of(lv);
-	for (const ThreeDTextureLevels &lv : this->addon_mask_levels) b += levels_of(lv);
-	return b + levels_of(this->mask_levels) + levels_of(this->rust_levels) + levels_of(this->second_levels);
-}
-
 std::string DescribeThreeDObjectMemory()
 {
 	auto mb = [](size_t b) { return b / (1024.0 * 1024.0); };
@@ -11264,9 +11267,17 @@ std::string DescribeThreeDObjectMemory()
 	/* The frames the card poses: their joints' matrices (ThreeDBonesFrame). */
 	size_t bones = 0, bones_count = 0;
 	/* The vehicles and figures holding the most, by name: their shapes and their textures (the player, 4. 11.: "can't
-	 * you see from the log what object it was?" -- the sums above name nothing). A texture two of them share counts
-	 * with each. */
+	 * you see from the log what object it was?" -- the sums above name nothing). A texture several of them share counts
+	 * with each by its share (the colleague's lorries share their add-ons' pictures: each lorry was told 606 MB, the
+	 * three of them together held that); and the biggest textures, of what and how many share them. */
 	std::vector<std::pair<size_t, std::string>> biggest;
+	struct HeldTexture {
+		size_t bytes = 0;
+		int holders = 0;
+		std::string first; ///< the first object holding it, and what it is to it
+		int w = 0, h = 0, level = 0; ///< its finest level with pixels
+	};
+	std::map<const void *, HeldTexture> held_textures;
 	{
 		std::lock_guard lock(_lazy_mutex);
 		auto count_bones = [&](const ThreeDVehicleObject &v) {
@@ -11276,17 +11287,44 @@ std::string DescribeThreeDObjectMemory()
 				bones_count++;
 			}
 		};
-		auto held_by = [&](const ThreeDVehicleObject &v) {
-			const size_t b = v.HeldBytes();
-			if (b >= (1u << 20)) biggest.emplace_back(b, v.name);
-		};
+		std::vector<const ThreeDVehicleObject *> objects;
 		for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
 			for (const ThreeDVehicleObject &v : *list) {
 				count_bones(v);
-				held_by(v);
+				objects.push_back(&v);
+				std::set<const void *> own;
+				v.ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *what) {
+					const size_t b = LevelsBytes(lv);
+					if (b == 0 || !own.insert(lv.get()).second) return;
+					HeldTexture &t = held_textures[lv.get()];
+					if (t.holders++ > 0) return;
+					t.bytes = b;
+					t.first = fmt::format("{} {}", v.name, what);
+					t.level = FinestLevel(*lv);
+					t.w = (*lv)[t.level].w;
+					t.h = (*lv)[t.level].h;
+				});
 			}
 		}
 		for (const auto &[name, passage] : _passages) count_bones(*passage);
+		for (const ThreeDVehicleObject *v : objects) {
+			double b = v->shape != nullptr ? v->shape->Bytes() : 0;
+			for (const auto &s : v->frame_shapes) b += s != nullptr ? s->Bytes() : 0;
+			std::set<const void *> own;
+			v->ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *) {
+				auto it = held_textures.find(lv.get());
+				if (it != held_textures.end() && own.insert(lv.get()).second) b += static_cast<double>(it->second.bytes) / it->second.holders;
+			});
+			if (b >= (1u << 20)) biggest.emplace_back(static_cast<size_t>(b), v->name);
+		}
+	}
+	std::vector<const HeldTexture *> by_size;
+	for (const auto &[at, t] : held_textures) by_size.push_back(&t);
+	std::ranges::sort(by_size, std::greater{}, &HeldTexture::bytes);
+	std::string textures_most;
+	for (size_t i = 0; i < std::min<size_t>(by_size.size(), 3); i++) {
+		const HeldTexture &t = *by_size[i];
+		textures_most += fmt::format("{}{:.1f} MB {}x{} (uroven {}, {} sdili od {})", i == 0 ? "" : ", ", t.bytes / (1024.0 * 1024.0), t.w, t.h, t.level, t.holders, t.first);
 	}
 	size_t textures = 0, texture_count = 0, pngs = 0, png_count = 0, masks = 0;
 	{
@@ -11334,8 +11372,8 @@ std::string DescribeThreeDObjectMemory()
 	std::ranges::sort(biggest, std::greater{});
 	std::string most;
 	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
-	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a textury) {}",
-			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most);
+	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
+			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
 }
 
 /** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */
