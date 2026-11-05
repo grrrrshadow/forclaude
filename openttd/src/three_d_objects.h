@@ -886,6 +886,9 @@ struct ThreeDVehicleObject {
 	float length_m = 0;             ///< "rozmer_m" "delka": its length, metres; 0 from its shape (Length())
 	std::string detail_file;        ///< "maska_podrobnosti": the mask of details of its body's texture (ThreeDDetailMask), its path; empty none
 	std::string body;               ///< a vehicle that is an animal of a set ("sada_objektu", "objekt": the colleague's horses of the Special): its figure, drawn in a gait ("<body>/stoji", "chuze", "klus", "cval") at its frame (ShapeFrame())
+	bool body_on_bones = false;     ///< the figures of all its gaits (body) are on bones: the card poses it as them (OnBones(), GetBones())
+
+	const ThreeDVehicleObject *BodyAt(int &frame) const;
 
 	size_t HeldBytes() const;
 	const ThreeDVehicleShape *GetShape() const;
