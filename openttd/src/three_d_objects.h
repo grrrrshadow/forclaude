@@ -889,8 +889,8 @@ struct ThreeDVehicleObject {
 	bool body_on_bones = false;     ///< the figures of all its gaits (body) are on bones: the card poses it as them (OnBones(), GetBones())
 
 	const ThreeDVehicleObject *BodyAt(int &frame) const;
+	void ForHeldTextures(const std::function<void(const ThreeDTextureLevels &, const char *)> &fn) const;
 
-	size_t HeldBytes() const;
 	const ThreeDVehicleShape *GetShape() const;
 	const ThreeDVehicleShape *GetShape(int frame) const;
 	const ThreeDVehicleShape *GetShape(int frame, const ThreeDParts &parts) const;

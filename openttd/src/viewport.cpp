@@ -13945,7 +13945,10 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	by_card = by_card && EyeFigureFitsCard(*fig, *model.shape, _settings_client.gui.three_d_wheels);
 	const size_t textures = std::max<size_t>(1, whole->pngs.size());
 	if (by_card) {
-		if (!TryGetThreeDEyeVehiclePaints(fig, fg.state, model.texture_ppm, textures, model.texs, model.paints, model.held)) return false;
+		/* Only the textures of the triangles drawn, of the parts its state shows (as the map has them): the add-ons of
+		 * the other states not made at all (the colleague's horse wagon: thirty pictures, a few drawn at a time). */
+		const std::shared_ptr<const ThreeDGpuTriangles> drawn = ThreeDGpuTrianglesOf(*model.shape, fig->PartsOf(fg.state), true, textures, fg.own_cab);
+		if (!TryGetThreeDEyeVehiclePaints(fig, fg.state, model.texture_ppm, textures, model.texs, model.paints, model.held, &drawn->used, whole)) return false;
 	} else {
 		model.texs.assign(textures, nullptr);
 		for (size_t i = 0; i < model.texs.size(); i++) {

@@ -1037,6 +1037,29 @@ static float TexelsPerMetre(const ThreeDVehicleObject &obj, const ThreeDVehicleS
 }
 
 /**
+ * The level of detail of a texture of a shape for a picture: about a texel to a pixel, each texture by its own
+ * triangles (TexelsPerMetre()) -- an add-on's picture over a few small parts needs a coarser level than the body's.
+ * @param pixels how big a metre of the shape is on the picture
+ */
+static int TextureLevelAt(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int texture, double pixels)
+{
+	const float density = TexelsPerMetre(obj, shape, texture);
+	int level = 0;
+	if (density <= 0.0f) {
+		/* Its triangles cover nothing of it, their corners at one point (the colleague's Tatra 148: six hundred
+		 * triangles of a part at 0, 0 of a picture of 4096 x 3824, made at its full size, 80 MB, for the colour of one
+		 * texel). The levels are the means of the texels drawn from (DecodeTextureLevels()): one of 128 texels keeps
+		 * that colour. */
+		int tw = 1024, th = 1024;
+		if (!obj.TextureSize(texture, tw, th)) tw = th = 1024;
+		while (std::max(tw, th) >> level > 128 && level < 12) level++;
+		return level;
+	}
+	for (double d = density; d >= 2.0 * pixels && level < 12; d /= 2.0) level++;
+	return level;
+}
+
+/**
  * The paint of a state over the body's texture (texture 0) of an object: its colour by number, faded with age, then
  * rusted (the colleague's points 6 and 7) -- each texel as RasterObject() draws it and as the processor paints a
  * texture for the view from the eyes (GetThreeDEyeVehicleTexture()); the card paints so by GpuPaintOf().
@@ -1502,10 +1525,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	int level = 0;
 	for (float d = TexelsPerMetre(obj, *shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
 	auto level_of = [&](int k) {
-		if (k == 0) return level;
-		int l = 0;
-		for (float d = TexelsPerMetre(obj, *shape, k); d >= 2.0f * p && l < 12; d /= 2.0f) l++;
-		return l;
+		return k == 0 ? level : TextureLevelAt(obj, *shape, k, p);
 	};
 	/* Only the textures of the triangles drawn (and the body's, for a triangle without one): those of the add-ons the
 	 * state does not show are not made at all (an add-on's picture is of sixteen million pixels). */
@@ -1836,7 +1856,7 @@ static void ForgetGpuDetailColours()
  * state, level and colour, a texture of a lorry tens of megabytes (the player, 18. 10.: "the paint on the card").
  * @param held keeps the colours of the details while the picture is drawn
  */
-static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, const ThreeDVehicleState *st, int index, const ObjectPaintOfState &painted, const ObjectDetailPaint &details, uint32_t tint, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
+static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &whole, const ThreeDVehicleState *st, int index, const ObjectPaintOfState &painted, const ObjectDetailPaint &details, uint32_t tint, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held, int level = -1)
 {
 	ThreeDGpuPaint g;
 	auto rgb = [](Colour c) { return std::array<float, 3>{static_cast<float>(c.r), static_cast<float>(c.g), static_cast<float>(c.b)}; };
@@ -1858,7 +1878,8 @@ static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVeh
 	}
 	const int a = static_cast<size_t>(index) < whole.tex_addon.size() ? whole.tex_addon[index] : -1;
 	if (a >= 0 && st != nullptr && static_cast<size_t>(a) < st->addon_colours.size() && st->addon_colours[a] != 0) {
-		g.addon_mask = obj.GetAddonMask(a, painted.level);
+		/* The add-on's mask as fine as its texture (TextureLevelAt()), else as the body's. */
+		g.addon_mask = obj.GetAddonMask(a, level >= 0 ? level : painted.level);
 		g.addon_colour = rgb(Colour(st->addon_colours[a]));
 		g.addon_start = obj.addons[a].start > 0 ? static_cast<float>(obj.addons[a].start) : 255.0f;
 	} else if (body && painted.second_mask != nullptr) {
@@ -2048,20 +2069,17 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 		for (float d = TexelsPerMetre(obj, shape); d >= 2.0f * p && level < 12; d /= 2.0f) level++;
 		/* Its textures as they are, each at its own level, painted by the card as they are drawn (GpuPaintOf()). */
 		m.textures.assign(m.triangles->used.size(), nullptr);
+		std::vector<int> levels(m.textures.size(), level);
 		for (size_t i = 0; i < m.textures.size(); i++) {
 			if (!m.triangles->used[i]) continue;
-			int l = level;
-			if (i != 0) {
-				l = 0;
-				for (float d = TexelsPerMetre(obj, shape, static_cast<int>(i)); d >= 2.0f * p && l < 12; d /= 2.0f) l++;
-			}
-			m.textures[i] = obj.GetTexture(l, static_cast<int>(i));
+			if (i != 0) levels[i] = TextureLevelAt(obj, shape, static_cast<int>(i), p);
+			m.textures[i] = obj.GetTexture(levels[i], static_cast<int>(i));
 		}
 		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0);
 		const ObjectDetailPaint details(obj, whole, st, std::max<size_t>(1, whole.pngs.size()), m.textures);
 		m.paints.resize(m.textures.size());
 		for (size_t i = 0; i < m.textures.size(); i++) {
-			if (m.textures[i] != nullptr) m.paints[i] = GpuPaintOf(obj, whole, st, static_cast<int>(i), painted, details, tint, held);
+			if (m.textures[i] != nullptr) m.paints[i] = GpuPaintOf(obj, whole, st, static_cast<int>(i), painted, details, tint, held, levels[i]);
 		}
 	}
 	/* The crew that walks: each figure the state shows at its frame of the way gone, turned, sized and stood at its
@@ -2117,8 +2135,11 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			for (float d = TexelsPerMetre(*load.fig, *ls); d >= 2.0f * p * biggest && load_level < 12; d /= 2.0f) load_level++;
 			std::shared_ptr<const ThreeDGpuTriangles> triangles = ThreeDGpuTrianglesOf(*ls, 0, false, ls->pngs.size());
 			std::vector<const ThreeDObjectTexture *> textures(triangles->used.size(), nullptr);
+			std::vector<int> levels(textures.size(), load_level);
 			for (size_t i = 0; i < textures.size(); i++) {
-				if (triangles->used[i]) textures[i] = load.fig->GetTexture(load_level, static_cast<int>(i));
+				if (!triangles->used[i]) continue;
+				if (i != 0) levels[i] = TextureLevelAt(*load.fig, *ls, static_cast<int>(i), p * biggest);
+				textures[i] = load.fig->GetTexture(levels[i], static_cast<int>(i));
 			}
 			std::vector<ThreeDGpuPaint> paints;
 			if (load.state != 0) {
@@ -2126,7 +2147,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 				const ObjectDetailPaint details(*load.fig, *ls, nullptr, std::max<size_t>(1, ls->pngs.size()), textures);
 				paints.resize(textures.size());
 				for (size_t i = 0; i < textures.size(); i++) {
-					if (textures[i] != nullptr) paints[i] = GpuPaintOf(*load.fig, *ls, load.fig->State(load.state), static_cast<int>(i), painted, details, 0, held);
+					if (textures[i] != nullptr) paints[i] = GpuPaintOf(*load.fig, *ls, load.fig->State(load.state), static_cast<int>(i), painted, details, 0, held, levels[i]);
 				}
 			}
 			for (const ThreeDLoadPlace &at : load.places) {
@@ -3951,12 +3972,13 @@ void TrimThreeDEyePainted()
 	if (freed > 0) Debug(misc, 1, "3D textures: {:.1f} MB painted for the view from the eyes and not drawn let go of", freed / (1024.0 * 1024.0));
 }
 
-/** The level of detail of an object's textures for the view from the eyes: about a texel to a pixel. */
-static int EyeTextureLevel(const ThreeDVehicleObject *obj, const ThreeDVehicleShape *shape, double pixels_per_metre)
+/**
+ * The level of detail of an object's texture for the view from the eyes: about a texel to a pixel, a texture by its
+ * own triangles of the shape (TextureLevelAt()), the body's (0) by all of them.
+ */
+static int EyeTextureLevel(const ThreeDVehicleObject *obj, const ThreeDVehicleShape *shape, double pixels_per_metre, int index = 0)
 {
-	int level = 0;
-	for (double d = TexelsPerMetre(*obj, *shape); d >= 2.0 * pixels_per_metre && level < 12; d /= 2.0) level++;
-	return level;
+	return TextureLevelAt(*obj, *shape, index, pixels_per_metre);
 }
 
 /**
@@ -4102,12 +4124,18 @@ const ThreeDObjectTexture *TryGetThreeDEyeVehicleTexture(const ThreeDVehicleObje
  * and level (GetThreeDEyeVehicleTexture()), a lorry close sixty four megabytes (the player, 29. 10.: "3 cars I see take
  * the last 750 MB"). Only what is made already (ThreeDLazyNoWait); what is not is made in the background.
  * @param count how many textures its shape draws by
+ * @param used by index, whether a triangle drawn has it (ThreeDGpuTriangles::used): those not are not made (an add-on
+ *             its state does not show); nullptr all
+ * @param drawn the shape drawn, of the parts its state shows: each texture but the body's as fine as its own triangles
+ *              of it need (EyeTextureLevel()) -- all as fine as the body's held the colleague's horse wagon at 160 MB
+ *              close by, thirty pictures of 1024 x 1024 at their full size for the small parts they cover; nullptr all
+ *              as the body's
  * @param[out] textures by index
  * @param[out] paints by index; empty when its state paints nothing
  * @param[out] held the colours of the details, kept till the card has drawn
  * @return false: something of it not made yet
  */
-bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, size_t count, std::vector<const ThreeDObjectTexture *> &textures, std::vector<ThreeDGpuPaint> &paints, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held)
+bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, double pixels_per_metre, size_t count, std::vector<const ThreeDObjectTexture *> &textures, std::vector<ThreeDGpuPaint> &paints, std::vector<std::shared_ptr<const ThreeDObjectTexture>> &held, const std::vector<bool> *used, const ThreeDVehicleShape *drawn)
 {
 	ThreeDLazyNoWait no_wait;
 	paints.clear();
@@ -4115,8 +4143,11 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	if (shape == nullptr) return false;
 	const int level = EyeTextureLevel(obj, shape, pixels_per_metre);
 	textures.assign(count, nullptr);
+	std::vector<int> levels(count, level);
 	for (size_t i = 0; i < textures.size(); i++) {
-		textures[i] = obj->GetTexture(level, static_cast<int>(i));
+		if (used != nullptr && (i >= used->size() || !(*used)[i])) continue;
+		if (i != 0 && drawn != nullptr) levels[i] = EyeTextureLevel(obj, drawn, pixels_per_metre, static_cast<int>(i));
+		textures[i] = obj->GetTexture(levels[i], static_cast<int>(i));
 		if (textures[i] == nullptr) return false;
 	}
 	if (state == 0) return !no_wait.Missed();
@@ -4124,7 +4155,9 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state));
 	const ObjectDetailPaint details(*obj, *shape, st, textures.size(), textures);
 	paints.resize(textures.size());
-	for (size_t i = 0; i < textures.size(); i++) paints[i] = GpuPaintOf(*obj, *shape, st, static_cast<int>(i), painted, details, 0, held);
+	for (size_t i = 0; i < textures.size(); i++) {
+		if (textures[i] != nullptr) paints[i] = GpuPaintOf(*obj, *shape, st, static_cast<int>(i), painted, details, 0, held, levels[i]);
+	}
 	return !no_wait.Missed();
 }
 
