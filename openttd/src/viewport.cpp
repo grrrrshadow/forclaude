@@ -6626,6 +6626,10 @@ static void TurnedCardBandDirty(const Viewport &vp, int left, int top, int right
 		gp = &it->second->card;
 	}
 	if (gp == nullptr || gp->stood.empty()) return;
+	/* Told into its own picture: the maps are of its size (TurnedCardMapSet() takes it from *_tcg). Into the main view's
+	 * while a car moved in a vehicle window, nothing was told -- the sizes differ --, the car laid only when something
+	 * else there was (the player, test2: "the train moved on by a tile, the train's window did not change"). */
+	AutoRestoreBackup card(_tcg, gp);
 	TurnedCardGround &g = *gp;
 	const int x0 = UnScaleByZoomLower(left, vp.zoom) - g.l, y0 = UnScaleByZoomLower(top, vp.zoom) - g.t;
 	const int x1 = UnScaleByZoom(right, vp.zoom) + 1 - g.l, y1 = UnScaleByZoom(bottom, vp.zoom) + 1 - g.t;
@@ -9241,7 +9245,12 @@ static void TurnedCardLaySmallViewsDirty(int left, int top, int right, int botto
 		AutoRestoreBackup version(_tg_version, &small->version);
 		const TurnedCardGround &g = small->card;
 		if (g.vp != &vp || !g.shown || !TurnedCardGroundFollow(vp, vp.zoom)) continue;
-		if (TurnedCardLayChanged(vp, left, top, right, bottom) == 0) _small_card_dirty_passes++;
+		const int laid = TurnedCardLayChanged(vp, left, top, right, bottom);
+		if (laid == 0) _small_card_dirty_passes++;
+		/* Nothing in it changed, its blocks only holes: its window moved or came to the front maybe -- the picture shown
+		 * where the view is now, among the windows as it is now (the player, test2: "I dragged the window on, the picture
+		 * of the map stayed there"). Laid, the card's showing it did that. */
+		if (laid == 2) ShowTurnedCardGround();
 	}
 }
 
