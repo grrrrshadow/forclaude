@@ -3347,6 +3347,11 @@ void UpdateWindows()
 		/* Update viewport only if window is not shaded. */
 		if (w->viewport != nullptr && !w->IsShaded()) UpdateViewportPosition(w, delta_ms.count());
 	}
+	/* The moving things of the turned main view laid over what stands on the card, as they are now and where the view is
+	 * now: after it moved above, not before (the player, 6. 11.: dragging the map, the houses, the industries, the cars
+	 * and the trains ran ahead of the ground; the move had the card's ground and what stands follow the view, and the
+	 * picture of the moving things shown over them stayed where the view was a frame before). */
+	TurnedCardLayMovers();
 	NetworkDrawChatMessage();
 	/* Redraw mouse cursor in case it was hidden */
 	DrawMouseCursor();

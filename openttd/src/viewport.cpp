@@ -9008,8 +9008,10 @@ void TurnedMovingLayerUpdate()
 
 /**
  * The things that move on the turned main view laid by the card over what stands on it (the moving layer,
- * ThreeDGpuStanding::moving), after the dirty blocks are drawn: when one of them moved, or what stands or the view
- * changed. Collected over all of the view as a block is (ViewportDoDrawTurned()), only they.
+ * ThreeDGpuStanding::moving), once a frame after the dirty blocks are drawn and the views moved (UpdateWindows()), the
+ * last before the frame is shown: when one of them moved, or what stands or the view changed. Collected over all of the
+ * view as a block is (ViewportDoDrawTurned()), only they. A move of the view after them left the picture of them shown
+ * a frame behind the ground and what stands, which the move takes along (MoveViewGround() of three_d_gpu.cpp).
  */
 void TurnedCardLayMovers()
 {
