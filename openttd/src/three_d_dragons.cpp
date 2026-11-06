@@ -876,6 +876,54 @@ uint TakeThreeDDragonDamage()
 }
 
 /**
+ * Where to put the walker of the view from the first person about a point, not into a fight with a dragon at once
+ * (the player, 6. 11.: "to come in under a dragon and into a fight with it is not good"): the point, or moved straight
+ * away from each dragon that would go for the walker there, beyond the reach it gives up the chase at.
+ * @param x,y the point, world units; moved
+ */
+static constexpr double KEEP_AWAY_M = CHASE_M * 1.5 + 10.0;
+
+/** Whether a dragon there would go for the walker. */
+static bool Fights(const Dragon &d)
+{
+	return d.state != State::Dying && d.state != State::Dead && d.state != State::Leave;
+}
+
+/** Whether a dragon would go for the walker of the view from the first person put at a point (ThreeDDragonsKeepAway()). */
+bool ThreeDDragonWouldFight(double x, double y)
+{
+	for (const Dragon &d : _dragons) {
+		if (Fights(d) && std::hypot(x - d.x, y - d.y) < KEEP_AWAY_M * OBJECT_UNITS_PER_METRE) return true;
+	}
+	return false;
+}
+
+void ThreeDDragonsKeepAway(double &x, double &y)
+{
+	const double keep = KEEP_AWAY_M * OBJECT_UNITS_PER_METRE;
+	for (int round = 0; round < 4; round++) {
+		bool moved = false;
+		for (const Dragon &d : _dragons) {
+			if (!Fights(d)) continue;
+			double dx = x - d.x, dy = y - d.y;
+			const double dist = std::hypot(dx, dy);
+			if (dist >= keep) continue;
+			if (dist < 1.0) {
+				dx = 1.0;
+				dy = 0.0;
+			} else {
+				dx /= dist;
+				dy /= dist;
+			}
+			x = std::clamp(d.x + dx * keep, 2.0 * TILE_SIZE, (Map::SizeX() - 2.0) * TILE_SIZE);
+			y = std::clamp(d.y + dy * keep, 2.0 * TILE_SIZE, (Map::SizeY() - 2.0) * TILE_SIZE);
+			moved = true;
+		}
+		if (!moved) return;
+	}
+}
+
+/**
  * A dragon comes now (or the rig sends one): a flying one crosses the map through the place, a walking one comes
  * down there.
  * @param kind the creature of the indices, or empty for any

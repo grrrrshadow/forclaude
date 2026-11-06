@@ -1036,15 +1036,20 @@ struct FirstPersonWindow : Window {
 		return false;
 	}
 
-	/** The walker to the nearest place it can stand from a world point. */
-	void PutNear(double x, double y)
+	/**
+	 * The walker to the nearest place it can stand from a world point: beside an industry of the original game it
+	 * cannot go into (the player, 6. 11.), round a house, out of the water.
+	 * @param away_from_dragons and where no dragon would go for it at once (the god's eye: ShowFirstPersonWindowAt())
+	 */
+	void PutNear(double x, double y, bool away_from_dragons = false)
 	{
-		/* The nearest place to stand, in rings a quarter of a tile apart. */
-		for (int ring = 0; ring < 24; ring++) {
+		/* The nearest place to stand, in rings a quarter of a tile apart, up to twelve tiles off (the largest
+		 * industries). */
+		for (int ring = 0; ring < 48; ring++) {
 			for (int k = 0; k < std::max(1, ring * 8); k++) {
 				const double a = k * 2 * M_PI / std::max(1, ring * 8), r = ring * TILE_SIZE / 4.0;
 				const double px = x + r * std::cos(a), py = y + r * std::sin(a);
-				if (FirstPersonWalkable(px, py)) {
+				if (FirstPersonWalkable(px, py) && (!away_from_dragons || !ThreeDDragonWouldFight(px, py))) {
 					this->walker.x = px;
 					this->walker.y = py;
 					return;
@@ -2348,7 +2353,11 @@ void ShowFirstPersonWindowAt(TileIndex tile)
 	ShowFirstPersonWindow();
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr || w->Riding() != nullptr) return;
-	w->PutNear(TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0);
+	/* Not into a fight with a dragon at once (the player, 6. 11.); a building the walker cannot go into, beside it
+	 * (PutNear()). */
+	double x = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	ThreeDDragonsKeepAway(x, y);
+	w->PutNear(x, y, true);
 	w->MakePicture();
 	w->SetDirty();
 }
