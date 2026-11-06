@@ -9676,6 +9676,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		const bool hex = argv[2].starts_with("0x");
 		const auto id = ParseInteger<uint32_t>(hex ? argv[2].substr(2) : argv[2], hex ? 16 : 10);
 		if (id.has_value()) IConsolePrint(CC_DEFAULT, "test3d: text 0x{:X}: {}", *id, GetString(static_cast<StringID>(*id)));
+	} else if (what == "posun_okna" && argv.size() > 3) {
+		/* 'posun_okna <dx> <dy>': the front vehicle window moved as a drag of its title bar moves it (window.cpp,
+		 * HandleWindowDragging(): its view with it, both its places drawn again). */
+		auto dx = number(2), dy = number(3);
+		Window *w = nullptr;
+		for (Window *v : Window::IterateFromFront()) {
+			if (v->window_class == WindowClass::VehicleView) {
+				w = v;
+				break;
+			}
+		}
+		if (w == nullptr || !dx.has_value() || !dy.has_value()) {
+			IConsolePrint(CC_ERROR, "test3d: okno vozidla NENI");
+			return true;
+		}
+		w->SetDirty();
+		if (w->viewport != nullptr) {
+			w->viewport->left += *dx;
+			w->viewport->top += *dy;
+		}
+		w->left += *dx;
+		w->top += *dy;
+		w->SetDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: okno vozidla na {},{}", w->left, w->top);
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {
