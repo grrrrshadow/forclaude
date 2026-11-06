@@ -3682,6 +3682,13 @@ static void AddBoxFaces(std::vector<BoxFace> &faces, const ThreeDPart &part, boo
 			ClipBoxPolygon(poly, 0, cx1, false);
 			ClipBoxPolygon(poly, 1, cy0, true);
 			ClipBoxPolygon(poly, 1, cy1, false);
+			/* A wall lying on the cut itself is the tile's past it: a box of the next tile reaching to the cut (with its
+			 * margin) had its back wall drawn here too, from this tile's sprite (the hotel 2x1, test2: a grey smear over the
+			 * front of the block with the pool). */
+			auto on = [&poly](int axis, double limit) {
+				return std::ranges::all_of(poly, [&](const BoxVertex &v) { return std::abs((axis == 0 ? v.x : v.y) - limit) < 1e-9; });
+			};
+			if (on(0, cx0) || on(0, cx1) || on(1, cy0) || on(1, cy1)) return false;
 		}
 		return poly.size() >= 3;
 	};
@@ -4017,32 +4024,66 @@ struct TurnedTexture {
 	int width, height; ///< its size, pixels at the frame's zoom
 };
 
+/** A sprite drawn into the texture of a standing thing (MakeTurnedTexture()): where the game draws it facing north. */
+struct TurnedTextureSprite {
+	SpriteID image;
+	PaletteID pal;
+	const SubSprite *sub;
+	int x, y;
+};
+
+/** The sprite of a standing thing and its children (a depot's door frame, drawn apart from the shed), where the game draws them facing north: the turn's shift taken off again. */
+static void AddTurnedTextureSprites(std::vector<TurnedTextureSprite> &out, const ParentSpriteToDraw &ps)
+{
+	const Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az);
+	const int shift_x = t.x - c.x, shift_y = t.y - c.y;
+	const int sx = ps.x - shift_x, sy = ps.y - shift_y, sleft = ps.left - shift_x, stop = ps.top - shift_y;
+	out.push_back({ps.image, ps.pal, ps.sub, sx, sy});
+	for (int child_idx = ps.first_child; child_idx >= 0;) {
+		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
+		child_idx = cs.next;
+		out.push_back({cs.image, cs.pal, cs.sub, (cs.relative ? sleft : sx) + cs.x, (cs.relative ? stop : sy) + cs.y});
+	}
+}
+
 /**
  * Draw the sprite of a standing thing, with its children, north-up into _turned_texture, for its pixels to be laid
- * over faces (DrawTurnedFaces()).
+ * over faces (DrawTurnedFaces()). A house of several tiles with a hand table (box_kind 1): the sprites of all its
+ * tiles, as the game draws them, far first -- its boxes do not keep to the tiles' sprites (the hotel 2x1, test2: the
+ * front of the block with the pool is half in the sprite of the tile behind, the box of the tile in front had nothing
+ * there and the boxes behind showed through it).
  * @return whether there is anything to lay
  */
 static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDraw &ps, TurnedTexture &tex, const std::vector<EvenRegion> *even = nullptr)
 {
 	ZoomLevel zoom = frame.zoom;
 	int mask = ScaleByZoom(-1, zoom);
-	const Sprite *spr = GetSprite(ps.image & SPRITE_MASK, SpriteType::Normal);
 
-	/* Where the game draws the sprite facing north: the turn's shift taken off again. */
-	Point c = RemapCoords(ps.ax, ps.ay, ps.az), t = ProjectTurned(ps.ax, ps.ay, ps.az);
-	int shift_x = t.x - c.x, shift_y = t.y - c.y;
-	int sx = ps.x - shift_x, sy = ps.y - shift_y, sleft = ps.left - shift_x, stop = ps.top - shift_y;
-	/* The texture holds the sprite and its children: a depot's door frame, drawn apart from the shed. */
-	int bleft = sleft, btop = stop, bright = sleft + spr->width, bbottom = stop + spr->height;
-	for (int child_idx = ps.first_child; child_idx >= 0;) {
-		const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
-		child_idx = cs.next;
-		const Sprite *cspr = GetSprite(cs.image & SPRITE_MASK, SpriteType::Normal);
-		int cx = (cs.relative ? sleft : sx) + cs.x + cspr->x_offs, cy = (cs.relative ? stop : sy) + cs.y + cspr->y_offs;
-		bleft = std::min(bleft, cx);
-		btop = std::min(btop, cy);
-		bright = std::max(bright, cx + cspr->width);
-		bbottom = std::max(bbottom, cy + cspr->height);
+	static std::vector<TurnedTextureSprite> sprites;
+	sprites.clear();
+	if (ps.box_kind == 1 && ps.box != nullptr && (ps.box->tiles_x > 1 || ps.box->tiles_y > 1)) {
+		/* The tiles of the house among what the block collected: whatever of them shows in the block reaches into it. */
+		static std::vector<const ParentSpriteToDraw *> house;
+		house.clear();
+		for (const ParentSpriteToDraw &o : _vd.parent_sprites_to_draw) {
+			if (o.box_kind == 1 && o.box == ps.box && o.box_ox == ps.box_ox && o.box_oy == ps.box_oy && o.box_oz == ps.box_oz) house.push_back(&o);
+		}
+		if (std::ranges::find(house, &ps) == house.end()) house.push_back(&ps);
+		std::ranges::sort(house, [](const ParentSpriteToDraw *a, const ParentSpriteToDraw *b) {
+			return std::make_pair(a->box_dx + a->box_dy, a->box_dx) < std::make_pair(b->box_dx + b->box_dy, b->box_dx);
+		});
+		for (const ParentSpriteToDraw *o : house) AddTurnedTextureSprites(sprites, *o);
+	} else {
+		AddTurnedTextureSprites(sprites, ps);
+	}
+	int bleft = INT_MAX, btop = INT_MAX, bright = INT_MIN, bbottom = INT_MIN;
+	for (const TurnedTextureSprite &s : sprites) {
+		const Sprite *spr = GetSprite(s.image & SPRITE_MASK, SpriteType::Normal);
+		const int x = s.x + spr->x_offs, y = s.y + spr->y_offs;
+		bleft = std::min(bleft, x);
+		btop = std::min(btop, y);
+		bright = std::max(bright, x + spr->width);
+		bbottom = std::max(bbottom, y + spr->height);
 	}
 	const int margin = TILE_HEIGHT * ZOOM_BASE;
 	int tleft = (bleft - margin) & mask;
@@ -4071,7 +4112,7 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 		mix(to_underlying(zoom));
 		mix(static_cast<uint32_t>(tw));
 		mix(static_cast<uint32_t>(th));
-		sprite(ps.image, ps.pal, ps.sub, sx, sy);
+		for (const TurnedTextureSprite &s : sprites) sprite(s.image, s.pal, s.sub, s.x, s.y);
 		/* A building's texture evened by its faces (EvenTurnedTexture()). */
 		if (even != nullptr) {
 			mix(0x45564E00u | static_cast<uint32_t>(even->size()));
@@ -4080,11 +4121,6 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 					for (double v : r.p[i]) mix(static_cast<uint32_t>(std::lround(v * 64)));
 				}
 			}
-		}
-		for (int child_idx = ps.first_child; child_idx >= 0;) {
-			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
-			child_idx = cs.next;
-			sprite(cs.image, cs.pal, cs.sub, (cs.relative ? sleft : sx) + cs.x, (cs.relative ? stop : sy) + cs.y);
 		}
 		_turned_faces_out->textures++;
 		_turned_faces_out->key = key;
@@ -4109,17 +4145,7 @@ static bool MakeTurnedTexture(const DrawPixelInfo &frame, const ParentSpriteToDr
 	{
 		AutoRestoreBackup dpi_backup(_cur_dpi, &tdpi);
 		AutoRestoreBackup anim_backup(_screen_disable_anim, true);
-		DrawSpriteViewport(ps.image, ps.pal, sx, sy, ps.sub);
-		int child_idx = ps.first_child;
-		while (child_idx >= 0) {
-			const ChildScreenSpriteToDraw &cs = _vd.child_screen_sprites_to_draw[child_idx];
-			child_idx = cs.next;
-			if (cs.relative) {
-				DrawSpriteViewport(cs.image, cs.pal, sleft + cs.x, stop + cs.y, cs.sub);
-			} else {
-				DrawSpriteViewport(cs.image, cs.pal, sx + cs.x, sy + cs.y, cs.sub);
-			}
-		}
+		for (const TurnedTextureSprite &s : sprites) DrawSpriteViewport(s.image, s.pal, s.x, s.y, s.sub);
 	}
 	if (even != nullptr) EvenTurnedTexture(_turned_texture.data(), tw, th, tleft, ttop, zoom, ps, *even);
 	_turned_times.texture += TurnedNow() - t0;
