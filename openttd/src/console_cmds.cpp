@@ -9501,6 +9501,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: cesta {} bodu{}{}", way.size(), text, NavStraight((*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE, (*x2 + 0.5) * TILE_SIZE, (*y2 + 0.5) * TILE_SIZE) ? " (rovne)" : "");
 			return true;
 		}
+		if (argv.size() > 4 && argv[2] == "oko") {
+			/* 'draci oko <x> <y>': the view from the first person opened at a tile as the god's eye opens it
+			 * (ShowFirstPersonWindowAt(): beside an industry it cannot go into, not in a fight with a dragon). */
+			auto x = number(3), y = number(4);
+			if (!x.has_value() || !y.has_value()) return true;
+			ShowFirstPersonWindowAt(TileXY(*x, *y));
+			if (FirstPersonWalkerAt(wx, wy)) IConsolePrint(CC_DEFAULT, "test3d: chodec na {:.2f},{:.2f}", wx / TILE_SIZE, wy / TILE_SIZE);
+		}
 		if (argv.size() > 2 && argv[2] == "posli") {
 			/* 'draci posli [jmeno] [dlazdic]': so many tiles ahead of the walker (4 without it). */
 			extern double FirstPersonWalkerHeading();

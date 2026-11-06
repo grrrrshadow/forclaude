@@ -2404,6 +2404,33 @@ static bool TestScissoredClearAmongPictures()
 	return ok;
 }
 
+/*
+ * The first draw of each kind in a run waited for at once, its step named before it. The player's phone (6. 11.: into
+ * the view from the eyes on a farm's field, and under a dragon) went down in its driver compiling a shader, both times
+ * in the glFinish at the end of the first frame from the eyes, and the diary could not say for which of its draws: the
+ * card compiles a program's shader anew for each way of drawing with it (blending, the depth, the corners' attributes).
+ * Waited for at its first draw, the last line of the diary says which.
+ */
+static std::set<std::string, std::less<>> _first_draws;
+
+/**
+ * Before a draw: whether it is the first of its kind in this run, its step written and kept -- they are few, and say
+ * what the card has drawn (FirstDrawDone() after it then).
+ */
+static bool FirstDraw(std::string_view what)
+{
+	if (_first_draws.contains(what)) return false;
+	_first_draws.emplace(what);
+	Diary(fmt::format("krok prvni kresleni {} (glFinish)", what), true);
+	return true;
+}
+
+/** After the first draw of its kind: the card waited for, its shader compiled for it now. */
+static void FirstDrawDone(bool first)
+{
+	if (first) gl.glFinish();
+}
+
 bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::string &why)
 {
 	GLuint vs = CompileShader(GL_VERTEX_SHADER, vertex, why);
@@ -4985,6 +5012,14 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
  * how far ahead, the larger the nearer): each side of a building that faces away left out as the processor leaves it
  * out -- on the picture y down, a triangle of side 1 drawn when its corners go round clockwise --; the figures opaque.
  */
+/** The kind of a draw of the figures from the eyes for FirstDraw(): what the card compiles their program anew for. */
+static std::string MeshDrawKind(bool glass, bool instanced, const GpuShape &shape, bool bones, int8_t facing, double determinant)
+{
+	const char *sides = facing == 0 || determinant == 0 ? "obe" : (facing * determinant < 0 ? "ccw" : "cw");
+	return fmt::format("postavy z oci{}{}, normaly {}, kola {}, kosti {}, strany {}", glass ? ", sklo" : "", instanced ? ", instance" : "",
+			shape.has_nrm ? 1 : 0, shape.has_wheel ? 1 : 0, bones && shape.has_bones ? 1 : 0, sides);
+}
+
 void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 {
 	gl.glUseProgram(_eye_building_program.program);
@@ -4997,14 +5032,17 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 		gl.glBindVertexArray(d.on->vao);
 		for (const GpuBuilding::Run &r : d.on->runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
-			if (r.facing == 0 || !d.eye->building.cull) {
+			const bool cull = r.facing != 0 && d.eye->building.cull;
+			if (!cull) {
 				gl.glDisable(GL_CULL_FACE);
 			} else {
 				gl.glEnable(GL_CULL_FACE);
 				gl.glFrontFace(r.facing > 0 ? GL_CW : GL_CCW);
 			}
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
+			const bool first = FirstDraw(fmt::format("budovy z oci, strany {}", cull ? (r.facing > 0 ? "cw" : "ccw") : "obe"));
 			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
+			FirstDrawDone(first);
 		}
 	}
 	gl.glDisable(GL_CULL_FACE);
@@ -5057,7 +5095,9 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			SetPaint(_eye_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
 			gl.glBindTexture(GL_TEXTURE_2D, d.textures[r.texture]);
 			CullVehicleRun(r.facing, -determinant);
+			const bool first = FirstDraw(MeshDrawKind(glass, false, *d.shape, d.mesh->bones != nullptr, r.facing, -determinant));
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
+			FirstDrawDone(first);
 		}
 	}
 	/* The batches of meshes alike (EyeObjectDraws::Batch): the shape's triangles once for all its instances, their
@@ -5096,7 +5136,9 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 				SetPaint(_eye_mesh_program, r.texture < b.mesh->paints.size() ? &b.mesh->paints[r.texture] : nullptr, &b.paints[r.texture]);
 				gl.glBindTexture(GL_TEXTURE_2D, b.textures[r.texture]);
 				CullVehicleRun(r.facing, -b.mirrored);
+				const bool first = FirstDraw(MeshDrawKind(glass, true, *b.shape, false, r.facing, -b.mirrored));
 				gl.glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)), count);
+				FirstDrawDone(first);
 			}
 			/* The shape's VAO as it was: its own attributes alone. */
 			for (GLuint a = 4; a <= 8; a++) {
@@ -5512,7 +5554,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glDepthMask(GL_TRUE);
 	};
 	/* A job over the whole picture: its program, the picture of the moment read, the other written. */
-	auto job = [&](const GpuProgram &p) {
+	std::string_view job_name;
+	auto job = [&](const GpuProgram &p, std::string_view name) {
+		job_name = name;
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, _frame_pixel_fbo[1 - now]);
 		gl.glDrawBuffers(1, colour_only);
 		gl.glDisable(GL_DEPTH_TEST);
@@ -5531,7 +5575,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 	};
 	auto done = [&]() {
 		gl.glBindVertexArray(_frame_empty_vao);
+		const bool first = FirstDraw(fmt::format("snimku z oci: {}", job_name));
 		gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+		FirstDrawDone(first);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		gl.glActiveTexture(GL_TEXTURE0);
@@ -5570,7 +5616,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glBindVertexArray(_frame_glow_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_glow_vbo);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(v.size() * sizeof(float)), v.data(), GL_STREAM_DRAW);
+		const bool first = FirstDraw("snimku z oci: zare");
 		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(v.size() / 13));
+		FirstDrawDone(first);
 		gl.glDisable(GL_BLEND);
 	};
 	/* The figures' glass, after what is solid; seen through, its depth not kept (what is behind it is lit, hazed and
@@ -5590,7 +5638,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		if (s.kind != Kind::Triangles && s.kind != Kind::Objects && s.kind != Kind::Lay) glass();
 		switch (s.kind) {
 			case Kind::Background:
-				job(_frame_background_program);
+				job(_frame_background_program, "obloha");
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_background_program.program, "u_horizon"), s.horizon);
 				done();
 				break;
@@ -5628,7 +5676,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 						gl.glDepthMask(GL_FALSE);
 					}
 					gl.glBindTexture(GL_TEXTURE_2D, names[run.texture]);
+					const bool first = FirstDraw(fmt::format("snimku z oci: trojuhelniky{}{}", run.glass ? ", sklo" : "", grass ? ", trava" : ""));
 					gl.glDrawArrays(GL_TRIANGLES, static_cast<GLint>(run.first), static_cast<GLsizei>(count));
+					FirstDrawDone(first);
 					if (run.glass) {
 						gl.glDisable(GL_BLEND);
 						gl.glDepthMask(GL_TRUE);
@@ -5662,7 +5712,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glUniform1i(gl.glGetUniformLocation(_frame_lay_program.program, "u_lay_z"), 3);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_lay_program.program, "u_near"), depth_scale);
 				gl.glBindVertexArray(_frame_empty_vao);
+				const bool first = FirstDraw("snimku z oci: polozeny obraz (tunel)");
 				gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+				FirstDrawDone(first);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);
@@ -5670,14 +5722,14 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				break;
 			}
 			case Kind::Haze:
-				job(_frame_haze_program);
+				job(_frame_haze_program, "mlha");
 				gl.glUniform3f(gl.glGetUniformLocation(_frame_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_from"), s.from);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_haze_program.program, "u_reach"), s.depth);
 				done();
 				break;
 			case Kind::FarHaze:
-				job(_frame_far_haze_program);
+				job(_frame_far_haze_program, "mlha v dali");
 				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_from"), s.from);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_to"), s.to);
@@ -5695,7 +5747,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, m.nu, m.nv, 0, GL_RED, GL_FLOAT, m.nearest);
 					_frame_shadow_key = m.key;
 				}
-				job(_frame_shadow_program);
+				job(_frame_shadow_program, "stiny");
 				const GLuint p = _frame_shadow_program.program;
 				gl.glUniform1i(gl.glGetUniformLocation(p, "u_map"), 2);
 				gl.glUniform3f(gl.glGetUniformLocation(p, "u_sun"), m.sun[0], m.sun[1], m.sun[2]);
@@ -5710,7 +5762,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				break;
 			}
 			case Kind::Night:
-				job(_frame_night_program);
+				job(_frame_night_program, "noc");
 				gl.glUniform3f(gl.glGetUniformLocation(_frame_night_program.program, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
 				done();
 				glows(s.glows);
@@ -5719,7 +5771,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				glows(s.glows);
 				break;
 			case Kind::GlowAfterNight:
-				job(_frame_glow_after_program);
+				job(_frame_glow_after_program, "svetla po noci");
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, _frame_glow);
 				gl.glUniform1i(gl.glGetUniformLocation(_frame_glow_after_program.program, "u_glow"), 2);
@@ -5737,7 +5789,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				}
 				gl.glActiveTexture(GL_TEXTURE2);
 				EyeFrameList(list);
-				job(_frame_lamps_program);
+				job(_frame_lamps_program, "lampy");
 				const GLuint p = _frame_lamps_program.program;
 				gl.glUniform1i(gl.glGetUniformLocation(p, "u_lights"), 2);
 				gl.glUniform1i(gl.glGetUniformLocation(p, "u_count"), static_cast<GLint>(s.lights.size()));
@@ -5755,7 +5807,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				for (const ThreeDGpuEyeBlast &b : s.blasts) list.insert(list.end(), {b.sx, b.sy, b.radius, b.iw, b.r, b.g, b.b, b.alpha});
 				gl.glActiveTexture(GL_TEXTURE2);
 				EyeFrameList(list);
-				job(_frame_blasts_program);
+				job(_frame_blasts_program, "kour a vybuchy");
 				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_blasts"), 2);
 				gl.glUniform1i(gl.glGetUniformLocation(_frame_blasts_program.program, "u_count"), static_cast<GLint>(s.blasts.size()));
 				done();
@@ -5787,7 +5839,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 					gl.glBindVertexArray(_frame_star_vao);
 					gl.glBindBuffer(GL_ARRAY_BUFFER, _frame_star_vbo);
 					gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(stars.size() * sizeof(float)), stars.data(), GL_STREAM_DRAW);
+					const bool first = FirstDraw("snimku z oci: hvezdy");
 					gl.glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(stars.size() / 5));
+					FirstDrawDone(first);
 					gl.glDisable(GL_BLEND);
 				}
 				if (s.moon[2] > 0) {
@@ -5806,7 +5860,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 							gl.glBlendFunc(GL_ONE, GL_ONE);
 						}
 						gl.glBindVertexArray(_frame_empty_vao);
+						const bool first = FirstDraw(glow == 1 ? "snimku z oci: mesic, zare" : "snimku z oci: mesic");
 						gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+						FirstDrawDone(first);
 						gl.glDisable(GL_BLEND);
 					}
 				}
@@ -5852,7 +5908,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glBindTexture(GL_TEXTURE_2D, _frame_colour[now]);
 		gl.glUniform1i(gl.glGetUniformLocation(_frame_copy_program.program, "u_colour"), 0);
 		gl.glBindVertexArray(_frame_empty_vao);
+		const bool first = FirstDraw("snimku z oci: kopie k ukazani");
 		gl.glDrawArrays(GL_TRIANGLES, 0, 3);
+		FirstDrawDone(first);
 		gl.glBindVertexArray(0);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
