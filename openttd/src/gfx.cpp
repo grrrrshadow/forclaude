@@ -1518,8 +1518,7 @@ void DrawDirtyBlocks()
 		}
 	}
 
-	/* The moving things laid over what stands, as they are now (TurnedCardLayMovers()). */
-	TurnedCardLayMovers();
+	/* The moving things are laid over what stands once the views have moved too (TurnedCardLayMovers(), UpdateWindows()). */
 
 	++_dirty_block_colour;
 	_invalid_rect.left = _screen.width;
