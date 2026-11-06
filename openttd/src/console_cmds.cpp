@@ -9677,12 +9677,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		const auto id = ParseInteger<uint32_t>(hex ? argv[2].substr(2) : argv[2], hex ? 16 : 10);
 		if (id.has_value()) IConsolePrint(CC_DEFAULT, "test3d: text 0x{:X}: {}", *id, GetString(static_cast<StringID>(*id)));
 	} else if (what == "posun_okna" && argv.size() > 3) {
-		/* 'posun_okna <dx> <dy>': the front vehicle window moved as a drag of its title bar moves it (window.cpp,
-		 * HandleWindowDragging(): its view with it, both its places drawn again). */
+		/* 'posun_okna <dx> <dy> [potom <command...>]': the front vehicle window or extra view moved as a drag of its title bar moves it
+		 * (window.cpp, HandleWindowDragging(): its view with it, both its places drawn again). */
 		auto dx = number(2), dy = number(3);
 		Window *w = nullptr;
 		for (Window *v : Window::IterateFromFront()) {
-			if (v->window_class == WindowClass::VehicleView) {
+			if (v->window_class == WindowClass::VehicleView || v->window_class == WindowClass::ExtraViewport) {
 				w = v;
 				break;
 			}
@@ -9700,6 +9700,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		w->top += *dy;
 		w->SetDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: okno vozidla na {},{}", w->left, w->top);
+		/* '... potom <command...>': run right after the move (the game paused, a picture taken after it). */
+		if (argv.size() > 5 && argv[4] == "potom") {
+			std::string then;
+			for (size_t i = 5; i < argv.size(); i++) {
+				if (!then.empty()) then += ' ';
+				then += argv[i];
+			}
+			IConsoleCmdExec(then);
+		}
 	} else if (what == "okna") {
 		/* Every window there is, for the rig. */
 		for (const Window *w : Window::Iterate()) {
