@@ -3446,10 +3446,13 @@ static void AddTurnedTileGround(std::vector<TurnedGroundPiece> &pieces, std::vec
 			key.Mix(cs.relative);
 		}
 	}
-	/* Another picture of the tile's ground than it had: what the view kept of the ground is old (TurnedGroundOfView). */
-	static std::unordered_map<uint32_t, uint64_t> foundation_of_tile;
+	/* Another picture of the tile's ground than it had: what the view kept of the ground is old (TurnedGroundOfView).
+	 * At each zoom its own: a vehicle window at another zoom than the map drawing the same tile told it changed at
+	 * every draw of either, all the ground of every view laid again (the rig, test2: a window moved over a slope). */
+	static std::unordered_map<uint64_t, uint64_t> foundation_of_tile;
 	if (foundation_of_tile.size() > 100000) foundation_of_tile.clear();
-	auto [had, first_time] = foundation_of_tile.try_emplace(static_cast<uint32_t>(x0 / TILE_SIZE) | static_cast<uint32_t>(y0 / TILE_SIZE) << 16, key.key);
+	const uint64_t tile_at_zoom = static_cast<uint64_t>(static_cast<uint32_t>(x0 / TILE_SIZE) | static_cast<uint32_t>(y0 / TILE_SIZE) << 16) | static_cast<uint64_t>(to_underlying(zoom)) << 32;
+	auto [had, first_time] = foundation_of_tile.try_emplace(tile_at_zoom, key.key);
 	if (first_time || had->second != key.key) {
 		had->second = key.key;
 		TurnedGroundChangedForAllViews();
