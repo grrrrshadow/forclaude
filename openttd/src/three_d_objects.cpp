@@ -311,6 +311,8 @@ static std::vector<ThreeDVehicleObject> _figure_objects;
 static std::vector<ThreeDIvy> _three_d_ivies;
 /** The graffiti of the walls ("druh": "zed_grafiti"), the names of their figures (GetThreeDGraffiti()). */
 static std::vector<std::string> _three_d_graffiti;
+/** The spalled places of the concrete ("druh": "zed_odprysk"), the names of their figures (GetThreeDConcreteSpalls()). */
+static std::vector<std::string> _three_d_concrete_spalls;
 
 /**
  * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
@@ -4338,6 +4340,80 @@ static void DressInMasonry(ThreeDObject &piece, const BridgeWallPicture &wall)
 	piece.texels_per_unit = static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE));
 }
 
+/**
+ * The flat upright faces of concrete of a bridge's piece (ThreeDObject::decal_faces): its triangles of concrete (all of
+ * them, or those of tri_tex 1) that stand upright, gathered by their plane -- the way they face, to 2 degrees, and how
+ * far out, to 5 cm --, each plane a rectangle from its leftmost to its rightmost and from its foot to its top, kept
+ * where it is at least a metre wide, 70 cm high and filled by its triangles at least to 70 % (not the opening of an
+ * arch); placed as PlaceIndustryPart() places the piece.
+ * @param mesh the piece's mesh, metres, its normals telling its triangles' outside
+ * @param all every triangle of concrete; else those of tri_tex 1 (LayBridgeConcrete())
+ */
+static std::vector<ThreeDObject::DecalFace> ConcreteDecalFaces(const GlbMesh &mesh, bool all, const float at[3], float turn)
+{
+	struct Plane {
+		double hx = 0, hy = 0, d = 0, area = 0;
+		double t0 = std::numeric_limits<double>::max(), t1 = -std::numeric_limits<double>::max();
+		double z0 = std::numeric_limits<double>::max(), z1 = -std::numeric_limits<double>::max();
+	};
+	std::map<std::pair<int, int>, Plane> planes;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (!all && (t / 3 >= mesh.tri_tex.size() || mesh.tri_tex[t / 3] == 0)) continue;
+		const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+		const double len = std::sqrt(gx * gx + gy * gy + gz * gz);
+		if (len < 1e-9) continue;
+		if (normals) {
+			double s = 0;
+			for (int k = 0; k < 3; k++) {
+				const float *n = &mesh.nrm[mesh.tri[t + k] * 3];
+				s += gx * n[0] + gy * n[1] + gz * n[2];
+			}
+			if (s < 0) {
+				gx = -gx;
+				gy = -gy;
+				gz = -gz;
+			}
+		}
+		if (std::abs(gz / len) > 0.25) continue;
+		const double h = std::hypot(gx, gy), hx = gx / h, hy = gy / h;
+		int angle = static_cast<int>(std::lround(std::atan2(hy, hx) * 90.0 / M_PI));
+		if (angle == -90) angle = 90;
+		const double d = hx * a[0] + hy * a[1];
+		Plane &p = planes[{angle, static_cast<int>(std::lround(d / 0.05))}];
+		const double area = len / 2;
+		p.hx += hx * area;
+		p.hy += hy * area;
+		p.d += d * area;
+		p.area += area;
+		for (const float *q : {a, b, c}) {
+			const double along = -hy * q[0] + hx * q[1];
+			p.t0 = std::min(p.t0, along);
+			p.t1 = std::max(p.t1, along);
+			p.z0 = std::min<double>(p.z0, q[2]);
+			p.z1 = std::max<double>(p.z1, q[2]);
+		}
+	}
+	std::vector<ThreeDObject::DecalFace> faces;
+	const double r = turn * M_PI / 180.0, cs = std::cos(r), sn = std::sin(r);
+	for (const auto &[key, p] : planes) {
+		const double w = p.t1 - p.t0, h = p.z1 - p.z0;
+		if (w < 1.0 || h < 0.7 || p.area < 0.7 * w * h) continue;
+		const double hl = std::hypot(p.hx, p.hy);
+		if (hl <= 0) continue;
+		const double hx = p.hx / hl, hy = p.hy / hl, d = p.d / p.area;
+		auto place_x = [&](double x, double y) { return static_cast<float>((at[0] + x * cs - y * sn) * OBJECT_UNITS_PER_METRE); };
+		auto place_y = [&](double x, double y) { return static_cast<float>((at[1] + x * sn + y * cs) * OBJECT_UNITS_PER_METRE); };
+		/* Its left end, as one looks at it from outside, is at its least along (-hy, hx), as the walls' (MasonryMesh()). */
+		const double lx = hx * d - hy * p.t0, ly = hy * d + hx * p.t0, rx = hx * d - hy * p.t1, ry = hy * d + hx * p.t1;
+		faces.push_back({static_cast<float>(hx * cs - hy * sn), static_cast<float>(hx * sn + hy * cs), place_x(lx, ly), place_y(lx, ly), place_x(rx, ry), place_y(rx, ry),
+				static_cast<float>((at[2] + p.z0) * OBJECT_HEIGHT_PER_METRE), static_cast<float>((at[2] + p.z1) * OBJECT_HEIGHT_PER_METRE)});
+	}
+	return faces;
+}
+
 /** The concrete of the bridges' models: the warm grey cell of their shared atlas (the others its paint, the deck, the steel). */
 static const Colour BRIDGE_CONCRETE_CELL(0xA8, 0xA6, 0xA0);
 
@@ -4567,7 +4643,11 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				ThreeDObject piece = PlaceIndustryPart(*meshes[p], fmt::format("{}/{} {} {}", name, BRIDGE_PIECE_NODES[p], type, q * 90), at, q * 90.0f, 1.0f, 1, 1);
 				piece.colours = colours;
 				piece.variant_paint = {paint, paint};
-				if (has_concrete[p]) DressInConcrete(piece, meshes[p]->mesh, *concrete);
+				if (has_concrete[p]) {
+					DressInConcrete(piece, meshes[p]->mesh, *concrete);
+					piece.decal_faces = ConcreteDecalFaces(meshes[p]->mesh, false, at, q * 90.0f);
+					if (q == 0) Debug(misc, 1, "3D bridge {}: {} for type {}, {} faces of concrete for the spalls", name, BRIDGE_PIECE_NODES[p], type, piece.decal_faces.size());
+				}
 				_three_d_bridge_pieces[type][p][q] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(piece));
 				/* The map's: every piece a map's level higher, stood a level lower (EyeBridgePieces() of viewport.cpp,
@@ -4595,6 +4675,7 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 						static constexpr std::string_view MATERIALS[BRIDGE_WALL_MATERIALS] = {"cihly", "kamen", "beton"};
 						ThreeDObject piece = PlaceIndustryPart(*masonry[w][k][map], fmt::format("{}/{} {} {} {}{}", name, BRIDGE_PIECE_NODES[p], type, q * 90, MATERIALS[w], map != 0 ? " mapa" : ""), at, q * 90.0f, 1.0f, 1, 1);
 						DressInMasonry(piece, *walls[w]);
+						if (w == BRIDGE_WALL_CONCRETE && map == 0) piece.decal_faces = ConcreteDecalFaces(masonry[w][k][map]->mesh, true, at, q * 90.0f);
 						(map != 0 ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[w][type][p][q] = _three_d_objects.size();
 						_three_d_objects.push_back(std::move(piece));
 					}
@@ -5457,6 +5538,8 @@ static void ReadThreeDVehicleObjects()
 					}
 					/* A graffiti (the player, test2): on the concrete of the retaining walls, under the ivies (DrawEyeRetainingWalls()). */
 					if (figure_kind == "zed_grafiti") _three_d_graffiti.push_back(fig.name);
+					/* A place where the concrete has spalled off (the player, 7. 11.): on the concrete at random, as the graffiti. */
+					if (figure_kind == "zed_odprysk") _three_d_concrete_spalls.push_back(fig.name);
 					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
 						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
@@ -6819,6 +6902,7 @@ void ResetThreeDVehicleObjects()
 	_thing_places.clear();
 	_three_d_ivies.clear();
 	_three_d_graffiti.clear();
+	_three_d_concrete_spalls.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -6920,6 +7004,13 @@ std::span<const std::string> GetThreeDGraffiti()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _three_d_graffiti;
+}
+
+/** The spalled places of the concrete, read with the figures. */
+std::span<const std::string> GetThreeDConcreteSpalls()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_concrete_spalls;
 }
 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)

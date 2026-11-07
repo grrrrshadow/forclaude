@@ -13554,6 +13554,69 @@ static constexpr uint32_t EYE_GRAFFITI_AREA_PERCENT = 35;
 static constexpr uint32_t EYE_GRAFFITI_WALL_PERCENT = 60;
 /** How far off the face of a wall a graffiti is, metres: in front of the concrete, behind the ivies' leaves. */
 static constexpr double EYE_GRAFFITI_OFF_M = 0.03;
+/** How many of the walls of concrete have places where it has spalled off, of a hundred; and how far off the face they are, metres (under a graffiti). */
+static constexpr uint32_t EYE_SPALL_WALL_PERCENT = 35;
+static constexpr double EYE_SPALL_OFF_M = 0.015;
+/** Of a bridge's faces of concrete on a tile, how many have a spalled place, of a hundred (DrawEyeObjectDecals()). */
+static constexpr uint32_t EYE_SPALL_FACE_PERCENT = 30;
+
+/**
+ * A board laid on a face from the eyes (a graffiti, a place where the concrete has spalled off): its picture over the
+ * rectangle from its left foot (ax, ay) to its right one (bx, by), z0 to z1 up (the eyes' units), as one looks at the
+ * face from outside; its texture at the level of detail of its distance, about a texel to a pixel. One not made yet
+ * (in the background) not this frame.
+ * @param w_m its width, metres
+ */
+static void DrawEyeDecal(const CabCanvas &cv, const CabEye &eye, const ThreeDVehicleObject &fig, double w_m, double ax, double ay, double bx, double by, double z0, double z1, uint light)
+{
+	const CabPoint mid = CabToEye(eye, (ax + bx) / 2, (ay + by) / 2, (z0 + z1) / 2, 0, 0);
+	int tw0 = 1, th0 = 1;
+	fig.TextureSize(0, tw0, th0);
+	const double texels_per_unit = tw0 / (std::max(w_m, 0.01) * OBJECT_UNITS_PER_METRE);
+	const double pixels_per_unit = eye.focal / std::max(mid.f, CAB_NEAR * 4);
+	const int level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
+	const ThreeDObjectTexture *tex = fig.TryGetTexture(level);
+	if (tex == nullptr || tex->px.empty()) return;
+	if (_eye_frame != nullptr) _eye_frame->kept[tex->px.data()] = tex->uid.value;
+	/* A half texel in from its edges. */
+	const double u0 = 0.5, u1 = tex->w - 0.5, v0 = 0.5, v1 = tex->h - 0.5;
+	std::vector<CabPoint> poly = {CabToEye(eye, ax, ay, z0, u0, v1), CabToEye(eye, bx, by, z0, u1, v1), CabToEye(eye, bx, by, z1, u1, v0), CabToEye(eye, ax, ay, z1, u0, v0)};
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex->px.data(), tex->w, tex->h, std::move(poly), eye, 0, light);
+}
+
+/**
+ * The places where the concrete of an object has spalled off (the player, 7. 11.: "the wires sticking out of the
+ * concrete as graffiti too, laid at random, because on the bridge the picture comes again and again"): on its flat
+ * upright faces of concrete (ThreeDObject::decal_faces, a bridge's piece), each tile and each height its own -- on some
+ * faces one, a little bigger or smaller, anywhere on it it fits.
+ * @param salt what tells apart the pieces standing on one tile (the height it stands at)
+ */
+static void DrawEyeObjectDecals(const CabCanvas &cv, const CabEye &eye, const ThreeDObject &o, TileIndex origin, double ox, double oy, double oz, uint32_t salt)
+{
+	const std::span<const std::string> spalls = GetThreeDConcreteSpalls();
+	if (spalls.empty()) return;
+	for (size_t i = 0; i < o.decal_faces.size(); i++) {
+		const ThreeDObject::DecalFace &face = o.decal_faces[i];
+		const uint32_t h = EyeWallHash(TileX(origin) * 7919u + TileY(origin) * 104729u + salt * 31u + static_cast<uint32_t>(i) * 0x9E3779B9u + 0x0DD5u);
+		if (h % 100 >= EYE_SPALL_FACE_PERCENT) continue;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(spalls[(h >> 8) % spalls.size()]);
+		const ThreeDVehicleShape *shape = fig != nullptr ? fig->TryGetShape() : nullptr;
+		if (shape == nullptr || shape->x1 - shape->x0 < 0.05f || shape->z1 - shape->z0 < 0.05f) continue;
+		const double face_w_m = std::hypot(face.rx - face.lx, face.ry - face.ly) / OBJECT_UNITS_PER_METRE;
+		const double face_h_m = (face.z1 - face.z0) / OBJECT_HEIGHT_PER_METRE;
+		double scale = 0.7 + ((h >> 12) % 51) / 100.0;
+		scale = std::min({scale, (face_w_m - 0.1) / (shape->x1 - shape->x0), (face_h_m - 0.1) / (shape->z1 - shape->z0)});
+		if (scale < 0.4) continue;
+		const double w_m = (shape->x1 - shape->x0) * scale, h_m = (shape->z1 - shape->z0) * scale;
+		const double f0 = (0.05 + (face_w_m - 0.1 - w_m) * ((h >> 18) % 1000) / 999.0) / face_w_m, f1 = f0 + w_m / face_w_m;
+		const double up = (0.05 + (face_h_m - 0.1 - h_m) * ((h >> 4) % 997) / 996.0) * OBJECT_HEIGHT_PER_METRE;
+		const double z0 = oz + face.z0 + up, z1 = z0 + h_m * OBJECT_HEIGHT_PER_METRE;
+		const double off = EYE_SPALL_OFF_M * OBJECT_UNITS_PER_METRE;
+		const double ax = ox + face.lx + (face.rx - face.lx) * f0 + face.nx * off, ay = oy + face.ly + (face.ry - face.ly) * f0 + face.ny * off;
+		const double bx = ox + face.lx + (face.rx - face.lx) * f1 + face.nx * off, by = oy + face.ly + (face.ry - face.ly) * f1 + face.ny * off;
+		DrawEyeDecal(cv, eye, *fig, w_m, ax, ay, bx, by, z0, z1, ThreeDLightOfNormal(face.nx, face.ny, 0));
+	}
+}
 
 /**
  * What a retaining wall is of (DrawEyeRetainingWalls()): under a house of bricks [0]; else of stone [1] or of concrete
@@ -13598,6 +13661,7 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 		if (ivy.on_retaining_walls) ivies.push_back(&ivy);
 	}
 	const std::span<const std::string> graffiti = GetThreeDGraffiti();
+	const std::span<const std::string> spalls = GetThreeDConcreteSpalls();
 	auto ground_of = [&grounds](int x, int y) -> std::pair<Slope, int> {
 		auto it = grounds.find(static_cast<uint32_t>(x) | static_cast<uint32_t>(y) << 16);
 		if (it != grounds.end()) return it->second;
@@ -13753,26 +13817,37 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 					if (z0 + (h_m + 0.1) * OBJECT_HEIGHT_PER_METRE > top_z) z0 = foot + 0.1 * OBJECT_HEIGHT_PER_METRE;
 					const double z1 = z0 + h_m * OBJECT_HEIGHT_PER_METRE;
 					if (z1 + 0.1 * OBJECT_HEIGHT_PER_METRE > top_z) continue;
-					/* Its texture at the level of detail of its distance, about a texel to a pixel. */
-					const double mid_x = along_x((f0 + f1) / 2), mid_y = along_y((f0 + f1) / 2);
-					const CabPoint mid = CabToEye(eye, mid_x, mid_y, (z0 + z1) / 2, 0, 0);
-					if (mid.f < CAB_NEAR) continue;
-					int gw0 = 1, gh0 = 1;
-					fig->TextureSize(0, gw0, gh0);
-					const double g_texels_per_unit = gw0 / (w_m * OBJECT_UNITS_PER_METRE);
-					const double g_pixels_per_unit = eye.focal / std::max(mid.f, CAB_NEAR * 4);
-					const int g_level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, g_texels_per_unit / std::max(g_pixels_per_unit, 1e-6))))));
-					const ThreeDObjectTexture *gt = fig->TryGetTexture(g_level);
-					if (gt == nullptr || gt->px.empty()) continue;
-					if (_eye_frame != nullptr) _eye_frame->kept[gt->px.data()] = gt->uid.value;
 					const double off = EYE_GRAFFITI_OFF_M * OBJECT_UNITS_PER_METRE;
-					const double ax = along_x(f0) + NX[e] * off, ay = along_y(f0) + NY[e] * off;
-					const double bx = along_x(f1) + NX[e] * off, by = along_y(f1) + NY[e] * off;
-					/* Its picture from the left as one looks at the face, a half texel in from its edges. */
-					const double u0 = 0.5, u1 = gt->w - 0.5, v0 = 0.5, v1 = gt->h - 0.5;
-					std::vector<CabPoint> poly = {CabToEye(eye, ax, ay, z0, u0, v1), CabToEye(eye, bx, by, z0, u1, v1),
-							CabToEye(eye, bx, by, z1, u1, v0), CabToEye(eye, ax, ay, z1, u0, v0)};
-					CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, gt->px.data(), gt->w, gt->h, std::move(poly), eye, 0, light);
+					DrawEyeDecal(cv, eye, *fig, w_m, along_x(f0) + NX[e] * off, along_y(f0) + NY[e] * off, along_x(f1) + NX[e] * off, along_y(f1) + NY[e] * off, z0, z1, light);
+				}
+			}
+			/* The places where the concrete has spalled off (the player, 7. 11.: not in its texture, where they came again
+			 * and again, but laid at random): on some walls of concrete one or two, a little bigger or smaller, anywhere
+			 * on it they fit, under a graffiti. */
+			if (mat == 2 && !spalls.empty()) {
+				const uint32_t s = EyeWallHash(static_cast<uint32_t>(tx) * 4 + static_cast<uint32_t>(ty) * 0x10000u * 4 + e + 0x0DD5u);
+				const int count = s % 100 < EYE_SPALL_WALL_PERCENT ? 1 + static_cast<int>((s >> 8) % 2) : 0;
+				const double slot = edge_m / std::max(count, 1);
+				for (int k = 0; k < count; k++) {
+					const uint32_t sk = EyeWallHash(s + static_cast<uint32_t>(k + 1) * 0x9E3779B9u);
+					const ThreeDVehicleObject *fig = GetThreeDFigure(spalls[sk % spalls.size()]);
+					const ThreeDVehicleShape *shape = fig != nullptr ? fig->TryGetShape() : nullptr;
+					if (shape == nullptr || shape->x1 - shape->x0 < 0.05f || shape->z1 - shape->z0 < 0.05f) continue;
+					double scale = 0.7 + ((sk >> 8) % 51) / 100.0;
+					const double room_w = slot - 0.2;
+					if ((shape->x1 - shape->x0) * scale > room_w) scale = room_w / (shape->x1 - shape->x0);
+					if (scale < 0.4) continue;
+					const double w_m = (shape->x1 - shape->x0) * scale, h_m = (shape->z1 - shape->z0) * scale;
+					const double x0_m = k * slot + 0.1 + (room_w - w_m) * ((sk >> 16) % 1000) / 999.0;
+					const double f0 = x0_m / edge_m, f1 = (x0_m + w_m) / edge_m;
+					const double foot = std::max(EyeLevelZ(foot_at(f0)), EyeLevelZ(foot_at(f1)));
+					const double top_z = std::min(EyeLevelZ(top_at(f0)), EyeLevelZ(top_at(f1)));
+					const double room_h = top_z - foot - (h_m + 0.2) * OBJECT_HEIGHT_PER_METRE;
+					if (room_h < 0) continue;
+					const double z0 = foot + 0.1 * OBJECT_HEIGHT_PER_METRE + room_h * ((sk >> 26) % 32) / 31.0;
+					const double off = EYE_SPALL_OFF_M * OBJECT_UNITS_PER_METRE;
+					DrawEyeDecal(cv, eye, *fig, w_m, along_x(f0) + NX[e] * off, along_y(f0) + NY[e] * off, along_x(f1) + NX[e] * off, along_y(f1) + NY[e] * off,
+							z0, z0 + h_m * OBJECT_HEIGHT_PER_METRE, light);
 				}
 			}
 			/* The ivies: on some walls one to three, each where the wall is high enough for it. */
@@ -16706,6 +16781,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		if (c.f < -1.0 * TILE_SIZE * std::max(o.tiles_x, o.tiles_y)) continue;
 		/* Near, the ivies on its walls: a house's own, not its interior's nor its doors'. */
 		if (c.f < EYE_WALL_DETAIL_UNITS && IsTileType(co.origin, TileType::House) && !o.is_interior && o.door_node.empty()) AddEyeHouseIvies(o, co.origin, ox, oy, oz);
+		/* Near, the spalled places of its concrete (a bridge's piece), each tile its own. */
+		if (c.f < EYE_WALL_DETAIL_UNITS && !o.decal_faces.empty()) DrawEyeObjectDecals(cv, eye, o, co.origin, ox, oy, oz, static_cast<uint32_t>(co.ez));
 		/* Its texture if it is read; else read in the background, the house there the next frame (the player, 17. 10., 4). */
 		const ThreeDObjectTexture *full = o.TryGetTexture(0);
 		if (full == nullptr) continue;
