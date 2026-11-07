@@ -356,7 +356,12 @@ struct ThreeDObject {
 	/** Its texture's texels to a unit of the world, where its texture is not one picture over its tiles (a bridge's pillar
 	 * in the bricks of the retaining walls: a picture to 5 m, MasonryMesh()); 0 so: the level of detail from the eyes by it. */
 	float texels_per_unit = 0;
+	/** By its other materials (material_pngs): one a picture again and again by the world, its texels to a unit of the
+	 * world, where the rest of it is a texture of its own (a bridge's concrete in the walls' beside its atlas,
+	 * LayBridgeConcrete()); none or 0 as its own. Each its own level of detail from the eyes (EyeTextureLevel()). */
+	std::vector<float> material_texels_per_unit;
 
+	int EyeTextureLevel(uint8_t texture, int level, double pixels_per_unit) const;
 	bool Read() const;
 	bool TryRead() const;
 	/** Whether its shape and texture are read (Read()): what is read of it may be looked at then, on any thread. */
