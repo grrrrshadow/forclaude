@@ -6013,11 +6013,14 @@ static void ReadThreeDVehicleObjects()
 					_figure_objects.push_back(std::move(fig));
 					continue;
 				}
-				/* A vehicle of a set: "vozidlo", or "auto" (the colleague's Tatras, hra/3d/PROSBA-TATRA-613-CIVILNI.md) with
-				 * the set's id; an "auto" without one is a car of the game's own that drives about by itself (later). */
+				/* A vehicle of a set: "vozidlo", or "auto" (the colleague's Tatras, hra/3d/PROSBA-TATRA-613-CIVILNI.md) or
+				 * "lod" (his boats, hra/3d/LODE-3D-PRO-HRU.md: "druh" "lod", "typ" "lod") with the set's id; an "auto"
+				 * without one is a car of the game's own that drives about by itself (later), a "lod" without one a boat
+				 * of the sets of things. */
 				const std::string kind = e.value("druh", std::string("dum"));
 				const bool driving = kind == "auto" && !e.contains("grf") && e.contains("jizda") && e.at("jizda").is_object();
-				if (kind != "vozidlo" && !(kind == "auto" && e.contains("grf")) && !driving) continue;
+				const bool of_set = (kind == "auto" || kind == "lod") && e.contains("grf");
+				if (kind != "vozidlo" && !of_set && !driving) continue;
 				ThreeDVehicleObject obj;
 				obj.package = package;
 				if (e.contains("soubor") && e.at("soubor").is_string()) {
@@ -6032,7 +6035,7 @@ static void ReadThreeDVehicleObjects()
 				} else {
 					continue;
 				}
-				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : "vlak")));
+				obj.type = ParseIndexVehicleType(e.value("typ", std::string(kind == "auto" ? "silnice" : kind == "lod" ? "lod" : "vlak")));
 				auto grfid = ParseIndexGrfId(e.value("grf", std::string()));
 				if (obj.type == VehicleType::Invalid || (!grfid.has_value() && !driving)) {
 					Debug(misc, 0, "3D vehicle {}: no type or set", obj.name);
