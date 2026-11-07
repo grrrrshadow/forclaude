@@ -210,6 +210,53 @@ static void DrawHousePlants(const TileInfo *ti, bool desert = false)
 	}
 }
 
+/** The tile's own number for the things standing on it by chance (the snowman, its place and facing). */
+static uint32_t SnowmanHash(TileIndex tile)
+{
+	return (TileX(tile) * 2246822519u) ^ (TileY(tile) * 2654435761u) ^ 0x27D4EB2Fu;
+}
+
+/**
+ * Whether a snowman stands on a tile (DrawSnowman()): clear land under snow deep enough, no rocks, not steep, beside a
+ * house, about one such tile in four by the tile.
+ * @param tile the tile
+ */
+bool SnowmanStandsAt(TileIndex tile)
+{
+	if (!IsTileType(tile, TileType::Clear) || !IsSnowTile(tile) || GetClearGround(tile) == ClearGround::Rocks) return false;
+	if (GetClearDensity(tile) < 2 || IsSteepSlope(GetTileSlope(tile))) return false;
+	if (GB(SnowmanHash(tile), 0, 8) % 4 != 0) return false;
+	for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		const TileIndexDiffC step = TileIndexDiffCByDiagDir(d);
+		const TileIndex next = TileAddWrap(tile, step.x, step.y);
+		if (next != INVALID_TILE && IsTileType(next, TileType::House)) return true;
+	}
+	return false;
+}
+
+/**
+ * A snowman by some of the houses on the snow (the colleague's snehulak, set doplnky, hra/3d/PAR18-7-11-PRO-HRU.md part 7;
+ * the player, 7. 11.: "the snowman a decoration on the snow"), where SnowmanStandsAt(), facing a way of its own -- as
+ * the plants by the houses (DrawHousePlants()), in the turned view and from the eyes.
+ * @param ti the tile, of snow
+ */
+static void DrawSnowman(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	if (!SnowmanStandsAt(ti->tile)) return;
+	const uint32_t hash = SnowmanHash(ti->tile);
+	static constexpr std::string_view SNOWMAN = "snehulak";
+	const int z = ti->z + GetSlopeMaxPixelZ(ti->tileh) / 2;
+	const float facing = static_cast<float>(GB(hash, 8, 9) % 24 * 15);
+	const int x = ti->x + 4 + static_cast<int>(GB(hash, 17, 3)), y = ti->y + 4 + static_cast<int>(GB(hash, 20, 3));
+	if (eye) {
+		AddCabFigure(SNOWMAN, 1.0f, x, y, z, facing);
+	} else {
+		AddThreeDFigureToViewport(SNOWMAN, 1.0f, x, y, z, facing, _cur_dpi->zoom, ti->tile);
+	}
+}
+
 static void DrawTile_Clear(TileInfo *ti)
 {
 	if (IsSnowTile(ti->tile)) {
@@ -220,6 +267,7 @@ static void DrawTile_Clear(TileInfo *ti)
 			++density;
 			DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + (density * 19) + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 		}
+		DrawSnowman(ti);
 
 		DrawBridgeMiddle(ti, {});
 		return;

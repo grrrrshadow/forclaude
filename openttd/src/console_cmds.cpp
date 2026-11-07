@@ -26,6 +26,7 @@
 #include "town_map.h"
 #include "house.h"
 #include "clear_map.h"
+#include "clear_func.h"
 #include "tree_map.h"
 #include "rail_map.h"
 #include "road_map.h"
@@ -10824,6 +10825,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			text += fmt::format(" {}:{},{}", ind->type == IT_MARIJUANA_PLANTATION ? "mari" : "brambory", TileX(ind->location.tile), TileY(ind->location.tile));
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: pole{}", text.empty() ? " zadna" : text);
+	} else if (what == "snehulaci") {
+		/* 'snehulaci': how many snowmen stand on the map (SnowmanStandsAt()) and the tiles of the first few. */
+		std::string first;
+		uint count = 0;
+		for (TileIndex t(0); t < Map::Size(); ++t) {
+			if (!SnowmanStandsAt(t)) continue;
+			if (count++ < 5) first += fmt::format(" {},{}", TileX(t), TileY(t));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: snehulaku {}:{}", count, first);
 	} else if (what == "posekat") {
 		/* 'posekat [r]': the fields about the first farm, within r tiles (8), harvested: their type 8, the bales of straw
 		 * standing on them in the 3D views (GetThreeDFieldBales()); the farm's tile and a field's said. */
