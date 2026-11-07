@@ -16641,6 +16641,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		int shape_level;
 		ThreeDObjectShapeView shape;
 		std::vector<const ThreeDObjectTexture *> texs; ///< its textures by the triangles' (ThreeDObject::GetTextureOf()): [0] tex; nullptr not made yet
+		double pixels_per_unit; ///< the picture's pixels to a unit of the world there: its materials' levels (ThreeDObject::EyeTextureLevel())
 	};
 	std::vector<ObjectJob> jobs;
 	for (const CabObject &co : objects) {
@@ -16660,7 +16661,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double reach = TILE_SIZE * std::hypot(o.tiles_x, o.tiles_y) / 2 + o.top * CAB_Z_SCALE;
 		const double near_pixels_per_unit = eye.focal / std::max(c.f - reach, CAB_NEAR * 4);
 		const int shape_level = ThreeDShapeLevel(near_pixels_per_unit * OBJECT_UNITS_PER_METRE, 1.5);
-		jobs.push_back({&o, co.origin, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}, {}});
+		jobs.push_back({&o, co.origin, ox, oy, oz, level, o.PaintAt(co.origin), nullptr, shape_level, {}, {}, pixels_per_unit});
 	}
 	/* Its texture painted and its shape simplified if they are made; else unpainted and whole meanwhile, made in the background. */
 	for (ObjectJob &j : jobs) {
@@ -16668,7 +16669,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		j.shape = j.o->TryGetShape(j.shape_level);
 		/* Its add-ons' textures too; one not made yet, its triangles not this frame. */
 		j.texs.assign(1, j.tex);
-		for (uint8_t k = 1; k < j.o->Textures(); k++) j.texs.push_back(j.o->TryGetTextureOf(k, j.level, j.o->AddonPaintAt(j.origin, k)));
+		for (uint8_t k = 1; k < j.o->Textures(); k++) j.texs.push_back(j.o->TryGetTextureOf(k, j.o->EyeTextureLevel(k, j.level, j.pixels_per_unit), j.o->AddonPaintAt(j.origin, k)));
 	}
 	/* As a job of the frame, off the lock: each object on a core of its own: every corner to the eye once, the
 	 * triangles turned away left out (as the engines do), those wholly before the eye straight to its list, the others

@@ -4144,6 +4144,8 @@ static constexpr float BRIDGE_MAP_LEVEL_M = static_cast<float>(TILE_HEIGHT / OBJ
 
 /** How many materials the retaining walls are of: bricks [0], stone [1], concrete [2] (zdi_5m.py, beton_5m.py). */
 static constexpr size_t BRIDGE_WALL_MATERIALS = 3;
+/** Of those the concrete: the bridges' own concrete too (LayBridgeConcrete()). */
+static constexpr size_t BRIDGE_WALL_CONCRETE = 2;
 /** The pillars of the bridges in the bricks [0], the stone [1] or the concrete [2] of the retaining walls (BridgeHasMasonryPillars()): their pieces as _three_d_bridge_pieces, only the pillar's and its foot's. */
 static std::array<BridgePieceObjects, BRIDGE_WALL_MATERIALS> _three_d_bridge_wall_pieces = {_three_d_bridge_pieces, _three_d_bridge_pieces, _three_d_bridge_pieces};
 /** The same pieces for the map. */
@@ -4334,6 +4336,90 @@ static void DressInMasonry(ThreeDObject &piece, const BridgeWallPicture &wall)
 	piece.texels_per_unit = static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE));
 }
 
+/** The concrete of the bridges' models: the warm grey cell of their shared atlas (the others its paint, the deck, the steel). */
+static const Colour BRIDGE_CONCRETE_CELL(0xA8, 0xA6, 0xA0);
+
+/**
+ * A bridge's piece with its concrete laid in the concrete of the walls (zed_lic_beton, beton_5m.py; the player, test2:
+ * "the grey concrete I don't like", the plain grey deck of the girder bridge, the grey of the suspension bridge): its
+ * triangles that draw from the atlas's concrete cell (BRIDGE_CONCRETE_CELL) laid by the world as the pillars of masonry
+ * are (MasonryMesh()), after the others as they are; tri_tex 1 the concrete's, 0 the model's own (DressInConcrete()).
+ * @return whether it has concrete
+ */
+static bool LayBridgeConcrete(GlbMesh &mesh, double w_m, double h_m)
+{
+	const size_t t = mesh.png_texture >= 0 ? static_cast<size_t>(mesh.png_texture) : (mesh.tri_tex.empty() ? 0 : mesh.tri_tex[0]);
+	if (t >= mesh.textures.size() || mesh.textures[t].png == nullptr || mesh.uv.size() / 2 != mesh.pos.size() / 3) return false;
+	std::vector<ThreeDObjectTexture> levels;
+	DecodeTextureLevels(*mesh.textures[t].png, levels, mesh.textures[t].flat, false);
+	if (levels.empty() || levels[0].px.empty() || levels[0].w <= 0 || levels[0].h <= 0) return false;
+	const ThreeDObjectTexture &atlas = levels[0];
+	auto is_concrete = [&](size_t tri) {
+		double u = 0, v = 0;
+		for (int k = 0; k < 3; k++) {
+			u += mesh.uv[mesh.tri[tri + k] * 2] / 3.0;
+			v += mesh.uv[mesh.tri[tri + k] * 2 + 1] / 3.0;
+		}
+		const int x = std::clamp(static_cast<int>(std::floor((u - std::floor(u)) * atlas.w)), 0, atlas.w - 1);
+		const int y = std::clamp(static_cast<int>(std::floor((v - std::floor(v)) * atlas.h)), 0, atlas.h - 1);
+		const Colour c(atlas.px[static_cast<size_t>(y) * atlas.w + x]);
+		return std::abs(c.r - BRIDGE_CONCRETE_CELL.r) <= 8 && std::abs(c.g - BRIDGE_CONCRETE_CELL.g) <= 8 && std::abs(c.b - BRIDGE_CONCRETE_CELL.b) <= 8;
+	};
+	/* Its triangles in two meshes, each with its own corners. */
+	GlbMesh rest, concrete;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	auto take = [&](GlbMesh &to, size_t tri, bool uv) {
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = mesh.tri[tri + k];
+			to.tri.push_back(static_cast<uint32_t>(to.pos.size() / 3));
+			to.pos.insert(to.pos.end(), mesh.pos.begin() + i * 3, mesh.pos.begin() + i * 3 + 3);
+			if (normals) to.nrm.insert(to.nrm.end(), mesh.nrm.begin() + i * 3, mesh.nrm.begin() + i * 3 + 3);
+			if (uv) to.uv.insert(to.uv.end(), mesh.uv.begin() + i * 2, mesh.uv.begin() + i * 2 + 2);
+		}
+	};
+	for (size_t tri = 0; tri + 2 < mesh.tri.size(); tri += 3) take(is_concrete(tri) ? concrete : rest, tri, true);
+	if (concrete.tri.empty()) return false;
+	const GlbMesh laid = MasonryMesh(concrete, w_m, h_m);
+	if (laid.tri.empty()) return false;
+	/* The model's own first, then the concrete. */
+	const uint32_t base = static_cast<uint32_t>(rest.pos.size() / 3);
+	mesh.pos = std::move(rest.pos);
+	mesh.nrm = std::move(rest.nrm);
+	mesh.uv = std::move(rest.uv);
+	mesh.tri = std::move(rest.tri);
+	const size_t own = mesh.tri.size() / 3;
+	mesh.pos.insert(mesh.pos.end(), laid.pos.begin(), laid.pos.end());
+	if (normals) mesh.nrm.insert(mesh.nrm.end(), laid.nrm.begin(), laid.nrm.end());
+	mesh.uv.insert(mesh.uv.end(), laid.uv.begin(), laid.uv.end());
+	for (uint32_t i : laid.tri) mesh.tri.push_back(base + i);
+	mesh.tri_tex.assign(own, 0);
+	mesh.tri_tex.resize(mesh.tri.size() / 3, 1);
+	/* (A bridge's piece has no groups, marks nor glass of its triangles: those of the triangles as read would not fit.) */
+	mesh.tri_group.clear();
+	mesh.tri_mark.clear();
+	mesh.tri_glass.clear();
+	return true;
+}
+
+/**
+ * A bridge's piece placed (PlaceIndustryPart()) with its concrete laid (LayBridgeConcrete()) in the walls' concrete:
+ * its other material, its model's texture the rest; each its own level of detail from the eyes -- the small atlas of
+ * the model at the concrete's would be a texel of all its colours.
+ */
+static void DressInConcrete(ThreeDObject &piece, const GlbMesh &mesh, const BridgeWallPicture &wall)
+{
+	piece.material_pngs = {wall.png};
+	piece.material_flats = {wall.flat};
+	piece.material_levels.assign(1, nullptr);
+	piece.material_texels_per_unit = {static_cast<float>(wall.w / (wall.w_m * OBJECT_UNITS_PER_METRE))};
+	piece.tri_tex = mesh.tri_tex;
+	piece.corner_tex.assign(piece.pos.size() / 3, 0);
+	for (size_t t = 0; t < mesh.tri_tex.size() && t * 3 + 2 < mesh.tri.size(); t++) {
+		if (mesh.tri_tex[t] == 0) continue;
+		for (int k = 0; k < 3; k++) piece.corner_tex[mesh.tri[t * 3 + k]] = 1;
+	}
+}
+
 /**
  * A 3D bridge ("druh": "most", the colleague's hra/3d/MOSTY-3D-PRO-HRU.md): one model whose named nodes are its pieces
  * (BRIDGE_PIECE_NODES), in true metres, +x along the bridge from x 0 to a tile's length, y across from its middle, z 0
@@ -4395,6 +4481,17 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
 			}
 			Debug(misc, 1, "3D bridge {}: its pillar's piece {:.2f} m high stretched to a level, z {:.2f} to {:.2f}", holder.name, z1 - z0, z1 - BRIDGE_LEVEL_M, z1);
+		}
+	}
+	/* Its concrete in the walls' concrete (LayBridgeConcrete()), the pillar's as stretched; the map's then squashed as laid. */
+	const auto &concrete = BridgeWallPictures(folder)[BRIDGE_WALL_CONCRETE];
+	std::array<bool, to_underlying(ThreeDBridgePiece::Count)> has_concrete{};
+	if (concrete.has_value()) {
+		for (size_t p = 0; p < meshes.size(); p++) {
+			if (!meshes[p].has_value() || !LayBridgeConcrete(meshes[p]->mesh, concrete->w_m, concrete->h_m)) continue;
+			meshes[p]->facing = TriangleFacing(meshes[p]->mesh);
+			has_concrete[p] = true;
+			Debug(misc, 1, "3D bridge {}: {} in concrete, {} of its {} triangles", holder.name, BRIDGE_PIECE_NODES[p], std::ranges::count(meshes[p]->mesh.tri_tex, 1), meshes[p]->mesh.tri_tex.size());
 		}
 	}
 	/* For the map (the player, 4. 11.: "bridges and aqueducts from above and at 0 too"): each piece squashed from the
@@ -4468,6 +4565,7 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				ThreeDObject piece = PlaceIndustryPart(*meshes[p], fmt::format("{}/{} {} {}", name, BRIDGE_PIECE_NODES[p], type, q * 90), at, q * 90.0f, 1.0f, 1, 1);
 				piece.colours = colours;
 				piece.variant_paint = {paint, paint};
+				if (has_concrete[p]) DressInConcrete(piece, meshes[p]->mesh, *concrete);
 				_three_d_bridge_pieces[type][p][q] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(piece));
 				/* The map's: every piece a map's level higher, stood a level lower (EyeBridgePieces() of viewport.cpp,
@@ -4476,6 +4574,7 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 				ThreeDObject map_piece = PlaceIndustryPart(*map_meshes[p], fmt::format("{}/{} {} {} mapa", name, BRIDGE_PIECE_NODES[p], type, q * 90), map_at, q * 90.0f, 1.0f, 1, 1);
 				map_piece.colours = colours;
 				map_piece.variant_paint = {paint, paint};
+				if (has_concrete[p]) DressInConcrete(map_piece, map_meshes[p]->mesh, *concrete);
 				_three_d_bridge_map_pieces[type][p][q] = _three_d_objects.size();
 				_three_d_objects.push_back(std::move(map_piece));
 			}
@@ -11036,6 +11135,20 @@ const ThreeDObjectTexture *ThreeDObject::GetTextureOf(uint8_t texture, int level
 	if (texture > this->addon_objects.size() && texture - 1 - this->addon_objects.size() < this->material_pngs.size()) return this->MaterialTexture(texture - 1 - this->addon_objects.size(), level, true);
 	if (texture == 0 || texture > this->addon_objects.size()) return this->GetTexture(level, paint);
 	return _three_d_objects[this->addon_objects[texture - 1]].GetTexture(level, paint);
+}
+
+/**
+ * The level of detail from the eyes of a texture of its triangles (GetTextureOf()): its own one's, or a material's
+ * whose texels to a unit of the world are its own (material_texels_per_unit) by them -- about a texel to a pixel.
+ * @param level its own texture's level there
+ * @param pixels_per_unit the picture's pixels to a unit of the world there
+ */
+int ThreeDObject::EyeTextureLevel(uint8_t texture, int level, double pixels_per_unit) const
+{
+	if (texture <= this->addon_objects.size()) return level;
+	const size_t m = texture - 1 - this->addon_objects.size();
+	if (m >= this->material_texels_per_unit.size() || this->material_texels_per_unit[m] <= 0) return level;
+	return std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, this->material_texels_per_unit[m] / std::max(pixels_per_unit, 1e-6))))));
 }
 
 /** A texture of the building's triangles if it is made already (as TryGetTexture()); else made in the background. */
