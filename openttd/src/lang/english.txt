@@ -2301,6 +2301,8 @@ STR_FIRST_PERSON_PLANT_GROWING                                  :Marijuana growi
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the marijuana
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
+STR_FIRST_PERSON_HELM_HERE                                      :E: take the wheel of {VEHICLE}
+STR_FIRST_PERSON_ASHORE_HERE                                    :E: go ashore
 STR_FIRST_PERSON_PICK_HERE                                      :E: pick the mushroom ({RAW_STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: feed the dragon
 STR_FIRST_PERSON_GRILL                                          :E: grill at the fire

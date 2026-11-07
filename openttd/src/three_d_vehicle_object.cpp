@@ -3848,6 +3848,68 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 }
 
 /**
+ * The decks of a vehicle object (the colleague's boats, the walker on board: first_person_gui.cpp): the highest of its
+ * level faces over a point of its frame and not higher than so much -- its deck, the floor of its wheelhouse, a step.
+ * Faces of either side count, the files have them either way.
+ * @param x,y the point, metres in its frame (+x its front)
+ * @param up_to metres: nothing higher counts (a roof over the walker's head)
+ * @return the height of the deck there, metres in its frame; none when there is nothing under the point
+ */
+std::optional<double> ThreeDVehicleDeckZ(const ThreeDVehicleObject &obj, double x, double y, double up_to)
+{
+	const ThreeDVehicleShape *shape = obj.GetShape();
+	if (shape == nullptr) return std::nullopt;
+	std::optional<double> best;
+	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		const float *a = &shape->pos[shape->tri[t] * 3], *b = &shape->pos[shape->tri[t + 1] * 3], *c = &shape->pos[shape->tri[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		if (len <= 0 || std::abs(nz) < THREE_D_DECK_LEVEL * len) continue;
+		const double px = x - a[0], py = y - a[1];
+		const double s = (px * vy - py * vx) / nz, r = (ux * py - uy * px) / nz;
+		if (s < 0 || r < 0 || s + r > 1) continue;
+		const double z = a[2] + s * uz + r * vz;
+		if (z > up_to) continue;
+		if (!best.has_value() || z > *best) best = z;
+	}
+	return best;
+}
+
+/**
+ * Whether a vehicle object's steep faces stand across a way on it at a height (a wall of its wheelhouse, its railing,
+ * its mast): the walker on board does not go through them (first_person_gui.cpp).
+ * @param ax,ay,bx,by the way, metres in its frame
+ * @param z the height it is tried at, metres in its frame
+ */
+bool ThreeDVehicleBlocks(const ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z)
+{
+	const ThreeDVehicleShape *shape = obj.GetShape();
+	if (shape == nullptr) return false;
+	const double dx = bx - ax, dy = by - ay;
+	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		const float *a = &shape->pos[shape->tri[t] * 3], *b = &shape->pos[shape->tri[t + 1] * 3], *c = &shape->pos[shape->tri[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		const double nz = ux * vy - uy * vx;
+		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz;
+		if (std::abs(nz) >= THREE_D_DECK_LEVEL * std::sqrt(nx * nx + ny * ny + nz * nz)) continue;
+		/* The way (a level segment) against the triangle (Möller and Trumbore). */
+		const double hx = dy * vz, hy = -dx * vz, hz = dx * vy - dy * vx; // (dx, dy, 0) x v
+		const double det = ux * hx + uy * hy + uz * hz;
+		if (std::abs(det) < 1e-12) continue;
+		const double sx = ax - a[0], sy = ay - a[1], sz = z - a[2];
+		const double u = (sx * hx + sy * hy + sz * hz) / det;
+		if (u < 0 || u > 1) continue;
+		const double qx = sy * uz - sz * uy, qy = sz * ux - sx * uz, qz = sx * uy - sy * ux; // s x u
+		const double v = (dx * qx + dy * qy) / det;
+		if (v < 0 || u + v > 1) continue;
+		const double along = (vx * qx + vy * qy + vz * qz) / det;
+		if (along >= 0 && along <= 1) return true;
+	}
+	return false;
+}
+
+/**
  * The lights of an object drawn in the view from the eyes, in the world (a vehicle of the game, GetThreeDEyeVehicle(),
  * or a car of the game's own driving about): where its lamps are, its object turned as it faces and as big as it is
  * drawn; the pool of its headlights on the way ahead.

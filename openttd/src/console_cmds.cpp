@@ -1107,6 +1107,47 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		}
 		return true;
 	}
+	if (argv.size() >= 2 && argv[1] == "paluba") {
+		/* 'testlod paluba [dm]': the first ship's decks (ThreeDVehicleDeckZ()), the highest level face under each point of
+		 * its outline at most so many decimetres over its waterline (all without), decimetres, a row each half metre
+		 * across, '.' none; +x its bow to the right. */
+		const double up_to = argv.size() > 2 ? ParseInteger<int>(argv[2]).value_or(999) / 10.0 : 99.0;
+		for (const Ship *sh : Ship::Iterate()) {
+			ThreeDEyeVehicle ev;
+			const ThreeDVehicleShape *shape = GetThreeDEyeVehicle(sh, ev) && ev.obj != nullptr ? ev.obj->GetShape() : nullptr;
+			if (shape == nullptr) {
+				IConsolePrint(CC_ERROR, "testlod: lod {} bez 3D objektu.", sh->unitnumber);
+				return true;
+			}
+			const ThreeDVehicleObject &obj = *ev.obj;
+			if (argv.size() > 3 && argv[2] == "obj") {
+				/* 'testlod paluba obj <file>': its shape as a Wavefront file, a group a texture, to look at it elsewhere. */
+				std::string out;
+				for (size_t i = 0; i + 2 < shape->pos.size(); i += 3) out += fmt::format("v {:.3f} {:.3f} {:.3f}\n", shape->pos[i], shape->pos[i + 1], shape->pos[i + 2]);
+				int group = -1;
+				for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+					const int tex = t / 3 < shape->tri_tex.size() ? shape->tri_tex[t / 3] : 0;
+					if (tex != group) out += fmt::format("g t{}\n", group = tex);
+					out += fmt::format("f {} {} {}\n", shape->tri[t] + 1, shape->tri[t + 1] + 1, shape->tri[t + 2] + 1);
+				}
+				if (auto f = FileHandle::Open(std::string(argv[3]), "wb"); f.has_value()) fwrite(out.data(), 1, out.size(), *f);
+				IConsolePrint(CC_DEFAULT, "testlod: tvar lode {} do {} ({} trojuhelniku)", sh->unitnumber, argv[3], shape->tri.size() / 3);
+				return true;
+			}
+			IConsolePrint(CC_DEFAULT, "testlod: lod {} objekt x {:.1f}..{:.1f} y {:.1f}..{:.1f} z {:.1f}..{:.1f} m, ridic {} na {:.2f},{:.2f},{:.2f}",
+					sh->unitnumber, shape->x0, shape->x1, shape->y0, shape->y1, shape->z0, shape->z1, obj.has_helm ? "ano" : "ne", obj.helm[0], obj.helm[1], obj.helm[2]);
+			for (double y = std::floor(shape->y1 * 2) / 2; y >= shape->y0; y -= 0.5) {
+				std::string row = fmt::format("{:5.1f} ", y);
+				for (double x = std::ceil(shape->x0 * 2) / 2; x <= shape->x1; x += 0.5) {
+					const std::optional<double> deck = ThreeDVehicleDeckZ(obj, x, y, up_to);
+					row += deck.has_value() ? fmt::format("{:3d}", static_cast<int>(std::lround(*deck * 10))) : std::string("  .");
+				}
+				IConsolePrint(CC_DEFAULT, "testlod: {}", row);
+			}
+			break;
+		}
+		return true;
+	}
 	uint sx = argv.size() > 2 ? 0 : Map::MaxX() / 2;
 	uint sy = argv.size() > 2 ? 0 : Map::MaxY() / 2;
 	if (argv.size() > 2) {
@@ -9553,7 +9594,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			auto real = [&](size_t i) { auto v = ParseInteger<int>(argv[i].substr(0, argv[i].find('.')), 10); double f = v.value_or(0); if (auto dot = argv[i].find('.'); dot != std::string_view::npos) { auto d = argv[i].substr(dot + 1); auto frac = ParseInteger<int>(d, 10); if (frac.has_value()) f += (f < 0 || argv[i].starts_with("-") ? -1 : 1) * *frac / std::pow(10.0, d.size()); } return f; };
 			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: {}", RigFirstPersonAtHouse(TileXY(*x, *y), real(5), real(6), real(7)));
 		} else if (argv.size() > 3 && argv[2] == "smer") {
-			/* 'chodec smer <degrees>': the walker looking that way, from the map's x towards its y. */
+			/* 'chodec smer <degrees>': the walker looking that way, from the map's x towards its y; on board a boat from its bow. */
 			extern void RigFirstPersonFace(double degrees);
 			RigFirstPersonFace(number(3).value_or(0));
 		} else if (argv.size() > 6 && argv[2] == "krok") {

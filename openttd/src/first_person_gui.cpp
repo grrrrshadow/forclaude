@@ -39,6 +39,7 @@
 #include "bridge_map.h"
 #include "three_d.h"
 #include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
 #include "language.h"
 #include "timer/timer.h"
 #include "timer/timer_window.h"
@@ -160,6 +161,41 @@ static constexpr double FIRST_PERSON_MINE_AHEAD_M = 1.8;
 static constexpr double FIRST_PERSON_MINE_UP_M = 0.8;
 /** How near a vehicle the walker gets into it (E), metres from a piece of it. */
 static constexpr double FIRST_PERSON_BOARD_M = 5.0;
+/**
+ * On board a boat (FirstPersonWindow::aboard): how high a step up on its deck the walker takes (the yacht's cockpit is
+ * 1.4 m deep, out of it over its seats, 0.8 m each), how far down it steps, metres; how much deeper than where its
+ * helmsman is it goes (below, inside its hull, it does not: its cabins are its interior's); its foot, metres either way
+ * from its middle, on a deck at two of its corners at least (not on the yacht's boom, not on a rail; over an edge as it
+ * steps up, yes); how near its helmsman's place E takes the wheel; the height a wall stops it at, over the higher of its
+ * feet where it is and where it steps (a mast, a wheelhouse; the cockpit's coaming as it climbs its seats, not), and
+ * how far before it, metres.
+ */
+static constexpr double FIRST_PERSON_DECK_STEP_M = 0.8;
+static constexpr double FIRST_PERSON_DECK_DROP_M = 1.0;
+static constexpr double FIRST_PERSON_DECK_DEPTH_M = 1.0;
+static constexpr double FIRST_PERSON_DECK_FOOT_M = 0.15;
+static constexpr double FIRST_PERSON_HELM_M = 1.5;
+static constexpr double FIRST_PERSON_DECK_CHEST_M = 1.2;
+static constexpr double FIRST_PERSON_DECK_REACH_M = 0.3;
+
+/** A point of a boat's frame (metres, +x its bow) in the world as the eyes see it lie (GetThreeDEyeVehicle()). */
+static void BoatToWorld(const ThreeDEyeVehicle &ev, double lx, double ly, double lz, double &x, double &y, double &z)
+{
+	const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
+	const double mx = lx * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = ly * ev.scale * OBJECT_UNITS_PER_METRE;
+	x = ev.x + mx * fx - my * fy;
+	y = ev.y + mx * fy + my * fx;
+	z = ev.z + lz * ev.scale * OBJECT_HEIGHT_PER_METRE;
+}
+
+/** A world point in a boat's frame, metres (BoatToWorld() the other way). */
+static void WorldToBoat(const ThreeDEyeVehicle &ev, double x, double y, double &lx, double &ly)
+{
+	const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
+	const double dx = x - ev.x, dy = y - ev.y;
+	lx = (dx * fx + dy * fy) / (ev.scale * ev.along * OBJECT_UNITS_PER_METRE);
+	ly = (dy * fx - dx * fy) / (ev.scale * OBJECT_UNITS_PER_METRE);
+}
 /** How near a mushroom the walker picks it (E), metres. */
 static constexpr double FIRST_PERSON_PICK_M = 1.5;
 /** How near the middle of a door the walker opens it with E, metres. */
@@ -616,11 +652,169 @@ struct FirstPersonWindow : Window {
 	CabArrows arrows{};                      ///< the arrows driving it
 	mutable SimtrainsCabSeat seat{};         ///< a train of MSTS: the player at its desk, as in the cab view (simtrains_cab.h)
 	CabLook cab_look{};                      ///< the head turned in it with the right button, as in the cab view
+	/*
+	 * On board a boat (the player, 7. 11.: "the second E, to stop steering, must not put me into the water"; the
+	 * colleague's hra/3d/LODE-3D-PRO-HRU.md: "drive it from the cab or walk about the boat"): the walker stands on its
+	 * deck and goes with it, its place kept in the boat's frame, its height on the boat's level faces
+	 * (ThreeDVehicleDeckZ()), its walls in its way (ThreeDVehicleBlocks()).
+	 */
+	VehicleID aboard = VehicleID::Invalid(); ///< the boat the walker stands on, Invalid elsewhere
+	double deck_x = 0, deck_y = 0, deck_z = 0; ///< where on it, metres of its frame (+x its bow), and its feet's height there
+	double deck_heading = 0;                 ///< radians the walker faces from the boat's bow
+	double deck_helm = 0;                    ///< the height of its helmsman's place (StandOnBoard()), metres of its frame: no deeper than a metre under it
 
 	/** The vehicle the walker is in, nullptr on foot. */
 	const Vehicle *Riding() const
 	{
 		return this->riding != VehicleID::Invalid() ? Vehicle::GetIfValid(this->riding) : nullptr;
+	}
+
+	/** The boat the walker stands on and how it lies now (GetThreeDEyeVehicle()), nullptr when there is none (gone, sunk). */
+	const Vehicle *Aboard(ThreeDEyeVehicle &ev) const
+	{
+		const Vehicle *v = this->aboard != VehicleID::Invalid() ? Vehicle::GetIfValid(this->aboard) : nullptr;
+		if (v == nullptr || v->vehstatus.Test(VehState::Crashed) || !GetThreeDEyeVehicle(v, ev) || ev.obj == nullptr) return nullptr;
+		return v;
+	}
+
+	/** The walker where it stands on the boat as the boat lies now: its place, height and facing in the world. */
+	void PlaceOnBoard(const ThreeDEyeVehicle &ev)
+	{
+		double x, y, z;
+		BoatToWorld(ev, this->deck_x, this->deck_y, this->deck_z, x, y, z);
+		this->walker.x = x;
+		this->walker.y = y;
+		this->walker.stand_z = z;
+		this->walker.stand_x = x;
+		this->walker.stand_y = y;
+		this->walker.heading = std::remainder(ev.facing * M_PI / 180.0 + this->deck_heading, 2 * M_PI);
+	}
+
+	/**
+	 * Letting go of a boat's wheel (GetOut()): the walker stays on board where its helmsman stands (the index's "ridic"
+	 * "poloha"), else in its middle, facing its bow.
+	 * @return false when it is no boat of a 3D object with a deck there: out beside it as from a car
+	 */
+	bool StandOnBoard(const Vehicle *v)
+	{
+		if (v->type != VehicleType::Ship) return false;
+		ThreeDEyeVehicle ev;
+		if (!GetThreeDEyeVehicle(v, ev) || ev.obj == nullptr) return false;
+		const ThreeDVehicleObject &obj = *ev.obj;
+		const double hx = obj.has_helm ? obj.helm[0] : 0, hy = obj.has_helm ? obj.helm[1] : 0, hz = obj.has_helm ? obj.helm[2] : 0;
+		const std::optional<double> deck = ThreeDVehicleDeckZ(obj, hx, hy, hz + FIRST_PERSON_DECK_STEP_M);
+		if (!deck.has_value()) return false;
+		this->aboard = v->index;
+		this->deck_x = hx;
+		this->deck_y = hy;
+		this->deck_z = *deck;
+		this->deck_helm = obj.has_helm ? hz : *deck;
+		this->deck_heading = 0;
+		this->head = 0;
+		this->PlaceOnBoard(ev);
+		return true;
+	}
+
+	/**
+	 * Whether the walker's foot finds a deck at a height at a point of a boat: under two of its corners at least,
+	 * something no lower and not a step higher (not the top of a boom, a rail, a winch; over an edge as it steps up, yes).
+	 */
+	static bool DeckFooting(const ThreeDVehicleObject &obj, double x, double y, double z)
+	{
+		int corners = 0;
+		for (const double fx : {-FIRST_PERSON_DECK_FOOT_M, FIRST_PERSON_DECK_FOOT_M}) {
+			for (const double fy : {-FIRST_PERSON_DECK_FOOT_M, FIRST_PERSON_DECK_FOOT_M}) {
+				const std::optional<double> under = ThreeDVehicleDeckZ(obj, x + fx, y + fy, z + FIRST_PERSON_DECK_STEP_M);
+				if (under.has_value() && *under >= z - FIRST_PERSON_DECK_FOOT_M) corners++;
+			}
+		}
+		return corners >= 2;
+	}
+
+	/**
+	 * A step on board (Walk()): the way, world units, in the boat's frame; onto the highest deck there the foot finds
+	 * (DeckFooting(); the top of the yacht's binnacle no, the seat under it yes) at most a step up or down, no wall
+	 * across it at the chest; off its deck nowhere (over its side to the land: E, GoAshore()).
+	 */
+	void MoveOnBoard(double dx, double dy)
+	{
+		ThreeDEyeVehicle ev;
+		if (this->Aboard(ev) == nullptr) return;
+		const ThreeDVehicleObject &obj = *ev.obj;
+		double lx, ly;
+		WorldToBoat(ev, this->walker.x + dx, this->walker.y + dy, lx, ly);
+		std::optional<double> deck;
+		double up_to = this->deck_z + FIRST_PERSON_DECK_STEP_M;
+		for (int tries = 0;; tries++) {
+			deck = ThreeDVehicleDeckZ(obj, lx, ly, up_to);
+			if (!deck.has_value() || *deck < this->deck_z - FIRST_PERSON_DECK_DROP_M || *deck < this->deck_helm - FIRST_PERSON_DECK_DEPTH_M) return;
+			if (DeckFooting(obj, lx, ly, *deck)) break;
+			if (tries == 3) return;
+			up_to = *deck - 0.02;
+		}
+		/* Walls: the way a body's half-width farther, at the chest over the higher deck of the two. */
+		const double len = std::hypot(lx - this->deck_x, ly - this->deck_y);
+		const double ex = len > 0 ? lx + (lx - this->deck_x) / len * FIRST_PERSON_DECK_REACH_M : lx;
+		const double ey = len > 0 ? ly + (ly - this->deck_y) / len * FIRST_PERSON_DECK_REACH_M : ly;
+		if (ThreeDVehicleBlocks(obj, this->deck_x, this->deck_y, ex, ey, std::max(this->deck_z, *deck) + FIRST_PERSON_DECK_CHEST_M)) return;
+		this->deck_x = lx;
+		this->deck_y = ly;
+		this->deck_z = *deck;
+		this->PlaceOnBoard(ev);
+	}
+
+	/** Whether the walker on board stands by its wheel (its helmsman's place, else its middle): E takes it there. */
+	bool AtHelm(const ThreeDEyeVehicle &ev) const
+	{
+		const ThreeDVehicleObject &obj = *ev.obj;
+		const double hx = obj.has_helm ? obj.helm[0] : 0, hy = obj.has_helm ? obj.helm[1] : 0;
+		return std::hypot(this->deck_x - hx, this->deck_y - hy) <= FIRST_PERSON_HELM_M;
+	}
+
+	/** Where the walker on board steps over the side onto the land near (a quay, the shore): the nearest place to stand within reach, world units. */
+	std::optional<std::pair<double, double>> AshorePlace() const
+	{
+		const double reach = FIRST_PERSON_BOARD_M * OBJECT_UNITS_PER_METRE;
+		for (int ring = 1; ring <= 20; ring++) {
+			const double r = reach * ring / 20;
+			for (int k = 0; k < ring * 8; k++) {
+				const double a = k * 2 * M_PI / (ring * 8);
+				const double x = this->walker.x + r * std::cos(a), y = this->walker.y + r * std::sin(a);
+				if (FirstPersonFree(x, y)) return std::make_pair(x, y);
+			}
+		}
+		return std::nullopt;
+	}
+
+	/** E on board away from the wheel: over the side onto the land near (AshorePlace()). */
+	bool GoAshore()
+	{
+		const auto place = this->AshorePlace();
+		if (!place.has_value()) return false;
+		this->aboard = VehicleID::Invalid();
+		this->walker.x = place->first;
+		this->walker.y = place->second;
+		FirstPersonSettle(this->walker);
+		return true;
+	}
+
+	/**
+	 * How far a vehicle is from the walker for getting into it: from its middle; a boat of a 3D object from its hull,
+	 * its outline in its frame (the yacht is 16 m long: from its middle the walker on the quay beside it was out of reach).
+	 */
+	double BoardDistance(const Vehicle *u) const
+	{
+		if (u->type == VehicleType::Ship) {
+			ThreeDEyeVehicle ev;
+			const ThreeDVehicleShape *shape = GetThreeDEyeVehicle(u, ev) && ev.obj != nullptr ? ev.obj->GetShape() : nullptr;
+			if (shape != nullptr) {
+				double lx, ly;
+				WorldToBoat(ev, this->walker.x, this->walker.y, lx, ly);
+				const double ox = std::max({0.0, shape->x0 - lx, lx - shape->x1}), oy = std::max({0.0, shape->y0 - ly, ly - shape->y1});
+				return std::hypot(ox, oy) * ev.scale * OBJECT_UNITS_PER_METRE;
+			}
+		}
+		return std::hypot(u->x_pos - this->walker.x, u->y_pos - this->walker.y);
 	}
 
 	/**
@@ -636,7 +830,7 @@ struct FirstPersonWindow : Window {
 			if (u->type != VehicleType::Road && u->type != VehicleType::Train && u->type != VehicleType::Ship) continue;
 			if (u->vehstatus.Any({VehState::Hidden, VehState::Crashed})) continue;
 			if (std::abs(u->z_pos - ground) > 2 * TILE_HEIGHT) continue;
-			const double d = std::hypot(u->x_pos - this->walker.x, u->y_pos - this->walker.y);
+			const double d = this->BoardDistance(u);
 			if (d < best_d) {
 				best_d = d;
 				best = u->First();
@@ -649,6 +843,7 @@ struct FirstPersonWindow : Window {
 	void GetIn(const Vehicle *v)
 	{
 		this->riding = v->index;
+		this->aboard = VehicleID::Invalid();
 		this->walk_on = 0;
 		this->head = 0;
 		this->weapon_out = false;
@@ -675,6 +870,12 @@ struct FirstPersonWindow : Window {
 		this->camera = {};
 		if (v != nullptr) {
 			CabLetGo(v);
+			/* A boat: the walker stays on board by its wheel, not in the water (StandOnBoard()). */
+			if (this->StandOnBoard(v)) {
+				this->MakePicture();
+				this->SetDirty();
+				return;
+			}
 			const int yaw = v->cab_free ? v->cab_yaw : (v->direction != Direction::Invalid ? DirectionToCabYaw(v->direction) : 0);
 			const double heading = yaw * 2 * M_PI / CAB_YAW_TURN, fx = std::cos(heading), fy = std::sin(heading);
 			this->walker.heading = std::remainder(heading, 2 * M_PI);
@@ -800,6 +1001,20 @@ struct FirstPersonWindow : Window {
 			this->GetOut();
 			return;
 		}
+		/* On board a boat: by its wheel E takes it again; elsewhere on its deck, over the side onto the land near. */
+		if (this->aboard != VehicleID::Invalid()) {
+			ThreeDEyeVehicle ev;
+			if (const Vehicle *boat = this->Aboard(ev); boat != nullptr) {
+				if (this->AtHelm(ev)) {
+					this->GetIn(boat);
+				} else if (this->GoAshore()) {
+					this->MakePicture();
+					this->SetDirty();
+				}
+				return;
+			}
+			this->aboard = VehicleID::Invalid();
+		}
 		/* At a door: opened away from the walker, or shut. A wing that swings through the walker standing by its hinge
 		 * moves it aside (the player, 29. 10.: "the window of the hut has to push me away when I open it, it stopped
 		 * open through me and I could not leave"); with nowhere to go, the wing stays as it was. */
@@ -869,6 +1084,19 @@ struct FirstPersonWindow : Window {
 		}
 		if (rv == nullptr) this->riding = VehicleID::Invalid();
 		for (uint i = 0; i < steps; i++) {
+			if (rv == nullptr && this->aboard != VehicleID::Invalid()) {
+				/* On board: where the boat has gone and turned meanwhile; gone or sunk, the walker out where it was. */
+				ThreeDEyeVehicle ev;
+				if (this->Aboard(ev) == nullptr) {
+					this->aboard = VehicleID::Invalid();
+					this->PutNear(this->walker.x, this->walker.y);
+				} else {
+					this->PlaceOnBoard(ev);
+					this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
+					this->deck_heading = std::remainder(this->walker.heading - ev.facing * M_PI / 180.0, 2 * M_PI);
+					continue;
+				}
+			}
 			if (rv == nullptr) this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Fly(FIRST_PERSON_TICK_MS / 1000.0);
@@ -1131,6 +1359,12 @@ struct FirstPersonWindow : Window {
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
 		const double rx = fy, ry = -fx;
 		const double dx = (fx * ahead + rx * aside) * speed, dy = (fy * ahead + ry * aside) * speed;
+		/* On board a boat: on its deck (MoveOnBoard()), in pieces as on the ground. */
+		if (this->aboard != VehicleID::Invalid()) {
+			const int deck_pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
+			for (int i = 0; i < deck_pieces; i++) this->MoveOnBoard(dx / deck_pieces, dy / deck_pieces);
+			return;
+		}
 		/* Along a wall, sliding, and round a post (FirstPersonMove()); in pieces, so that a run does not step over a
 		 * thin wall. */
 		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
@@ -1928,6 +2162,13 @@ struct FirstPersonWindow : Window {
 					/* A train driven from its desk: where its controls stand (as the cab view's panel). */
 					if (const std::string desk = SimtrainsDeskText(rv); !desk.empty()) hint += "   " + desk;
 					riding = true;
+				} else if (ThreeDEyeVehicle ev; this->Aboard(ev) != nullptr) {
+					/* On board a boat: by its wheel E takes it, elsewhere over the side onto the land near. */
+					if (this->AtHelm(ev)) {
+						hint = GetString(STR_FIRST_PERSON_HELM_HERE, this->aboard);
+					} else if (this->AshorePlace().has_value()) {
+						hint = GetString(STR_FIRST_PERSON_ASHORE_HERE);
+					}
 				} else if (const WalkerPlant *plant = WalkerPlantNear(this->walker.x, this->walker.y, WALKER_PLANT_REACH_M); plant != nullptr) {
 					/* By the walker's plant: how long till the harvest, or E harvests it. */
 					switch (GetWalkerPlantStage(*plant)) {
@@ -2448,8 +2689,10 @@ std::string DescribeFirstPerson()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}), nohy {:.2f} m nad zemi, smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
-			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE,
+	const Vehicle *boat = w->aboard != VehicleID::Invalid() ? Vehicle::GetIfValid(w->aboard) : nullptr;
+	const std::string deck = boat == nullptr ? std::string() : fmt::format(", na palube lodi {} na {:.1f},{:.1f} m (paluba {:.2f} m)", boat->unitnumber, w->deck_x, w->deck_y, w->deck_z);
+	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}){}, nohy {:.2f} m nad zemi, smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
+			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE, deck,
 			(FirstPersonFeetZ(w->walker) - GetSlopePixelZOutsideMap(static_cast<int>(w->walker.x), static_cast<int>(w->walker.y))) / OBJECT_HEIGHT_PER_METRE, w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards);
 }
 
@@ -2797,11 +3040,18 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 	if (w == nullptr) return;
 	w->walker.pitch = std::clamp(pitch, -FIRST_PERSON_PITCH_MAX, FIRST_PERSON_PITCH_MAX);
 	for (int i = 0; i < steps; i++) {
-		w->walker.heading = std::remainder(w->walker.heading + turn * FIRST_PERSON_TURN * FIRST_PERSON_TICK_MS / 1000.0, 2 * M_PI);
+		const double turned = turn * FIRST_PERSON_TURN * FIRST_PERSON_TICK_MS / 1000.0;
+		w->walker.heading = std::remainder(w->walker.heading + turned, 2 * M_PI);
+		/* On board a boat: the facing kept to the boat's bow (as Step()). */
+		if (w->aboard != VehicleID::Invalid()) w->deck_heading = std::remainder(w->deck_heading + turned, 2 * M_PI);
 		if (ahead == 0 && aside == 0) continue;
 		const double speed = FIRST_PERSON_WALK_MS * OBJECT_UNITS_PER_METRE * FIRST_PERSON_TICK_MS / 1000.0;
 		const double fx = std::cos(w->walker.heading), fy = std::sin(w->walker.heading);
 		const double nx = w->walker.x + (fx * ahead + fy * aside) * speed, ny = w->walker.y + (fy * ahead - fx * aside) * speed;
+		if (w->aboard != VehicleID::Invalid()) {
+			w->MoveOnBoard(nx - w->walker.x, ny - w->walker.y);
+			continue;
+		}
 		/* As the walker walks: its circle against the walls, round a post (FirstPersonMove()), up the stairs. */
 		FirstPersonSettle(w->walker);
 		if (FirstPersonMove(w->walker, nx - w->walker.x, ny - w->walker.y)) FirstPersonSettle(w->walker);
@@ -2810,12 +3060,17 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 	w->SetDirty();
 }
 
-/** The rig: the walker looking the way given, degrees from the map's x towards its y (as RigFirstPersonWalk() turns it). */
+/** The rig: the walker looking the way given, degrees from the map's x towards its y (as RigFirstPersonWalk() turns it); on board a boat from its bow. */
 void RigFirstPersonFace(double degrees)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return;
 	w->walker.heading = std::remainder(degrees * M_PI / 180.0, 2 * M_PI);
+	/* On board a boat: the degrees from its bow (towards its +y), the facing kept to it (as Step()). */
+	if (ThreeDEyeVehicle ev; w->Aboard(ev) != nullptr) {
+		w->deck_heading = w->walker.heading;
+		w->PlaceOnBoard(ev);
+	}
 	w->MakePicture();
 	w->SetDirty();
 }
