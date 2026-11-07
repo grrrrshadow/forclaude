@@ -11475,6 +11475,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		AutoRestoreBackup cur_company(_current_company, _local_company);
 		const bool rail = what == "trat";
 		const uint need_x = rail ? 34 : 18, need_y = rail ? 10 : 18;
+		/* 'trat <type> <end> <depth>': the dip under the bridge so many levels deep (1), the land raised for it first. */
+		const int depth = rail ? std::clamp(number(4).value_or(1), 1, 2) : 1;
 		uint x0 = 0, y0 = 0;
 		bool found = false;
 		for (uint ty = 2; ty + need_y + 2 < Map::SizeY() && !found; ty++) {
@@ -11500,6 +11502,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		auto err = [](const CommandCost &r) { return r.GetErrorMessage() == INVALID_STRING_ID ? std::string("?") : GetString(r.GetErrorMessage()); };
 		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 1, y0 + need_y - 1), TileXY(x0, y0), false, LevelMode::Level);
+		for (int d = 1; d < depth; d++) Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 1, y0 + need_y - 1), TileXY(x0, y0), false, LevelMode::Raise);
 		std::string failed;
 		TileIndex depot;
 		VehicleType vtype;
@@ -11511,7 +11514,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			bridge_end = static_cast<uint>(std::clamp(number(3).value_or(13), 8, 13));
 			/* A hill a level high for the tunnel; a dip a level deep under the bridge. */
 			Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 22, y0 + need_y - 1), TileXY(x0 + 16, y0), false, LevelMode::Raise);
-			if (bridge_end >= 11) Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 10, ry + 2), TileXY(x0 + 8, ry - 2), false, LevelMode::Lower);
+			/* Two levels deep only two tiles wide: the land a level a tile up to the heads, they stay level. */
+			for (int d = 0; d < depth && bridge_end >= 11; d++) Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, TileXY(x0 + 10, ry + 2), TileXY(x0 + (depth > 1 ? 9 : 8), ry - 2), false, LevelMode::Lower);
 			depot = TileXY(x0 + 1, ry);
 			CommandCost r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, depot, RAILTYPE_RAIL, DiagDirection::SW);
 			if (r.Failed()) failed = fmt::format("depot: {}", err(r));

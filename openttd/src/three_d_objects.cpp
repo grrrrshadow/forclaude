@@ -4359,6 +4359,29 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 		Debug(misc, 0, "3D bridge {}: no node stred", holder.name);
 		return;
 	}
+	/* A pillar's piece is stacked a level apart under the next (EyeBridgePieces() of viewport.cpp): one shorter than a
+	 * level reaches down to the next one's top, its top where it is -- the suspension bridge's is 4.2 m, z -5 to -0.8,
+	 * and the pillar of a high bridge stood in pieces with gaps between them (the player, test2: "the pillars are short and
+	 * there is a gap between them when it is several levels high"). Its normals as stretched. */
+	if (auto &pillar = meshes[to_underlying(ThreeDBridgePiece::Pillar)]; pillar.has_value() && pillar->mesh.pos.size() >= 3) {
+		std::vector<float> &pos = pillar->mesh.pos;
+		float z0 = pos[2], z1 = pos[2];
+		for (size_t i = 2; i < pos.size(); i += 3) {
+			z0 = std::min(z0, pos[i]);
+			z1 = std::max(z1, pos[i]);
+		}
+		if (z1 - z0 > 0.1f && z1 - z0 < BRIDGE_LEVEL_M - 0.01f) {
+			const float stretch = BRIDGE_LEVEL_M / (z1 - z0);
+			for (size_t i = 2; i < pos.size(); i += 3) pos[i] = z1 + (pos[i] - z1) * stretch;
+			for (size_t i = 0; i + 2 < pillar->mesh.nrm.size(); i += 3) {
+				float *n = &pillar->mesh.nrm[i];
+				n[2] /= stretch;
+				const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+				if (len > 0) for (int k = 0; k < 3; k++) n[k] /= len;
+			}
+			Debug(misc, 1, "3D bridge {}: its pillar's piece {:.2f} m high stretched to a level, z {:.2f} to {:.2f}", holder.name, z1 - z0, z1 - BRIDGE_LEVEL_M, z1);
+		}
+	}
 	/* For the map (the player, 4. 11.: "bridges and aqueducts from above and at 0 too"): each piece squashed from the
 	 * eyes' level of 5 m to the map's of 3, its normals as squashed (a slope steeper, its normal flatter). */
 	std::array<std::optional<IndustryPartMesh>, to_underlying(ThreeDBridgePiece::Count)> map_meshes;
