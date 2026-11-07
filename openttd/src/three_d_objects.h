@@ -360,6 +360,14 @@ struct ThreeDObject {
 	 * world, where the rest of it is a texture of its own (a bridge's concrete in the walls' beside its atlas,
 	 * LayBridgeConcrete()); none or 0 as its own. Each its own level of detail from the eyes (EyeTextureLevel()). */
 	std::vector<float> material_texels_per_unit;
+	/** Its flat upright faces of concrete (a bridge's piece, ConcreteDecalFaces()): where the spalled places are laid at
+	 * random as the graffiti (DrawEyeObjectDecals() of viewport.cpp), each tile its own. */
+	struct DecalFace {
+		float nx, ny;         ///< its normal out, horizontal, of length 1
+		float lx, ly, rx, ry; ///< its left end and its right end as one looks at it from outside, world units of its frame
+		float z0, z1;         ///< its foot and its top, units of height of its frame
+	};
+	std::vector<DecalFace> decal_faces;
 
 	int EyeTextureLevel(uint8_t texture, int level, double pixels_per_unit) const;
 	bool Read() const;
@@ -1006,6 +1014,8 @@ struct ThreeDIvy {
 std::span<const ThreeDIvy> GetThreeDIvies();
 /** The graffiti of the walls ("druh": "zed_grafiti", our objekty/nase/grafiti.py): the names of their figures, boards with their pictures. */
 std::span<const std::string> GetThreeDGraffiti();
+/** The places where the concrete has spalled off ("druh": "zed_odprysk", our objekty/nase/beton_5m.py): boards laid on the concrete at random. */
+std::span<const std::string> GetThreeDConcreteSpalls();
 
 /**
  * A piece of the shared loads (the colleague's objekty/naklady, hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md): a pallet of
