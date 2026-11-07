@@ -3219,6 +3219,15 @@ static void OweCardPlace(int x, int y, int z, int reach, int height)
 }
 
 /**
+ * The place of a figure of the map whose shape is not read yet (FigureRequest()'s not_yet): its size not known, as far
+ * as the biggest reaches -- a dragon of the map, three times its size, 30 m tall with its wings aside.
+ */
+static void OweUnknownFigurePlace(int x, int y, int z)
+{
+	OweCardPlace(x, y, z, 3 * TILE_SIZE, static_cast<int>(30 * OBJECT_HEIGHT_PER_METRE));
+}
+
+/**
  * Where and as which picture a vehicle drawn as an object is drawn on the map: the object at the angle of the view,
  * hung from the middle of its chain, sorted by the box of its pieces; its other pieces draw nothing.
  * @param pose where and at what angle to draw it instead (a round curve, round_track.h), or nullptr
@@ -4672,19 +4681,27 @@ static void NoteMovingFigure(TileIndex tile, int ticks, const ThreeDVehicleShape
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
+	if (not_yet != nullptr) *not_yet = false;
 	if (std::isnan(yaw)) yaw = GetViewYaw();
+	/* Drawn by the card, its shape and its bones not waited for either: made in the background, its place drawn again
+	 * when they come (not_yet). The main thread read a horse's skeleton for the map, 0.3 s in the rig, 0.8 s on the
+	 * phone (the player's test2: the frames stood as the purchase window was opened by the farm). */
+	auto missing = [&]() -> std::optional<PictureToMake> {
+		if (not_yet != nullptr && for_card) *not_yet = true;
+		return std::nullopt;
+	};
 	if (name.starts_with("vozidlo:") || name.starts_with("naklad:")) {
 		/* A vehicle standing as a figure (or a piece of the loads): at its true size against the building, empty, still. */
 		ThreeDEyeVehicle ev;
 		if (!GetThreeDStandingVehicle(name, ev)) return std::nullopt;
 		const bool for_eye = ViewportDrawingEye();
 		const ThreeDParts parts = ev.obj->PartsOf(ev.state);
-		const ThreeDVehicleShape *shape = for_eye ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
-		if (shape == nullptr) return std::nullopt;
+		const ThreeDVehicleShape *shape = for_eye || for_card ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
+		if (shape == nullptr) return missing();
 		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 		const float world_az = facing - 135.0f;
 		later = for_eye;
@@ -4714,11 +4731,11 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 	std::shared_ptr<const ThreeDBonesFrame> bones;
 	const ThreeDVehicleShape *shape = nullptr;
 	if (for_card && fig->OnBones() && ThreeDGpuPosesBones()) {
-		if (ThreeDCardFrame(*fig, frame, later, bones, shape) == nullptr) return std::nullopt;
+		if (ThreeDCardFrame(*fig, frame, true, bones, shape) == nullptr) return missing();
 	} else {
-		shape = later ? fig->TryGetShape(frame) : fig->GetShape(frame);
+		shape = later || for_card ? fig->TryGetShape(frame) : fig->GetShape(frame);
 	}
-	if (shape == nullptr) return std::nullopt;
+	if (shape == nullptr) return missing();
 	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 	/* A thing that turns: where in its turn it is, by the game's tick (its frames change after so many turns). */
 	const int spin_step = fig->spin_ticks > 0 ? static_cast<int>((TimerGameTick::counter % fig->spin_ticks) * SPIN_STEPS / fig->spin_ticks) : 0;
@@ -4762,8 +4779,15 @@ const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float sc
  */
 std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
-	bool later = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, 0, true);
+	bool later = false, not_yet = false;
+	card = nullptr;
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, 0, true, &not_yet);
+	if (not_yet) {
+		/* Its shape or its bones not read yet: nothing of it, the building drawn again when they come (a stand-in given). */
+		_stand_ins_given++;
+		OweUnknownFigurePlace(x, y, z);
+		return true;
+	}
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
@@ -4792,7 +4816,14 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
 	 * picture so that it is within what the card draws one in. */
 	if (ViewportVehiclesOnCard()) {
-		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true);
+		bool not_yet = false;
+		std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, THREE_D_GPU_VEHICLE_FRAME * 0.75f, state, true, &not_yet);
+		if (not_yet) {
+			/* Its shape or its bones not read yet (read in the background): nothing of it till they come, its place drawn again then. */
+			_stand_ins_given++;
+			OweUnknownFigurePlace(x, y, z);
+			return true;
+		}
 		if (!p.has_value()) return false;
 		std::shared_ptr<const ThreeDGpuStandingVehicle> card;
 		std::vector<ThreeDPictureLight> lights;
