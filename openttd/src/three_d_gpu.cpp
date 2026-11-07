@@ -1449,6 +1449,22 @@ void main()
 				if (qa == 253 || qa == 254) r += wk;
 			}
 			if (r > 0.0) t.rgb = m >= 0.4 * r ? mark / max(m, 1e-4) : surface / max(r - m, 1e-4);
+		} else if (ta == 251) {
+			/* Water (DrawEyeWater() of viewport.cpp): between the water's texels alone, its banks and foam sharp. */
+			vec2 f = v_uv - 0.5;
+			ivec2 b = ivec2(floor(f));
+			vec2 w = f - vec2(b);
+			vec3 sum = vec3(0.0);
+			float r = 0.0;
+			for (int k = 0; k < 4; k++) {
+				ivec2 o = ivec2(k & 1, k >> 1);
+				vec4 q = texelFetch(u_tex, origin + clamp(b + o, ivec2(0), size - 1), 0);
+				if (int(q.a * 255.0 + 0.5) != 251) continue;
+				float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
+				sum += wk * q.rgb;
+				r += wk;
+			}
+			if (r > 1e-4) t.rgb = sum / r;
 		}
 	}
 	/* Our grass's texel of the ground (THREE_D_GPU_EYE_GRASS): its colour our grass's picture at the world point the pixel
@@ -3555,8 +3571,9 @@ GLuint NewGroundTexture(int w, int h)
 /**
  * The surface of a road of the ground of the view from the eyes smoothed (DrawEyeRoad() of viewport.cpp, the processor
  * the same where it draws them): each of its texels (THREE_D_GPU_ROAD_SURFACE) the mean of those of it about it, seven
- * by seven, of a near lightness (to 40) -- the dither gone, the edge of a pavement kept. Each texel of the rect, into a
- * picture of its own, laid back; a texel beside it the rect reads as it is.
+ * by seven, of a near lightness (to 40) -- the dither gone, the edge of a pavement kept; the water's alike, among the
+ * water's texels (THREE_D_GPU_WATER_SURFACE, DrawEyeWater()). Each texel of the rect, into a picture of its own, laid
+ * back; a texel beside it the rect reads as it is.
  */
 const char *const ROAD_SMOOTH_VERTEX = R"(#version 330 core
 void main()
@@ -3574,7 +3591,8 @@ void main()
 	ivec2 p = u_at + ivec2(gl_FragCoord.xy);
 	ivec2 size = textureSize(u_ground, 0);
 	vec4 t = texelFetch(u_ground, p, 0);
-	if (int(t.a * 255.0 + 0.5) != 253) {
+	int ta = int(t.a * 255.0 + 0.5);
+	if (ta != 253 && ta != 251) {
 		o_colour = t;
 		return;
 	}
@@ -3586,7 +3604,7 @@ void main()
 			ivec2 q = p + ivec2(dx, dy);
 			if (q.x < 0 || q.y < 0 || q.x >= size.x || q.y >= size.y) continue;
 			vec4 s = texelFetch(u_ground, q, 0);
-			if (int(s.a * 255.0 + 0.5) != 253) continue;
+			if (int(s.a * 255.0 + 0.5) != ta) continue;
 			vec3 c = floor(s.rgb * 255.0 + 0.5);
 			if (abs(Light(c) - l) > 40.0) continue;
 			sum += c;

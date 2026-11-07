@@ -259,6 +259,8 @@ static constexpr int THREE_D_GPU_EYE_GRASS = 32;       ///< the ground: its texe
 /** A texel of the ground of the view from the eyes on a road (DrawEyeRoad() of viewport.cpp), by its alpha: its surface smoothed, a white mark. */
 static constexpr uint8_t THREE_D_GPU_ROAD_SURFACE = 253;
 static constexpr uint8_t THREE_D_GPU_ROAD_MARK = 254;
+/** A texel of the ground of the view from the eyes, its alpha: water smoothed as a road's surface, among its own alone (DrawEyeWater() of viewport.cpp). */
+static constexpr uint8_t THREE_D_GPU_WATER_SURFACE = 251;
 /** A texel of the ground of the view from the eyes of our grass (DrawOurGrass() of viewport.cpp), by its alpha: no colour, its
  * red which tint of ThreeDGpuEyeFrame::grass_tint, its green its light in 128ths (the game's grass on that slope). */
 static constexpr uint8_t THREE_D_GPU_GRASS = 252;
