@@ -9593,6 +9593,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			auto x = number(3), y = number(4);
 			auto real = [&](size_t i) { auto v = ParseInteger<int>(argv[i].substr(0, argv[i].find('.')), 10); double f = v.value_or(0); if (auto dot = argv[i].find('.'); dot != std::string_view::npos) { auto d = argv[i].substr(dot + 1); auto frac = ParseInteger<int>(d, 10); if (frac.has_value()) f += (f < 0 || argv[i].starts_with("-") ? -1 : 1) * *frac / std::pow(10.0, d.size()); } return f; };
 			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: {}", RigFirstPersonAtHouse(TileXY(*x, *y), real(5), real(6), real(7)));
+		} else if (argv.size() > 4 && argv[2] == "zem") {
+			/* 'chodec zem <x> <y>': at a world point the ground the walker stands on and the water there (units of height). */
+			auto x = number(3), y = number(4);
+			if (x.has_value() && y.has_value()) {
+				const std::optional<double> surface = EyeWaterSurfaceZ(*x, *y);
+				IConsolePrint(CC_DEFAULT, "test3d: zem na {},{}: chodec {:.2f}, hladina {}, hloubka {:.2f}, sklon dlazdice {}", *x, *y, FirstPersonGroundZ(*x, *y),
+						surface.has_value() ? fmt::format("{:.2f}", *surface) : std::string("zadna"), EyeWaterDepth(*x, *y), to_underlying(GetTileSlope(TileVirtXY(*x, *y))));
+			}
+		} else if (argv.size() > 4 && argv[2] == "voda") {
+			/* 'chodec voda <x> <y>': the walker into the water in the middle of the tile, at its surface. */
+			extern bool RigFirstPersonIntoWater(TileIndex tile);
+			auto x = number(3), y = number(4);
+			if (x.has_value() && y.has_value()) IConsolePrint(CC_DEFAULT, "test3d: chodec do vody: {}", RigFirstPersonIntoWater(TileXY(*x, *y)) ? "plave" : "tam neni voda");
 		} else if (argv.size() > 3 && argv[2] == "smer") {
 			/* 'chodec smer <degrees>': the walker looking that way, from the map's x towards its y; on board a boat from its bow. */
 			extern void RigFirstPersonFace(double degrees);
