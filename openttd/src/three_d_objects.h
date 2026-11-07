@@ -1238,6 +1238,12 @@ struct ThreeDPasture {
 const ThreeDPasture *GetThreeDPasture();
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope);
 
+/** The bales on a farm's field after the harvest (GetThreeDFieldBales()): the colleague's shared pieces of the loads, in the straw's colour. */
+static constexpr std::string_view FIELD_BALE_ROUND = "balik";
+static constexpr std::string_view FIELD_BALE_SQUARE = "balik_hranaty";
+static constexpr std::string_view FIELD_BALE_STRAW = "E2C46A";
+std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope slope);
+
 /**
  * A tile of an industry of the original game drawn from the parts the industries share (the colleague's
  * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, set prumysl_vanilla): the ground of the tile, the parts standing on it (of the

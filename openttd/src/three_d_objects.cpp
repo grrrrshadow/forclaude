@@ -6644,6 +6644,8 @@ static void ReadThreeDVehicleObjects()
 		}
 		own_colour(name, colour);
 	}
+	/* The straw of the bales on a farm's field after the harvest (the field's type 8, FieldBales()). */
+	for (const std::string_view bale : {FIELD_BALE_ROUND, FIELD_BALE_SQUARE}) own_colour(bale, *ParseIndexColour(FIELD_BALE_STRAW));
 	MakeHumanoidFigures();
 	SplitThemeGuests();
 	/* The vehicles that are animals of a set: the file of their figure (its textures, its margins). */
@@ -9969,6 +9971,66 @@ const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slop
 		}
 	}
 	return made.get();
+}
+
+/**
+ * The bales on a farm's field after the harvest, its type 8, whose sprite has the haystacks painted in (the player,
+ * 7. 11.: "one field has no 3D graphics, it is the field with the bales of straw"): the colleague's shared pieces of
+ * the loads (hra/3d/PAR18-7-11-PRO-HRU.md, part 6) standing as the pallets on a yard do, "naklad:<piece>|<part>=<RRGGBB>"
+ * (GetThreeDStandingVehicle()) -- round ones one by one about the field, small square ones by a few or in a little
+ * stack -- in the straw's colour, each on the ground under it. One of a few layouts a tile, by the tile.
+ * @return none when the sets have not the bales: the field's sprite with them painted in stays
+ */
+std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope slope)
+{
+	struct Bale {
+		bool square;
+		float x, y, z, turn; ///< its foot, metres from the tile's north corner; degrees
+	};
+	/* A little stack of square ones: two side by side, one across them on top. */
+	auto stack = [](float x, float y) {
+		return std::array<Bale, 3>{{{true, x, y - 0.24f, 0, 0}, {true, x, y + 0.24f, 0, 0}, {true, x, y, 0.36f, 90}}};
+	};
+	static const std::array<std::vector<Bale>, 6> layouts = [&] {
+		std::array<std::vector<Bale>, 6> l;
+		l[0] = {{false, 4.0f, 4.5f, 0, 30}, {false, 10.5f, 9.5f, 0, 105}};
+		l[1] = {{false, 7.4f, 7.0f, 0, 75}};
+		l[2] = {{false, 3.5f, 10.5f, 0, 10}, {false, 8.0f, 3.8f, 0, 60}, {false, 11.6f, 11.2f, 0, 140}};
+		for (const Bale &b : stack(7.4f, 7.4f)) l[3].push_back(b);
+		l[4] = {{true, 3.2f, 4.0f, 0, 20}, {true, 6.1f, 8.3f, 0, 200}, {true, 9.4f, 5.1f, 0, 95}, {true, 11.2f, 11.0f, 0, 40}};
+		l[5] = {{false, 4.8f, 9.6f, 0, 0}};
+		for (const Bale &b : stack(10.4f, 4.2f)) l[5].push_back(b);
+		return l;
+	}();
+	const ThreeDLoadPiece *round = GetThreeDLoadPiece(FIELD_BALE_ROUND);
+	const ThreeDLoadPiece *square = GetThreeDLoadPiece(FIELD_BALE_SQUARE);
+	if (round == nullptr || square == nullptr) return {};
+	const size_t layout = (TileX(tile) * 7919u + TileY(tile) * 104729u) % layouts.size();
+	static std::map<std::pair<size_t, Slope>, std::vector<ThreeDObjectFigure>> made;
+	auto [it, fresh] = made.try_emplace({layout, slope});
+	if (!fresh) return it->second;
+	/* The corners' heights in metres, as the wheat's (GetThreeDSlopedPlants()). */
+	const double level = TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+	const bool steep = IsSteepSlope(slope);
+	auto corner = [&](Corner c) -> double {
+		double h = (to_underlying(slope) & to_underlying(SlopeWithOneCornerRaised(c))) != 0 ? level : 0;
+		if (steep && GetHighestSlopeCorner(slope) == c) h = 2 * level;
+		return h;
+	};
+	const double n = corner(CORNER_N), e = corner(CORNER_E), s = corner(CORNER_S), w = corner(CORNER_W);
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	for (const Bale &b : layouts[layout]) {
+		const ThreeDLoadPiece *piece = b.square ? square : round;
+		ThreeDObjectFigure f;
+		f.figure = fmt::format("naklad:{}|{}={}", piece->name, piece->paint_part, FIELD_BALE_STRAW);
+		const double u = std::clamp(b.x / side, 0.0, 1.0), v = std::clamp(b.y / side, 0.0, 1.0);
+		f.at[0] = b.x;
+		f.at[1] = b.y;
+		f.at[2] = b.z + static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
+		f.facing = b.turn;
+		it->second.push_back(std::move(f));
+	}
+	return it->second;
 }
 
 /**

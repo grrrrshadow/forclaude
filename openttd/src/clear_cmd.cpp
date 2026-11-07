@@ -250,7 +250,11 @@ static void DrawTile_Clear(TileInfo *ti)
 			if (IsPasture(ti->tile)) {
 				DrawClearLandTile(ti, 3);
 			} else {
-				DrawGroundSprite(_clear_land_sprites_farmland[GetFieldType(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+				/* After the harvest the 3D views (drawn without fences) stand its bales up (GetThreeDFieldBales()): its
+				 * ground without the haystacks painted in, the stubble of the ripe field. */
+				uint type = GetFieldType(ti->tile);
+				if (type == 8 && !_draw_fences && !GetThreeDFieldBales(ti->tile, ti->tileh).empty()) type = 7;
+				DrawGroundSprite(_clear_land_sprites_farmland[type] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 			}
 			DrawClearLandFence(ti);
 			break;
