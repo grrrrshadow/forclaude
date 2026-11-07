@@ -607,6 +607,13 @@ struct PLYRChunkHandler : ChunkHandler {
 			Company *c = Company::CreateAtIndex(CompanyID(index));
 			SlObject(c, slt);
 			_company_colours[c->index] = c->colour;
+			/* A game from before the tents: its walker carries them as a new one would (WalkerStartItems()). */
+			if (IsSavegameVersionBefore(SaveLoadVersion::WalkerTents)) {
+				for (WalkerItem tent : {WalkerItem::CelticTent, WalkerItem::CampingTent}) {
+					uint16_t &n = c->walker_items[to_underlying(tent)];
+					n = std::max<uint16_t>(n, 1);
+				}
+			}
 		}
 	}
 

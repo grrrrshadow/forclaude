@@ -10666,6 +10666,39 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: inventar: mari {}, sazenice {}, seno {}, houby {}, zdravi {}", c->walker_items[to_underlying(WalkerItem::Marijuana)], c->walker_items[to_underlying(WalkerItem::Seedling)],
 					c->walker_items[to_underlying(WalkerItem::Hay)], c->walker_items[to_underlying(WalkerItem::Mushrooms)], c->walker_health);
 		}
+	} else if (what == "stan") {
+		/* The walkers' tents (WalkerTent): 'stan' lists them and the inventory's; 'stan kelt|kempink' pitches one of the
+		 * inventory in front of the walker as its click there does (one given when it has none); 'stan silnice' builds a
+		 * road over the first one (it is gone with the news, CheckWalkerTents). */
+		extern bool FirstPersonWalkerAt(double &x, double &y);
+		extern double FirstPersonWalkerHeading();
+		double wx = 0, wy = 0;
+		const bool walker = FirstPersonWalkerAt(wx, wy);
+		Company *c = Company::GetIfValid(_local_company);
+		if (argv.size() > 2 && (argv[2] == "kelt" || argv[2] == "kempink") && walker && c != nullptr) {
+			const WalkerItem item = argv[2] == "kelt" ? WalkerItem::CelticTent : WalkerItem::CampingTent;
+			if (c->walker_items[to_underlying(item)] == 0) c->walker_items[to_underlying(item)] = 1;
+			const auto [tile, facing] = WalkerTentPlace(wx, wy, FirstPersonWalkerHeading());
+			const CommandCost r = Command<Commands::PitchWalkerTent>::Do(DoCommandFlag::Execute, tile, item, facing, static_cast<uint8_t>(number(3).value_or(0)));
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: stan {}", r.Succeeded() ? std::string("postaven") : RefusalReason(r));
+		} else if (argv.size() > 2 && argv[2] == "silnice" && !_walker_tents.empty()) {
+			const TileIndex tile{_walker_tents.front().tile};
+			const CommandCost r = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, tile, RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+			IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: silnice pres stan {}", r.Succeeded() ? std::string("postavena") : RefusalReason(r));
+		}
+		for (const WalkerTent &t : _walker_tents) {
+			double fx = 0, fy = 0;
+			WalkerTentFireAt(TileIndex{t.tile}, fx, fy);
+			IConsolePrint(CC_DEFAULT, "test3d: stan {} na dlazdici {},{}, vchod {} st, barva {}, firma {}, ohniste {:.1f},{:.1f}, gril {}", t.item == to_underlying(WalkerItem::CampingTent) ? "kempink" : "kelt",
+					TileX(TileIndex{t.tile}), TileY(TileIndex{t.tile}), t.facing, t.colour, t.owner, fx / TILE_SIZE, fy / TILE_SIZE, ThreeDForestGrill(TileIndex{t.tile}));
+		}
+		if (c != nullptr) {
+			IConsolePrint(CC_DEFAULT, "test3d: inventar: kelt {}, kempink {}", c->walker_items[to_underlying(WalkerItem::CelticTent)], c->walker_items[to_underlying(WalkerItem::CampingTent)]);
+		}
+		if (walker) {
+			IConsolePrint(CC_DEFAULT, "test3d: chodec na {:.2f},{:.2f}, blokuje stan {}, vchod v dosahu {}", wx / TILE_SIZE, wy / TILE_SIZE, WalkerTentBlocks(wx, wy) ? "ano" : "ne",
+					WalkerTentEntranceNear(wx, wy, WALKER_TENT_REACH_M) != nullptr ? "ano" : "ne");
+		}
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "ukaz") {
 		/* 'stojici ukaz 0|1': what stands on the turned main view laid by the card over its ground, shown straight from
 		 * it (1; ThreeDGpuStanding), or drawn by the processor into the screen (0). */

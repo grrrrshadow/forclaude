@@ -922,6 +922,7 @@ STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} workers died
 STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} clerks died
 STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. {COMMA} shareholders on a visit died
+STR_NEWS_WALKER_TENT_EVICTED                                    :{BIG_FONT}{BLACK}Givmi {PRESIDENT_NAME} was evicted with their tent from a building plot
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {RAW_STRING}. Everybody there died
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombed {TOWN}. {COMMA} inhabitants died, {COMMA} houses levelled
 
@@ -2299,6 +2300,7 @@ STR_FIRST_PERSON_MAT_HERE                                       :Mat sells marij
 STR_FIRST_PERSON_NURSE_HERE                                     :Nurse, health insurance: press I
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marijuana growing: harvest in {NUM} day{P "" s}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the marijuana
+STR_FIRST_PERSON_TENT_STRIKE                                    :E: fold the tent
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_HELM_HERE                                      :E: take the wheel of {VEHICLE}
@@ -2342,6 +2344,7 @@ STR_WALKER_DOG                                                  :{RAW_STRING}
 STR_WALKER_YOUR_DOG                                             :Your dog: {RAW_STRING}
 STR_WALKER_LET_DOG_GO                                           :[let go]
 STR_WALKER_PLANT                                                :[plant in front of you]
+STR_WALKER_PITCH                                                :[pitch in front of you]
 STR_WALKER_MAT_SELLS                                            :Mat sells:
 STR_WALKER_NURSE_SELLS                                          :A nurse of the church sells:
 STR_WALKER_NURSE_INSURANCE                                      :Health insurance for {COMMA} days: a nurse walks with you and heals you
@@ -2375,6 +2378,8 @@ STR_WALKER_ITEM_PAPER_LANTERN                                   :Paper lantern
 STR_WALKER_ITEM_IRON_LANTERN                                    :Candle lantern
 STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Mushroom goulash
 STR_WALKER_ITEM_MINE_HAMMER                                     :Mine hammer
+STR_WALKER_ITEM_CELTIC_TENT                                     :Celtic tent
+STR_WALKER_ITEM_CAMPING_TENT                                    :Camping tent
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here
@@ -2386,6 +2391,11 @@ STR_ERROR_WALKER_CAN_T_PLANT                                    :{WHITE}Can't pl
 STR_ERROR_WALKER_CAN_T_HARVEST                                  :{WHITE}Can't harvest...
 STR_ERROR_WALKER_CAN_T_FEED                                     :{WHITE}Can't feed it...
 STR_ERROR_WALKER_CANNOT_PLANT_HERE                              :{WHITE}It won't grow here
+STR_ERROR_WALKER_CAN_T_PITCH                                    :{WHITE}Can't pitch the tent...
+STR_ERROR_WALKER_CAN_T_STRIKE                                   :{WHITE}Can't fold the tent...
+STR_ERROR_WALKER_TENT_NOT_FREE                                  :{WHITE}... the tile in front of you is not free land (a road, a building, water, a field)
+STR_ERROR_WALKER_TENT_NOT_FLAT                                  :{WHITE}... the tile in front of you is not level
+STR_ERROR_WALKER_TENT_ALREADY                                   :{WHITE}... a tent already stands there
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}You can't have more plants
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}It isn't ripe yet
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}

@@ -1030,6 +1030,7 @@ STR_NEWS_PLANE_CRASH_OUT_OF_FUEL                                :{BIG_FONT}{BLAC
 STR_NEWS_RAID_INDUSTRY_WORKERS                                  :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} dělníků
 STR_NEWS_RAID_INDUSTRY_CLERKS                                   :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} úředníků
 STR_NEWS_RAID_INDUSTRY_SHAREHOLDERS                             :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřelo {COMMA} akcionářů na prohlídce
+STR_NEWS_WALKER_TENT_EVICTED                                    :{BIG_FONT}{BLACK}Givmi {PRESIDENT_NAME} byl se svým stanem vykázán ze stavebního pozemku
 STR_NEWS_RAID_INDUSTRY_EVERYBODY                                :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {STRING}, zemřeli tam všichni
 STR_NEWS_RAID_TOWN                                              :{BIG_FONT}{BLACK}{PRESIDENT_NAME} bombardoval {TOWN}, zemřelo {COMMA} obyvatel, zbořeno {COMMA} domů
 
@@ -2407,6 +2408,7 @@ STR_FIRST_PERSON_MAT_HERE                                       :Mat prodává m
 STR_FIRST_PERSON_NURSE_HERE                                     :Sestřička, zdravotní pojištění: zmáčkni I
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marihuana roste: sklizeň za {NUM} d{P en ny ní}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: sklidit marihuanu
+STR_FIRST_PERSON_TENT_STRIKE                                    :E: složit stan
 STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit marihuanové seno
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_HELM_HERE                                      :E: řídit {VEHICLE}
@@ -2450,6 +2452,7 @@ STR_WALKER_DOG                                                  :{RAW_STRING}
 STR_WALKER_YOUR_DOG                                             :Tvůj pes: {RAW_STRING}
 STR_WALKER_LET_DOG_GO                                           :[pustit]
 STR_WALKER_PLANT                                                :[zasadit před sebe]
+STR_WALKER_PITCH                                                :[postavit před sebe]
 STR_WALKER_MAT_SELLS                                            :Mat prodává:
 STR_WALKER_NURSE_SELLS                                          :Sestřička od kostela prodává:
 STR_WALKER_NURSE_INSURANCE                                      :Zdravotní pojištění na {COMMA} dní: sestřička chodí s tebou a léčí tě
@@ -2483,6 +2486,8 @@ STR_WALKER_ITEM_PAPER_LANTERN                                   :Papírová luce
 STR_WALKER_ITEM_IRON_LANTERN                                    :Kovaná lucerna
 STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Houbový guláš
 STR_WALKER_ITEM_MINE_HAMMER                                     :Minové kladivo
+STR_WALKER_ITEM_CELTIC_TENT                                     :Keltský stan
+STR_WALKER_ITEM_CAMPING_TENT                                    :Kempinkový stan
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
@@ -2494,6 +2499,11 @@ STR_ERROR_WALKER_CAN_T_PLANT                                    :{WHITE}Nelze za
 STR_ERROR_WALKER_CAN_T_HARVEST                                  :{WHITE}Nelze sklidit...
 STR_ERROR_WALKER_CAN_T_FEED                                     :{WHITE}Nelze nakrmit...
 STR_ERROR_WALKER_CANNOT_PLANT_HERE                              :{WHITE}Tady to neporoste
+STR_ERROR_WALKER_CAN_T_PITCH                                    :{WHITE}Stan nejde postavit...
+STR_ERROR_WALKER_CAN_T_STRIKE                                   :{WHITE}Stan nejde složit...
+STR_ERROR_WALKER_TENT_NOT_FREE                                  :{WHITE}... dlaždice před tebou není volná (silnice, budova, voda, pole)
+STR_ERROR_WALKER_TENT_NOT_FLAT                                  :{WHITE}... dlaždice před tebou není rovná
+STR_ERROR_WALKER_TENT_ALREADY                                   :{WHITE}... už tam stojí stan
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}Víc kytek už mít nemůžeš
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}Ještě neuzrála
 STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}

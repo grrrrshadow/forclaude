@@ -27,6 +27,10 @@
 #include "three_d_objects.h"
 #include "viewport_func.h"
 #include "water_map.h"
+#include "bridge_map.h"
+#include "clear_map.h"
+#include "news_func.h"
+#include "strings_func.h"
 #include "timer/timer.h"
 #include "timer/timer_game_economy.h"
 #include "timer/timer_game_tick.h"
@@ -65,6 +69,8 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_IRON_LANTERN, 15, 0, WalkerItemKind::Light},
 	{STR_WALKER_ITEM_MUSHROOM_GOULASH, 6, 30, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_MINE_HAMMER, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_CELTIC_TENT, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_CAMPING_TENT, 0, 0, WalkerItemKind::Thing},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -311,6 +317,11 @@ CommandCost CmdWalkerCheat(DoCommandFlags flags, uint16_t quiver)
 	if (flags.Test(DoCommandFlag::Execute)) {
 		for (uint8_t i = 0; i < to_underlying(WalkerItem::End); i++) {
 			c->walker_items[i] = WalkerCheatCount(static_cast<WalkerItem>(i), c->walker_items[i], quiver);
+		}
+		/* A tent of each kind, when it has none and none of its is pitched (the player: "iddqd fills them up"). */
+		for (WalkerItem tent : {WalkerItem::CelticTent, WalkerItem::CampingTent}) {
+			const bool pitched = std::ranges::any_of(_walker_tents, [&](const WalkerTent &t) { return t.owner == c->index.base() && t.item == to_underlying(tent); });
+			if (!pitched && c->walker_items[to_underlying(tent)] == 0) c->walker_items[to_underlying(tent)] = 1;
 		}
 		InvalidateWindowData(WindowClass::FirstPerson, 0);
 		InvalidateWindowData(WindowClass::WalkerInventory, 0);
@@ -560,4 +571,365 @@ static const IntervalTimer<TimerGameTick> _walker_plants_out_of_pot({TimerGameTi
 });
 static const IntervalTimer<TimerGameEconomy> _walker_plants_grow({TimerGameEconomy::Trigger::Day, TimerGameEconomy::Priority::None}, [](auto) {
 	for (const WalkerPlant &p : _walker_plants) MarkWalkerPlantDirty(p);
+});
+
+/** The tents the walkers pitched (WalkerTent), saved with the game. */
+std::vector<WalkerTent> _walker_tents;
+
+/** Where the things of a tent lie, metres in its frame: +x out of its entrance, from the middle of its floor. */
+struct WalkerTentLayout {
+	std::string_view figure; ///< the tent's figure of the indices (the colleague's objekty/doplnky)
+	float door;              ///< its entrance ("dvere" "poloha"), along x
+	float reach;             ///< as far as its cloth goes from the middle (its awning), metres
+	float fire[2];           ///< the fireplace: out before the entrance and aside (the player: "the fireplace farther from the entrance")
+	float barrel[2];         ///< the shared barrel, inside at the back
+};
+
+static const WalkerTentLayout &TentLayout(uint8_t item)
+{
+	/* The Celtic tent's long side is its entrance under its awning (3.09 m out); the camping tent a dome 2.5 m about. */
+	static constexpr WalkerTentLayout CELTIC{"stan_kelt", 1.79f, 3.3f, {5.4f, 1.7f}, {-1.15f, 1.2f}};
+	static constexpr WalkerTentLayout CAMPING{"stan_kempink", 2.52f, 2.7f, {6.0f, 1.7f}, {-1.3f, 1.15f}};
+	return item == to_underlying(WalkerItem::CampingTent) ? CAMPING : CELTIC;
+}
+
+/** The figures of the fireplace, the grill's trestles and its spit, and the barrel (objekty/nase, objekty/doplnky). */
+static constexpr std::string_view TENT_FIRE = "ohniste_stanu";
+static constexpr std::string_view TENT_TRESTLES = "kozy_grilu";
+static constexpr std::string_view TENT_SPIT = "rozen";
+static constexpr std::string_view TENT_BARREL = "sud_s_pipou_99914b93";
+/** The spit over the fire as over the forest's (ReadForestPart()): its rod so high in the forks, sized so. */
+static constexpr float TENT_SPIT_UP_M = 1.01f, TENT_SPIT_SCALE = 1.08f;
+/** How near the walker the fireplace and the barrel keep it, metres. */
+static constexpr double TENT_FIRE_R_M = 0.75, TENT_BARREL_R_M = 0.4;
+
+/** A point of a tent's frame (metres) in the world (world units). */
+static void TentToWorld(const WalkerTent &t, double lx, double ly, double &x, double &y)
+{
+	const double a = t.facing * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	x = (TileX(TileIndex{t.tile}) + 0.5) * TILE_SIZE + (lx * c - ly * s) * OBJECT_UNITS_PER_METRE;
+	y = (TileY(TileIndex{t.tile}) + 0.5) * TILE_SIZE + (lx * s + ly * c) * OBJECT_UNITS_PER_METRE;
+}
+
+/** A world point (world units) in a tent's frame (metres). */
+static void WorldToTent(const WalkerTent &t, double x, double y, double &lx, double &ly)
+{
+	const double a = t.facing * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	const double dx = (x - (TileX(TileIndex{t.tile}) + 0.5) * TILE_SIZE) / OBJECT_UNITS_PER_METRE;
+	const double dy = (y - (TileY(TileIndex{t.tile}) + 0.5) * TILE_SIZE) / OBJECT_UNITS_PER_METRE;
+	lx = dx * c + dy * s;
+	ly = -dx * s + dy * c;
+}
+
+/** The tent pitched on a tile, nullptr none. */
+const WalkerTent *WalkerTentAt(TileIndex tile)
+{
+	for (const WalkerTent &t : _walker_tents) {
+		if (t.tile == tile.base()) return &t;
+	}
+	return nullptr;
+}
+
+/** The tent whose entrance is nearest a world point within reach of it (metres), nullptr none. */
+const WalkerTent *WalkerTentEntranceNear(double x, double y, double reach_m)
+{
+	const WalkerTent *best = nullptr;
+	double best_d = reach_m * OBJECT_UNITS_PER_METRE;
+	for (const WalkerTent &t : _walker_tents) {
+		double dx, dy;
+		TentToWorld(t, TentLayout(t.item).door, 0, dx, dy);
+		const double d = std::hypot(dx - x, dy - y);
+		if (d <= best_d) {
+			best_d = d;
+			best = &t;
+		}
+	}
+	return best;
+}
+
+/** Where a tent's fireplace is, world units; false no tent on the tile. */
+bool WalkerTentFireAt(TileIndex tile, double &x, double &y)
+{
+	const WalkerTent *t = WalkerTentAt(tile);
+	if (t == nullptr) return false;
+	const WalkerTentLayout &l = TentLayout(t->item);
+	TentToWorld(*t, l.fire[0], l.fire[1], x, y);
+	return true;
+}
+
+/** The tile of the tent whose fireplace is nearest a world point within reach of it (world units), INVALID_TILE none. */
+TileIndex WalkerTentFireNear(double x, double y, double reach)
+{
+	TileIndex best = INVALID_TILE;
+	for (const WalkerTent &t : _walker_tents) {
+		double fx, fy;
+		WalkerTentFireAt(TileIndex{t.tile}, fx, fy);
+		const double d = std::hypot(fx - x, fy - y);
+		if (d < reach) {
+			reach = d;
+			best = TileIndex{t.tile};
+		}
+	}
+	return best;
+}
+
+/**
+ * The parts of a pitched tent as the 3D views draw them: the tent in the colour of its cloth (the first of its palette's
+ * shades, ThreeDVehicleObject::PaletteState()), the barrel in it, the fireplace before it, and with an animal chosen to
+ * grill (ThreeDForestGrill()) the trestles and the spit over the fire, as over the forest's.
+ */
+void ForWalkerTentParts(const WalkerTent &t, const std::function<void(const WalkerTentPart &)> &f)
+{
+	const WalkerTentLayout &l = TentLayout(t.item);
+	const float facing = static_cast<float>(t.facing);
+	int state = 0;
+	if (const ThreeDVehicleObject *fig = GetThreeDFigure(l.figure); fig != nullptr && fig->palette_states.second >= 4) {
+		state = fig->PaletteState(t.colour % (fig->palette_states.second / 4));
+	}
+	double x, y;
+	TentToWorld(t, 0, 0, x, y);
+	f({l.figure, x, y, 0.0f, facing, 1.0f, 0, state});
+	TentToWorld(t, l.barrel[0], l.barrel[1], x, y);
+	f({TENT_BARREL, x, y, 0.0f, facing, 1.0f, 0, 0});
+	TentToWorld(t, l.fire[0], l.fire[1], x, y);
+	f({TENT_FIRE, x, y, 0.0f, facing, 1.0f, 0, 0});
+	if (const int animal = ThreeDForestGrill(TileIndex{t.tile}); animal >= 0) {
+		/* Along the entrance, as one sits by the fire looking at the tent. */
+		const float spit = std::fmod(facing + 90.0f, 360.0f);
+		f({TENT_TRESTLES, x, y, 0.0f, spit, 1.0f, 0, 0});
+		f({TENT_SPIT, x, y, TENT_SPIT_UP_M, spit, TENT_SPIT_SCALE, animal, 0});
+	}
+}
+
+/** The cells of a tent's footprint (WalkerTentBlocks()): a tenth of a metre across, so many each way from its middle. */
+static constexpr double TENT_CELL_M = 0.1;
+static constexpr int TENT_CELLS = 80;
+/** What of a tent is in the walker's way: its cloth and poles from the knees over the head (metres over its floor). */
+static constexpr double TENT_BODY_LO_M = 0.3, TENT_BODY_HI_M = 1.8;
+
+/**
+ * The footprint of a tent's cloth and poles as high as the walker's body (TENT_BODY_LO_M to TENT_BODY_HI_M), its
+ * triangles cut to that height on cells of TENT_CELL_M from its middle -- the walls of the dome, the Celtic tent's
+ * poles; not its floor, not its awning over the entrance. Made the first time; empty while its figure is not read.
+ */
+static const std::vector<uint8_t> &TentFootprint(uint8_t item)
+{
+	static std::array<std::vector<uint8_t>, 2> made;
+	std::vector<uint8_t> &fp = made[item == to_underlying(WalkerItem::CampingTent) ? 1 : 0];
+	if (!fp.empty()) return fp;
+	const ThreeDVehicleObject *fig = GetThreeDFigure(TentLayout(item).figure);
+	const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape() : nullptr;
+	if (shape == nullptr) return fp;
+	const int n = 2 * TENT_CELLS;
+	fp.assign(static_cast<size_t>(n) * n, 0);
+	auto cell = [&](double v) { return static_cast<int>(std::floor(v / TENT_CELL_M)) + TENT_CELLS; };
+	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+		/* The triangle cut to the body's height: a convex polygon. */
+		std::vector<std::array<double, 3>> poly;
+		for (int k = 0; k < 3; k++) {
+			const float *p = &shape->pos[shape->tri[t + k] * 3];
+			poly.push_back({p[0], p[1], p[2]});
+		}
+		for (int side = 0; side < 2 && !poly.empty(); side++) {
+			const double limit = side == 0 ? TENT_BODY_LO_M : TENT_BODY_HI_M;
+			auto inside = [&](const std::array<double, 3> &p) { return side == 0 ? p[2] >= limit : p[2] <= limit; };
+			std::vector<std::array<double, 3>> cut;
+			for (size_t k = 0; k < poly.size(); k++) {
+				const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+				if (inside(a)) cut.push_back(a);
+				if (inside(a) != inside(b)) {
+					const double w = (limit - a[2]) / (b[2] - a[2]);
+					cut.push_back({a[0] + (b[0] - a[0]) * w, a[1] + (b[1] - a[1]) * w, limit});
+				}
+			}
+			poly = std::move(cut);
+		}
+		if (poly.empty()) continue;
+		/* Its outline, a half cell a step (a wall seen from above is a line), and its inside (a sloping wall). */
+		double x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+		for (size_t k = 0; k < poly.size(); k++) {
+			const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+			x0 = std::min(x0, a[0]); x1 = std::max(x1, a[0]);
+			y0 = std::min(y0, a[1]); y1 = std::max(y1, a[1]);
+			const int steps = 1 + static_cast<int>(std::hypot(b[0] - a[0], b[1] - a[1]) / (TENT_CELL_M / 2));
+			for (int s = 0; s <= steps; s++) {
+				const double w = static_cast<double>(s) / steps;
+				const int cx = cell(a[0] + (b[0] - a[0]) * w), cy = cell(a[1] + (b[1] - a[1]) * w);
+				if (cx >= 0 && cy >= 0 && cx < n && cy < n) fp[static_cast<size_t>(cy) * n + cx] = 1;
+			}
+		}
+		if (poly.size() < 3) continue;
+		for (int cy = std::max(0, cell(y0)); cy <= std::min(n - 1, cell(y1)); cy++) {
+			for (int cx = std::max(0, cell(x0)); cx <= std::min(n - 1, cell(x1)); cx++) {
+				const double px = (cx - TENT_CELLS + 0.5) * TENT_CELL_M, py = (cy - TENT_CELLS + 0.5) * TENT_CELL_M;
+				int sign = 0;
+				bool in = true;
+				for (size_t k = 0; k < poly.size() && in; k++) {
+					const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
+					const double cr = (b[0] - a[0]) * (py - a[1]) - (b[1] - a[1]) * (px - a[0]);
+					const int sg = cr > 1e-9 ? 1 : (cr < -1e-9 ? -1 : 0);
+					if (sg == 0) continue;
+					if (sign == 0) sign = sg;
+					in = sg == sign;
+				}
+				if (in) fp[static_cast<size_t>(cy) * n + cx] = 1;
+			}
+		}
+	}
+	return fp;
+}
+
+/** Whether a tent, its fireplace or its barrel stands at a world point: the walker does not go there (first_person_gui.cpp). */
+bool WalkerTentBlocks(double x, double y)
+{
+	if (_walker_tents.empty() || x < 0 || y < 0) return false;
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	if (!IsValidTile(tile)) return false;
+	const WalkerTent *t = WalkerTentAt(tile);
+	if (t == nullptr) return false;
+	const WalkerTentLayout &l = TentLayout(t->item);
+	double lx, ly;
+	WorldToTent(*t, x, y, lx, ly);
+	if (std::hypot(lx - l.fire[0], ly - l.fire[1]) < TENT_FIRE_R_M) return true;
+	if (std::hypot(lx - l.barrel[0], ly - l.barrel[1]) < TENT_BARREL_R_M) return true;
+	const std::vector<uint8_t> &fp = TentFootprint(t->item);
+	if (fp.empty()) return false;
+	const int cx = static_cast<int>(std::floor(lx / TENT_CELL_M)) + TENT_CELLS, cy = static_cast<int>(std::floor(ly / TENT_CELL_M)) + TENT_CELLS;
+	return cx >= 0 && cy >= 0 && cx < 2 * TENT_CELLS && cy < 2 * TENT_CELLS && fp[static_cast<size_t>(cy) * 2 * TENT_CELLS + cx] != 0;
+}
+
+/** Whether a tree of a tile standing at a world point is left out: under a tent or its fireplace (the player: "a tree may be there"). */
+bool WalkerTentHides(TileIndex tile, double x, double y)
+{
+	const WalkerTent *t = _walker_tents.empty() ? nullptr : WalkerTentAt(tile);
+	if (t == nullptr) return false;
+	const WalkerTentLayout &l = TentLayout(t->item);
+	double lx, ly;
+	WorldToTent(*t, x, y, lx, ly);
+	return std::hypot(lx, ly) < l.reach + 0.8 || std::hypot(lx - l.fire[0], ly - l.fire[1]) < 2.0;
+}
+
+/**
+ * Why a tent cannot stand on a tile, INVALID_STRING_ID when it can: clear land (grass, rough land, a field, snow, the
+ * desert) or trees (the player: "a tree may be there"), level, nothing over it; not a road, a railway, a building, the
+ * water, an industry (the player: "the tile must be free, no road, no building"; "not on a slope").
+ */
+StringID WalkerTentGroundError(TileIndex tile)
+{
+	if (!IsValidTile(tile) || TileX(tile) == 0 || TileY(tile) == 0 || TileX(tile) >= Map::MaxX() || TileY(tile) >= Map::MaxY()) return STR_ERROR_WALKER_TENT_NOT_FREE;
+	if (!IsTileType(tile, TileType::Clear) && !IsTileType(tile, TileType::Trees)) return STR_ERROR_WALKER_TENT_NOT_FREE;
+	/* A farm's field is not free land either. */
+	if (IsTileType(tile, TileType::Clear) && !IsSnowTile(tile) && GetClearGround(tile) == ClearGround::Fields) return STR_ERROR_WALKER_TENT_NOT_FREE;
+	if (IsBridgeAbove(tile)) return STR_ERROR_WALKER_TENT_NOT_FREE;
+	if (GetTileSlope(tile) != SLOPE_FLAT) return STR_ERROR_WALKER_TENT_NOT_FLAT;
+	return INVALID_STRING_ID;
+}
+
+/**
+ * Where the walker pitches a tent (the player: "on the tile in front of the walker"): on the tile beside its own the
+ * way it looks, of the eight about it, so that the tent in the middle of it never stands on the walker; its entrance
+ * looking to the walker.
+ * @param x,y the walker, world units
+ * @param heading radians it looks to, 0 along +x
+ * @return the tile, and the degrees its entrance looks to
+ */
+std::pair<TileIndex, uint16_t> WalkerTentPlace(double x, double y, double heading)
+{
+	const double eighth = std::round(heading / (M_PI / 4)) * (M_PI / 4);
+	const int dx = static_cast<int>(std::lround(std::cos(eighth))), dy = static_cast<int>(std::lround(std::sin(eighth)));
+	const int tx = static_cast<int>(std::floor(x / TILE_SIZE)) + dx, ty = static_cast<int>(std::floor(y / TILE_SIZE)) + dy;
+	if (tx < 0 || ty < 0 || tx >= static_cast<int>(Map::SizeX()) || ty >= static_cast<int>(Map::SizeY())) return {INVALID_TILE, 0};
+	const double cx = (tx + 0.5) * TILE_SIZE, cy = (ty + 0.5) * TILE_SIZE;
+	double facing = std::atan2(y - cy, x - cx) * 180.0 / M_PI;
+	if (facing < 0) facing += 360.0;
+	return {TileXY(tx, ty), static_cast<uint16_t>(static_cast<int>(std::lround(facing)) % 360)};
+}
+
+/** The map about a tent drawn again: it was pitched, folded, its grill changed. */
+static void MarkWalkerTentDirty(const WalkerTent &t)
+{
+	const TileIndex tile{t.tile};
+	if (IsValidTile(tile)) MarkTileDirtyByTile(tile);
+}
+
+/**
+ * Pitch a tent of the walker's inventory on a tile (WalkerTent): in its middle, its entrance looking so, its cloth a
+ * colour of its palette.
+ * @param flags operation to perform
+ * @param tile where
+ * @param item which tent (WalkerItem::CelticTent, CampingTent)
+ * @param facing degrees in the world its entrance looks to
+ * @param colour the colour of its cloth, of its palette (the walker's computer chose it by chance)
+ * @return nothing, or an error
+ */
+CommandCost CmdPitchWalkerTent(DoCommandFlags flags, TileIndex tile, WalkerItem item, uint16_t facing, uint8_t colour)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr || !IsWalkerTentItem(item) || facing >= 360) return CMD_ERROR;
+	if (c->walker_items[to_underlying(item)] == 0) return CommandCost(STR_ERROR_WALKER_HAS_NONE);
+	if (const StringID why = WalkerTentGroundError(tile); why != INVALID_STRING_ID) return CommandCost(why);
+	if (WalkerTentAt(tile) != nullptr) return CommandCost(STR_ERROR_WALKER_TENT_ALREADY);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[to_underlying(item)]--;
+		WalkerTent &t = _walker_tents.emplace_back();
+		t.tile = tile.base();
+		t.facing = facing;
+		t.item = to_underlying(item);
+		t.colour = colour;
+		t.owner = c->index.base();
+		MarkWalkerTentDirty(t);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * Fold the walker's tent on a tile back into its inventory, the fire put out, the barrel with it.
+ * @param flags operation to perform
+ * @param tile where it stands
+ * @return nothing, or an error
+ */
+CommandCost CmdStrikeWalkerTent(DoCommandFlags flags, TileIndex tile)
+{
+	Company *c = Company::GetIfValid(_current_company);
+	if (c == nullptr) return CMD_ERROR;
+	auto it = std::ranges::find_if(_walker_tents, [&](const WalkerTent &t) { return t.tile == tile.base(); });
+	if (it == _walker_tents.end() || it->owner != c->index.base()) return CMD_ERROR;
+	if (c->walker_items[it->item] >= WALKER_ITEM_MAX) return CommandCost(STR_ERROR_WALKER_CARRIES_TOO_MANY);
+	if (flags.Test(DoCommandFlag::Execute)) {
+		c->walker_items[it->item]++;
+		SetThreeDForestGrill(tile, -1);
+		MarkWalkerTentDirty(*it);
+		_walker_tents.erase(it);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+		InvalidateWindowData(WindowClass::WalkerInventory, 0);
+	}
+	return CommandCost();
+}
+
+/**
+ * The tents whose ground is gone (the player, 7. 11.: "the news that Givmi "the player's name" was evicted with his
+ * tent from a building plot, when I build a road over the tent; he loses the tent of the inventory if he does not
+ * fold it with E, when they evict him"): something built over one (a road, a railway, a house), its tile dug to a
+ * slope or flooded -- it is gone, not back in the inventory, and the news says so; a tent of a company that is no more
+ * goes quietly. The same on every computer: the game's state, in the game's ticks.
+ */
+static const IntervalTimer<TimerGameTick> _walker_tents_evicted({TimerGameTick::Priority::None, 16}, [](auto) {
+	for (auto it = _walker_tents.begin(); it != _walker_tents.end();) {
+		const TileIndex tile{it->tile};
+		const Company *c = Company::GetIfValid(CompanyID(it->owner));
+		const bool gone = c == nullptr || WalkerTentGroundError(tile) != INVALID_STRING_ID;
+		if (!gone) {
+			++it;
+			continue;
+		}
+		if (c != nullptr) {
+			AddNewsItem(GetEncodedString(STR_NEWS_WALKER_TENT_EVICTED, c->index), NewsType::General, NewsStyle::Normal, {}, tile);
+		}
+		SetThreeDForestGrill(tile, -1);
+		MarkWalkerTentDirty(*it);
+		it = _walker_tents.erase(it);
+		InvalidateWindowData(WindowClass::FirstPerson, 0);
+	}
 });

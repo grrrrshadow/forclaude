@@ -15,5 +15,6 @@
 void DrawRoughLandTile(const TileInfo *ti);
 void DrawClearLandTile(const TileInfo *ti, uint8_t set);
 bool SnowmanStandsAt(TileIndex tile);
+bool DrawWalkerTent(const TileInfo *ti);
 
 #endif /* CLEAR_FUNC_H */

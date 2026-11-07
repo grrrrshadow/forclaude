@@ -384,6 +384,8 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	/* On the deck of a bridge over the tile (FirstPersonStandZ()), whatever is under it is not in the way: the river, the
 	 * sea, a railway (the player, 26. 10.: up the ramp onto the road bridge, and no further along it). */
 	if (IsBridgeAbove(tile) && stand >= GetBridgePixelHeight(GetSouthernBridgeEnd(tile)) - 0.1 * OBJECT_HEIGHT_PER_METRE) return true;
+	/* A walker's tent: in through its entrance, not through its cloth; round its fireplace and its barrel (WalkerTent). */
+	if (WalkerTentBlocks(x, y)) return false;
 	/* The feet over the ground of a building whose north tile is origin. */
 	auto feet = [stand](TileIndex origin) { return std::max(0.0, stand - GetTileMaxPixelZ(origin)); };
 	switch (GetTileType(tile)) {
@@ -508,6 +510,13 @@ static bool FirstPersonFree(double x, double y, double stand = -std::numeric_lim
 		if (!FirstPersonWalkable(x + radius * std::cos(a), y + radius * std::sin(a), stand)) return false;
 	}
 	return true;
+}
+
+/** The company's own tent whose entrance the walker stands at, to fold it with E (WalkerTent); nullptr none. */
+static const WalkerTent *FirstPersonTentToStrike(double x, double y)
+{
+	const WalkerTent *t = WalkerTentEntranceNear(x, y, WALKER_TENT_REACH_M);
+	return t != nullptr && t->owner == _local_company.base() ? t : nullptr;
 }
 
 /**
@@ -1152,6 +1161,12 @@ struct FirstPersonWindow : Window {
 		/* By a farm's dragon resting: what it is fed chosen (ShowDragonFeedWindow()). */
 		if (const auto dragon = ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M); dragon.has_value()) {
 			ShowDragonFeedWindow(dragon->place);
+			return;
+		}
+		/* At the entrance of its tent: folded back into the inventory (WalkerTent). */
+		if (const WalkerTent *tent = FirstPersonTentToStrike(this->walker.x, this->walker.y); tent != nullptr) {
+			CloseWindowById(WindowClass::ForestGrill, 0);
+			Command<Commands::StrikeWalkerTent>::Post(STR_ERROR_WALKER_CAN_T_STRIKE, TileIndex{tent->tile});
 			return;
 		}
 		/* By a forest's fire: what is grilled chosen (ShowForestGrillWindow()). */
@@ -2334,8 +2349,11 @@ struct FirstPersonWindow : Window {
 				} else if (ThreeDRestingDragonNear(this->walker.x, this->walker.y, FirstPersonFeetZ(this->walker), FIRST_PERSON_FEED_M).has_value()) {
 					/* By a farm's dragon resting: E feeds it. */
 					hint = GetString(STR_FIRST_PERSON_FEED_DRAGON);
+				} else if (FirstPersonTentToStrike(this->walker.x, this->walker.y) != nullptr) {
+					/* At the entrance of its tent: E folds it (before the grill, as BoardOrLeave). */
+					hint = GetString(STR_FIRST_PERSON_TENT_STRIKE);
 				} else if (ThreeDForestFireNear(this->walker.x, this->walker.y, FIRST_PERSON_GRILL_M * OBJECT_UNITS_PER_METRE) != INVALID_TILE) {
-					/* By a forest's fire: E grills there. */
+					/* By a forest's fire (or a tent's): E grills there. */
 					hint = GetString(STR_FIRST_PERSON_GRILL);
 				} else if (const StringID shop = WalkerShopName(FirstPersonShopNearby()); shop != INVALID_STRING_ID) {
 					/* At a shop: I opens the inventory, where it is bought. */
@@ -2702,19 +2720,28 @@ std::string RigForestGrill(TileIndex tile, std::string_view what)
 {
 	FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (fp == nullptr) return "zadny chodec";
+	/* The forest's fire, or the fireplace of a walker's tent on the tile (WalkerTent). */
 	const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
-	if (forest == nullptr || forest->grill == nullptr) return "zadny ohen";
-	/* Beyond the logs about the fire, on the side of the north corner. */
-	const double fx = TileX(tile) * TILE_SIZE + forest->fire[0] * OBJECT_UNITS_PER_METRE, fy = TileY(tile) * TILE_SIZE + forest->fire[1] * OBJECT_UNITS_PER_METRE;
-	fp->walker.x = fx - 3.2 * OBJECT_UNITS_PER_METRE;
-	fp->walker.y = fy;
-	fp->walker.heading = 0;
+	double fx, fy;
+	if (forest != nullptr && forest->grill != nullptr) {
+		fx = TileX(tile) * TILE_SIZE + forest->fire[0] * OBJECT_UNITS_PER_METRE;
+		fy = TileY(tile) * TILE_SIZE + forest->fire[1] * OBJECT_UNITS_PER_METRE;
+	} else if (!WalkerTentFireAt(tile, fx, fy)) {
+		return "zadny ohen";
+	}
+	/* Beyond the logs about the fire, on the side of the north corner (a tent's: on the side away from the tent). */
+	const WalkerTent *tent = WalkerTentAt(tile);
+	const double away = tent != nullptr ? tent->facing * M_PI / 180.0 : M_PI;
+	fp->walker.x = fx + std::cos(away) * 3.2 * OBJECT_UNITS_PER_METRE;
+	fp->walker.y = fy + std::sin(away) * 3.2 * OBJECT_UNITS_PER_METRE;
+	fp->walker.heading = away + M_PI;
 	fp->walker.pitch = -0.3;
 	SetFocusedWindow(fp);
 	fp->OnKeyPress('e', 'E');
+	const double mx = (fx - TileX(tile) * TILE_SIZE) / OBJECT_UNITS_PER_METRE, my = (fy - TileY(tile) * TILE_SIZE) / OBJECT_UNITS_PER_METRE;
 	ForestGrillWindow *w = static_cast<ForestGrillWindow *>(FindWindowById(WindowClass::ForestGrill, 0));
-	if (w == nullptr) return fmt::format("ohen na {:.1f},{:.1f} m, okno zavreno", forest->fire[0], forest->fire[1]);
-	std::string out = fmt::format("ohen na {:.1f},{:.1f} m, nabidka:", forest->fire[0], forest->fire[1]);
+	if (w == nullptr) return fmt::format("ohen na {:.1f},{:.1f} m, okno zavreno", mx, my);
+	std::string out = fmt::format("ohen na {:.1f},{:.1f} m, nabidka:", mx, my);
 	const std::vector<int> buttons = w->Buttons();
 	for (int animal : buttons) out += " " + GetString(ForestGrillWindow::ButtonName(animal));
 	const int want = what == "prasatko" ? 0 : what == "kravicka" ? 1 : what == "ovecka" ? 2 : what == "snist" ? -1 : -2;

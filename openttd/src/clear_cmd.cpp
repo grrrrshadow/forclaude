@@ -20,6 +20,7 @@
 #include "town.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "walker_inventory.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -257,8 +258,49 @@ static void DrawSnowman(const TileInfo *ti)
 	}
 }
 
+/**
+ * A walker's tent pitched on the tile (WalkerTent; the player, 7. 11.: "when I click the tent in the inventory it
+ * stands"), its fireplace and its barrel, in the turned view, facing north among the objects and from the eyes, as the
+ * snowman (DrawSnowman()).
+ * @param ti the tile, clear land or trees
+ * @return whether a tent stands there (the tile's plants and snowman are left out)
+ */
+bool DrawWalkerTent(const TileInfo *ti)
+{
+	const WalkerTent *t = _walker_tents.empty() ? nullptr : WalkerTentAt(ti->tile);
+	if (t == nullptr) return false;
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return true;
+	ForWalkerTentParts(*t, [&](const WalkerTentPart &p) {
+		const double z = ti->z + p.up_m * OBJECT_HEIGHT_PER_METRE;
+		if (eye) {
+			AddCabFigure(p.figure, p.scale, p.x, p.y, z, p.facing, p.frame, p.state);
+		} else {
+			AddThreeDFigureToViewport(p.figure, p.scale, static_cast<int>(std::lround(p.x)), static_cast<int>(std::lround(p.y)), static_cast<int>(std::lround(z)),
+					p.facing, _cur_dpi->zoom, ti->tile, 0, p.frame, p.state);
+		}
+	});
+	return true;
+}
+
 static void DrawTile_Clear(TileInfo *ti)
 {
+	if (DrawWalkerTent(ti)) {
+		/* The ground under the tent as it is, without the plants by the houses and the snowman. */
+		if (IsSnowTile(ti->tile)) {
+			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else if (GetClearGround(ti->tile) == ClearGround::Rough) {
+			DrawRoughLandTile(ti);
+		} else if (GetClearGround(ti->tile) == ClearGround::Desert) {
+			DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else if (GetClearGround(ti->tile) == ClearGround::Rocks) {
+			DrawGroundSprite(SPR_FLAT_ROCKY_LAND_1 + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+		} else {
+			DrawClearLandTile(ti, GetClearDensity(ti->tile));
+		}
+		DrawBridgeMiddle(ti, {});
+		return;
+	}
 	if (IsSnowTile(ti->tile)) {
 		uint8_t density = GetClearDensity(ti->tile);
 		DrawGroundSprite(_clear_land_sprites_snow_desert[density] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);

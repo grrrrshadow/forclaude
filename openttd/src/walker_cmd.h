@@ -30,6 +30,8 @@ CommandCost CmdPlantWalkerSeedling(DoCommandFlags flags, int32_t x, int32_t y);
 CommandCost CmdHarvestWalkerPlant(DoCommandFlags flags, int32_t x, int32_t y);
 CommandCost CmdBuyWalkerNurse(DoCommandFlags flags, uint8_t months);
 CommandCost CmdHealWalkerByNurse(DoCommandFlags flags, uint8_t health);
+CommandCost CmdPitchWalkerTent(DoCommandFlags flags, TileIndex tile, WalkerItem item, uint16_t facing, uint8_t colour);
+CommandCost CmdStrikeWalkerTent(DoCommandFlags flags, TileIndex tile);
 Money WalkerPetPrice(std::string_view name);
 Money WalkerNursePrice();
 struct CompanyProperties;
@@ -56,5 +58,7 @@ DEF_CMD_TRAIT(Commands::PlantWalkerSeedling, CmdPlantWalkerSeedling, {}, Command
 DEF_CMD_TRAIT(Commands::HarvestWalkerPlant, CmdHarvestWalkerPlant, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::BuyWalkerNurse, CmdBuyWalkerNurse, {}, CommandType::OtherManagement)
 DEF_CMD_TRAIT(Commands::HealWalkerByNurse, CmdHealWalkerByNurse, {}, CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::PitchWalkerTent, CmdPitchWalkerTent, {}, CommandType::OtherManagement)
+DEF_CMD_TRAIT(Commands::StrikeWalkerTent, CmdStrikeWalkerTent, {}, CommandType::OtherManagement)
 
 #endif /* WALKER_CMD_H */

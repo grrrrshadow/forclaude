@@ -3996,6 +3996,8 @@ int ThreeDForestGrill(TileIndex tile)
 {
 	auto it = _three_d_forest_grills.find(tile);
 	if (it == _three_d_forest_grills.end()) return -1;
+	/* The fireplace of a walker's tent grills so too (the player, 7. 11.: "our fireplace with E to grill", WalkerTent). */
+	if (WalkerTentAt(tile) != nullptr) return it->second;
 	const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
 	return forest != nullptr && forest->grill != nullptr ? it->second : -1;
 }
@@ -4011,10 +4013,11 @@ void SetThreeDForestGrill(TileIndex tile, int animal)
 	MarkTileDirtyByTile(tile);
 }
 
-/** The tile of the forest's fire nearest a world point within reach of it (world units), INVALID_TILE none. */
+/** The tile of the forest's fire, or a walker's tent's (WalkerTentFireNear()), nearest a world point within reach of it (world units), INVALID_TILE none. */
 TileIndex ThreeDForestFireNear(double x, double y, double reach)
 {
-	TileIndex best = INVALID_TILE;
+	TileIndex best = WalkerTentFireNear(x, y, reach);
+	if (double fx, fy; best != INVALID_TILE && WalkerTentFireAt(best, fx, fy)) reach = std::hypot(fx - x, fy - y);
 	const int tx = static_cast<int>(x / TILE_SIZE), ty = static_cast<int>(y / TILE_SIZE);
 	for (int dy = -1; dy <= 1; dy++) {
 		for (int dx = -1; dx <= 1; dx++) {
@@ -5730,6 +5733,12 @@ static void ReadThreeDVehicleObjects()
 					/* Standing on its lowest corner ("na_zem"): the fox's origin was the bottom of that snow, without it she
 					 * hung in the air. */
 					fig.to_ground = e.value("na_zem", false);
+					/* A node of another's scene as a thing of its own (our fireplace by the walker's tent, the forest
+					 * cabin's "ohniste", the player 7. 11.: "outside by the tent our fireplace with E to grill"): its
+					 * middle at the origin ("na_stred"); only the ends of a thing ("jen_konce_m": the grill's trestles
+					 * without its bricks, as over the forest's fire). */
+					fig.to_middle = e.value("na_stred", false);
+					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
 					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
 					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
 					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
@@ -8248,6 +8257,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->frame_lights) key += "|f";
 	for (const std::string &n : this->skip_nodes) key += "|x" + n;
 	if (this->to_ground) key += "|g";
+	if (this->to_middle) key += "|m";
+	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
@@ -8501,6 +8512,25 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 					std::ranges::count_if(made->night_kind, [](uint8_t k) { return k >= 2; }), made->front_lights.size() / 3, made->back_lights.size() / 3, made->front_back_lights.size() / 3, made->back_front_lights.size() / 3);
 		}
 	}
+	if (this->ends_beyond > 0) {
+		/* Only its ends ("jen_konce_m"): a triangle with a corner nearer its origin along x is left out, as an add-on's
+		 * place leaves it ("beyond", LayAddons()). */
+		const size_t triangles = mesh.tri.size() / 3;
+		std::vector<uint32_t> tri;
+		std::vector<uint8_t> tri_tex;
+		std::vector<uint16_t> tri_group;
+		for (size_t t = 0; t < triangles; t++) {
+			bool kept = true;
+			for (size_t k = 0; k < 3; k++) kept = kept && std::abs(mesh.pos[mesh.tri[t * 3 + k] * 3]) >= this->ends_beyond;
+			if (!kept) continue;
+			tri.insert(tri.end(), {mesh.tri[t * 3], mesh.tri[t * 3 + 1], mesh.tri[t * 3 + 2]});
+			if (mesh.tri_tex.size() == triangles) tri_tex.push_back(mesh.tri_tex[t]);
+			if (mesh.tri_group.size() == triangles) tri_group.push_back(mesh.tri_group[t]);
+		}
+		mesh.tri = std::move(tri);
+		if (mesh.tri_tex.size() == triangles) mesh.tri_tex = std::move(tri_tex);
+		if (mesh.tri_group.size() == triangles) mesh.tri_group = std::move(tri_group);
+	}
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
 	made->uv = std::move(mesh.uv);
@@ -8747,6 +8777,17 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		for (size_t i = 2; i < made->pos.size(); i += 3) made->pos[i] -= made->z0;
 		made->z1 -= made->z0;
 		made->z0 = 0;
+	}
+	if (this->to_middle && made->x0 <= made->x1) {
+		const float mx = (made->x0 + made->x1) / 2, my = (made->y0 + made->y1) / 2;
+		for (size_t i = 0; i + 1 < made->pos.size(); i += 3) {
+			made->pos[i] -= mx;
+			made->pos[i + 1] -= my;
+		}
+		made->x0 -= mx;
+		made->x1 -= mx;
+		made->y0 -= my;
+		made->y1 -= my;
 	}
 	Debug(misc, 1, "3D vehicle {}{}: {} triangles ({} of them wheels of their own files), {} corners{}, {} textures, {:.2f} x {:.2f} x {:.2f} m (bottom {:.2f} m), read in {} ms", this->name,
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,

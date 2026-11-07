@@ -437,6 +437,7 @@ enum class SaveLoadVersion : uint16_t {
 	CabReverse, ///< Saveload version: 382\n A road vehicle driven freely from its cab going backwards (Vehicle::cab_reverse, cab_drive.h).
 	CabCargo, ///< Saveload version: 383\n A road vehicle driven from its cab loading or unloading at a stop, step by step (Vehicle::cab_cargo, cab_cargo_ticks; CmdCabCargo()).
 	WalkerNurse, ///< Saveload version: 384\n The walker's health insurance, bought of a nurse before a church, till a day (CompanyProperties::walker_nurse_until).
+	WalkerTents, ///< Saveload version: 385\n The walkers' tents, pitched or carried: the Celtic and the camping tent in the inventory from the start (old games are given them), the pitched ones where (WalkerTent, the WTNT chunk).
 
 	MaxVersion, ///< Highest possible saveload version.
 };

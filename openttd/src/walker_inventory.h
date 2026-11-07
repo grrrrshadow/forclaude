@@ -29,6 +29,9 @@
 #include "tile_type.h"
 
 #include <array>
+#include <functional>
+#include <string_view>
+#include <utility>
 #include <vector>
 
 /** The things the walker can carry. Their numbers are saved: new ones go at the end. */
@@ -61,6 +64,8 @@ enum class WalkerItem : uint8_t {
 	IronLantern,  ///< the wrought candle lantern (the colleague's objekty/predmety/lucerna_kovana.glb): a light
 	MushroomGoulash, ///< mushroom goulash of the pub, while mushrooms come to it (PubCooksGoulash()): heals
 	MineHammer, ///< the mine hammer (the colleague's objekty/predmety/kladivo_minove.glb, par16): a mortar's bomb on a pole, its blow a blast; from iddqd
+	CelticTent, ///< the Celtic tent (the colleague's objekty/doplnky/stan_kelt.glb): pitched on a tile in front of the walker (WalkerTent); from the start
+	CampingTent, ///< the camping tent (objekty/doplnky/stan_kempink.glb): so too
 	End,        ///< the end of the known things
 };
 
@@ -119,7 +124,15 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::Bullets)] = WALKER_BULLETS_FULL;
 	items[static_cast<size_t>(WalkerItem::RocketLauncher)] = 1;
 	items[static_cast<size_t>(WalkerItem::Rockets)] = WALKER_ROCKETS_FULL;
+	items[static_cast<size_t>(WalkerItem::CelticTent)] = 1;
+	items[static_cast<size_t>(WalkerItem::CampingTent)] = 1;
 	return items;
+}
+
+/** Whether a thing of the inventory is a tent (WalkerTent). */
+constexpr bool IsWalkerTentItem(WalkerItem item)
+{
+	return item == WalkerItem::CelticTent || item == WalkerItem::CampingTent;
 }
 
 /** What a thing of the inventory is. */
@@ -179,5 +192,46 @@ extern std::vector<WalkerPlant> _walker_plants;
 WalkerPlantStage GetWalkerPlantStage(const WalkerPlant &p);
 int32_t WalkerPlantAgeDays(const WalkerPlant &p);
 const WalkerPlant *WalkerPlantNear(double x, double y, double reach_m);
+
+/**
+ * A tent the walker pitched (the player, 7. 11.: "when I click the tent in the inventory it stands; the tile must be
+ * free, no road, no building; a tree may be there; outside beside the tent our fireplace with E to grill; a barrel of
+ * beer into the tent"; "not on a slope", "the fireplace farther from the entrance", "no mattress, no lying"): in the
+ * middle of a tile, its entrance to where the walker stood, its fireplace out before the entrance, the shared barrel
+ * in it. The game's: saved, the same on every computer. Folded back into the inventory by E at its entrance; gone with
+ * the news when something is built over it (CheckWalkerTents()).
+ */
+struct WalkerTent {
+	uint32_t tile = 0;     ///< the tile it stands in the middle of (TileIndex::base())
+	uint16_t facing = 0;   ///< degrees in the world its entrance looks to, 0 along +x, 90 along +y
+	uint8_t item = 0;      ///< the thing of the inventory it is (WalkerItem::CelticTent, CampingTent)
+	uint8_t colour = 0;    ///< the colour of its cloth, of its palette ("barvy" of its record)
+	uint8_t owner = 0;     ///< the company whose walker pitched it
+};
+
+/** A part of a pitched tent as the 3D views draw it (ForWalkerTentParts()): a figure of the indices where it stands. */
+struct WalkerTentPart {
+	std::string_view figure; ///< the figure of the indices
+	double x, y;             ///< where its origin stands, world units
+	float up_m;              ///< metres over the ground
+	float facing;            ///< degrees in the world its +x looks to
+	float scale;             ///< its size against its true metres
+	int frame;               ///< its frame (the spit's animal), 0 none
+	int state;               ///< its state (the cloth's colour), 0 as it is
+};
+
+extern std::vector<WalkerTent> _walker_tents;
+const WalkerTent *WalkerTentAt(TileIndex tile);
+const WalkerTent *WalkerTentEntranceNear(double x, double y, double reach_m);
+void ForWalkerTentParts(const WalkerTent &t, const std::function<void(const WalkerTentPart &)> &f);
+bool WalkerTentBlocks(double x, double y);
+bool WalkerTentHides(TileIndex tile, double x, double y);
+TileIndex WalkerTentFireNear(double x, double y, double reach);
+bool WalkerTentFireAt(TileIndex tile, double &x, double &y);
+StringID WalkerTentGroundError(TileIndex tile);
+std::pair<TileIndex, uint16_t> WalkerTentPlace(double x, double y, double heading);
+
+/** How far the walker reaches the entrance of a tent to fold it (E), metres. */
+static constexpr double WALKER_TENT_REACH_M = 1.8;
 
 #endif /* WALKER_INVENTORY_H */

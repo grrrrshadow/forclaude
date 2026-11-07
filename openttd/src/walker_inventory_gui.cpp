@@ -96,6 +96,7 @@ struct WalkerInventoryWindow : Window {
 		Plant, ///< plant a seedling in front of the walker
 		BuyOfMat, ///< buy one of Mat walking by
 		BuyNurse, ///< buy a month of the health insurance of a nurse before a church
+		Pitch, ///< pitch a tent on the tile in front of the walker
 	};
 	/** A line of the list a click acts on. */
 	struct Line {
@@ -264,6 +265,9 @@ struct WalkerInventoryWindow : Window {
 			} else if (item == WalkerItem::Seedling && FirstPersonOpen()) {
 				DrawString(ir.left, ir.right, y, STR_WALKER_PLANT, TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Plant});
+			} else if (IsWalkerTentItem(item) && FirstPersonOpen()) {
+				DrawString(ir.left, ir.right, y, STR_WALKER_PITCH, TextColour::Orange, AlignmentH::End);
+				this->lines.push_back({y, y + lh, item, LineDoes::Pitch});
 			} else if (key != 0 && FirstPersonOpen()) {
 				DrawString(ir.left, ir.right, y, item == hand ? STR_WALKER_IN_HAND : STR_WALKER_TAKE, item == hand ? TextColour::Green : TextColour::Orange, AlignmentH::End);
 				this->lines.push_back({y, y + lh, item, LineDoes::Hand});
@@ -435,6 +439,15 @@ struct WalkerInventoryWindow : Window {
 				case LineDoes::BuyNurse:
 					Command<Commands::BuyWalkerNurse>::Post(STR_ERROR_WALKER_CAN_T_BUY, 1);
 					break;
+				case LineDoes::Pitch: {
+					/* On the tile beside the walker's the way it looks (of the eight), in its middle, its entrance to the
+					 * walker; its cloth a colour of its palette by chance (the player: "the colour by chance"). */
+					double x = 0, y = 0;
+					if (!FirstPersonWalkerAt(x, y)) break;
+					const auto [tile, facing] = WalkerTentPlace(x, y, FirstPersonWalkerHeading());
+					Command<Commands::PitchWalkerTent>::Post(STR_ERROR_WALKER_CAN_T_PITCH, tile, l.item, facing, static_cast<uint8_t>(InteractiveRandomRange(256)));
+					break;
+				}
 			}
 			return;
 		}

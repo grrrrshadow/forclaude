@@ -889,6 +889,8 @@ struct ThreeDVehicleObject {
 	std::string only_node;          ///< a figure of one node of a file of several ("uzel", the colleague's girls of the lorries: a pose a node, the textures once): only that node of it is drawn
 	std::vector<std::string> skip_nodes; ///< nodes of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni"; a saucer's frames: its beam and its sheep)
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
+	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
+	float ends_beyond = 0;          ///< "jen_konce_m": only its triangles all so far or farther from its origin along its own x, metres; 0 all (the grill's trestles without its bricks, as ThreeDObjectFigure::beyond)
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
 	uint32_t light_colour = 0;      ///< a light's thing: "svetlo" "barva", 0xRRGGBB; 0 the game's own for it
 	float light_reach_m = 0;        ///< and "dosah_m", how far it lights; 0 the game's own

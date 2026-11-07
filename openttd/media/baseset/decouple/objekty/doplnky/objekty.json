@@ -6718,5 +6718,147 @@
   "autor": "Leek Prop, HiItsSterre (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/leek-prop-64c2646c108a41ba97b8a8387c7f016b), převod predmety/par18_doplnky.py",
   "licence": "CC BY 4.0 (uvést HiItsSterre; změny: zmenšený na 0,6 m, textura 128 px)",
   "poznamka": "společný doplněk: jeden pórek nastojato (bílý stvol dole, zelené listy nahoře), 0,6 m; počátek pod patou, předek podél +x; jen barva, bez světla a bez noci; hra ho sází do zahrad u domů v řádcích (asi po 0,25 m, řádky 0,4 m od sebe) a bílý stvol zapustí asi o 0,1 m do záhonu"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stan_kelt",
+  "soubor": "stan_kelt.glb",
+  "nazev": {
+   "cs": "keltský stan",
+   "en": "Celtic tent"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "stan_kelt_maska_latka.png",
+    "zacatek": 236,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "E8E4DA"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -1.98,
+    3.09
+   ],
+   "y": [
+    -2.01,
+    1.98
+   ],
+   "z": [
+    0.0,
+    3.84
+   ]
+  },
+  "trojuhelniku": 836,
+  "dvere": [
+   {
+    "poloha": [
+     1.79,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 3.59,
+    "vyska": 2.81
+   }
+  ],
+  "autor": "Trenton - Celtic Tent, andreas (Sketchfab, CC BY-NC 4.0, https://sketchfab.com/3d-models/trenton-celtic-tent-f4696719dbb846f6950e07f93062582a), převod predmety/stany.py",
+  "licence": "CC BY-NC 4.0 (jen nekomerčně, hra je zdarma; uvést andreas; změny: bez věcí na zemi, bez zavěšeného hrnce, bez cípu plachty na zemi, zvětšený 1,5×, jen textura barvy 256 px)",
+  "poznamka": "společný doplněk (hráč 7. 11.: „stany budou převeliké aby se dalo vstoupit“, „celtic tent vyhazej věci na zemi“, „zavěšený hrnec mezi sloupy stanu taky pryč“, „stany budem měnit barvu“): plachta na rámu z tyčí, dlouhá strana +x otevřená pod stříškou je vchod (dvere), uvnitř dřevěná podlaha; zvětšený 1,5× (hřeben 3,2 m, stříška 2,9 m), dá se do něj vejít; počátek uprostřed podlahy na zemi, vchod podél +x; oboustranný, jen barva bez světla a bez noci; barva plachty z palety (maska latka; poslední v paletě je její bílá)"
+ },
+ {
+  "druh": "doplnek",
+  "jmeno": "stan_kempink",
+  "soubor": "stan_kempink.glb",
+  "nazev": {
+   "cs": "kempinkový stan",
+   "en": "camping tent"
+  },
+  "barvy": [
+   {
+    "cast": "latka",
+    "maska": "stan_kempink_maska_latka.png",
+    "zacatek": 158,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "9C7A3C"
+    ]
+   },
+   {
+    "cast": "strecha",
+    "maska": "stan_kempink_maska_strecha.png",
+    "zacatek": 128,
+    "paleta": [
+     "C83228",
+     "2A5CB0",
+     "2E8B4A",
+     "E0B020",
+     "E8731E",
+     "B03A8C",
+     "1E9AA8",
+     "7A3FA0",
+     "D84A6E",
+     "4A8C2A",
+     "2A4C8C"
+    ]
+   }
+  ],
+  "rozmer_m": {
+   "x": [
+    -2.48,
+    2.48
+   ],
+   "y": [
+    -2.42,
+    2.42
+   ],
+   "z": [
+    0.0,
+    3.01
+   ]
+  },
+  "trojuhelniku": 250,
+  "dvere": [
+   {
+    "poloha": [
+     2.52,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 2.32,
+    "vyska": 2.15
+   }
+  ],
+  "autor": "Camping Tent, AndreuSeara (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/camping-tent-70a8f7db5f724989a035166b79ace87b), převod predmety/stany.py",
+  "licence": "CC BY 4.0 (uvést AndreuSeara; změny: vyříznutý vchod, zvětšený 2,5×, jen textura barvy 256 px)",
+  "poznamka": "společný doplněk (hráč 7. 11.: „první otevři vchod ať se dá vstoupit“, „stany budou převeliké aby se dalo vstoupit“, „stany budem měnit barvu“): kopulový stan, vchod na +x vyříznutý až k zemi (dvere); zvětšený 2,5× (3 m vysoký), dá se do něj vejít; počátek uprostřed na zemi, vchod podél +x; oboustranný, jen barva bez světla a bez noci; barvy z palety: latka (boky, poslední v paletě jejich hnědá) a strecha (horní díl, poslední je jeho modrá); černý pás dole a tyče ne"
  }
 ]

@@ -30,6 +30,7 @@
 #include "climate_industries.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "walker_inventory.h"
 
 #include "table/strings.h"
 #include "table/tree_land.h"
@@ -738,6 +739,11 @@ static bool DrawThemedTrees(const TileInfo *ti)
 	bool drawn = false;
 	/* n: the number of the tree's place, its colours of the use (ThreeDVehicleObject::TreeState()). */
 	auto place = [&](const ThreeDMapTree &kind, float size, int x, int y, float facing, uint32_t n) {
+		/* Not under a walker's tent or over its fireplace. */
+		if (WalkerTentHides(ti->tile, x, y)) {
+			drawn = true;
+			return;
+		}
 		const ThreeDVehicleObject *fig = use != TreeUse::None ? GetThreeDFigure(kind.name) : nullptr;
 		const int state = fig != nullptr ? fig->TreeState(use, n) : 0;
 		if (eye) {
@@ -840,6 +846,9 @@ static void DrawTile_Trees(TileInfo *ti)
 		case TreeGround::Rough: DrawRoughLandTile(ti); break;
 		default: DrawGroundSprite(_clear_land_sprites_snow_desert[GetTreeDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE); break;
 	}
+
+	/* A walker's tent among the trees (the player, 7. 11.: "a tree may be there"): those under it left out (DrawThemedTrees()). */
+	DrawWalkerTent(ti);
 
 	/* Do not draw trees when the invisible trees setting is set */
 	if (IsInvisibilitySet(TransparencyOption::Trees)) return;

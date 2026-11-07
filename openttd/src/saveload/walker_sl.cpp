@@ -49,9 +49,44 @@ struct WPLTChunkHandler : ChunkHandler {
 	}
 };
 
+static const SaveLoad _walker_tent_desc[] = {
+	SLE_VAR(WalkerTent, tile, VarTypes::U32),
+	SLE_VAR(WalkerTent, facing, VarTypes::U16),
+	SLE_VAR(WalkerTent, item, VarTypes::U8),
+	SLE_VAR(WalkerTent, colour, VarTypes::U8),
+	SLE_VAR(WalkerTent, owner, VarTypes::U8),
+};
+
+/** The walkers' pitched tents (WalkerTent). */
+struct WTNTChunkHandler : ChunkHandler {
+	WTNTChunkHandler() : ChunkHandler('WTNT', ChunkType::Table) {}
+
+	void Save() const override
+	{
+		SlTableHeader(_walker_tent_desc);
+		int index = 0;
+		for (WalkerTent &t : _walker_tents) {
+			SlSetArrayIndex(index++);
+			SlObject(&t, _walker_tent_desc);
+		}
+	}
+
+	void Load() const override
+	{
+		const std::vector<SaveLoad> slt = SlTableHeader(_walker_tent_desc);
+		_walker_tents.clear();
+		while (SlIterateArray() != -1) {
+			WalkerTent &t = _walker_tents.emplace_back();
+			SlObject(&t, slt);
+		}
+	}
+};
+
 static const WPLTChunkHandler WPLT;
+static const WTNTChunkHandler WTNT;
 static const ChunkHandlerRef walker_chunk_handlers[] = {
 	WPLT,
+	WTNT,
 };
 
 extern const ChunkHandlerTable _walker_chunk_handlers(walker_chunk_handlers);

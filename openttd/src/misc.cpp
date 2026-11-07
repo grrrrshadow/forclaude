@@ -174,6 +174,7 @@ void InitializeGame(uint size_x, uint size_y, bool reset_date, bool reset_settin
 	NetworkInitChatMessage();
 	InitializeAnimatedTiles();
 	_walker_plants.clear();
+	_walker_tents.clear();
 
 	InitializeEconomy();
 
