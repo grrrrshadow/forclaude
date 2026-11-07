@@ -13549,6 +13549,11 @@ static constexpr double EYE_LEVEL_M = EYE_LEVEL_STRETCH * TILE_HEIGHT / OBJECT_H
 static constexpr double EYE_WALL_DETAIL_UNITS = 12.0 * TILE_SIZE;
 /** How many of the retaining walls have ivies on them, of a hundred. */
 static constexpr uint32_t EYE_WALL_IVY_PERCENT = 45;
+/** How many pieces of the land (4 x 4 tiles) are scribbled on, of a hundred; and of their walls of concrete how many have graffiti: about every fifth, together. */
+static constexpr uint32_t EYE_GRAFFITI_AREA_PERCENT = 35;
+static constexpr uint32_t EYE_GRAFFITI_WALL_PERCENT = 60;
+/** How far off the face of a wall a graffiti is, metres: in front of the concrete, behind the ivies' leaves. */
+static constexpr double EYE_GRAFFITI_OFF_M = 0.03;
 
 /**
  * What a retaining wall is of (DrawEyeRetainingWalls()): under a house of bricks [0]; else of stone [1] or of concrete
@@ -13592,6 +13597,7 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 	for (const ThreeDIvy &ivy : GetThreeDIvies()) {
 		if (ivy.on_retaining_walls) ivies.push_back(&ivy);
 	}
+	const std::span<const std::string> graffiti = GetThreeDGraffiti();
 	auto ground_of = [&grounds](int x, int y) -> std::pair<Slope, int> {
 		auto it = grounds.find(static_cast<uint32_t>(x) | static_cast<uint32_t>(y) << 16);
 		if (it != grounds.end()) return it->second;
@@ -13718,6 +13724,55 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 						const double in = (RAILING_IN_M + py) * OBJECT_UNITS_PER_METRE;
 						return std::array<double, 3>{along_x(f) - NX[e] * in, along_y(f) - NY[e] * in, EyeLevelZ(top_at(f)) + (coping_h + pz) * OBJECT_HEIGHT_PER_METRE};
 					});
+				}
+			}
+			/* The graffiti, only on the concrete (the player, test2, 6. 11.): a piece of the land 4 x 4 tiles scribbled on or
+			 * not, on its walls one to three each, every one in a slot of its own along the wall; a picture of its own
+			 * size a little bigger or smaller, low on the wall where it is reached from the ground, a few centimetres off
+			 * the face -- the ivies' leaves farther off over it. */
+			if (mat == 2 && !graffiti.empty() && EyeWallHash(static_cast<uint32_t>(tx / 4) * 7919u + static_cast<uint32_t>(ty / 4) * 104729u + 0x6A1Fu) % 100 < EYE_GRAFFITI_AREA_PERCENT) {
+				const uint32_t g = EyeWallHash(static_cast<uint32_t>(tx) * 4 + static_cast<uint32_t>(ty) * 0x10000u * 4 + e + 0x51u);
+				const int count = g % 100 < EYE_GRAFFITI_WALL_PERCENT ? 1 + static_cast<int>((g >> 8) % 3) : 0;
+				const double slot = edge_m / std::max(count, 1);
+				for (int k = 0; k < count; k++) {
+					const uint32_t gk = EyeWallHash(g + static_cast<uint32_t>(k + 1) * 0x9E3779B9u);
+					const ThreeDVehicleObject *fig = GetThreeDFigure(graffiti[gk % graffiti.size()]);
+					const ThreeDVehicleShape *shape = fig != nullptr ? fig->TryGetShape() : nullptr;
+					if (shape == nullptr || shape->x1 - shape->x0 < 0.05f || shape->z1 - shape->z0 < 0.05f) continue;
+					double scale = 0.8 + ((gk >> 8) % 41) / 100.0;
+					const double room_w = slot - 0.2;
+					if ((shape->x1 - shape->x0) * scale > room_w) scale = room_w / (shape->x1 - shape->x0);
+					if (scale < 0.5) continue;
+					const double w_m = (shape->x1 - shape->x0) * scale, h_m = (shape->z1 - shape->z0) * scale;
+					const double x0_m = k * slot + 0.1 + (room_w - w_m) * ((gk >> 16) % 1000) / 999.0;
+					const double f0 = x0_m / edge_m, f1 = (x0_m + w_m) / edge_m;
+					const double foot = std::max(EyeLevelZ(foot_at(f0)), EyeLevelZ(foot_at(f1)));
+					const double top_z = std::min(EyeLevelZ(top_at(f0)), EyeLevelZ(top_at(f1)));
+					/* Its foot 0.2 to 0.9 m up; lower where the wall is low, none where it is lower than the picture. */
+					double z0 = foot + (0.2 + ((gk >> 26) % 8) / 10.0) * OBJECT_HEIGHT_PER_METRE;
+					if (z0 + (h_m + 0.1) * OBJECT_HEIGHT_PER_METRE > top_z) z0 = foot + 0.1 * OBJECT_HEIGHT_PER_METRE;
+					const double z1 = z0 + h_m * OBJECT_HEIGHT_PER_METRE;
+					if (z1 + 0.1 * OBJECT_HEIGHT_PER_METRE > top_z) continue;
+					/* Its texture at the level of detail of its distance, about a texel to a pixel. */
+					const double mid_x = along_x((f0 + f1) / 2), mid_y = along_y((f0 + f1) / 2);
+					const CabPoint mid = CabToEye(eye, mid_x, mid_y, (z0 + z1) / 2, 0, 0);
+					if (mid.f < CAB_NEAR) continue;
+					int gw0 = 1, gh0 = 1;
+					fig->TextureSize(0, gw0, gh0);
+					const double g_texels_per_unit = gw0 / (w_m * OBJECT_UNITS_PER_METRE);
+					const double g_pixels_per_unit = eye.focal / std::max(mid.f, CAB_NEAR * 4);
+					const int g_level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, g_texels_per_unit / std::max(g_pixels_per_unit, 1e-6))))));
+					const ThreeDObjectTexture *gt = fig->TryGetTexture(g_level);
+					if (gt == nullptr || gt->px.empty()) continue;
+					if (_eye_frame != nullptr) _eye_frame->kept[gt->px.data()] = gt->uid.value;
+					const double off = EYE_GRAFFITI_OFF_M * OBJECT_UNITS_PER_METRE;
+					const double ax = along_x(f0) + NX[e] * off, ay = along_y(f0) + NY[e] * off;
+					const double bx = along_x(f1) + NX[e] * off, by = along_y(f1) + NY[e] * off;
+					/* Its picture from the left as one looks at the face, a half texel in from its edges. */
+					const double u0 = 0.5, u1 = gt->w - 0.5, v0 = 0.5, v1 = gt->h - 0.5;
+					std::vector<CabPoint> poly = {CabToEye(eye, ax, ay, z0, u0, v1), CabToEye(eye, bx, by, z0, u1, v1),
+							CabToEye(eye, bx, by, z1, u1, v0), CabToEye(eye, ax, ay, z1, u0, v0)};
+					CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, gt->px.data(), gt->w, gt->h, std::move(poly), eye, 0, light);
 				}
 			}
 			/* The ivies: on some walls one to three, each where the wall is high enough for it. */
