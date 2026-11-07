@@ -2813,8 +2813,8 @@ static void ReadTreeFigurePaint(const nlohmann::json &e, const std::string &fold
 /**
  * An add-on of the buildings as a figure painted a colour by number ("barvy" of its record, as the add-ons of the houses:
  * the colleague's ivies, hra/3d/VYPLNE-ZDI-POPINAVKY-PRO-HRU.md; the player, 4. 11.: "one model, many greens"): its
- * first part's mask over its first texture and its "zacatek" its paint, a state for each colour of its palette
- * (PaletteState()). A tree painted by its use (ReadTreeFigurePaint()) is not painted so.
+ * first part's mask over its first texture and its "zacatek" its paint, a state for each of a few shades of each colour
+ * of its palette (PaletteState()). A tree painted by its use (ReadTreeFigurePaint()) is not painted so.
  */
 static void ReadFigurePalette(const nlohmann::json &e, const std::string &folder, ThreeDVehicleObject &fig)
 {
@@ -2829,13 +2829,26 @@ static void ReadFigurePalette(const nlohmann::json &e, const std::string &folder
 	if (palette.empty()) return;
 	fig.paint.mask_file = folder + b.at("maska").get<std::string>();
 	fig.paint.start = std::clamp(b.value("zacatek", 255), 1, 255);
-	fig.palette_states = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(palette.size())};
-	for (uint32_t colour : palette) {
-		ThreeDVehicleState st;
-		st.first = 1; // no sprite picks it
-		st.last = 0;
-		st.colour = colour;
-		fig.states.push_back(std::move(st));
+	/* Each colour of its palette in a few shades of green (the player, test2: two ivies of one shape had one green, "we
+	 * have not many kinds of one ivy"): as it is, darker, darker and bluer, darker and yellower -- the eight light greens
+	 * of its palette, close to each other, four times as many from a dark ivy to a light one. */
+	static constexpr std::array<std::array<float, 3>, 4> SHADES = {{
+		{1.00f, 1.00f, 1.00f},
+		{0.80f, 0.80f, 0.80f},
+		{0.56f, 0.62f, 0.66f},
+		{0.76f, 0.70f, 0.52f},
+	}};
+	fig.palette_states = {static_cast<uint16_t>(fig.states.size() + 1), static_cast<uint16_t>(palette.size() * SHADES.size())};
+	for (const auto &shade : SHADES) {
+		for (uint32_t colour : palette) {
+			const Colour c(colour);
+			auto scaled = [](uint8_t v, float f) { return static_cast<uint8_t>(std::clamp(std::lround(v * f), 0L, 255L)); };
+			ThreeDVehicleState st;
+			st.first = 1; // no sprite picks it
+			st.last = 0;
+			st.colour = Colour(scaled(c.r, shade[0]), scaled(c.g, shade[1]), scaled(c.b, shade[2])).data;
+			fig.states.push_back(std::move(st));
+		}
 	}
 }
 

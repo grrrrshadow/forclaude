@@ -4762,10 +4762,10 @@ static const ThreeDModelPicture *RequestedPicture(PictureToMake p, bool later)
 	return pic;
 }
 
-const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up)
+const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, int state)
 {
 	bool later = false;
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later);
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, height, frame, yaw, z, x, y, up, later, FIGURE_PICTURE_SIDE, state);
 	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
 }
 
