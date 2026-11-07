@@ -678,6 +678,7 @@ struct VehicleSettings {
 	AccelerationModel roadveh_acceleration_model; ///< realistic acceleration for road vehicles
 	uint8_t train_slope_steepness; ///< Steepness of hills for trains when using realistic acceleration
 	uint8_t roadveh_slope_steepness; ///< Steepness of hills for road vehicles when using realistic acceleration
+	bool road_speed_rules; ///< road vehicles keep to the rules of the road: 50 km/h by the town's houses, 80 on its land (RoadRulesSpeedAt())
 	bool wagon_speed_limits; ///< enable wagon speed limits
 	bool object_original_size; ///< The vehicles drawn from 3D objects (three_d_vehicle_object.h) at the original game's size, as the bigger sets (BRYLE); else smaller, at CZTR's scale. Their length is the object's.
 	bool no_engine_cargo; ///< engines may not carry cargo -- wagons haul, engines pull

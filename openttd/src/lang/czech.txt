@@ -1622,6 +1622,9 @@ STR_CONFIG_SETTING_PERCENTAGE                                   :{COMMA}%
 STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS                 :Strmost svahu pro silniční vozidla: {STRING}
 STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS_HELPTEXT        :Vyšší hodnoty ztěžují vozidlům výjezd do kopce
 
+STR_CONFIG_SETTING_ROAD_SPEED_RULES                             :Silniční vozidla dodržují předpisovou rychlost: {STRING}
+STR_CONFIG_SETTING_ROAD_SPEED_RULES_HELPTEXT                    :Auta, autobusy, náklaďáky a trolejbusy jezdí nejvýš 50 km/h tam, kde u silnice stojí domy města, a nejvýš 80 km/h jinde v území města; v poušti kolem tropických měst a mimo města tak rychle, jak mohou. Tramvaje jezdí svou rychlostí a vozidlo řízené ručně z kabiny omezené není
+
 STR_CONFIG_SETTING_FORBID_90_DEG                                :Zakázat vlakům otáčení o 90 stupňů: {STRING}
 STR_CONFIG_SETTING_FORBID_90_DEG_HELPTEXT                       :90° zatočení nastane ve chvíli, kdy vodorovná kolej přímo navazuje na svislou kolej na vedlejším políčku. Vlak tak zatáčí o 90° místo klasických 45° u jiných kombinací kolejí.
 

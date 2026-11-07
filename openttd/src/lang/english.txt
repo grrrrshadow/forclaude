@@ -1514,6 +1514,9 @@ STR_CONFIG_SETTING_PERCENTAGE                                   :{COMMA}%
 STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS                 :Slope steepness for road vehicles: {STRING2}
 STR_CONFIG_SETTING_ROAD_VEHICLE_SLOPE_STEEPNESS_HELPTEXT        :Steepness of a sloped tile for a road vehicle. Higher values make it more difficult to climb a hill
 
+STR_CONFIG_SETTING_ROAD_SPEED_RULES                             :Road vehicles keep to the speed limits of the rules of the road: {STRING2}
+STR_CONFIG_SETTING_ROAD_SPEED_RULES_HELPTEXT                    :Cars, buses, lorries and trolleybuses drive at most 50 km/h where the houses of a town stand along the road and at most 80 km/h elsewhere on a town's land; in the desert about the towns of the tropics and out of the towns as fast as they can. Trams keep to their own speed, and a vehicle driven by hand from its cab is not limited
+
 STR_CONFIG_SETTING_FORBID_90_DEG                                :Forbid trains from making 90° turns: {STRING2}
 STR_CONFIG_SETTING_FORBID_90_DEG_HELPTEXT                       :90 degree turns occur when a horizontal track is directly followed by a vertical track piece on the adjacent tile, thus making the train turn by 90 degree when traversing the tile edge instead of the usual 45 degrees for other track combinations
 
