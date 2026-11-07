@@ -3110,6 +3110,100 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 	}
 }
 
+/**
+ * Whether the ground of a tile in the view from the eyes is water that DrawEyeWater() smooths: the sea, a river, a
+ * canal, a coast, a lock's, a depot's, a buoy's -- with the roads, as the player chose (gui.eye_roads; the player, 7.
+ * 11.: "smear the water's pixels like the road; with the road's smoothing on and off in the settings").
+ */
+static bool EyeWaterTile(int x, int y)
+{
+	if (!_settings_client.gui.eye_roads || !IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) return false;
+	const TileIndex tile = TileXY(x, y);
+	return IsTileType(tile, TileType::Water) || (IsTileType(tile, TileType::Station) && IsBuoy(tile));
+}
+
+/** Whether a pixel of the ground is the water's: blue (not a coast's sand or foam, a canal's banks). */
+static inline bool EyeWaterPixel(uint32_t p)
+{
+	if ((p >> 24) == 0) return false;
+	const Colour c(p);
+	return c.b > c.r + 12 && c.b + 8 >= c.g;
+}
+
+/**
+ * The ground of a water tile drawn into the ground of the view from the eyes, smoothed as a road's surface
+ * (DrawEyeRoad()): its sprites as the game draws them; its water's pixels (EyeWaterPixel()) the mean of those of its
+ * water about them of a near lightness, marked THREE_D_GPU_WATER_SURFACE, so that the view takes them between their
+ * texels (CabRoadTexel()); or marked as drawn for the card to smooth them (SmoothGroundRoads()). Its banks, sand and
+ * foam as they are.
+ * @param smooth the water smoothed here: the processor draws (no card)
+ */
+static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth)
+{
+	const DrawPixelInfo *d = _cur_dpi;
+	if (d == nullptr || sprites.empty()) return;
+	const int s = ScaleByZoom(1, d->zoom);
+	auto floor_div = [](int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
+	int px0 = INT_MAX, py0 = INT_MAX, px1 = INT_MIN, py1 = INT_MIN;
+	for (const EyeRoadSprite &e : sprites) {
+		const Sprite *spr = GetSprite(e.image & SPRITE_MASK, SpriteType::Normal);
+		px0 = std::min(px0, floor_div(e.x + spr->x_offs - d->left, s) - 1);
+		py0 = std::min(py0, floor_div(e.y + spr->y_offs - d->top, s) - 1);
+		px1 = std::max(px1, floor_div(e.x + spr->x_offs + spr->width - d->left + s - 1, s) + 1);
+		py1 = std::max(py1, floor_div(e.y + spr->y_offs + spr->height - d->top + s - 1, s) + 1);
+	}
+	if (px1 <= 0 || py1 <= 0 || px0 >= d->width / s || py0 >= d->height / s) return;
+	const int tw = px1 - px0, th = py1 - py0;
+	if (tw <= 0 || th <= 0) return;
+	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo t{};
+	t.dst_ptr = own.data();
+	t.left = d->left + px0 * s;
+	t.top = d->top + py0 * s;
+	t.width = tw * s;
+	t.height = th * s;
+	t.pitch = tw;
+	t.zoom = d->zoom;
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
+		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+	}
+	uint32_t *dst = static_cast<uint32_t *>(d->dst_ptr);
+	const int dw = d->width / s, dh = d->height / s;
+	auto at = [&](int i, int j) { return static_cast<size_t>(j) * tw + i; };
+	auto light = [](uint32_t p) { const Colour c(p); return (c.r * 77 + c.g * 150 + c.b * 29) >> 8; };
+	static constexpr int R = 3; // a window of seven, as the roads'
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const uint32_t p = own[at(i, j)];
+			if ((p >> 24) == 0) continue;
+			const int x = px0 + i, y = py0 + j;
+			if (x < 0 || y < 0 || x >= dw || y >= dh) continue;
+			uint32_t out = p;
+			if (EyeWaterPixel(p)) {
+				if (smooth) {
+					const int want = light(p);
+					uint32_t r = 0, g = 0, b = 0, cnt = 0;
+					for (int qy = std::max(0, j - R); qy <= std::min(th - 1, j + R); qy++) {
+						for (int qx = std::max(0, i - R); qx <= std::min(tw - 1, i + R); qx++) {
+							const uint32_t q = own[at(qx, qy)];
+							if (!EyeWaterPixel(q) || std::abs(light(q) - want) > 40) continue;
+							const Colour c(q);
+							r += c.r;
+							g += c.g;
+							b += c.b;
+							cnt++;
+						}
+					}
+					out = Colour(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt)).data;
+				}
+				out = (out & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_WATER_SURFACE) << 24;
+			}
+			dst[static_cast<size_t>(y) * d->pitch + x] = out;
+		}
+	}
+}
+
 extern bool _eye_frame_on_card;
 
 /** Whether the card smooths the roads of the kept ground of the view from the eyes (DrawEyeRoad()): when it draws the frames. */
@@ -3294,6 +3388,12 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 					rec->road_marks.clear();
 					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks, !card_roads);
 					if (rec->round != INVALID_TILE) round.push_back(rec->round);
+					continue;
+				}
+				if (roads && EyeWaterTile(rec->tile_x, rec->tile_y)) {
+					std::vector<EyeRoadSprite> water;
+					for (const TurnedGroundSprite &gs : rec->sprites) water.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
+					DrawEyeWater(water, !card_roads);
 					continue;
 				}
 				for (const TurnedGroundSprite &gs : rec->sprites) {
@@ -11808,10 +11908,28 @@ static constexpr uint8_t CAB_GRASS = 32;      ///< the ground: our grass's texel
 static uint32_t CabRoadTexel(const uint32_t *tex, int tw, int th, double u, double v, uint32_t p)
 {
 	const uint8_t pa = static_cast<uint8_t>(p >> 24);
-	if (pa != THREE_D_GPU_ROAD_SURFACE && pa != THREE_D_GPU_ROAD_MARK) return p;
+	if (pa != THREE_D_GPU_ROAD_SURFACE && pa != THREE_D_GPU_ROAD_MARK && pa != THREE_D_GPU_WATER_SURFACE) return p;
 	const double fu = u - 0.5, fv = v - 0.5;
 	const int bu = static_cast<int>(std::floor(fu)), bv = static_cast<int>(std::floor(fv));
 	const double wu = fu - bu, wv = fv - bv;
+	if (pa == THREE_D_GPU_WATER_SURFACE) {
+		/* Water (DrawEyeWater()): between the water's texels alone, its banks and foam sharp. */
+		double w = 0, sum[3] = {};
+		for (int k = 0; k < 4; k++) {
+			const int ou = k & 1, ov = k >> 1;
+			const uint32_t q = tex[static_cast<size_t>(std::clamp(bv + ov, 0, th - 1)) * tw + std::clamp(bu + ou, 0, tw - 1)];
+			if (static_cast<uint8_t>(q >> 24) != THREE_D_GPU_WATER_SURFACE) continue;
+			const double wk = (ou == 1 ? wu : 1 - wu) * (ov == 1 ? wv : 1 - wv);
+			const Colour c(q);
+			sum[0] += wk * c.r;
+			sum[1] += wk * c.g;
+			sum[2] += wk * c.b;
+			w += wk;
+		}
+		if (w <= 1e-4) return p;
+		auto channel = [&](int k) { return static_cast<uint8_t>(std::clamp(std::lround(sum[k] / w), 0L, 255L)); };
+		return Colour(channel(0), channel(1), channel(2)).data;
+	}
 	double m = 0, r = 0, mark[3] = {}, surface[3] = {};
 	for (int k = 0; k < 4; k++) {
 		const int ou = k & 1, ov = k >> 1;
@@ -16741,6 +16859,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
 					}
 					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks, true);
+					continue;
+				}
+				if (EyeWaterTile(t.x, t.y)) {
+					std::vector<EyeRoadSprite> water;
+					for (size_t i = t.first; i < t.end; i++) {
+						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+						water.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
+					}
+					DrawEyeWater(water, true);
 					continue;
 				}
 				for (size_t i = t.first; i < t.end; i++) {

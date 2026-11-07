@@ -2264,8 +2264,8 @@ STR_CONFIG_SETTING_EYE_SHADOWS                                  :Shadows in the 
 STR_CONFIG_SETTING_EYE_SHADOWS_HELPTEXT                         :By day the buildings cast the sun's shadows in the views from the eyes and from the cab. The map of the shadows is made anew whenever other buildings are about, which can stutter on a slow machine as the walker goes through a town. The lights at night are their own thing and stay either way
 STR_CONFIG_SETTING_MAP_GRASS                                    :Grassy surface on the map: {STRING2}
 STR_CONFIG_SETTING_MAP_GRASS_HELPTEXT                           :The grass of the temperate climate is drawn as a grassy surface on the map too, not as the original chequered tiles. In the view from the eyes it is always grassy
-STR_CONFIG_SETTING_EYE_ROADS                                    :Smooth roads in the view from the eyes: {STRING2}
-STR_CONFIG_SETTING_EYE_ROADS_HELPTEXT                           :In the view from the eyes the asphalt of the roads is smoothed and their white marks get sharp edges, the original roads and those of a set alike. The map stays as it is
+STR_CONFIG_SETTING_EYE_ROADS                                    :Smooth roads and water in the view from the eyes: {STRING2}
+STR_CONFIG_SETTING_EYE_ROADS_HELPTEXT                           :In the view from the eyes the asphalt of the roads and the water are smoothed and the roads' white marks get sharp edges, the original roads and those of a set alike. The map stays as it is
 STR_CONFIG_SETTING_CAB_CAMERA                                   :Camera of the cab: {STRING2}
 STR_CONFIG_SETTING_CAB_CAMERA_HELPTEXT                          :What the view from a vehicle's cab shows, and the view from a vehicle boarded with E: the eye in the driver's head with the interior of the vehicle's 3D model about it, the same eye without the model, or the eye over the roof, looking at the vehicle from above and behind. The button Camera of the window goes round them and looks ahead again
 STR_CONFIG_SETTING_CAB_MSTS_KEYS                                :Drive the trains of MSTS by the keys of MSTS: {STRING2}
