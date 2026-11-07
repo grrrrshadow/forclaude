@@ -966,6 +966,7 @@ SettingsContainer &GetSettingsTree()
 				physics->Add(new SettingEntry("vehicle.freight_trains"));
 				physics->Add(new SettingEntry("vehicle.roadveh_acceleration_model"));
 				physics->Add(new SettingEntry("vehicle.roadveh_slope_steepness"));
+				physics->Add(new SettingEntry("vehicle.road_speed_rules"));
 				physics->Add(new SettingEntry("vehicle.smoke_amount"));
 				physics->Add(new SettingEntry("vehicle.plane_speed"));
 				physics->Add(new SettingEntry("vehicle.aircraft_range"));

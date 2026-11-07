@@ -89,6 +89,7 @@ static const uint8_t RV_OVERTAKE_TIMEOUT = 35;
 void RoadVehUpdateCache(RoadVehicle *v, bool same_length = false);
 void PlaceRoadVehicleAtStopEntrance(RoadVehicle *v, TileIndex tile, Trackdir into);
 void GetRoadVehSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, int &yoffs, EngineImageType image_type);
+int RoadRulesSpeedAt(TileIndex tile);
 
 /** Element of the RoadVehPathCache. */
 struct RoadVehPathElement {

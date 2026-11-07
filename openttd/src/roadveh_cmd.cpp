@@ -53,6 +53,7 @@
 #include "green_load.h"
 
 #include "three_d_vehicle_object.h"
+#include "town.h"
 #include "autoreplace_gui.h"
 #include "group.h"
 #include "vehicle_gui.h"
@@ -557,6 +558,39 @@ void RoadVehicle::UpdateDeltaXY()
 	}
 }
 
+/** How far from a town's middle its land is looked for at all (RoadRulesSpeedAt()), tiles (Manhattan). */
+static constexpr uint ROAD_RULES_TOWN_REACH = 48;
+/** How far around a town's built-up area its land goes for the rules of the road, tiles: as a themed town's land (GetThemedLand()). */
+static constexpr double ROAD_RULES_TOWN_MARGIN = 4.0;
+/** The speeds of the rules of the road, km/h: where the town's houses stand, and on the rest of its land. */
+static constexpr int ROAD_RULES_HOUSES_KMH = 50;
+static constexpr int ROAD_RULES_TOWN_KMH = 80;
+
+/**
+ * The speed limit of the rules of the road on a tile (vehicle.road_speed_rules; the player, 6. 11.: "50 km/h where the
+ * houses of the town stand, 80 elsewhere on the town's land, none in the desert about the towns of the tropics nor
+ * out of the towns"). By the town's houses: a house on a tile next to it. A town's land: within its built-up area
+ * (HouseZone::TownEdge) and a margin about it, as a themed town's land is. The desert: the tropics' desert zone, and
+ * the desert of a town of the desert houses in another climate (ThemedLand::Desert).
+ * @return the limit in a road vehicle's units of speed (as the cab's, CabSpeedLimitInternal()), 0 none
+ */
+int RoadRulesSpeedAt(TileIndex tile)
+{
+	const int tx = TileX(tile), ty = TileY(tile);
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			if ((dx == 0 && dy == 0) || !IsInsideBS(tx + dx, 0, Map::SizeX()) || !IsInsideBS(ty + dy, 0, Map::SizeY())) continue;
+			if (IsTileType(TileXY(tx + dx, ty + dy), TileType::House)) return ROAD_RULES_HOUSES_KMH * 2;
+		}
+	}
+	const Town *t = ClosestTownFromTile(tile, ROAD_RULES_TOWN_REACH);
+	if (t == nullptr) return 0;
+	const double r = std::sqrt(static_cast<double>(t->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)])) + ROAD_RULES_TOWN_MARGIN;
+	if (DistanceSquare(tile, t->xy) > r * r) return 0;
+	if (_settings_game.game_creation.landscape == LandscapeType::Tropic ? GetTropicZone(tile) == TropicZone::Desert : GetThemedLand(tile) == ThemedLand::Desert) return 0;
+	return ROAD_RULES_TOWN_KMH * 2;
+}
+
 /**
  * Calculates the maximum speed of the vehicle under its current conditions.
  * @return Maximum speed of the vehicle.
@@ -585,6 +619,11 @@ inline int RoadVehicle::GetCurrentMaxSpeed() const
 
 	/* Off the road, driven freely from the cab (cab_drive.h): half the speed over the fields. */
 	if (this->cab_free && !IsTileType(this->tile, TileType::Road) && !IsTileType(this->tile, TileType::Station)) max_speed /= 2;
+	/* The rules of the road (RoadRulesSpeedAt()): the cars, the buses, the lorries and the trolleybuses; not the trams,
+	 * nor one the player drives by hand from its cab. */
+	if (_settings_game.vehicle.road_speed_rules && !RoadTypeIsTram(this->roadtype) && !this->IsCabSteered()) {
+		if (const int rule = RoadRulesSpeedAt(this->tile); rule > 0) max_speed = std::min(max_speed, rule);
+	}
 	return std::min<int>({max_speed, this->current_order.GetMaxSpeed() * 2, this->CabSpeedLimitInternal()});
 }
 

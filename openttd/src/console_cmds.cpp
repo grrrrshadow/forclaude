@@ -3853,6 +3853,122 @@ static bool ConTestCoupleFilter(std::span<std::string_view> argv)
 }
 
 /**
+ * The rules of the road on a town's land (RoadRulesSpeedAt(), vehicle.road_speed_rules), for reading a headless run:
+ * a map of its road tiles about a town -- 5 the 50 km/h by its houses, 8 the 80 on its land, - none, H a house, . the
+ * rest --, and every road vehicle's speed and the most it may go now.
+ * Usage: testpredpis [town index]
+ * @copydoc IConsoleCmdProc
+ */
+static bool ConTestRoadRules(std::span<std::string_view> argv)
+{
+	if (argv.empty()) {
+		IConsolePrint(CC_HELP, "The rules of the road about a town. Usage: 'testpredpis [town index]'.");
+		return true;
+	}
+	/* 'testpredpis autobus': a depot by a straight road of the first town and a bus out of it, wandering its roads. */
+	const bool make_bus = argv.size() > 1 && argv[1] == "autobus";
+	const Town *town = nullptr;
+	if (argv.size() > 1 && !make_bus) {
+		if (auto n = ParseInteger<uint>(argv[1]); n.has_value()) town = Town::GetIfValid(*n);
+	} else {
+		for (const Town *t : Town::Iterate()) {
+			town = t;
+			break;
+		}
+	}
+	if (town == nullptr) {
+		IConsolePrint(CC_ERROR, "testpredpis: no such town.");
+		return true;
+	}
+	const int reach = static_cast<int>(std::sqrt(static_cast<double>(town->cache.squared_town_zone_radius[to_underlying(HouseZone::TownEdge)]))) + 8;
+	const int cx = TileX(town->xy), cy = TileY(town->xy);
+	if (make_bus) {
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made == nullptr) {
+				IConsolePrint(CC_ERROR, "testpredpis: no company to build as.");
+				return true;
+			}
+			SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		/* The nearest straight flat road of the town with clear flat land beside it, the depot's door onto it. */
+		TileIndex depot = INVALID_TILE, road = INVALID_TILE;
+		DiagDirection door = DiagDirection::Begin;
+		for (int r = 0; r < reach && depot == INVALID_TILE; r++) {
+			for (int y = cy - r; y <= cy + r && depot == INVALID_TILE; y++) {
+				for (int x = cx - r; x <= cx + r && depot == INVALID_TILE; x++) {
+					if (std::max(std::abs(x - cx), std::abs(y - cy)) != r || !IsInsideBS(x, 1, Map::SizeX() - 2) || !IsInsideBS(y, 1, Map::SizeY() - 2)) continue;
+					const TileIndex t = TileXY(x, y);
+					if (!IsTileType(t, TileType::Road) || !IsNormalRoad(t) || GetTileSlope(t) != SLOPE_FLAT) continue;
+					const RoadBits bits = GetRoadBits(t, RoadTramType::Road);
+					if (bits != ROAD_X && bits != ROAD_Y) continue;
+					for (DiagDirection d : bits == ROAD_X ? std::array{DiagDirection::NW, DiagDirection::SE} : std::array{DiagDirection::NE, DiagDirection::SW}) {
+						const TileIndex side = TileAddByDiagDir(t, d);
+						if (!IsTileType(side, TileType::Clear) || GetTileSlope(side) != SLOPE_FLAT || TileHeight(side) != TileHeight(t)) continue;
+						depot = side;
+						road = t;
+						door = ReverseDiagDir(d);
+						break;
+					}
+				}
+			}
+		}
+		if (depot == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "testpredpis: no place for a depot by the town's roads.");
+			return true;
+		}
+		if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, depot, ROADTYPE_ROAD, door).Failed()) {
+			IConsolePrint(CC_ERROR, "testpredpis: the depot at ({},{}) could not be built.", TileX(depot), TileY(depot));
+			return true;
+		}
+		Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, road, DiagDirToRoadBits(ReverseDiagDir(door)), ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+		for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+			if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;
+			auto [cost, bus, a, b, c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Succeeded() && bus != VehicleID::Invalid()) {
+				Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, bus, false);
+				IConsolePrint(CC_DEFAULT, "testpredpis: autobus {} z depa na ({},{}), nejvys {}", Vehicle::Get(bus)->unitnumber, TileX(depot), TileY(depot), e->GetDisplayMaxSpeed());
+			}
+			break;
+		}
+		return true;
+	}
+	IConsolePrint(CC_DEFAULT, "testpredpis: mesto {} na ({},{}), okruh {}, predpis {}", town->index.base(), cx, cy, reach - 8, _settings_game.vehicle.road_speed_rules ? "zapnuto" : "vypnuto");
+	int counts[3] = {};
+	for (int y = cy - reach; y <= cy + reach; y++) {
+		std::string row;
+		for (int x = cx - reach; x <= cx + reach; x++) {
+			if (!IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) {
+				row += ' ';
+				continue;
+			}
+			const TileIndex t = TileXY(x, y);
+			if (IsTileType(t, TileType::House)) {
+				row += 'H';
+			} else if (IsTileType(t, TileType::Road)) {
+				const int rule = RoadRulesSpeedAt(t);
+				row += rule == 100 ? '5' : rule == 160 ? '8' : '-';
+				counts[rule == 100 ? 0 : rule == 160 ? 1 : 2]++;
+			} else {
+				row += '.';
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "  {:3} {}", y, row);
+	}
+	IConsolePrint(CC_DEFAULT, "testpredpis: silnic 50 km/h {}, 80 km/h {}, bez omezeni {}", counts[0], counts[1], counts[2]);
+	for (const RoadVehicle *rv : RoadVehicle::Iterate()) {
+		if (!rv->IsFrontEngine()) continue;
+		const Vehicle *v = rv;
+		IConsolePrint(CC_DEFAULT, "testpredpis: auto {} na ({},{}) rychlost {} nejvys {} predpis {} (km-ish/h x2){}", rv->unitnumber, TileX(rv->tile), TileY(rv->tile),
+				rv->cur_speed, v->GetCurrentMaxSpeed(), RoadRulesSpeedAt(rv->tile), rv->IsCabSteered() ? " rizene z kabiny" : "");
+	}
+	return true;
+}
+
+/**
  * Print where every train stands right now, for reading a headless run.
  * @copydoc IConsoleCmdProc
  */
@@ -18405,6 +18521,7 @@ void IConsoleStdLibRegister()
 	IConsole::CmdRegister("testpauza",               ConTestUnpause);
 	IConsole::CmdRegister("testfiltr",               ConTestCoupleFilter);
 	IConsole::CmdRegister("teststav",                ConTestCoupleState);
+	IConsole::CmdRegister("testpredpis",             ConTestRoadRules);
 	IConsole::CmdRegister("testvse",                 ConTestEverything);
 	IConsole::CmdRegister("testpodminka",            ConTestConditionalOrder);
 	IConsole::CmdRegister("testrozkazy",             ConTestOrders);
