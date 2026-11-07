@@ -237,7 +237,62 @@ enum class WeaponUse : uint8_t {
 	Crossbow, ///< shot, then drawn again
 	Burst,    ///< fires shot after shot while the button is held (the machine gun)
 	Rocket,   ///< a rocket, flying straight, exploding where it hits; then loaded again (the rocket launcher)
+	Rod,      ///< cast into the water, a fish caught on it (the fishing rod, FishingStage)
 };
+
+/**
+ * How the walker fishes (the player, 7. 11.: "the rod in the inventory from the start, held as the hammer; a click casts
+ * the hook with a worm six to ten metres ahead, only into the water; after five to twenty seconds a bite, the rod bends,
+ * two seconds 'A bite! Click'; clicked in time the fish hangs by its mouth and goes into the inventory, late it escapes;
+ * the worms are not used up"). Only the screen, never saved.
+ */
+enum class FishingStage : uint8_t {
+	Ready,   ///< the hook hanging under the rod's tip before the eyes
+	Flying,  ///< the hook flying out to the water
+	Waiting, ///< the hook floating on the water, a fish to bite
+	Bite,    ///< a fish biting: the rod bent, a click in time catches it
+	Caught,  ///< a fish caught, hanging by its mouth before the eyes a moment
+};
+/** How far ahead the hook falls, metres: somewhere between. */
+static constexpr double FIRST_PERSON_CAST_MIN_M = 6.0;
+static constexpr double FIRST_PERSON_CAST_MAX_M = 10.0;
+/** Seconds the hook flies out; the rod's swing back, then forward, in the first of them. */
+static constexpr double FIRST_PERSON_CAST_S = 0.9;
+static constexpr double FIRST_PERSON_CAST_SWING_S = 0.45;
+/** Seconds on the water before a fish bites: somewhere between. */
+static constexpr double FIRST_PERSON_BITE_MIN_S = 5.0;
+static constexpr double FIRST_PERSON_BITE_MAX_S = 20.0;
+/** Seconds a fish bites: clicked in them, it is caught. */
+static constexpr double FIRST_PERSON_BITE_S = 2.0;
+/** Seconds a fish caught hangs before the eyes before it goes into the inventory. */
+static constexpr double FIRST_PERSON_CAUGHT_S = 2.5;
+/** Seconds a word about the fishing is shown (no water there, the fish escaped, what was caught). */
+static constexpr double FIRST_PERSON_FISH_SAY_S = 2.5;
+/** The line from the tip to the hook hanging before the eyes, and to a fish caught, metres. */
+static constexpr float FIRST_PERSON_HOOK_HANG_M = 0.7f;
+static constexpr float FIRST_PERSON_FISH_HANG_M = 0.5f;
+/** The hook's eyelet (its origin) over the water floating, so that its worm is half in it; its bobbing up and down, metres. */
+static constexpr double FIRST_PERSON_HOOK_FLOAT_M = 0.3;
+static constexpr double FIRST_PERSON_HOOK_BOB_M = 0.04;
+/** The fish on the rod (the player: "only those three on the rod, the big green one in a river, the other two in the sea"). */
+struct FirstPersonRodFish {
+	WalkerItem item;        ///< the thing of the inventory
+	std::string_view figure; ///< its animal of the water of the indices
+	bool sea;               ///< caught in the sea, else in a river, a canal, a lake
+};
+static const FirstPersonRodFish _first_person_rod_fish[] = {
+	{WalkerItem::Perch, "ryba_okoun", false},
+	{WalkerItem::Discus, "ryba_tercovec", true},
+	{WalkerItem::Goldfish, "ryba_zavojnatka", true},
+};
+
+/** Whether the water at a world point is the sea's (the fish of the sea bite there), else a river's, a canal's, a lake's. */
+static bool FishingInSea(double x, double y)
+{
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	if (!IsValidTile(tile) || !HasTileWaterClass(tile)) return true;
+	return GetWaterClass(tile) == WaterClass::Sea;
+}
 
 /**
  * A weapon of the walker, by its key 1 to 5 (the player, 15. 10.: the big hammer; 17. 10.: "the bow and the crossbow
@@ -268,7 +323,11 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::WarHammer, "kladivo_valecne", WeaponUse::Swing, 2.7, 2},
 	{WalkerItem::Pitchfork, "vidle", WeaponUse::Swing, 2.6, 2},
 	{WalkerItem::MineHammer, "kladivo_minove", WeaponUse::Swing, 2.0, 6},
+	{WalkerItem::FishingRod, "prut_bambus", WeaponUse::Rod, 0, 0},
 };
+/** The fishing rod bent as a fish bites (the colleague's objekty/predmety/prut_ohnuty.glb), and the hook with its worm. */
+static constexpr std::string_view FIRST_PERSON_ROD_BENT = "prut_ohnuty";
+static constexpr std::string_view FIRST_PERSON_HOOK = "hacek_zizala";
 
 /**
  * A light of the walker for its left hand (the colleague's hra/3d/PROSBA-NOC-ZBRANE-TRABANT-LAMPY.md, point 3: "a thing
@@ -666,6 +725,17 @@ struct FirstPersonWindow : Window {
 	std::vector<FirstPersonMissile> missiles; ///< the arrows and the bolts shot
 	std::vector<FirstPersonBlast> blasts;  ///< the rockets' smoke and blasts
 	std::vector<FirstPersonFeeding> feedings; ///< the farms' dragons fed, smoking or breathing fire
+	FishingStage fishing = FishingStage::Ready; ///< how the walker fishes with the rod in the hand
+	double fish_time = 0;                 ///< seconds in that stage
+	double fish_bites_at = 0;             ///< waiting: the second in it a fish bites
+	double hook_x = 0, hook_y = 0, hook_z = 0; ///< the hook flying or on the water: world units, units of height (its eyelet)
+	double cast_x = 0, cast_y = 0, cast_z = 0; ///< where it flew from (the rod's tip about)
+	double land_x = 0, land_y = 0;        ///< where it falls onto the water
+	double water_z = 0;                   ///< the surface of the water it falls onto, units of height
+	int rod_fish = -1;                    ///< the fish biting or caught (_first_person_rod_fish), -1 none
+	int rod_fish_colour = 0;              ///< its colour of its palette (ThreeDVehicleObject::PaletteState())
+	std::string fish_say;                 ///< a word about the fishing shown a moment (FIRST_PERSON_FISH_SAY_S), empty none
+	double fish_say_left = 0;             ///< seconds it is shown yet
 	int hurt_steps = 0;                   ///< steps the picture is still red of a dragon's blow
 	uint64_t nurse_healed = 0;            ///< the tick of the game the walker's nurse last healed it (or began to be able to)
 	int light = -1;                       ///< the light asked for in the left hand (_first_person_lights), -1 none: the one held put out first
@@ -1662,6 +1732,7 @@ struct FirstPersonWindow : Window {
 		}
 		this->reload_time = std::max(0.0, this->reload_time - dt);
 		this->kick = std::max(0.0f, this->kick - static_cast<float>(dt / FIRST_PERSON_KICK_S));
+		this->Fish(dt);
 		this->Dress();
 		this->HoldLight(dt);
 	}
@@ -1733,6 +1804,8 @@ struct FirstPersonWindow : Window {
 	{
 		ThreeDHeldThing &held = this->walker.held;
 		const FirstPersonWeapon &w = _first_person_weapons[this->weapon];
+		held.line = false;
+		held.hanging_glows = false;
 		if (held.raise <= 0) {
 			held.thing.clear();
 			held.loaded.clear();
@@ -1740,6 +1813,7 @@ struct FirstPersonWindow : Window {
 		}
 		std::string_view state;
 		switch (w.use) {
+			case WeaponUse::Rod: held.hold = ThreeDHold::Rod; break;
 			case WeaponUse::Swing: held.hold = ThreeDHold::Swung; break;
 			case WeaponUse::Bow: held.hold = ThreeDHold::Bow; state = this->draw_time >= FIRST_PERSON_BOW_DRAW_S * 0.4 ? "napnuto" : "volno"; break;
 			case WeaponUse::Crossbow: held.hold = ThreeDHold::Crossbow; state = this->reload_time > 0 ? "vystreleno" : "natazeno"; break;
@@ -1763,6 +1837,215 @@ struct FirstPersonWindow : Window {
 		held.kick = this->kick;
 		held.drawn = this->draw_time >= 0 ? static_cast<float>(std::min(1.0, this->draw_time / FIRST_PERSON_BOW_DRAW_S)) : 0.0f;
 		held.twist = w.twist;
+		if (w.use == WeaponUse::Rod) this->DressRod();
+	}
+
+	/**
+	 * The fishing rod in the hand as the walker fishes (FishingStage): bent as a fish bites (the colleague's
+	 * prut_ohnuty); its line from its tip ("spicka") down to the hook hanging before the eyes, out to it on the water, or
+	 * down to the fish caught, by its mouth ("usta"), in its colour.
+	 */
+	void DressRod()
+	{
+		ThreeDHeldThing &held = this->walker.held;
+		const std::string_view rod = this->fishing == FishingStage::Bite ? FIRST_PERSON_ROD_BENT : _first_person_weapons[this->weapon].thing;
+		held.thing = std::string(rod);
+		const std::array<float, 3> grip = GetThreeDThingPlace(rod, "uchyt").value_or(std::array<float, 3>{0, 0, 0.25f});
+		std::copy(grip.begin(), grip.end(), held.grip);
+		const auto tip = GetThreeDThingPlace(rod, "spicka");
+		if (!tip.has_value()) return;
+		std::copy(tip->begin(), tip->end(), held.tip);
+		held.line = true;
+		held.hanging.clear();
+		held.hanging_fish = false;
+		held.hanging_state = 0;
+		held.hanging_scale = 1.0f;
+		std::fill(std::begin(held.hanging_at), std::end(held.hanging_at), 0.0f);
+		std::fill(std::begin(held.line_end), std::end(held.line_end), std::numeric_limits<double>::quiet_NaN());
+		if (this->fishing == FishingStage::Caught && this->rod_fish >= 0) {
+			const FirstPersonRodFish &f = _first_person_rod_fish[this->rod_fish];
+			held.hanging = std::string(f.figure);
+			held.hanging_fish = true;
+			held.hang_m = FIRST_PERSON_FISH_HANG_M;
+			const std::array<float, 3> mouth = GetThreeDThingPlace(f.figure, "usta").value_or(std::array<float, 3>{0, 0, 0});
+			std::copy(mouth.begin(), mouth.end(), held.hanging_at);
+			const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(f.figure);
+			held.hanging_scale = a != nullptr ? a->scale : 1.0f;
+			held.hanging_state = this->rod_fish_colour;
+			/* The fish of the sea glow at night ("v_noci_sviti"). */
+			held.hanging_glows = a != nullptr && a->glows;
+		} else if (this->fishing == FishingStage::Ready || this->fishing == FishingStage::Caught) {
+			held.hanging = std::string(FIRST_PERSON_HOOK);
+			held.hang_m = FIRST_PERSON_HOOK_HANG_M;
+		} else {
+			held.line_end[0] = this->hook_x;
+			held.line_end[1] = this->hook_y;
+			held.line_end[2] = this->hook_z;
+		}
+	}
+
+	/** A word about the fishing shown a moment over the view. */
+	void SayFishing(std::string text)
+	{
+		this->fish_say = std::move(text);
+		this->fish_say_left = FIRST_PERSON_FISH_SAY_S;
+	}
+
+	/** The rod's tip about where it is in the world as the hook is cast: ahead of the walker and over its eyes. */
+	void RodTipInWorld(double &x, double &y, double &z) const
+	{
+		const double h = this->walker.heading;
+		x = this->walker.x + std::cos(h) * 3.0 * OBJECT_UNITS_PER_METRE;
+		y = this->walker.y + std::sin(h) * 3.0 * OBJECT_UNITS_PER_METRE;
+		z = FirstPersonFeetZ(this->walker) + this->walker.eye_z + 1.2 * OBJECT_HEIGHT_PER_METRE;
+	}
+
+	/**
+	 * A click with the rod in the hand: the hook cast six to ten metres ahead, only into the water and not swimming;
+	 * on the water reeled in again; a fish biting caught -- into the inventory (the command), hanging before the eyes a
+	 * moment.
+	 */
+	void FishClick()
+	{
+		switch (this->fishing) {
+			case FishingStage::Ready: {
+				if (this->walker.swimming) {
+					this->SayFishing(GetString(STR_FIRST_PERSON_FISH_SWIMMING));
+					break;
+				}
+				const double metres = FIRST_PERSON_CAST_MIN_M + (FIRST_PERSON_CAST_MAX_M - FIRST_PERSON_CAST_MIN_M) * InteractiveRandomRange(1001) / 1000.0;
+				const double h = this->walker.heading;
+				const double tx = this->walker.x + std::cos(h) * metres * OBJECT_UNITS_PER_METRE, ty = this->walker.y + std::sin(h) * metres * OBJECT_UNITS_PER_METRE;
+				const std::optional<double> water = EyeWaterSurfaceZ(tx, ty);
+				if (!water.has_value()) {
+					this->SayFishing(GetString(STR_FIRST_PERSON_FISH_NO_WATER));
+					break;
+				}
+				this->water_z = *water;
+				this->RodTipInWorld(this->cast_x, this->cast_y, this->cast_z);
+				this->land_x = tx;
+				this->land_y = ty;
+				this->hook_x = this->cast_x;
+				this->hook_y = this->cast_y;
+				this->hook_z = this->cast_z;
+				this->fishing = FishingStage::Flying;
+				this->fish_time = 0;
+				break;
+			}
+			case FishingStage::Waiting:
+				/* Reeled in, nothing on it. */
+				this->fishing = FishingStage::Ready;
+				this->fish_time = 0;
+				break;
+			case FishingStage::Bite: {
+				const WalkerItem item = this->rod_fish >= 0 ? _first_person_rod_fish[this->rod_fish].item : WalkerItem::End;
+				if (item == WalkerItem::End) break;
+				Command<Commands::PickWalkerItem>::Post(STR_ERROR_WALKER_CAN_T_BUY, item);
+				this->SayFishing(GetString(STR_FIRST_PERSON_FISH_CAUGHT, GetWalkerItemSpec(item).name));
+				this->fishing = FishingStage::Caught;
+				this->fish_time = 0;
+				break;
+			}
+			case FishingStage::Flying:
+			case FishingStage::Caught:
+				break;
+		}
+		this->Dress();
+	}
+
+	/** A fish of the water the hook is in bites (the big green perch in a river, a canal, a lake; the two of the sea there), its colour at random. */
+	void FishBites()
+	{
+		const bool sea = FishingInSea(this->hook_x, this->hook_y);
+		std::vector<int> fish;
+		for (int k = 0; k < static_cast<int>(std::size(_first_person_rod_fish)); k++) {
+			const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(_first_person_rod_fish[k].figure);
+			if (_first_person_rod_fish[k].sea == sea && a != nullptr && a->on_rod) fish.push_back(k);
+		}
+		this->rod_fish = fish.empty() ? -1 : fish[InteractiveRandomRange(static_cast<uint32_t>(fish.size()))];
+		this->rod_fish_colour = 0;
+		if (this->rod_fish >= 0) {
+			/* Its colour of its palette as it is: the first of the four shades ReadFigurePalette() makes of each. */
+			const ThreeDVehicleObject *fig = GetThreeDFigure(_first_person_rod_fish[this->rod_fish].figure);
+			const uint32_t colours = fig != nullptr ? fig->palette_states.second / 4 : 0;
+			if (colours > 0) this->rod_fish_colour = fig->PaletteState(InteractiveRandomRange(colours));
+		}
+		this->fishing = this->rod_fish >= 0 ? FishingStage::Bite : FishingStage::Waiting;
+		this->fish_time = 0;
+		if (this->rod_fish < 0) this->fish_bites_at = 1e9;
+	}
+
+	/**
+	 * The fishing with the rod in the hand, a step: the rod swung back and forward as the hook flies out along its arc;
+	 * the hook bobbing on the water till a fish bites (five to twenty seconds); the hook pulled under while it bites, two
+	 * seconds, then it escapes; the fish caught hanging before the eyes a moment. Put away, in a vehicle or swimming, the
+	 * hook is reeled in.
+	 */
+	void Fish(double dt)
+	{
+		this->fish_say_left = std::max(0.0, this->fish_say_left - dt);
+		const FirstPersonWeapon &w = _first_person_weapons[this->weapon];
+		ThreeDHeldThing &held = this->walker.held;
+		const bool fishing = w.use == WeaponUse::Rod && this->weapon_out && this->wanted == this->weapon && held.raise >= 1.0f && this->Riding() == nullptr && !this->walker.swimming;
+		if (!fishing) {
+			this->fishing = FishingStage::Ready;
+			this->fish_time = 0;
+			this->rod_fish = -1;
+			if (w.use == WeaponUse::Rod) held.swing = 0;
+			return;
+		}
+		this->fish_time += dt;
+		held.swing = 0;
+		const double float_z = this->water_z + FIRST_PERSON_HOOK_FLOAT_M * OBJECT_HEIGHT_PER_METRE;
+		switch (this->fishing) {
+			case FishingStage::Ready:
+				break;
+			case FishingStage::Flying: {
+				/* The rod back and up, forward and down, back to rest; the hook leaving as it comes forward. */
+				const double s = this->fish_time;
+				const double back = FIRST_PERSON_CAST_SWING_S * 0.4;
+				if (s < back) {
+					held.swing = static_cast<float>(-35.0 * s / back);
+				} else if (s < FIRST_PERSON_CAST_SWING_S) {
+					held.swing = static_cast<float>(-35.0 + 50.0 * (s - back) / (FIRST_PERSON_CAST_SWING_S - back));
+				} else {
+					held.swing = static_cast<float>(15.0 * std::max(0.0, 1.0 - (s - FIRST_PERSON_CAST_SWING_S) / (FIRST_PERSON_CAST_S - FIRST_PERSON_CAST_SWING_S)));
+				}
+				const double u = std::clamp((s - back) / (FIRST_PERSON_CAST_S - back), 0.0, 1.0);
+				this->hook_x = this->cast_x + (this->land_x - this->cast_x) * u;
+				this->hook_y = this->cast_y + (this->land_y - this->cast_y) * u;
+				this->hook_z =this->cast_z + (float_z - this->cast_z) * u + 1.5 * OBJECT_HEIGHT_PER_METRE * 4 * u * (1 - u);
+				if (s >= FIRST_PERSON_CAST_S) {
+					this->fishing = FishingStage::Waiting;
+					this->fish_time = 0;
+					this->fish_bites_at = FIRST_PERSON_BITE_MIN_S + (FIRST_PERSON_BITE_MAX_S - FIRST_PERSON_BITE_MIN_S) * InteractiveRandomRange(1001) / 1000.0;
+					this->hook_z = float_z;
+				}
+				break;
+			}
+			case FishingStage::Waiting:
+				this->hook_z = float_z + FIRST_PERSON_HOOK_BOB_M * OBJECT_HEIGHT_PER_METRE * std::sin(this->fish_time * 2 * M_PI * 0.7);
+				if (this->fish_time >= this->fish_bites_at) this->FishBites();
+				break;
+			case FishingStage::Bite:
+				/* Pulled under in jerks. */
+				this->hook_z = float_z - (0.18 + 0.07 * std::sin(this->fish_time * 13.0)) * OBJECT_HEIGHT_PER_METRE;
+				if (this->fish_time >= FIRST_PERSON_BITE_S) {
+					this->SayFishing(GetString(STR_FIRST_PERSON_FISH_ESCAPED));
+					this->rod_fish = -1;
+					this->fishing = FishingStage::Waiting;
+					this->fish_time = 0;
+					this->fish_bites_at = FIRST_PERSON_BITE_MIN_S + (FIRST_PERSON_BITE_MAX_S - FIRST_PERSON_BITE_MIN_S) * InteractiveRandomRange(1001) / 1000.0;
+				}
+				break;
+			case FishingStage::Caught:
+				if (this->fish_time >= FIRST_PERSON_CAUGHT_S) {
+					this->fishing = FishingStage::Ready;
+					this->fish_time = 0;
+					this->rod_fish = -1;
+				}
+				break;
+		}
 	}
 
 	/**
@@ -1804,6 +2087,9 @@ struct FirstPersonWindow : Window {
 				if (this->reload_time > 0 || Carried(w.ammo) == 0) break;
 				this->Shoot(w, 1.0);
 				this->reload_time = FIRST_PERSON_ROCKET_RELOAD_S;
+				break;
+			case WeaponUse::Rod:
+				this->FishClick();
 				break;
 		}
 		this->Dress();
@@ -2347,6 +2633,10 @@ struct FirstPersonWindow : Window {
 				/* A dot in the middle, where it looks. */
 				const int cx = r.left + w / 2, cy = r.top + h / 2;
 				GfxFillRect(cx - 1, cy - 1, cx + 1, cy + 1, GetColourGradient(Colours::White, Shade::Lightest));
+				/* The fishing: a fish biting (the player: "two seconds 'A bite! Click'"), or a word about it a moment, big
+				 * under the dot. */
+				const std::string fishing_word = this->fishing == FishingStage::Bite ? GetString(STR_FIRST_PERSON_FISH_BITE) : this->fish_say_left > 0 ? this->fish_say : std::string();
+				if (!fishing_word.empty()) DrawString(r.left, r.right, cy + GetCharacterHeight(FontSize::Large) * 2, fishing_word, TextColour::Yellow, AlignmentH::Centre, false, FontSize::Large);
 				/* The weapon out, and how many arrows or bolts there are for it. */
 				const int line = r.bottom - GetCharacterHeight(FontSize::Normal) - WidgetDimensions::scaled.framerect.bottom * 2;
 				if (this->weapon_out && this->Riding() == nullptr) {
@@ -2376,6 +2666,9 @@ struct FirstPersonWindow : Window {
 					/* A train driven from its desk: where its controls stand (as the cab view's panel). */
 					if (const std::string desk = SimtrainsDeskText(rv); !desk.empty()) hint += "   " + desk;
 					riding = true;
+				} else if (this->fishing == FishingStage::Waiting) {
+					/* The hook on the water: a fish to bite, a click reels it in. */
+					hint = GetString(STR_FIRST_PERSON_FISH_WAITING);
 				} else if (ThreeDEyeVehicle ev; this->Aboard(ev) != nullptr) {
 					/* On board a boat: by its wheel E takes it, elsewhere over the side onto the land near. */
 					if (this->AtHelm(ev)) {
@@ -3027,6 +3320,46 @@ std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
 }
 
 /**
+ * The rig: the fishing rod (FishingStage) -- "prut" into the hand, "nahod"/"klik" a click with it, "zabira" a fish to
+ * bite now on the water -- then so many steps; how it fishes then, the picture made.
+ */
+int FirstPersonWeaponKey(WalkerItem item);
+
+std::string RigFirstPersonFish(std::string_view what, int steps)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	if (what == "prut") {
+		w->Choose(FirstPersonWeaponKey(WalkerItem::FishingRod) - 1);
+		w->weapon = w->wanted;
+		w->walker.held.raise = w->weapon_out ? 1.0f : 0.0f;
+		w->Dress();
+	} else if (what == "nahod" || what == "klik") {
+		w->Attack(false);
+	} else if (what == "zabira" && w->fishing == FishingStage::Waiting) {
+		w->fish_bites_at = w->fish_time;
+	}
+	const double dt = FIRST_PERSON_TICK_MS / 1000.0;
+	for (int i = 0; i < steps; i++) w->Hold(dt);
+	static constexpr std::string_view STAGES[] = {"pripraveno", "leti", "ceka", "zabira", "chycena"};
+	std::string out = fmt::format("{} ({:.1f} s), v ruce {}{}", STAGES[to_underlying(w->fishing)], w->fish_time, w->walker.held.thing.empty() ? std::string("nic") : w->walker.held.thing, w->walker.held.line ? " s vlascem" : "");
+	if (!w->walker.held.hanging.empty()) out += fmt::format(", visi {} {:.1f} m pod spickou", w->walker.held.hanging, w->walker.held.hang_m);
+	if (w->fishing == FishingStage::Flying || w->fishing == FishingStage::Waiting || w->fishing == FishingStage::Bite) {
+		out += fmt::format(", hacek {:.1f} m pred chodcem, ocko {:.2f} m nad vodou", std::hypot(w->hook_x - w->walker.x, w->hook_y - w->walker.y) / OBJECT_UNITS_PER_METRE, (w->hook_z - w->water_z) / OBJECT_HEIGHT_PER_METRE);
+		out += FishingInSea(w->hook_x, w->hook_y) ? ", more" : ", reka";
+	}
+	if (w->rod_fish >= 0) out += fmt::format(", ryba {} stav {}", _first_person_rod_fish[w->rod_fish].figure, w->rod_fish_colour);
+	if (w->fish_say_left > 0) out += ", hlaska: " + w->fish_say;
+	if (const Company *c = Company::GetIfValid(_local_company); c != nullptr) {
+		out += fmt::format("; inventar prut {}, okoun {}, tercovec {}, zavojnatka {}", c->walker_items[to_underlying(WalkerItem::FishingRod)], c->walker_items[to_underlying(WalkerItem::Perch)],
+				c->walker_items[to_underlying(WalkerItem::Discus)], c->walker_items[to_underlying(WalkerItem::Goldfish)]);
+	}
+	w->MakePicture();
+	w->SetDirty();
+	return out;
+}
+
+/**
  * The rig: the walker before the n-th dragon of the farms resting on its place, so many metres from its mouth at an angle
  * from its front, looking at its mouth.
  * @return where, or why not
@@ -3082,6 +3415,10 @@ void AddFirstPersonMissilesToEye()
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return;
 	for (const FirstPersonMissile &m : w->missiles) AddCabMissile(m.thing, m.x, m.y, m.z, m.facing, m.pitch);
+	/* The hook of the fishing rod flying out or on the water (its line drawn with the rod, ThreeDHeldThingTriangles()). */
+	if (w->fishing == FishingStage::Flying || w->fishing == FishingStage::Waiting || w->fishing == FishingStage::Bite) {
+		AddCabMissile(FIRST_PERSON_HOOK, w->hook_x, w->hook_y, w->hook_z, static_cast<float>(w->walker.heading * 180.0 / M_PI), 0.0f);
+	}
 }
 
 /** The key of a weapon of the walker (1 to 5, as Choose() counts them from 0), 0 for a thing that is not one. */

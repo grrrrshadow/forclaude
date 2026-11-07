@@ -66,6 +66,10 @@ enum class WalkerItem : uint8_t {
 	MineHammer, ///< the mine hammer (the colleague's objekty/predmety/kladivo_minove.glb, par16): a mortar's bomb on a pole, its blow a blast; from iddqd
 	CelticTent, ///< the Celtic tent (the colleague's objekty/doplnky/stan_kelt.glb): pitched on a tile in front of the walker (WalkerTent); from the start
 	CampingTent, ///< the camping tent (objekty/doplnky/stan_kempink.glb): so too
+	FishingRod, ///< the bamboo fishing rod (objekty/predmety/prut_bambus.glb): cast into the water before the walker, a fish caught on it (FirstPersonFishing); from the start
+	Perch,      ///< the big green perch, caught in a river, a canal or a lake (objekty/voda/ryba_okoun.glb)
+	Discus,     ///< the discus, caught in the sea (objekty/voda/ryba_tercovec.glb)
+	Goldfish,   ///< the fancy goldfish, caught in the sea (objekty/voda/ryba_zavojnatka.glb)
 	End,        ///< the end of the known things
 };
 
@@ -80,8 +84,12 @@ enum class WalkerItemKind : uint8_t {
 /** The tile a thing is bought "at" from Mat walking about the town (CmdBuyWalkerItem()): the map's corner, no shop ever, and a tile the commands take. */
 static constexpr TileIndex WALKER_SOLD_BY_MAT{0};
 
-/** The places of the inventory kept and saved: room for the things to come. */
-static constexpr size_t WALKER_ITEM_SLOTS = 32;
+/**
+ * The places of the inventory kept and saved: one for every number a thing can have (a WalkerItem is a byte), so that the
+ * things to come never outgrow it (the player, 7. 11.: "64 will soon be too few").
+ */
+static constexpr size_t WALKER_ITEM_SLOTS = 256;
+static_assert(static_cast<size_t>(WalkerItem::End) <= WALKER_ITEM_SLOTS);
 /**
  * The quick keys, 1 to 9 (the player, 23. 10.: "the numbers of the weapons are not needed, the player assigns them as in
  * Morrowind, what is under 1 and under 2"): each the thing the player put under it in the inventory, End none.
@@ -126,6 +134,7 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::Rockets)] = WALKER_ROCKETS_FULL;
 	items[static_cast<size_t>(WalkerItem::CelticTent)] = 1;
 	items[static_cast<size_t>(WalkerItem::CampingTent)] = 1;
+	items[static_cast<size_t>(WalkerItem::FishingRod)] = 1;
 	return items;
 }
 
@@ -133,6 +142,12 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 constexpr bool IsWalkerTentItem(WalkerItem item)
 {
 	return item == WalkerItem::CelticTent || item == WalkerItem::CampingTent;
+}
+
+/** Whether a thing of the inventory is a fish caught on the rod (the player, 7. 11.: "only the three fish meant for it"). */
+constexpr bool IsWalkerFishItem(WalkerItem item)
+{
+	return item == WalkerItem::Perch || item == WalkerItem::Discus || item == WalkerItem::Goldfish;
 }
 
 /** What a thing of the inventory is. */

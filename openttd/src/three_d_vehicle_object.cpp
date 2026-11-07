@@ -5202,6 +5202,21 @@ void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height
 			hand = V{-0.40f, -0.20f - lowered * 0.9f, 0.80f};
 			break;
 		}
+		case ThreeDHold::Rod: {
+			/* A fishing rod: from the hand at the bottom right forward and up, a little in towards the middle, so that
+			 * its tip is seen above the middle; its reel (+x) under it, a fish bending it down that way. Cast, it is
+			 * swung back and up, then forward and down as the hook flies (the swing as a hammer's). */
+			az = unit({-0.10f, 0.40f, 0.91f});
+			ax = V{0.0f, -1.0f, 0.3f};
+			const float d = ax.x * az.x + ax.y * az.y + ax.z * az.z;
+			ax = unit({ax.x - d * az.x, ax.y - d * az.y, ax.z - d * az.z});
+			ay = V{az.y * ax.z - az.z * ax.y, az.z * ax.x - az.x * ax.z, az.x * ax.y - az.y * ax.x};
+			hand = V{0.34f, -0.44f - lowered * 0.7f, 0.50f};
+			const float a = held.swing * static_cast<float>(M_PI) / 180.0f;
+			swing_c = std::cos(a);
+			swing_s = std::sin(a);
+			break;
+		}
 	}
 	/* A point of the thing (or a direction, without the grip and the hand), offset by where the loaded one sits,
 	 * turned about its handle. */
@@ -5229,17 +5244,21 @@ void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height
 	/* The light from above, a little left and behind the eye. */
 	const V sun = unit({-0.45f, 0.75f, -0.5f});
 	const float cx = width / 2.0f, cy = height / 2.0f, f = static_cast<float>(focal);
-	auto add = [&](const ThreeDVehicleObject *o, const ThreeDVehicleShape *sh, const float *offset) {
+	/* A shape put before the eye by `to_eye` (a point of it, or a direction without where it is); `state` its paint (a
+	 * fish's colour of its palette, its texture at the detail it is seen at). */
+	auto add_by = [&](const ThreeDVehicleObject *o, const ThreeDVehicleShape *sh, int state, bool glows, const auto &to_eye) {
 		const size_t n = sh->pos.size() / 3;
 		std::vector<float> sx(n), sy(n), iz(n), light(n, 1.0f);
-		const bool lit = sh->nrm.size() == sh->pos.size();
+		const bool lit = !glows && sh->nrm.size() == sh->pos.size();
+		float nearest = 1e9f;
 		for (size_t i = 0; i < n; i++) {
-			const V p = place(sh->pos[i * 3], sh->pos[i * 3 + 1], sh->pos[i * 3 + 2], true, offset);
+			const V p = to_eye(sh->pos[i * 3], sh->pos[i * 3 + 1], sh->pos[i * 3 + 2], true);
 			iz[i] = p.z > 0.02f ? 1.0f / p.z : -1.0f;
 			sx[i] = cx + f * p.x * std::max(iz[i], 0.0f);
 			sy[i] = cy - f * p.y * std::max(iz[i], 0.0f);
+			if (p.z > 0.02f) nearest = std::min(nearest, p.z);
 			if (lit) {
-				const V q = place(sh->nrm[i * 3], sh->nrm[i * 3 + 1], sh->nrm[i * 3 + 2], false, nullptr);
+				const V q = to_eye(sh->nrm[i * 3], sh->nrm[i * 3 + 1], sh->nrm[i * 3 + 2], false);
 				light[i] = 0.45f + 0.55f * std::max(0.0f, std::abs(q.x * sun.x + q.y * sun.y + q.z * sun.z));
 			}
 		}
@@ -5247,7 +5266,7 @@ void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height
 			const uint32_t c[3] = {sh->tri[t], sh->tri[t + 1], sh->tri[t + 2]};
 			if (iz[c[0]] <= 0 || iz[c[1]] <= 0 || iz[c[2]] <= 0) continue; // behind the eye
 			const int ti = t / 3 < sh->tri_tex.size() ? sh->tri_tex[t / 3] : 0;
-			const ThreeDObjectTexture *tex = o->GetTexture(0, ti);
+			const ThreeDObjectTexture *tex = state != 0 ? GetThreeDEyeVehicleTexture(o, state, f / std::max(0.1f, nearest), ti) : o->GetTexture(0, ti);
 			if (tex == nullptr) continue;
 			ThreeDHeldTriangle &h = out.emplace_back();
 			h.tex = tex;
@@ -5264,13 +5283,81 @@ void ThreeDHeldThingTriangles(const ThreeDHeldThing &held, int width, int height
 			h.glow = glow != 0;
 		}
 	};
-	add(obj, shape, nullptr);
-	/* The arrow on the string, the bolt in the groove. */
-	if (!held.loaded.empty()) {
-		const ThreeDVehicleObject *missile = GetThreeDFigure(held.loaded);
-		const ThreeDVehicleShape *ms = missile != nullptr ? missile->GetShape(0) : nullptr;
-		if (ms != nullptr && !ms->tri.empty()) add(missile, ms, held.nock);
+	auto add = [&](const ThreeDVehicleObject *o, const ThreeDVehicleShape *sh, const float *offset) {
+		add_by(o, sh, 0, false, [&](float px, float py, float pz, bool point) { return place(px, py, pz, point, point ? offset : nullptr); });
+	};
+	if (!held.only_hanging) {
+		add(obj, shape, nullptr);
+		/* The arrow on the string, the bolt in the groove. */
+		if (!held.loaded.empty()) {
+			const ThreeDVehicleObject *missile = GetThreeDFigure(held.loaded);
+			const ThreeDVehicleShape *ms = missile != nullptr ? missile->GetShape(0) : nullptr;
+			if (ms != nullptr && !ms->tri.empty()) add(missile, ms, held.nock);
+		}
 	}
+	if (!held.line) return;
+
+	/* The fishing rod's line from its tip: down to what hangs on it, or out to the hook on the water, sagging a little
+	 * between; a thin dark band of a pixel or two, in pieces so that it bends. */
+	const V tip = place(held.tip[0], held.tip[1], held.tip[2], true, nullptr);
+	const bool out_there = held.hanging.empty();
+	if (out_there && !held.line_to_seen) return;
+	const V end = out_there ? V{held.line_to[0], held.line_to[1], held.line_to[2]} : V{tip.x, tip.y - held.hang_m, tip.z};
+	static const ThreeDObjectTexture line_colour = [] {
+		ThreeDObjectTexture t;
+		t.w = t.h = 1;
+		t.px = {0xFF262420};
+		return t;
+	}();
+	const float sag = out_there ? 0.06f * std::sqrt((end.x - tip.x) * (end.x - tip.x) + (end.y - tip.y) * (end.y - tip.y) + (end.z - tip.z) * (end.z - tip.z)) : 0.0f;
+	const int pieces = out_there ? 16 : 1;
+	const float half = std::max(0.6f, width / 1100.0f);
+	auto line_point = [&](float t) { return V{tip.x + (end.x - tip.x) * t, tip.y + (end.y - tip.y) * t - sag * 4 * t * (1 - t), tip.z + (end.z - tip.z) * t}; };
+	for (int k = 0; k < (held.only_hanging ? 0 : pieces); k++) {
+		const V a = line_point(static_cast<float>(k) / pieces), b = line_point(static_cast<float>(k + 1) / pieces);
+		if (a.z <= 0.05f || b.z <= 0.05f) continue;
+		const float ax0 = cx + f * a.x / a.z, ay0 = cy - f * a.y / a.z, bx0 = cx + f * b.x / b.z, by0 = cy - f * b.y / b.z;
+		float nx = -(by0 - ay0), ny = bx0 - ax0;
+		const float len = std::sqrt(nx * nx + ny * ny);
+		if (len < 1e-3f) continue;
+		nx *= half / len;
+		ny *= half / len;
+		const float qx[4] = {ax0 - nx, ax0 + nx, bx0 + nx, bx0 - nx}, qy[4] = {ay0 - ny, ay0 + ny, by0 + ny, by0 - ny};
+		const float qz[4] = {1.0f / a.z, 1.0f / a.z, 1.0f / b.z, 1.0f / b.z};
+		for (const auto &tri : {std::array<int, 3>{0, 1, 2}, std::array<int, 3>{0, 2, 3}}) {
+			ThreeDHeldTriangle &h = out.emplace_back();
+			h.tex = &line_colour;
+			for (int c = 0; c < 3; c++) {
+				h.sx[c] = qx[tri[c]];
+				h.sy[c] = qy[tri[c]];
+				h.iz[c] = qz[tri[c]];
+				h.u[c] = 0.5f;
+				h.v[c] = 0.5f;
+				h.light[c] = 1.0f;
+			}
+		}
+	}
+	if (out_there || held.skip_hanging) return;
+
+	/* What hangs on it before the eyes, the line holding it there: the hook upright as it is; a fish head up by its
+	 * mouth, its side to the eye (its +x up, its top to the right); one glowing at night by its own light. */
+	const ThreeDVehicleObject *hung = GetThreeDFigure(held.hanging);
+	const ThreeDVehicleShape *hs = hung != nullptr ? hung->GetShape(0) : nullptr;
+	if (hs == nullptr || hs->tri.empty()) return;
+	const V hx = held.hanging_fish ? V{0, 1, 0} : V{1, 0, 0};
+	const V hy = held.hanging_fish ? V{0, 0, 1} : V{0, 0, -1};
+	const V hz = held.hanging_fish ? V{1, 0, 0} : V{0, 1, 0};
+	const float s = held.hanging_scale;
+	add_by(hung, hs, held.hanging_state, held.hanging_glows && held.only_hanging, [&](float px, float py, float pz, bool point) {
+		if (point) {
+			px = (px - held.hanging_at[0]) * s;
+			py = (py - held.hanging_at[1]) * s;
+			pz = (pz - held.hanging_at[2]) * s;
+		}
+		V v{hx.x * px + hy.x * py + hz.x * pz, hx.y * px + hy.y * py + hz.y * pz, hx.z * px + hy.z * py + hz.z * pz};
+		if (point) v = V{v.x + end.x, v.y + end.y, v.z + end.z};
+		return v;
+	});
 }
 
 /**

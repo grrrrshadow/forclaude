@@ -1213,6 +1213,20 @@ struct ThreeDMushroom {
 	float height_m = 0.1f;       ///< "vyska_m"
 };
 const std::vector<ThreeDMushroom> &GetThreeDMushrooms();
+
+/**
+ * An animal of the water of the indices ("druh": "vodni_zvire", the colleague's objekty/voda; the player, 7. 11.: "only
+ * those three on the rod, the big green one in a river, the other two in the sea"): a figure of its name, true metres,
+ * facing +x, its origin in the middle of its body.
+ */
+struct ThreeDWaterAnimal {
+	std::string name;     ///< "jmeno", a figure
+	bool sea = false;     ///< "voda": "more" in the sea, else ("reka") in a river, a canal, a lake
+	bool on_rod = false;  ///< "na_prut": caught on the rod
+	bool glows = false;   ///< "v_noci_sviti": it glows at night
+	float scale = 1.0f;   ///< "meritko": so many times its true size, in the water and on the hook
+};
+const ThreeDWaterAnimal *GetThreeDWaterAnimal(std::string_view name);
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();

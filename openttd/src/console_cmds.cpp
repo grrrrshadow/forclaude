@@ -9558,6 +9558,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			 * so many steps. */
 			extern std::string RigFirstPersonWeapon(int key, int draw_ms, int steps);
 			IConsolePrint(CC_DEFAULT, "test3d: zbran {}", RigFirstPersonWeapon(number(3).value_or(1), number(4).value_or(0), argv.size() > 5 && argv[5] == "drzet" ? -1 : number(5).value_or(0)));
+		} else if (argv.size() > 3 && argv[2] == "ryba") {
+			/* 'chodec ryba prut|nahod|klik|zabira|kroky [steps]': the fishing rod into the hand, a click with it, a fish to bite
+			 * now, then so many steps (first_person_gui.cpp, FishingStage). */
+			extern std::string RigFirstPersonFish(std::string_view what, int steps);
+			IConsolePrint(CC_DEFAULT, "test3d: ryba {}", RigFirstPersonFish(argv[3], number(4).value_or(0)));
 		} else if (argv.size() > 2 && argv[2] == "drak") {
 			/* 'chodec drak [n] [metres] [degrees]': the walker before the n-th dragon of the farms resting, so far from its
 			 * mouth, at the angle from its front, looking at it; two of the beer, the marijuana and the hay given it, of

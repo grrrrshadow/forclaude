@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <optional>
 #include <string>
 #include <vector>
@@ -168,6 +169,7 @@ enum class ThreeDHold : uint8_t {
 	Crossbow, ///< a crossbow: at the right shoulder, along the look
 	Shoulder, ///< a rocket launcher: its tube along the look, low at the right, so that all of it is seen
 	Left,     ///< a light (the torch, the lantern): upright in the left hand, low at the left
+	Rod,      ///< a fishing rod: from the right hand at the bottom right forward and up, its reel under it; cast as it is swung
 };
 
 /** The thing in the walker's hands, as it is drawn over the picture from its eyes (DrawThreeDHeldThing()). */
@@ -183,6 +185,25 @@ struct ThreeDHeldThing {
 	float drawn = 0;     ///< a bow: how far it is drawn, 0 to 1 (brought before the eye, the arrow at the dot)
 	float twist = 0;     ///< swung: degrees it is turned about its handle (a sword's flat to the eye)
 	int frame = 0;       ///< its frame (a torch's flame, "plamen")
+	/*
+	 * The fishing rod's line (first_person_gui.cpp; the player, 7. 11.: "a thin dark line from the tip to the hook"): from
+	 * the rod's tip down to what hangs on it before the eyes -- the hook with its worm, a fish caught by its mouth -- or
+	 * out to the hook floating on the water.
+	 */
+	bool line = false;          ///< a line from its tip
+	float tip[3] = {};          ///< its tip, metres in its frame (its node "spicka")
+	float hang_m = 0;           ///< the line hangs so long from the tip down to what hangs on it
+	std::string hanging;        ///< what hangs on it, a figure ("hacek_zizala", a fish); empty for the line out to line_end
+	float hanging_at[3] = {};   ///< the point of it the line holds, metres in its frame (the hook's eyelet, its origin; a fish's "usta")
+	float hanging_scale = 1.0f; ///< its size against its true metres
+	int hanging_state = 0;      ///< its state (a fish's colour of its palette)
+	bool hanging_fish = false;  ///< a fish: head up by its mouth, its side to the eye; else upright as it is
+	bool hanging_glows = false; ///< it glows at night (the fish of the sea): unshaded, drawn after the dark
+	bool skip_hanging = false;  ///< drawn without what hangs on the line (it is drawn by itself after the dark)
+	bool only_hanging = false;  ///< only what hangs on the line drawn
+	double line_end[3] = {NAN, NAN, NAN}; ///< the line's end out in the world (the hook on the water), world units and units of height, NaN none
+	float line_to[3] = {};      ///< that end as the thing is drawn (set by the view as it draws it): metres, x to the right, y up, z ahead
+	bool line_to_seen = false;  ///< whether line_to is set: that end ahead of the eye
 };
 
 /** A puff of the smoke of a rocket, or its blast, seen from the eyes (first_person_gui.cpp): a soft ball of colour. */

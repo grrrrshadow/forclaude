@@ -673,5 +673,122 @@
   "autor": "Mortar Hammer, Lyndschoko (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/mortar-hammer-5de1c9926f394d15b1e7f985a7201de2), převod tvorove/par16.py bez renderu",
   "licence": "CC BY 4.0 (uvést Lyndschoko; změny: otočené, zmenšené na 0.85 m, jen barevná textura)",
   "poznamka": "další kladivo (hráč: „kladivo dalši“): minometná mina na trubce; počátek na spodním konci násady, násada po +z, mina nahoře leží po ose x, nos s rozbuškou do +x, křidélka do −x (úderné plochy do ±x jako u kladiv); prázdný uzel uchyt na násadě 0,2 m nad koncem; 0.85 m vysoké, mina 1.01 m dlouhá; mávání si dělá hra; glb z gltfpacku"
+ },
+ {
+  "soubor": "prut_bambus.glb",
+  "jmeno": "prut_bambus",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "bambusový prut",
+   "en": "bamboo fishing rod"
+  },
+  "kategorie": "rybareni",
+  "vaha_kg": 0.6,
+  "rozmer_m": {
+   "x": [
+    -0.017,
+    0.134
+   ],
+   "y": [
+    -0.017,
+    0.086
+   ],
+   "z": [
+    0.0,
+    4.5
+   ]
+  },
+  "uchyt": "uchyt",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.25
+   ],
+   "spicka": [
+    0.003,
+    -0.0,
+    4.5
+   ]
+  },
+  "trojuhelniku": 728,
+  "autor": "Bamboo Fishing Rod, Total_Marginal (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/bamboo-fishing-rod-43d7c0540bb3468f837b23543882434e), převod voda/pruty.py",
+  "licence": "CC-BY-4.0 (uvést Total_Marginal; změny: otočený, zjednodušený, textury menší)",
+  "poznamka": "rybářský prut do ruky; počátek na konci rukojeti, prut po +z, 4,5 m, dřevěný naviják na +x, vlasec vede po prutu ke špičce; prázdné uzly uchyt (kde ho drží ruka) a spicka (konec prutu: odtud visí vlasec, ten kreslí hra, na něm hacek_zizala a ulovená ryba za uzel usta); hra prut drží a nahazuje, když ryba zabere, ukáže prut_ohnuty"
+ },
+ {
+  "soubor": "prut_ohnuty.glb",
+  "jmeno": "prut_ohnuty",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "prut, když ryba zabere",
+   "en": "fishing rod with a bite"
+  },
+  "kategorie": "rybareni",
+  "vaha_kg": 0.4,
+  "rozmer_m": {
+   "x": [
+    -0.329,
+    0.371
+   ],
+   "y": [
+    -0.059,
+    0.037
+   ],
+   "z": [
+    0.0,
+    2.0
+   ]
+  },
+  "uchyt": "uchyt",
+  "uzly": {
+   "uchyt": [
+    0.0,
+    0.0,
+    0.3
+   ],
+   "spicka": [
+    -0.029,
+    -0.0,
+    2.0
+   ]
+  },
+  "trojuhelniku": 902,
+  "autor": "New Fishing Rod, Cxrly97 (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/new-fishing-rod-e2c4d58aad8e468f8b5e4bea70c93e7b), převod voda/pruty.py",
+  "licence": "CC-BY-4.0 (uvést Cxrly97; změny: otočený, zjednodušený, textury menší)",
+  "poznamka": "rybářský prut do ruky; počátek na konci rukojeti, prut po +z, ohnutý, jak když ryba zabere: špička se sklání k +x, vlasec ze špičky ke splávku; 2 m od konce ke špičce, bez navijáku; prázdné uzly uchyt (kde ho drží ruka) a spicka (konec prutu: odtud visí vlasec, ten kreslí hra, na něm hacek_zizala a ulovená ryba za uzel usta); hra prut drží a nahazuje, když ryba zabere, ukáže prut_ohnuty"
+ },
+ {
+  "soubor": "hacek_zizala.glb",
+  "jmeno": "hacek_zizala",
+  "druh": "predmet",
+  "nazev": {
+   "cs": "háček se žížalou",
+   "en": "hook with a worm"
+  },
+  "kategorie": "rybareni",
+  "vaha_kg": 0.01,
+  "rozmer_m": {
+   "x": [
+    -0.087,
+    0.217
+   ],
+   "y": [
+    -0.085,
+    0.016
+   ],
+   "z": [
+    -0.54,
+    0.0
+   ]
+  },
+  "pro": [
+   "prut_bambus",
+   "prut_ohnuty"
+  ],
+  "trojuhelniku": 494,
+  "autor": "Fishing Rod, KendeMrena (Sketchfab, CC-BY-4.0, https://sketchfab.com/3d-models/fishing-rod-fd6db07b74a84bd1b93796fa295dcd16), převod voda/pruty.py",
+  "licence": "CC-BY-4.0 (uvést KendeMrena; změny: jen háček se žížalou ze sady na led, zjednodušený, barvy místo textury)",
+  "poznamka": "háček se žížalou, společný pro oba pruty (hráč: „žižalu haček si mužou pruty pučovat“); schválně třikrát větší, žížala velká jako brambora, ať je vidět (hráč: „velkou žižalu jak bramboru“); počátek v očku háčku nahoře, visí dolů (-z); hra ho věší na vlasec pod uzel spicka prutu, vlasec kreslí hra (hráč: „však tam hra dá nějakej špagat“); ulovená ryba visí místo žížaly za uzel usta"
  }
 ]

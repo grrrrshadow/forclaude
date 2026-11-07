@@ -1,0 +1,123 @@
+[
+ {
+  "soubor": "ryba_okoun.glb",
+  "jmeno": "ryba_okoun",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "velký zelený okoun",
+   "en": "big green bass"
+  },
+  "meritko": 1,
+  "rozmer_m": [
+   0.5,
+   0.1,
+   0.2
+  ],
+  "voda": "reka",
+  "v_noci_sviti": false,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.25,
+    0.0,
+    0.002
+   ]
+  },
+  "trojuhelniku": 2460,
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v řece, v noci nesvítí; barvy modelu"
+ },
+ {
+  "soubor": "ryba_tercovec.glb",
+  "jmeno": "ryba_tercovec",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "terčovec",
+   "en": "discus"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.2,
+   0.06,
+   0.17
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.1,
+    0.0,
+    -0.017
+   ]
+  },
+  "trojuhelniku": 1569,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_tercovec_maska_telo.png",
+    "zacatek": 242,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v moři, v noci svítí; barva z palety (maska telo, oči ne)"
+ },
+ {
+  "soubor": "ryba_zavojnatka.glb",
+  "jmeno": "ryba_zavojnatka",
+  "druh": "vodni_zvire",
+  "nazev": {
+   "cs": "závojnatka",
+   "en": "fancy goldfish"
+  },
+  "meritko": 2,
+  "rozmer_m": [
+   0.25,
+   0.05,
+   0.12
+  ],
+  "voda": "more",
+  "v_noci_sviti": true,
+  "na_prut": true,
+  "uzly": {
+   "usta": [
+    0.125,
+    0.0,
+    -0.01
+   ]
+  },
+  "trojuhelniku": 2649,
+  "barvy": [
+   {
+    "cast": "telo",
+    "maska": "ryba_zavojnatka_maska_telo.png",
+    "zacatek": 237,
+    "paleta": [
+     "E83A2A",
+     "F28C28",
+     "F2D22E",
+     "3AA655",
+     "2E8BD8",
+     "7B4BC4",
+     "E85AA8",
+     "2EC4C4"
+    ]
+   }
+  ],
+  "autor": "Lowpoly fish pack, assetfactory (Sketchfab, SKETCHFAB Standard, https://sketchfab.com/3d-models/lowpoly-fish-pack-812a52c7f7cc4e10b69c5c5f9e4269f2), převod voda/pruty.py",
+  "licence": "SKETCHFAB Standard (uvést assetfactory; změny: vyříznutá z balíku, otočená, skutečná velikost, zjednodušená, textura 128 px)",
+  "poznamka": "ryba na prut (hráč: „pujdou ulovit jenom tyhle na prut“) a zároveň plave ve vodě; skutečné metry, čelem k +x, nahoru +y, počátek uprostřed těla; bez kostry, hra ji jen posouvá; prázdný uzel usta: za ten visí na háčku pod uzlem spicka prutu; v moři, v noci svítí; barva z palety (maska telo, oči ne)"
+ }
+]

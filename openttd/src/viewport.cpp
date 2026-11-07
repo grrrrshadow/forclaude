@@ -17681,7 +17681,25 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		});
 	};
 	if (walker != nullptr && !walker->blasts.empty()) blasts_job(false);
-	if (walker != nullptr && !walker->held.thing.empty()) held_job(walker->held);
+	if (walker != nullptr && !walker->held.thing.empty()) {
+		/* The fishing rod's line out to the hook on the water: that end as the thing in the hand is drawn -- metres from the
+		 * eye, x to the right, y up, z ahead, the picture's middle its (ThreeDHeldThingTriangles()), not the horizon's. */
+		ThreeDHeldThing held = walker->held;
+		held.line_to_seen = false;
+		if (held.line && held.hanging.empty() && !std::isnan(held.line_end[0])) {
+			const CabPoint p = CabToEye(eye, held.line_end[0], held.line_end[1], EyeStandZ(held.line_end[0], held.line_end[1], held.line_end[2]), 0, 0);
+			if (p.f > CAB_NEAR) {
+				const double ahead = p.f / OBJECT_UNITS_PER_METRE;
+				held.line_to[0] = static_cast<float>(p.r / OBJECT_UNITS_PER_METRE + (eye.cx - width / 2.0) * ahead / eye.focal);
+				held.line_to[1] = static_cast<float>(p.u / OBJECT_UNITS_PER_METRE + (height / 2.0 - eye.cy) * ahead / eye.focal);
+				held.line_to[2] = static_cast<float>(ahead);
+				held.line_to_seen = true;
+			}
+		}
+		/* A fish caught that glows at night (the sea's): the rod and its line under the dark, the fish after it. */
+		held.skip_hanging = night && held.hanging_glows;
+		held_job(held);
+	}
 	/* The light in its left hand (the torch, the lantern): by day with the weapon, at night after the dark (it lights
 	 * itself, and about the walker, DrawEyeWitchLight()). */
 	if (walker != nullptr && !walker->left.thing.empty() && !night) held_job(walker->left);
@@ -17785,6 +17803,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		if (walker != nullptr && !walker->blasts.empty()) blasts_job(true);
 		if (walker != nullptr && !walker->left.thing.empty()) held_job(walker->left);
+		if (walker != nullptr && !walker->held.thing.empty() && walker->held.hanging_glows) {
+			ThreeDHeldThing fish = walker->held;
+			fish.only_hanging = true;
+			held_job(fish);
+		}
 		{
 			const double t = static_cast<double>(TimerGameTick::counter) * 0.15;
 			/* The lighter the night (gui.night_light), the fewer stars are seen: towards the dawn only the brightest. */

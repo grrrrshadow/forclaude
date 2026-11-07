@@ -71,6 +71,10 @@ static const WalkerItemSpec _walker_items[] = {
 	{STR_WALKER_ITEM_MINE_HAMMER, 0, 0, WalkerItemKind::Weapon},
 	{STR_WALKER_ITEM_CELTIC_TENT, 0, 0, WalkerItemKind::Thing},
 	{STR_WALKER_ITEM_CAMPING_TENT, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_FISHING_ROD, 0, 0, WalkerItemKind::Weapon},
+	{STR_WALKER_ITEM_PERCH, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_DISCUS, 0, 0, WalkerItemKind::Thing},
+	{STR_WALKER_ITEM_GOLDFISH, 0, 0, WalkerItemKind::Thing},
 };
 static_assert(std::size(_walker_items) == to_underlying(WalkerItem::End));
 
@@ -421,14 +425,15 @@ CommandCost CmdHealWalkerByNurse(DoCommandFlags flags, uint8_t health)
 
 /**
  * A thing the walker picks up where it is (the player, 18. 10.: "the mushrooms will be picked about the clay towns"):
- * one more of it in the inventory. Only the mushrooms are picked so.
+ * one more of it in the inventory. Only the mushrooms are picked so, and the fish caught on the rod (7. 11.: "into the
+ * inventory").
  * @param flags operation to perform
  * @param item the thing
  * @return nothing, or an error
  */
 CommandCost CmdPickWalkerItem(DoCommandFlags flags, WalkerItem item)
 {
-	if (item != WalkerItem::Mushrooms) return CMD_ERROR;
+	if (item != WalkerItem::Mushrooms && !IsWalkerFishItem(item)) return CMD_ERROR;
 	Company *c = Company::GetIfValid(_current_company);
 	if (c == nullptr) return CMD_ERROR;
 	if (c->walker_items[to_underlying(item)] >= WALKER_ITEM_MAX) return CommandCost(STR_ERROR_WALKER_CARRIES_TOO_MANY);

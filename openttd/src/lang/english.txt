@@ -2301,6 +2301,12 @@ STR_FIRST_PERSON_NURSE_HERE                                     :Nurse, health i
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marijuana growing: harvest in {NUM} day{P "" s}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: harvest the marijuana
 STR_FIRST_PERSON_TENT_STRIKE                                    :E: fold the tent
+STR_FIRST_PERSON_FISH_WAITING                                   :Waiting for a bite · a click reels the hook in
+STR_FIRST_PERSON_FISH_BITE                                      :A bite! Click!
+STR_FIRST_PERSON_FISH_CAUGHT                                    :Caught: {STRING}
+STR_FIRST_PERSON_FISH_ESCAPED                                   :The fish got away
+STR_FIRST_PERSON_FISH_NO_WATER                                  :No water there
+STR_FIRST_PERSON_FISH_SWIMMING                                  :No fishing while swimming
 STR_FIRST_PERSON_PLANT_HAY                                      :E: harvest the marijuana hay
 STR_FIRST_PERSON_BOARD_HERE                                     :E: get into {VEHICLE}
 STR_FIRST_PERSON_HELM_HERE                                      :E: take the wheel of {VEHICLE}
@@ -2380,6 +2386,10 @@ STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Mushroom goulas
 STR_WALKER_ITEM_MINE_HAMMER                                     :Mine hammer
 STR_WALKER_ITEM_CELTIC_TENT                                     :Celtic tent
 STR_WALKER_ITEM_CAMPING_TENT                                    :Camping tent
+STR_WALKER_ITEM_FISHING_ROD                                     :Bamboo fishing rod
+STR_WALKER_ITEM_PERCH                                           :Big green perch
+STR_WALKER_ITEM_DISCUS                                          :Discus
+STR_WALKER_ITEM_GOLDFISH                                        :Fancy goldfish
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

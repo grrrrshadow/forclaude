@@ -130,6 +130,8 @@ static bool _three_d_house_plants_made = false;
 static std::vector<ThreeDAnimal> _animals;
 /** The mushrooms to pick of the indices (ThreeDMushroom). */
 static std::vector<ThreeDMushroom> _mushrooms;
+/** The animals of the water of the indices (ThreeDWaterAnimal). */
+static std::vector<ThreeDWaterAnimal> _water_animals;
 
 /** The town theme an index names ("tema"): "hlinene" the clay town (TownTheme::Clay), 0 none or one the game does not know. */
 static uint8_t ParseIndexTheme(const nlohmann::json &e)
@@ -5788,6 +5790,27 @@ static void ReadThreeDVehicleObjects()
 				 * bogeymen"): one of the animals, as the sellers of dogs are; the one on the bones a humanoid besides. */
 				const bool nurse = figure_kind == "postava" && e.value("role", std::string()) == "sestricka";
 				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac")) || nurse;
+				/* An animal of the water (the colleague's objekty/voda, "vodni_zvire"): a figure as a thing is, painted a
+				 * colour of its palette ("barvy": the discus and the goldfish of the sea), the fish on the rod among them. */
+				if (figure_kind == "vodni_zvire" && e.contains("soubor") && e.at("soubor").is_string()) {
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
+					fig.thing = true;
+					ReadFigurePalette(e, folder, fig);
+					ThreeDWaterAnimal a;
+					a.name = fig.name;
+					a.sea = e.value("voda", std::string()) == "more";
+					a.on_rod = e.value("na_prut", false);
+					a.glows = e.value("v_noci_sviti", false);
+					a.scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					std::erase_if(_water_animals, [&](const ThreeDWaterAnimal &w) { return w.name == a.name; });
+					_water_animals.push_back(std::move(a));
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
 					/* A figure: metres, the origin between its feet on the ground, facing +x. A plant ("rostlina", the
 					 * colleague's hra/3d/PROSBA-PRUMYSL-3D.md) as one: its foot at the origin, 1 m high, by the name of
@@ -7003,6 +7026,7 @@ void ResetThreeDVehicleObjects()
 	_ufos.clear();
 	_animals.clear();
 	_mushrooms.clear();
+	_water_animals.clear();
 	_thing_sounds.clear();
 	_thing_places.clear();
 	_three_d_ivies.clear();
@@ -10399,6 +10423,16 @@ const std::vector<ThreeDMushroom> &GetThreeDMushrooms()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _mushrooms;
+}
+
+/** An animal of the water of the indices by its name ("vodni_zvire": the fish on the rod), or nullptr. */
+const ThreeDWaterAnimal *GetThreeDWaterAnimal(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	for (const ThreeDWaterAnimal &a : _water_animals) {
+		if (a.name == name) return &a;
+	}
+	return nullptr;
 }
 
 /**

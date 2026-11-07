@@ -2409,6 +2409,12 @@ STR_FIRST_PERSON_NURSE_HERE                                     :Sestřička, zd
 STR_FIRST_PERSON_PLANT_GROWING                                  :Marihuana roste: sklizeň za {NUM} d{P en ny ní}
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: sklidit marihuanu
 STR_FIRST_PERSON_TENT_STRIKE                                    :E: složit stan
+STR_FIRST_PERSON_FISH_WAITING                                   :Čeká se na záběr · klik vytáhne háček
+STR_FIRST_PERSON_FISH_BITE                                      :Zabírá! Klikni!
+STR_FIRST_PERSON_FISH_CAUGHT                                    :Úlovek: {STRING}
+STR_FIRST_PERSON_FISH_ESCAPED                                   :Ryba utekla
+STR_FIRST_PERSON_FISH_NO_WATER                                  :Tam není voda
+STR_FIRST_PERSON_FISH_SWIMMING                                  :Ve vodě rybařit nejde
 STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit marihuanové seno
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
 STR_FIRST_PERSON_HELM_HERE                                      :E: řídit {VEHICLE}
@@ -2488,6 +2494,10 @@ STR_WALKER_ITEM_MUSHROOM_GOULASH                                :Houbový gulá�
 STR_WALKER_ITEM_MINE_HAMMER                                     :Minové kladivo
 STR_WALKER_ITEM_CELTIC_TENT                                     :Keltský stan
 STR_WALKER_ITEM_CAMPING_TENT                                    :Kempinkový stan
+STR_WALKER_ITEM_FISHING_ROD                                     :Bambusový prut
+STR_WALKER_ITEM_PERCH                                           :Velký zelený okoun
+STR_WALKER_ITEM_DISCUS                                          :Terčovec
+STR_WALKER_ITEM_GOLDFISH                                        :Závojnatka
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
