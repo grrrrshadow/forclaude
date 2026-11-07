@@ -3238,7 +3238,7 @@ void DrawPictureAt(const ThreeDGpuPicture &pic, const std::vector<MeshOnCard> &d
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
 			SetPaint(_mesh_program, r.texture < d.mesh->paints.size() ? &d.mesh->paints[r.texture] : nullptr, &d.paints[r.texture]);
 			/* Its material's own light, and see-through by its own alpha (a material "BLEND") or the glass's. */
-			const uint32_t glow = d.mesh->shape->Glow(r.texture);
+			const uint32_t glow = d.mesh->Glow(r.texture);
 			const Colour e(glow);
 			gl.glUniform4f(_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
 			if (glass) {
@@ -5005,7 +5005,7 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 			EyeObjectDraws::Batch *batch = nullptr;
 			for (EyeObjectDraws::Batch &b : out.batches) {
 				if (b.shape != d.shape || b.indices != d.indices || b.mirrored != mirrored || b.textures != d.textures) continue;
-				if ((b.mesh->lit && b.shape->has_nrm) != lit || b.mesh->paints.size() != m.paints.size()) continue;
+				if ((b.mesh->lit && b.shape->has_nrm) != lit || b.mesh->paints.size() != m.paints.size() || b.mesh->glow_all != m.glow_all) continue;
 				bool same = true;
 				for (size_t i = 0; i < m.paints.size() && same; i++) same = SamePaint(b.mesh->paints[i], m.paints[i]);
 				if (!same) continue;
@@ -5102,7 +5102,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 		if (wheels > 0) gl.glUniformMatrix4fv(_eye_mesh_program.wheels, static_cast<GLsizei>(wheels), GL_TRUE, d.mesh->wheels[0].data());
 		for (const ThreeDGpuTriangles::Run &r : runs) {
 			if (r.texture >= d.textures.size() || d.textures[r.texture] == 0) continue;
-			const uint32_t glow = d.mesh->shape->Glow(r.texture);
+			const uint32_t glow = d.mesh->Glow(r.texture);
 			const Colour e(glow);
 			gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
 			if (glass) {
@@ -5143,7 +5143,7 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			}
 			for (const ThreeDGpuTriangles::Run &r : runs) {
 				if (r.texture >= b.textures.size() || b.textures[r.texture] == 0) continue;
-				const uint32_t glow = b.mesh->shape->Glow(r.texture);
+				const uint32_t glow = b.mesh->Glow(r.texture);
 				const Colour e(glow);
 				gl.glUniform4f(_eye_mesh_program.glow, e.r, e.g, e.b, glow == 0 ? 0.0f : (e.a == ThreeDVehicleShape::GLOW_TEXTURED ? 1.0f : 2.0f));
 				if (glass) {
@@ -6070,6 +6070,11 @@ void GpuThreadMain()
 }
 
 } // namespace
+
+uint32_t ThreeDGpuMesh::Glow(size_t texture) const
+{
+	return this->glow_all != 0 ? this->glow_all : this->shape->Glow(texture);
+}
 
 /** Whether the card draws the 3D pictures now, not starting it nor waiting for it (the thread making the pictures of the map). */
 bool ThreeDGpuReady()

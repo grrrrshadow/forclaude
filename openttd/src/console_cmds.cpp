@@ -177,6 +177,7 @@
 #include "walker_cmd.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
+#include "three_d_water_life.h"
 #include "three_d_witches.h"
 #include "three_d_ufo.h"
 #include "disaster_vehicle.h"
@@ -9721,6 +9722,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: uder {}", HitThreeDDragon(wx, wy, FirstPersonWalkerHeading(), 2.5) ? "zasahl" : "minul");
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDDragons());
+	} else if (what == "voda") {
+		/* The world under the water (three_d_water_life.h): 'voda' tells who swims about the walker; 'voda posli <jmeno>
+		 * [metru]' puts one (a school of the small ones) so many metres ahead of it (5 without), the orca leaping at once. */
+		if (argv.size() > 3 && argv[2] == "posli") {
+			IConsolePrint(CC_DEFAULT, "test3d: voda {}", SendThreeDWaterAnimal(argv[3], number(4).value_or(5)) ? "poslano" : "NEPOSLANO");
+		} else if (argv.size() > 4 && argv[2] == "rostliny") {
+			/* 'voda rostliny <x> <y>': the water lilies and the cattails about a tile. */
+			IConsolePrint(CC_DEFAULT, "test3d: rostliny {}", DescribeThreeDRiverPlants(TileXY(number(3).value_or(0), number(4).value_or(0))));
+		} else if (argv.size() > 4 && argv[2] == "reka") {
+			/* 'voda reka <x> <y>': the tile of a river or a lake nearest a tile, and how many of them. */
+			const TileIndex from = TileXY(number(3).value_or(0), number(4).value_or(0));
+			TileIndex best = INVALID_TILE;
+			uint count = 0;
+			for (const auto t : Map::Iterate()) {
+				if (!IsTileType(t, TileType::Water) || !IsWater(t) || GetWaterClass(t) != WaterClass::River) continue;
+				count++;
+				if (best == INVALID_TILE || DistanceManhattan(t, from) < DistanceManhattan(best, from)) best = t;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: reka {} dlazdic, nejblizsi {}", count, best == INVALID_TILE ? std::string("zadna") : fmt::format("{},{}", TileX(best), TileY(best)));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDWaterLife());
 	} else if (what == "zvirata") {
 		/* The dogs, the animals, the ghosts and the sellers (three_d_animals.h): 'zvirata' tells where they are and what
 		 * the indices have; 'zvirata posli <jmeno> [metru]' puts one so many metres ahead of the walker (3 without);

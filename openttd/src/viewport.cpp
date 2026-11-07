@@ -118,6 +118,7 @@
 #include "three_d_vehicle_object.h"
 #include "three_d_dragons.h"
 #include "three_d_animals.h"
+#include "three_d_water_life.h"
 #include "three_d_witches.h"
 #include "three_d_ufo.h"
 #include "three_d_walkers.h"
@@ -13476,6 +13477,7 @@ struct CabFigure {
 	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
 	std::shared_ptr<const ThreeDLikenessSolid> likeness; ///< a vehicle of sprites only: its likeness's solid (AddCabLikeness()), kept till the frame is drawn
 	double base = std::numeric_limits<double>::quiet_NaN(); ///< the height of the land it stands on when known (a building's it is on), else found where it stands (EyeBaseZ())
+	uint32_t glow = 0;    ///< its own light over all of it, as a material's (ThreeDVehicleShape::Glow()): a thing of the sea at night; 0 none
 };
 static std::vector<CabFigure> _cab_figures;
 /** A model drawn by its triangles is as detailed as this many pixels between its corners (ThreeDVehicleShape::Simpler()). The rig: 'test3d detail <px>', 0 the whole shape. */
@@ -13497,6 +13499,26 @@ void AddCabFigure(std::string_view name, float size, double x, double y, double 
 {
 	CabFigure f{std::string(name), size, x, y, z, facing, frame};
 	f.state = state;
+	_cab_figures.push_back(std::move(f));
+}
+
+/**
+ * A figure in the water in the view from the eyes (three_d_water_life.cpp): over the height it is lifted with
+ * (EyeStandZ(): the bed under it, or the surface a water lily's leaves are at), its own metres kept; at night, one of
+ * the sea, glowing all of it in its colours (the player, 7. 11.: "at night everything may glow, the fish, the plants in
+ * the sea"), its palette's colour too.
+ * @param z its origin, units of height
+ * @param base the height of the game it is lifted with, units of height
+ * @param glows it glows all over
+ * @param pitch degrees its front is raised (a fish swimming up)
+ */
+void AddCabWaterFigure(std::string_view name, float size, double x, double y, double z, double base, float facing, int frame, int state, bool glows, float pitch)
+{
+	CabFigure f{std::string(name), size, x, y, z, facing, frame};
+	f.state = state;
+	f.base = base;
+	f.pitch = pitch;
+	if (glows) f.glow = Colour(255, 255, 255, ThreeDVehicleShape::GLOW_TEXTURED).data;
 	_cab_figures.push_back(std::move(f));
 }
 
@@ -14497,8 +14519,9 @@ static void CabDrawFigureModel(uint32_t *dst, float *zb, int width, int height, 
 				const double away = (uu * vf - uf * vu) * qa.r + (uf * vr - ur * vf) * qa.u + (ur * vu - uu * vr) * qa.f;
 				if (s.FacesAway(t / 3, away, fg.along * fg.stretch < 0 ? 1 : -1)) continue;
 			}
-			/* A material's own light (tex_glow) over it, unshaded: brighter by its colour's strongest. */
-			const uint32_t glow = s.Glow(static_cast<size_t>(ti));
+			/* A material's own light (tex_glow) over it, unshaded: brighter by its colour's strongest; the figure's own
+			 * over all of it (a thing of the sea at night). */
+			const uint32_t glow = fg.glow != 0 ? fg.glow : s.Glow(static_cast<size_t>(ti));
 			uint light = static_cast<uint>((lights[ia] + lights[ib] + lights[ic]) / 3 * 256);
 			if (glow != 0) {
 				const Colour e(glow);
@@ -14677,6 +14700,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		g.textures = texs;
 		g.paints = paints;
 		g.bones = bones;
+		g.glow_all = fg.glow;
 	};
 	/* A thing that turns, about its axis through its centre (CabFigureModel::spin): its corners at R (p - c) + c. */
 	const M3 &spin = model.spin;
@@ -14878,6 +14902,39 @@ static constexpr int EYE_WATER_BED_PIECES = 4;
  * the steeper and the deeper the darker. A tile of open water in pieces, so that it slopes down from the shore.
  * @param colours keeps the colours its triangles point to till the batch of the ground is drawn
  */
+/**
+ * The height of the bed at a corner of a piece of a tile of water (EYE_WATER_BED_PIECES each way), units of height of
+ * the game: the surface of this tile's water over it (the corner on its far edges inside it) less the depth there.
+ */
+static double EyeWaterBedCorner(int tx, int ty, int i, int j)
+{
+	static constexpr int N = EYE_WATER_BED_PIECES;
+	const double wx = tx * static_cast<double>(TILE_SIZE) + i * static_cast<double>(TILE_SIZE) / N;
+	const double wy = ty * static_cast<double>(TILE_SIZE) + j * static_cast<double>(TILE_SIZE) / N;
+	const int sx = std::min(static_cast<int>(wx), (tx + 1) * static_cast<int>(TILE_SIZE) - 1);
+	const int sy = std::min(static_cast<int>(wy), (ty + 1) * static_cast<int>(TILE_SIZE) - 1);
+	return GetSlopePixelZ(sx, sy, true) - EyeWaterDepth(std::min(wx, sx + 0.999), std::min(wy, sy + 0.999));
+}
+
+/**
+ * The height of the bed under the water at a world point, as DrawEyeWaterBed() draws it (its pieces' two triangles),
+ * units of height of the game; what stands on it stands on it there (three_d_water_life.cpp). None off the water.
+ */
+std::optional<double> EyeWaterBedZ(double x, double y)
+{
+	static constexpr int N = EYE_WATER_BED_PIECES;
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return std::nullopt;
+	const int tx = static_cast<int>(x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(y) / static_cast<int>(TILE_SIZE);
+	if (!EyeSwimTile(TileXY(tx, ty))) return std::nullopt;
+	const double piece = static_cast<double>(TILE_SIZE) / N;
+	const double px = (x - tx * static_cast<double>(TILE_SIZE)) / piece, py = (y - ty * static_cast<double>(TILE_SIZE)) / piece;
+	const int i = std::clamp(static_cast<int>(px), 0, N - 1), j = std::clamp(static_cast<int>(py), 0, N - 1);
+	const double u = std::clamp(px - i, 0.0, 1.0), v = std::clamp(py - j, 0.0, 1.0);
+	const double a = EyeWaterBedCorner(tx, ty, i, j), b = EyeWaterBedCorner(tx, ty, i + 1, j), c = EyeWaterBedCorner(tx, ty, i + 1, j + 1), d = EyeWaterBedCorner(tx, ty, i, j + 1);
+	/* The triangles a b c (over the diagonal, u >= v) and a c d. */
+	return u >= v ? a + u * (b - a) + v * (c - b) : a + v * (d - a) + u * (c - d);
+}
+
 static void DrawEyeWaterBed(const CabEye &eye, uint32_t *dst, float *zb, int width, int height, std::deque<uint32_t> &colours)
 {
 	static constexpr int N = EYE_WATER_BED_PIECES;
@@ -14892,12 +14949,7 @@ static void DrawEyeWaterBed(const CabEye &eye, uint32_t *dst, float *zb, int wid
 				for (int i = 0; i <= N; i++) {
 					const double wx = tx * static_cast<double>(TILE_SIZE) + i * static_cast<double>(TILE_SIZE) / N;
 					const double wy = ty * static_cast<double>(TILE_SIZE) + j * static_cast<double>(TILE_SIZE) / N;
-					/* The surface of this tile's water, the corner on its far edges inside it. */
-					const int sx = std::min(static_cast<int>(wx), (tx + 1) * static_cast<int>(TILE_SIZE) - 1);
-					const int sy = std::min(static_cast<int>(wy), (ty + 1) * static_cast<int>(TILE_SIZE) - 1);
-					const double surface = GetSlopePixelZ(sx, sy, true);
-					const double depth = EyeWaterDepth(std::min(wx, sx + 0.999), std::min(wy, sy + 0.999));
-					at[j * (N + 1) + i] = {wx, wy, EyeLevelZ(surface - depth)};
+					at[j * (N + 1) + i] = {wx, wy, EyeLevelZ(EyeWaterBedCorner(tx, ty, i, j))};
 				}
 			}
 			for (int j = 0; j < N; j++) {
@@ -16729,6 +16781,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * driving about (three_d_walkers.h; the player, 16. 10.: "Mat was not seen at all, I came out beside him"). */
 	AddThreeDDragonsToEye();
 	AddThreeDAnimalsToEye();
+	/* The world under the water: diving, its beds and its fish; the orca leaping out of it over it too. */
+	AddThreeDWaterLifeToEye(under_water);
 	AddThreeDMushroomsToEye();
 	AddThreeDWitchesToEye();
 	AddThreeDUfosToEye();

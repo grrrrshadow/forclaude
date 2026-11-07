@@ -3205,6 +3205,15 @@ bool FirstPersonWalkerAt(double &x, double &y)
 	return true;
 }
 
+/** The height of the walker's eyes swimming, units of height of the game (three_d_water_life.cpp: the fish keep away from the diver); false not swimming. */
+bool FirstPersonSwimmerEyeZ(double &z)
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr || !w->walker.swimming) return false;
+	z = FirstPersonFeetZ(w->walker) + w->walker.eye_z;
+	return true;
+}
+
 /** Whether one can stand on the ground at a world point, as the walker can (among the buildings of an industry by their shapes; three_d_animals.cpp: the dogs of a farm's yard). */
 bool FirstPersonGroundWalkable(double x, double y)
 {

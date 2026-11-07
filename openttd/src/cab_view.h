@@ -234,6 +234,7 @@ bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, Ca
 double FirstPersonGroundZ(double x, double y);
 std::optional<double> EyeWaterSurfaceZ(double x, double y);
 double EyeWaterDepth(double x, double y);
+std::optional<double> EyeWaterBedZ(double x, double y);
 double FirstPersonStandZ(double x, double y, double from);
 double FirstPersonFeetZ(const FirstPersonEye &walker);
 void ShowFirstPersonWindow();

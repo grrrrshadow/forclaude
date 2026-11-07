@@ -910,6 +910,7 @@ struct ThreeDVehicleObject {
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
 	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
 	float ends_beyond = 0;          ///< "jen_konce_m": only its triangles all so far or farther from its origin along its own x, metres; 0 all (the grill's trestles without its bricks, as ThreeDObjectFigure::beyond)
+	float keep_above = NAN;         ///< only its triangles all so high over its origin or higher, metres (a water lily's leaves, "<jmeno>/hladina"); NAN all
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
 	uint32_t light_colour = 0;      ///< a light's thing: "svetlo" "barva", 0xRRGGBB; 0 the game's own for it
 	float light_reach_m = 0;        ///< and "dosah_m", how far it lights; 0 the game's own
@@ -1217,7 +1218,8 @@ const std::vector<ThreeDMushroom> &GetThreeDMushrooms();
 /**
  * An animal of the water of the indices ("druh": "vodni_zvire", the colleague's objekty/voda; the player, 7. 11.: "only
  * those three on the rod, the big green one in a river, the other two in the sea"): a figure of its name, true metres,
- * facing +x, its origin in the middle of its body.
+ * facing +x, its origin in the middle of its body (one that swims), else under it on the bed. Its poses ("pozy": the
+ * octopus's "stoji", the fish's "plave", the orca's "klid" and "vyskok") figures of their own, "<jmeno>/<poza>".
  */
 struct ThreeDWaterAnimal {
 	std::string name;     ///< "jmeno", a figure
@@ -1225,8 +1227,29 @@ struct ThreeDWaterAnimal {
 	bool on_rod = false;  ///< "na_prut": caught on the rod
 	bool glows = false;   ///< "v_noci_sviti": it glows at night
 	float scale = 1.0f;   ///< "meritko": so many times its true size, in the water and on the hook
+	float size[3] = {};   ///< "rozmer_m": length, width, height, metres
+	std::vector<std::string> poses; ///< "pozy", their names
+	bool swims = false;   ///< it swims: a pose "plave", or no poses and an origin in its middle (the shark, the fish on the rod)
+	bool Has(std::string_view pose) const { return std::ranges::find(this->poses, pose) != this->poses.end(); }
 };
 const ThreeDWaterAnimal *GetThreeDWaterAnimal(std::string_view name);
+const std::vector<ThreeDWaterAnimal> &GetThreeDWaterAnimals();
+
+/**
+ * A plant of the water of the indices ("druh": "vodni_rostlina", the colleague's objekty/voda): a figure of its name, its
+ * foot at its origin on the bed, up +z. A water lily's leaves at the surface (leaf_m), on the map only they
+ * ("<jmeno>/hladina"); a cattail ("u_brehu") in the water by the bank, its leaves over the surface.
+ */
+struct ThreeDWaterPlant {
+	std::string name;       ///< "jmeno", a figure
+	bool sea = false;       ///< "voda": "more" on the sea's bed, else on a river's or a lake's
+	bool glows = false;     ///< "v_noci_sviti"
+	bool by_bank = false;   ///< "u_brehu": in the water by the bank
+	float leaf_m = 0;       ///< "vyska_listu_m": its highest leaf so high over its foot, at the surface; 0 all of it under the water
+	float scale = 1.0f;     ///< "meritko"
+	float size[3] = {};     ///< "rozmer_m": length, width, height, metres
+};
+const std::vector<ThreeDWaterPlant> &GetThreeDWaterPlants();
 const ThreeDVehicleObject *GetThreeDEffect(std::string_view name);
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars();
 void ResetThreeDVehicleObjects();

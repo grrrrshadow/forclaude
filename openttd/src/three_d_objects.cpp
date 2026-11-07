@@ -132,6 +132,8 @@ static std::vector<ThreeDAnimal> _animals;
 static std::vector<ThreeDMushroom> _mushrooms;
 /** The animals of the water of the indices (ThreeDWaterAnimal). */
 static std::vector<ThreeDWaterAnimal> _water_animals;
+/** And its plants (ThreeDWaterPlant). */
+static std::vector<ThreeDWaterPlant> _water_plants;
 
 /** The town theme an index names ("tema"): "hlinene" the clay town (TownTheme::Clay), 0 none or one the game does not know. */
 static uint8_t ParseIndexTheme(const nlohmann::json &e)
@@ -5790,9 +5792,10 @@ static void ReadThreeDVehicleObjects()
 				 * bogeymen"): one of the animals, as the sellers of dogs are; the one on the bones a humanoid besides. */
 				const bool nurse = figure_kind == "postava" && e.value("role", std::string()) == "sestricka";
 				const bool animal = figure_kind == "pes" || figure_kind == "zvire" || figure_kind == "strasidlo" || (figure_kind == "postava" && e.contains("prodavac")) || nurse;
-				/* An animal of the water (the colleague's objekty/voda, "vodni_zvire"): a figure as a thing is, painted a
-				 * colour of its palette ("barvy": the discus and the goldfish of the sea), the fish on the rod among them. */
-				if (figure_kind == "vodni_zvire" && e.contains("soubor") && e.at("soubor").is_string()) {
+				/* An animal or a plant of the water (the colleague's objekty/voda, "vodni_zvire", "vodni_rostlina"): a figure as
+				 * a thing is, painted a colour of its palette ("barvy": the discus and the goldfish of the sea, the sea's
+				 * plants), the fish on the rod among them; an animal's poses ("pozy") on its bones, each a figure. */
+				if ((figure_kind == "vodni_zvire" || figure_kind == "vodni_rostlina") && e.contains("soubor") && e.at("soubor").is_string()) {
 					ThreeDVehicleObject fig;
 					fig.package = package;
 					fig.file = folder + e.at("soubor").get<std::string>();
@@ -5800,15 +5803,72 @@ static void ReadThreeDVehicleObjects()
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = true;
 					ReadFigurePalette(e, folder, fig);
+					float size[3] = {};
+					if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3) {
+						for (size_t k = 0; k < 3; k++) {
+							if (e.at("rozmer_m")[k].is_number()) size[k] = std::clamp(e.at("rozmer_m")[k].get<float>(), 0.0f, 100.0f);
+						}
+					}
+					const bool sea = e.value("voda", std::string()) == "more";
+					const bool glows = e.value("v_noci_sviti", false);
+					const float scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					if (figure_kind == "vodni_rostlina") {
+						ThreeDWaterPlant p;
+						p.name = fig.name;
+						p.sea = sea;
+						p.glows = glows;
+						p.by_bank = e.value("u_brehu", false);
+						p.leaf_m = std::clamp(e.value("vyska_listu_m", 0.0f), 0.0f, 50.0f);
+						p.scale = scale;
+						std::copy(std::begin(size), std::end(size), p.size);
+						/* A water lily on the map, where the water is not seen through: its leaves at the surface alone. */
+						if (p.leaf_m > 0) {
+							ThreeDVehicleObject leaves = fig;
+							leaves.name = fig.name + "/hladina";
+							leaves.keep_above = std::max(0.0f, p.leaf_m - 0.3f);
+							_figure_objects.push_back(std::move(leaves));
+						}
+						std::erase_if(_water_plants, [&](const ThreeDWaterPlant &w) { return w.name == p.name; });
+						_water_plants.push_back(std::move(p));
+						_figure_objects.push_back(std::move(fig));
+						continue;
+					}
 					ThreeDWaterAnimal a;
 					a.name = fig.name;
-					a.sea = e.value("voda", std::string()) == "more";
+					a.sea = sea;
 					a.on_rod = e.value("na_prut", false);
-					a.glows = e.value("v_noci_sviti", false);
-					a.scale = std::clamp(e.value("meritko", 1.0f), 0.1f, 20.0f);
+					a.glows = glows;
+					a.scale = scale;
+					std::copy(std::begin(size), std::end(size), a.size);
+					if (e.contains("pozy") && e.at("pozy").is_object() && !e.at("pozy").empty()) {
+						const auto &poses = e.at("pozy");
+						auto posed = [&](const std::string &pose, const nlohmann::json &p, const std::string &name) {
+							ThreeDVehicleObject one = fig;
+							one.name = name;
+							one.skeleton_file = fig.file;
+							one.skeleton_anim = p.is_object() && p.contains("animace") && p.at("animace").is_string() ? p.at("animace").get<std::string>() : pose;
+							one.frames = p.is_object() ? std::clamp(p.value("snimku", 1), 1, 64) : 1;
+							one.frame_ticks = p.is_object() ? std::clamp(p.value("tiku", 1), 1, 1000) : 1;
+							one.loop = p.is_object() ? p.value("smycka", true) : true;
+							one.walk_step = p.is_object() ? std::clamp(p.value("krok_m", 0.0f), 0.0f, 100.0f) : 0.0f;
+							if (one.frames >= 2) one.frame_prefix = pose + "_";
+							_figure_objects.push_back(std::move(one));
+						};
+						for (const auto &[pose, p] : poses.items()) {
+							posed(pose, p, fig.name + "/" + pose);
+							a.poses.push_back(pose);
+						}
+						const std::string first = poses.contains("plave") ? std::string("plave") : poses.contains("stoji") ? std::string("stoji") : poses.begin().key();
+						posed(first, poses.at(first), fig.name);
+						a.swims = poses.contains("plave");
+					} else {
+						/* Without poses: one flat, far lower than wide, lies on the bed (the starfish, the big octopus with its
+						 * arms spread), the others swim (the shark, the fish on the rod). */
+						a.swims = a.on_rod || !(size[2] < 0.35f * size[1]);
+						_figure_objects.push_back(std::move(fig));
+					}
 					std::erase_if(_water_animals, [&](const ThreeDWaterAnimal &w) { return w.name == a.name; });
 					_water_animals.push_back(std::move(a));
-					_figure_objects.push_back(std::move(fig));
 					continue;
 				}
 				if ((figure_kind == "postava" || figure_kind == "rostlina" || figure_kind == "predmet" || figure_kind == "strom" || animal) && e.contains("soubor")) {
@@ -7027,6 +7087,7 @@ void ResetThreeDVehicleObjects()
 	_animals.clear();
 	_mushrooms.clear();
 	_water_animals.clear();
+	_water_plants.clear();
 	_thing_sounds.clear();
 	_thing_places.clear();
 	_three_d_ivies.clear();
@@ -8362,6 +8423,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->to_ground) key += "|g";
 	if (this->to_middle) key += "|m";
 	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
+	if (!std::isnan(this->keep_above)) key += fmt::format("|c{}", this->keep_above);
 	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
@@ -8616,16 +8678,21 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 					std::ranges::count_if(made->night_kind, [](uint8_t k) { return k >= 2; }), made->front_lights.size() / 3, made->back_lights.size() / 3, made->front_back_lights.size() / 3, made->back_front_lights.size() / 3);
 		}
 	}
-	if (this->ends_beyond > 0) {
-		/* Only its ends ("jen_konce_m"): a triangle with a corner nearer its origin along x is left out, as an add-on's
-		 * place leaves it ("beyond", LayAddons()). */
+	/* Only its ends ("jen_konce_m"): a triangle with a corner nearer its origin along x is left out, as an add-on's place
+	 * leaves it ("beyond", LayAddons()). Only what is high enough (keep_above, a water lily's leaves): a triangle with a
+	 * corner lower is left out. */
+	if (this->ends_beyond > 0 || !std::isnan(this->keep_above)) {
 		const size_t triangles = mesh.tri.size() / 3;
 		std::vector<uint32_t> tri;
 		std::vector<uint8_t> tri_tex;
 		std::vector<uint16_t> tri_group;
 		for (size_t t = 0; t < triangles; t++) {
 			bool kept = true;
-			for (size_t k = 0; k < 3; k++) kept = kept && std::abs(mesh.pos[mesh.tri[t * 3 + k] * 3]) >= this->ends_beyond;
+			for (size_t k = 0; k < 3; k++) {
+				const uint32_t i = mesh.tri[t * 3 + k];
+				if (this->ends_beyond > 0) kept = kept && std::abs(mesh.pos[i * 3]) >= this->ends_beyond;
+				if (!std::isnan(this->keep_above)) kept = kept && mesh.pos[i * 3 + 2] >= this->keep_above;
+			}
 			if (!kept) continue;
 			tri.insert(tri.end(), {mesh.tri[t * 3], mesh.tri[t * 3 + 1], mesh.tri[t * 3 + 2]});
 			if (mesh.tri_tex.size() == triangles) tri_tex.push_back(mesh.tri_tex[t]);
@@ -10433,6 +10500,20 @@ const ThreeDWaterAnimal *GetThreeDWaterAnimal(std::string_view name)
 		if (a.name == name) return &a;
 	}
 	return nullptr;
+}
+
+/** All the animals of the water of the indices. */
+const std::vector<ThreeDWaterAnimal> &GetThreeDWaterAnimals()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _water_animals;
+}
+
+/** All the plants of the water of the indices ("vodni_rostlina"). */
+const std::vector<ThreeDWaterPlant> &GetThreeDWaterPlants()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _water_plants;
 }
 
 /**
