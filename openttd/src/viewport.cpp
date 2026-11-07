@@ -12778,6 +12778,8 @@ static inline void CabAlongAcross(Axis axis, int x0, int y0, double a, double c,
 	}
 }
 
+static uint32_t EyeWallHash(uint32_t a);
+
 /** The game's bridge type of a bridge (its end) with 3D pieces (GetThreeDBridgePiece()), an aqueduct's THREE_D_AQUEDUCT; nullopt none. */
 static std::optional<uint> EyeBridgeType(TileIndex end)
 {
@@ -12837,8 +12839,12 @@ static bool EyeBridgePieces(TileIndex tile, F add, bool map)
 		if (free && BridgeTileHasPillars(tile)) {
 			const int levels = bz / static_cast<int>(TILE_HEIGHT) - GetTileZ(tile);
 			/* Its pillars of masonry in the bricks of the retaining walls in a town (as the walls under the houses are),
-			 * else in their stone (the player, 5. 11.); the whole bridge alike, by its south end. */
-			const int wall = ClosestTownFromTile(south, _settings_game.economy.dist_local_authority) != nullptr ? 0 : 1;
+			 * else in their stone (the player, 5. 11.); a girder bridge of steel's in concrete, bricks or stone, one bridge
+			 * this, another that (the player, 6. 11.: "the pillars alternate concrete, bricks, stone"). The whole bridge
+			 * alike, by its south end. */
+			const bool girder = *type == 2 || *type == 9;
+			const int wall = girder ? static_cast<int>(EyeWallHash(TileX(south) * 7919u + TileY(south) * 104729u + 0xB21Du) % 3) :
+					(ClosestTownFromTile(south, _settings_game.economy.dist_local_authority) != nullptr ? 0 : 1);
 			for (int k = 0; k < levels; k++) {
 				const ThreeDObject *o = GetThreeDBridgePiece(*type, k + 1 == levels ? ThreeDBridgePiece::PillarFoot : ThreeDBridgePiece::Pillar, along, map, wall);
 				if (o != nullptr) add(o, bz - (k + 1) * static_cast<int>(TILE_HEIGHT));
@@ -13545,12 +13551,23 @@ static constexpr double EYE_WALL_DETAIL_UNITS = 12.0 * TILE_SIZE;
 static constexpr uint32_t EYE_WALL_IVY_PERCENT = 45;
 
 /**
+ * What a retaining wall is of (DrawEyeRetainingWalls()): under a house of bricks [0]; else of stone [1] or of concrete
+ * [2] by the piece of the land, eight tiles each way, it stands in -- the walls along a road or a track one material
+ * for a stretch, not a patchwork (the player, 6. 11.: the fills of bricks, stone and now concrete too).
+ */
+static int EyeWallMaterial(TileIndex tile)
+{
+	if (IsTileType(tile, TileType::House)) return 0;
+	return EyeWallHash(TileX(tile) / 8 * 7919u + TileY(tile) / 8 * 104729u + 0x5EEDu) % 2 == 0 ? 1 : 2;
+}
+
+/**
  * The retaining walls of the foundations in the view from the eyes (the player, 4. 11.: "the fills on the slopes under
  * the tracks and under the houses", "a brick wall and a stone one ... a plain board and a nice texture of a wall on
  * it"; our hra/3d/PROSBA-VYPLNE-ZDI.md, the colleague's objekty/vyplne): where a tile levelled on a slope stands above
  * the land beside it, a wall straight down from its edge to that land -- or to the ground of the tile beside, raised
- * by a foundation of its own. Its face is our board (objekty/nase, zdi_5m.py), of bricks under the houses and of stone
- * else, its texture a level (5 m) high and three times along a tile's edge, so the bricks go on round the corners, cut
+ * by a foundation of its own. Its face is our board (objekty/nase, zdi_5m.py, beton_5m.py), of bricks under the houses
+ * and of stone or concrete else (EyeWallMaterial()), its texture a level (5 m) high and three times along a tile's edge, so the bricks go on round the corners, cut
  * by the land below to a triangle or a trapezium. Near, on its top the colleague's coping, over a road his railing,
  * and on some walls the ivies, each its own green (ThreeDVehicleObject::PaletteState()).
  * @param tiles the tiles with a foundation
@@ -13563,12 +13580,12 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 	static const Corner CORNERS[4] = {CORNER_N, CORNER_E, CORNER_S, CORNER_W};
 	static const int CX[4] = {0, 0, TILE_SIZE, TILE_SIZE}, CY[4] = {0, TILE_SIZE, TILE_SIZE, 0};
 	static const int NX[4] = {-1, 0, 1, 0}, NY[4] = {0, 1, 0, -1};
-	/* The faces: of bricks [0], of stone [1]; without them in a colour of their own. */
-	const ThreeDVehicleObject *faces[2] = {GetThreeDFigure("zed_lic_cihly"), GetThreeDFigure("zed_lic_kamen")};
+	/* The faces: of bricks [0], of stone [1], of concrete [2] (EyeWallMaterial()); without them in a colour of their own. */
+	const ThreeDVehicleObject *faces[3] = {GetThreeDFigure("zed_lic_cihly"), GetThreeDFigure("zed_lic_kamen"), GetThreeDFigure("zed_lic_beton")};
 	const ThreeDVehicleObject *coping = GetThreeDFigure("zed_koruna"), *railing = GetThreeDFigure("zed_zabradli");
 	const ThreeDVehicleShape *coping_shape = coping != nullptr ? coping->TryGetShape() : nullptr;
 	const ThreeDVehicleShape *railing_shape = railing != nullptr ? railing->TryGetShape() : nullptr;
-	static const Colour FACE_COLOUR[2] = {Colour(140, 88, 58), Colour(112, 112, 116)};
+	static const Colour FACE_COLOUR[3] = {Colour(140, 88, 58), Colour(112, 112, 116), Colour(128, 128, 124)};
 	const double edge_m = TILE_SIZE / OBJECT_UNITS_PER_METRE;
 	const double coping_h = coping_shape != nullptr ? std::max(0.0f, coping_shape->z1) : 0.0;
 	std::vector<const ThreeDIvy *> ivies;
@@ -13584,7 +13601,7 @@ static void DrawEyeRetainingWalls(const CabCanvas &cv, const CabEye &eye, std::s
 	for (const EyeFoundationTile &ft : tiles) {
 		const int tx = TileX(ft.tile), ty = TileY(ft.tile);
 		const auto [raw_slope, raw_z] = GetTilePixelSlope(ft.tile);
-		const int mat = IsTileType(ft.tile, TileType::House) ? 0 : 1;
+		const int mat = EyeWallMaterial(ft.tile);
 		const bool road = IsNormalRoadTile(ft.tile);
 		int top[4], raw[4];
 		for (int c = 0; c < 4; c++) {

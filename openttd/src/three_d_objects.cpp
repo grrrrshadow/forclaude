@@ -4142,10 +4142,12 @@ static constexpr float BRIDGE_LEVEL_M = 5.0f;
 /** A level of the map's land, metres (TILE_HEIGHT of OBJECT_HEIGHT_PER_METRE): the pieces for the map squashed to it. */
 static constexpr float BRIDGE_MAP_LEVEL_M = static_cast<float>(TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE);
 
-/** The pillars of the bridges in the bricks [0] or the stone [1] of the retaining walls (BridgeHasMasonryPillars()): their pieces as _three_d_bridge_pieces, only the pillar's and its foot's. */
-static std::array<BridgePieceObjects, 2> _three_d_bridge_wall_pieces = {_three_d_bridge_pieces, _three_d_bridge_pieces};
+/** How many materials the retaining walls are of: bricks [0], stone [1], concrete [2] (zdi_5m.py, beton_5m.py). */
+static constexpr size_t BRIDGE_WALL_MATERIALS = 3;
+/** The pillars of the bridges in the bricks [0], the stone [1] or the concrete [2] of the retaining walls (BridgeHasMasonryPillars()): their pieces as _three_d_bridge_pieces, only the pillar's and its foot's. */
+static std::array<BridgePieceObjects, BRIDGE_WALL_MATERIALS> _three_d_bridge_wall_pieces = {_three_d_bridge_pieces, _three_d_bridge_pieces, _three_d_bridge_pieces};
 /** The same pieces for the map. */
-static std::array<BridgePieceObjects, 2> _three_d_bridge_wall_map_pieces = _three_d_bridge_wall_pieces;
+static std::array<BridgePieceObjects, BRIDGE_WALL_MATERIALS> _three_d_bridge_wall_map_pieces = _three_d_bridge_wall_pieces;
 
 /**
  * Whether the pillars of one of the game's bridge types are of masonry, in the bricks or the stone of the retaining walls
@@ -4159,7 +4161,7 @@ static bool BridgeHasMasonryPillars(uint type)
 
 static bool ImageSizeOfHead(std::span<const uint8_t> head, int &w, int &h);
 
-/** A face of the retaining walls (zed_lic_cihly, zed_lic_kamen of our set objekty/nase, zdi_5m.py) as the material of a bridge's pillars. */
+/** A face of the retaining walls (zed_lic_cihly, zed_lic_kamen, zed_lic_beton of our set objekty/nase, zdi_5m.py, beton_5m.py) as the material of a bridge's pillars. */
 struct BridgeWallPicture {
 	ThreeDTextureBytes png;  ///< its picture, shared with the walls' (InternThreeDTextureBytes())
 	uint32_t flat = 0;       ///< its material's colour
@@ -4169,12 +4171,12 @@ struct BridgeWallPicture {
 };
 
 /**
- * The faces of the retaining walls, bricks [0] and stone [1], read once for all the bridges: from our set beside the
- * bridges' (".../objekty/mosty/" -> ".../objekty/nase/"); one not there, those pillars as their model has them.
+ * The faces of the retaining walls, bricks [0], stone [1] and concrete [2], read once for all the bridges: from our set
+ * beside the bridges' (".../objekty/mosty/" -> ".../objekty/nase/"); one not there, those pillars as their model has them.
  */
-static const std::array<std::optional<BridgeWallPicture>, 2> &BridgeWallPictures(const std::string &bridges_folder)
+static const std::array<std::optional<BridgeWallPicture>, BRIDGE_WALL_MATERIALS> &BridgeWallPictures(const std::string &bridges_folder)
 {
-	static std::array<std::optional<BridgeWallPicture>, 2> pictures;
+	static std::array<std::optional<BridgeWallPicture>, BRIDGE_WALL_MATERIALS> pictures;
 	static bool read = false;
 	if (read) return pictures;
 	read = true;
@@ -4183,7 +4185,7 @@ static const std::array<std::optional<BridgeWallPicture>, 2> &BridgeWallPictures
 	const size_t sep = f.find_last_of(PATHSEPCHAR);
 	if (sep == std::string_view::npos) return pictures;
 	const std::string ours = fmt::format("{}nase{}", f.substr(0, sep + 1), PATHSEPCHAR);
-	static constexpr std::string_view FILES[2] = {"zed_lic_cihly.glb", "zed_lic_kamen.glb"};
+	static constexpr std::string_view FILES[BRIDGE_WALL_MATERIALS] = {"zed_lic_cihly.glb", "zed_lic_kamen.glb", "zed_lic_beton.glb"};
 	for (size_t k = 0; k < pictures.size(); k++) {
 		GlbMesh mesh;
 		if (!ReadGlbMesh(ours + std::string(FILES[k]), mesh) || mesh.textures.empty()) {
@@ -4412,10 +4414,11 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 	for (size_t p = 0; p < meshes.size(); p++) {
 		if (meshes[p].has_value()) map_meshes[p] = squashed(*meshes[p]);
 	}
-	/* Its pillar and the pillar's foot of masonry (BridgeHasMasonryPillars()): in the bricks [0] and the stone [1] of the
-	 * walls, the eyes' [0] and the map's [1] -- the map's squashed as laid, a picture still a level of the land high. */
+	/* Its pillar and the pillar's foot of masonry (BridgeHasMasonryPillars()): in the bricks [0], the stone [1] and the
+	 * concrete [2] of the walls, the eyes' [0] and the map's [1] -- the map's squashed as laid, a picture still a level of
+	 * the land high. */
 	static constexpr ThreeDBridgePiece PILLAR_PIECES[2] = {ThreeDBridgePiece::Pillar, ThreeDBridgePiece::PillarFoot};
-	std::array<std::array<std::array<std::optional<IndustryPartMesh>, 2>, 2>, 2> masonry;
+	std::array<std::array<std::array<std::optional<IndustryPartMesh>, 2>, 2>, BRIDGE_WALL_MATERIALS> masonry;
 	const nlohmann::json types = aqueduct ? nlohmann::json::array({THREE_D_AQUEDUCT}) : e.at("mosty");
 	bool any_masonry = false;
 	for (const auto &n : types) any_masonry |= n.is_number_integer() && n.get<int>() >= 0 && BridgeHasMasonryPillars(n.get<int>());
@@ -4488,7 +4491,8 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 					for (int q = 0; q < 4; q++) {
 						const double a = q * M_PI / 2;
 						const float at[3] = {static_cast<float>(half - half * std::cos(a)), static_cast<float>(half - half * std::sin(a)), map != 0 ? BRIDGE_MAP_LEVEL_M : BRIDGE_LEVEL_M};
-						ThreeDObject piece = PlaceIndustryPart(*masonry[w][k][map], fmt::format("{}/{} {} {} {}{}", name, BRIDGE_PIECE_NODES[p], type, q * 90, w == 0 ? "cihly" : "kamen", map != 0 ? " mapa" : ""), at, q * 90.0f, 1.0f, 1, 1);
+						static constexpr std::string_view MATERIALS[BRIDGE_WALL_MATERIALS] = {"cihly", "kamen", "beton"};
+						ThreeDObject piece = PlaceIndustryPart(*masonry[w][k][map], fmt::format("{}/{} {} {} {}{}", name, BRIDGE_PIECE_NODES[p], type, q * 90, MATERIALS[w], map != 0 ? " mapa" : ""), at, q * 90.0f, 1.0f, 1, 1);
 						DressInMasonry(piece, *walls[w]);
 						(map != 0 ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[w][type][p][q] = _three_d_objects.size();
 						_three_d_objects.push_back(std::move(piece));
@@ -4504,8 +4508,8 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
  * tile; never waiting for the indices (ThreeDObjectsIndexRead()). The inner pieces and the end without their own the
  * middle piece, the pillar's foot without its own the pillar's.
  * @param map the map's piece: squashed to the map's level of 3 m, each a map's level higher than the eyes' piece
- * @param wall a pillar's piece of masonry (BridgeHasMasonryPillars()) in the bricks 0 or the stone 1 of the retaining
- *             walls; -1, or a bridge whose pillars are not, as its model has it
+ * @param wall a pillar's piece of masonry (BridgeHasMasonryPillars()) in the bricks 0, the stone 1 or the concrete 2 of
+ *             the retaining walls; -1, or a bridge whose pillars are not, as its model has it
  * @return nullptr when that bridge has no 3D pieces, or not that one
  */
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map, int wall)
@@ -4515,7 +4519,7 @@ const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int
 	 * houses are switched off, the 3D bridges are off too"). */
 	if (_settings_client.gui.three_d_houses != 0) return nullptr;
 	const int q = quarter_turns & 3;
-	if ((wall == 0 || wall == 1) && (piece == ThreeDBridgePiece::Pillar || piece == ThreeDBridgePiece::PillarFoot)) {
+	if (wall >= 0 && static_cast<size_t>(wall) < BRIDGE_WALL_MATERIALS && (piece == ThreeDBridgePiece::Pillar || piece == ThreeDBridgePiece::PillarFoot)) {
 		const auto &walled = (map ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[wall][type];
 		size_t k = walled[to_underlying(piece)][q];
 		if (k == SIZE_MAX) k = walled[to_underlying(ThreeDBridgePiece::Pillar)][q];
