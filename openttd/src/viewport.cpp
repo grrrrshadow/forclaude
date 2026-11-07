@@ -14700,6 +14700,112 @@ double FirstPersonStandZ(double x, double y, double from)
 	return best;
 }
 
+/**
+ * Whether the walker swims on a tile (the player, 7. 11.: swimming and diving): the open water of the sea, a river, a
+ * canal, a buoy in it; not a coast (half land), a lock, a depot, a dock, the map's edge.
+ */
+static bool EyeSwimTile(TileIndex tile)
+{
+	if (!IsValidTile(tile)) return false;
+	if (IsTileType(tile, TileType::Water)) return IsWater(tile);
+	return IsTileType(tile, TileType::Station) && IsBuoy(tile);
+}
+
+/** The height of the water's surface at a world point the walker swims at (EyeSwimTile()), units of height; none elsewhere. */
+std::optional<double> EyeWaterSurfaceZ(double x, double y)
+{
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return std::nullopt;
+	const int ix = static_cast<int>(x), iy = static_cast<int>(y);
+	if (!EyeSwimTile(TileVirtXY(ix, iy))) return std::nullopt;
+	return static_cast<double>(GetSlopePixelZ(ix, iy, true));
+}
+
+/**
+ * How deep under the surface of the water the bed lies at a world point, units of height (the player, 7. 11.: "the sea's
+ * first two tiles from the shore down under today's land, deeper we do not need; rivers and aqueducts a steep slope under
+ * the water, they are a tile wide, at the bottom less"): from the nearest land (a tile not swum on, EyeSwimTile()) the
+ * sea a level deeper a tile, two at most; a river or a canal a level within a quarter of a tile. 0 on land.
+ */
+double EyeWaterDepth(double x, double y)
+{
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return 0;
+	const int tx = static_cast<int>(x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(y) / static_cast<int>(TILE_SIZE);
+	const TileIndex here = TileXY(tx, ty);
+	if (!EyeSwimTile(here)) return 0;
+	const bool narrow = IsTileType(here, TileType::Water) && (IsRiver(here) || IsCanal(here));
+	static constexpr int REACH = 2;
+	double nearest = (REACH + 1) * TILE_SIZE;
+	for (int dy = -REACH; dy <= REACH; dy++) {
+		for (int dx = -REACH; dx <= REACH; dx++) {
+			const int nx = tx + dx, ny = ty + dy;
+			/* Past the map's edge, and its edge's own tiles (void), the sea goes on. */
+			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
+			if (EyeSwimTile(TileXY(nx, ny))) continue;
+			const double ox = std::max({0.0, nx * static_cast<double>(TILE_SIZE) - x, x - (nx + 1) * static_cast<double>(TILE_SIZE)});
+			const double oy = std::max({0.0, ny * static_cast<double>(TILE_SIZE) - y, y - (ny + 1) * static_cast<double>(TILE_SIZE)});
+			nearest = std::min(nearest, std::hypot(ox, oy));
+		}
+	}
+	return narrow ? std::min(1.0, nearest / (TILE_SIZE / 4.0)) * TILE_HEIGHT : std::min(2.0, nearest / TILE_SIZE) * TILE_HEIGHT;
+}
+
+/** How far the eyes see under the water, metres: farther all is the water's colour. */
+static constexpr double EYE_UNDER_WATER_SEEN_M = 22.0;
+/** How far about the eyes the bed under the water is drawn, tiles; how many pieces a tile's bed is of each way. */
+static constexpr int EYE_WATER_BED_TILES = 6;
+static constexpr int EYE_WATER_BED_PIECES = 4;
+
+/**
+ * The bed under the water about the diving walker's eyes (EyeWaterDepth()), as high as the land is from the eyes: sand,
+ * the steeper and the deeper the darker. A tile of open water in pieces, so that it slopes down from the shore.
+ * @param colours keeps the colours its triangles point to till the batch of the ground is drawn
+ */
+static void DrawEyeWaterBed(const CabEye &eye, uint32_t *dst, float *zb, int width, int height, std::deque<uint32_t> &colours)
+{
+	static constexpr int N = EYE_WATER_BED_PIECES;
+	const int ex = static_cast<int>(eye.x) / static_cast<int>(TILE_SIZE), ey = static_cast<int>(eye.y) / static_cast<int>(TILE_SIZE);
+	for (int ty = ey - EYE_WATER_BED_TILES; ty <= ey + EYE_WATER_BED_TILES; ty++) {
+		for (int tx = ex - EYE_WATER_BED_TILES; tx <= ex + EYE_WATER_BED_TILES; tx++) {
+			if (tx < 1 || ty < 1 || tx >= static_cast<int>(Map::SizeX()) - 1 || ty >= static_cast<int>(Map::SizeY()) - 1) continue;
+			if (!EyeSwimTile(TileXY(tx, ty))) continue;
+			/* Its corners' heights from the eyes: the surface over them less the depth there. */
+			std::array<std::array<double, 3>, (N + 1) * (N + 1)> at;
+			for (int j = 0; j <= N; j++) {
+				for (int i = 0; i <= N; i++) {
+					const double wx = tx * static_cast<double>(TILE_SIZE) + i * static_cast<double>(TILE_SIZE) / N;
+					const double wy = ty * static_cast<double>(TILE_SIZE) + j * static_cast<double>(TILE_SIZE) / N;
+					/* The surface of this tile's water, the corner on its far edges inside it. */
+					const int sx = std::min(static_cast<int>(wx), (tx + 1) * static_cast<int>(TILE_SIZE) - 1);
+					const int sy = std::min(static_cast<int>(wy), (ty + 1) * static_cast<int>(TILE_SIZE) - 1);
+					const double surface = GetSlopePixelZ(sx, sy, true);
+					const double depth = EyeWaterDepth(std::min(wx, sx + 0.999), std::min(wy, sy + 0.999));
+					at[j * (N + 1) + i] = {wx, wy, EyeLevelZ(surface - depth)};
+				}
+			}
+			for (int j = 0; j < N; j++) {
+				for (int i = 0; i < N; i++) {
+					const auto &a = at[j * (N + 1) + i], &b = at[j * (N + 1) + i + 1], &c = at[(j + 1) * (N + 1) + i + 1], &d = at[(j + 1) * (N + 1) + i];
+					for (const auto &tri : {std::array{&a, &b, &c}, std::array{&a, &c, &d}}) {
+						const auto &p = *tri[0], &q = *tri[1], &r = *tri[2];
+						/* Lit by how level it lies (heights and lengths in the same metres), darker the deeper. */
+						const double ux = (q[0] - p[0]) / OBJECT_UNITS_PER_METRE, uy = (q[1] - p[1]) / OBJECT_UNITS_PER_METRE, uz = (q[2] - p[2]) / OBJECT_HEIGHT_PER_METRE;
+						const double vx = (r[0] - p[0]) / OBJECT_UNITS_PER_METRE, vy = (r[1] - p[1]) / OBJECT_UNITS_PER_METRE, vz = (r[2] - p[2]) / OBJECT_HEIGHT_PER_METRE;
+						const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+						const double level = std::abs(nz) / std::max(1e-9, std::sqrt(nx * nx + ny * ny + nz * nz));
+						const double low = EyeLevelZ(GetSlopePixelZ(tx * TILE_SIZE, ty * TILE_SIZE, true)) - (p[2] + q[2] + r[2]) / 3.0;
+						const double light = (0.55 + 0.45 * level) * (1.0 - 0.3 * std::clamp(low / EyeLevelZ(2.0 * TILE_HEIGHT), 0.0, 1.0));
+						colours.push_back(Colour(static_cast<uint8_t>(168 * light), static_cast<uint8_t>(150 * light), static_cast<uint8_t>(104 * light)).data);
+						const uint32_t *tex = EyeColour(colours.back());
+						std::vector<CabPoint> poly;
+						for (const auto *v : tri) poly.push_back(CabToEye(eye, (*v)[0], (*v)[1], (*v)[2], 0, 0));
+						CabDrawPolygon(dst, zb, width, height, tex, 1, 1, std::move(poly), eye, 0);
+					}
+				}
+			}
+		}
+	}
+}
+
 /** The height the walker's feet are at (FirstPersonEye::stand_z), where it stood at it; put somewhere else, the ground storey's. */
 double FirstPersonFeetZ(const FirstPersonEye &walker)
 {
@@ -15946,11 +16052,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	eye.ry = -eye.fx;
 	/* The eye's height is the eyes' (EyeStandZ()): lifted with the land it is over, as all that stands on it. */
 	double cab_pitch = 0; ///< radians the cab the eye is in is tipped up a slope: the eye looks so much up with it
+	bool under_water = false; ///< the walker's eyes under the water's surface (diving): the bed drawn, the haze of the water
 	if (walker != nullptr) {
-		/* The walker's eyes over the ground where it stands. */
+		/* The walker's eyes over the ground where it stands. Swimming, as high as the land under the water is from the
+		 * eyes (EyeLevelZ()): over the surface, at it, down to the bed. */
 		eye.x = walker->x;
 		eye.y = walker->y;
-		eye.z = EyeStandZ(walker->x, walker->y, FirstPersonFeetZ(*walker)) + walker->eye_z;
+		eye.z = walker->swimming ? EyeLevelZ(FirstPersonFeetZ(*walker) + walker->eye_z) : EyeStandZ(walker->x, walker->y, FirstPersonFeetZ(*walker)) + walker->eye_z;
+		if (walker->swimming) {
+			const std::optional<double> surface = EyeWaterSurfaceZ(walker->x, walker->y);
+			under_water = surface.has_value() && FirstPersonFeetZ(*walker) + walker->eye_z < *surface;
+		}
 	} else if (in_model_cab) {
 		/* In the driver's head of the model, as big as the model is drawn, turned as its state turns it. */
 		const double across = own_model.scale * OBJECT_UNITS_PER_METRE, ahead = across * own_model.along;
@@ -16740,6 +16852,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				lay(frame_marks);
 			}
 		}
+		/* Diving: the bed under the water about the eyes (DrawEyeWaterBed()). */
+		if (under_water) DrawEyeWaterBed(eye, dst, zb, width, height, mark_colours);
 	}
 	/* 4a. The far land beyond them, to the horizon (DrawEyeFarLand()); not in a tunnel. */
 	if (!in_tunnel.has_value()) {
@@ -17343,7 +17457,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* 6. The haze: the far fades into the sky at the horizon, the more the farther, to the far land's end (a stripe
 	 * of rows a core). */
 	const double haze_depth = CAB_FAR_TILES * TILE_SIZE * 0.4;
-	if (!in_tunnel.has_value()) out.Job([width, height, haze, haze_depth](uint32_t *dst, float *zb) {
+	if (!in_tunnel.has_value() && !under_water) out.Job([width, height, haze, haze_depth](uint32_t *dst, float *zb) {
 		ParallelRows(height, [&](int lo, int hi) {
 			for (size_t i = static_cast<size_t>(lo) * width; i < static_cast<size_t>(hi) * width; i++) {
 				float z = zb[i];
@@ -17368,16 +17482,20 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The haze far off (as OpenMW's fog): from 60 % of the far land's reach the picture fades into the colour of the
 	 * horizon, and the ground beyond it (past the map's edge) is all haze, so the view ends softly. */
 	{
-		const double fog_near = CAB_FAR_TILES * TILE_SIZE * 0.6, fog_far = CAB_FAR_TILES * TILE_SIZE * 0.98;
-		const Colour far_haze(150, 178, 205);
-		out.Job([eye, width, height, fog_near, fog_far, far_haze](uint32_t *dst, float *zb) {
+		/* Under the water instead: its own haze near the eyes, the sky all of it (the surface seen from under it, the
+		 * bed and what is in the water fade into the water's colour within twenty metres). */
+		const double fog_near = under_water ? 0.5 * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
+		const double fog_far = under_water ? EYE_UNDER_WATER_SEEN_M * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.98;
+		const Colour far_haze = under_water ? Colour(24, 72, 92) : Colour(150, 178, 205);
+		const double horizon = under_water ? -1.0 : eye.cy;
+		out.Job([width, height, fog_near, fog_far, far_haze, horizon](uint32_t *dst, float *zb) {
 			ParallelRows(height, [&](int lo, int hi) {
 			for (int y = lo; y < hi; y++) {
 				for (int x = 0; x < width; x++) {
 					const size_t i = static_cast<size_t>(y) * width + x;
 					double f;
 					if (zb[i] <= 0.0f) {
-						if (y < eye.cy) continue; // the sky
+						if (y < horizon) continue; // the sky
 						f = 1.0;
 					} else {
 						f = std::clamp((1.0 / zb[i] - fog_near) / (fog_far - fog_near), 0.0, 1.0);
@@ -17388,12 +17506,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 			});
-		}, [eye, fog_near, fog_far, far_haze](EyeCard &card) {
+		}, [fog_near, fog_far, far_haze, horizon](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::FarHaze);
 			st.colour = {static_cast<float>(far_haze.r), static_cast<float>(far_haze.g), static_cast<float>(far_haze.b)};
 			st.from = static_cast<float>(fog_near);
 			st.to = static_cast<float>(fog_far);
-			st.horizon = static_cast<float>(eye.cy);
+			st.horizon = static_cast<float>(horizon);
 			return true;
 		});
 	}

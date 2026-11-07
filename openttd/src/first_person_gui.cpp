@@ -177,6 +177,19 @@ static constexpr double FIRST_PERSON_DECK_FOOT_M = 0.15;
 static constexpr double FIRST_PERSON_HELM_M = 1.5;
 static constexpr double FIRST_PERSON_DECK_CHEST_M = 1.2;
 static constexpr double FIRST_PERSON_DECK_REACH_M = 0.3;
+/**
+ * In the water (FirstPersonEye::swimming; the player, 7. 11.: "under the water without breath and without the health
+ * going"; "I swim after my look, the arrows as ever, and with the right button I look up, down, left, right and swim
+ * that way"): how fast it swims, metres a second; its eyes over the surface at the top, metres; over the bed at the
+ * bottom, metres; how high a shore over the surface it climbs out onto from the top, metres; how high over the water a
+ * deck or a quay it steps onto from a boat, metres.
+ */
+static constexpr double FIRST_PERSON_SWIM_MS = 1.4;
+static constexpr double FIRST_PERSON_SWIM_RUN_MS = 2.4;
+static constexpr double FIRST_PERSON_SWIM_EYE_OVER_M = 0.15;
+static constexpr double FIRST_PERSON_SWIM_BED_M = 0.5;
+static constexpr double FIRST_PERSON_SWIM_CLIMB_M = 0.8;
+static constexpr double FIRST_PERSON_DECK_ASHORE_M = 1.5;
 
 /** A point of a boat's frame (metres, +x its bow) in the world as the eyes see it lie (GetThreeDEyeVehicle()). */
 static void BoatToWorld(const ThreeDEyeVehicle &ev, double lx, double ly, double lz, double &x, double &y, double &z)
@@ -705,6 +718,7 @@ struct FirstPersonWindow : Window {
 		const std::optional<double> deck = ThreeDVehicleDeckZ(obj, hx, hy, hz + FIRST_PERSON_DECK_STEP_M);
 		if (!deck.has_value()) return false;
 		this->aboard = v->index;
+		this->walker.swimming = false;
 		this->deck_x = hx;
 		this->deck_y = hy;
 		this->deck_z = *deck;
@@ -745,6 +759,11 @@ struct FirstPersonWindow : Window {
 		WorldToBoat(ev, this->walker.x + dx, this->walker.y + dy, lx, ly);
 		std::optional<double> deck;
 		double up_to = this->deck_z + FIRST_PERSON_DECK_STEP_M;
+		/* Nothing of the boat under the step at all: over its side (OverBoard()). */
+		if (!ThreeDVehicleDeckZ(obj, lx, ly, std::numeric_limits<double>::infinity()).has_value()) {
+			this->OverBoard(this->walker.x + dx, this->walker.y + dy);
+			return;
+		}
 		for (int tries = 0;; tries++) {
 			deck = ThreeDVehicleDeckZ(obj, lx, ly, up_to);
 			if (!deck.has_value() || *deck < this->deck_z - FIRST_PERSON_DECK_DROP_M || *deck < this->deck_helm - FIRST_PERSON_DECK_DEPTH_M) return;
@@ -799,6 +818,99 @@ struct FirstPersonWindow : Window {
 	}
 
 	/**
+	 * A step off a boat's deck over its side, to a world point: into the water there (IntoWater()); onto a quay or a
+	 * shore about as high as the deck; else nowhere.
+	 */
+	void OverBoard(double x, double y)
+	{
+		if (EyeWaterSurfaceZ(x, y).has_value()) {
+			this->IntoWater(x, y);
+			return;
+		}
+		if (!FirstPersonFree(x, y) || std::abs(FirstPersonGroundZ(x, y) - FirstPersonFeetZ(this->walker)) > FIRST_PERSON_DECK_ASHORE_M * OBJECT_HEIGHT_PER_METRE) return;
+		this->aboard = VehicleID::Invalid();
+		this->walker.x = x;
+		this->walker.y = y;
+		this->walker.stand_x = -1;
+		FirstPersonSettle(this->walker);
+	}
+
+	/** Into the water at a world point (off the shore, a quay, over a boat's side): at its surface, swimming. */
+	void IntoWater(double x, double y)
+	{
+		const std::optional<double> surface = EyeWaterSurfaceZ(x, y);
+		if (!surface.has_value()) return;
+		this->aboard = VehicleID::Invalid();
+		this->walker.swimming = true;
+		this->walker.x = x;
+		this->walker.y = y;
+		this->walker.stand_z = *surface + FIRST_PERSON_SWIM_EYE_OVER_M * OBJECT_HEIGHT_PER_METRE - this->walker.eye_z;
+		this->walker.stand_x = x;
+		this->walker.stand_y = y;
+	}
+
+	/**
+	 * A stroke in the water by so much: world units across, units of height up. Its eyes no higher than a little over
+	 * the surface, no lower than a little over the bed (EyeWaterDepth()): near the shore, where the bed comes up, the
+	 * walker wades. At the shore from the top: out onto it, low and free; else no further that way.
+	 * @return whether it moved
+	 */
+	bool SwimBy(double dx, double dy, double dz)
+	{
+		double x = this->walker.x + dx, y = this->walker.y + dy;
+		std::optional<double> surface = EyeWaterSurfaceZ(x, y);
+		if (!surface.has_value()) {
+			const std::optional<double> here = EyeWaterSurfaceZ(this->walker.x, this->walker.y);
+			if (!here.has_value()) return false;
+			/* Where it stands up: on along its way till its circle is all on the land, out of the water (aslant to the
+			 * shore farther), a couple of metres at most. */
+			const double len = std::hypot(dx, dy);
+			const bool at_top = FirstPersonFeetZ(this->walker) + this->walker.eye_z >= *here;
+			for (double reach = 1.25; at_top && len > 0 && reach <= 6.0; reach *= 1.6) {
+				const double ox = x + dx / len * FIRST_PERSON_RADIUS * reach, oy = y + dy / len * FIRST_PERSON_RADIUS * reach;
+				if (!FirstPersonFree(ox, oy) || FirstPersonGroundZ(ox, oy) > *here + FIRST_PERSON_SWIM_CLIMB_M * OBJECT_HEIGHT_PER_METRE) continue;
+				this->walker.swimming = false;
+				this->walker.x = ox;
+				this->walker.y = oy;
+				this->walker.stand_x = -1;
+				FirstPersonSettle(this->walker);
+				return true;
+			}
+			if (dz == 0) return false;
+			x = this->walker.x;
+			y = this->walker.y;
+			surface = here;
+		}
+		const double eye = this->walker.eye_z;
+		const double top = *surface + FIRST_PERSON_SWIM_EYE_OVER_M * OBJECT_HEIGHT_PER_METRE - eye;
+		const double bottom = *surface - EyeWaterDepth(x, y) + FIRST_PERSON_SWIM_BED_M * OBJECT_HEIGHT_PER_METRE - eye;
+		this->walker.stand_z = std::max(std::min(FirstPersonFeetZ(this->walker) + dz, top), bottom);
+		this->walker.x = x;
+		this->walker.y = y;
+		this->walker.stand_x = x;
+		this->walker.stand_y = y;
+		return true;
+	}
+
+	/**
+	 * Swimming (Walk()): ahead the way the eyes look, up and down with them (pitch), aside level, in pieces as on the
+	 * ground; out onto the shore, the rest of the way walking no more this step.
+	 */
+	void Swim(double ahead, double aside, double dt)
+	{
+		const double norm = std::sqrt(ahead * ahead + aside * aside);
+		const double ms = ((this->running || _shift_pressed) ? FIRST_PERSON_SWIM_RUN_MS : FIRST_PERSON_SWIM_MS) * dt / norm;
+		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading), rx = fy, ry = -fx;
+		const double cp = std::cos(this->walker.pitch), sp = std::sin(this->walker.pitch);
+		const double dx = (fx * cp * ahead + rx * aside) * ms * OBJECT_UNITS_PER_METRE, dy = (fy * cp * ahead + ry * aside) * ms * OBJECT_UNITS_PER_METRE;
+		const double dz = sp * ahead * ms * OBJECT_HEIGHT_PER_METRE;
+		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
+		for (int i = 0; i < pieces && this->walker.swimming; i++) {
+			if (!this->SwimBy(dx / pieces, dy / pieces, dz / pieces)) break;
+		}
+	}
+
+	/**
 	 * How far a vehicle is from the walker for getting into it: from its middle; a boat of a 3D object from its hull,
 	 * its outline in its frame (the yacht is 16 m long: from its middle the walker on the quay beside it was out of reach).
 	 */
@@ -844,6 +956,7 @@ struct FirstPersonWindow : Window {
 	{
 		this->riding = v->index;
 		this->aboard = VehicleID::Invalid();
+		this->walker.swimming = false;
 		this->walk_on = 0;
 		this->head = 0;
 		this->weapon_out = false;
@@ -1088,16 +1201,22 @@ struct FirstPersonWindow : Window {
 				/* On board: where the boat has gone and turned meanwhile; gone or sunk, the walker out where it was. */
 				ThreeDEyeVehicle ev;
 				if (this->Aboard(ev) == nullptr) {
+					/* Into the water where it was, or out onto the land near. */
 					this->aboard = VehicleID::Invalid();
-					this->PutNear(this->walker.x, this->walker.y);
+					if (EyeWaterSurfaceZ(this->walker.x, this->walker.y).has_value()) {
+						this->IntoWater(this->walker.x, this->walker.y);
+					} else {
+						this->PutNear(this->walker.x, this->walker.y);
+					}
 				} else {
 					this->PlaceOnBoard(ev);
 					this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
-					this->deck_heading = std::remainder(this->walker.heading - ev.facing * M_PI / 180.0, 2 * M_PI);
-					continue;
+					/* Still on board (not over its side): facing as it turns. */
+					if (this->aboard != VehicleID::Invalid()) this->deck_heading = std::remainder(this->walker.heading - ev.facing * M_PI / 180.0, 2 * M_PI);
 				}
+			} else if (rv == nullptr) {
+				this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 			}
-			if (rv == nullptr) this->Walk(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Hold(FIRST_PERSON_TICK_MS / 1000.0);
 			this->Fly(FIRST_PERSON_TICK_MS / 1000.0);
 		}
@@ -1271,6 +1390,7 @@ struct FirstPersonWindow : Window {
 	 */
 	void PutNear(double x, double y, bool away_from_dragons = false)
 	{
+		this->walker.swimming = false;
 		/* The nearest place to stand, in rings a quarter of a tile apart, up to twelve tiles off (the largest
 		 * industries). */
 		for (int ring = 0; ring < 48; ring++) {
@@ -1354,6 +1474,11 @@ struct FirstPersonWindow : Window {
 		if (ahead == 0 && aside == 0) return;
 		/* Going: the body turns to where the eyes look, and goes there (the right button steers the walk). */
 		this->head = 0;
+		/* In the water: after the eyes, up and down too (Swim()). */
+		if (this->walker.swimming) {
+			this->Swim(ahead, aside, dt);
+			return;
+		}
 		const double norm = std::sqrt(ahead * ahead + aside * aside);
 		const double speed = ((this->running || _shift_pressed) ? FIRST_PERSON_RUN_MS : FIRST_PERSON_WALK_MS) * OBJECT_UNITS_PER_METRE * dt / norm;
 		const double fx = std::cos(this->walker.heading), fy = std::sin(this->walker.heading);
@@ -1370,10 +1495,28 @@ struct FirstPersonWindow : Window {
 		const int pieces = std::max(1, static_cast<int>(std::ceil(std::hypot(dx, dy) / FIRST_PERSON_SUBSTEP)));
 		FirstPersonSettle(this->walker);
 		for (int i = 0; i < pieces; i++) {
+			if (this->StepIntoWater(dx / pieces, dy / pieces)) break;
 			if (!FirstPersonMove(this->walker, dx / pieces, dy / pieces)) break;
 			/* Up a stair, or down off it. */
 			FirstPersonSettle(this->walker);
 		}
+	}
+
+	/**
+	 * A step off the shore, a quay or a bank (not off a bridge's deck: its railing) into the water before the walker,
+	 * the edge of its circle over it: swimming there (IntoWater()). Not along the shore, it does not slide along it.
+	 * @return whether it went into the water
+	 */
+	bool StepIntoWater(double dx, double dy)
+	{
+		const double len = std::hypot(dx, dy);
+		if (len <= 0) return false;
+		const double wx = this->walker.x + dx / len * FIRST_PERSON_RADIUS * 1.2, wy = this->walker.y + dy / len * FIRST_PERSON_RADIUS * 1.2;
+		if (!EyeWaterSurfaceZ(wx, wy).has_value()) return false;
+		const TileIndex under = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
+		if (IsBridgeAbove(under) && FirstPersonFeetZ(this->walker) >= GetBridgePixelHeight(GetSouthernBridgeEnd(under)) - 0.1 * OBJECT_HEIGHT_PER_METRE) return false;
+		this->IntoWater(wx, wy);
+		return true;
 	}
 
 	/** How many of a thing the walker carries. */
@@ -2690,7 +2833,11 @@ std::string DescribeFirstPerson()
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
 	const Vehicle *boat = w->aboard != VehicleID::Invalid() ? Vehicle::GetIfValid(w->aboard) : nullptr;
-	const std::string deck = boat == nullptr ? std::string() : fmt::format(", na palube lodi {} na {:.1f},{:.1f} m (paluba {:.2f} m)", boat->unitnumber, w->deck_x, w->deck_y, w->deck_z);
+	std::string deck = boat == nullptr ? std::string() : fmt::format(", na palube lodi {} na {:.1f},{:.1f} m (paluba {:.2f} m)", boat->unitnumber, w->deck_x, w->deck_y, w->deck_z);
+	if (const std::optional<double> surface = EyeWaterSurfaceZ(w->walker.x, w->walker.y); w->walker.swimming && surface.has_value()) {
+		const double eyes = (*surface - (FirstPersonFeetZ(w->walker) + w->walker.eye_z)) / OBJECT_HEIGHT_PER_METRE;
+		deck = fmt::format(", plave: oci {:.2f} m {} hladinou, dno {:.2f} m pod hladinou", std::abs(eyes), eyes > 0 ? "pod" : "nad", EyeWaterDepth(w->walker.x, w->walker.y) / OBJECT_HEIGHT_PER_METRE);
+	}
 	return fmt::format("chodec na {:.1f},{:.1f} (dlazdice {},{}){}, nohy {:.2f} m nad zemi, smer {:.0f}, pohled {:.0f}, {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu",
 			w->walker.x, w->walker.y, static_cast<int>(w->walker.x) / TILE_SIZE, static_cast<int>(w->walker.y) / TILE_SIZE, deck,
 			(FirstPersonFeetZ(w->walker) - GetSlopePixelZOutsideMap(static_cast<int>(w->walker.x), static_cast<int>(w->walker.y))) / OBJECT_HEIGHT_PER_METRE, w->walker.heading * 180.0 / M_PI, w->walker.pitch * 180.0 / M_PI, w->picture.width, w->picture.height, w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards);
@@ -3052,8 +3199,15 @@ void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)
 			w->MoveOnBoard(nx - w->walker.x, ny - w->walker.y);
 			continue;
 		}
-		/* As the walker walks: its circle against the walls, round a post (FirstPersonMove()), up the stairs. */
+		/* In the water as it swims (Swim()): after the eyes, up and down too. */
+		if (w->walker.swimming) {
+			w->Swim(ahead, aside, FIRST_PERSON_TICK_MS / 1000.0);
+			continue;
+		}
+		/* As the walker walks: its circle against the walls, round a post (FirstPersonMove()), up the stairs; into the
+		 * water off the shore. */
 		FirstPersonSettle(w->walker);
+		if (w->StepIntoWater(nx - w->walker.x, ny - w->walker.y)) continue;
 		if (FirstPersonMove(w->walker, nx - w->walker.x, ny - w->walker.y)) FirstPersonSettle(w->walker);
 	}
 	w->MakePicture();
@@ -3073,6 +3227,17 @@ void RigFirstPersonFace(double degrees)
 	}
 	w->MakePicture();
 	w->SetDirty();
+}
+
+/** The rig ('test3d chodec voda <x> <y>'): the walker into the water in the middle of a tile, at its surface; whether it swims. */
+bool RigFirstPersonIntoWater(TileIndex tile)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return false;
+	w->IntoWater(TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0);
+	w->MakePicture();
+	w->SetDirty();
+	return w->walker.swimming;
 }
 
 /** The rig: so many steps of the view's timer with no key held, as the walker stands (FirstPersonWindow::Step()). */
