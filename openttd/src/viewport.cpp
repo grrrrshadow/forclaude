@@ -5848,7 +5848,12 @@ static void AddFieldWheat()
 		return;
 	}
 	const uint type = GetFieldType(_cur_ti.tile);
-	if (type == 0 || type >= 8) return;
+	if (type == 8) {
+		/* After the harvest: the bales of straw standing about it (GetThreeDFieldBales()). */
+		if (const auto bales = GetThreeDFieldBales(_cur_ti.tile, _cur_ti.tileh); !bales.empty()) _turned_objects.push_back({nullptr, _cur_ti.tile, _cur_ti.z, nullptr, bales});
+		return;
+	}
+	if (type == 0 || type > 8) return;
 	const ThreeDObject *wheat = GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala");
 	if (wheat != nullptr) _turned_objects.push_back({GetThreeDSlopedPlants(wheat, _cur_ti.tileh), _cur_ti.tile, _cur_ti.z});
 }
@@ -16310,6 +16315,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		} else if (tile_type == TileType::Clear && IsClearGround(_cur_ti.tile, ClearGround::Fields) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* Wheat on the farm's fields (AddFieldWheat()), near the eye: farther the field's ground says enough. */
 			const uint type = GetFieldType(_cur_ti.tile);
+			/* After the harvest its bales of straw, as the vehicles standing about (AddFieldWheat()). */
+			for (const ThreeDObjectFigure &f : type == 8 ? GetThreeDFieldBales(_cur_ti.tile, _cur_ti.tileh) : std::span<const ThreeDObjectFigure>()) {
+				if (ThreeDEyeVehicle ev; GetThreeDStandingVehicle(f.figure, ev)) {
+					ev.scale = f.scale;
+					ev.x = _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE;
+					ev.y = _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE;
+					ev.z = _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+					ev.facing = f.facing;
+					AddCabVehicle(ev, false);
+				}
+			}
 			const ThreeDObject *wheat = type == 0 || type >= 8 ? nullptr : GetThreeDSlopedPlants(GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala"), _cur_ti.tileh);
 			if (wheat != nullptr) {
 				for (const ThreeDObjectFigure &f : wheat->plants) {

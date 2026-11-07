@@ -10824,6 +10824,35 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			text += fmt::format(" {}:{},{}", ind->type == IT_MARIJUANA_PLANTATION ? "mari" : "brambory", TileX(ind->location.tile), TileY(ind->location.tile));
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: pole{}", text.empty() ? " zadna" : text);
+	} else if (what == "posekat") {
+		/* 'posekat [r]': the fields about the first farm, within r tiles (8), harvested: their type 8, the bales of straw
+		 * standing on them in the 3D views (GetThreeDFieldBales()); the farm's tile and a field's said. */
+		const int r = std::clamp(number(2).value_or(8), 1, 32);
+		const Industry *farm = nullptr;
+		for (const Industry *ind : Industry::Iterate()) {
+			if (GetIndustrySpec(ind->type)->behaviour.Test(IndustryBehaviour::PlantFields)) {
+				farm = ind;
+				break;
+			}
+		}
+		if (farm == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d posekat: no farm on the map.");
+			return true;
+		}
+		const int fx = TileX(farm->location.tile), fy = TileY(farm->location.tile);
+		uint count = 0;
+		TileIndex first = INVALID_TILE;
+		for (int y = std::max(1, fy - r); y <= std::min<int>(Map::MaxY() - 1, fy + r); y++) {
+			for (int x = std::max(1, fx - r); x <= std::min<int>(Map::MaxX() - 1, fx + r); x++) {
+				const TileIndex t = TileXY(x, y);
+				if (!IsTileType(t, TileType::Clear) || !IsClearGround(t, ClearGround::Fields) || IsPasture(t)) continue;
+				SetFieldType(t, 8);
+				MarkTileDirtyByTile(t);
+				if (first == INVALID_TILE) first = t;
+				count++;
+			}
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: posekat farma {},{} poli {} prvni {},{}", fx, fy, count, first != INVALID_TILE ? TileX(first) : 0, first != INVALID_TILE ? TileY(first) : 0);
 	} else if (what == "lampy") {
 		/* 'lampy <0|1>': at night the lamps and lit windows of the houses light what is about them (1) or not. */
 		extern bool _cab_lamp_light;

@@ -614,7 +614,8 @@
     "paleta": [
      "D8C070",
      "7A9A3A",
-     "C8B080"
+     "C8B080",
+     "E2C46A"
     ]
    }
   ],
@@ -632,7 +633,59 @@
   ],
   "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
-  "poznamka": "kulatý balík 1,5 m široký 1,2 m, leží napříč (osa podél y), síťka; barví se celý; skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 9 kB, glb z gltfpacku"
+  "poznamka": "kulatý balík 1,5 m široký 1,2 m, leží napříč (osa podél y), síťka; barví se celý; od 7. 11. i sláma (E2C46A) a sdílený: náklad, posekané pole, stodola na farmě (hráč: „mame baliky slámy? budou sdilene pro prumysl na farmu pole posekané“); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 9 kB, glb z gltfpacku"
+ },
+ {
+  "soubor": "balik_hranaty.glb",
+  "jmeno": "balik_hranaty",
+  "druh": "naklad",
+  "nazev": {
+   "cs": "hranatý balík slámy",
+   "en": "square straw bale"
+  },
+  "rozmer_m": [
+   0.9,
+   0.46,
+   0.36
+  ],
+  "skladani": {
+   "zpusob": "mrizka",
+   "max_vrstev": 6,
+   "otaceni": [
+    0,
+    90
+   ],
+   "poznamka": "celé kusy vedle sebe v mřížce na ložné ploše, nikdy roztažené; kolik kusů, tolik naloženo"
+  },
+  "trojuhelniku": 12,
+  "barvy": [
+   {
+    "cast": "slama",
+    "maska": "balik_hranaty_maska.png",
+    "zacatek": 200,
+    "paleta": [
+     "E2C46A",
+     "D8C070",
+     "C8B080",
+     "7A9A3A"
+    ]
+   }
+  ],
+  "naklady": [
+   {
+    "naklad": "FICR",
+    "popis": "seno",
+    "barva": "D8C070"
+   },
+   {
+    "naklad": "MARI",
+    "popis": "marihuanové seno",
+    "barva": "7A9A3A"
+   }
+  ],
+  "autor": "grrrrf: vlastní model predmety/naklady.py (stavebnice predmety/stavebnice3d.py, textury generované)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "poznamka": "malý hranatý balík slámy 0,9 × 0,46 × 0,36 m se dvěma provázky podél dokola přes vršek, čela a spodek (hráč 7. 11.: „kulatý balíky, tyhle hranatý“); barví se celý (sláma E2C46A, seno, marihuanové seno); sdílený: náklad, posekané pole, stodola na farmě; skládá se do stohu až šest vrstev; ze stébel jako kulaté balíky Terrna (fotky sena a řezu z heuballen.zip, hráč: „ať vypadaj jako ze stebel“); skutečné metry, počátek uprostřed spodku, +x podél delší strany, s normálami, vlastní malý atlas; 32 kB, glb z gltfpacku"
  },
  {
   "jmeno": "dobytek_prase",
