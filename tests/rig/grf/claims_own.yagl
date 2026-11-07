@@ -1,0 +1,79 @@
+// A vehicle set of two that number their vehicles where the game's own vehicles
+// sit: a rail wagon under 116, the car carrier's number, and a lorry under 88,
+// the first marijuana lorry's. Big sets number their vehicles past the original
+// set's and reach these numbers as a matter of course. Played by the scene
+// vozidlasada (see README.md): the game's own vehicles have to stay the game's,
+// and the set's two vehicles stand beside them.
+//     yagl -e <out>/claims_own.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container2;
+optional_info // Action14
+{
+    INFO: 
+    {
+        VRSN: [ 0x01 0x00 0x00 0x00 ];
+        MINV: [ 0x01 0x00 0x00 0x00 ];
+        NPAR: [ 0x00 ];
+        PALS: [ 0x41 ];
+        BLTR: [ 0x38 ];
+    }
+}
+grf // Action08
+{
+    grf_id: "RIGv";
+    version: GRF8;
+    name: "Rig: vehicles on the game's own numbers";
+    description: "A rail wagon under 116 and a lorry under 88, where the game's own car carrier and marijuana lorry sit.";
+}
+properties<Trains, 0x0074> // Action00
+{
+    // instance_id: 0x0074
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        track_type: 0;
+        sprite_id: 0x22;
+        speed_kmh: 100;
+        power: 0;
+        weight_tons: 10;
+        weight_high_byte: 0x00;
+        cargo_capacity: 20;
+        cargo_type: 0x01;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x00;
+    }
+}
+strings<Trains, default, 0x0074> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0074 */ "RigWagon116";
+}
+properties<RoadVehicles, 0x0058> // Action00
+{
+    // instance_id: 0x0058
+    {
+        climate_availability: Temperate | Arctic | Tropical | Toyland;
+        long_introduction_date: date(1900/1/1);
+        model_life_years: 255;
+        vehicle_life_years: 30;
+        reliability_decay_speed: 20;
+        sprite_id: 0x01;
+        speed_2_kmh: 0x64;
+        power_10_hp: 0x0A;
+        weight_quarter_tons: 0x14;
+        cargo_capacity: 0x14;
+        cargo_type: 0x01;
+        refittable_cargo_classes: 0x0010;
+        refit_cargo_types: 0x00000000;
+        cost_factor: 0x64;
+        running_cost_factor: 0x64;
+    }
+}
+strings<RoadVehicles, default, 0x0058> // <feature, language, first_id> Action04, Default
+{
+    /* 0x0058 */ "RigLorry88";
+}

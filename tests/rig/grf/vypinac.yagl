@@ -1,0 +1,16 @@
+// Test GRF: a set that switches another off by its GRF ID (Action E), aimed at
+// the game's own set RIGv (vestaveny.yagl); that one has to stay on.
+//     yagl -e <out>/vypinac.grf tests/rig/grf      (the battery builds it every run)
+yagl_version: "";
+grf_format: Container1;
+grf // Action08
+{
+    grf_id: "RIGx";
+    version: GRF8;
+    name: "Rig: vypinac";
+    description: "Switches RIGv off";
+}
+disable_grfs // Action0E
+{
+    grf_ids: [ "RIGv" ];
+}

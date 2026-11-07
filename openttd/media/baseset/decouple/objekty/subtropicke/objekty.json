@@ -1,0 +1,1187 @@
+[
+ {
+  "soubor": "dum_4e_domy.glb",
+  "jmeno": "dum_4e_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 78,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11ee; roky 0–; 2 díly, shoda obrysu 0.969; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (68 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     6.01,
+     3.93,
+     6.88
+    ],
+    "smer": [
+     -0.3,
+     -0.95
+    ]
+   },
+   {
+    "poloha": [
+     3.7,
+     8.56,
+     6.88
+    ],
+    "smer": [
+     -0.97,
+     0.26
+    ]
+   },
+   {
+    "poloha": [
+     3.7,
+     5.09,
+     8.03
+    ],
+    "smer": [
+     -0.81,
+     -0.59
+    ]
+   },
+   {
+    "poloha": [
+     6.01,
+     7.4,
+     8.03
+    ],
+    "smer": [
+     -0.98,
+     -0.19
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_4f_domy.glb",
+  "jmeno": "dum_4f_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 79,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f1; roky 0–; 2 díly, shoda obrysu 0.979; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (70 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     7.69,
+     8.21,
+     6.31
+    ],
+    "smer": [
+     0.52,
+     0.85
+    ]
+   },
+   {
+    "poloha": [
+     9.89,
+     3.82,
+     6.31
+    ],
+    "smer": [
+     0.6,
+     -0.8
+    ]
+   },
+   {
+    "poloha": [
+     9.89,
+     7.11,
+     7.0
+    ],
+    "smer": [
+     0.99,
+     -0.11
+    ]
+   },
+   {
+    "poloha": [
+     7.69,
+     4.91,
+     7.0
+    ],
+    "smer": [
+     0.2,
+     -0.98
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_50_domy.glb",
+  "jmeno": "dum_50_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 80,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f4; roky 0–; 2 díly, shoda obrysu 0.929; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.19,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 19,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (38 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     9.83,
+     9.22,
+     4.78
+    ],
+    "smer": [
+     0.81,
+     0.59
+    ]
+   },
+   {
+    "poloha": [
+     6.82,
+     7.2,
+     4.78
+    ],
+    "smer": [
+     -0.96,
+     -0.28
+    ]
+   },
+   {
+    "poloha": [
+     9.08,
+     7.2,
+     5.25
+    ],
+    "smer": [
+     1.0,
+     -0.06
+    ]
+   },
+   {
+    "poloha": [
+     7.57,
+     9.22,
+     5.25
+    ],
+    "smer": [
+     0.2,
+     0.98
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_51_domy_0.glb",
+  "jmeno": "dum_51_domy_0",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   0
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f5, barevné sloty 0; roky 0–; 2 díly, shoda obrysu 0.985; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "strechy": [
+   {
+    "poloha": [
+     6.07,
+     8.9,
+     3.56
+    ],
+    "smer": [
+     -0.75,
+     0.66
+    ]
+   },
+   {
+    "poloha": [
+     7.8,
+     5.9,
+     3.56
+    ],
+    "smer": [
+     0.21,
+     -0.98
+    ]
+   },
+   {
+    "poloha": [
+     7.8,
+     8.15,
+     3.94
+    ],
+    "smer": [
+     0.71,
+     0.71
+    ]
+   },
+   {
+    "poloha": [
+     6.07,
+     6.65,
+     3.94
+    ],
+    "smer": [
+     -0.77,
+     -0.64
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_51_domy_1.glb",
+  "jmeno": "dum_51_domy_1",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   1
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f6, barevné sloty 1; roky 0–; 2 díly, shoda obrysu 0.942; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.28,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 26,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (52 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     7.08,
+     9.71,
+     3.69
+    ],
+    "smer": [
+     -0.1,
+     0.99
+    ]
+   },
+   {
+    "poloha": [
+     8.41,
+     6.47,
+     3.69
+    ],
+    "smer": [
+     0.66,
+     -0.75
+    ]
+   },
+   {
+    "poloha": [
+     7.08,
+     7.28,
+     4.19
+    ],
+    "smer": [
+     -0.4,
+     -0.92
+    ]
+   },
+   {
+    "poloha": [
+     8.41,
+     8.9,
+     4.19
+    ],
+    "smer": [
+     0.7,
+     0.72
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_51_domy_2.glb",
+  "jmeno": "dum_51_domy_2",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   2
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f7, barevné sloty 2; roky 0–; 2 díly, shoda obrysu 0.986; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.63,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (8 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     4.22,
+     10.06,
+     4.94
+    ],
+    "smer": [
+     -0.85,
+     0.52
+    ]
+   },
+   {
+    "poloha": [
+     5.95,
+     5.67,
+     4.94
+    ],
+    "smer": [
+     -0.59,
+     -0.81
+    ]
+   },
+   {
+    "poloha": [
+     5.95,
+     8.96,
+     5.56
+    ],
+    "smer": [
+     -0.86,
+     0.51
+    ]
+   },
+   {
+    "poloha": [
+     4.22,
+     6.76,
+     5.56
+    ],
+    "smer": [
+     -0.94,
+     -0.34
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_51_domy_3.glb",
+  "jmeno": "dum_51_domy_3",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 81,
+  "varianty": [
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11f8, barevné sloty 3; roky 0–; 2 díly, shoda obrysu 0.987; 24 trojúhelníků, textura 512×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.4,
+     14.61,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "strechy": [
+   {
+    "poloha": [
+     3.76,
+     5.46,
+     4.06
+    ],
+    "smer": [
+     -0.85,
+     -0.53
+    ]
+   },
+   {
+    "poloha": [
+     6.19,
+     6.79,
+     4.06
+    ],
+    "smer": [
+     -0.79,
+     -0.62
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_52_byty.glb",
+  "jmeno": "dum_52_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 82,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x11fb; roky 0–; 1 díly, shoda obrysu 0.939; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.86,
+     13.18,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (324 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     9.42,
+     5.38,
+     26.91
+    ],
+    "smer": [
+     0.71,
+     -0.71
+    ]
+   },
+   {
+    "poloha": [
+     6.3,
+     8.5,
+     26.91
+    ],
+    "smer": [
+     -0.71,
+     0.71
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_53_kostel.glb",
+  "jmeno": "dum_53_kostel",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 83,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Kostel, sprite 0x11fc; roky 0–; 1 díly, shoda obrysu 0.918; 10 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.52,
+     14.8,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (8 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     9.16,
+     6.56,
+     10.12
+    ],
+    "smer": [
+     0.71,
+     -0.71
+    ]
+   },
+   {
+    "poloha": [
+     5.87,
+     9.86,
+     10.12
+    ],
+    "smer": [
+     -0.71,
+     0.71
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_54_domy.glb",
+  "jmeno": "dum_54_domy",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 84,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Domy, sprite 0x11ff; roky 0–; 2 díly, shoda obrysu 0.967; 24 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     6.96,
+     14.15,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 25,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (50 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     3.61,
+     4.51,
+     7.09
+    ],
+    "smer": [
+     -0.79,
+     -0.61
+    ]
+   },
+   {
+    "poloha": [
+     2.17,
+     10.29,
+     7.09
+    ],
+    "smer": [
+     -0.83,
+     0.56
+    ]
+   },
+   {
+    "poloha": [
+     2.17,
+     5.95,
+     8.28
+    ],
+    "smer": [
+     -0.97,
+     -0.23
+    ]
+   },
+   {
+    "poloha": [
+     3.61,
+     8.85,
+     8.28
+    ],
+    "smer": [
+     -0.88,
+     0.47
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_55_byty.glb",
+  "jmeno": "dum_55_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 85,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x1202; přebarvení pink, red, yellow má texturu slotu 0; roky 1973–; 1 díly, shoda obrysu 0.966; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     8.44,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (588 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     7.0,
+     11.68,
+     17.72
+    ],
+    "smer": [
+     -0.43,
+     0.9
+    ]
+   },
+   {
+    "poloha": [
+     9.88,
+     5.66,
+     17.72
+    ],
+    "smer": [
+     0.43,
+     -0.9
+    ]
+   },
+   {
+    "poloha": [
+     9.88,
+     10.18,
+     17.72
+    ],
+    "smer": [
+     0.69,
+     0.72
+    ]
+   },
+   {
+    "poloha": [
+     7.0,
+     7.17,
+     17.72
+    ],
+    "smer": [
+     -0.69,
+     -0.72
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_56_byty.glb",
+  "jmeno": "dum_56_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 86,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x1205; přebarvení pink, red, yellow má texturu slotu 0; roky 1962–; 1 díly, shoda obrysu 0.949; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.69,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (160 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     6.05,
+     11.02,
+     13.69
+    ],
+    "smer": [
+     -0.41,
+     0.91
+    ]
+   },
+   {
+    "poloha": [
+     9.32,
+     3.67,
+     13.69
+    ],
+    "smer": [
+     0.41,
+     -0.91
+    ]
+   },
+   {
+    "poloha": [
+     9.32,
+     9.18,
+     13.69
+    ],
+    "smer": [
+     0.66,
+     0.75
+    ]
+   },
+   {
+    "poloha": [
+     6.05,
+     5.51,
+     13.69
+    ],
+    "smer": [
+     -0.66,
+     -0.75
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_57_vysoky.glb",
+  "jmeno": "dum_57_vysoky",
+  "druh": "dum",
+  "dlazdic_x": 2,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 87,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, sprity 0x120a 0x120b; roky 1984–; 4 díly, shoda obrysu 0.955; 40 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     17.0,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (914 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     23.33,
+     8.06,
+     10.69
+    ],
+    "smer": [
+     1.0,
+     -0.08
+    ]
+   },
+   {
+    "poloha": [
+     8.15,
+     12.83,
+     11.62
+    ],
+    "smer": [
+     -0.9,
+     0.44
+    ]
+   },
+   {
+    "poloha": [
+     14.68,
+     6.19,
+     25.12
+    ],
+    "smer": [
+     -0.7,
+     -0.72
+    ]
+   },
+   {
+    "poloha": [
+     19.45,
+     10.67,
+     10.69
+    ],
+    "smer": [
+     0.76,
+     0.65
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_59_byty.glb",
+  "jmeno": "dum_59_byty",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 89,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Byty, sprite 0x120e; roky 0–; 1 díly, shoda obrysu 0.987; 14 trojúhelníků, textura 1024×512",
+  "dvere": [
+   {
+    "poloha": [
+     7.86,
+     14.69,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (220 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     9.45,
+     4.97,
+     15.0
+    ],
+    "smer": [
+     0.44,
+     -0.9
+    ]
+   },
+   {
+    "poloha": [
+     6.27,
+     11.45,
+     15.0
+    ],
+    "smer": [
+     -0.44,
+     0.9
+    ]
+   },
+   {
+    "poloha": [
+     6.27,
+     6.59,
+     15.56
+    ],
+    "smer": [
+     -0.7,
+     -0.71
+    ]
+   },
+   {
+    "poloha": [
+     9.45,
+     9.83,
+     15.56
+    ],
+    "smer": [
+     0.7,
+     0.71
+    ]
+   }
+  ]
+ },
+ {
+  "soubor": "dum_5a_vysoky.glb",
+  "jmeno": "dum_5a_vysoky",
+  "druh": "dum",
+  "dlazdic_x": 1,
+  "dlazdic_y": 1,
+  "klima": "subtropicke",
+  "nahrazuje_house": 90,
+  "varianty": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "autor": "grrrrf (dum_glb.py z tabulky objemů auto_tabulka.py, hra/3d-z-obrazku/modely), textura OpenGFX 7.1 (OpenGFX team)",
+  "licence": "GPL-2.0 (textura odvozená z OpenGFX 7.1, geometrie vlastní)",
+  "poznamka": "Vysoký kancelářský blok, sprite 0x1211; roky 1993–; 2 díly, shoda obrysu 0.905; 20 trojúhelníků, textura 1024×1024",
+  "dvere": [
+   {
+    "poloha": [
+     4.51,
+     14.57,
+     0.0
+    ],
+    "smer": [
+     0,
+     1
+    ],
+    "sirka": 1.5,
+    "odhad": true
+   }
+  ],
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 32,
+   "poznamka": "v noci ukaž uzel noc přes dům: teplé tabulky 20 mm před okny z textury, asi 60 % oken (528 trojúhelníků, stejná textura: teplé políčko v nevyužitém rohu, i v textuře se sněhem); uzel den je prázdný; svetlo_NN místa pro záři (domy/noc_z_textury.py)"
+  },
+  "strechy": [
+   {
+    "poloha": [
+     10.06,
+     4.22,
+     6.94
+    ],
+    "smer": [
+     0.59,
+     -0.81
+    ]
+   },
+   {
+    "poloha": [
+     3.61,
+     12.14,
+     29.25
+    ],
+    "smer": [
+     -0.66,
+     0.75
+    ]
+   },
+   {
+    "poloha": [
+     7.05,
+     6.88,
+     6.94
+    ],
+    "smer": [
+     -0.8,
+     -0.6
+    ]
+   },
+   {
+    "poloha": [
+     5.41,
+     10.52,
+     29.25
+    ],
+    "smer": [
+     -0.6,
+     0.8
+    ]
+   }
+  ]
+ }
+]

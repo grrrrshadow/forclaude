@@ -1,0 +1,111 @@
+[
+ {
+  "soubor": "tatra613.glb",
+  "druh": "auto",
+  "kotva": "stred",
+  "kola": [
+   {
+    "soubor": "kolo_t613.glb",
+    "polohy": [
+     [
+      1.53,
+      0.8,
+      0.31
+     ],
+     [
+      -1.45,
+      0.8,
+      0.31
+     ]
+    ],
+    "oba_boky": true,
+    "toceni": {
+     "zdroj": "jizda",
+     "polomer_m": 0.31
+    },
+    "rizeni": {
+     "polohy": [
+      0
+     ],
+     "max_uhel": 35
+    }
+   }
+  ],
+  "dily": [
+   {
+    "uzel": "viko_motoru",
+    "osa": [
+     0,
+     1,
+     0
+    ],
+    "stred": [
+     -1.69,
+     0.0,
+     1.01
+    ],
+    "uhel": 70,
+    "kdy": "porucha",
+    "poznamka": "zadní víko motoru, závěs vpředu u zadního okna; při poruše se zvedne o 70° a je vidět motor (hráč: „nech tam motor, porucha tak se otevře viko a bude tam motor“)"
+   }
+  ],
+  "rozmer_m": {
+   "delka": 5.239,
+   "sirka": 2.108,
+   "vyska": 1.391
+  },
+  "autor": "3D model Tatra 613 1975-1996, DEMON_SCARY1235 (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/tatra-613-1975-1996-c554d6fdaf8749e291b25cbf487f82f8), zjednodušený a nabarvený bez renderu (auta/tatra613_vb.py); kola a maják vlastní",
+  "licence": "CC BY 4.0 (uvést DEMON_SCARY1235; změny: civilní a VB nátěr, nápisy, maják, bez interiéru, decimace, vlastní kola)",
+  "jmeno": "tatra613_vb",
+  "textura": "tatra613_vb.png",
+  "doplnky": [
+   {
+    "soubor": "majak_vb.glb",
+    "poloha": [
+     -0.12,
+     0.0,
+     1.441
+    ],
+    "blikani": {
+     "uzly": [
+      "majak_00",
+      "majak_01"
+     ],
+     "tiku": 8,
+     "kdy": "nalozeno"
+    },
+    "poznamka": "modrý maják na střeše: majak_00 zhasnutý, majak_01 svítí (emissive, plný jas). Bliká jen, když veze jednu osobu, jinak nikdy (hráč: „tatry vb blika jen s jednou osobou“, „tatra ma blikat jen naložena 1 osobou. to ji nedavej blikat jinak“). Zatím nikoho neveze, tak nebliká; až budou soudruzi nový náklad (hráč: „kde na zastavce nakladada vyklada soudruhy. to je novej náklad“), naloží soudruha u jedné budovy ÚV KSČ, cestou bliká a u druhé ho vyloží"
+   }
+  ],
+  "lak": {
+   "maska": "tatra613_vb_lak.png",
+   "cil": "C8A65E",
+   "let": 20,
+   "krok": 1
+  },
+  "svetla": {
+   "noc": "noc",
+   "predni": [
+    "svetlo_predni_00",
+    "svetlo_predni_01",
+    "svetlo_predni_02",
+    "svetlo_predni_03"
+   ],
+   "zadni": [
+    "svetlo_zadni_00",
+    "svetlo_zadni_01"
+   ],
+   "poznamka": "světla vyznačená v modelu jako okna domu (hráč: „auta musi mit vyznačena světla jako maj domy okna. kolem auta jsou metr daleko světla“): uzel noc jsou skla světel (svetlo_predni teple bílá, svetlo_zadni červená, plný jas, jen v noci), prázdné uzly svetlo_predni_NN a svetlo_zadni_NN uprostřed světel; hra/3d/PROSBA-SVETLA-VOZIDEL-UZLY.md"
+  },
+  "jizda": {
+   "k": "dum",
+   "nahrazuje_house": 31,
+   "objekt": "dum_1f_uv_ksc",
+   "kde": "stani",
+   "rychlost_kmh": 60,
+   "stoji_tiku": 400,
+   "poznamka": "jako Mat ze dveří do dveří: od stání jedné budovy ÚV KSČ po silnici ke stání jiné, chvíli stojí, jede dál; po pravé straně, natočená podle směru; maják jen s jednou osobou (zatím prázdná, nebliká)"
+  },
+  "poznamka": "Tatra 613 VB, která jezdí sama (hráč: „hranata tam je osobak vb“, „bude jezdit jako mat, od uv ksč k jinemu uv ksč“): nátěr VB jako tatra613_vb_3d. 24000 trojúhelníků (karoserie a víko motoru), kolo zvlášť kolo_t613.glb (2 polohy × 2 boky, poloměr 0.31 m), atlas 2048 px jen barva bez světla, s normálami, okna neprůhledná, bez interiéru, motor pod víkem zůstal; délka 5.239 m"
+ }
+]
