@@ -110,6 +110,8 @@ bool ThreeDVehicleObjectPreviewFitMade(EngineID engine, int side, float azimuth)
 void ForgetThreeDVehicleObjectPreviews();
 const ThreeDModelPicture *GetThreeDEyeVehiclePicture(const ThreeDEyeVehicle &ev, ZoomLevel zoom, float yaw);
 std::string DescribeThreeDVehicleObjectSprites();
+std::string DescribeThreeDVehicleWear(const Vehicle *v);
+std::string DescribeThreeDObjectWear(std::string_view name);
 void QueueThreeDFireworks(TileIndex hut_front);
 void AddThreeDEffectsToViewport(ZoomLevel zoom);
 bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit = false);

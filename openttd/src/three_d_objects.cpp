@@ -317,6 +317,10 @@ static std::vector<ThreeDIvy> _three_d_ivies;
 static std::vector<std::string> _three_d_graffiti;
 /** The spalled places of the concrete ("druh": "zed_odprysk"), the names of their figures (GetThreeDConcreteSpalls()). */
 static std::vector<std::string> _three_d_concrete_spalls;
+/** The pieces of rust of old vehicles ("druh": "vuz_rez"), the names of their figures (GetThreeDRustPieces()). */
+static std::vector<std::string> _three_d_rust_pieces;
+/** The boards' sizes ("sirka_m", "vyska_m"), by their figures' names (GetThreeDBoardSize()). */
+static std::map<std::string, std::pair<float, float>> _three_d_board_sizes;
 
 /**
  * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
@@ -1114,6 +1118,7 @@ struct GlbReadOptions {
 	std::string_view point_skip;  ///< with point_prefix, the nodes whose names start so are not of its places
 	std::vector<float> *points = nullptr;
 	std::vector<uint16_t> *point_groups = nullptr; ///< with points, each place's group (as tri_group), 0 none
+	std::vector<std::string> *point_names = nullptr; ///< with points, each place's node's name
 	std::string_view skip_node;
 	bool skip_wings = false;      ///< with all_nodes, the wings of doors and windows (IsWingNode(), read on their own) and their children left out
 	const std::vector<std::string> *skip_nodes = nullptr; ///< with all_nodes, the nodes so named (and their children) left out
@@ -1498,6 +1503,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					points->push_back(static_cast<float>(-m[14]));
 					points->push_back(static_cast<float>(m[13]));
 					if (o.point_groups != nullptr) o.point_groups->push_back(group);
+					if (o.point_names != nullptr) o.point_names->emplace_back(node_name);
 				}
 				if (inside && !o.points_only && node.contains("mesh")) add_mesh(node.at("mesh").get<int>(), m, group, mark, glass);
 				if (node.contains("children")) for (const auto &c : node.at("children")) todo.push_back({c.get<int>(), m, inside, group, mark, glass});
@@ -5582,7 +5588,7 @@ static void ReadThreeDVehicleObjects()
 					ReadMotionSet(e, folder, package);
 					continue;
 				}
-				if ((figure_kind == "doplnek" || figure_kind.starts_with("zed_")) && e.contains("soubor") && e.at("soubor").is_string()) {
+				if ((figure_kind == "doplnek" || figure_kind.starts_with("zed_") || figure_kind == "vuz_rez") && e.contains("soubor") && e.at("soubor").is_string()) {
 					/* An add-on of the buildings a figure too, a thing as big as the building it stands by: one of a
 					 * building's event stands only on its days ("akce" "doplnky": the new stadium's grill and barrel by
 					 * the fire Tatra, the player 29. 10.: "Mat with the grill in the middle of the pitch by the Tatra",
@@ -5624,6 +5630,11 @@ static void ReadThreeDVehicleObjects()
 					if (figure_kind == "zed_grafiti") _three_d_graffiti.push_back(fig.name);
 					/* A place where the concrete has spalled off (the player, 7. 11.): on the concrete at random, as the graffiti. */
 					if (figure_kind == "zed_odprysk") _three_d_concrete_spalls.push_back(fig.name);
+					/* A piece of rust (the player, 7. 11.): laid on the flat faces of an old vehicle (ThreeDWear). */
+					if (figure_kind == "vuz_rez") _three_d_rust_pieces.push_back(fig.name);
+					if (e.contains("sirka_m") && e.contains("vyska_m")) {
+						_three_d_board_sizes[fig.name] = {std::clamp(e.value("sirka_m", 1.0f), 0.05f, 20.0f), std::clamp(e.value("vyska_m", 1.0f), 0.05f, 20.0f)};
+					}
 					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
 						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
@@ -6442,6 +6453,21 @@ static void ReadThreeDVehicleObjects()
 					obj.glass_node = e.at("sklo").value("uzel", std::string());
 					obj.glass_alpha = std::clamp(e.at("sklo").value("alfa", 0.15f), 0.0f, 1.0f);
 				}
+				/* Its places of graffiti (the colleague's hra/3d/GRAFITI-VAGONY-PRO-HRU.md): empty nodes of its file at their
+				 * middles on its sides, sprayed as it ages (ThreeDWear). */
+				if (e.contains("grafiti") && e.at("grafiti").is_array()) {
+					for (const auto &g : e.at("grafiti")) {
+						if (!g.is_object() || !g.contains("uzel") || !g.at("uzel").is_string()) continue;
+						ThreeDGraffitiPlace place;
+						place.node = g.at("uzel").get<std::string>();
+						place.w = std::clamp(g.value("sirka_m", 1.0f), 0.1f, 30.0f);
+						place.h = std::clamp(g.value("vyska_m", 1.0f), 0.1f, 10.0f);
+						obj.graffiti_places.push_back(std::move(place));
+						if (obj.graffiti_places.size() >= 255) break;
+					}
+				}
+				obj.graffiti_from = static_cast<uint8_t>(std::clamp(e.value("grafiti_od_let", 3), 0, 200));
+				obj.graffiti_every = static_cast<uint8_t>(std::clamp(e.value("grafiti_po_letech", 3), 1, 200));
 				/* The states its GRF picks by its sprites ("stavy"): a colour of the paint, how far it has faded and rusted. */
 				if (e.contains("stavy") && e.at("stavy").is_array()) {
 					for (const auto &st : e.at("stavy")) {
@@ -7093,6 +7119,8 @@ void ResetThreeDVehicleObjects()
 	_three_d_ivies.clear();
 	_three_d_graffiti.clear();
 	_three_d_concrete_spalls.clear();
+	_three_d_rust_pieces.clear();
+	_three_d_board_sizes.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -7201,6 +7229,21 @@ std::span<const std::string> GetThreeDConcreteSpalls()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _three_d_concrete_spalls;
+}
+
+/** The pieces of rust of old vehicles, read with the figures. */
+std::span<const std::string> GetThreeDRustPieces()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_rust_pieces;
+}
+
+/** How big a board laid on a face is ("sirka_m", "vyska_m" of a graffiti, a spalled place, a piece of rust), metres; 1 x 1 not known. */
+std::pair<float, float> GetThreeDBoardSize(std::string_view name)
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	auto it = _three_d_board_sizes.find(std::string(name));
+	return it != _three_d_board_sizes.end() ? it->second : std::pair<float, float>{1.0f, 1.0f};
 }
 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)
@@ -8724,6 +8767,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	made->uv = std::move(mesh.uv);
 	made->tri = std::move(mesh.tri);
 	made->tri_tex = std::move(mesh.tri_tex);
+	made->own_triangles = static_cast<uint32_t>(made->tri.size() / 3);
 	for (GlbTexture &t : mesh.textures) {
 		made->pngs.push_back(std::move(t.png));
 		made->flats.push_back(t.flat);
@@ -8815,6 +8859,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	}
 	/* The add-ons: of each, only the nodes a state may show, each its part, its textures after the others (marked as
 	 * the add-on's, for the colour a state gives it). */
+	made->addons_from = static_cast<uint32_t>(made->tri.size() / 3);
 	for (size_t ai = 0; ai < this->addons.size(); ai++) {
 		const ThreeDVehicleAddon &addon = this->addons[ai];
 		/* Only the nodes a state may show (the others not read at all: a file of the loads has seventy five), without
@@ -9397,6 +9442,411 @@ int ThreeDVehicleObject::EmptyStateOf(int step) const
 	std::lock_guard lock(_lazy_mutex);
 	auto [it, added] = this->empty_steps.emplace(step, 0);
 	if (!added) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
+}
+
+/** How far a graffiti is laid off its place on a vehicle's side, metres: as on the walls (EYE_GRAFFITI_OFF_M of viewport.cpp). */
+static constexpr float WEAR_GRAFFITI_OFF_M = 0.03f;
+/** How far a piece of rust is laid off the face, metres: under a graffiti were they on one place. */
+static constexpr float WEAR_RUST_OFF_M = 0.02f;
+/** The cells the flat faces of a vehicle are looked at in, metres. */
+static constexpr float WEAR_CELL_M = 0.05f;
+/** The sides of the squares a piece of rust is looked for a place of, in cells, the biggest first (1 m to 20 cm). */
+static constexpr std::array<int, 5> WEAR_SQUARES = {20, 14, 10, 6, 4};
+/** How many places for rust a vehicle has at most, and how many pieces at its last level: one to so many square metres of its flat faces, 3 to 30. */
+static constexpr size_t WEAR_MAX_SPOTS = 96;
+static constexpr float WEAR_M2_A_PIECE = 1.2f;
+static constexpr uint32_t WEAR_MIN_PIECES = 3, WEAR_MAX_PIECES = 30;
+
+/** A hash of two numbers, the same every run: which place, which board of a vehicle's wear. */
+static uint32_t WearHash(uint32_t a, uint32_t b)
+{
+	uint32_t h = a * 0x9E3779B1u ^ (b + 0x7F4A7C15u + (a << 6) + (a >> 2));
+	h ^= h >> 15;
+	h *= 0x2C1B3C6Du;
+	h ^= h >> 12;
+	h *= 0x297A2D39u;
+	h ^= h >> 15;
+	return h;
+}
+
+/**
+ * Where a vehicle wears (ThreeDWear), from its shape: its places of graffiti -- the empty nodes "grafiti_NN" of its file
+ * its record names, the side by where they lie -- and the places for pieces of rust on the flat upright faces of its
+ * sides and ends (the plan of 7. 11.: "the game finds the flat upright faces itself, as on the bridges"). A face is of
+ * its own file's triangles or its add-ons' (a Tatra of the colleague's is its add-ons: its cab, its chassis, its body)
+ * the state shows (parts), not of its wheels of their own files nor its crew, not of the glass, not of a light of its
+ * own, not see-through, not of a wheel that turns; turned out to a side (|n_y| > 0.97) or an end (|n_x| > 0.97)
+ * and upright, and on that side of its middle (the inner faces of an open wagon's walls are not). The triangles of a
+ * face on one plane laid into cells of WEAR_CELL_M, the places of graffiti taken out, and squares fully on it looked
+ * for, the biggest first, apart from each other.
+ */
+static void FindWearSpots(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, const ThreeDParts &parts, ThreeDWear &out)
+{
+	/* The places of graffiti, by the record's order. */
+	if (!obj.graffiti_places.empty() && !obj.file.ends_with(".s") && !obj.file.ends_with(".S")) {
+		GlbMesh none;
+		std::vector<float> points;
+		std::vector<std::string> names;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = "\x01";
+		o.points_only = true;
+		o.point_prefix = "grafiti_";
+		o.points = &points;
+		o.point_names = &names;
+		ReadGlbMesh(obj.file, none, o);
+		for (const ThreeDGraffitiPlace &place : obj.graffiti_places) {
+			auto it = std::ranges::find(names, place.node);
+			if (it == names.end()) {
+				Debug(misc, 1, "3D vehicle {}: the place of graffiti {} is not in {}", obj.name, place.node, obj.file);
+				continue;
+			}
+			const size_t k = static_cast<size_t>(it - names.begin()) * 3;
+			ThreeDWear::Spot s;
+			for (int a = 0; a < 3; a++) s.at[a] = points[k + a];
+			s.nx = 0;
+			s.ny = points[k + 1] >= 0 ? 1.0f : -1.0f;
+			s.w = place.w;
+			s.h = place.h;
+			out.graffiti.push_back(s);
+		}
+	}
+
+	/* The upright flat triangles of its body, each with the plane it lies on. */
+	struct Flat {
+		int axis;   ///< 0 an end (its normal along x), 1 a side (along y)
+		int sign;   ///< its normal to + or -
+		float plane;
+		size_t t;
+	};
+	std::vector<Flat> flats;
+	const size_t triangles = shape.tri.size() / 3;
+	const size_t own = shape.own_triangles > 0 ? std::min<size_t>(shape.own_triangles, triangles) : triangles;
+	const size_t addons_from = shape.addons_from > 0 ? std::min<size_t>(shape.addons_from, triangles) : triangles;
+	const float xc = (shape.x0 + shape.x1) / 2, yc = (shape.y0 + shape.y1) / 2;
+	const float hx = (shape.x1 - shape.x0) / 2, hy = (shape.y1 - shape.y0) / 2;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size();
+	for (size_t t = 0; t < triangles; t++) {
+		if (t >= own && t < addons_from) continue; // its wheels of their own files and its crew
+		if (shape.IsGlass(t) || !ThreeDVehicleShape::Shown(t < shape.tri_part.size() ? shape.tri_part[t] : 0, parts)) continue;
+		const size_t ti = t < shape.tri_tex.size() ? shape.tri_tex[t] : 0;
+		if (shape.Glow(ti) != 0 || shape.Alpha(ti) < 255) continue;
+		const uint32_t c[3] = {shape.tri[t * 3], shape.tri[t * 3 + 1], shape.tri[t * 3 + 2]};
+		if (!shape.corner_wheel.empty() && (shape.corner_wheel[c[0]] != 0 || shape.corner_wheel[c[1]] != 0 || shape.corner_wheel[c[2]] != 0)) continue;
+		const float *a = &shape.pos[c[0] * 3], *b = &shape.pos[c[1] * 3], *d = &shape.pos[c[2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+		double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		if (len < 2e-4) continue; // smaller than a square centimetre
+		nx /= len;
+		ny /= len;
+		nz /= len;
+		/* Its outer side as its normals have it, where it has them. */
+		if (has_nrm) {
+			double sx = 0, sy = 0, sz = 0;
+			for (uint32_t k : c) {
+				sx += shape.nrm[k * 3];
+				sy += shape.nrm[k * 3 + 1];
+				sz += shape.nrm[k * 3 + 2];
+			}
+			if (sx * nx + sy * ny + sz * nz < 0) {
+				nx = -nx;
+				ny = -ny;
+				nz = -nz;
+			}
+		}
+		if (std::abs(nz) > 0.08) continue;
+		Flat f;
+		if (std::abs(ny) > 0.97) {
+			f.axis = 1;
+			f.sign = ny > 0 ? 1 : -1;
+			f.plane = (a[1] + b[1] + d[1]) / 3;
+			if (f.sign * (f.plane - yc) < 0.3f * hy) continue;
+		} else if (std::abs(nx) > 0.97) {
+			f.axis = 0;
+			f.sign = nx > 0 ? 1 : -1;
+			f.plane = (a[0] + b[0] + d[0]) / 3;
+			if (f.sign * (f.plane - xc) < 0.5f * hx) continue;
+		} else {
+			continue;
+		}
+		f.t = t;
+		flats.push_back(f);
+	}
+	std::ranges::sort(flats, [](const Flat &p, const Flat &q) { return std::tie(p.axis, p.sign, p.plane) < std::tie(q.axis, q.sign, q.plane); });
+
+	float flat_area = 0;
+	struct Found {
+		ThreeDWear::Spot spot;
+		int size;
+		uint32_t order;
+	};
+	std::vector<Found> found;
+	for (size_t first = 0; first < flats.size();) {
+		/* A face: the triangles on one plane, within 2.5 cm. */
+		size_t last = first + 1;
+		while (last < flats.size() && flats[last].axis == flats[first].axis && flats[last].sign == flats[first].sign && flats[last].plane - flats[first].plane < 0.025f) last++;
+		const int axis = flats[first].axis, sign = flats[first].sign;
+		float plane = 0, u0 = std::numeric_limits<float>::max(), u1 = -u0, z0 = u0, z1 = -u0;
+		for (size_t k = first; k < last; k++) {
+			plane += flats[k].plane;
+			for (int i = 0; i < 3; i++) {
+				const float *p = &shape.pos[shape.tri[flats[k].t * 3 + i] * 3];
+				const float u = axis == 1 ? p[0] : p[1];
+				u0 = std::min(u0, u);
+				u1 = std::max(u1, u);
+				z0 = std::min(z0, p[2]);
+				z1 = std::max(z1, p[2]);
+			}
+		}
+		plane /= static_cast<float>(last - first);
+		const int cols = static_cast<int>(std::ceil((u1 - u0) / WEAR_CELL_M)), rows = static_cast<int>(std::ceil((z1 - z0) / WEAR_CELL_M));
+		if (cols < WEAR_SQUARES.back() + 2 || rows < WEAR_SQUARES.back() + 2 || cols > 2000 || rows > 400) {
+			first = last;
+			continue;
+		}
+		/* Its cells whose middles a triangle of it covers. */
+		std::vector<uint8_t> on(static_cast<size_t>(cols) * rows, 0);
+		for (size_t k = first; k < last; k++) {
+			float pu[3], pz[3];
+			for (int i = 0; i < 3; i++) {
+				const float *p = &shape.pos[shape.tri[flats[k].t * 3 + i] * 3];
+				pu[i] = ((axis == 1 ? p[0] : p[1]) - u0) / WEAR_CELL_M;
+				pz[i] = (p[2] - z0) / WEAR_CELL_M;
+			}
+			const float area = (pu[1] - pu[0]) * (pz[2] - pz[0]) - (pz[1] - pz[0]) * (pu[2] - pu[0]);
+			if (std::abs(area) < 1e-6f) continue;
+			const int c0 = std::max(0, static_cast<int>(std::floor(std::min({pu[0], pu[1], pu[2]})))), c1 = std::min(cols - 1, static_cast<int>(std::ceil(std::max({pu[0], pu[1], pu[2]}))));
+			const int r0 = std::max(0, static_cast<int>(std::floor(std::min({pz[0], pz[1], pz[2]})))), r1 = std::min(rows - 1, static_cast<int>(std::ceil(std::max({pz[0], pz[1], pz[2]}))));
+			for (int r = r0; r <= r1; r++) {
+				for (int cc = c0; cc <= c1; cc++) {
+					const float qu = cc + 0.5f, qz = r + 0.5f;
+					const float w0 = ((pu[2] - pu[1]) * (qz - pz[1]) - (pz[2] - pz[1]) * (qu - pu[1])) / area;
+					const float w1 = ((pu[0] - pu[2]) * (qz - pz[2]) - (pz[0] - pz[2]) * (qu - pu[2])) / area;
+					if (w0 < -1e-4f || w1 < -1e-4f || 1.0f - w0 - w1 < -1e-4f) continue;
+					on[static_cast<size_t>(r) * cols + cc] = 1;
+				}
+			}
+		}
+		/* How much of a place of graffiti on this side lies on this face (the rig: is it flat). */
+		for (ThreeDWear::Spot &g : out.graffiti) {
+			if (axis != 1 || g.ny != static_cast<float>(sign) || std::abs(g.at[1] - plane) > 0.03f) continue;
+			size_t in = 0, all = 0;
+			for (float z = g.at[2] - g.h / 2 + WEAR_CELL_M / 2; z < g.at[2] + g.h / 2; z += WEAR_CELL_M) {
+				for (float u = g.at[0] - g.w / 2 + WEAR_CELL_M / 2; u < g.at[0] + g.w / 2; u += WEAR_CELL_M) {
+					all++;
+					const int cc = static_cast<int>((u - u0) / WEAR_CELL_M), r = static_cast<int>((z - z0) / WEAR_CELL_M);
+					if (cc >= 0 && cc < cols && r >= 0 && r < rows && on[static_cast<size_t>(r) * cols + cc] != 0) in++;
+				}
+			}
+			if (all > 0) g.flat = std::max(g.flat, static_cast<float>(in) / all);
+		}
+		/* Not where a graffiti is, nor a hand's breadth round it. */
+		for (const ThreeDWear::Spot &g : out.graffiti) {
+			if (axis != 1 || g.ny != static_cast<float>(sign) || std::abs(g.at[1] - plane) > 0.15f) continue;
+			const int gc0 = std::max(0, static_cast<int>(std::floor((g.at[0] - g.w / 2 - 0.1f - u0) / WEAR_CELL_M))), gc1 = std::min(cols - 1, static_cast<int>(std::ceil((g.at[0] + g.w / 2 + 0.1f - u0) / WEAR_CELL_M)));
+			const int gr0 = std::max(0, static_cast<int>(std::floor((g.at[2] - g.h / 2 - 0.1f - z0) / WEAR_CELL_M))), gr1 = std::min(rows - 1, static_cast<int>(std::ceil((g.at[2] + g.h / 2 + 0.1f - z0) / WEAR_CELL_M)));
+			for (int r = gr0; r <= gr1; r++) {
+				for (int cc = gc0; cc <= gc1; cc++) on[static_cast<size_t>(r) * cols + cc] = 0;
+			}
+		}
+		size_t covered = 0;
+		for (uint8_t v : on) covered += v;
+		flat_area += covered * WEAR_CELL_M * WEAR_CELL_M;
+		/* The sums of the cells covered, for a square at once. */
+		std::vector<uint32_t> sum(static_cast<size_t>(cols + 1) * (rows + 1), 0);
+		for (int r = 0; r < rows; r++) {
+			for (int cc = 0; cc < cols; cc++) {
+				sum[static_cast<size_t>(r + 1) * (cols + 1) + cc + 1] = on[static_cast<size_t>(r) * cols + cc] + sum[static_cast<size_t>(r) * (cols + 1) + cc + 1] + sum[static_cast<size_t>(r + 1) * (cols + 1) + cc] - sum[static_cast<size_t>(r) * (cols + 1) + cc];
+			}
+		}
+		auto full = [&](int c, int r, int n) {
+			const size_t w = cols + 1;
+			return sum[(r + n) * w + c + n] + sum[r * w + c] - sum[r * w + c + n] - sum[(r + n) * w + c] == static_cast<uint32_t>(n * n);
+		};
+		/* Squares on it, a cell of it round each to its edge, apart from each other; the biggest first, from places as by
+		 * chance (the same every run). */
+		std::vector<uint8_t> used(on.size(), 0);
+		const uint32_t face_seed = static_cast<uint32_t>(axis * 2 + (sign > 0) + 4 * static_cast<int>(std::lround(plane * 100)));
+		for (int n : WEAR_SQUARES) {
+			const int m = n + 2;
+			if (m > cols || m > rows) continue;
+			std::vector<std::pair<uint32_t, int>> starts;
+			for (int r = 0; r + m <= rows; r++) {
+				for (int cc = 0; cc + m <= cols; cc++) starts.emplace_back(WearHash(face_seed, static_cast<uint32_t>(r * cols + cc)), r * cols + cc);
+			}
+			std::ranges::sort(starts);
+			for (const auto &[h, at] : starts) {
+				if (found.size() >= WEAR_MAX_SPOTS * 4) break;
+				const int r = at / cols, cc = at % cols;
+				if (!full(cc, r, m)) continue;
+				bool free = true;
+				for (int y = r; y < r + m && free; y++) {
+					for (int x = cc; x < cc + m && free; x++) free = used[static_cast<size_t>(y) * cols + x] == 0;
+				}
+				if (!free) continue;
+				for (int y = r; y < r + m; y++) {
+					for (int x = cc; x < cc + m; x++) used[static_cast<size_t>(y) * cols + x] = 1;
+				}
+				const float u = u0 + (cc + m / 2.0f) * WEAR_CELL_M, z = z0 + (r + m / 2.0f) * WEAR_CELL_M;
+				ThreeDWear::Spot s;
+				s.at[0] = axis == 1 ? u : plane;
+				s.at[1] = axis == 1 ? plane : u;
+				s.at[2] = z;
+				s.nx = axis == 0 ? static_cast<float>(sign) : 0.0f;
+				s.ny = axis == 1 ? static_cast<float>(sign) : 0.0f;
+				s.w = s.h = n * WEAR_CELL_M;
+				found.push_back({s, n, h});
+			}
+		}
+		first = last;
+	}
+	/* The biggest first, then as found: as many as any vehicle of it has at most. */
+	std::ranges::stable_sort(found, [](const Found &p, const Found &q) { return p.size > q.size; });
+	for (const Found &f : found) {
+		if (out.rust.size() >= WEAR_MAX_SPOTS) break;
+		out.rust.push_back(f.spot);
+	}
+	out.rust_full = static_cast<uint32_t>(std::min<size_t>(out.rust.size(), std::clamp<uint32_t>(static_cast<uint32_t>(flat_area / WEAR_M2_A_PIECE), WEAR_MIN_PIECES, WEAR_MAX_PIECES)));
+	Debug(misc, 2, "3D vehicle {}: wear: {} places of graffiti, {} places for rust on {:.1f} m2 of flat faces, {} pieces at most", obj.name, out.graffiti.size(), out.rust.size(), flat_area, out.rust_full);
+}
+
+/**
+ * The boards of a wear (ThreeDVehicleState::wear): the graffiti on as many of its places as are sprayed, the places in
+ * an order of the vehicle's variant, each a graffiti of the walls that fits it well -- shrunk to fit, not made bigger --,
+ * of the variant and the place; the pieces of rust, as many as its level gives, on its places in another order of the
+ * variant, each a piece that fits its place (a smaller one where a bigger one would be shrunk under 60 %).
+ */
+void ThreeDWear::Boards(uint32_t wear, std::vector<ThreeDWearBoard> &out) const
+{
+	out.clear();
+	const uint32_t variant = wear & 0xFF, sprayed = (wear >> 8) & 0xFF, rusted = std::min<uint32_t>((wear >> 16) & 0xFF, THREE_D_WEAR_RUST_LEVELS);
+	/* A board of size w x h, sized, its middle on a place, off its face. */
+	auto lay = [&out](const std::string &name, const Spot &s, float scale, float off) {
+		const ThreeDVehicleObject *fig = GetThreeDFigure(name);
+		if (fig == nullptr) return;
+		const auto [w, h] = GetThreeDBoardSize(name);
+		const float turn = std::atan2(s.nx, -s.ny), c = std::cos(turn), sn = std::sin(turn);
+		ThreeDWearBoard &b = out.emplace_back();
+		b.fig = fig;
+		b.at[0] = s.at[0] - c * w * scale / 2 + s.nx * off;
+		b.at[1] = s.at[1] - sn * w * scale / 2 + s.ny * off;
+		b.at[2] = s.at[2] - h * scale / 2;
+		b.turn = turn * 180.0f / static_cast<float>(M_PI);
+		b.scale = scale;
+	};
+	/* The places in an order of the variant. */
+	auto order = [variant](size_t n, uint32_t salt) {
+		std::vector<std::pair<uint32_t, size_t>> o;
+		for (size_t i = 0; i < n; i++) o.emplace_back(WearHash(variant * 7919u + salt, static_cast<uint32_t>(i)), i);
+		std::ranges::sort(o);
+		return o;
+	};
+	const std::span<const std::string> graffiti = GetThreeDGraffiti();
+	if (sprayed > 0 && !graffiti.empty() && !this->graffiti.empty()) {
+		const auto places = order(this->graffiti.size(), 1);
+		for (size_t k = 0; k < places.size() && k < sprayed; k++) {
+			const Spot &s = this->graffiti[places[k].second];
+			/* The graffiti that fit it well: as much of it covered as the best covers, or nearly. */
+			std::vector<std::pair<size_t, float>> fit;
+			float best = 0;
+			for (size_t g = 0; g < graffiti.size(); g++) {
+				const auto [w, h] = GetThreeDBoardSize(graffiti[g]);
+				const float scale = std::min({1.0f, s.w / w, s.h / h});
+				const float covers = w * scale * h * scale / (s.w * s.h);
+				fit.emplace_back(g, scale);
+				best = std::max(best, covers);
+			}
+			std::erase_if(fit, [&](const std::pair<size_t, float> &f) {
+				const auto [w, h] = GetThreeDBoardSize(graffiti[f.first]);
+				return w * f.second * h * f.second / (s.w * s.h) < 0.5f * best;
+			});
+			if (fit.empty()) continue;
+			const auto &[g, scale] = fit[WearHash(variant + 101, static_cast<uint32_t>(places[k].second)) % fit.size()];
+			lay(graffiti[g], s, scale, WEAR_GRAFFITI_OFF_M);
+		}
+	}
+	const std::span<const std::string> pieces = GetThreeDRustPieces();
+	if (rusted > 0 && !pieces.empty() && !this->rust.empty() && this->rust_full > 0) {
+		const uint32_t count = std::max<uint32_t>(1, (this->rust_full * rusted + THREE_D_WEAR_RUST_LEVELS - 1) / THREE_D_WEAR_RUST_LEVELS);
+		const auto places = order(this->rust.size(), 2);
+		for (size_t k = 0; k < places.size() && k < count; k++) {
+			const Spot &s = this->rust[places[k].second];
+			size_t piece = 0;
+			float scale = 0;
+			for (uint32_t attempt = 0; attempt < 8; attempt++) {
+				piece = WearHash(variant + 211, static_cast<uint32_t>(places[k].second * 8 + attempt)) % pieces.size();
+				const auto [w, h] = GetThreeDBoardSize(pieces[piece]);
+				scale = std::min(1.0f, (s.w - 0.02f) / std::max(w, h));
+				if (scale >= 0.6f) break;
+			}
+			if (scale > 0.2f) lay(pieces[piece], s, scale, WEAR_RUST_OFF_M);
+		}
+	}
+}
+
+/**
+ * Where it wears with the parts a state shows (FindWearSpots()), found the first time asked for, once its shape is read
+ * with them; nullptr till then.
+ */
+const ThreeDWear *ThreeDVehicleObject::Wear(const ThreeDParts &parts) const
+{
+	const std::pair<uint64_t, uint64_t> key{parts.bits[0], parts.bits[1]};
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->wear_spots.find(key);
+		if (it != this->wear_spots.end()) return it->second.get();
+	}
+	const ThreeDVehicleShape *shape = this->TryGetShape(0, parts);
+	if (shape == nullptr) return nullptr;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		if (!this->shape_parts.Contains(parts)) return nullptr; // its parts not added yet
+	}
+	auto made = std::make_shared<ThreeDWear>();
+	FindWearSpots(*this, *shape, parts, *made);
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->wear_spots.emplace(key, std::move(made));
+	return it->second.get();
+}
+
+/**
+ * A state as another (0 as it is) but worn as old as the vehicle is (ThreeDVehicleState::wear: the player, 7. 11.,
+ * "graffiti and rust"): its boards laid, as the pieces of a load are (GetThreeDLoadPieces()). Made the first time, a
+ * step after its states as ComposeState() makes them; as it is where nothing of it is laid, or while its shape is not
+ * yet read (new till it is).
+ * @param wear the vehicle's wear, 0 new
+ */
+int ThreeDVehicleObject::WornStateOf(int step, uint32_t wear) const
+{
+	if (wear == 0) return step;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->worn_steps.find({step, wear});
+		if (it != this->worn_steps.end()) return it->second;
+	}
+	const ThreeDWear *spots = this->Wear(this->PartsOf(step));
+	if (spots == nullptr) return step;
+	std::vector<ThreeDWearBoard> boards;
+	spots->Boards(wear, boards);
+	ThreeDVehicleState made;
+	if (!boards.empty()) {
+		if (const ThreeDVehicleState *s = this->State(step); s != nullptr) {
+			std::lock_guard lock(_lazy_mutex);
+			made = *s;
+		} else {
+			made.addon_parts.assign(this->addons.size(), -1);
+			made.addon_colours.assign(this->addons.size(), 0);
+		}
+		made.wear = wear;
+		made.wear_boards = std::move(boards);
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->worn_steps.emplace(std::make_pair(step, wear), step);
+	if (!added || made.wear == 0) return it->second;
 	this->composed.push_back(std::move(made));
 	it->second = static_cast<int>(this->states.size() + this->composed.size());
 	return it->second;

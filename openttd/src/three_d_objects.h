@@ -487,6 +487,8 @@ struct ThreeDVehicleShape {
 	std::vector<int8_t> tex_addon;      ///< each texture's add-on (ThreeDVehicleObject::addons), -1 none
 	std::vector<uint8_t> corner_wheel;  ///< each corner's wheel that turns, n the wheel n - 1 of ThreeDVehicleObject::model_wheels, 0 none; empty none
 	float glass_alpha = 0.15f;          ///< how much of the glass's colour a layer of it lays over
+	uint32_t own_triangles = 0;         ///< the triangles of its own file, first: then those of its wheels of their own files and of its crew ...
+	uint32_t addons_from = 0;           ///< ... then from this one on those of its add-ons; 0 not known (all of its own file)
 	/* The parts of its add-ons (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md, points 5, 6 and 10): the windows,
 	 * the lamps and the wheels are in each part's node, shown with it -- the cab's windows and its headlights only
 	 * where the cab is. */
@@ -653,6 +655,18 @@ struct ThreeDPlacedLoad {
 };
 
 /**
+ * A board laid on a vehicle's face as it wears (a graffiti, a piece of rust): its figure, a board as glTF has it --
+ * from its origin at its left foot along +x, up +y, its face to +z (objekty/nase/grafiti.py, rez_kusy.py) -- where its
+ * origin lies in the vehicle's frame, turned about z and sized, as a piece of a load (ThreeDLoadPlace).
+ */
+struct ThreeDWearBoard {
+	const struct ThreeDVehicleObject *fig = nullptr;
+	float at[3] = {};
+	float turn = 0;   ///< degrees: 0 its face to -y, 180 to +y, 90 to +x
+	float scale = 1.0f;
+};
+
+/**
  * A state of a vehicle object chosen by its GRF ("stavy", grrrrf hra/3d/ROZHRANI-GRF-STAVY.md): the GRF picks a set of
  * its sprites for the vehicle by its own rules (random bits, age, breakdown, load …) and a set whose first sprite is
  * numbered within [first, last] in the GRF draws the object so. The game decides nothing of it by itself (the player,
@@ -691,7 +705,47 @@ struct ThreeDVehicleState {
 	 * the index: the game puts the vehicle's own into the state it draws (ThreeDVehicleObject::ComposeState()).
 	 */
 	uint16_t true_colours = 0;
+	/**
+	 * Its wear as old as the vehicle is (the player, 7. 11.: "graffiti and rust"; ThreeDVehicleObject::WornStateOf()):
+	 * its variant, the vehicle's own of THREE_D_WEAR_VARIANTS (bits 0-7), how many of its places of graffiti are
+	 * sprayed (bits 8-15) and how far it has rusted in pieces (bits 16-23, to THREE_D_WEAR_RUST_LEVELS); 0 new. Not of
+	 * the index: the game puts the vehicle's own into the state it draws, its boards laid as the pieces of a load are
+	 * (GetThreeDLoadPieces()).
+	 */
+	uint32_t wear = 0;
+	std::vector<ThreeDWearBoard> wear_boards; ///< and the boards of it, where they lie (ThreeDWear::Boards())
 	static constexpr uint8_t GIVEN_COLOUR = 1, GIVEN_FADE = 2, GIVEN_RUST = 4, GIVEN_TURN = 8;
+};
+
+/** How many ways an object's vehicles wear (ThreeDVehicleState::wear): each vehicle one of them by its number, so the wagons of a train differ. */
+static constexpr uint32_t THREE_D_WEAR_VARIANTS = 16;
+/** How far an old vehicle rusts in pieces: a level at 8 years, another every 2 years, all at 20 (the plan of 7. 11.). */
+static constexpr uint32_t THREE_D_WEAR_RUST_LEVELS = 7;
+
+/** A place of graffiti on a vehicle's side ("grafiti" of its record, the colleague's hra/3d/GRAFITI-VAGONY-PRO-HRU.md): an empty node of its file at the place's middle on the side's face. */
+struct ThreeDGraffitiPlace {
+	std::string node; ///< "uzel": "grafiti_NN"
+	float w = 1.0f;   ///< "sirka_m": along the vehicle, metres
+	float h = 1.0f;   ///< "vyska_m"
+};
+
+/**
+ * Where a vehicle object wears (ThreeDVehicleObject::Wear()), found once from its shape: its places of graffiti read
+ * from its file, and the places on the flat upright faces of its sides and ends a piece of rust fits on -- not its
+ * roof, its glass, its lights, its wheels, the parts its states show nor the places of graffiti.
+ */
+struct ThreeDWear {
+	/** A flat place: its middle on the face, the face's normal out (horizontal), how big a square fits there. */
+	struct Spot {
+		float at[3];
+		float nx, ny;
+		float w, h; ///< a place of graffiti: its size; a place for rust: the side of the square that fits
+		float flat = 0; ///< a place of graffiti: how much of it lies on a flat face of the side within 3 cm of it, 0 to 1 (the rig: 'test3d opotrebeni popis')
+	};
+	std::vector<Spot> graffiti; ///< by the places of its record, those found in its file
+	std::vector<Spot> rust;     ///< in the order they were found (biggest first), apart from each other
+	uint32_t rust_full = 0;     ///< how many pieces of rust it has at the last level
+	void Boards(uint32_t wear, std::vector<ThreeDWearBoard> &out) const;
 };
 
 /** A figure riding in a vehicle object ("posadka"): a figure of an index ("druh": "postava"), where its feet stand, turned. */
@@ -873,6 +927,8 @@ struct ThreeDVehicleObject {
 	ThreeDParts seat_groups;  ///< by part, the groups of the crew one of which sits at the driver's seat ("misto_ridicky"): the record's driver not drawn where they are shown
 	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
 	mutable std::map<int, int> empty_steps; ///< the step of each state standing empty (EmptyStateOf()), made the first time
+	mutable std::map<std::pair<int, uint32_t>, int> worn_steps; ///< the step of each state worn (WornStateOf()), by the state and its wear
+	mutable std::map<std::pair<uint64_t, uint64_t>, std::shared_ptr<const ThreeDWear>> wear_spots; ///< where it wears (Wear()), by the parts its state shows, found the first time it is drawn worn so
 	std::vector<ThreeDVehicleAddon> addons;  ///< "doplnky"
 	std::vector<std::string> part_names;     ///< the parts the states show: each add-on's nodes ("<soubor>/<uzel>"), then the crew's groups ("posadky/<jmeno>"); part n is bit n of a state's parts
 	std::vector<ThreeDModelWheel> model_wheels; ///< "kola_v_modelu"
@@ -927,6 +983,9 @@ struct ThreeDVehicleObject {
 	std::string detail_file;        ///< "maska_podrobnosti": the mask of details of its body's texture (ThreeDDetailMask), its path; empty none
 	std::string body;               ///< a vehicle that is an animal of a set ("sada_objektu", "objekt": the colleague's horses of the Special): its figure, drawn in a gait ("<body>/stoji", "chuze", "klus", "cval") at its frame (ShapeFrame())
 	bool body_on_bones = false;     ///< the figures of all its gaits (body) are on bones: the card poses it as them (OnBones(), GetBones())
+	std::vector<ThreeDGraffitiPlace> graffiti_places; ///< "grafiti": the places of graffiti on its sides
+	uint8_t graffiti_from = 3;      ///< "grafiti_od_let": the first sprayed at so many years of age ...
+	uint8_t graffiti_every = 3;     ///< "grafiti_po_letech": ... and another every so many years, till all its places are
 
 	const ThreeDVehicleObject *BodyAt(int &frame) const;
 	void ForHeldTextures(const std::function<void(const ThreeDTextureLevels &, const char *)> &fn) const;
@@ -971,6 +1030,8 @@ struct ThreeDVehicleObject {
 	int ComposeState(const std::vector<int> &layers, uint16_t true_colours = 0, uint64_t load = 0) const;
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
+	int WornStateOf(int step, uint32_t wear) const;
+	const ThreeDWear *Wear(const ThreeDParts &parts) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const;
 	void Forget() const;
@@ -1040,6 +1101,9 @@ std::span<const ThreeDIvy> GetThreeDIvies();
 std::span<const std::string> GetThreeDGraffiti();
 /** The places where the concrete has spalled off ("druh": "zed_odprysk", our objekty/nase/beton_5m.py): boards laid on the concrete at random. */
 std::span<const std::string> GetThreeDConcreteSpalls();
+/** The pieces of rust of old vehicles ("druh": "vuz_rez", our objekty/nase/rez_kusy.py): boards laid on their sides and ends as they age. */
+std::span<const std::string> GetThreeDRustPieces();
+std::pair<float, float> GetThreeDBoardSize(std::string_view name);
 
 /**
  * A piece of the shared loads (the colleague's objekty/naklady, hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md): a pallet of

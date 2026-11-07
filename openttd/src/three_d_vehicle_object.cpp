@@ -234,7 +234,7 @@ static uint64_t LoadCode(const ThreeDVehicleObject *obj, const std::vector<int> 
 	return static_cast<uint64_t>(count) << 32 | label;
 }
 
-static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
+static int GrfStateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
 {
 	/* The vehicle's colours of its set for its masks of details (the colleague's hra/3d/PROSBA-NAKLADAKY-TATRA-3D.md,
 	 * point 2): as its 2D pictures are painted (GetCustomEngineSprite()), the default ones in the purchase list. */
@@ -320,16 +320,106 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 	return obj->ComposeState(layers, painted, LoadCode(obj, layers, loaded_by != nullptr ? loaded_by->v : v, engine));
 }
 
+int _three_d_rig_wear_years = -1; ///< the rig's age of every vehicle's wear ('test3d opotrebeni'), years; -1 their own
+
+/**
+ * How a vehicle has worn as old as it is (ThreeDVehicleState::wear; the player, 7. 11.: "graffiti and rust", the plan:
+ * a train, a wagon, a car, a bus or a boat, not an aircraft; new clean, a renewed one new again): of its places of
+ * graffiti the first sprayed at "grafiti_od_let" years (3), another every "grafiti_po_letech" (3) till all are; the
+ * first pieces of rust at 8 years, more every 2 years, all at 20 (THREE_D_WEAR_RUST_LEVELS). Which places and which
+ * boards by its variant, one of THREE_D_WEAR_VARIANTS by its number, so the wagons of a train differ. In the purchase
+ * list and the news new; an animal (a horse of the Special) never.
+ * @return the wear, 0 new
+ */
+static uint32_t WearCode(const ThreeDVehicleObject *obj, const Vehicle *v, EngineImageType image_type)
+{
+	if (v == nullptr || image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview) return 0;
+	if (v->type != VehicleType::Train && v->type != VehicleType::Road && v->type != VehicleType::Ship) return 0;
+	if (!obj->body.empty() || !obj->frame_prefix.empty() || !obj->skeleton_file.empty()) return 0;
+	const int years = _three_d_rig_wear_years >= 0 ? _three_d_rig_wear_years : std::max(v->age.base(), 0) / CalendarTime::DAYS_IN_YEAR;
+	uint32_t sprayed = 0;
+	if (!obj->graffiti_places.empty() && years >= obj->graffiti_from) {
+		sprayed = std::min<uint32_t>(static_cast<uint32_t>(obj->graffiti_places.size()), 1 + static_cast<uint32_t>(years - obj->graffiti_from) / obj->graffiti_every);
+	}
+	const uint32_t rusted = years >= 8 ? std::min<uint32_t>(THREE_D_WEAR_RUST_LEVELS, 1 + static_cast<uint32_t>(years - 8) / 2) : 0;
+	if (sprayed == 0 && rusted == 0) return 0;
+	const uint32_t variant = (static_cast<uint32_t>(v->index.base()) * 2654435761u >> 16) % THREE_D_WEAR_VARIANTS;
+	return variant | std::min<uint32_t>(sprayed, 0xFF) << 8 | rusted << 16;
+}
+
+/**
+ * The step of the state a vehicle object is drawn in (ThreeDVehicleObject::State()): that its GRF picks (GrfStateStep()),
+ * worn as old as the vehicle is (WearCode(), ThreeDVehicleObject::WornStateOf()).
+ * @return its step; 0 none: the object as it is, its paint new, no rust
+ */
+static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehicle *v, EngineImageType image_type)
+{
+	const int step = GrfStateStep(obj, engine, v, image_type);
+	const uint32_t wear = WearCode(obj, v, image_type);
+	return wear == 0 ? step : obj->WornStateOf(step, wear);
+}
+
+/**
+ * The rig ('test3d opotrebeni objekt <jmeno>'): where a vehicle object wears in its first state -- the places of graffiti
+ * found in its file and how flat each is, the places for rust -- its shape read now; no vehicle of it needed (the Raj
+ * of the colleague's wagons, of a cargo the rig's game has not).
+ */
+std::string DescribeThreeDObjectWear(std::string_view name)
+{
+	const ThreeDVehicleObject *obj = GetThreeDVehicleObjectNamed(name);
+	if (obj == nullptr) return fmt::format("{}: neni", name);
+	const ThreeDParts parts = obj->PartsOf(0);
+	if (obj->GetShape(0, parts) == nullptr) return fmt::format("{}: tvar nejde precist", name);
+	const ThreeDWear *spots = obj->Wear(parts);
+	if (spots == nullptr) return fmt::format("{}: tvar jeste neprecten", name);
+	std::string out = fmt::format("{}: mist grafiti {}/{}, mist pro rez {}, kusu rzi nejvys {}", obj->name, spots->graffiti.size(), obj->graffiti_places.size(), spots->rust.size(), spots->rust_full);
+	for (size_t k = 0; k < spots->graffiti.size(); k++) {
+		const ThreeDWear::Spot &g = spots->graffiti[k];
+		out += fmt::format("; misto grafiti {} [{:.2f} {:.2f} {:.2f}] {:.2f} x {:.2f} m rovne {:.0f} %", k + 1, g.at[0], g.at[1], g.at[2], g.w, g.h, g.flat * 100);
+	}
+	return out;
+}
+
+/**
+ * The rig ('test3d opotrebeni popis'): how a vehicle drawn by an object has worn -- its object, its age, its wear, the
+ * places of graffiti and for rust found on its object, and the boards laid, each its figure, where and how big.
+ * @return empty for a vehicle of no object, or not the one its object is drawn by
+ */
+std::string DescribeThreeDVehicleWear(const Vehicle *v)
+{
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
+	if (obj == nullptr || piece != obj->anchor) return {};
+	const uint32_t wear = WearCode(obj, v, EngineImageType::OnMap);
+	const ThreeDVehicleState *st = obj->State(StateStep(obj, v->engine_type, v, EngineImageType::OnMap));
+	const ThreeDWear *spots = obj->Wear(obj->PartsOf(GrfStateStep(obj, v->engine_type, v, EngineImageType::OnMap)));
+	if (spots == nullptr) return fmt::format("{}: tvar jeste neprecten", obj->name);
+	std::string out = fmt::format("{} {} let, opotrebeni {:#x} (varianta {}, grafiti {}, rez {}); mist grafiti {}/{}, mist pro rez {}, kusu rzi nejvys {}", obj->name,
+		std::max(v->age.base(), 0) / CalendarTime::DAYS_IN_YEAR, wear, wear & 0xFF, (wear >> 8) & 0xFF, (wear >> 16) & 0xFF,
+		spots != nullptr ? spots->graffiti.size() : 0, obj->graffiti_places.size(), spots != nullptr ? spots->rust.size() : 0, spots != nullptr ? spots->rust_full : 0);
+	for (size_t k = 0; k < spots->graffiti.size(); k++) {
+		out += fmt::format("; misto grafiti {} rovne {:.0f} %", k + 1, spots->graffiti[k].flat * 100);
+	}
+	if (st != nullptr) {
+		for (const ThreeDWearBoard &b : st->wear_boards) {
+			out += fmt::format("; {} [{:.2f} {:.2f} {:.2f}] {:.0f}st x{:.2f}", b.fig != nullptr ? b.fig->name : std::string("?"), b.at[0], b.at[1], b.at[2], b.turn, b.scale);
+		}
+	}
+	return out;
+}
+
 /**
  * The pieces of the shared loads a state carries, a kind of piece in a colour each: those side by side on the bed, as
  * many as are loaded (ThreeDVehicleState::load_piece), and those on their own places (ThreeDVehicleState::placed_loads);
- * of their own colour or their cargo's, where each lies on the bed.
+ * of their own colour or their cargo's, where each lies on the bed. And the boards of its wear (the graffiti and the
+ * pieces of rust of an old vehicle, ThreeDVehicleState::wear_boards), laid as the pieces are, so drawn wherever they
+ * are: on the map, from the eyes and from the cab.
  * @return false none
  */
 bool GetThreeDLoadPieces(const ThreeDVehicleState *st, std::vector<ThreeDLoadPieces> &out)
 {
 	out.clear();
-	if (st == nullptr || !st->bed.Given()) return false;
+	if (st == nullptr || (!st->bed.Given() && st->wear_boards.empty())) return false;
 	/* The kind of a figure in a frame and a state, those of one kind together. */
 	auto kind = [&out](const ThreeDVehicleObject *fig, int frame, int state) -> ThreeDLoadPieces * {
 		if (fig == nullptr) return nullptr;
@@ -347,7 +437,7 @@ bool GetThreeDLoadPieces(const ThreeDVehicleState *st, std::vector<ThreeDLoadPie
 		if (piece.figure.empty()) return nullptr;
 		return kind(GetThreeDFigure(piece.figure), piece.frame, ThreeDLoadColourState(piece, st->load_label, colour));
 	};
-	const ThreeDLoadPiece *piece = st->load_piece.empty() ? nullptr : GetThreeDLoadPiece(st->load_piece);
+	const ThreeDLoadPiece *piece = st->load_piece.empty() || !st->bed.Given() ? nullptr : GetThreeDLoadPiece(st->load_piece);
 	if (piece != nullptr && (st->load_count > 0 || !piece->seats.empty())) {
 		/* Pieces with seats (the benches of the girls) all, as many as the bed takes, empty too when the state shows them;
 		 * the others as many as are loaded. */
@@ -368,9 +458,12 @@ bool GetThreeDLoadPieces(const ThreeDVehicleState *st, std::vector<ThreeDLoadPie
 		}
 	}
 	for (const ThreeDPlacedLoad &placed : st->placed_loads) {
-		const ThreeDLoadPiece *piece = GetThreeDLoadPiece(placed.piece);
+		const ThreeDLoadPiece *piece = st->bed.Given() ? GetThreeDLoadPiece(placed.piece) : nullptr;
 		if (piece == nullptr) continue;
 		if (ThreeDLoadPieces *k = kind_of(*piece, placed.colour); k != nullptr) k->places.push_back({{placed.at[0], placed.at[1], st->bed.floor}, 0.0f});
+	}
+	for (const ThreeDWearBoard &b : st->wear_boards) {
+		if (ThreeDLoadPieces *k = kind(b.fig, 0, 0); k != nullptr) k->places.push_back({{b.at[0], b.at[1], b.at[2]}, b.turn, b.scale});
 	}
 	std::erase_if(out, [](const ThreeDLoadPieces &k) { return k.places.empty(); });
 	return !out.empty();
