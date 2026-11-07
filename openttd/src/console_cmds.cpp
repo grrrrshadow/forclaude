@@ -1153,7 +1153,10 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 	}
 
 	std::string why = "zadny typ lodi";
+	/* 'testlod <x> <y> <text>': only a ship whose name has the text (the sets' boats, "Plachetnice"). */
+	const std::string_view named = argv.size() > 3 ? argv[3] : std::string_view();
 	for (const Engine *e : Engine::IterateType(VehicleType::Ship)) {
+		if (!named.empty() && GetString(STR_ENGINE_NAME, e->index).find(named) == std::string::npos) continue;
 		auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
 		if (cost.Failed()) {
 			why = RefusalReason(cost);
