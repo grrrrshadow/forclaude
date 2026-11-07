@@ -2409,6 +2409,8 @@ STR_FIRST_PERSON_PLANT_GROWING                                  :Marihuana roste
 STR_FIRST_PERSON_PLANT_RIPE                                     :E: sklidit marihuanu
 STR_FIRST_PERSON_PLANT_HAY                                      :E: sklidit marihuanové seno
 STR_FIRST_PERSON_BOARD_HERE                                     :E: nastoupit do {VEHICLE}
+STR_FIRST_PERSON_HELM_HERE                                      :E: řídit {VEHICLE}
+STR_FIRST_PERSON_ASHORE_HERE                                    :E: vystoupit na břeh
 STR_FIRST_PERSON_PICK_HERE                                      :E: utrhnout houbu ({RAW_STRING})
 STR_FIRST_PERSON_FEED_DRAGON                                    :E: nakrmit draka
 STR_FIRST_PERSON_GRILL                                          :E: grilovat u ohně

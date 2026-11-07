@@ -6110,6 +6110,18 @@ static void ReadThreeDVehicleObjects()
 					for (int k = 0; k < 3; k++) obj.cab[k] = e.at("kabina").at(k).get<float>();
 					obj.has_cab = true;
 				}
+				/* The helmsman of a boat (the colleague's hra/3d/LODE-3D-PRO-HRU.md, "ridic"): his eyes the cab's when it has
+				 * no "kabina", and where he stands or sits -- the walker there on the deck when he lets go of the wheel. */
+				if (e.contains("ridic") && e.at("ridic").is_object()) {
+					const auto &helmsman = e.at("ridic");
+					auto point = [&](const char *key, float (&out)[3]) {
+						if (!helmsman.contains(key) || !helmsman.at(key).is_array() || helmsman.at(key).size() != 3) return false;
+						for (int k = 0; k < 3; k++) out[k] = helmsman.at(key).at(k).get<float>();
+						return true;
+					};
+					if (!obj.has_cab) obj.has_cab = point("oko", obj.cab);
+					obj.has_helm = point("poloha", obj.helm);
+				}
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
 				if (e.contains("svetla") && e.at("svetla").is_object()) {

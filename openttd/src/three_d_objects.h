@@ -826,6 +826,8 @@ struct ThreeDVehicleObject {
 	bool has_cab = false;           ///< "kabina": where the eye of the cab view is
 	bool lights_off = false;        ///< "svetla" "vychozi": "off": it has no lights, never lit (a horse, a barrow), VehicleLightsOn()
 	float cab[3] = {};              ///< x, y, z, metres
+	bool has_helm = false;          ///< "ridic" "poloha": where its helmsman stands or sits (the colleague's boats): the walker stands there when he lets go of the wheel
+	float helm[3] = {};             ///< x, y, z, metres
 	std::string msts_cab;           ///< an engine of MSTS: its cab's .cvf (SimtrainsCab), empty none
 	ThreeDVehiclePaint paint;       ///< "lak"; a tree's: its first part painted by its use (its crown, "barvy_casti"), the colour its state's
 	ThreeDVehiclePaint second_paint; ///< a tree's second part painted by its use (its snow over the crown): its mask and "zacatek", the colour its state's (second_colour)

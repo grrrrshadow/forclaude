@@ -76,6 +76,10 @@ struct ThreeDEyeVehicle {
 	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
 bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
+/** How level a face is to be stood on (ThreeDVehicleDeckZ()): its normal's up at least so much of it; steeper ones are walls (ThreeDVehicleBlocks()). */
+static constexpr double THREE_D_DECK_LEVEL = 0.7;
+std::optional<double> ThreeDVehicleDeckZ(const struct ThreeDVehicleObject &obj, double x, double y, double up_to);
+bool ThreeDVehicleBlocks(const struct ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z);
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 
