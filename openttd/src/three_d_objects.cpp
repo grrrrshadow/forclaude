@@ -2345,6 +2345,38 @@ static void TakeGlbFloors(const GlbMesh &mesh, ThreeDObject &obj, uint16_t first
 }
 
 /**
+ * The rig ('testlod glbobj'): a .glb file on the disk, all its nodes as an interior is read, as a Wavefront file (a
+ * group a texture), its corners as the game reads them.
+ * @return what was done, for the console
+ */
+std::string WriteGlbAsObj(const std::string &glb, const std::string &out)
+{
+	GlbMesh mesh;
+	GlbReadOptions o;
+	o.all_nodes = true;
+	if (!ReadGlbMesh(glb, mesh, o) || mesh.pos.empty()) return fmt::format("{} nejde precist", glb);
+	std::string text;
+	double lo[3] = {1e9, 1e9, 1e9}, hi[3] = {-1e9, -1e9, -1e9};
+	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
+		text += fmt::format("v {:.3f} {:.3f} {:.3f}\n", mesh.pos[i], mesh.pos[i + 1], mesh.pos[i + 2]);
+		for (int k = 0; k < 3; k++) {
+			lo[k] = std::min<double>(lo[k], mesh.pos[i + k]);
+			hi[k] = std::max<double>(hi[k], mesh.pos[i + k]);
+		}
+	}
+	int group = -1;
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		const int tex = t / 3 < mesh.tri_tex.size() ? mesh.tri_tex[t / 3] : 0;
+		if (tex != group) text += fmt::format("g t{}\n", group = tex);
+		text += fmt::format("f {} {} {}\n", mesh.tri[t] + 1, mesh.tri[t + 1] + 1, mesh.tri[t + 2] + 1);
+	}
+	auto f = FileHandle::Open(out, "wb");
+	if (!f.has_value()) return fmt::format("{} nejde zapsat", out);
+	fwrite(text.data(), 1, text.size(), *f);
+	return fmt::format("{} do {}: {} trojuhelniku, x {:.2f}..{:.2f} y {:.2f}..{:.2f} z {:.2f}..{:.2f}", glb, out, mesh.tri.size() / 3, lo[0], hi[0], lo[1], hi[1], lo[2], hi[2]);
+}
+
+/**
  * Leave out of a mesh what lies in an interior's box (a few centimetres more every way: its walls are the house's),
  * and the wings of the doors, drawn on their own (ThreeDObject::outside).
  * @param interior_path the interior's file

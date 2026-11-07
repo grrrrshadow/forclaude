@@ -1107,6 +1107,13 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		}
 		return true;
 	}
+	if (argv.size() > 3 && argv[1] == "glbobj") {
+		/* 'testlod glbobj <glb> <obj>': a .glb file on the disk (all its nodes, as an interior is read) as a Wavefront
+		 * file, to look at its floors and walls elsewhere (a packed one Python does not read). */
+		extern std::string WriteGlbAsObj(const std::string &glb, const std::string &out);
+		IConsolePrint(CC_DEFAULT, "testlod: {}", WriteGlbAsObj(std::string(argv[2]), std::string(argv[3])));
+		return true;
+	}
 	if (argv.size() >= 2 && argv[1] == "paluba") {
 		/* 'testlod paluba [dm]': the first ship's decks (ThreeDVehicleDeckZ()), the highest level face under each point of
 		 * its outline at most so many decimetres over its waterline (all without), decimetres, a row each half metre
