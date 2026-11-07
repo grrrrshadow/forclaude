@@ -3561,6 +3561,24 @@ std::string TakeCardReachForRig()
  * @param pose where and at what angle to draw it instead (a round curve, round_track.h), or nullptr
  * @return whether the vehicle is drawn as an object (a piece drawn with its anchor piece counts)
  */
+/**
+ * The figures on a boat's deck that are there now (ForThreeDBoatFigures(): the colleague's sailing yacht, the girls at
+ * its bow and its stern while it loads with studentky aboard) on the map, where the boat lies, twice as big as the
+ * girls at the stops (the colleague's rule 12: twice outside a cab).
+ */
+static void AddThreeDBoatFiguresToViewport(const Vehicle *v, const ThreeDVehicleObject &obj, ZoomLevel zoom)
+{
+	ThreeDEyeVehicle ev;
+	if (!GetThreeDEyeVehicle(v, ev) || ev.obj == nullptr) return;
+	const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
+	ForThreeDBoatFigures(v, obj, false, [&](const ThreeDBoatFigure &b) {
+		const double mx = b.at[0] * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = b.at[1] * ev.scale * OBJECT_UNITS_PER_METRE;
+		const int x = static_cast<int>(std::lround(ev.x + mx * fx - my * fy)), y = static_cast<int>(std::lround(ev.y + mx * fy + my * fx));
+		const int z = v->z_pos + static_cast<int>(std::lround(b.at[2] * ev.scale * OBJECT_HEIGHT_PER_METRE));
+		AddThreeDFigureToViewport(b.figure, (b.girl ? 2.0f : 1.0f) * b.scale * ev.scale, x, y, z, ev.facing + b.facing, zoom);
+	});
+}
+
 bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const RoundTrackPose *pose)
 {
 	/* What stands on the turned view's block laid by the card: the vehicle drawn by it, no picture (CardVehicle()). */
@@ -3624,6 +3642,7 @@ bool AddThreeDVehicleObjectToViewport(const Vehicle *v, ZoomLevel zoom, const Ro
 	} else if (place.pic != nullptr) {
 		AddTurnedVehiclePicture(place.pic, place.ax, place.ay, place.az, place.xmin, place.ymin, place.zmin, place.xmax, place.ymax, place.zmax);
 	}
+	if (v->type == VehicleType::Ship && !obj->boat_figures.empty()) AddThreeDBoatFiguresToViewport(v, *obj, zoom);
 	return true;
 }
 
@@ -3848,6 +3867,76 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
 }
 
 /**
+ * The triangles of a vehicle object's shape by squares of its plan (ThreeDVehicleDeckZ(), ThreeDVehicleCeilingZ(),
+ * ThreeDVehicleBlocks()): the yacht's rooms are 35 000 triangles, and each step of the walker on board asks a dozen
+ * times -- each only those over its square. Made the first time a shape is asked, again when it is another.
+ */
+struct ShapePlan {
+	size_t tris = 0;     ///< the triangles of the shape it was made for (made again when they change)
+	double x0 = 0, y0 = 0;
+	int nx = 0, ny = 0;
+	std::vector<std::vector<uint32_t>> cells; ///< each square's triangles, their first corner's place in the shape's list
+};
+static constexpr double SHAPE_PLAN_CELL_M = 0.5;
+
+static const ShapePlan &PlanOf(const ThreeDVehicleShape &shape)
+{
+	static std::map<const ThreeDVehicleShape *, ShapePlan> plans;
+	ShapePlan &p = plans[&shape];
+	if (p.tris == shape.tri.size() && !p.cells.empty()) return p;
+	p = {};
+	p.tris = shape.tri.size();
+	double x1 = -1e9, y1 = -1e9;
+	p.x0 = 1e9;
+	p.y0 = 1e9;
+	for (size_t i = 0; i + 2 < shape.pos.size(); i += 3) {
+		p.x0 = std::min<double>(p.x0, shape.pos[i]);
+		p.y0 = std::min<double>(p.y0, shape.pos[i + 1]);
+		x1 = std::max<double>(x1, shape.pos[i]);
+		y1 = std::max<double>(y1, shape.pos[i + 1]);
+	}
+	if (x1 < p.x0) return p;
+	p.nx = static_cast<int>((x1 - p.x0) / SHAPE_PLAN_CELL_M) + 1;
+	p.ny = static_cast<int>((y1 - p.y0) / SHAPE_PLAN_CELL_M) + 1;
+	p.cells.resize(static_cast<size_t>(p.nx) * p.ny);
+	for (size_t t = 0; t + 2 < shape.tri.size(); t += 3) {
+		double lx = 1e9, ly = 1e9, hx = -1e9, hy = -1e9;
+		for (size_t k = 0; k < 3; k++) {
+			const float *c = &shape.pos[shape.tri[t + k] * 3];
+			lx = std::min<double>(lx, c[0]);
+			ly = std::min<double>(ly, c[1]);
+			hx = std::max<double>(hx, c[0]);
+			hy = std::max<double>(hy, c[1]);
+		}
+		const int cx0 = static_cast<int>((lx - p.x0) / SHAPE_PLAN_CELL_M), cx1 = static_cast<int>((hx - p.x0) / SHAPE_PLAN_CELL_M);
+		const int cy0 = static_cast<int>((ly - p.y0) / SHAPE_PLAN_CELL_M), cy1 = static_cast<int>((hy - p.y0) / SHAPE_PLAN_CELL_M);
+		for (int cy = cy0; cy <= cy1; cy++) {
+			for (int cx = cx0; cx <= cx1; cx++) p.cells[static_cast<size_t>(cy) * p.nx + cx].push_back(static_cast<uint32_t>(t));
+		}
+	}
+	return p;
+}
+
+/** The triangles of a shape whose plan may reach over a rectangle of its plan (PlanOf()), each square's in turn: f(first corner's place), true stops. */
+static bool ForTrianglesOver(const ThreeDVehicleShape &shape, double ax, double ay, double bx, double by, const std::function<bool(size_t)> &f)
+{
+	const ShapePlan &p = PlanOf(shape);
+	if (p.cells.empty()) return false;
+	const int cx0 = std::max(0, static_cast<int>(std::floor((std::min(ax, bx) - p.x0) / SHAPE_PLAN_CELL_M)));
+	const int cx1 = std::min(p.nx - 1, static_cast<int>(std::floor((std::max(ax, bx) - p.x0) / SHAPE_PLAN_CELL_M)));
+	const int cy0 = std::max(0, static_cast<int>(std::floor((std::min(ay, by) - p.y0) / SHAPE_PLAN_CELL_M)));
+	const int cy1 = std::min(p.ny - 1, static_cast<int>(std::floor((std::max(ay, by) - p.y0) / SHAPE_PLAN_CELL_M)));
+	for (int cy = cy0; cy <= cy1; cy++) {
+		for (int cx = cx0; cx <= cx1; cx++) {
+			for (uint32_t t : p.cells[static_cast<size_t>(cy) * p.nx + cx]) {
+				if (f(t)) return true;
+			}
+		}
+	}
+	return false;
+}
+
+/**
  * The decks of a vehicle object (the colleague's boats, the walker on board: first_person_gui.cpp): the highest of its
  * level faces over a point of its frame and not higher than so much -- its deck, the floor of its wheelhouse, a step.
  * Faces of either side count, the files have them either way.
@@ -3855,25 +3944,88 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
  * @param up_to metres: nothing higher counts (a roof over the walker's head)
  * @return the height of the deck there, metres in its frame; none when there is nothing under the point
  */
+/** The height of a level face of a shape over a point of its plan, none when it is not level (a wall) or not over the point. */
+static std::optional<double> LevelFaceZ(const ThreeDVehicleShape &shape, size_t t, double x, double y)
+{
+	const float *a = &shape.pos[shape.tri[t] * 3], *b = &shape.pos[shape.tri[t + 1] * 3], *c = &shape.pos[shape.tri[t + 2] * 3];
+	const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+	const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+	const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+	if (len <= 0 || std::abs(nz) < THREE_D_DECK_LEVEL * len) return std::nullopt;
+	const double px = x - a[0], py = y - a[1];
+	const double s = (px * vy - py * vx) / nz, r = (ux * py - uy * px) / nz;
+	if (s < 0 || r < 0 || s + r > 1) return std::nullopt;
+	return a[2] + s * uz + r * vz;
+}
+
 std::optional<double> ThreeDVehicleDeckZ(const ThreeDVehicleObject &obj, double x, double y, double up_to)
 {
 	const ThreeDVehicleShape *shape = obj.GetShape();
 	if (shape == nullptr) return std::nullopt;
 	std::optional<double> best;
-	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
-		const float *a = &shape->pos[shape->tri[t] * 3], *b = &shape->pos[shape->tri[t + 1] * 3], *c = &shape->pos[shape->tri[t + 2] * 3];
-		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
-		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
-		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
-		if (len <= 0 || std::abs(nz) < THREE_D_DECK_LEVEL * len) continue;
-		const double px = x - a[0], py = y - a[1];
-		const double s = (px * vy - py * vx) / nz, r = (ux * py - uy * px) / nz;
-		if (s < 0 || r < 0 || s + r > 1) continue;
-		const double z = a[2] + s * uz + r * vz;
-		if (z > up_to) continue;
-		if (!best.has_value() || z > *best) best = z;
-	}
+	ForTrianglesOver(*shape, x, y, x, y, [&](size_t t) {
+		const std::optional<double> z = LevelFaceZ(*shape, t, x, y);
+		if (z.has_value() && *z <= up_to && (!best.has_value() || *z > *best)) best = z;
+		return false;
+	});
 	return best;
+}
+
+/**
+ * The ceilings of a vehicle object (the walker in a boat's rooms, first_person_gui.cpp): the lowest of its level faces
+ * over a point higher than so much -- the roof of its cabin, the floor of its cockpit over the space under it, a table.
+ * @param x,y the point, metres in its frame (+x its front)
+ * @param above metres: nothing lower counts (the floor the walker stands on)
+ * @return the height of the ceiling there, metres in its frame; none when the sky is over the point
+ */
+std::optional<double> ThreeDVehicleCeilingZ(const ThreeDVehicleObject &obj, double x, double y, double above)
+{
+	const ThreeDVehicleShape *shape = obj.GetShape();
+	if (shape == nullptr) return std::nullopt;
+	std::optional<double> best;
+	ForTrianglesOver(*shape, x, y, x, y, [&](size_t t) {
+		const std::optional<double> z = LevelFaceZ(*shape, t, x, y);
+		if (z.has_value() && *z > above && (!best.has_value() || *z < *best)) best = z;
+		return false;
+	});
+	return best;
+}
+
+/** A boat's rooms (ThreeDVehicleObject::interior_figure, the colleague's sailing yacht): the figure of its whole hull with its cabins, its shape read; nullptr none. */
+const ThreeDVehicleObject *ThreeDBoatRooms(const ThreeDVehicleObject &obj)
+{
+	if (obj.interior_figure.empty()) return nullptr;
+	const ThreeDVehicleObject *rooms = GetThreeDFigure(obj.interior_figure, obj.package);
+	return rooms != nullptr && rooms->GetShape() != nullptr ? rooms : nullptr;
+}
+
+/**
+ * The figures on a boat and in its rooms that are there now (ThreeDVehicleObject::boat_figures): those of its deck while
+ * it stands loading ("dvere_otevrene"), those of its saloon while it sails ("dvere_zavrene"), the girls only while it
+ * carries studentky (the player, 7. 11.: "the yacht only when it carries studentky; the passengers are not seen").
+ * @param inside those in its rooms too (the walker aboard, its rooms drawn)
+ */
+int _three_d_rig_boat = -1; ///< the rig ('testlod holky'): the boats with studentky sailing (0) or loading (1), -1 as they are
+
+void ForThreeDBoatFigures(const Vehicle *v, const ThreeDVehicleObject &obj, bool inside, const std::function<void(const ThreeDBoatFigure &)> &f)
+{
+	if (obj.boat_figures.empty()) return;
+	bool loading = v->current_order.IsType(OT_LOADING);
+	bool studentky = false;
+	for (const Vehicle *u = v->First(); u != nullptr && !studentky; u = u->Next()) {
+		studentky = u->cargo_cap > 0 && IsValidCargoType(u->cargo_type) && CargoSpec::Get(u->cargo_type)->label == CT_STUDENTKY && u->cargo.StoredCount() > 0;
+	}
+	if (_three_d_rig_boat >= 0) {
+		studentky = true;
+		loading = _three_d_rig_boat == 1;
+	}
+	for (const ThreeDBoatFigure &b : obj.boat_figures) {
+		if (b.inside && !inside) continue;
+		if (b.girl && !studentky) continue;
+		if (b.when == ThreeDBoatFigure::When::Loading && !loading) continue;
+		if (b.when == ThreeDBoatFigure::When::Sailing && loading) continue;
+		f(b);
+	}
 }
 
 /**
@@ -3887,26 +4039,25 @@ bool ThreeDVehicleBlocks(const ThreeDVehicleObject &obj, double ax, double ay, d
 	const ThreeDVehicleShape *shape = obj.GetShape();
 	if (shape == nullptr) return false;
 	const double dx = bx - ax, dy = by - ay;
-	for (size_t t = 0; t + 2 < shape->tri.size(); t += 3) {
+	return ForTrianglesOver(*shape, ax, ay, bx, by, [&](size_t t) {
 		const float *a = &shape->pos[shape->tri[t] * 3], *b = &shape->pos[shape->tri[t + 1] * 3], *c = &shape->pos[shape->tri[t + 2] * 3];
 		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
 		const double nz = ux * vy - uy * vx;
 		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz;
-		if (std::abs(nz) >= THREE_D_DECK_LEVEL * std::sqrt(nx * nx + ny * ny + nz * nz)) continue;
+		if (std::abs(nz) >= THREE_D_DECK_LEVEL * std::sqrt(nx * nx + ny * ny + nz * nz)) return false;
 		/* The way (a level segment) against the triangle (Möller and Trumbore). */
 		const double hx = dy * vz, hy = -dx * vz, hz = dx * vy - dy * vx; // (dx, dy, 0) x v
 		const double det = ux * hx + uy * hy + uz * hz;
-		if (std::abs(det) < 1e-12) continue;
+		if (std::abs(det) < 1e-12) return false;
 		const double sx = ax - a[0], sy = ay - a[1], sz = z - a[2];
 		const double u = (sx * hx + sy * hy + sz * hz) / det;
-		if (u < 0 || u > 1) continue;
+		if (u < 0 || u > 1) return false;
 		const double qx = sy * uz - sz * uy, qy = sz * ux - sx * uz, qz = sx * uy - sy * ux; // s x u
 		const double v = (dx * qx + dy * qy) / det;
-		if (v < 0 || u + v > 1) continue;
+		if (v < 0 || u + v > 1) return false;
 		const double along = (vx * qx + vy * qy + vz * qz) / det;
-		if (along >= 0 && along <= 1) return true;
-	}
-	return false;
+		return along >= 0 && along <= 1;
+	});
 }
 
 /**

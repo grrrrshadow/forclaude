@@ -3113,6 +3113,51 @@ static void ReadCrew(const nlohmann::json &list, std::vector<ThreeDVehicleCrew> 
 	}
 }
 
+/**
+ * A boat with rooms (the colleague's sailing yacht, hra/3d/LODE-3D-PRO-HRU.md): "interier" -- its file, the whole hull
+ * with its cabins and the same origin as the boat's, "doplnky" (the barrel of beer) and "postavy" in it -- and the
+ * "postavy" on its deck. Its rooms a figure of their own "<jmeno>/interier", walked on and drawn from the eyes while the
+ * walker is aboard (the player, 7. 11.: "I want the interior"); the figures by when they are there ("kdy").
+ */
+static void ReadBoatRooms(const nlohmann::json &e, const std::string &folder, const std::string &package, ThreeDVehicleObject &obj)
+{
+	auto figures = [&obj](const nlohmann::json &list, bool inside, bool girls) {
+		if (!list.is_array()) return;
+		const uint32_t shift = girls ? GirlsShift(list) : 0;
+		for (const auto &f : list) {
+			const char *key = girls ? "postava" : "jmeno";
+			if (!f.is_object() || !f.contains(key) || !f.at(key).is_string() || !f.contains("poloha")) continue;
+			const auto &at = f.at("poloha");
+			if (!at.is_array() || at.size() != 3) continue;
+			ThreeDBoatFigure b;
+			b.figure = girls ? FigureNamed(f, shift) : f.at(key).get<std::string>();
+			for (int k = 0; k < 3; k++) b.at[k] = at.at(k).get<float>();
+			b.facing = f.value("otoceni", 0.0f);
+			b.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+			const std::string when = f.value("kdy", std::string());
+			b.when = when == "dvere_otevrene" ? ThreeDBoatFigure::When::Loading : when == "dvere_zavrene" ? ThreeDBoatFigure::When::Sailing : ThreeDBoatFigure::When::Always;
+			b.girl = girls;
+			b.inside = inside;
+			obj.boat_figures.push_back(std::move(b));
+		}
+	};
+	if (e.contains("postavy")) figures(e.at("postavy"), false, true);
+	if (!e.contains("interier") || !e.at("interier").is_object()) return;
+	const auto &in = e.at("interier");
+	if (!in.contains("soubor") || !in.at("soubor").is_string()) return;
+	ThreeDVehicleObject rooms;
+	rooms.package = package;
+	rooms.file = folder + in.at("soubor").get<std::string>();
+	NoteMarginsFilled(e, rooms.file, MarginsOf::Vehicles);
+	rooms.name = obj.name + "/interier";
+	rooms.thing = true;
+	rooms.floors_over = 0.03f;
+	obj.interior_figure = rooms.name;
+	_figure_objects.push_back(std::move(rooms));
+	if (in.contains("doplnky")) figures(in.at("doplnky"), true, false);
+	if (in.contains("postavy")) figures(in.at("postavy"), true, true);
+}
+
 /** The figures standing on a building ("postavy") and its doors ("dvere"). */
 /** A figure of a list ("postava", "poza", "poloha", "otoceni", "meritko"); whether it is one. */
 static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
@@ -6163,6 +6208,8 @@ static void ReadThreeDVehicleObjects()
 					if (!obj.has_cab) obj.has_cab = point("oko", obj.cab);
 					obj.has_helm = point("poloha", obj.helm);
 				}
+				/* Its rooms and the figures on it and in them (ReadBoatRooms()). */
+				if (obj.type == VehicleType::Ship) ReadBoatRooms(e, folder, package, obj);
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */
 				if (e.contains("svetla") && e.at("svetla").is_object()) {
@@ -8291,6 +8338,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->to_ground) key += "|g";
 	if (this->to_middle) key += "|m";
 	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
+	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
 	if (this->has_cab) key += fmt::format("|k{},{},{}", this->cab[0], this->cab[1], this->cab[2]);
 	if (!this->addons.empty()) key += fmt::format("|p{:x}.{:x}", parts.bits[1], parts.bits[0]);
 	if (auto known = KnownVehicleShape(key); known != nullptr) return known;
@@ -8562,6 +8610,23 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		mesh.tri = std::move(tri);
 		if (mesh.tri_tex.size() == triangles) mesh.tri_tex = std::move(tri_tex);
 		if (mesh.tri_group.size() == triangles) mesh.tri_group = std::move(tri_group);
+	}
+	if (!std::isnan(this->floors_over)) {
+		/* A boat's rooms (ReadBoatRooms()): their floors under its waterline lifted a little over it -- the water's plane
+		 * lies across the hull, and the yacht's floor under its cockpit lay under it, the sea showing over it. */
+		std::vector<bool> lift(mesh.pos.size() / 3, false);
+		for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+			const float *a = &mesh.pos[mesh.tri[t] * 3], *b = &mesh.pos[mesh.tri[t + 1] * 3], *c = &mesh.pos[mesh.tri[t + 2] * 3];
+			const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+			const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+			const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+			/* Floors, not the keel deep under them (its top would stand out of the water). */
+			if (len <= 0 || nz < 0.9 * len || std::max({a[2], b[2], c[2]}) >= this->floors_over || std::min({a[2], b[2], c[2]}) < this->floors_over - 0.6f) continue;
+			for (size_t k = 0; k < 3; k++) lift[mesh.tri[t + k]] = true;
+		}
+		for (size_t i = 0; i < lift.size(); i++) {
+			if (lift[i]) mesh.pos[i * 3 + 2] = this->floors_over;
+		}
 	}
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);

@@ -178,6 +178,16 @@ static constexpr double FIRST_PERSON_HELM_M = 1.5;
 static constexpr double FIRST_PERSON_DECK_CHEST_M = 1.2;
 static constexpr double FIRST_PERSON_DECK_REACH_M = 0.3;
 /**
+ * In a boat's rooms (ThreeDBoatRooms(), the colleague's sailing yacht; the player, 7. 11.: "shrink the player so he fits
+ * under the cockpit and the low ceiling over the stairs does not matter"): the walker as small as the room over him, its
+ * eyes so far under its ceiling; no smaller than so much (under the yacht's cockpit 0.87 m), metres; what is lower over
+ * the floor than so much is no ceiling (a step, a seat's edge), metres; the chest a wall stops at is this much of the room.
+ */
+static constexpr double FIRST_PERSON_ROOM_MIN_M = 0.8;
+static constexpr double FIRST_PERSON_ROOM_OVER_EYES_M = 0.15;
+static constexpr double FIRST_PERSON_ROOM_FLOOR_M = 0.3;
+static constexpr double FIRST_PERSON_ROOM_CHEST = 0.6;
+/**
  * In the water (FirstPersonEye::swimming; the player, 7. 11.: "under the water without breath and without the health
  * going"; "I swim after my look, the arrows as ever, and with the right button I look up, down, left, right and swim
  * that way"): how fast it swims, metres a second; its eyes over the surface at the top, metres; over the bed at the
@@ -724,7 +734,7 @@ struct FirstPersonWindow : Window {
 		if (!GetThreeDEyeVehicle(v, ev) || ev.obj == nullptr) return false;
 		const ThreeDVehicleObject &obj = *ev.obj;
 		const double hx = obj.has_helm ? obj.helm[0] : 0, hy = obj.has_helm ? obj.helm[1] : 0, hz = obj.has_helm ? obj.helm[2] : 0;
-		const std::optional<double> deck = ThreeDVehicleDeckZ(obj, hx, hy, hz + FIRST_PERSON_DECK_STEP_M);
+		const std::optional<double> deck = ThreeDVehicleDeckZ(WalkedOn(obj), hx, hy, hz + FIRST_PERSON_DECK_STEP_M);
 		if (!deck.has_value()) return false;
 		this->aboard = v->index;
 		this->walker.swimming = false;
@@ -736,6 +746,44 @@ struct FirstPersonWindow : Window {
 		this->head = 0;
 		this->PlaceOnBoard(ev);
 		return true;
+	}
+
+	/** What of a boat the walker walks on: its rooms when it has them (ThreeDBoatRooms(): its whole hull with its cabins), else its object. */
+	static const ThreeDVehicleObject &WalkedOn(const ThreeDVehicleObject &obj)
+	{
+		const ThreeDVehicleObject *rooms = ThreeDBoatRooms(obj);
+		return rooms != nullptr ? *rooms : obj;
+	}
+
+	/**
+	 * How high the room over a floor of a boat is where the walker stands (FIRST_PERSON_ROOM_*): to the lowest ceiling
+	 * over its head and round it a little, metres; infinite under the sky.
+	 */
+	static double RoomAt(const ThreeDVehicleObject &obj, double x, double y, double floor)
+	{
+		double room = std::numeric_limits<double>::infinity();
+		for (const auto &[ox, oy] : {std::pair{0.0, 0.0}, {0.1, 0.0}, {-0.1, 0.0}, {0.0, 0.1}, {0.0, -0.1}}) {
+			const std::optional<double> ceiling = ThreeDVehicleCeilingZ(obj, x + ox, y + oy, floor + FIRST_PERSON_ROOM_FLOOR_M);
+			if (ceiling.has_value()) room = std::min(room, *ceiling - floor);
+		}
+		return room;
+	}
+
+	/**
+	 * The walker's eyes under a low ceiling (the player, 7. 11.: "shrink the player so he fits under the cockpit and the
+	 * low ceiling over the stairs does not matter"): in a boat's rooms as high as the room over him lets them, a little
+	 * under its ceiling; elsewhere at their height.
+	 */
+	void FitEyes()
+	{
+		double eyes = FIRST_PERSON_EYES_M;
+		ThreeDEyeVehicle ev;
+		if (this->aboard != VehicleID::Invalid() && this->Aboard(ev) != nullptr) {
+			if (const ThreeDVehicleObject *rooms = ThreeDBoatRooms(*ev.obj); rooms != nullptr) {
+				eyes = std::min(eyes, (RoomAt(*rooms, this->deck_x, this->deck_y, this->deck_z) - FIRST_PERSON_ROOM_OVER_EYES_M) * ev.scale);
+			}
+		}
+		this->walker.eye_z = eyes * OBJECT_HEIGHT_PER_METRE;
 	}
 
 	/**
@@ -763,7 +811,9 @@ struct FirstPersonWindow : Window {
 	{
 		ThreeDEyeVehicle ev;
 		if (this->Aboard(ev) == nullptr) return;
-		const ThreeDVehicleObject &obj = *ev.obj;
+		/* A boat with rooms: their shape, all its hull; down into them and under its low ceilings, as small as they are. */
+		const bool rooms = ThreeDBoatRooms(*ev.obj) != nullptr;
+		const ThreeDVehicleObject &obj = WalkedOn(*ev.obj);
 		double lx, ly;
 		WorldToBoat(ev, this->walker.x + dx, this->walker.y + dy, lx, ly);
 		std::optional<double> deck;
@@ -775,20 +825,25 @@ struct FirstPersonWindow : Window {
 		}
 		for (int tries = 0;; tries++) {
 			deck = ThreeDVehicleDeckZ(obj, lx, ly, up_to);
-			if (!deck.has_value() || *deck < this->deck_z - FIRST_PERSON_DECK_DROP_M || *deck < this->deck_helm - FIRST_PERSON_DECK_DEPTH_M) return;
+			if (!deck.has_value() || *deck < this->deck_z - FIRST_PERSON_DECK_DROP_M || (!rooms && *deck < this->deck_helm - FIRST_PERSON_DECK_DEPTH_M)) return;
 			if (DeckFooting(obj, lx, ly, *deck)) break;
 			if (tries == 3) return;
 			up_to = *deck - 0.02;
 		}
-		/* Walls: the way a body's half-width farther, at the chest over the higher deck of the two. */
+		/* Room over the step: the walker as small as it is, not smaller than he can be (the table, a bunk's shelf). */
+		const double room = rooms ? RoomAt(obj, lx, ly, *deck) : std::numeric_limits<double>::infinity();
+		if (room < FIRST_PERSON_ROOM_MIN_M) return;
+		/* Walls: the way a body's half-width farther, at the chest over the higher deck of the two -- lower as he is. */
 		const double len = std::hypot(lx - this->deck_x, ly - this->deck_y);
 		const double ex = len > 0 ? lx + (lx - this->deck_x) / len * FIRST_PERSON_DECK_REACH_M : lx;
 		const double ey = len > 0 ? ly + (ly - this->deck_y) / len * FIRST_PERSON_DECK_REACH_M : ly;
-		if (ThreeDVehicleBlocks(obj, this->deck_x, this->deck_y, ex, ey, std::max(this->deck_z, *deck) + FIRST_PERSON_DECK_CHEST_M)) return;
+		const double chest = std::min(FIRST_PERSON_DECK_CHEST_M, FIRST_PERSON_ROOM_CHEST * room);
+		if (ThreeDVehicleBlocks(obj, this->deck_x, this->deck_y, ex, ey, std::max(this->deck_z, *deck) + chest)) return;
 		this->deck_x = lx;
 		this->deck_y = ly;
 		this->deck_z = *deck;
 		this->PlaceOnBoard(ev);
+		if (rooms) this->FitEyes();
 	}
 
 	/** Whether the walker on board stands by its wheel (its helmsman's place, else its middle): E takes it there. */
@@ -1294,6 +1349,7 @@ struct FirstPersonWindow : Window {
 		}
 		this->seen_heading = this->walker.heading;
 		this->seen_pitch = this->walker.pitch;
+		this->FitEyes();
 		this->MakePicture();
 		this->hurt_steps = std::max(0, this->hurt_steps - static_cast<int>(steps));
 		this->SetWidgetDirty(WID_FP_CANVAS);
@@ -2712,6 +2768,30 @@ static void ShowForestGrillWindow(TileIndex fire)
 }
 
 /**
+ * The rig: the walker on board its boat at a point of its frame (metres, +x its bow), on the floor there no higher than
+ * so much, facing so many degrees from its bow (into the rooms of the sailing yacht).
+ * @return the floor it stands on, the room over it, its eyes
+ */
+std::string RigOnBoard(double x, double y, double up_to, double facing)
+{
+	FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (fp == nullptr) return "zadny chodec";
+	ThreeDEyeVehicle ev;
+	if (fp->aboard == VehicleID::Invalid() || fp->Aboard(ev) == nullptr) return "chodec neni na lodi";
+	const ThreeDVehicleObject &obj = FirstPersonWindow::WalkedOn(*ev.obj);
+	const std::optional<double> deck = ThreeDVehicleDeckZ(obj, x, y, up_to);
+	if (!deck.has_value()) return "tam neni podlaha";
+	fp->deck_x = x;
+	fp->deck_y = y;
+	fp->deck_z = *deck;
+	fp->deck_heading = facing * M_PI / 180.0;
+	fp->PlaceOnBoard(ev);
+	fp->FitEyes();
+	return fmt::format("{} podlaha {:.2f} m, mistnost {:.2f} m, oci {:.2f} m", ThreeDBoatRooms(*ev.obj) != nullptr ? "interier," : "obal,", *deck,
+			FirstPersonWindow::RoomAt(obj, x, y, *deck), fp->walker.eye_z / OBJECT_HEIGHT_PER_METRE);
+}
+
+/**
  * The rig: the walker by the fire of the forest on a tile, E pressed there, a click on a button (as the player would:
  * "ovecka", "prasatko", "kravicka", "snist"; "" none).
  * @return the menu it offers and what is on the spit after
@@ -2814,6 +2894,13 @@ const Vehicle *FirstPersonRiding()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	return w != nullptr ? w->Riding() : nullptr;
+}
+
+/** The boat the walker of the view from the first person stands on (its rooms drawn from the eyes, ThreeDBoatRooms()), Invalid elsewhere. */
+VehicleID FirstPersonBoatAboard()
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	return w != nullptr ? w->aboard : VehicleID::Invalid();
 }
 
 bool FirstPersonWalkerAt(double &x, double &y)

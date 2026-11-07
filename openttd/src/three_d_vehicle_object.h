@@ -80,6 +80,10 @@ bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
 static constexpr double THREE_D_DECK_LEVEL = 0.7;
 std::optional<double> ThreeDVehicleDeckZ(const struct ThreeDVehicleObject &obj, double x, double y, double up_to);
 bool ThreeDVehicleBlocks(const struct ThreeDVehicleObject &obj, double ax, double ay, double bx, double by, double z);
+std::optional<double> ThreeDVehicleCeilingZ(const struct ThreeDVehicleObject &obj, double x, double y, double above);
+const struct ThreeDVehicleObject *ThreeDBoatRooms(const struct ThreeDVehicleObject &obj);
+struct ThreeDBoatFigure;
+void ForThreeDBoatFigures(const Vehicle *v, const struct ThreeDVehicleObject &obj, bool inside, const std::function<void(const ThreeDBoatFigure &)> &f);
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 

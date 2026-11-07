@@ -17230,6 +17230,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		AddCabVehicle(own_model, false);
 		_cab_figures.back().own_cab = true;
 	}
+	extern VehicleID FirstPersonBoatAboard();
+	const VehicleID boat_aboard = FirstPersonBoatAboard();
 	for (const Vehicle *u : Vehicle::Iterate()) {
 		/* The vehicle itself only seen from over its roof: all of it, its driver too. */
 		if (u->First() == own && !roof) continue;
@@ -17259,7 +17261,25 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * sprites of its eight directions are only for what is drawn from them (the player, 16. 10.). */
 		ThreeDEyeVehicle ev;
 		if (ThreeDEnabled() && u->type != VehicleType::Effect && u->direction != Direction::Invalid && !u->vehstatus.Test(VehState::Crashed) && GetThreeDEyeVehicle(u, ev)) {
-			if (ev.obj != nullptr) AddCabVehicle(ev, false);
+			if (ev.obj == nullptr) continue;
+			/* A boat with rooms the walker is aboard (the colleague's sailing yacht): its whole hull with its cabins
+			 * (ThreeDBoatRooms()); the figures on its deck and in its saloon that are there now. */
+			const bool boat = u->type == VehicleType::Ship;
+			const ThreeDVehicleObject *rooms = boat && u->index == boat_aboard ? ThreeDBoatRooms(*ev.obj) : nullptr;
+			if (rooms != nullptr) {
+				AddCabFigure(rooms->name, ev.scale, ev.x, ev.y, ev.z, ev.facing, 0);
+			} else {
+				AddCabVehicle(ev, false);
+			}
+			if (boat) {
+				ForThreeDBoatFigures(u, *ev.obj, rooms != nullptr, [&ev](const ThreeDBoatFigure &b) {
+					const double a = ev.facing * M_PI / 180.0, fx = std::cos(a), fy = std::sin(a);
+					const double mx = b.at[0] * ev.scale * ev.along * OBJECT_UNITS_PER_METRE, my = b.at[1] * ev.scale * OBJECT_UNITS_PER_METRE;
+					const ThreeDVehicleObject *fig = GetThreeDFigure(b.figure);
+					const float size = fig != nullptr && fig->thing ? ev.scale * b.scale : CAB_FIGURE_SCALE * b.scale;
+					AddCabFigure(b.figure, size, ev.x + mx * fx - my * fy, ev.y + mx * fy + my * fx, ev.z + b.at[2] * ev.scale * OBJECT_HEIGHT_PER_METRE, ev.facing + b.facing, -1);
+				});
+			}
 			continue;
 		}
 		PaletteID pal = PAL_NONE;

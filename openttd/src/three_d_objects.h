@@ -704,6 +704,22 @@ struct ThreeDVehicleCrew {
 	bool on_seat = false;       ///< "uzel": "sedlo" in place of "poloha": sitting where the body's seat is in its pose (a rider on a horse of the Special)
 };
 
+/**
+ * A figure on a boat or in its rooms (the colleague's sailing yacht, hra/3d/LODE-3D-PRO-HRU.md: "postavy" on its deck
+ * and "interier" "postavy" and "doplnky" in its saloon): drawn by itself where the boat lies (ThreeDBoatFigures()).
+ */
+struct ThreeDBoatFigure {
+	/** When it is there ("kdy"): always, while the boat stands loading ("dvere_otevrene"), while it sails ("dvere_zavrene"). */
+	enum class When : uint8_t { Always, Loading, Sailing };
+	std::string figure;   ///< the figure of the indices, a girl's with her pose
+	float at[3] = {};     ///< "poloha": metres in the boat's frame
+	float facing = 0;     ///< "otoceni": degrees against the boat's bow, 90 its +x to +y
+	float scale = 1.0f;   ///< "meritko"
+	When when = When::Always;
+	bool girl = false;    ///< one of "postavy": there only while the boat carries studentky (the player, 7. 11.: "the yacht only when it carries studentky")
+	bool inside = false;  ///< in its rooms ("interier"): drawn only with them, while the walker is aboard
+};
+
 /** The gaits of a vehicle that is an animal (ThreeDVehicleObject::body), slowest first: standing, then each faster. */
 inline constexpr std::array<std::string_view, 4> BODY_GAITS = {"stoji", "chuze", "klus", "cval"};
 
@@ -828,6 +844,9 @@ struct ThreeDVehicleObject {
 	float cab[3] = {};              ///< x, y, z, metres
 	bool has_helm = false;          ///< "ridic" "poloha": where its helmsman stands or sits (the colleague's boats): the walker stands there when he lets go of the wheel
 	float helm[3] = {};             ///< x, y, z, metres
+	float floors_over = NAN;        ///< a boat's rooms (ReadBoatRooms()): their floors under its waterline lifted to so many metres over it, NAN as they are
+	std::string interior_figure;    ///< a boat with rooms ("interier", the colleague's sailing yacht): the figure of its whole hull with its cabins, walked on and drawn while the walker is aboard; empty none
+	std::vector<ThreeDBoatFigure> boat_figures; ///< and the figures on its deck and in its rooms
 	std::string msts_cab;           ///< an engine of MSTS: its cab's .cvf (SimtrainsCab), empty none
 	ThreeDVehiclePaint paint;       ///< "lak"; a tree's: its first part painted by its use (its crown, "barvy_casti"), the colour its state's
 	ThreeDVehiclePaint second_paint; ///< a tree's second part painted by its use (its snow over the crown): its mask and "zacatek", the colour its state's (second_colour)

@@ -1107,6 +1107,20 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		}
 		return true;
 	}
+	if (argv.size() > 2 && argv[1] == "holky") {
+		/* 'testlod holky plavba|pristav|ne': the boats carry studentky, sailing (in the saloon) or loading (on deck); "ne" as they are. */
+		extern int _three_d_rig_boat;
+		_three_d_rig_boat = argv[2] == "plavba" ? 0 : argv[2] == "pristav" ? 1 : -1;
+		IConsolePrint(CC_DEFAULT, "testlod: holky na lodich {}", argv[2]);
+		return true;
+	}
+	if (argv.size() > 5 && argv[1] == "chodec") {
+		/* 'testlod chodec <x> <y> <do_m> <smer>': the walker on board its boat at a point of its frame (RigOnBoard()). */
+		extern std::string RigOnBoard(double x, double y, double up_to, double facing);
+		auto num = [&](size_t i) { return std::strtod(std::string(argv[i]).c_str(), nullptr); };
+		IConsolePrint(CC_DEFAULT, "testlod: chodec {}", RigOnBoard(num(2), num(3), num(4), num(5)));
+		return true;
+	}
 	if (argv.size() > 3 && argv[1] == "glbobj") {
 		/* 'testlod glbobj <glb> <obj>': a .glb file on the disk (all its nodes, as an interior is read) as a Wavefront
 		 * file, to look at its floors and walls elsewhere (a packed one Python does not read). */
