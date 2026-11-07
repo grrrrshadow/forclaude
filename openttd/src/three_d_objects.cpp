@@ -309,6 +309,8 @@ static bool _vehicle_objects_read = false;
 static std::vector<ThreeDVehicleObject> _figure_objects;
 /** The ivies among the add-ons ("popinavka" of a record), where they grow (GetThreeDIvies()). */
 static std::vector<ThreeDIvy> _three_d_ivies;
+/** The graffiti of the walls ("druh": "zed_grafiti"), the names of their figures (GetThreeDGraffiti()). */
+static std::vector<std::string> _three_d_graffiti;
 
 /**
  * The motions of the figures of a kind of bones ("druh": "pohyby", the colleague's hra/3d/KOSTRA-POSTAV-PRO-HRU.md):
@@ -5453,6 +5455,8 @@ static void ReadThreeDVehicleObjects()
 						}
 						if (ivy.on_retaining_walls || ivy.on_houses) _three_d_ivies.push_back(std::move(ivy));
 					}
+					/* A graffiti (the player, test2): on the concrete of the retaining walls, under the ivies (DrawEyeRetainingWalls()). */
+					if (figure_kind == "zed_grafiti") _three_d_graffiti.push_back(fig.name);
 					if (e.contains("stromy_mapy_dalsi") && e.at("stromy_mapy_dalsi").is_array()) {
 						for (const auto &more : e.at("stromy_mapy_dalsi")) ReadMapTrees(more, fig.name);
 					}
@@ -6814,6 +6818,7 @@ void ResetThreeDVehicleObjects()
 	_thing_sounds.clear();
 	_thing_places.clear();
 	_three_d_ivies.clear();
+	_three_d_graffiti.clear();
 	_vehicle_objects_read = false;
 }
 
@@ -6908,6 +6913,13 @@ std::span<const ThreeDIvy> GetThreeDIvies()
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	return _three_d_ivies;
+}
+
+/** The graffiti of the walls, read with the figures. */
+std::span<const std::string> GetThreeDGraffiti()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _three_d_graffiti;
 }
 
 const ThreeDVehicleObject *GetThreeDFigure(std::string_view name, std::string_view package)

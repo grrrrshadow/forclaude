@@ -1004,6 +1004,8 @@ struct ThreeDIvy {
 	bool on_houses = false;         ///< on the walls of the houses ("zed_domu")
 };
 std::span<const ThreeDIvy> GetThreeDIvies();
+/** The graffiti of the walls ("druh": "zed_grafiti", our objekty/nase/grafiti.py): the names of their figures, boards with their pictures. */
+std::span<const std::string> GetThreeDGraffiti();
 
 /**
  * A piece of the shared loads (the colleague's objekty/naklady, hra/3d/NAKLADY-OHRADA-ZETOR-PRO-HRU.md): a pallet of
