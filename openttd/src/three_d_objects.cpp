@@ -11278,7 +11278,7 @@ static uint32_t PartColourNumber(uint32_t h, uint32_t town, size_t k, const Thre
 	x ^= x >> 12;
 	x *= 0x297A2D39u;
 	x ^= x >> 15;
-	return x % std::min<size_t>(part.palette.size(), 1u << bits);
+	return x % std::min<size_t>(part.palette.size(), size_t{1} << bits);
 }
 
 /**

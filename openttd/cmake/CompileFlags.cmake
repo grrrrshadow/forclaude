@@ -20,6 +20,8 @@ macro(compile_flags)
     # Our strings are UTF-8.
     if(MSVC)
         add_compile_options(/utf-8)
+        # three_d_objects.cpp has more sections than a plain COFF object allows (C1128).
+        add_compile_options(/bigobj)
     else()
         add_compile_options(-finput-charset=utf-8)
     endif()
