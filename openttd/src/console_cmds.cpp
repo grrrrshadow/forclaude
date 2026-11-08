@@ -9672,6 +9672,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ShowFirstPersonWindow();
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
+	} else if (what == "prejezd" && argv.size() > 4) {
+		/* 'prejezd <x> <y> zavri|otevri': the level crossing on the tile closed or open as a train would have it (its
+		 * AŽD posts' barriers and lights, DrawThreeDCrossingPosts()), till a train comes. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value() || !IsLevelCrossingTile(TileXY(*x, *y))) {
+			IConsolePrint(CC_ERROR, "test3d: prejezd: na {},{} neni prejezd", x.value_or(0), y.value_or(0));
+			return true;
+		}
+		SetCrossingBarred(TileXY(*x, *y), argv[4] == "zavri");
+		MarkTileDirtyByTile(TileXY(*x, *y));
+		IConsolePrint(CC_DEFAULT, "test3d: prejezd {},{} {}", *x, *y, argv[4] == "zavri" ? "zavreny" : "otevreny");
 	} else if (what == "tunel" && argv.size() > 3 && argv[2] == "stena") {
 		/* 'tunel stena <0 bricks, 1 stone, 2 concrete, -1 each its own>': the walls of the tunnels from the eyes (CabDrawTube()). */
 		extern int _cab_tunnel_wall_rig;

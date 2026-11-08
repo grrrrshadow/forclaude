@@ -5027,6 +5027,33 @@ static void NoteMovingFigure(TileIndex tile, int ticks, const ThreeDVehicleShape
 }
 
 /**
+ * A thing on the map that changes by the game's ticks of itself, not by a frame of a figure (a level crossing's
+ * blinking lights, DrawThreeDCrossingPosts() of rail_cmd.cpp): its box drawn again when the ticks' step changes, as a
+ * moving figure's (_moving_figures_timer).
+ * @param ticks the ticks a step of it is held
+ * @param x0,y0,x1,y1 the ground it is over, world units
+ * @param z0,z1 the heights it is between, units
+ */
+void NoteThreeDBlinking(TileIndex tile, int ticks, double x0, double y0, double x1, double y1, int z0, int z1)
+{
+	const uint64_t step = TimerGameTick::counter / ticks;
+	for (MovingFigure &m : _moving_figures) {
+		if (m.tile != tile || m.ticks != ticks) continue;
+		m.step = step;
+		if (m.z0 != INT_MIN) {
+			m.z0 = std::min(m.z0, z0);
+			m.z1 = std::max(m.z1, z1);
+			m.x0 = std::min(m.x0, x0);
+			m.y0 = std::min(m.y0, y0);
+			m.x1 = std::max(m.x1, x1);
+			m.y1 = std::max(m.y1, y1);
+		}
+		return;
+	}
+	_moving_figures.push_back({tile, ticks, step, z0, z1, x0, y0, x1, y1});
+}
+
+/**
  * What a figure of the turned map is drawn as (GetThreeDFigurePicture()): what its picture is asked for by -- or the
  * card's drawing of it --, how tall it is; its tile drawn again as it moves, as there.
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)

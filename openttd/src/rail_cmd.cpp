@@ -32,6 +32,7 @@
 #include "core/backup_type.hpp"
 #include "core/container_func.hpp"
 #include "timer/timer_game_calendar.h"
+#include "timer/timer_game_tick.h"
 #include "strings_func.h"
 #include "company_gui.h"
 #include "object_map.h"
@@ -2977,6 +2978,79 @@ static void PutThreeDStraight(const TileInfo *ti, std::string_view name, Axis ax
 	AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
 }
 
+/** Our level crossing's AŽD posts (objekty/nase/azd.py): from the track's middle along the road, from the road's middle aside, metres. */
+static constexpr double THREE_D_CROSSING_POST_TRACK_M = 5.6, THREE_D_CROSSING_POST_SIDE_M = 5.0;
+/** How long a light of theirs is on, and off, the game's ticks: half a second, the red ones in turn, the white one by itself. */
+static constexpr int THREE_D_CROSSING_BLINK_TICKS = 18;
+/** In a post's frame (azd.py: its lights to +x, the road at -y; metres): its footprint, its top, where its barrier turns and how long it is. */
+static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.4, THREE_D_POST_Y0 = -0.35, THREE_D_POST_Y1 = 0.9, THREE_D_POST_TOP_M = 3.8;
+static constexpr double THREE_D_BARRIER_X = 0.06, THREE_D_BARRIER_Y = 0.25, THREE_D_BARRIER_Z = 1.45, THREE_D_BARRIER_LEN = 5.0;
+
+/**
+ * The posts of our level crossing (the player, 8. 11.: "the lights one Czech and the crossing", "1 yes"): the AŽD post of
+ * the player's model, for each way the road's traffic comes the one on its right before the track (on its left driving
+ * on the left: the mirrored post), its warning lights to it, its barrier over the right half of the road. The crossing
+ * closed (IsCrossingBarred(): a train is coming) the barriers down and the two red lights in turn; open, the barriers up
+ * and the white light blinking slowly. On the map the tile drawn again as the lights change (NoteThreeDBlinking()).
+ * @param rail_axis the track's way; the road across it
+ */
+static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye)
+{
+	if (GetThreeDFigure("azd_sloupek") == nullptr) return;
+	const bool closed = IsCrossingBarred(ti->tile);
+	const bool on_left = _settings_game.vehicle.road_side == RoadVehicleDrivingSide::Left;
+	const bool phase = (TimerGameTick::counter / THREE_D_CROSSING_BLINK_TICKS) % 2 == 0;
+	const std::string_view lit = closed ? (phase ? "_l" : "_p") : (phase ? "_b" : "");
+	const std::string_view mirror = on_left ? "_z" : "";
+	const std::string post = fmt::format("azd_sloupek{}{}", lit, mirror);
+	const std::string barrier = fmt::format("azd_zavora_{}{}", closed ? "dole" : "nahore", mirror);
+	const double upm = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
+	const double mx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, my = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	for (const int way : {1, -1}) {
+		/* The way the traffic goes along the road (across the track), its right (left), the post before the track there. */
+		const double dx = rail_axis == Axis::X ? 0.0 : way, dy = rail_axis == Axis::X ? way : 0.0;
+		const double side = on_left ? -1.0 : 1.0, rx = dy * side, ry = -dx * side;
+		const double px = mx - dx * THREE_D_CROSSING_POST_TRACK_M * upm + rx * THREE_D_CROSSING_POST_SIDE_M * upm;
+		const double py = my - dy * THREE_D_CROSSING_POST_TRACK_M * upm + ry * THREE_D_CROSSING_POST_SIDE_M * upm;
+		/* Its lights to the traffic coming: its frame's +x against the way. */
+		const double fa = std::atan2(-dy, -dx), ca = std::cos(fa), sa = std::sin(fa);
+		const float facing = static_cast<float>(fa * 180.0 / M_PI);
+		if (eye) {
+			AddCabFigure(post, 1.0f, px, py, ti->z, facing);
+			AddCabFigure(barrier, 1.0f, px, py, ti->z, facing);
+			continue;
+		}
+		/* A box of a part of it on the map: its corners in the post's frame (y mirrored driving on the left), world units. */
+		auto box = [&](double a0, double a1, double b0, double b1, int z0, int z1) {
+			double x0 = INFINITY, y0 = INFINITY, x1 = -INFINITY, y1 = -INFINITY;
+			for (const double a : {a0, a1}) {
+				for (const double b0m : {b0, b1}) {
+					const double b = on_left ? -b0m : b0m;
+					const double wx = px + (a * ca - b * sa) * upm, wy = py + (a * sa + b * ca) * upm;
+					x0 = std::min(x0, wx);
+					y0 = std::min(y0, wy);
+					x1 = std::max(x1, wx);
+					y1 = std::max(y1, wy);
+				}
+			}
+			const int bx0 = static_cast<int>(std::floor(x0)), by0 = static_cast<int>(std::floor(y0));
+			return std::array<int, 6>{bx0, by0, z0, std::max(bx0, static_cast<int>(std::ceil(x1)) - 1), std::max(by0, static_cast<int>(std::ceil(y1)) - 1), z1};
+		};
+		const int ix = static_cast<int>(std::lround(px)), iy = static_cast<int>(std::lround(py));
+		const int pivot = ti->z + static_cast<int>(std::lround(THREE_D_BARRIER_Z * hpm));
+		const std::array<int, 6> post_box = box(THREE_D_POST_X0, THREE_D_POST_X1, THREE_D_POST_Y0, THREE_D_POST_Y1, ti->z, ti->z + static_cast<int>(std::lround(THREE_D_POST_TOP_M * hpm)));
+		const std::array<int, 6> barrier_box = closed ?
+				box(THREE_D_BARRIER_X - 0.1, THREE_D_BARRIER_X + 0.1, THREE_D_BARRIER_Y - THREE_D_BARRIER_LEN, THREE_D_BARRIER_Y - 0.2, pivot - 1, pivot + 1) :
+				box(THREE_D_BARRIER_X - 0.1, THREE_D_BARRIER_X + 0.1, THREE_D_BARRIER_Y - 0.1, THREE_D_BARRIER_Y + 0.1, pivot + 1, pivot + static_cast<int>(std::lround(THREE_D_BARRIER_LEN * hpm)));
+		AddThreeDFigureToViewportInBox(post, 1.0f, ix, iy, ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &post_box);
+		AddThreeDFigureToViewportInBox(barrier, 1.0f, ix, iy, ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &barrier_box);
+	}
+	if (!eye) {
+		NoteThreeDBlinking(ti->tile, THREE_D_CROSSING_BLINK_TICKS, TileX(ti->tile) * TILE_SIZE, TileY(ti->tile) * TILE_SIZE, (TileX(ti->tile) + 1) * TILE_SIZE, (TileY(ti->tile) + 1) * TILE_SIZE,
+				ti->z, ti->z + static_cast<int>(std::lround(THREE_D_POST_TOP_M * hpm)) + 2);
+	}
+}
+
 /**
  * Our 3D track on a tile of another kind than plain rail (the player, 8. 11.: "finish the 3D track"): a rail station's or
  * a waypoint's (their platforms and buildings the game's), a depot's from its door to its middle, a level crossing's --
@@ -3008,6 +3082,8 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	/* Across it its embankment, a crossing's panels and ramps. */
 	const double across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
 	PutThreeDStraight(ti, name, axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0, across, ti->z, ThreeDRailsTall());
+	/* A level crossing's AŽD posts with their lights and barriers. */
+	if (crossing) DrawThreeDCrossingPosts(ti, axis, eye);
 	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, door);
 	return true;
 }
