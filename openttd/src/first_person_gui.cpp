@@ -461,6 +461,9 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	/* On the deck of a bridge over the tile (FirstPersonStandZ()), whatever is under it is not in the way: the river, the
 	 * sea, a railway (the player, 26. 10.: up the ramp onto the road bridge, and no further along it). */
 	if (IsBridgeAbove(tile) && stand >= GetBridgePixelHeight(GetSouthernBridgeEnd(tile)) - 0.1 * OBJECT_HEIGHT_PER_METRE) return true;
+	/* Under the land in a tunnel (FirstPersonTunnelFloor(); the player, 8. 11.: "I cannot walk through the tunnel on
+	 * foot"): within its tube, not into the rock beside it. */
+	if (std::isfinite(stand) && stand < FirstPersonGroundZ(x, y) - TILE_HEIGHT / 2.0) return FirstPersonTunnelFloor(x, y, stand).has_value();
 	/* A walker's tent: in through its entrance, not through its cloth; round its fireplace and its barrel (WalkerTent). */
 	if (WalkerTentBlocks(x, y)) return false;
 	/* The feet over the ground of a building whose north tile is origin. */

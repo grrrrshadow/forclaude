@@ -13712,6 +13712,251 @@ static const std::array<std::array<double, 2>, 9> _cab_tunnel_profile = {{
 	{3.0, 11.4}, {5.2, 9.0}, {CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {CAB_TUNNEL_HALF, 0},
 }};
 
+/**
+ * The materials of a tunnel's walls inside, each tunnel one of them (the player, 8. 11.: "on the walls of the tunnel
+ * bricks, concrete, stone from inside"; "bricks, stone with climbing plants, concrete with climbing plants and graffiti").
+ */
+enum class CabTunnelWall : uint8_t { Bricks, Stone, Concrete };
+
+/** The rig: every tunnel's walls of this material ('test3d tunel stena <0 bricks, 1 stone, 2 concrete>'), -1 each its own. */
+int _cab_tunnel_wall_rig = -1;
+
+/** Pixels a metre of a tunnel's wall picture round its cross-section (CabTunnelWallTexture()). */
+static constexpr double CAB_WALL_PX_M = 32.0;
+
+/** Where each corner of a tunnel's cross-section is round its walls and vault from its left foot, metres (_cab_tunnel_profile). */
+static const std::array<double, 9> &CabTunnelProfileMetres()
+{
+	static const std::array<double, 9> at = [] {
+		std::array<double, 9> m{};
+		for (size_t i = 1; i < m.size(); i++) {
+			const double dc = (_cab_tunnel_profile[i][0] - _cab_tunnel_profile[i - 1][0]) / OBJECT_UNITS_PER_METRE;
+			const double dz = (_cab_tunnel_profile[i][1] - _cab_tunnel_profile[i - 1][1]) / OBJECT_HEIGHT_PER_METRE;
+			m[i] = m[i - 1] + std::hypot(dc, dz);
+		}
+		return m;
+	}();
+	return at;
+}
+
+/**
+ * The picture of a piece of a tunnel's walls and vault (CabDrawTube()): along it the piece of the tube (its step, 4
+ * world units), round it from the left foot over the vault to the right one. Bricks in courses round the vault, stones
+ * in rows of blocks, or concrete in the panels of its formwork with its tie holes and the streaks of the water; sooted
+ * up to the crown. Climbing plants up from the feet and hanging from the vault (more of them nearer the daylight,
+ * levels 1 to 3), on concrete a graffiti of bubble letters and tags at the height of a hand (two of them). Drawn here,
+ * 32 bpp, each once; the card keeps it by its number.
+ * @param ivy the climbing plants: 0 none, 3 the most
+ * @param graffiti 0 none, else which
+ */
+static const CabTexture &CabTunnelWallTexture(CabTunnelWall kind, int ivy, int graffiti)
+{
+	static std::map<int, CabTexture> made;
+	const int key = to_underlying(kind) * 100 + ivy * 10 + graffiti;
+	auto [it, added] = made.try_emplace(key);
+	CabTexture &t = it->second;
+	if (added) {
+		const std::array<double, 9> &round_m = CabTunnelProfileMetres();
+		const int w = 128, h = static_cast<int>(std::ceil(round_m.back() * CAB_WALL_PX_M)) + 1;
+		t.w = w;
+		t.h = h;
+		t.px.assign(static_cast<size_t>(w) * h, 0);
+		/* Each row's height over the floor, metres: the walls straight up, the vault round over them. */
+		std::vector<double> up(h);
+		for (int y = 0; y < h; y++) {
+			const double m = y / CAB_WALL_PX_M;
+			size_t i = 0;
+			while (i + 2 < round_m.size() && m > round_m[i + 1]) i++;
+			const double f = std::clamp((m - round_m[i]) / std::max(1e-6, round_m[i + 1] - round_m[i]), 0.0, 1.0);
+			up[y] = (_cab_tunnel_profile[i][1] + f * (_cab_tunnel_profile[i + 1][1] - _cab_tunnel_profile[i][1])) / OBJECT_HEIGHT_PER_METRE;
+		}
+		uint32_t seed = 0x9E3779B9u * static_cast<uint32_t>(key + 1);
+		auto rnd = [&seed](uint32_t n) { seed = seed * 1664525u + 1013904223u; return (seed >> 8) % n; };
+		auto hash = [key](uint32_t a, uint32_t b) { return EyeWallHash(a * 73856093u ^ b * 19349663u ^ static_cast<uint32_t>(to_underlying(static_cast<CabTunnelWall>(key / 100))) * 83492791u); };
+		std::vector<std::array<int, 3>> rgb(static_cast<size_t>(w) * h);
+		auto at = [&](int x, int y) -> std::array<int, 3> & { return rgb[static_cast<size_t>(y) * w + ((x % w) + w) % w]; };
+
+		/* The material. */
+		if (kind == CabTunnelWall::Bricks) {
+			const int course = 5, brick = 16;
+			for (int y = 0; y < h; y++) {
+				const int row = y / course, shift = (row & 1) * brick / 2;
+				for (int x = 0; x < w; x++) {
+					const int bx = x + shift;
+					const bool joint = y % course == course - 1 || bx % brick == brick - 1;
+					const int n = static_cast<int>(rnd(13)) - 6;
+					if (joint) {
+						at(x, y) = {104 + n, 98 + n, 90 + n};
+					} else {
+						const uint32_t hb = hash(row, (bx % w) / brick);
+						const int d = static_cast<int>(hb % 37) - 18, burnt = (hb >> 8) % 7 == 0 ? -30 : 0;
+						at(x, y) = {146 + d + burnt + n, 66 + d / 2 + burnt / 2 + n, 46 + d / 3 + burnt / 3 + n};
+					}
+				}
+			}
+		} else if (kind == CabTunnelWall::Stone) {
+			int y0 = 0, row = 0;
+			while (y0 < h) {
+				const int rh = 9 + static_cast<int>(hash(row, 1) % 7);
+				/* The row's blocks across the picture's width, so that it goes on into the next piece. */
+				std::vector<int> cuts{0};
+				for (int x = 0; x < w;) {
+					x += 18 + static_cast<int>(hash(row, 100 + static_cast<uint32_t>(cuts.size())) % 17);
+					cuts.push_back(std::min(x, w));
+				}
+				const int offset = static_cast<int>(hash(row, 2) % w);
+				for (int y = y0; y < std::min(h, y0 + rh); y++) {
+					for (int x = 0; x < w; x++) {
+						const int lx = (x + offset) % w;
+						size_t b = 0;
+						while (b + 2 < cuts.size() && lx >= cuts[b + 1]) b++;
+						const bool joint = y == y0 + rh - 1 || lx == cuts[b + 1] - 1 || (y == y0 + rh - 2 && rnd(3) == 0);
+						const int n = static_cast<int>(rnd(17)) - 8;
+						if (joint) {
+							at(x, y) = {64 + n / 2, 60 + n / 2, 54 + n / 2};
+						} else {
+							const uint32_t hb = hash(row, 300 + static_cast<uint32_t>(b));
+							const int d = static_cast<int>(hb % 33) - 16, warm = static_cast<int>((hb >> 8) % 13) - 4;
+							at(x, y) = {128 + d + warm + n, 122 + d + n, 110 + d - warm + n};
+						}
+					}
+				}
+				y0 += rh;
+				row++;
+			}
+		} else {
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) {
+					const int n = static_cast<int>(rnd(15)) - 7;
+					int v = 146 + n;
+					if (x % 64 == 0) v -= 20;               // the formwork's panels
+					if (y % 48 == 0) v -= 14;               // the lines of its pours
+					if (x % 64 == 16 && y % 48 == 24) v -= 50; // its tie holes
+					if (x % 64 == 17 && y % 48 == 24) v -= 40;
+					at(x, y) = {v, v, v - 4};
+				}
+			}
+			/* The streaks of the water down from the vault. */
+			for (int s = 0; s < 6; s++) {
+				const int sx = static_cast<int>(rnd(w)), wide = 2 + static_cast<int>(rnd(4));
+				for (int side = 0; side < 2; side++) {
+					const int from = side == 0 ? h / 2 - static_cast<int>(rnd(h / 3)) : h / 2 + static_cast<int>(rnd(h / 3));
+					const int to = side == 0 ? 0 : h - 1;
+					for (int y = std::min(from, to); y <= std::max(from, to); y++) {
+						for (int dx = 0; dx < wide; dx++) {
+							std::array<int, 3> &c = at(sx + dx, y);
+							for (int &p : c) p -= 16;
+						}
+					}
+				}
+			}
+		}
+
+		/* Soot of the engines, up to the crown. */
+		for (int y = 0; y < h; y++) {
+			const double f = 1.0 - 0.45 * std::clamp((up[y] - 2.0) / 2.6, 0.0, 1.0);
+			for (int x = 0; x < w; x++) {
+				for (int &p : at(x, y)) p = static_cast<int>(p * f);
+			}
+		}
+
+		/* A graffiti on concrete at the height of a hand, on each wall: bubble letters with their outline and a shine,
+		 * and tags beside. */
+		if (graffiti > 0) {
+			static const std::array<std::array<int, 3>, 6> paint{{{232, 70, 160}, {60, 200, 220}, {250, 214, 40}, {90, 210, 80}, {250, 120, 30}, {160, 90, 230}}};
+			for (int side = 0; side < 2; side++) {
+				auto row_at = [&](double metres) { const int y = static_cast<int>(metres * CAB_WALL_PX_M); return side == 0 ? y : h - 1 - y; };
+				const std::array<int, 3> fill = paint[(graffiti * 2 + side) % paint.size()], second = paint[(graffiti * 2 + side + 3) % paint.size()];
+				int x = 6 + static_cast<int>(rnd(10));
+				const int letters = 3 + static_cast<int>(rnd(3));
+				for (int l = 0; l < letters && x < w - 14; l++) {
+					const int lw = 13 + static_cast<int>(rnd(8)), lh = 22 + static_cast<int>(rnd(12));
+					const double base_m = 0.5 + rnd(30) / 100.0;
+					const int ya = row_at(base_m), yb = row_at(base_m + lh / CAB_WALL_PX_M);
+					const int ylo = std::min(ya, yb), yhi = std::max(ya, yb);
+					const double cx = x + lw / 2.0, cy = (ylo + yhi) / 2.0, rx = lw / 2.0, ry = (yhi - ylo) / 2.0;
+					for (int y = ylo - 1; y <= yhi + 1; y++) {
+						if (y < 0 || y >= h) continue;
+						for (int px = x - 1; px <= x + lw + 1; px++) {
+							const double e = std::pow((px - cx) / rx, 2) + std::pow((y - cy) / ry, 2);
+							if (e > 1.15) continue;
+							/* A letter's hole, its outline, its two colours, its shine. */
+							const double hole = std::pow((px - cx) / (rx * 0.35), 2) + std::pow((y - cy - ry * 0.2) / (ry * 0.25), 2);
+							if (hole < 1.0 && l % 2 == 0) continue;
+							if (e > 0.85 || (hole < 1.3 && l % 2 == 0)) {
+								at(px, y) = {18, 16, 20};
+							} else {
+								at(px, y) = (y - cy) * (side == 0 ? 1 : -1) > 0 ? fill : second;
+								if (std::abs(px - cx + rx * 0.4) < 1.0 && std::abs(y - cy) < ry * 0.5) at(px, y) = {245, 245, 245};
+							}
+						}
+					}
+					x += lw - 2 + static_cast<int>(rnd(3));
+				}
+				/* Tags: thin black and silver lines that wander. */
+				for (int g = 0; g < 2; g++) {
+					int tx = static_cast<int>(rnd(w));
+					double ty = 1.3 + rnd(40) / 100.0;
+					const std::array<int, 3> ink = g == 0 ? std::array<int, 3>{20, 20, 24} : std::array<int, 3>{196, 200, 206};
+					for (int s = 0; s < 40; s++) {
+						const int y = row_at(ty);
+						if (y >= 0 && y < h) at(tx, y) = ink;
+						tx++;
+						ty += (static_cast<int>(rnd(5)) - 2) / CAB_WALL_PX_M;
+					}
+				}
+			}
+		}
+
+		/* Climbing plants: up from both feet, as high as the daylight lets them (higher by the portal), hanging from the
+		 * crown by it too; leaves in clusters of a few greens, their stems brown. */
+		if (ivy > 0) {
+			static const std::array<std::array<int, 3>, 5> leaf{{{38, 74, 30}, {46, 92, 34}, {62, 118, 40}, {84, 140, 52}, {54, 104, 38}}};
+			const double reach = 0.6 + 0.8 * ivy, thick = 0.3 + 0.2 * ivy;
+			/* Each column's own height, a smooth wander. */
+			std::vector<double> tall(w);
+			double phase = rnd(1000) / 100.0;
+			for (int x = 0; x < w; x++) {
+				const double a = 2 * M_PI * x / w;
+				tall[x] = reach * (0.55 + 0.3 * std::sin(a * 2 + phase) + 0.15 * std::sin(a * 5 + phase * 1.7));
+			}
+			for (int y = 0; y < h; y++) {
+				for (int x = 0; x < w; x++) {
+					const bool climbs = up[y] < tall[x] && (y < h / 3 || y > h * 2 / 3);
+					const bool hangs = ivy == 3 && up[y] > 4.2 - 0.6 * (0.5 + 0.5 * std::sin(2 * M_PI * x / w * 3 + phase));
+					if (!climbs && !hangs) continue;
+					const double fade = climbs ? std::clamp((tall[x] - up[y]) / 0.4, 0.2, 1.0) : 0.7;
+					if (rnd(1000) < static_cast<uint32_t>(1000 * thick * fade)) {
+						const std::array<int, 3> c = leaf[rnd(static_cast<uint32_t>(leaf.size()))];
+						at(x, y) = c;
+						if (rnd(2) == 0) at(x + 1, y) = c;
+					}
+				}
+			}
+			/* Their stems. */
+			for (int s = 0; s < 3 + ivy * 2; s++) {
+				int sx = static_cast<int>(rnd(w));
+				for (int side = 0; side < 2; side++) {
+					for (int y = 0; y < h / 3; y++) {
+						const int yy = side == 0 ? y : h - 1 - y;
+						if (up[yy] > tall[((sx % w) + w) % w] * 0.9) break;
+						if (rnd(3) == 0) sx += static_cast<int>(rnd(3)) - 1;
+						at(sx, yy) = {78, 62, 40};
+					}
+				}
+			}
+		}
+
+		for (size_t i = 0; i < rgb.size(); i++) {
+			auto part = [](int v) { return static_cast<uint8_t>(std::clamp(v, 0, 255)); };
+			t.px[i] = Colour(part(rgb[i][0]), part(rgb[i][1]), part(rgb[i][2])).data;
+		}
+		t.uid = ThreeDUniqueId::Next();
+	}
+	if (_eye_frame != nullptr) _eye_frame->kept[t.px.data()] = t.uid;
+	return t;
+}
+
 /** The tunnel with an end on the tile, if there is one. */
 static std::optional<CabTunnel> CabTunnelAt(TileIndex tile)
 {
@@ -13733,6 +13978,50 @@ static std::optional<CabTunnel> CabTunnelAt(TileIndex tile)
 	t.s_hi = std::max(pa, pb);
 	t.c_mid = (t.axis == Axis::X ? TileY(tile) : TileX(tile)) * TILE_SIZE + TILE_SIZE / 2.0;
 	return t;
+}
+
+/**
+ * The tunnel whose tube a world point is in at a height (the player, 8. 11.: "I cannot walk on foot through the tunnel
+ * from the first person view"): between its portals, within its walls, from its floor to half a level over it. Its end
+ * found on the tiles to the north of the point along each way, as far as a tunnel may be long.
+ * @param z the height, units of height (the walker's feet)
+ */
+static std::optional<CabTunnel> CabTunnelAround(double x, double y, double z)
+{
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return std::nullopt;
+	const int tx = static_cast<int>(x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(y) / static_cast<int>(TILE_SIZE);
+	const int reach = _settings_game.construction.max_tunnel_length + 2;
+	for (const Axis axis : {Axis::X, Axis::Y}) {
+		for (int k = 0; k <= reach; k++) {
+			const int ax = tx - (axis == Axis::X ? k : 0), ay = ty - (axis == Axis::Y ? k : 0);
+			if (ax < 0 || ay < 0) break;
+			const TileIndex end = TileXY(ax, ay);
+			if (!IsTileType(end, TileType::TunnelBridge) || !IsTunnel(end) || DiagDirToAxis(GetTunnelBridgeDirection(end)) != axis) continue;
+			const std::optional<CabTunnel> t = CabTunnelAt(end);
+			if (!t.has_value()) continue;
+			const double s = axis == Axis::X ? x : y, c = (axis == Axis::X ? y : x) - t->c_mid;
+			if (s < t->s_lo || s > t->s_hi || std::abs(c) > CAB_TUNNEL_HALF) continue;
+			if (z < t->z - 1 || z > t->z + static_cast<int>(TILE_HEIGHT) / 2) continue;
+			return t;
+		}
+	}
+	return std::nullopt;
+}
+
+/**
+ * The floor the walker stands on in a tunnel at a world point at a height (CabTunnelAround()): its floor, on our track
+ * its sleepers (ThreeDTrackStandOver(), a height within a unit of the floor stretched as the land from the eyes, so much
+ * less here); nullopt where no tunnel's tube is.
+ */
+std::optional<double> FirstPersonTunnelFloor(double x, double y, double z)
+{
+	const std::optional<CabTunnel> t = CabTunnelAround(x, y, z);
+	if (!t.has_value()) return std::nullopt;
+	/* Our track's embankment along it as on its end tile, across it as far from its middle. */
+	const double across = (t->axis == Axis::X ? y : x) - t->c_mid + TILE_SIZE / 2.0;
+	const ThreeDEyeScope from_eyes;
+	const double on = ThreeDTrackStandOver(t->a, t->axis == Axis::X ? TILE_SIZE / 2.0 : across, t->axis == Axis::X ? across : TILE_SIZE / 2.0);
+	return t->z + on * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH;
 }
 
 /** A world point of a tunnel from the eyes: along its axis s, across c from its middle, dz above its floor (the floor of the land, EyeLevelZ(); the tube as it is). */
@@ -13814,7 +14103,7 @@ static void CabDrawPortal(const CabCanvas &cv, const CabEye &eye, const CabTunne
 static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, double s0, double s1)
 {
 	const double step = 4.0;
-	const Colour vault(112, 104, 92), floor = t.rail ? Colour(92, 84, 74) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
+	const Colour floor = t.rail ? Colour(92, 84, 74) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
 	/* Our 3D track through it (DrawThreeDTrackTunnel() of rail_cmd.cpp; objekty/nase/koleje.py): its low embankment of
 	 * stones 3.4 m across, the sleepers on it every 0.6 m, the rails at the gauge, their heads 0.37 m over the floor as
 	 * the trains run on them; electrified, the contact wire under the vault's crown (4.4 m: the vault is 4.6 m). */
@@ -13825,6 +14114,10 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 	const double bed_c = 1.7 * upm, bed_h = 0.12 * hpm, sleeper_l = 1.3 * upm, sleeper_w = (concrete ? 0.14 : 0.13) * upm, sleeper_top = 0.18 * hpm;
 	const double rail_c = (1.435 / 2 + 0.036) * upm, rail_w = 0.036 * upm, rail_foot = 0.2 * hpm, rail_top = 0.372 * hpm, wire_z = 4.4 * hpm;
 	const Colour ballast(112, 106, 98), sleeper = concrete ? Colour(168, 166, 160) : Colour(70, 53, 41), rail_side(97, 66, 48), contact(92, 70, 52);
+	/* Its walls of one material the whole tunnel (CabTunnelWallTexture()), by its ends; the rig's when it asks. */
+	const uint32_t which = EyeWallHash(static_cast<uint32_t>(std::min(t.a.base(), t.b.base())) * 2654435761u + 0x7E11u);
+	const CabTunnelWall material = static_cast<CabTunnelWall>(_cab_tunnel_wall_rig >= 0 ? _cab_tunnel_wall_rig % 3 : static_cast<int>(which % 3));
+	const std::array<double, 9> &round_m = CabTunnelProfileMetres();
 	int k = 0;
 	for (double sa = s0; sa < s1 - 0.01; sa += step, k++) {
 		double sb = std::min(s1, sa + step);
@@ -13833,11 +14126,19 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 		double from_end = std::min(std::abs(sm - t.s_lo), std::abs(t.s_hi - sm));
 		double light = 0.10 + 0.90 * std::exp(-from_end / 10.0);
 		if ((static_cast<int>(std::floor(sm / step)) & 1) != 0) light *= 0.85;
-		Colour wall = CabShade(vault, light);
+		/* The climbing plants where the daylight reaches, thicker by the portal; on concrete now and then a graffiti,
+		 * mostly by the portals -- each piece of the tube its own by where it is. */
+		const int ivy = from_end < 4.0 ? 3 : from_end < 9.0 ? 2 : from_end < 15.0 ? 1 : 0;
+		const uint32_t piece = EyeWallHash(which + static_cast<uint32_t>(static_cast<int>(std::floor(sm / step))) * 40503u);
+		const int graffiti = material == CabTunnelWall::Concrete && (piece % 100) < (from_end < 20.0 ? 45u : 10u) ? 1 + static_cast<int>((piece >> 8) % 2) : 0;
+		const CabTexture &tex = CabTunnelWallTexture(material, ivy, graffiti);
+		const double tu1 = (sb - sa) / step * tex.w - 0.01;
 		for (size_t i = 0; i + 1 < _cab_tunnel_profile.size(); i++) {
 			const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
 			auto a = CabTunnelPoint(t, sa, p[0], p[1]), b = CabTunnelPoint(t, sb, p[0], p[1]), c = CabTunnelPoint(t, sb, q[0], q[1]), d = CabTunnelPoint(t, sa, q[0], q[1]);
-			CabDrawSolid(cv, eye, {a, b, c, d}, wall);
+			const double v0 = std::min(round_m[i] * CAB_WALL_PX_M, tex.h - 0.01), v1 = std::min(round_m[i + 1] * CAB_WALL_PX_M, tex.h - 0.01);
+			std::vector<CabPoint> poly{CabToEye(eye, a[0], a[1], a[2], 0, v0), CabToEye(eye, b[0], b[1], b[2], tu1, v0), CabToEye(eye, c[0], c[1], c[2], tu1, v1), CabToEye(eye, d[0], d[1], d[2], 0, v1)};
+			CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, tex.px.data(), tex.w, tex.h, std::move(poly), eye, false, static_cast<uint>(std::lround(256 * light)));
 		}
 		auto f0 = CabTunnelPoint(t, sa, -CAB_TUNNEL_HALF, 0), f1 = CabTunnelPoint(t, sb, -CAB_TUNNEL_HALF, 0), f2 = CabTunnelPoint(t, sb, CAB_TUNNEL_HALF, 0), f3 = CabTunnelPoint(t, sa, CAB_TUNNEL_HALF, 0);
 		CabDrawSolid(cv, eye, {f0, f1, f2, f3}, CabShade(floor, light));
@@ -15397,6 +15698,8 @@ static double CabWalkedGround(int ix, int iy)
 {
 	const TileIndex tile = TileVirtXY(ix, iy);
 	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsBridge(tile)) return GetSlopePixelZ(ix, iy, true);
+	/* A tunnel's end: level with the tunnel's floor into its portal, as the eyes draw it (CabTunnelGround()). */
+	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsTunnel(tile)) return GetTilePixelZ(tile);
 	return GetSlopePixelZOutsideMap(ix, iy);
 }
 
@@ -15433,6 +15736,10 @@ double FirstPersonStandZ(double x, double y, double from)
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	const double up_to = from + CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
 	double best = CabWalkedGround(ix, iy);
+	/* Under the land, in a tunnel (the player, 8. 11.: "I cannot walk through the tunnel on foot"): on its floor. */
+	if (from < best - CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE) {
+		if (const std::optional<double> floor = FirstPersonTunnelFloor(x, y, from); floor.has_value()) return *floor;
+	}
 	const TileIndex tile = TileVirtXY(ix, iy);
 	TileIndex origin;
 	if (const ThreeDObject *obj = GetThreeDObjectToStandOnAt(tile, origin); obj != nullptr) {
@@ -17018,6 +17325,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	{
 		std::vector<TileIndex> near;
 		if (v != nullptr) near.push_back(v->tile);
+		/* The walker in a tunnel, under the land (CabTunnelAround()). */
+		if (walker != nullptr && !walker->swimming) {
+			if (const std::optional<CabTunnel> t = CabTunnelAround(walker->x, walker->y, FirstPersonFeetZ(*walker)); t.has_value()) near.push_back(t->a);
+		}
 		if (eye.x >= 0 && eye.y >= 0 && eye.x < Map::SizeX() * TILE_SIZE && eye.y < Map::SizeY() * TILE_SIZE) near.push_back(TileVirtXY(static_cast<int>(eye.x), static_cast<int>(eye.y)));
 		for (TileIndex tile : near) {
 			std::optional<CabTunnel> t = CabTunnelAt(tile);

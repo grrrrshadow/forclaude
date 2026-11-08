@@ -9672,6 +9672,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			ShowFirstPersonWindow();
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeFirstPerson());
+	} else if (what == "tunel" && argv.size() > 3 && argv[2] == "stena") {
+		/* 'tunel stena <0 bricks, 1 stone, 2 concrete, -1 each its own>': the walls of the tunnels from the eyes (CabDrawTube()). */
+		extern int _cab_tunnel_wall_rig;
+		_cab_tunnel_wall_rig = number(3).value_or(-1);
+		IConsolePrint(CC_DEFAULT, "test3d: steny tunelu {}", _cab_tunnel_wall_rig);
 	} else if (what == "oko") {
 		/* The god's eye under the main toolbar (toolbar_gui.cpp): 'oko' tells where it is and where the help button is;
 		 * 'oko klik' clicks it; 'oko prave' a press of the right button; 'oko <x> <y>' clicks it and then the tile. */
