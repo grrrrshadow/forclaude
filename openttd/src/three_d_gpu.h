@@ -193,6 +193,11 @@ struct ThreeDGpuGround {
 	int view_w = 0, view_h = 0;  ///< its size: the view's (made anew, all black, when another)
 	int move_x = 0, move_y = 0;  ///< before the block is laid, what it holds moved by so many pixels (the view moved); a block of no size only moves it
 	int view = 0;                ///< whose pictures of the view (THREE_D_GPU_VIEWS): 0 the turned main view's, 1 on the small views'
+	/**
+	 * Texels a pixel of the sprites is at the zoom (4 at 4x in, 1 at the usual zoom and out): a texel the texture has
+	 * nothing for takes the nearest drawn within three of those, not of texels (GROUND_FRAGMENT).
+	 */
+	int fill_step = 1;
 	/** The view's pictures let go of instead (the small view closed, ThreeDGpuForgetView()), and its kept ground's
 	 * texture by this key (ThreeDGpuGroundTexture::key), 0 none. */
 	bool forget = false;

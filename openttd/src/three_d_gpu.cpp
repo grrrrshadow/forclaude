@@ -1027,7 +1027,8 @@ void main()
 /* The ground of the turned map (DrawGroundOnCard()), as the processor lays it (DrawTexturedTriangle() of viewport.cpp):
  * a corner at its pixel of the block, rows down as the card's rows up; each pixel at its middle the texel under it of
  * its texture (the kept picture of the ground, or a tile's in the atlas, where the texture is in it) -- one the
- * texture has nothing for (0) takes the nearest drawn within three, in the processor's order --, as it is. */
+ * texture has nothing for (0) takes the nearest drawn within three pixels of the sprites (u_step texels each), in the
+ * processor's order --, as it is. */
 const char *const GROUND_VERTEX = R"(#version 330 core
 layout(location = 0) in vec2 a_pos;
 layout(location = 1) in vec2 a_uv;
@@ -1052,6 +1053,7 @@ uniform sampler2D u_atlas;
 noperspective in vec2 v_uv;
 flat in vec4 v_bounds;
 flat in float v_atlas;
+uniform int u_step;
 out vec4 o_colour;
 const ivec2 NEAR[24] = ivec2[24](ivec2(1, 0), ivec2(-1, 0), ivec2(0, 1), ivec2(0, -1), ivec2(1, 1), ivec2(-1, 1), ivec2(1, -1), ivec2(-1, -1),
 		ivec2(2, 0), ivec2(-2, 0), ivec2(0, 2), ivec2(0, -2), ivec2(2, 1), ivec2(-2, 1), ivec2(2, -1), ivec2(-2, -1),
@@ -1069,7 +1071,7 @@ void main()
 	vec4 t = Texel(at);
 	if (t == vec4(0.0)) {
 		for (int k = 0; k < 24; k++) {
-			ivec2 n = at + NEAR[k];
+			ivec2 n = at + NEAR[k] * u_step;
 			if (n.x < 0 || n.y < 0 || n.x >= size.x || n.y >= size.y) continue;
 			t = Texel(n);
 			if (t != vec4(0.0)) break;
@@ -4006,6 +4008,7 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(g.width), static_cast<float>(g.height));
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_ground"), 0);
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_atlas"), 1);
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_step"), std::max(1, g.fill_step));
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, _ground_atlas);
 		gl.glActiveTexture(GL_TEXTURE0);
