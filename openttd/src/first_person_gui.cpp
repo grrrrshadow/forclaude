@@ -480,7 +480,8 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			return true;
 		}
 		case TileType::Water:
-			return IsCoast(tile);
+			/* A coast, and the bank a river or a canal has along the land (EyeOnRiverBank()). */
+			return IsCoast(tile) || EyeOnRiverBank(x, y);
 		case TileType::Industry: {
 			const IndustryGfx gfx = GetIndustryGfx(tile);
 			if (gfx == GFX_MARIJUANA_PLANTATION || gfx == GFX_POTATO_FIELD) return true;

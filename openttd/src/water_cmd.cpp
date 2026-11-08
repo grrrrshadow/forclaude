@@ -42,6 +42,7 @@
 #include "pathfinder/water_regions.h"
 #include "town_type.h"
 #include "three_d_water_life.h"
+#include "tree_cmd.h"
 
 #include "table/strings.h"
 
@@ -987,7 +988,11 @@ static void DrawTile_Water(TileInfo *ti)
 		case WaterTileType::Clear:
 			DrawWaterClassGround(ti);
 			/* A river's or a lake's water lilies and cattails (three_d_water_life.cpp). */
-			if (GetWaterClass(ti->tile) == WaterClass::River) DrawThreeDRiverPlants(ti);
+			if (GetWaterClass(ti->tile) == WaterClass::River) {
+				DrawThreeDRiverPlants(ti);
+				/* And the trees on its banks (the river narrowed by them, EyeOnRiverBank()). */
+				DrawRiverBankTreeFigures(ti);
+			}
 			/* A plain water tile can be traversed in any direction, so setting blocked pillars here would mean all bridges
 			 * with edges would have no pillars above water. Instead prefer current behaviour of ships passing through. */
 			DrawBridgeMiddle(ti, {});

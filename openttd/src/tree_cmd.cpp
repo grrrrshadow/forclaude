@@ -838,6 +838,70 @@ bool DrawRoadsideTreeFigures(const TileInfo *ti, std::span<const Point> spots)
 	return drawn;
 }
 
+/** Of the sides of a river's tile by the land, so many in a hundred have a tree on their bank, and so many of those a second. */
+static constexpr uint RIVER_BANK_TREES = 45, RIVER_BANK_SECOND = 20;
+/** The trunk of a tree on a river's bank so far in from the land, world units: in the middle of the bank (EYE_RIVER_BANK). */
+static constexpr int RIVER_BANK_TREE_IN = 1;
+
+/**
+ * The trees on the banks of a river (the player, test3: "we narrow the river and then we can put trees on its banks,
+ * now nothing is planted there at all"): on the bank a tile of a river has along the land (EyeOnRiverBank(), the
+ * river narrowed by it), along about every other side a tree, now and then two, of the climate's kinds of trees as the
+ * trees of the map (GetRandomTreeType(), GetThreeDMapTrees()), painted as they are, their crowns over the water; in the
+ * turned view, from the eyes and facing north among the houses drawn as objects. No trunk in the walker's way, as the
+ * map's trees.
+ * @param ti the tile, of a river's water
+ */
+void DrawRiverBankTreeFigures(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	if (IsInvisibilitySet(TransparencyOption::Trees)) return;
+	TreeUse use = TreeUse::None;
+	switch (_settings_game.game_creation.landscape) {
+		case LandscapeType::Temperate: use = TreeUse::Temperate; break;
+		/* Snowy over the snow line, as the land about it is. */
+		case LandscapeType::Arctic: use = TileHeight(ti->tile) > GetSnowLine() ? TreeUse::Snow : TreeUse::SubArctic; break;
+		default: break;
+	}
+	for (DiagDirection side : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
+		const TileIndexDiffC step = TileIndexDiffCByDiagDir(side);
+		const TileIndex next = TileAddWrap(ti->tile, step.x, step.y);
+		if (next == INVALID_TILE || (IsTileType(next, TileType::Water) && IsWater(next))) continue;
+		const uint32_t side_hash = (TileX(ti->tile) * 2654435761u) ^ (TileY(ti->tile) * 40503u) ^ ((to_underlying(side) + 1) * 0x9E3779B1u);
+		if (side_hash % 100 >= RIVER_BANK_TREES) continue;
+		const uint count = (side_hash >> 8) % 100 < RIVER_BANK_SECOND ? 2 : 1;
+		for (uint i = 0; i < count; i++) {
+			const uint32_t hash = side_hash * (i + 1) * 668265263u ^ 0x51ED27u;
+			const TreeType kind = GetRandomTreeType(ti->tile, GB(hash, 8, 8));
+			if (kind == TREE_INVALID) continue;
+			const auto trees = GetThreeDMapTrees(static_cast<uint8_t>(kind));
+			if (trees.empty()) continue;
+			const ThreeDMapTree &tree = trees[GB(hash, 0, 8) % trees.size()];
+			/* Along the side, two of them apart; in from the land onto the middle of the bank. */
+			const int along = count == 1 ? 3 + static_cast<int>(GB(hash, 12, 8) % 10) : (i == 0 ? 2 + static_cast<int>(GB(hash, 12, 2)) : 10 + static_cast<int>(GB(hash, 12, 2)));
+			int x = ti->x, y = ti->y;
+			if (step.x != 0) {
+				x += step.x > 0 ? static_cast<int>(TILE_SIZE) - 1 - RIVER_BANK_TREE_IN : RIVER_BANK_TREE_IN;
+				y += along;
+			} else {
+				x += along;
+				y += step.y > 0 ? static_cast<int>(TILE_SIZE) - 1 - RIVER_BANK_TREE_IN : RIVER_BANK_TREE_IN;
+			}
+			const float size = std::round((0.75f + 0.25f * static_cast<float>(GB(hash, 16, 8)) / 255.0f) * 20.0f) / 20.0f;
+			const float facing = static_cast<float>(GB(hash, 4, 9) % 24 * 15);
+			const int z = GetSlopePixelZ(x, y);
+			const ThreeDVehicleObject *fig = use != TreeUse::None ? GetThreeDFigure(tree.name) : nullptr;
+			const int state = fig != nullptr ? fig->TreeState(use, GB(hash, 25, 7)) : 0;
+			if (eye) {
+				AddCabFigure(tree.name, size * tree.scale, x, y, z, facing, 0, state);
+			} else {
+				AddThreeDFigureToViewport(tree.name, size * tree.scale, x, y, z, facing, _cur_dpi->zoom, ti->tile, 0, -1, state);
+			}
+		}
+	}
+}
+
 static void DrawTile_Trees(TileInfo *ti)
 {
 	switch (GetTreeGround(ti->tile)) {

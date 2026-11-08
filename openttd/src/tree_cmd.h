@@ -17,6 +17,7 @@
 void PlaceTree(TileIndex tile, uint32_t r, bool keep_density = false);
 struct TileInfo;
 bool DrawRoadsideTreeFigures(const TileInfo *ti, std::span<const Point> spots);
+void DrawRiverBankTreeFigures(const TileInfo *ti);
 
 CommandCost CmdPlantTree(DoCommandFlags flags, TileIndex tile, TileIndex start_tile, uint8_t tree_to_plant, bool diagonal);
 

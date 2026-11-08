@@ -240,6 +240,7 @@ std::optional<double> EyeWaterSurfaceZ(double x, double y);
  * it is to grow in the water").
  */
 static constexpr double EYE_RIVER_BANK = 2.0;
+bool EyeOnRiverBank(double x, double y);
 double EyeWaterDepth(double x, double y);
 std::optional<double> EyeWaterBedZ(double x, double y);
 double FirstPersonStandZ(double x, double y, double from);

@@ -3123,6 +3123,14 @@ static bool EyeWaterTile(int x, int y)
 	return IsTileType(tile, TileType::Water) || (IsTileType(tile, TileType::Station) && IsBuoy(tile));
 }
 
+/** Whether a tile is a river's or a canal's water (its bank by the land, EyeOnRiverBank()). */
+static bool EyeNarrowWaterTile(int x, int y)
+{
+	if (!IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) return false;
+	const TileIndex tile = TileXY(x, y);
+	return IsTileType(tile, TileType::Water) && IsWater(tile) && (IsRiver(tile) || IsCanal(tile));
+}
+
 /** Whether a pixel of the ground is the water's: blue (not a coast's sand or foam, a canal's banks). */
 static inline bool EyeWaterPixel(uint32_t p)
 {
@@ -3131,15 +3139,25 @@ static inline bool EyeWaterPixel(uint32_t p)
 	return c.b > c.r + 12 && c.b + 8 >= c.g;
 }
 
+/** A river's or a canal's tile whose bank DrawEyeWater() draws as our grass: the tile, the height and slope of its ground. */
+struct EyeRiverBankTile {
+	int tile_x, tile_y, base_z;
+	Slope slope;
+};
+
 /**
  * The ground of a water tile drawn into the ground of the view from the eyes, smoothed as a road's surface
  * (DrawEyeRoad()): its sprites as the game draws them; its water's pixels (EyeWaterPixel()) the mean of those of its
  * water about them of a near lightness, marked THREE_D_GPU_WATER_SURFACE, so that the view takes them between their
  * texels (CabRoadTexel()); or marked as drawn for the card to smooth them (SmoothGroundRoads()). Its banks, sand and
- * foam as they are.
+ * foam as they are. A river's or a canal's bank (EyeOnRiverBank(); the player, test3: "we narrow the river"): its
+ * strip by the land, and the pixels of the grass its sprite draws, our grass (DrawOurGrass(), from the eyes marked) --
+ * the water past it straight, a few pixels of the grass hanging over it.
  * @param smooth the water smoothed here: the processor draws (no card)
+ * @param mark the water's pixels marked (THREE_D_GPU_WATER_SURFACE): the water smoothed (gui.eye_roads)
+ * @param bank the tile is a river's or a canal's whose bank is our grass: its tile, the height and slope of its ground
  */
-static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth)
+static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bool mark = true, const EyeRiverBankTile *bank = nullptr)
 {
 	const DrawPixelInfo *d = _cur_dpi;
 	if (d == nullptr || sprites.empty()) return;
@@ -3181,7 +3199,27 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth)
 			const int x = px0 + i, y = py0 + j;
 			if (x < 0 || y < 0 || x >= dw || y >= dh) continue;
 			uint32_t out = p;
-			if (EyeWaterPixel(p)) {
+			if (bank != nullptr) {
+				/* The world point the pixel shows (as DrawOurGrass()): on the bank, or the sprite's grass, our grass. */
+				bool grass = !EyeWaterPixel(p);
+				if (!grass) {
+					const double a = (t.left + i * s + s / 2.0) / (2.0 * ZOOM_BASE), b = (t.top + j * s + s / 2.0) / ZOOM_BASE;
+					double z = bank->base_z, wx = 0, wy = 0;
+					for (int k = 0; k < 3; k++) {
+						wx = (b + z - a) / 2;
+						wy = (b + z + a) / 2;
+						const int fx = std::clamp(static_cast<int>(std::floor(wx)) - bank->tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+						const int fy = std::clamp(static_cast<int>(std::floor(wy)) - bank->tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+						z = bank->base_z + GetPartialPixelZ(fx, fy, bank->slope);
+					}
+					grass = EyeOnRiverBank(wx, wy);
+				}
+				if (grass) {
+					dst[static_cast<size_t>(y) * d->pitch + x] = Colour(3, 128, 0, THREE_D_GPU_GRASS).data;
+					continue;
+				}
+			}
+			if (mark && EyeWaterPixel(p)) {
 				if (smooth) {
 					const int want = light(p);
 					uint32_t r = 0, g = 0, b = 0, cnt = 0;
@@ -3391,10 +3429,13 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 					if (rec->round != INVALID_TILE) round.push_back(rec->round);
 					continue;
 				}
-				if (roads && EyeWaterTile(rec->tile_x, rec->tile_y)) {
+				/* From the eyes a river's or a canal's bank our grass (EyeOnRiverBank()), whether the water is smoothed or not. */
+				const bool bank = eyes && grass && EyeNarrowWaterTile(rec->tile_x, rec->tile_y);
+				if ((roads && EyeWaterTile(rec->tile_x, rec->tile_y)) || bank) {
 					std::vector<EyeRoadSprite> water;
 					for (const TurnedGroundSprite &gs : rec->sprites) water.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
-					DrawEyeWater(water, !card_roads);
+					const EyeRiverBankTile at{rec->tile_x, rec->tile_y, rec->base_z, rec->slope};
+					DrawEyeWater(water, roads && !card_roads, roads, bank ? &at : nullptr);
 					continue;
 				}
 				for (const TurnedGroundSprite &gs : rec->sprites) {
@@ -14853,12 +14894,41 @@ static bool EyeSwimTile(TileIndex tile)
 	return IsTileType(tile, TileType::Station) && IsBuoy(tile);
 }
 
-/** The height of the water's surface at a world point the walker swims at (EyeSwimTile()), units of height; none elsewhere. */
+/**
+ * Whether a world point lies on the bank a tile of a river or a canal has drawn along the land beside it (EYE_RIVER_BANK;
+ * the player, test3: "we narrow the river; a few pixels of the bank's grass may hang over its bed, the bed need not copy
+ * the grass, it may be straight"): land there -- walked on, grass and trees on it --, its water past it.
+ */
+bool EyeOnRiverBank(double x, double y)
+{
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return false;
+	const int tx = static_cast<int>(x) / static_cast<int>(TILE_SIZE), ty = static_cast<int>(y) / static_cast<int>(TILE_SIZE);
+	const TileIndex here = TileXY(tx, ty);
+	if (!IsTileType(here, TileType::Water) || !IsWater(here) || !(IsRiver(here) || IsCanal(here))) return false;
+	const double lx = x - tx * static_cast<double>(TILE_SIZE), ly = y - ty * static_cast<double>(TILE_SIZE);
+	/* Off its edges farther than the bank, no land beside is near. */
+	if (lx >= EYE_RIVER_BANK && ly >= EYE_RIVER_BANK && TILE_SIZE - lx > EYE_RIVER_BANK && TILE_SIZE - ly > EYE_RIVER_BANK) return false;
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			if (dx == 0 && dy == 0) continue;
+			const int nx = tx + dx, ny = ty + dy;
+			/* Past the map's edge, and its edge's own tiles (void), the water goes on. */
+			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
+			if (EyeSwimTile(TileXY(nx, ny))) continue;
+			const double ox = dx < 0 ? lx : dx > 0 ? TILE_SIZE - lx : 0.0;
+			const double oy = dy < 0 ? ly : dy > 0 ? TILE_SIZE - ly : 0.0;
+			if (std::hypot(ox, oy) < EYE_RIVER_BANK) return true;
+		}
+	}
+	return false;
+}
+
+/** The height of the water's surface at a world point the walker swims at (EyeSwimTile(), not on a river's bank, EyeOnRiverBank()), units of height; none elsewhere. */
 std::optional<double> EyeWaterSurfaceZ(double x, double y)
 {
 	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return std::nullopt;
 	const int ix = static_cast<int>(x), iy = static_cast<int>(y);
-	if (!EyeSwimTile(TileVirtXY(ix, iy))) return std::nullopt;
+	if (!EyeSwimTile(TileVirtXY(ix, iy)) || EyeOnRiverBank(x, y)) return std::nullopt;
 	return static_cast<double>(GetSlopePixelZ(ix, iy, true));
 }
 
@@ -15048,7 +15118,11 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 	if (!OurGrassOn(true) || GetThemedLand(tile) != ThemedLand::None) return;
 	int thirds = 0;
 	bool rough = false;
-	if (IsTileType(tile, TileType::Clear)) {
+	/* A river's or a canal's bank (EyeOnRiverBank()): its tufts on it alone, as a meadow's. */
+	const bool bank = IsTileType(tile, TileType::Water) && IsWater(tile) && (IsRiver(tile) || IsCanal(tile));
+	if (bank) {
+		thirds = 3;
+	} else if (IsTileType(tile, TileType::Clear)) {
 		if (IsSnowTile(tile)) return;
 		if (IsClearGround(tile, ClearGround::Grass)) {
 			thirds = GetClearDensity(tile);
@@ -15080,6 +15154,7 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 	/* A piece at a point of the tile: on the ground there, sheared along it. Its turn in eighths and its height in a few
 	 * steps: without the card its picture is shared by all alike (GetThreeDPlantPicture()). */
 	auto lay = [&](std::string_view name, double x, double y, float size, float stretch) {
+		if (bank && !EyeOnRiverBank(x0 + x, y0 + y)) return;
 		double z, rise_x, rise_y;
 		CabGroundPlane(slope, base_z, x, y, z, rise_x, rise_y);
 		const float facing = static_cast<float>(45 * static_cast<int>(next() * 8));
@@ -16582,7 +16657,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 		}
 		/* Our grass about the walker (AddOurGrass()). */
-		if ((tile_type == TileType::Clear || tile_type == TileType::Trees) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
+		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
 			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh);
 		}
 		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
@@ -16916,13 +16991,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks, true);
 					continue;
 				}
-				if (EyeWaterTile(t.x, t.y)) {
+				const bool bank = grass && EyeNarrowWaterTile(t.x, t.y);
+				if (EyeWaterTile(t.x, t.y) || bank) {
 					std::vector<EyeRoadSprite> water;
 					for (size_t i = t.first; i < t.end; i++) {
 						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 						water.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
 					}
-					DrawEyeWater(water, true);
+					const bool smooth = EyeWaterTile(t.x, t.y);
+					const EyeRiverBankTile at{t.x, t.y, t.z, t.slope};
+					DrawEyeWater(water, smooth, smooth, bank ? &at : nullptr);
 					continue;
 				}
 				for (size_t i = t.first; i < t.end; i++) {
