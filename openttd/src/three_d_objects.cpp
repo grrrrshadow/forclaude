@@ -48,6 +48,7 @@
 #include "slope_func.h"
 #include "language.h"
 #include "landscape.h"
+#include "round_track.h"
 #include "3rdparty/nlohmann/json.hpp"
 #include "3rdparty/meshoptimizer/meshoptimizer.h"
 #include "timer/timer.h"
@@ -4816,6 +4817,220 @@ const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int
 	if (k == SIZE_MAX && (piece == ThreeDBridgePiece::MiddleA || piece == ThreeDBridgePiece::MiddleB || piece == ThreeDBridgePiece::End)) k = pieces[to_underlying(ThreeDBridgePiece::Middle)][q];
 	if (k == SIZE_MAX && piece == ThreeDBridgePiece::PillarFoot) k = pieces[to_underlying(ThreeDBridgePiece::Pillar)][q];
 	return k < _three_d_objects.size() ? &_three_d_objects[k] : nullptr;
+}
+
+/** The pictures of our straight piece of track (objekty/nase/koleje.py) for the arcs (GetThreeDTrackArc()): read of its file once. */
+struct TrackArcMaterials {
+	bool tried = false;
+	ThreeDTextureBytes bed;     ///< "nasep": the stones with the sleepers and the rails' lines, a side, the top, the other side
+	ThreeDTextureBytes sleeper; ///< "prazec": the sleeper's wood or concrete
+	uint32_t rail = 0;          ///< "kolejnice": the rails' colour (Colour::data)
+	uint32_t head = 0;          ///< "hlava": their heads' top, worn bright
+};
+static TrackArcMaterials _track_arc_materials[2]; // wooden sleepers, concrete
+
+/** The pictures of the straight piece of a kind (ThreeDVehicleObject::file of the figure kolej_rovna_*), nullptr without them. */
+static const TrackArcMaterials *TrackArcMaterialsOf(bool concrete)
+{
+	TrackArcMaterials &m = _track_arc_materials[concrete ? 1 : 0];
+	if (!m.tried) {
+		m.tried = true;
+		const ThreeDVehicleObject *fig = GetThreeDFigure(concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+		GlbMesh mesh;
+		if (fig != nullptr && ReadGlbMesh(fig->file, mesh, true)) {
+			for (const GlbTexture &t : mesh.textures) {
+				if (t.name.ends_with("_nasep")) {
+					m.bed = t.png;
+				} else if (t.name.ends_with("_prazec")) {
+					m.sleeper = t.png;
+				} else if (t.name.ends_with("_kolejnice")) {
+					m.rail = t.flat;
+				} else if (t.name.ends_with("_hlava")) {
+					m.head = t.flat;
+				}
+			}
+		}
+		if (m.bed == nullptr || m.sleeper == nullptr) Debug(misc, 0, "3D track: no pictures of {} for the arcs", concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	}
+	return m.bed != nullptr && m.sleeper != nullptr ? &m : nullptr;
+}
+
+/** An arc of our track made (GetThreeDTrackArc()), kept by the shape of its centre line; let go of when not drawn for a while. */
+struct TrackArcMade {
+	std::unique_ptr<ThreeDObject> obj;
+	std::chrono::steady_clock::time_point used;
+};
+static std::unordered_map<uint64_t, TrackArcMade> _track_arcs;
+
+/**
+ * Our track along an arc of a round curve (round_track.h; the player, 8. 11.: "the curves in 3D, yes", "make the track
+ * like the fishing rod's line, a thick square rope"): drawn along the arc's centre line in one, not in pieces -- the
+ * block of the embankment (its top and its two sides), each rail a bar (its top and its two sides) --, the sleepers
+ * boxes across it at the straight piece's spacing. The pictures of the straight piece (objekty/nase/koleje.py: the
+ * stones with the sleepers and the rails' lines drawn in them along the piece, the sleeper's wood or concrete, the
+ * rails' colours), laid by the length along the arc, so that the picture's sleepers are under the boxes. An object
+ * made here, as the pieces of the bridges are (PlaceIndustryPart()), in the world's units from the tile's north corner,
+ * its foot the tile's ground (a round tile is flat); drawn as a house is, from above and from the eyes.
+ * @param concrete concrete sleepers (an electrified track)
+ * @return nullptr: the piece is not drawn round (straight within its tile), or the pictures are not there
+ */
+const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete)
+{
+	/* The straight piece's measures (koleje.py), metres. */
+	static constexpr double BED_H = 0.12, BED_W = 3.4, SLEEPER_L = 2.6, SLEEPER_OVER = 0.06, PLATE = 0.02;
+	static constexpr double GAUGE = 1.435, RAIL_W = 0.072, RAIL_TALL = 0.172;
+	static constexpr int SLEEPERS_A_TILE = 25; // round(the tile's 14.84 m / 0.6)
+	static constexpr double TEX_W = 88, TEX_SIDE = 4; // the bed's picture: a side, the top (80), the other side
+	const double sleeper_w = concrete ? 0.28 : 0.26;
+	const TrackArcMaterials *mats = TrackArcMaterialsOf(concrete);
+	if (mats == nullptr) return nullptr;
+	/* Its centre line, about every half metre: none for a piece straight within its tile. */
+	const double units = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
+	std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, track, 0.5 * units);
+	if (line.size() < 2) return nullptr;
+
+	uint64_t key = 14695981039346656037ull;
+	auto mix = [&key](uint64_t v) {
+		key ^= v;
+		key *= 1099511628211ull;
+	};
+	mix(tile.base());
+	mix(to_underlying(track));
+	mix(concrete ? 1 : 0);
+	for (const RoundTrackPoint &p : line) {
+		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.x * 64))));
+		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.y * 64))));
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (auto it = _track_arcs.find(key); it != _track_arcs.end()) {
+		it->second.used = now;
+		return it->second.obj.get();
+	}
+	/* Many kept: those not drawn for a minute let go of, their textures made (none being made in the background). */
+	if (_track_arcs.size() > 256) {
+		for (auto it = _track_arcs.begin(); it != _track_arcs.end();) {
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; });
+			if (made && now - it->second.used > std::chrono::seconds(60)) {
+				it = _track_arcs.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	/* The line from the tile's north corner, its length along from its start; cut where the bed's picture begins again
+	 * (every tile's length: a texture is not repeated). */
+	struct At {
+		double x, y;   ///< world units from the tile's north corner
+		double tx, ty; ///< the way along, a unit
+		double s;      ///< the length along to it, world units
+	};
+	const double ox = TileX(tile) * TILE_SIZE, oy = TileY(tile) * TILE_SIZE;
+	std::vector<At> at;
+	at.reserve(line.size() + 4);
+	for (const RoundTrackPoint &p : line) {
+		const double s = at.empty() ? 0.0 : at.back().s + std::hypot(p.x - ox - at.back().x, p.y - oy - at.back().y);
+		/* Across a beginning of the picture: a point there, the way of the stretch. */
+		if (!at.empty()) {
+			const double wrap = std::ceil(at.back().s / TILE_SIZE + 1e-9) * TILE_SIZE;
+			if (wrap > at.back().s + 1e-6 && wrap < s - 1e-6) {
+				const double f = (wrap - at.back().s) / (s - at.back().s);
+				const At &a = at.back();
+				at.push_back({a.x + (p.x - ox - a.x) * f, a.y + (p.y - oy - a.y) * f, p.tx, p.ty, wrap});
+			}
+		}
+		at.push_back({p.x - ox, p.y - oy, p.tx, p.ty, s});
+	}
+	const double total = at.back().s;
+
+	auto made = std::make_unique<ThreeDObject>();
+	ThreeDObject &o = *made;
+	o.name = fmt::format("kolej_oblouk_{}_{}", tile.base(), to_underlying(track));
+	o.variants = 0; // no house's
+	o.tiles_x = o.tiles_y = 1;
+	/* Its pictures, all its other materials' (none its own): 1 the bed's, 2 the sleeper's, 3 the rails', 4 their heads'. */
+	o.texture_of = SIZE_MAX;
+	o.material_pngs = {mats->bed, mats->sleeper, nullptr, nullptr};
+	o.material_flats = {0, 0, mats->rail, mats->head};
+	o.material_levels.assign(4, nullptr);
+	o.texels_per_unit = static_cast<float>(TEX_W / (BED_W * units));
+	std::vector<float> nrm;
+	/* A face of four corners counter-clockwise seen from outside, its outward normal (the light, which side is seen). */
+	auto quad = [&](uint8_t tex, const std::array<std::array<double, 3>, 4> &p, const std::array<std::array<double, 2>, 4> &uv, double nx, double ny, double nz) {
+		const uint32_t base = static_cast<uint32_t>(o.pos.size() / 3);
+		for (int k = 0; k < 4; k++) {
+			o.pos.insert(o.pos.end(), {static_cast<float>(p[k][0]), static_cast<float>(p[k][1]), static_cast<float>(p[k][2])});
+			o.uv.insert(o.uv.end(), {static_cast<float>(uv[k][0]), static_cast<float>(uv[k][1])});
+			nrm.insert(nrm.end(), {static_cast<float>(nx), static_cast<float>(ny), static_cast<float>(nz)});
+			o.corner_tex.push_back(tex);
+		}
+		for (const auto &t : {std::array<uint32_t, 3>{0, 1, 2}, std::array<uint32_t, 3>{0, 2, 3}}) {
+			const auto &a = p[t[0]], &b = p[t[1]], &c = p[t[2]];
+			const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+			const double gx = uy * vz - uz * vy, gy = uz * vx - ux * vz, gz = ux * vy - uy * vx;
+			const double d = gx * nx + gy * ny + gz * nz;
+			o.tri.insert(o.tri.end(), {base + t[0], base + t[1], base + t[2]});
+			o.tri_tex.push_back(tex);
+			o.facing.push_back(d > 0 ? 1 : (d < 0 ? -1 : 0));
+		}
+	};
+	/* The bed's picture across: its left side, its top, its right side (half a pixel in from its edges). */
+	const double sl = 0.5 / TEX_W, t0 = TEX_SIDE / TEX_W, t1 = (TEX_W - TEX_SIDE) / TEX_W, sr = (TEX_W - 0.5) / TEX_W;
+	const double half_bed = BED_W / 2 * units, bed_top = BED_H * hpm;
+	const double rail_c = (GAUGE / 2 + RAIL_W / 2) * units, rail_hw = RAIL_W / 2 * units;
+	const double rail_z0 = (BED_H + SLEEPER_OVER) * hpm, rail_z1 = (BED_H + SLEEPER_OVER + PLATE + RAIL_TALL) * hpm;
+	for (size_t i = 0; i + 1 < at.size(); i++) {
+		const At &a = at[i], &b = at[i + 1];
+		if (b.s - a.s < 1e-6) continue;
+		/* Across at each end by its own way, so that the stretches meet; the sides lit by the stretch's. */
+		const double anx = -a.ty, any = a.tx, bnx = -b.ty, bny = b.tx;
+		const double mnx = (anx + bnx) / 2, mny = (any + bny) / 2, ml = std::max(std::hypot(mnx, mny), 1e-9);
+		const double snx = mnx / ml, sny = mny / ml;
+		const double v0 = std::fmod(a.s, TILE_SIZE) / TILE_SIZE, v1 = v0 + (b.s - a.s) / TILE_SIZE;
+		auto across = [&](const At &p, double nx, double ny, double off, double z) { return std::array<double, 3>{p.x + nx * off, p.y + ny * off, z}; };
+		/* The bed: its top, its left side (+n), its right side. */
+		quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
+				{{{t0, v0}, {t0, v1}, {t1, v1}, {t1, v0}}}, 0, 0, 1);
+		quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
+				{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
+		quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
+				{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
+		/* The rails: each its two sides and its head's top. */
+		for (int side : {-1, 1}) {
+			const double c = side * rail_c;
+			const std::array<std::array<double, 2>, 4> flat{{{0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}, {0.5, 0.5}}};
+			quad(3, {across(a, anx, any, c + rail_hw, rail_z0), across(b, bnx, bny, c + rail_hw, rail_z0), across(b, bnx, bny, c + rail_hw, rail_z1), across(a, anx, any, c + rail_hw, rail_z1)}, flat, snx, sny, 0);
+			quad(3, {across(b, bnx, bny, c - rail_hw, rail_z0), across(a, anx, any, c - rail_hw, rail_z0), across(a, anx, any, c - rail_hw, rail_z1), across(b, bnx, bny, c - rail_hw, rail_z1)}, flat, -snx, -sny, 0);
+			quad(4, {across(a, anx, any, c + rail_hw, rail_z1), across(b, bnx, bny, c + rail_hw, rail_z1), across(b, bnx, bny, c - rail_hw, rail_z1), across(a, anx, any, c - rail_hw, rail_z1)}, flat, 0, 0, 1);
+		}
+	}
+	/* The sleepers: at the picture's, every 25th of a tile's length from the start, each across the way there. */
+	const double step = static_cast<double>(TILE_SIZE) / SLEEPERS_A_TILE;
+	const double half_w = sleeper_w / 2 * units, half_l = SLEEPER_L / 2 * units, z0 = (BED_H - 0.01) * hpm, z1 = (BED_H + SLEEPER_OVER) * hpm;
+	size_t seg = 0;
+	for (double s = step / 2; s < total; s += step) {
+		while (seg + 2 < at.size() && at[seg + 1].s < s) seg++;
+		const At &a = at[seg], &b = at[seg + 1];
+		const double f = b.s > a.s ? std::clamp((s - a.s) / (b.s - a.s), 0.0, 1.0) : 0.0;
+		const double cx = a.x + (b.x - a.x) * f, cy = a.y + (b.y - a.y) * f;
+		double dx = b.x - a.x, dy = b.y - a.y;
+		const double dl = std::max(std::hypot(dx, dy), 1e-9);
+		dx /= dl;
+		dy /= dl;
+		const double nx = -dy, ny = dx;
+		/* Its corners: along it (its width) and across (its length), as koleje.py's sleeper(): u along its length, v across. */
+		auto p = [&](double along, double acr, double z) { return std::array<double, 3>{cx + dx * along + nx * acr, cy + dy * along + ny * acr, z}; };
+		quad(2, {p(-half_w, half_l, z1), p(half_w, half_l, z1), p(half_w, -half_l, z1), p(-half_w, -half_l, z1)}, {{{0, 0}, {0, 1}, {1, 1}, {1, 0}}}, 0, 0, 1);
+		quad(2, {p(half_w, half_l, z0), p(half_w, -half_l, z0), p(half_w, -half_l, z1), p(half_w, half_l, z1)}, {{{0, 1}, {1, 1}, {1, 0.75}, {0, 0.75}}}, dx, dy, 0);
+		quad(2, {p(-half_w, -half_l, z0), p(-half_w, half_l, z0), p(-half_w, half_l, z1), p(-half_w, -half_l, z1)}, {{{1, 1}, {0, 1}, {0, 0.75}, {1, 0.75}}}, -dx, -dy, 0);
+		quad(2, {p(-half_w, half_l, z0), p(half_w, half_l, z0), p(half_w, half_l, z1), p(-half_w, half_l, z1)}, {{{0, 1}, {0.05, 1}, {0.05, 0}, {0, 0}}}, nx, ny, 0);
+		quad(2, {p(half_w, -half_l, z0), p(-half_w, -half_l, z0), p(-half_w, -half_l, z1), p(half_w, -half_l, z1)}, {{{1, 1}, {0.95, 1}, {0.95, 0}, {1, 0}}}, -nx, -ny, 0);
+	}
+	o.light = CornerLight(nrm);
+	o.top = static_cast<float>(rail_z1);
+	const ThreeDObject *out = made.get();
+	_track_arcs.emplace(key, TrackArcMade{std::move(made), now});
+	return out;
 }
 
 /** A pasture's parts as read (ReadPasture()), by their places in _three_d_objects; resolved by GetThreeDPasture(). */

@@ -515,6 +515,7 @@ int TicksToLeaveDepot(const Train *v);
 Foundation GetRailFoundation(Slope tileh, TrackBits bits);
 bool ThreeDTrackShownOn(TileIndex tile);
 double ThreeDTrackRailTop(TileIndex tile);
+double ThreeDTrackStandOver(TileIndex tile, double lx, double ly);
 
 
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype);

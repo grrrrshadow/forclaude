@@ -2518,6 +2518,9 @@ static constexpr double THREE_D_RAIL_TOP_M = 0.372;
 /** Half the width of our track's embankment, metres (koleje.py BED_W): the box a piece fills. */
 static constexpr double THREE_D_TRACK_HALF_M = 1.7;
 
+/** How finely the centre line of an arc is followed where one stands on its embankment (ThreeDTrackStandOver()), world units: a metre. */
+static constexpr double THREE_D_ARC_STEP = OBJECT_UNITS_PER_METRE;
+
 /** A piece of our track on a tile (DrawThreeDTrack()): where its middle is and which way it goes, world units from the tile's north corner. */
 struct ThreeDTrackPiece {
 	double x, y;    ///< its middle
@@ -2538,17 +2541,66 @@ static const TrackIndexArray<ThreeDTrackPiece> THREE_D_TRACK_PIECES = {{{
 /**
  * Whether a tile's track is ours in 3D where it is drawn now (the player, 8. 11.: "the rails from above on and in 3D on
  * too by default"; ThreeDGroupShown(): from above or from the eyes by their settings): a plain rail of the normal
- * railways (not a monorail, not a maglev), not a piece of a round curve (round_track.h: drawn along its arc), not on
- * the half of a tile's foundation nor by the water.
+ * railways (not a monorail, not a maglev), not on the half of a tile's foundation nor by the water. A piece of a round
+ * curve too (round_track.h; the player, 8. 11.: "the curves in 3D, yes"): laid along its arc (DrawThreeDTrack()).
  */
 bool ThreeDTrackShownOn(TileIndex tile)
 {
 	if (!ThreeDEnabled() || !IsValidTile(tile) || !IsPlainRailTile(tile) || !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
 	if (GetRailTypeInfo(GetRailType(tile))->acceleration_type != VehicleAccelerationModel::Normal) return false;
 	if (GetRailGroundType(tile) == RailGroundType::HalfTileWater) return false;
-	if (IsNonContinuousFoundation(GetRailFoundation(GetTileSlope(tile), GetTrackBits(tile)))) return false;
-	if (RoundTrackDrawing() && IsRoundTrackTile(tile)) return false;
+	const TrackBits track = GetTrackBits(tile);
+	const Foundation f = GetRailFoundation(GetTileSlope(tile), track);
+	if (IsNonContinuousFoundation(f)) return false;
+	/* The tile after its foundation: flat, or up a slope along the track (X or Y); a piece across a corner level along
+	 * its way (the game lays one so on a slope without a foundation). Else the game's sprites. */
+	Slope s = GetTileSlope(tile);
+	ApplyFoundationToSlope(f, s);
+	for (Track t : track) {
+		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+		if (s == SLOPE_FLAT) continue;
+		if (t == Track::X ? (s == SLOPE_NE || s == SLOPE_SW) : t == Track::Y ? (s == SLOPE_NW || s == SLOPE_SE) : false) continue;
+		if (t == Track::X || t == Track::Y) return false;
+		auto at = [&](double x, double y) { return GetPartialPixelZ(std::clamp(static_cast<int>(x), 0, 15), std::clamp(static_cast<int>(y), 0, 15), s); };
+		if (at(p.x - p.ax, p.y - p.ay) != at(p.x + p.ax, p.y + p.ay)) return false;
+	}
 	return GetThreeDFigure("kolej_rovna_drevo") != nullptr;
+}
+
+/** Where one stands on our track: its sleepers' tops over the ground, metres (koleje.py BED_H + SLEEPER_OVER). */
+static constexpr double THREE_D_TRACK_STAND_M = 0.18;
+
+/**
+ * How high over the ground one stands at a point of a tile on our track's embankment (the player, 8. 11.: "the walker up
+ * onto the embankment, sure"; FirstPersonStandZ()), metres: on its sleepers; 0 off it, or where the track is the game's.
+ * @param lx,ly the point, world units from the tile's north corner
+ */
+double ThreeDTrackStandOver(TileIndex tile, double lx, double ly)
+{
+	if (!ThreeDTrackShownOn(tile)) return 0.0;
+	const double half = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
+	/* A round piece (the view from the eyes draws the round curves when they are on): along its arc. */
+	const bool round = RoundTrackEnabled() && IsRoundTrackTile(tile);
+	const double wx = TileX(tile) * TILE_SIZE + lx, wy = TileY(tile) * TILE_SIZE + ly;
+	for (Track t : GetTrackBits(tile)) {
+		if (round) {
+			const std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, t, THREE_D_ARC_STEP);
+			if (!line.empty()) {
+				for (size_t i = 0; i + 1 < line.size(); i++) {
+					const double sx = line[i + 1].x - line[i].x, sy = line[i + 1].y - line[i].y, len = std::hypot(sx, sy);
+					if (len <= 0) continue;
+					const double dx = wx - line[i].x, dy = wy - line[i].y, along = (dx * sx + dy * sy) / len;
+					if (along >= 0 && along <= len && std::abs(dx * sy - dy * sx) / len <= half) return THREE_D_TRACK_STAND_M;
+				}
+				continue;
+			}
+		}
+		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+		const double len = std::hypot(p.ax, p.ay), ux = p.ax / len, uy = p.ay / len;
+		const double dx = lx - p.x, dy = ly - p.y;
+		if (std::abs(dx * ux + dy * uy) <= len && std::abs(dx * uy - dy * ux) <= half) return THREE_D_TRACK_STAND_M;
+	}
+	return 0.0;
 }
 
 /**
@@ -2566,7 +2618,8 @@ double ThreeDTrackRailTop(TileIndex tile)
  * the tile without the track's sprites, each piece of track our object (objekty/nase/koleje.py) -- a straight one the
  * tile long, one across a corner, one up a slope (a level of the map 3 m, from the eyes 5 m); wooden sleepers, concrete
  * on an electrified track. In the turned view and among the objects facing north each in the box it fills
- * (AddThreeDFigureToViewportInBox()), from the eyes lying on the ground (AddCabGroundFigure()).
+ * (AddThreeDFigureToViewportInBox()), from the eyes lying on the ground (AddCabGroundFigure()). On a tile of a round
+ * curve (round_track.h; the player: "the curves in 3D, yes") a round piece along its arc in one (GetThreeDTrackArc()).
  * @param ti the tile
  * @param track its tracks
  * @return whether it was drawn so: its sprites of the track left out
@@ -2577,29 +2630,26 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	if (track.None() || !ThreeDTrackShownOn(ti->tile)) return false;
 
-	/* The tile after its foundation: flat, or up a slope along the track (X or Y); a piece across a corner level along
-	 * its way (the game lays one so on a slope without a foundation). Else the game's sprites. */
+	/* A tile of a round curve (round_track.h): flat, the ground the game draws under no track; its round pieces along
+	 * their arcs, no strip of the game's track drawn after the ground. */
+	const bool round = RoundTrackDrawing() && IsRoundTrackTile(ti->tile);
+	/* The tile after its foundation (ThreeDTrackShownOn(): flat, or as the pieces lie on it). */
 	const Foundation f = GetRailFoundation(ti->tileh, track);
 	Slope s = ti->tileh;
 	ApplyFoundationToSlope(f, s);
-	for (Track t : track) {
-		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
-		if (s == SLOPE_FLAT) continue;
-		if (t == Track::X ? (s == SLOPE_NE || s == SLOPE_SW) : t == Track::Y ? (s == SLOPE_NW || s == SLOPE_SE) : false) continue;
-		if (t == Track::X || t == Track::Y) return false;
-		auto at = [&](double x, double y) { return GetPartialPixelZ(std::clamp(static_cast<int>(x), 0, 15), std::clamp(static_cast<int>(y), 0, 15), s); };
-		if (at(p.x - p.ax, p.y - p.ay) != at(p.x + p.ax, p.y + p.ay)) return false;
+	if (round) {
+		DrawRoundTrackGround(ti->tile);
+	} else {
+		DrawFoundation(ti, f);
+		SpriteID ground;
+		switch (GetRailGroundType(ti->tile)) {
+			case RailGroundType::Barren: ground = SPR_FLAT_BARE_LAND; break;
+			case RailGroundType::SnowOrDesert:
+			case RailGroundType::HalfTileSnow: ground = SPR_FLAT_SNOW_DESERT_TILE; break;
+			default: ground = SPR_FLAT_GRASS_TILE; break;
+		}
+		DrawGroundSprite(ground + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 	}
-
-	DrawFoundation(ti, f);
-	SpriteID ground;
-	switch (GetRailGroundType(ti->tile)) {
-		case RailGroundType::Barren: ground = SPR_FLAT_BARE_LAND; break;
-		case RailGroundType::SnowOrDesert:
-		case RailGroundType::HalfTileSnow: ground = SPR_FLAT_SNOW_DESERT_TILE; break;
-		default: ground = SPR_FLAT_GRASS_TILE; break;
-	}
-	DrawGroundSprite(ground + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 
 	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
 	const std::string_view straight = concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo";
@@ -2608,35 +2658,49 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE;
 	const double half = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
 	const int rails = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+
+	/* A piece with its middle at (x, y), from it to its end (ax, ay): in the turned view in its box (along it to its
+	 * ends, across it the embankment's half each side, up from its foot to its rails' tops), from the eyes lying on the
+	 * ground. */
+	auto put = [&](std::string_view name, double x, double y, double ax, double ay, int z, int foot, int tall, float facing) {
+		if (eye) {
+			AddCabGroundFigure(name, x, y, z, facing);
+			return;
+		}
+		const double len = std::max(std::hypot(ax, ay), 1e-6), cx = -ay / len * half, cy = ax / len * half;
+		const double hx = std::abs(ax) + std::abs(cx), hy = std::abs(ay) + std::abs(cy);
+		const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
+		const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
+		const std::array<int, 6> box{bx0, by0, foot, bx1, by1, foot + tall - 1};
+		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+	};
+
 	for (Track t : track) {
+		/* A round piece along its arc in one (GetThreeDTrackArc(); the player: "like the fishing rod's line, a thick square
+		 * rope"), an object standing on the tile as a house does; a piece straight within its tile as on any tile. */
+		if (round) {
+			if (const ThreeDObject *arc = GetThreeDTrackArc(ti->tile, t, concrete); arc != nullptr) {
+				AddThreeDTileObject(arc, ti->tile, ti->z);
+				continue;
+			}
+		}
 		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
 		std::string_view name = (t == Track::X || t == Track::Y) ? straight : diagonal;
 		float facing = p.facing;
 		int z = ti->z;
+		int foot = ti->z;
 		int tall = rails;
 		if (s != SLOPE_FLAT && (t == Track::X || t == Track::Y)) {
-			/* Up the slope: its middle half a level up, its +x uphill. */
+			/* Up the slope: its middle half a level up, its +x uphill; its box from the slope's foot. */
 			name = slope;
 			z += TILE_HEIGHT / 2;
 			facing = s == SLOPE_SW ? 0.0f : s == SLOPE_SE ? 90.0f : s == SLOPE_NE ? 180.0f : 270.0f;
 			tall += TILE_HEIGHT;
 		} else if (s != SLOPE_FLAT) {
 			z += GetPartialPixelZ(static_cast<int>(p.x), static_cast<int>(p.y), s);
+			foot = z;
 		}
-		const double x = ox + p.x, y = oy + p.y;
-		if (eye) {
-			AddCabGroundFigure(name, x, y, z, facing);
-			continue;
-		}
-		/* Its box: along it to its ends, across it the embankment's half each side; up from its foot (a slope's low end)
-		 * to its rails' tops. */
-		const double len = std::hypot(p.ax, p.ay), cx = -p.ay / len * half, cy = p.ax / len * half;
-		const double hx = std::abs(p.ax) + std::abs(cx), hy = std::abs(p.ay) + std::abs(cy);
-		const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
-		const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
-		const int foot = name == slope ? ti->z : z;
-		const std::array<int, 6> box{bx0, by0, foot, bx1, by1, foot + tall - 1};
-		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+		put(name, ox + p.x, oy + p.y, p.ax, p.ay, z, foot, tall, facing);
 	}
 	return true;
 }
@@ -2650,15 +2714,16 @@ static void DrawTrackBits(TileInfo *ti, TrackBits track)
 {
 	const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
 
+	/* Ours in 3D: the ground and our pieces of track, along the arcs of a round curve too, no sprite of the track
+	 * (DrawThreeDTrack()). */
+	if (DrawThreeDTrack(ti, track)) return;
+
 	/* Part of a round curve (round_track.h): the ground only; the track is drawn along its arc after the ground. */
 	if (RoundTrackDrawing() && IsRoundTrackTile(ti->tile)) {
 		DrawRoundTrackGround(ti->tile);
 		RegisterRoundTrackTile(ti->tile);
 		return;
 	}
-
-	/* Ours in 3D: the ground and our pieces of track, no sprite of the track (DrawThreeDTrack()). */
-	if (DrawThreeDTrack(ti, track)) return;
 
 	if (rti->UsesOverlay()) {
 		DrawTrackBitsOverlay(ti, track, rti);

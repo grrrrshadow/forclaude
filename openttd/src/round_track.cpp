@@ -27,6 +27,7 @@
 #include "core/backup_type.hpp"
 #include "table/sprites.h"
 
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <map>
@@ -1017,6 +1018,46 @@ bool GetRoundTrackPose(const Vehicle *v, RoundTrackPose &pose)
 	pose.y = q.y;
 	pose.azimuth = static_cast<float>(std::atan2(tg.y, tg.x) * 180.0 / M_PI - 135.0);
 	return true;
+}
+
+/**
+ * The centre line of a piece of a round tile as its track is drawn round (CurveOf()), for our 3D track laid along it
+ * (DrawThreeDTrack() of rail_cmd.cpp; the player, 8. 11.: "the curves in 3D, yes"): from where the piece is drawn from
+ * to where to -- at a switch on past its edge over the straight way, as far as its arc goes there --, in stretches of
+ * equal length along it, at most `step` world units; their ends, the first and the last too. None for a piece drawn
+ * straight within its tile: the plain piece is that.
+ * @param step the longest stretch, world units
+ */
+std::vector<RoundTrackPoint> RoundTrackCentreLine(TileIndex tile, Track track, double step)
+{
+	std::vector<RoundTrackPoint> out;
+	if (!IsSimpleTile(tile) || !GetTrackBits(tile).Test(track)) return out;
+	const Curve &c = CurveOf(tile, track);
+	if (c.zones.empty() && c.lo >= 0 && c.hi <= c.len) return out;
+	/* How far along the line each fine step of the piece is: an arc is longer than the stretch of the piece it rounds. */
+	static constexpr int FINE = 96;
+	std::array<double, FINE + 1> s{}, at{};
+	Vec prev;
+	for (int k = 0; k <= FINE; k++) {
+		s[k] = c.lo + (c.hi - c.lo) * k / FINE;
+		Vec q, tg;
+		c.Eval(s[k], q, tg);
+		at[k] = k == 0 ? 0.0 : at[k - 1] + Length(q - prev);
+		prev = q;
+	}
+	const double total = at[FINE];
+	const int n = std::max(1, static_cast<int>(std::ceil(total / step - 1e-6)));
+	int k = 0;
+	for (int i = 0; i <= n; i++) {
+		const double want = total * i / n;
+		while (k < FINE - 1 && at[k + 1] < want) k++;
+		const double f = at[k + 1] > at[k] ? std::clamp((want - at[k]) / (at[k + 1] - at[k]), 0.0, 1.0) : 0.0;
+		Vec q, tg;
+		c.Eval(s[k] + (s[k + 1] - s[k]) * f, q, tg);
+		tg = Unit(tg);
+		out.push_back({q.x, q.y, tg.x, tg.y});
+	}
+	return out;
 }
 
 RoundTrackPass::RoundTrackPass(bool active) : was(_round_track_drawing)

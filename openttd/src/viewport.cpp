@@ -13908,6 +13908,30 @@ bool ViewportDrawingEye()
 	return _cab_collecting;
 }
 
+/** An object a tile's draw procedure put on its tile for the view from the eyes (AddThreeDTileObject()), taken after the tile. */
+struct CabTileObject {
+	const ThreeDObject *obj;
+	TileIndex origin;
+	int z;
+};
+static std::vector<CabTileObject> _cab_tile_objects;
+
+/**
+ * An object a tile's draw procedure puts on its tile in the 3D views (our track along an arc of a round curve,
+ * DrawThreeDTrack() of rail_cmd.cpp): among the objects of the turned view and of the view facing north with the
+ * objects, or of the view from the eyes while its tiles are collected -- standing at a tile's north corner at a height,
+ * drawn as a house is.
+ */
+void AddThreeDTileObject(const ThreeDObject *obj, TileIndex origin, int z)
+{
+	if (obj == nullptr) return;
+	if (_cab_collecting) {
+		_cab_tile_objects.push_back({obj, origin, z});
+	} else if (_drawing_turned || _north_house_objects_now) {
+		_turned_objects.emplace_back(obj, origin, z);
+	}
+}
+
 /** Whether a 3D view is collecting what to draw: the turned view, facing north with the houses as objects, or the view from the eyes. */
 bool ViewportDrawing3D()
 {
@@ -15312,6 +15336,14 @@ double FirstPersonStandZ(double x, double y, double from)
 	if (IsValidTile(tile) && IsBridgeAbove(tile)) {
 		const double deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 		if (deck <= up_to && deck > best) best = deck;
+	}
+	/* Up on our track's embankment, on its sleepers (ThreeDTrackStandOver(), by the settings from the eyes). A height
+	 * within a unit of the ground is stretched with it from the eyes (EyeBaseZ()), its metres a level's 5 m: so much
+	 * less here. */
+	if (IsValidTile(tile)) {
+		const ThreeDEyeScope from_eyes;
+		const double on = ThreeDTrackStandOver(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE);
+		if (on > 0) best = std::max(best, CabWalkedGround(ix, iy) + on * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH);
 	}
 	return best;
 }
@@ -17019,6 +17051,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const size_t round_before = RoundTrackTileCount();
 		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 		t.round = RoundTrackTileCount() != round_before;
+		/* The objects it put on its tile (AddThreeDTileObject()). */
+		for (const CabTileObject &co : _cab_tile_objects) objects.push_back({co.obj, co.origin, co.z});
+		_cab_tile_objects.clear();
 		t.end = _vd.tile_sprites_to_draw.size();
 		t.slope = _cur_ti.tileh;
 		t.z = _cur_ti.z;

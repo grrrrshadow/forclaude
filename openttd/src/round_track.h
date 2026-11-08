@@ -62,6 +62,13 @@ struct RoundTrackPose {
 };
 bool GetRoundTrackPose(const Vehicle *v, RoundTrackPose &pose);
 
+/** A point of the centre line of a piece of round track (RoundTrackCentreLine()): where, and the way it goes there. */
+struct RoundTrackPoint {
+	double x = 0, y = 0;   ///< world units
+	double tx = 0, ty = 0; ///< its direction, a unit
+};
+std::vector<RoundTrackPoint> RoundTrackCentreLine(TileIndex tile, Track track, double step);
+
 /** While a view is drawn: if it draws the round curves (the turned view), the tiles they are on are collected and drawn after the ground. */
 class RoundTrackPass {
 public:

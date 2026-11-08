@@ -12051,6 +12051,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		ScrollMainWindowToTile(depot, true);
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: {} u {},{}: {} (vozidlo {} typu {}) vyjizdi z depa na {},{}", what, x0, y0, GetString(STR_ENGINE_NAME, eid), v->unitnumber, to_underlying(v->type), TileX(depot), TileY(depot));
+	} else if (what == "kolej" && argv.size() > 5 && argv[2] == "osa") {
+		/* 'kolej osa <x> <y> <track>': the centre line of a round piece our 3D track is laid along (RoundTrackCentreLine()). */
+		auto x = number(3), y = number(4), tr = number(5);
+		if (!x.has_value() || !y.has_value() || !tr.has_value() || *tr < 0 || *tr > 5) return true;
+		const std::vector<RoundTrackPoint> line = RoundTrackCentreLine(TileXY(*x, *y), static_cast<Track>(*tr), 0.5 * OBJECT_UNITS_PER_METRE);
+		std::string out;
+		for (const RoundTrackPoint &p : line) out += fmt::format(" ({:.2f},{:.2f} {:.0f})", p.x, p.y, std::atan2(p.ty, p.tx) * 180.0 / M_PI);
+		IConsolePrint(CC_DEFAULT, "test3d: kolej osa {},{} {}: {} bodu{}", *x, *y, *tr, line.size(), out);
+		return true;
 	} else if (what == "kolej" && argv.size() > 4) {
 		/* The rig: one piece of rail, 'test3d kolej <x> <y> <track 0..5>' (X, Y, upper, lower, left, right), to lay
 		 * the curves the round curves of rails are seen on (round_track.h). */

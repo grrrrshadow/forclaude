@@ -31,6 +31,7 @@
 #include "industry_type.h"
 #include "engine_type.h"
 #include "tile_type.h"
+#include "track_type.h"
 #include "vehicle_type.h"
 #include "zoom_type.h"
 #include "sound_type.h"
@@ -1443,6 +1444,7 @@ enum class ThreeDBridgePiece : uint8_t {
 /** The "type" of the aqueducts' 3D pieces (a record with "akvadukt": true; the colleague's hra/3d/PROSBA-AKVADUKTY.md): past the game's bridge types. */
 static constexpr uint THREE_D_AQUEDUCT = 13; // MAX_BRIDGES of bridge.h (a static_assert in three_d_objects.cpp)
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map = false, int wall = -1);
+const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);
