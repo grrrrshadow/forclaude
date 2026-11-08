@@ -9568,6 +9568,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				}
 			}
 			RigFirstPersonLookAt(at, number(4).value_or(5), number(5).value_or(0));
+		} else if (argv.size() > 3 && argv[2] == "podoba") {
+			/* 'chodec podoba <n>': how the n-th visible vehicle of sprites only faces from the eyes (GetThreeDEyeLikeness()). */
+			int want = number(3).value_or(0), seen = 0;
+			for (const Vehicle *u : Vehicle::Iterate()) {
+				if (!u->IsPrimaryVehicle() || u->vehstatus.Test(VehState::Hidden) || seen++ != want) continue;
+				ThreeDEyeLikeness el;
+				const EyeLikeness got = GetThreeDEyeLikeness(u, PAL_NONE, 0.1, el);
+				IConsolePrint(CC_DEFAULT, "test3d: podoba {} na {},{} smer {}: {}, natoceni {:.1f}", want, u->x_pos, u->y_pos, to_underlying(u->direction), got == EyeLikeness::Solid ? "teleso" : "neni", el.facing);
+				break;
+			}
 		} else if (argv.size() > 3 && argv[2] == "zbran") {
 			/* 'chodec zbran <1-5> [draw ms] [steps|drzet]': a weapon in the hand (the hammer, the bow, the crossbow, the
 			 * sword, the two-handed sword); with draw ms a shot (the bow drawn so long, or held drawn) and its arrow let fly

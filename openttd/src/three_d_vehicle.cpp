@@ -2079,8 +2079,8 @@ static float LikenessPitch(const Vehicle *v, double x, double y, double facing, 
  * likeness made from its eight sprites (BuildVehicleModel()) as a solid seen from where the eye is -- not its sprite
  * of the nearest direction, drawn from thirty degrees up, turned to the eye (the player, 3. 11.: "you have the engine
  * from the side ... make of the 2D a proper 3D first person view"). Each part where the turned map hangs it, from the
- * position of its piece, in the piece's direction or along a round curve's arc; foreshortened along as the game
- * spaces its vehicles; raised up a slope.
+ * position of its piece, facing the way the piece goes, turning smoothly (ThreeDEyeLikenessFacing()), or along a round
+ * curve's arc; foreshortened along as the game spaces its vehicles; raised up a slope.
  * @param pal the palette of its sprites (the company's colours)
  * @param cell_m how coarse it may be, metres (its distance): the level of detail of its solid
  * @param[out] out where and which solid
@@ -2121,10 +2121,11 @@ EyeLikeness GetThreeDEyeLikeness(const Vehicle *v, PaletteID pal, double cell_m,
 		out.y = pose.y;
 		facing = (pose.azimuth + 135.0) * M_PI / 180.0;
 	} else {
+		/* Turning as its way turns, smoothly, as the vehicles drawn from their objects do (ThreeDEyeLikenessFacing()). */
 		const int d = to_underlying(v->direction) & 7;
 		out.x = v->x_pos;
 		out.y = v->y_pos;
-		facing = std::atan2(static_cast<double>(DIR_DY[d]), static_cast<double>(DIR_DX[d]));
+		facing = ThreeDEyeLikenessFacing(v, std::atan2(static_cast<double>(DIR_DY[d]), static_cast<double>(DIR_DX[d])));
 	}
 	facing = std::remainder(facing, 2 * M_PI);
 	out.facing = static_cast<float>(facing * 180.0 / M_PI);

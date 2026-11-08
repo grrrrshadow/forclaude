@@ -85,6 +85,7 @@ const struct ThreeDVehicleObject *ThreeDBoatRooms(const struct ThreeDVehicleObje
 struct ThreeDBoatFigure;
 void ForThreeDBoatFigures(const Vehicle *v, const struct ThreeDVehicleObject &obj, bool inside, const std::function<void(const ThreeDBoatFigure &)> &f);
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
+double ThreeDEyeLikenessFacing(const Vehicle *v, double by_direction);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 
 /** Pieces of a kind of the shared loads a state of a vehicle object carries (ThreeDLoadPiece): the figure, its frame and colour, and where each lies. */

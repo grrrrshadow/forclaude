@@ -510,8 +510,14 @@ static float RustTime(const ThreeDVehicleObject *obj, int step)
 	return s != nullptr && !obj->rust.mask_file.empty() ? s->rust : 0.0f;
 }
 
-/** The view from the eyes: how far back on its way a vehicle's heading is taken from (EyeFacing()), world units. */
-static constexpr double EYE_TRAIL_UNITS = 3.0;
+/**
+ * The view from the eyes: how far back on its way a vehicle's heading is taken from (EyeFacing()), world units -- its
+ * back following where its front went, about a car's wheelbase. The game's bend is straight, diagonal, straight; from 3
+ * units back the car stood at the diagonal's 45 degrees through the middle of the bend, as its sprites (the player,
+ * test3: "they drive the bend in the angles of the sprites, they can go round it rounder"); from 6 it turns all the way
+ * round, some 8 degrees a unit.
+ */
+static constexpr double EYE_TRAIL_UNITS = 6.0;
 /** And how much of the way to that heading it turns a tick: smooth, not in the steps of its way's points. */
 static constexpr double EYE_TURN_A_TICK = 0.5;
 
@@ -520,7 +526,7 @@ static constexpr double EYE_TURN_A_TICK = 0.5;
  * way its wheels turn there, and the way its crew walks wherever it is drawn (WalkCode()).
  */
 struct EyeTrail {
-	std::array<std::pair<int, int>, 8> at{}; ///< its last places, the newest last
+	std::array<std::pair<int, int>, 12> at{}; ///< its last places, the newest last (enough for EYE_TRAIL_UNITS, a unit a place)
 	int count = 0;
 	double target = 0;  ///< the heading its way gives, radians in the world, 0 along +x
 	double facing = 0;  ///< the heading it is drawn at, turning towards the target
@@ -3872,6 +3878,20 @@ static double EyeFacing(const Vehicle *v, const Vehicle *front, const Vehicle *l
 	}
 	e.tick = now;
 	return e.facing;
+}
+
+/**
+ * The way a vehicle of sprites only faces in the view from the eyes (its likeness, GetThreeDEyeLikeness()): as its way
+ * turns, smoothly, as a vehicle drawn from its object (EyeFacing()) -- not by its eight directions (the player, test3:
+ * "the cars I look at from the first person drive the bend in the angles of the sprites, they can go round it rounder").
+ * Each piece by its own way.
+ * @param by_direction its direction's angle, radians
+ * @return its heading, radians
+ */
+double ThreeDEyeLikenessFacing(const Vehicle *v, double by_direction)
+{
+	double rolled = 0, curvature = 0;
+	return EyeFacing(v, v, v, by_direction, false, rolled, curvature);
 }
 
 /**
