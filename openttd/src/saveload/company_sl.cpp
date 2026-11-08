@@ -515,6 +515,13 @@ public:
 	void LoadCheck(CompanyProperties *cprops) const override { this->Load(cprops); }
 };
 
+/**
+ * The walker's inventory as saved (CompanyProperties::walker_items): a list of any length, so that a game saved with
+ * fewer places than there are now loads -- the inventory grew from 32 to 256 places (the rod and the fish, 7. 11.) and
+ * the title game (opntitle.dat, of 32) no longer loaded: the title screen was a world of water (the player, test3).
+ */
+static std::vector<uint16_t> _walker_items_sl;
+
 /** Save/load of companies. */
 static const SaveLoad _company_desc[] = {
 	    SLE_VAR(CompanyProperties, name_2,          VarTypes::U32),
@@ -573,7 +580,7 @@ static const SaveLoad _company_desc[] = {
 	SLE_CONDVAR(CompanyProperties, tree_limit, VarTypes::U32, SaveLoadVersion::AutoreplaceWhenOldTreeLimit, SaveLoadVersion::MaxVersion),
 	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, 64, SaveLoadVersion::CompanyTotalDeliveredCargo, SaveLoadVersion::CargoTypes128),
 	SLE_CONDARR(CompanyProperties, total_delivered_cargo, VarTypes::U32, NUM_CARGO, SaveLoadVersion::CargoTypes128, SaveLoadVersion::MaxVersion),
-	SLE_CONDARR(CompanyProperties, walker_items, VarTypes::U16, WALKER_ITEM_SLOTS, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
+	SLEG_CONDVECTOR("walker_items", _walker_items_sl, VarTypes::U16, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
 	SLE_CONDVAR(CompanyProperties, walker_health, VarTypes::U8, SaveLoadVersion::WalkerInventory, SaveLoadVersion::MaxVersion),
 	SLE_CONDSSTR(CompanyProperties, walker_pet, VarTypes::STR, SaveLoadVersion::WalkerPet, SaveLoadVersion::MaxVersion),
 	SLE_CONDARR(CompanyProperties, walker_quick, VarTypes::U8, WALKER_QUICK_KEYS, SaveLoadVersion::WalkerQuickKeys, SaveLoadVersion::MaxVersion),
@@ -594,8 +601,10 @@ struct PLYRChunkHandler : ChunkHandler {
 
 		for (Company *c : Company::Iterate()) {
 			SlSetArrayIndex(c->index);
+			_walker_items_sl.assign(c->walker_items.begin(), c->walker_items.end());
 			SlObject(c, _company_desc);
 		}
+		_walker_items_sl.clear();
 	}
 
 	void Load() const override
@@ -605,7 +614,11 @@ struct PLYRChunkHandler : ChunkHandler {
 		int index;
 		while ((index = SlIterateArray()) != -1) {
 			Company *c = Company::CreateAtIndex(CompanyID(index));
+			_walker_items_sl.clear();
 			SlObject(c, slt);
+			/* The places saved; those it had not yet, as a new walker has them (WalkerStartItems()). */
+			std::copy_n(_walker_items_sl.begin(), std::min(_walker_items_sl.size(), c->walker_items.size()), c->walker_items.begin());
+			_walker_items_sl.clear();
 			_company_colours[c->index] = c->colour;
 			/* A game from before the tents: its walker carries them as a new one would (WalkerStartItems()). */
 			if (IsSavegameVersionBefore(SaveLoadVersion::WalkerTents)) {
@@ -626,6 +639,7 @@ struct PLYRChunkHandler : ChunkHandler {
 		while ((index = SlIterateArray()) != -1) {
 			std::unique_ptr<CompanyProperties> cprops = std::make_unique<CompanyProperties>();
 			SlObject(cprops.get(), slt);
+			_walker_items_sl.clear();
 
 			/* We do not load old custom names */
 			if (IsSavegameVersionBefore(SaveLoadVersion::ReplaceCustomNameArray)) {
