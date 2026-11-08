@@ -9625,8 +9625,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			auto x = number(3), y = number(4);
 			if (x.has_value() && y.has_value()) {
 				const std::optional<double> surface = EyeWaterSurfaceZ(*x, *y);
-				IConsolePrint(CC_DEFAULT, "test3d: zem na {},{}: chodec {:.2f}, hladina {}, hloubka {:.2f}, sklon dlazdice {}", *x, *y, FirstPersonGroundZ(*x, *y),
-						surface.has_value() ? fmt::format("{:.2f}", *surface) : std::string("zadna"), EyeWaterDepth(*x, *y), to_underlying(GetTileSlope(TileVirtXY(*x, *y))));
+				const TileIndex t = TileVirtXY(*x, *y);
+				IConsolePrint(CC_DEFAULT, "test3d: zem na {},{}: chodec {:.2f}, hladina {}, hloubka {:.2f}, sklon dlazdice {}, druh {}, most nad {}", *x, *y, FirstPersonGroundZ(*x, *y),
+						surface.has_value() ? fmt::format("{:.2f}", *surface) : std::string("zadna"), EyeWaterDepth(*x, *y), to_underlying(GetTileSlope(t)), to_underlying(GetTileType(t)),
+						IsBridgeAbove(t) ? fmt::format("{:.2f}", static_cast<double>(GetBridgePixelHeight(GetSouthernBridgeEnd(t)))) : std::string("ne"));
 			}
 		} else if (argv.size() > 4 && argv[2] == "voda") {
 			/* 'chodec voda <x> <y>': the walker into the water in the middle of the tile, at its surface. */

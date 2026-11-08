@@ -1652,7 +1652,11 @@ struct FirstPersonWindow : Window {
 	{
 		const double len = std::hypot(dx, dy);
 		if (len <= 0) return false;
-		const double wx = this->walker.x + dx / len * FIRST_PERSON_RADIUS * 1.2, wy = this->walker.y + dy / len * FIRST_PERSON_RADIUS * 1.2;
+		/* The edge of its circle where this step would take it: the walker stops a step short of the water (its circle
+		 * may not reach over it), so the edge where it stands may never come over it (the player, test3: "I cannot step
+		 * onto the river's tile", stopped a tenth of a unit off the shore of a lake for ever). */
+		const double reach = len + FIRST_PERSON_RADIUS * 1.2;
+		const double wx = this->walker.x + dx / len * reach, wy = this->walker.y + dy / len * reach;
 		if (!EyeWaterSurfaceZ(wx, wy).has_value()) return false;
 		const TileIndex under = TileVirtXY(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y));
 		if (IsBridgeAbove(under) && FirstPersonFeetZ(this->walker) >= GetBridgePixelHeight(GetSouthernBridgeEnd(under)) - 0.1 * OBJECT_HEIGHT_PER_METRE) return false;
