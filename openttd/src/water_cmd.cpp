@@ -43,6 +43,9 @@
 #include "town_type.h"
 #include "three_d_water_life.h"
 #include "tree_cmd.h"
+#include "three_d_objects.h"
+#include "three_d_vehicle_object.h"
+#include "ship.h"
 
 #include "table/strings.h"
 
@@ -864,6 +867,128 @@ static void DrawWaterTileStruct(const TileInfo *ti, std::span<const DrawTileSeqS
 	}
 }
 
+/** The middle tile of the lock a tile is part of. */
+static TileIndex LockMiddle(TileIndex tile)
+{
+	const TileIndexDiff up = TileOffsByDiagDir(GetLockDirection(tile));
+	switch (GetLockPart(tile)) {
+		case LockPart::Lower: return tile + up;
+		case LockPart::Upper: return tile - up;
+		default: return tile;
+	}
+}
+
+/**
+ * Whether the gates of a lock are open (DrawThreeDLock()): the lower one while a ship is on the lower tile or in the
+ * middle at the lower water, the upper one while one is on the upper tile or in the middle at the upper water; both
+ * shut while it rises or sinks.
+ * @param middle the lock's middle tile
+ * @return the lower gate open, the upper one open
+ */
+static std::pair<bool, bool> LockGatesOpen(TileIndex middle)
+{
+	const TileIndexDiff up = TileOffsByDiagDir(GetLockDirection(middle));
+	const int lower_water = GetTilePixelZ(middle - up);
+	auto ship = [](const Vehicle *v) { return v->type == VehicleType::Ship; };
+	const bool lower = HasVehicleOnTile(middle - up, ship) || HasVehicleOnTile(middle, [&](const Vehicle *v) { return v->type == VehicleType::Ship && v->z_pos <= lower_water; });
+	const bool upper = HasVehicleOnTile(middle + up, ship) || HasVehicleOnTile(middle, [&](const Vehicle *v) { return v->type == VehicleType::Ship && v->z_pos >= lower_water + static_cast<int>(TILE_HEIGHT); });
+	return {lower, upper};
+}
+
+/**
+ * A ship moved on or off a lock, or up or down in it: its three tiles drawn again, its gates as they are now
+ * (DrawThreeDLock()).
+ * @param tile a tile the ship is or was on
+ */
+void MarkLockDirtyForShip(TileIndex tile)
+{
+	if (!IsValidTile(tile) || !IsTileType(tile, TileType::Water) || !IsLock(tile)) return;
+	const TileIndex middle = LockMiddle(tile);
+	const TileIndexDiff up = TileOffsByDiagDir(GetLockDirection(middle));
+	for (TileIndex t : {middle - up, middle, middle + up}) MarkTileDirtyByTile(t);
+}
+
+/**
+ * A lock in 3D (the player, test3: "we need a 3D lock"; 8. 11.: "only the 3D look"): the walls of its tile and the
+ * leaves of its gate as our objects (objekty/nase/zdymadlo.py), the game's water under them, in the turned view, facing
+ * north among the objects and from the eyes, as the tent (DrawWalkerTent()). A wall stands along each side of its tile,
+ * the chamber's on the middle tile its foot rising with the water's slope; a gate of two leaves at the chamber's end on
+ * the lower and on the upper tile: shut in a point upstream, or open along the walls away from the chamber
+ * (LockGatesOpen()). Each wall and leaf its own object hung where it stands, sorted so with a ship between them.
+ * Building a lock stays the game's.
+ * @param ti the tile
+ * @param part its part of the lock
+ * @param dir the way up the lock
+ * @return whether it was drawn so: its structure's sprites left out
+ */
+static bool DrawThreeDLock(const TileInfo *ti, LockPart part, DiagDirection dir)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	/* A wall in thirds of the tile, each its own object sorted by its own middle (the player, test3: "the concrete at the
+	 * back is drawn over the gate, on top": one wall the tile long, sorted by its middle, was drawn after a leaf by the
+	 * tile's end); the middle tile's thirds up the slope each their own foot. */
+	static constexpr std::string_view SLOPE_WALLS[3] = {"zdymadlo_zed_svah_0", "zdymadlo_zed_svah_1", "zdymadlo_zed_svah_2"};
+	const std::string_view leaf = part == LockPart::Upper ? "zdymadlo_kridlo_horni" : "zdymadlo_kridlo_dolni";
+	auto wall_of = [part](int third) { return part == LockPart::Middle ? SLOPE_WALLS[third] : std::string_view(part == LockPart::Lower ? "zdymadlo_zed_dolni" : "zdymadlo_zed_horni"); };
+	for (int k = 0; k < 3; k++) {
+		if (GetThreeDFigure(wall_of(k)) == nullptr) return false;
+	}
+	if (GetThreeDFigure(leaf) == nullptr) return false;
+
+	/* Up the lock and across it, world units; the angle up it (0 along +x, 90 along +y). */
+	const TileIndexDiffC d = TileIndexDiffCByDiagDir(dir);
+	const double ax = d.x, ay = d.y, px = -ay, py = ax;
+	const float up_deg = static_cast<float>(std::atan2(ay, ax) * 180.0 / M_PI);
+	const double cx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	const double m = OBJECT_UNITS_PER_METRE;
+	const double half = TILE_SIZE / 2.0;
+	static constexpr double WALL_T_M = 1.6;      // zdymadlo.py WALL_T
+	static constexpr double GATE_ANGLE_DEG = 18.0; // zdymadlo.py GATE_ANGLE
+	const double leaf_l = (TILE_SIZE / m - 2 * WALL_T_M) / 2 / std::cos(GATE_ANGLE_DEG * M_PI / 180.0); // zdymadlo.py LEAF_L, metres
+	auto put = [&](std::string_view name, double x, double y, double z, float facing) {
+		if (eye) {
+			AddCabFigure(name, 1.0f, x, y, z, facing);
+		} else {
+			AddThreeDFigureToViewport(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, _cur_dpi->zoom, ti->tile);
+		}
+	};
+	/* The walls, at the sides of the tile, along it, a third at a time from its lower end up. */
+	for (int side : {-1, 1}) {
+		const double off = half - WALL_T_M / 2 * m;
+		for (int k = 0; k < 3; k++) {
+			const double along = (k - 1) * (TILE_SIZE / 3.0);
+			put(wall_of(k),cx + side * px * off + ax * along, cy + side * py * off + ay * along, ti->z, up_deg);
+		}
+	}
+	if (part == LockPart::Middle) return true;
+
+	/* The gate: on the lower tile 2 m short of its upper end, on the upper tile at its lower end. */
+	const auto [lower_open, upper_open] = LockGatesOpen(LockMiddle(ti->tile));
+	const bool open = part == LockPart::Lower ? lower_open : upper_open;
+	const double along = part == LockPart::Lower ? half - 2.0 * m : -(half - 0.3 * m);
+	const double gx = cx + ax * along, gy = cy + ay * along;
+	for (int side : {-1, 1}) {
+		/* Hinged at the wall's face, a little off it; shut towards the middle and upstream, open along the wall away from the chamber. */
+		const double hinge = half - (WALL_T_M + 0.3) * m;
+		const double hx = gx + side * px * hinge, hy = gy + side * py * hinge;
+		double fx, fy;
+		if (open) {
+			const double away = part == LockPart::Lower ? -1.0 : 1.0;
+			fx = ax * away;
+			fy = ay * away;
+		} else {
+			const double c = std::cos(GATE_ANGLE_DEG * M_PI / 180.0), s = std::sin(GATE_ANGLE_DEG * M_PI / 180.0);
+			fx = -side * px * c + ax * s;
+			fy = -side * py * c + ay * s;
+		}
+		/* Hung from its middle, half its length from the hinge. */
+		const double mid = leaf_l / 2 * m;
+		put(leaf, hx + fx * mid, hy + fy * mid, ti->z, static_cast<float>(std::atan2(fy, fx) * 180.0 / M_PI));
+	}
+	return true;
+}
+
 /**
  * Draw a lock tile.
  * @param ti The tile information of the lock tile.
@@ -891,6 +1016,9 @@ static void DrawWaterLock(const TileInfo *ti)
 
 	if (image < 5) image += water_base;
 	DrawGroundSprite(image, PAL_NONE);
+
+	/* Its walls and gates as our 3D objects where the 3D draws (DrawThreeDLock()). */
+	if (!IsInvisibilitySet(TransparencyOption::Buildings) && DrawThreeDLock(ti, part, GetLockDirection(ti->tile))) return;
 
 	/* Draw structures. */
 	uint     zoffs = 0;

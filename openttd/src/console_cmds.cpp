@@ -9981,6 +9981,76 @@ static bool ConTest3D(std::span<std::string_view> argv)
 						GetThreeDHouseTitle(t).value_or("-"), o != nullptr ? o->figures.size() : 0);
 			}
 		}
+	} else if (what == "zdymadlo") {
+		/* 'zdymadlo [x y]': a lock on the nearest slope it can be built on, a canal off each end, a ship depot at each
+		 * end of those and a ship going from one to the other through it (the player, test3: "a 3D lock"; DrawThreeDLock()). */
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			DoStartupNewCompany(false, CompanyID::Invalid());
+		}
+		if (_local_company == COMPANY_SPECTATOR) SetLocalCompany(CompanyID::Begin());
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+		const TileIndex asked = TileXY(static_cast<uint>(number(2).value_or(static_cast<int>(Map::SizeX() / 2))), static_cast<uint>(number(3).value_or(static_cast<int>(Map::SizeY() / 2))));
+		TileIndex middle = INVALID_TILE;
+		uint best = UINT_MAX;
+		for (TileIndex t : Map::Iterate()) {
+			if (!IsInclinedSlope(GetTileSlope(t))) continue;
+			const uint dist = DistanceManhattan(t, asked);
+			if (dist >= best) continue;
+			/* Room for the canals and the depots past its ends. */
+			const TileIndexDiffC dc = TileIndexDiffCByDiagDir(GetInclinedSlopeDirection(GetTileSlope(t)));
+			if (TileAddWrap(t, 8 * dc.x, 8 * dc.y) == INVALID_TILE || TileAddWrap(t, -8 * dc.x, -8 * dc.y) == INVALID_TILE) continue;
+			if (Command<Commands::BuildLock>::Do(DoCommandFlags{}, t).Failed()) continue;
+			/* A canal can go off each end as the land is (the lock not built yet: tried from two tiles past it). */
+			const TileIndexDiff dup = TileOffsByDiagDir(GetInclinedSlopeDirection(GetTileSlope(t)));
+			if (Command<Commands::BuildCanal>::Do(DoCommandFlags{}, t - dup * 6, t - dup * 2, WaterClass::Canal, false).Failed()) continue;
+			if (Command<Commands::BuildCanal>::Do(DoCommandFlags{}, t + dup * 6, t + dup * 2, WaterClass::Canal, false).Failed()) continue;
+			best = dist;
+			middle = t;
+		}
+		if (middle == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "test3d: zdymadlo: nikde nejde postavit");
+			return true;
+		}
+		CommandCost lock = Command<Commands::BuildLock>::Do(DoCommandFlag::Execute, middle);
+		const DiagDirection dir = GetLockDirection(middle);
+		const TileIndexDiff up = TileOffsByDiagDir(dir);
+		IConsolePrint(CC_DEFAULT, "test3d: zdymadlo na {},{} smer {}: {}", TileX(middle), TileY(middle), to_underlying(dir), RefusalReason(lock));
+		ScrollMainWindowToTile(middle, true);
+		/* Each end: the land past it levelled to its water, a canal on it, a ship depot at the far end. */
+		TileIndex depots[2] = {INVALID_TILE, INVALID_TILE};
+		for (int end = 0; end < 2; end++) {
+			const int sign = end == 0 ? -1 : 1;
+			const TileIndex near_end = middle + up * sign * 2, far_end = middle + up * sign * 6;
+			CommandCost canal = Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, far_end, near_end, WaterClass::Canal, false);
+			/* The depot over the last two tiles of the canal (its second tile the one further along its axis). */
+			CommandCost depot;
+			for (int k : {5, 6}) {
+				depot = Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, middle + up * sign * k, DiagDirToAxis(dir));
+				if (depot.Failed()) continue;
+				depots[end] = middle + up * sign * k;
+				break;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: zdymadlo konec {}: pruplav {}, depo {}", end == 0 ? "dolni" : "horni", RefusalReason(canal), RefusalReason(depot));
+		}
+		if (depots[0] == INVALID_TILE || depots[1] == INVALID_TILE) return true;
+		for (const Engine *e : Engine::IterateType(VehicleType::Ship)) {
+			auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, depots[0], e->index, true, INVALID_CARGO, ClientID::Invalid);
+			if (cost.Failed()) continue;
+			int n = 0;
+			for (int k : {1, 0}) {
+				const Depot *d = Depot::GetByTile(depots[k]);
+				if (d == nullptr) continue;
+				Order o{};
+				o.MakeGoToDepot(DestinationID(d->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+				Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, n++, o);
+			}
+			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
+			IConsolePrint(CC_DEFAULT, "test3d: zdymadlo: lod {} '{}' jede pres zdymadlo", Vehicle::Get(veh)->unitnumber, GetString(STR_ENGINE_NAME, e->index));
+			break;
+		}
+		return true;
 	} else if (what == "auta" && argv.size() > 2) {
 		/* 'auta <jmeno> [pocet] [x y] [zatacka] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight road
 		 * along x with a shed at each end and so many road vehicles of the first engine whose name has the text in it,

@@ -38,6 +38,7 @@
 #include "industry.h"
 #include "industry_map.h"
 #include "ship_cmd.h"
+#include "water.h"
 #include "console_func.h"
 #include "effectvehicle_func.h"
 #include "train.h"
@@ -629,6 +630,8 @@ static bool ShipMoveUpDownOnLock(Ship *v)
 		v->z_pos += dz;
 		v->UpdatePosition();
 		v->UpdateViewport(true, true);
+		/* Up or down in the lock: its gates shut, or one opens at the end (DrawThreeDLock() of water_cmd.cpp). */
+		MarkLockDirtyForShip(v->tile);
 	}
 
 	return true;
@@ -1114,6 +1117,9 @@ static void ShipController(Ship *v)
 				if (!vets.Test(VehicleEnterTileState::EnteredWormhole)) {
 					v->tile = gp.new_tile;
 					v->state = track;
+					/* On or off a lock: its gates drawn as they are now (DrawThreeDLock() of water_cmd.cpp). */
+					MarkLockDirtyForShip(gp.old_tile);
+					MarkLockDirtyForShip(gp.new_tile);
 
 					/* Update ship cache when the water class changes. Aqueducts are always canals. */
 					if (GetEffectiveWaterClass(gp.old_tile) != GetEffectiveWaterClass(gp.new_tile)) v->UpdateCache();
