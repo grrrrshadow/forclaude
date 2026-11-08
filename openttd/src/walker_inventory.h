@@ -70,6 +70,7 @@ enum class WalkerItem : uint8_t {
 	Perch,      ///< the big green perch, caught in a river, a canal or a lake (objekty/voda/ryba_okoun.glb)
 	Discus,     ///< the discus, caught in the sea (objekty/voda/ryba_tercovec.glb)
 	Goldfish,   ///< the fancy goldfish, caught in the sea (objekty/voda/ryba_zavojnatka.glb)
+	ShortRod,   ///< the short fishing rod (objekty/predmety/prut_ohnuty.glb straightened, objekty/nase prut_kratky), as the bamboo one; from the start (the player, test3: "we will have two rods")
 	End,        ///< the end of the known things
 };
 
@@ -135,6 +136,7 @@ constexpr std::array<uint16_t, WALKER_ITEM_SLOTS> WalkerStartItems()
 	items[static_cast<size_t>(WalkerItem::CelticTent)] = 1;
 	items[static_cast<size_t>(WalkerItem::CampingTent)] = 1;
 	items[static_cast<size_t>(WalkerItem::FishingRod)] = 1;
+	items[static_cast<size_t>(WalkerItem::ShortRod)] = 1;
 	return items;
 }
 

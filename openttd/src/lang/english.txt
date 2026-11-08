@@ -2390,6 +2390,7 @@ STR_WALKER_ITEM_FISHING_ROD                                     :Bamboo fishing 
 STR_WALKER_ITEM_PERCH                                           :Big green perch
 STR_WALKER_ITEM_DISCUS                                          :Discus
 STR_WALKER_ITEM_GOLDFISH                                        :Fancy goldfish
+STR_WALKER_ITEM_SHORT_ROD                                       :Short fishing rod
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Can't buy it...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Can't use it...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}It is not sold here

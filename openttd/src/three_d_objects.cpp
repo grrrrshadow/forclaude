@@ -1130,6 +1130,7 @@ struct GlbReadOptions {
 	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
 	bool points_only = false;     ///< only the places (points), no mesh read: the lights at the back of an add-on's parts
 	bool frames_only = false;     ///< with frame_prefix, only the meshes under the frame's node (the torch's flame without its stick)
+	const std::vector<std::string> *skip_materials = nullptr; ///< the triangles of the materials so named left out
 	/** With groups and only_groups, the nodes whose materials are taken as textures first, in the order they are met, before
 	 * only those of groups are read: the textures of an add-on the same whatever of its nodes are read. */
 	const std::vector<std::string> *material_groups = nullptr;
@@ -1365,6 +1366,11 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 			if (ca[0] * nm[0] + ca[1] * nm[1] + ca[2] * nm[2] < 0) for (double &e : nm) e = -e;
 			for (const auto &p : prims) {
 				if (p.value("mode", 4) != 4) continue; // triangles only
+				/* Its materials left out (the short rod's own float and line, the game draws its line). */
+				if (o.skip_materials != nullptr && p.contains("material") && j.contains("materials")) {
+					const auto &mat = j.at("materials").at(p.at("material").get<int>());
+					if (mat.contains("name") && mat.at("name").is_string() && std::ranges::find(*o.skip_materials, mat.at("name").get<std::string>()) != o.skip_materials->end()) continue;
+				}
 				std::vector<float> pos, nrm, uv;
 				std::vector<uint32_t> idx;
 				read(p.at("attributes").at("POSITION").get<int>(), 3, pos);
@@ -5920,6 +5926,25 @@ static void ReadThreeDVehicleObjects()
 					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
 					/* Only its frames' nodes ("jen_snimky"): the torch's flame without its stick, the fire of the fireplaces. */
 					fig.frames_only = e.value("jen_snimky", false);
+					/* Without some materials of its file ("bez_materialu"), laid along another line ("prohnuti" "z", "do"):
+					 * the fishing rods straight and bent (BendThreeDThingPoint()). */
+					if (e.contains("bez_materialu") && e.at("bez_materialu").is_array()) {
+						for (const auto &n : e.at("bez_materialu")) {
+							if (n.is_string()) fig.skip_materials.push_back(n.get<std::string>());
+						}
+					}
+					if (e.contains("prohnuti") && e.at("prohnuti").is_object()) {
+						auto line = [&](const char *key, std::vector<std::array<float, 2>> &into) {
+							const auto &b = e.at("prohnuti");
+							if (!b.contains(key) || !b.at(key).is_array()) return;
+							for (const auto &p : b.at(key)) {
+								if (p.is_array() && p.size() == 2 && p.at(0).is_number() && p.at(1).is_number()) into.push_back({p.at(0).get<float>(), p.at(1).get<float>()});
+							}
+							if (into.size() < 2) into.clear();
+						};
+						line("z", fig.bend_from);
+						line("do", fig.bend_to);
+					}
 					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
 					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
 					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
@@ -7182,6 +7207,8 @@ static constexpr int CREATURE_BLEND_TICKS = 8;
  * @param node the node
  * @return where, or nothing when the thing or the node is not there
  */
+static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, float *normal);
+
 std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node)
 {
 	const std::string key = fmt::format("{}/{}", thing, node);
@@ -7198,7 +7225,11 @@ std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, 
 		o.point_prefix = node;
 		o.points = &points;
 		ReadGlbMesh(fig->file, mesh, o);
-		if (points.size() >= 3) found = std::array<float, 3>{points[0], points[1], points[2]};
+		if (points.size() >= 3) {
+			/* A rod bent or straightened: its grip and its tip where its shape has them (BendThreeDThingPoint()). */
+			BendThreeDThingPoint(*fig, points.data(), nullptr);
+			found = std::array<float, 3>{points[0], points[1], points[2]};
+		}
 	}
 	_thing_places.emplace(key, found);
 	return found;
@@ -8434,6 +8465,86 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDPoseOnProcessor(const ThreeDVehi
 	return made;
 }
 
+/** A line of a thing laid along another (ThreeDVehicleObject::bend_from, bend_to): its points (x, z) and how far along it each is. */
+struct BendLine {
+	std::vector<std::array<double, 2>> p;
+	std::vector<double> s;
+
+	/** The line of points, or straight along z so long when there are none. */
+	BendLine(const std::vector<std::array<float, 2>> &points, double straight)
+	{
+		if (points.size() >= 2) {
+			for (const auto &q : points) this->p.push_back({q[0], q[1]});
+		} else {
+			this->p = {{0.0, 0.0}, {0.0, straight}};
+		}
+		this->s.push_back(0);
+		for (size_t i = 1; i < this->p.size(); i++) this->s.push_back(this->s.back() + std::hypot(this->p[i][0] - this->p[i - 1][0], this->p[i][1] - this->p[i - 1][1]));
+	}
+
+	double Length() const { return this->s.back(); }
+
+	/** Its piece where a length along it lies (past its ends, the first and the last). */
+	size_t PieceAt(double along) const
+	{
+		size_t i = 1;
+		while (i + 1 < this->p.size() && this->s[i] < along) i++;
+		return i;
+	}
+
+	/** Its way along piece i (x, z), of length 1. */
+	std::array<double, 2> Way(size_t i) const
+	{
+		const double dx = this->p[i][0] - this->p[i - 1][0], dz = this->p[i][1] - this->p[i - 1][1];
+		const double len = std::max(1e-9, std::hypot(dx, dz));
+		return {dx / len, dz / len};
+	}
+};
+
+/**
+ * A point of a thing laid from its line along another (ThreeDVehicleObject::bend_from, bend_to; the fishing rods,
+ * straight and bent): how far along its own line it is (the nearest piece; past its ends straight on) and how far
+ * aside of it, the same along and aside of the other; across the lines' plane (y) as it was. A direction (normals)
+ * turned as the line turned there.
+ */
+static void BendThreeDThingPoint(const ThreeDVehicleObject &o, float *point, float *normal)
+{
+	if (o.bend_from.empty() && o.bend_to.empty()) return;
+	const BendLine from(o.bend_from, BendLine(o.bend_to, 1.0).Length());
+	const BendLine to(o.bend_to, from.Length());
+	const double x = point[0], z = point[2];
+	/* The nearest piece of its own line, its ends straight on past them. */
+	double best = 1e18, along = 0, aside = 0;
+	for (size_t i = 1; i < from.p.size(); i++) {
+		const auto w = from.Way(i);
+		const double len = from.s[i] - from.s[i - 1];
+		const double rx = x - from.p[i - 1][0], rz = z - from.p[i - 1][1];
+		double t = rx * w[0] + rz * w[1];
+		if (i > 1) t = std::max(t, 0.0);
+		if (i + 1 < from.p.size()) t = std::min(t, len);
+		const double px = from.p[i - 1][0] + w[0] * t, pz = from.p[i - 1][1] + w[1] * t;
+		const double d = std::hypot(x - px, z - pz);
+		if (d < best) {
+			best = d;
+			along = from.s[i - 1] + t;
+			/* Aside: square to the way, +x where the way goes along +z. */
+			aside = (x - px) * w[1] - (z - pz) * w[0];
+		}
+	}
+	const size_t fi = from.PieceAt(along), ti = to.PieceAt(along);
+	const auto fw = from.Way(fi), tw = to.Way(ti);
+	const double t = along - to.s[ti - 1];
+	point[0] = static_cast<float>(to.p[ti - 1][0] + tw[0] * t + aside * tw[1]);
+	point[2] = static_cast<float>(to.p[ti - 1][1] + tw[1] * t - aside * tw[0]);
+	if (normal != nullptr) {
+		/* Turned by the turn of the way there: from fw to tw. */
+		const double c = fw[0] * tw[0] + fw[1] * tw[1], sn = fw[1] * tw[0] - fw[0] * tw[1];
+		const double nx = normal[0], nz = normal[2];
+		normal[0] = static_cast<float>(nx * c + nz * sn);
+		normal[2] = static_cast<float>(-nx * sn + nz * c);
+	}
+}
+
 /**
  * Make the object's shape (a frame of it): its file, its wheels, its crew, and of its add-ons the nodes of the parts
  * asked for (GetShape(int, uint64_t)) -- the textures of all its add-ons all the same, in the same order whatever parts
@@ -8475,7 +8586,10 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	for (const std::string &n : this->skip_nodes) key += "|x" + n;
 	if (this->to_ground) key += "|g";
 	if (this->to_middle) key += "|m";
-	if (this->frames_only) key += "|f";
+	if (this->frames_only) key += "|j";
+	for (const std::string &n : this->skip_materials) key += "|-" + n;
+	for (const auto &p : this->bend_from) key += fmt::format("|<{},{}", p[0], p[1]);
+	for (const auto &p : this->bend_to) key += fmt::format("|>{},{}", p[0], p[1]);
 	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
 	if (!std::isnan(this->keep_above)) key += fmt::format("|c{}", this->keep_above);
 	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
@@ -8661,13 +8775,15 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			o.skip_night = true;
 			o.groups = &marked;
 			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
-		} else if (!this->skip_nodes.empty() || this->night_glass || this->frames_only) {
-			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept, its frames alone. */
+		} else if (!this->skip_nodes.empty() || this->night_glass || this->frames_only || !this->skip_materials.empty()) {
+			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept, its frames alone,
+			 * materials left out (the short rod's own float and line). */
 			GlbReadOptions o;
 			o.all_nodes = true;
 			o.frame_prefix = this->frame_prefix;
 			o.frame = frame;
 			o.frames_only = this->frames_only;
+			if (!this->skip_materials.empty()) o.skip_materials = &this->skip_materials;
 			o.only_node = this->only_node;
 			o.skip_nodes = &this->skip_nodes;
 			o.skip_night = !this->night_glass;
@@ -8756,6 +8872,11 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		mesh.tri = std::move(tri);
 		if (mesh.tri_tex.size() == triangles) mesh.tri_tex = std::move(tri_tex);
 		if (mesh.tri_group.size() == triangles) mesh.tri_group = std::move(tri_group);
+	}
+	/* Laid along another line ("prohnuti": a rod bent or straightened, BendThreeDThingPoint()). */
+	if (!this->bend_from.empty() || !this->bend_to.empty()) {
+		const bool normals = mesh.nrm.size() == mesh.pos.size();
+		for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) BendThreeDThingPoint(*this, &mesh.pos[i], normals ? &mesh.nrm[i] : nullptr);
 	}
 	if (!std::isnan(this->floors_over)) {
 		/* A boat's rooms (ReadBoatRooms()): their floors under its waterline lifted a little over it -- the water's plane

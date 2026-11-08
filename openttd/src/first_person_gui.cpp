@@ -324,9 +324,10 @@ static const FirstPersonWeapon _first_person_weapons[] = {
 	{WalkerItem::Pitchfork, "vidle", WeaponUse::Swing, 2.6, 2},
 	{WalkerItem::MineHammer, "kladivo_minove", WeaponUse::Swing, 2.0, 6},
 	{WalkerItem::FishingRod, "prut_bambus", WeaponUse::Rod, 0, 0},
+	{WalkerItem::ShortRod, "prut_kratky", WeaponUse::Rod, 0, 0},
 };
-/** The fishing rod bent as a fish bites (the colleague's objekty/predmety/prut_ohnuty.glb), and the hook with its worm. */
-static constexpr std::string_view FIRST_PERSON_ROD_BENT = "prut_ohnuty";
+/** A fishing rod bent as a fish bites: its figure's name and this (objekty/nase: prut_bambus_ohnuty, prut_kratky_ohnuty); and the hook with its worm. */
+static constexpr std::string_view FIRST_PERSON_ROD_BENT = "_ohnuty";
 static constexpr std::string_view FIRST_PERSON_HOOK = "hacek_zizala";
 
 /**
@@ -1852,8 +1853,14 @@ struct FirstPersonWindow : Window {
 	void DressRod()
 	{
 		ThreeDHeldThing &held = this->walker.held;
-		const std::string_view rod = this->fishing == FishingStage::Bite ? FIRST_PERSON_ROD_BENT : _first_person_weapons[this->weapon].thing;
-		held.thing = std::string(rod);
+		/* The rod in the hand bent (its "<jmeno>_ohnuty") as a fish bites and while it hangs on it, else straight -- the same
+		 * rod (the player, test3: "two rods, each straight and bent, so that the hand does not hold another rod"). */
+		std::string rod{_first_person_weapons[this->weapon].thing};
+		if (this->fishing == FishingStage::Bite || this->fishing == FishingStage::Caught) {
+			std::string bent = rod + std::string(FIRST_PERSON_ROD_BENT);
+			if (GetThreeDFigure(bent) != nullptr) rod = std::move(bent);
+		}
+		held.thing = rod;
 		const std::array<float, 3> grip = GetThreeDThingPlace(rod, "uchyt").value_or(std::array<float, 3>{0, 0, 0.25f});
 		std::copy(grip.begin(), grip.end(), held.grip);
 		const auto tip = GetThreeDThingPlace(rod, "spicka");
@@ -3333,7 +3340,7 @@ std::string RigFirstPersonWeapon(int key, int draw_ms, int steps)
 }
 
 /**
- * The rig: the fishing rod (FishingStage) -- "prut" into the hand, "nahod"/"klik" a click with it, "zabira" a fish to
+ * The rig: the fishing rod (FishingStage) -- "prut" into the hand ("prut2" the short one), "nahod"/"klik" a click with it, "zabira" a fish to
  * bite now on the water -- then so many steps; how it fishes then, the picture made.
  */
 int FirstPersonWeaponKey(WalkerItem item);
@@ -3342,8 +3349,8 @@ std::string RigFirstPersonFish(std::string_view what, int steps)
 {
 	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	if (w == nullptr) return "zadny chodec";
-	if (what == "prut") {
-		w->Choose(FirstPersonWeaponKey(WalkerItem::FishingRod) - 1);
+	if (what == "prut" || what == "prut2") {
+		w->Choose(FirstPersonWeaponKey(what == "prut2" ? WalkerItem::ShortRod : WalkerItem::FishingRod) - 1);
 		w->weapon = w->wanted;
 		w->walker.held.raise = w->weapon_out ? 1.0f : 0.0f;
 		w->Dress();

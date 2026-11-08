@@ -980,6 +980,14 @@ struct ThreeDVehicleObject {
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
 	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
 	bool frames_only = false;       ///< "jen_snimky": of its file only its frames' nodes, not the rest drawn in each (the torch's flame without its stick: the fireplaces' fire)
+	std::vector<std::string> skip_materials; ///< "bez_materialu": the triangles of its file's materials so named left out (the short rod's own float and line)
+	/**
+	 * "prohnuti": a thing along its z (a fishing rod from its butt) laid along another line (the player, test3: "two rods,
+	 * each straight and bent, so that the hand does not hold another rod when a fish bites"): its line as its file has it
+	 * ("z", points x, z in metres; none: straight along z) and the line it is laid along ("do"; none: straight as long);
+	 * each corner kept as far from it, aside and across, as it was from its own (BendThreeDThingPoint()).
+	 */
+	std::vector<std::array<float, 2>> bend_from, bend_to;
 	float ends_beyond = 0;          ///< "jen_konce_m": only its triangles all so far or farther from its origin along its own x, metres; 0 all (the grill's trestles without its bricks, as ThreeDObjectFigure::beyond)
 	float keep_above = NAN;         ///< only its triangles all so high over its origin or higher, metres (a water lily's leaves, "<jmeno>/hladina"); NAN all
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light

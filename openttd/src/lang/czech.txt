@@ -2498,6 +2498,7 @@ STR_WALKER_ITEM_FISHING_ROD                                     :Bambusový prut
 STR_WALKER_ITEM_PERCH                                           :Velký zelený okoun
 STR_WALKER_ITEM_DISCUS                                          :Terčovec
 STR_WALKER_ITEM_GOLDFISH                                        :Závojnatka
+STR_WALKER_ITEM_SHORT_ROD                                       :Krátký prut
 STR_ERROR_WALKER_CAN_T_BUY                                      :{WHITE}Nelze koupit...
 STR_ERROR_WALKER_CAN_T_USE                                      :{WHITE}Nelze použít...
 STR_ERROR_WALKER_NOT_SOLD_HERE                                  :{WHITE}Tady se to neprodává
