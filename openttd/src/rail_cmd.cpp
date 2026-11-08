@@ -2556,6 +2556,7 @@ TrackBits ThreeDTrackBitsOf(TileIndex tile)
 		case TileType::Railway: return IsPlainRail(tile) ? GetTrackBits(tile) : TrackBits{DiagDirToDiagTrack(GetRailDepotDirection(tile))};
 		case TileType::Station: return HasStationRail(tile) ? TrackBits{AxisToTrack(GetRailStationAxis(tile))} : TrackBits{};
 		case TileType::Road: return IsLevelCrossing(tile) ? TrackBits{AxisToTrack(GetCrossingRailAxis(tile))} : TrackBits{};
+		case TileType::TunnelBridge: return GetTunnelBridgeTransportType(tile) == TransportType::Rail ? TrackBits{DiagDirToDiagTrack(GetTunnelBridgeDirection(tile))} : TrackBits{};
 		default: return {};
 	}
 }
@@ -2563,7 +2564,8 @@ TrackBits ThreeDTrackBitsOf(TileIndex tile)
 /**
  * Whether our 3D track is on a tile of another kind than plain rail (the player, 8. 11.: "finish the 3D track";
  * DrawThreeDTrackOn()): a rail station's or a waypoint's -- not a set's station, which keeps its own look --, a depot's,
- * a level crossing's; of the normal railways.
+ * a level crossing's, a railway bridge's end (and over its bridge, DrawThreeDTrackOverBridge()), a railway tunnel's end
+ * (and in it from the eyes); of the normal railways.
  */
 static bool ThreeDTrackOtherOn(TileIndex tile)
 {
@@ -2648,6 +2650,8 @@ double ThreeDTrackRailTop(TileIndex tile)
 
 /** Our catenary's wires over the ground, metres (objekty/nase/trakce.py CONTACT, CARRIER): the contact wire, the carrier wire. */
 static constexpr double THREE_D_CONTACT_M = 5.872, THREE_D_CARRIER_M = 7.272;
+/** In a tunnel under its vault (4.6 m from the eyes, CAB_TUNNEL_TOP of viewport.cpp): the contact wire (CabDrawTube()), the carrier wire just over it at the portal. */
+static constexpr double THREE_D_TUNNEL_CONTACT_M = 4.4, THREE_D_TUNNEL_CARRIER_M = 4.55;
 /** Our mast's top and where its arm begins, metres (trakce.py): the boxes they fill on the map. */
 static constexpr double THREE_D_MAST_TOP_M = 8.85, THREE_D_ARM_LOW_M = 5.8;
 /** The wires' colours from the eyes (GetThreeDWires() has them from above): the contact wire copper, the carrier wire darker. */
@@ -2674,11 +2678,16 @@ static bool ThreeDCatenaryOn(TileIndex tile)
  *    arm to its middle;
  *    a round piece at its middle on the outside of its turn. Every so many tiles (gui.three_d_catenary_spacing), none
  *    where they are switched off (gui.three_d_catenary_masts_*): the wires alone.
+ * On a bridge (ti its deck: its height, flat or up its ramp) each tile its own mast, none shared with the tracks beside
+ * on the ground; on a tunnel's end the wires down to the tunnel's contact wire at its portal (CabDrawTube() of
+ * viewport.cpp), no mast where the portal is at its edge on the north (it would stand in its face).
  * @param s the tile's slope after its foundation
  * @param round the tile is of a round curve drawn round
  * @param half_from a depot's track: only its wires from the edge its door is at to its middle, no mast; DiagDirection::Invalid none
+ * @param pairs whether its masts are shared with the tracks of the same way beside (not on a bridge)
+ * @param portal a tunnel's end: the edge its portal is at; DiagDirection::Invalid none
  */
-static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, DiagDirection half_from = DiagDirection::Invalid)
+static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, DiagDirection half_from = DiagDirection::Invalid, bool pairs = true, DiagDirection portal = DiagDirection::Invalid)
 {
 	const TileIndex tile = ti->tile;
 	const int tx = TileX(tile), ty = TileY(tile);
@@ -2698,14 +2707,29 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 
 	/* The wires: from above gathered into the tile's object, from the eyes each a line. */
 	std::vector<ThreeDWire> wires;
+	/* How much lower a wire is at a point: at a tunnel's portal down to the tunnel's wires, metres. */
+	auto lowered = [&](double lx, double ly, uint8_t k) -> double {
+		bool at = false;
+		switch (portal) {
+			case DiagDirection::NE: at = lx < 0.5; break;
+			case DiagDirection::SW: at = lx > TILE_SIZE - 0.5; break;
+			case DiagDirection::NW: at = ly < 0.5; break;
+			case DiagDirection::SE: at = ly > TILE_SIZE - 0.5; break;
+			default: break;
+		}
+		if (!at) return 0;
+		return k == 0 ? THREE_D_CONTACT_M - THREE_D_TUNNEL_CONTACT_M : THREE_D_CARRIER_M - THREE_D_TUNNEL_CARRIER_M;
+	};
 	auto wire = [&](double ax, double ay, double bx, double by) {
 		const double ga = ground(ax, ay), gb = ground(bx, by);
 		for (uint8_t k = 0; k < 2; k++) {
-			const double m = k == 0 ? THREE_D_CONTACT_M : THREE_D_CARRIER_M;
+			const double m = k == 0 ? THREE_D_CONTACT_M : THREE_D_CARRIER_M, da = lowered(ax, ay, k), db = lowered(bx, by, k);
 			if (eye) {
-				AddCabWire(ox + ax, oy + ay, ti->z + ga, ox + bx, oy + by, ti->z + gb, m, k == 0 ? THREE_D_CONTACT_COLOUR : THREE_D_CARRIER_COLOUR);
+				/* The ground of its ends lifted from the eyes as the land (EYE_LEVEL_STRETCH), its metres over it not: a
+				 * lowered end's metres taken off its ground so much less. */
+				AddCabWire(ox + ax, oy + ay, ti->z + ga - da * hpm / EYE_LEVEL_STRETCH, ox + bx, oy + by, ti->z + gb - db * hpm / EYE_LEVEL_STRETCH, m, k == 0 ? THREE_D_CONTACT_COLOUR : THREE_D_CARRIER_COLOUR);
 			} else {
-				wires.push_back({static_cast<float>(ax), static_cast<float>(ay), static_cast<float>(ga + m * hpm), static_cast<float>(bx), static_cast<float>(by), static_cast<float>(gb + m * hpm), k});
+				wires.push_back({static_cast<float>(ax), static_cast<float>(ay), static_cast<float>(ga + (m - da) * hpm), static_cast<float>(bx), static_cast<float>(by), static_cast<float>(gb + (m - db) * hpm), k});
 			}
 		}
 	};
@@ -2740,6 +2764,7 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 	const double arm = TILE_SIZE / 2.0, arm_diagonal = TILE_SIZE / 2.0 / std::sqrt(2.0);
 	/* A neighbour's straight track of the same way beside, with our catenary: one mast between them. */
 	auto beside = [&](int dx, int dy, Track t) {
+		if (!pairs) return false;
 		const int nx = tx + dx, ny = ty + dy;
 		if (nx < 0 || ny < 0 || nx >= static_cast<int>(Map::SizeX()) || ny >= static_cast<int>(Map::SizeY())) return false;
 		const TileIndex n = TileXY(nx, ny);
@@ -2778,7 +2803,7 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 				 * of the same way side by side two by two from the first on the north, each two the mast at the corner
 				 * between them, an arm to each. */
 				const bool x = t == Track::X;
-				if (!every_at(x ? tx : ty)) break;
+				if (portal == DiagDirection::NE || portal == DiagDirection::NW || !every_at(x ? tx : ty)) break;
 				const int sx = x ? 0 : 1, sy = x ? 1 : 0;
 				int before = 0;
 				while (before < 16 && beside(-sx * (before + 1), -sy * (before + 1), t)) before++;
@@ -2925,6 +2950,33 @@ double ThreeDRoadOverTrack(TileIndex tile, double x, double y)
 	return THREE_D_RAIL_TOP_M * std::max(0.0, 1.0 - (d - THREE_D_PANEL_HALF_M) / THREE_D_RAMP_M);
 }
 
+/** How high our track's box reaches on the map, units of height: to its rails' tops. */
+static int ThreeDRailsTall()
+{
+	return std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+}
+
+/**
+ * A straight piece of our track: in the turned view and among the objects facing north in its box (along it to its
+ * ends, across it so far, up from its foot), from the eyes lying there (AddCabGroundFigure()).
+ * @param x,y its middle, world units
+ * @param z its foot at its middle, units of height
+ * @param along,across half its box along its way and across it, world units
+ * @param foot,tall where its box begins and how high it is, units of height
+ */
+static void PutThreeDStraight(const TileInfo *ti, std::string_view name, Axis axis, double x, double y, int z, float facing, double along, double across, int foot, int tall)
+{
+	if (ViewportDrawingEye()) {
+		AddCabGroundFigure(name, x, y, z, facing);
+		return;
+	}
+	const double hx = axis == Axis::X ? along : across, hy = axis == Axis::X ? across : along;
+	const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
+	const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
+	const std::array<int, 6> box{bx0, by0, foot, bx1, by1, foot + tall - 1};
+	AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+}
+
 /**
  * Our 3D track on a tile of another kind than plain rail (the player, 8. 11.: "finish the 3D track"): a rail station's or
  * a waypoint's (their platforms and buildings the game's), a depot's from its door to its middle, a level crossing's --
@@ -2952,21 +3004,104 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 		mx += d.x * TILE_SIZE / 4.0;
 		my += d.y * TILE_SIZE / 4.0;
 	}
-	const float facing = axis == Axis::X ? 0.0f : 90.0f;
 	const double x = TileX(ti->tile) * TILE_SIZE + mx, y = TileY(ti->tile) * TILE_SIZE + my;
-	if (eye) {
-		AddCabGroundFigure(name, x, y, ti->z, facing);
-	} else {
-		/* Its box: along it to its ends, across it its embankment (a crossing's panels and ramps). */
-		const double along = (half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0), across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
-		const double hx = axis == Axis::X ? along : across, hy = axis == Axis::X ? across : along;
-		const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
-		const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
-		const int tall = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
-		const std::array<int, 6> box{bx0, by0, ti->z, bx1, by1, ti->z + tall - 1};
-		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
-	}
+	/* Across it its embankment, a crossing's panels and ramps. */
+	const double across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
+	PutThreeDStraight(ti, name, axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0, across, ti->z, ThreeDRailsTall());
 	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, door);
+	return true;
+}
+
+/** The straight piece of our track along a way (koleje.py kolej_rovna_*): wooden sleepers, concrete on an electrified railway. */
+static std::string_view ThreeDStraightName(RailType rt)
+{
+	return HasRailCatenary(rt) ? "kolej_rovna_beton" : "kolej_rovna_drevo";
+}
+
+/**
+ * Our 3D track on a railway bridge's end (the player, 8. 11.: "finish the 3D track"): up its ramp a piece up a slope (a
+ * level of the map 3 m, from the eyes 5 m) from the ground to the bridge, or level with the bridge on a foundation; its
+ * catenary over it, its mast its own. The ramp is the bridge's (its sprites, or the colleague's 3D pieces, whose deck's
+ * band with the game's rails viewport.cpp leaves out).
+ * @return whether it was drawn so
+ */
+bool DrawThreeDTrackBridgeHead(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	if (!ThreeDTrackShownOn(ti->tile)) return false;
+	const DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
+	const Axis axis = DiagDirToAxis(dir);
+	const int bz = GetBridgePixelHeight(ti->tile);
+	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE;
+	/* Its outer end's middle (the bridge goes on from its inner one): on the ground, or level with the bridge. */
+	const bool inner_low = dir == DiagDirection::NE || dir == DiagDirection::NW;
+	const double out = inner_low ? TILE_SIZE - 1 : 0;
+	const int out_z = GetSlopePixelZ(static_cast<int>(ox + (axis == Axis::X ? out : TILE_SIZE / 2)), static_cast<int>(oy + (axis == Axis::X ? TILE_SIZE / 2 : out)), true);
+	const bool rises = bz - out_z >= static_cast<int>(TILE_HEIGHT) / 2;
+	const RailType rt = GetRailType(ti->tile);
+	const double x = ox + TILE_SIZE / 2.0, y = oy + TILE_SIZE / 2.0, across = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
+	/* The deck it lies on: its catenary's ground. */
+	TileInfo deck = *ti;
+	deck.tileh = SLOPE_FLAT;
+	deck.z = bz;
+	if (rises) {
+		const bool concrete = HasRailCatenary(rt);
+		const std::string_view name = eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo");
+		/* Its middle half a level under the bridge, its +x up into it. */
+		const float facing = dir == DiagDirection::SW ? 0.0f : dir == DiagDirection::SE ? 90.0f : dir == DiagDirection::NE ? 180.0f : 270.0f;
+		PutThreeDStraight(ti, name, axis, x, y, bz - static_cast<int>(TILE_HEIGHT) / 2, facing, TILE_SIZE / 2.0, across, bz - static_cast<int>(TILE_HEIGHT), ThreeDRailsTall() + static_cast<int>(TILE_HEIGHT));
+		deck.z = bz - static_cast<int>(TILE_HEIGHT);
+		deck.tileh = dir == DiagDirection::SW ? SLOPE_SW : dir == DiagDirection::SE ? SLOPE_SE : dir == DiagDirection::NE ? SLOPE_NE : SLOPE_NW;
+	} else {
+		PutThreeDStraight(ti, ThreeDStraightName(rt), axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, across, bz, ThreeDRailsTall());
+	}
+	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(&deck, TrackBits{AxisToTrack(axis)}, deck.tileh, false, eye, DiagDirection::Invalid, false);
+	return true;
+}
+
+/**
+ * Our 3D track over a tile under a railway bridge (DrawBridgeMiddle()): a straight piece the tile long on the bridge's
+ * deck at its height, its catenary over it, a mast on each tile of its own. The deck is the bridge's (its sprites, or
+ * the colleague's 3D pieces, whose deck's band with the game's rails viewport.cpp leaves out).
+ * @param south the bridge's southern end
+ */
+void DrawThreeDTrackOverBridge(const TileInfo *ti, TileIndex south)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return;
+	if (!ThreeDTrackShownOn(south)) return;
+	const Axis axis = GetBridgeAxis(ti->tile);
+	const int bz = GetBridgePixelHeight(south);
+	const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(south)), axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE, bz, ThreeDRailsTall());
+	if (!ThreeDCatenaryOn(south)) return;
+	TileInfo deck = *ti;
+	deck.tileh = SLOPE_FLAT;
+	deck.z = bz;
+	DrawThreeDCatenary(&deck, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, DiagDirection::Invalid, false);
+}
+
+/**
+ * Our 3D track on a railway tunnel's end (the player, 8. 11.: "finish the 3D track"): a straight piece the tile long,
+ * level with the tunnel's floor into its portal; its catenary over it, no mast where the portal stands at its edge on
+ * the north (the tile before it has one at its outer edge). In the tunnel from the eyes its look along the tube
+ * (CabDrawTube() of viewport.cpp).
+ * @return whether it was drawn so: the tunnel's ground without the game's rails
+ */
+bool DrawThreeDTrackTunnel(const TileInfo *ti)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	if (!ThreeDTrackShownOn(ti->tile)) return false;
+	const DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
+	const Axis axis = DiagDirToAxis(dir);
+	const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(ti->tile)), axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE, ti->z, ThreeDRailsTall());
+	if (!ThreeDCatenaryOn(ti->tile)) return true;
+	TileInfo floor = *ti;
+	floor.tileh = SLOPE_FLAT;
+	DrawThreeDCatenary(&floor, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, DiagDirection::Invalid, true, dir);
 	return true;
 }
 

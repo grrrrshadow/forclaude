@@ -97,6 +97,7 @@
 #include "tunnelbridge.h"
 #include "bridge.h"
 #include "rail.h"
+#include "elrail_func.h"
 #include "rail_map.h"
 #include "road_map.h"
 #include "water_map.h"
@@ -4797,6 +4798,16 @@ static void DrawTurnedSlab(const DrawPixelInfo &frame, const ParentSpriteToDraw 
 /** How thick the deck of a bridge is drawn in the turned view, units of height below the track. */
 static constexpr int TURNED_DECK = 2;
 
+/**
+ * Whether a railway bridge has our 3D track on it (DrawThreeDTrackBridgeHead(), DrawThreeDTrackOverBridge() of
+ * rail_cmd.cpp): its floor's band of the game's rails then left out where it lies on 3D pieces.
+ * @param end an end of it
+ */
+static bool OurTrackOnBridge(TileIndex end)
+{
+	return GetTunnelBridgeTransportType(end) == TransportType::Rail && ThreeDTrackShownOn(end);
+}
+
 /** A box of a bridge over a tile, given along the bridge's axis and across it, in the tile's frame. */
 static inline ThreeDPart BridgePart(Axis axis, double a0, double a1, double c0, double c1, double h)
 {
@@ -4993,6 +5004,9 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to, bool pi
 {
 	const Axis axis = GetBridgeAxis(tile);
 	const int bz = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+	/* Our 3D track on it (DrawThreeDTrackOverBridge()): on 3D pieces no floor of the game's rails, on its sprites no
+	 * surface of them laid on its deck. */
+	const bool our_track = OurTrackOnBridge(GetSouthernBridgeEnd(tile));
 	/* Of 3D pieces (AddTurnedBridgePieces()): only the floor, a little over theirs; their pillars and railings theirs. */
 	const int16_t on_pieces = pieces ? TURNED_DECK_ON_PIECES | (GetTunnelBridgeTransportType(GetSouthernBridgeEnd(tile)) == TransportType::Water ? TURNED_DECK_WATER : 0) : 0;
 	const int x0 = TileX(tile) * TILE_SIZE, y0 = TileY(tile) * TILE_SIZE;
@@ -5037,6 +5051,10 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to, bool pi
 			ps.zmin = ps.box_oz;
 			continue;
 		}
+		if (ex >= static_cast<int>(TILE_SIZE) && ey >= static_cast<int>(TILE_SIZE) && our_track) {
+			ps.box_kind = 4;
+			continue;
+		}
 		if (ex >= static_cast<int>(TILE_SIZE) && ey >= static_cast<int>(TILE_SIZE)) {
 			/* A surface laid on the deck: a slab a step above it, sorted under what runs on it. */
 			ps.box_kind = 6;
@@ -5079,6 +5097,10 @@ static void TurnedBridgeOverTile(TileIndex tile, size_t from, size_t to, bool pi
 			railing.box_dx = static_cast<int16_t>(axis);
 			railing.box_dy = across;
 			if (!pieces) railings.push_back(railing);
+			if (pieces && our_track) {
+				ps.box_kind = 4;
+				continue;
+			}
 			ps.box_kind = 8;
 			ps.box_ox = x0;
 			ps.box_oy = y0;
@@ -5258,10 +5280,12 @@ static void TurnedDepot(TileIndex tile, size_t first_parent)
 static void TurnedBridgeHead(TileIndex head, size_t first_parent, bool pieces)
 {
 	const int16_t on_pieces = pieces ? TURNED_DECK_ON_PIECES | (GetTunnelBridgeTransportType(head) == TransportType::Water ? TURNED_DECK_WATER : 0) : 0;
+	/* On 3D pieces with our 3D track up them (DrawThreeDTrackBridgeHead()): no floor of the game's rails. */
+	const bool our_track = pieces && OurTrackOnBridge(head);
 	for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 		ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 		if (ps.image == SPR_EMPTY_BOUNDING_BOX || ps.box_kind != 0) continue;
-		if (ps.xmax - ps.xmin + 1 < static_cast<int>(TILE_SIZE) || ps.ymax - ps.ymin + 1 < static_cast<int>(TILE_SIZE)) {
+		if (ps.xmax - ps.xmin + 1 < static_cast<int>(TILE_SIZE) || ps.ymax - ps.ymin + 1 < static_cast<int>(TILE_SIZE) || our_track) {
 			if (pieces) ps.box_kind = 4;
 			continue;
 		}
@@ -13525,6 +13549,8 @@ static void CabDrawBridgeMiddle(const CabCanvas &cv, const CabEye &eye, TileInde
 			CabDrawAqueductWater(cv, eye, axis, x0, y0, bz + lift);
 			return;
 		}
+		/* Our 3D track lies on them (DrawThreeDTrackOverBridge()): not the game's rails besides. */
+		if (OurTrackOnBridge(GetSouthernBridgeEnd(tile))) return;
 		const double deck = bz + CAB_DECK_OVER_PIECES;
 		CabDrawDressed(cv, eye, back_tex, {pt(0, c_far, deck, c_far, bz), pt(TILE_SIZE, c_far, deck, c_far, bz), pt(TILE_SIZE, c_near, deck, c_near, bz), pt(0, c_near, deck, c_near, bz)}, true);
 		return;
@@ -13631,6 +13657,8 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 			CabDrawAqueductWater(cv, eye, axis, x0, y0, EyeLevelZ(bz));
 			return;
 		}
+		/* Our 3D track up them (DrawThreeDTrackBridgeHead()): not the game's rails besides. */
+		if (OurTrackOnBridge(head)) return;
 		/* Of 3D pieces (its ramp, EyeBridgePieces()): only the road or the track on the ramp's deck, a little over it. */
 		auto over = [&](double a, double c, double z) {
 			std::array<double, 6> p = pt(a, c, z, c, z);
@@ -13787,6 +13815,16 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 {
 	const double step = 4.0;
 	const Colour vault(112, 104, 92), floor = t.rail ? Colour(92, 84, 74) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
+	/* Our 3D track through it (DrawThreeDTrackTunnel() of rail_cmd.cpp; objekty/nase/koleje.py): its low embankment of
+	 * stones 3.4 m across, the sleepers on it every 0.6 m, the rails at the gauge, their heads 0.37 m over the floor as
+	 * the trains run on them; electrified, the contact wire under the vault's crown (4.4 m: the vault is 4.6 m). */
+	const bool ours = t.rail && ThreeDTrackShownOn(t.a);
+	const bool concrete = ours && HasRailCatenary(GetRailType(t.a));
+	const bool wired = concrete && !_settings_game.vehicle.disable_elrails && ThreeDGroupShown(ThreeDGroup::Catenary);
+	const double upm = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
+	const double bed_c = 1.7 * upm, bed_h = 0.12 * hpm, sleeper_l = 1.3 * upm, sleeper_w = (concrete ? 0.14 : 0.13) * upm, sleeper_top = 0.18 * hpm;
+	const double rail_c = (1.435 / 2 + 0.036) * upm, rail_w = 0.036 * upm, rail_foot = 0.2 * hpm, rail_top = 0.372 * hpm, wire_z = 4.4 * hpm;
+	const Colour ballast(112, 106, 98), sleeper = concrete ? Colour(168, 166, 160) : Colour(70, 53, 41), rail_side(97, 66, 48), contact(92, 70, 52);
 	int k = 0;
 	for (double sa = s0; sa < s1 - 0.01; sa += step, k++) {
 		double sb = std::min(s1, sa + step);
@@ -13803,7 +13841,29 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 		}
 		auto f0 = CabTunnelPoint(t, sa, -CAB_TUNNEL_HALF, 0), f1 = CabTunnelPoint(t, sb, -CAB_TUNNEL_HALF, 0), f2 = CabTunnelPoint(t, sb, CAB_TUNNEL_HALF, 0), f3 = CabTunnelPoint(t, sa, CAB_TUNNEL_HALF, 0);
 		CabDrawSolid(cv, eye, {f0, f1, f2, f3}, CabShade(floor, light));
-		if (t.rail) {
+		if (ours) {
+			const double near_light = std::min(1.0, light * 1.8 + 0.15);
+			auto quad = [&](double a0, double a1, double c0, double c1, double z0, double z1, Colour colour) {
+				CabDrawSolid(cv, eye, {CabTunnelPoint(t, a0, c0, z0), CabTunnelPoint(t, a1, c0, z0), CabTunnelPoint(t, a1, c1, z1), CabTunnelPoint(t, a0, c1, z1)}, colour);
+			};
+			/* The embankment: its top and its sides. */
+			quad(sa, sb, -bed_c, bed_c, bed_h, bed_h, CabShade(ballast, light));
+			quad(sa, sb, -bed_c, -bed_c, 0, bed_h, CabShade(ballast, light * 0.75));
+			quad(sa, sb, bed_c, bed_c, 0, bed_h, CabShade(ballast, light * 0.75));
+			/* The sleepers where they fall along the tunnel, the same from any piece. */
+			const double every = 0.6 * upm;
+			for (double s = std::ceil(sa / every) * every; s < sb; s += every) {
+				CabDrawSolid(cv, eye, {CabTunnelPoint(t, s - sleeper_w, -sleeper_l, sleeper_top), CabTunnelPoint(t, s + sleeper_w, -sleeper_l, sleeper_top),
+						CabTunnelPoint(t, s + sleeper_w, sleeper_l, sleeper_top), CabTunnelPoint(t, s - sleeper_w, sleeper_l, sleeper_top)}, CabShade(sleeper, light));
+			}
+			/* The rails: their sides and their heads, catching the light longer than the stones. */
+			for (double c : {-rail_c, rail_c}) {
+				quad(sa, sb, c - rail_w, c - rail_w, rail_foot, rail_top, CabShade(rail_side, light));
+				quad(sa, sb, c + rail_w, c + rail_w, rail_foot, rail_top, CabShade(rail_side, light));
+				quad(sa, sb, c - rail_w, c + rail_w, rail_top, rail_top, CabShade(rail, near_light));
+			}
+			if (wired) quad(sa, sb, -0.05, 0.05, wire_z, wire_z, CabShade(contact, near_light));
+		} else if (t.rail) {
 			/* The rails, catching the light longer than the stones. */
 			for (double c : {-1.6, 1.6}) {
 				auto r0 = CabTunnelPoint(t, sa, c - 0.2, 0.6), r1 = CabTunnelPoint(t, sb, c - 0.2, 0.6), r2 = CabTunnelPoint(t, sb, c + 0.2, 0.6), r3 = CabTunnelPoint(t, sa, c + 0.2, 0.6);
@@ -15298,7 +15358,10 @@ static void CabTunnelGround(TileIndex tile, int z)
 	auto add = [&](SpriteID image) { _vd.tile_sprites_to_draw.push_back({image, PAL_NONE, nullptr, pt.x, pt.y}); };
 	if (GetTunnelBridgeTransportType(tile) == TransportType::Rail) {
 		const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(tile));
-		if (rti->UsesOverlay()) {
+		if (ThreeDTrackShownOn(tile)) {
+			/* Our 3D track lies on it (DrawThreeDTrackTunnel()): the ground under it without the game's rails. */
+			add(SPR_FLAT_GRASS_TILE);
+		} else if (rti->UsesOverlay()) {
 			add(SPR_FLAT_GRASS_TILE);
 			SpriteID ground = GetCustomRailSprite(rti, tile, RailSpriteType::Ground);
 			if (ground != 0) add(ground + (axis == Axis::X ? RTO_X : RTO_Y));

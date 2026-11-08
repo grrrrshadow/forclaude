@@ -520,6 +520,9 @@ TrackBits ThreeDTrackBitsOf(TileIndex tile);
 double ThreeDRoadOverTrack(TileIndex tile, double x, double y);
 struct TileInfo;
 bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool crossing);
+bool DrawThreeDTrackBridgeHead(const TileInfo *ti);
+void DrawThreeDTrackOverBridge(const TileInfo *ti, TileIndex south);
+bool DrawThreeDTrackTunnel(const TileInfo *ti);
 
 
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype);

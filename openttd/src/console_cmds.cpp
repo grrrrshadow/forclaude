@@ -11963,6 +11963,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				if (r2.Failed()) failed = fmt::format("tunnel at {},{}: {}", x0 + 15, ry, err(r2));
 			}
 			track(24, need_x - 2);
+			/* 'test3d trat <type> <end> <depth> e': the railway electrified, the depot, the bridge and the tunnel with it
+			 * (our 3D catenary over them, DrawThreeDTrackOverBridge(), DrawThreeDTrackTunnel()). */
+			if (failed.empty() && std::find(argv.begin(), argv.end(), "e") != argv.end()) {
+				CommandCost rc = Command<Commands::ConvertRail>::Do(DoCommandFlag::Execute, TileXY(x0 + need_x - 1, y0 + need_y - 1), TileXY(x0, y0), RAILTYPE_ELECTRIC, false);
+				IConsolePrint(rc.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d trat: elektrifikace {}", rc.Succeeded() ? std::string("ano") : err(rc));
+			}
 			/* A road under the bridge where the ground is not lowered, a level under the deck, with a bus: the eye
 			 * bows under it. */
 			if (failed.empty()) {

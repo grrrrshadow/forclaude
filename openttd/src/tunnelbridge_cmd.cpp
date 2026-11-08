@@ -1354,7 +1354,13 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 		if (HasTunnelBridgeSnowOrDesert(ti->tile)) image += railtype_overlay != 0 ? 8 : 32;
 
 		image += to_underlying(tunnelbridge_direction) * 2;
-		DrawGroundSprite(image, PAL_NONE);
+		/* Our 3D track into the portal (DrawThreeDTrackTunnel()): under it the tunnel's base without the game's rails. */
+		const bool three_d = transport_type == TransportType::Rail && DrawThreeDTrackTunnel(ti);
+		if (three_d && railtype_overlay == 0) {
+			DrawGroundSprite(SPR_RAILTYPE_TUNNEL_BASE + (HasTunnelBridgeSnowOrDesert(ti->tile) ? 8 : 0) + to_underlying(tunnelbridge_direction) * 2, PAL_NONE);
+		} else {
+			DrawGroundSprite(image, PAL_NONE);
+		}
 
 		if (transport_type == TransportType::Road) {
 			RoadType road_rt = GetRoadTypeRoad(ti->tile);
@@ -1410,7 +1416,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 			}
 		} else {
 			const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
-			if (rti->UsesOverlay()) {
+			if (rti->UsesOverlay() && !three_d) {
 				SpriteID surface = GetCustomRailSprite(rti, ti->tile, RailSpriteType::Tunnel);
 				if (surface != 0) DrawGroundSprite(surface + to_underlying(tunnelbridge_direction), PAL_NONE);
 			}
@@ -1534,6 +1540,8 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 			}
 
 			EndSpriteCombine();
+			/* Our 3D track up the ramp (DrawThreeDTrackBridgeHead()), its catenary with it. */
+			DrawThreeDTrackBridgeHead(ti);
 			if (HasRailCatenaryDrawn(GetRailType(ti->tile))) {
 				DrawRailCatenary(ti);
 			}
@@ -1718,6 +1726,9 @@ void DrawBridgeMiddle(const TileInfo *ti, BridgePillarFlags blocked_pillars)
 		}
 
 		EndSpriteCombine();
+
+		/* Our 3D track on the deck (DrawThreeDTrackOverBridge()), its catenary with it. */
+		if (!IsInvisibilitySet(TransparencyOption::Bridges)) DrawThreeDTrackOverBridge(ti, rampsouth);
 
 		if (HasRailCatenaryDrawn(GetRailType(rampsouth))) {
 			DrawRailCatenaryOnBridge(ti);

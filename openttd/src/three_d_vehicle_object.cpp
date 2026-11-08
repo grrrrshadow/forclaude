@@ -19,6 +19,7 @@
 #include "vehicle_base.h"
 #include "vehicle_func.h"
 #include "train.h"
+#include "tunnel_map.h"
 #include "spritecache.h"
 #include "zoom_func.h"
 #include "landscape.h"
@@ -3387,7 +3388,14 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 {
 	if (v->type == VehicleType::Train) {
-		if (Train::From(v)->track == Track::Wormhole) return v->z_pos;
+		if (Train::From(v)->track == Track::Wormhole) {
+			/* On our 3D track over a bridge or through a tunnel (DrawThreeDTrackOverBridge(), CabDrawTube()) on its
+			 * rails: v->tile the end it went in by. On a bridge its metres kept over the deck lifted as the land (EyeBaseZ()
+			 * of viewport.cpp), in a tunnel all its height stretched so: so much less there. */
+			const ThreeDEyeScope from_eyes;
+			const double over = ThreeDTrackRailTop(v->tile) * OBJECT_HEIGHT_PER_METRE;
+			return v->z_pos + (IsTunnelTile(v->tile) ? over / EYE_LEVEL_STRETCH : over);
+		}
 	} else if (v->type == VehicleType::Road) {
 		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return v->z_pos;
 	} else {
