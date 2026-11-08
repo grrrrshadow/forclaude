@@ -513,6 +513,8 @@ void DrawTrainDepotSprite(int x, int y, DiagDirection dir, RailType railtype);
 int TicksToLeaveDepot(const Train *v);
 
 Foundation GetRailFoundation(Slope tileh, TrackBits bits);
+bool ThreeDTrackShownOn(TileIndex tile);
+double ThreeDTrackRailTop(TileIndex tile);
 
 
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype);

@@ -13935,6 +13935,7 @@ struct CabFigure {
 	bool own_cab = false; ///< the vehicle whose cab the eye is in: drawn round the eye, its driver not
 	double pitch = 0;     ///< degrees its +x is raised over the level (an arrow flying, AddCabMissile())
 	bool missile = false; ///< an arrow or a bolt: always by its triangles, however small
+	bool lies = false;    ///< lies along the ground (a piece of track, AddCabGroundFigure()): always by its triangles
 	float rise_x = 0, rise_y = 0; ///< a plant sheared along the ground under it: units of height it rises a world unit along x and y (AddOurGrass())
 	std::shared_ptr<const ThreeDLikenessSolid> likeness; ///< a vehicle of sprites only: its likeness's solid (AddCabLikeness()), kept till the frame is drawn
 	double base = std::numeric_limits<double>::quiet_NaN(); ///< the height of the land it stands on when known (a building's it is on), else found where it stands (EyeBaseZ())
@@ -13960,6 +13961,18 @@ void AddCabFigure(std::string_view name, float size, double x, double y, double 
 {
 	CabFigure f{std::string(name), size, x, y, z, facing, frame};
 	f.state = state;
+	_cab_figures.push_back(std::move(f));
+}
+
+/**
+ * A thing lying along the ground in the view from the eyes (a piece of our track, DrawThreeDTrack() of rail_cmd.cpp):
+ * always by its triangles -- a picture of it stands at its middle, and the ground before the middle hid its near half.
+ * @param z its foot at its middle, units of height
+ */
+void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing)
+{
+	CabFigure f{std::string(name), 1.0f, x, y, z, facing, 0};
+	f.lies = true;
 	_cab_figures.push_back(std::move(f));
 }
 
@@ -17961,7 +17974,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * player, 3. 11.: "the plants read back from the card are needed, it fell down for me among the trees"): the
 		 * same plant everywhere, drawn at once by the hundred; without the card only those at the walker's feet. */
 		const bool all_by_card = figures_by_card && _eye_figures_by_card;
-		fg.solid = fg.own_cab || fg.missile || small || all_by_card || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels);
+		fg.solid = fg.own_cab || fg.missile || fg.lies || small || all_by_card || (fg.plant ? foot.f < CAB_PLANT_SOLID : on_screen >= _cab_solid_pixels);
 		if (fg.solid) {
 			/* What it needs, if it is there (CabFigureReady()): drawn by its triangles as a job of the frame, after the
 			 * billboards, all of them at once on every core (the depth sorts them out). */

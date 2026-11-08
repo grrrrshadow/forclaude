@@ -12066,9 +12066,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
 		AutoRestoreBackup cur_company(_current_company, _local_company);
-		/* On a tile of rail of its type (a junction on the wired line of 'obloukjizda'), else plain rail. */
+		/* On a tile of rail of its type (a junction on the wired line of 'obloukjizda'), else plain rail; 'e' after the
+		 * track an electrified one; 'zvedni <corners>' (a Slope: 3 SW, 6 SE, 12 NE, 9 NW) those corners raised first,
+		 * a slope for our 3D track up it (DrawThreeDTrack()). */
 		const TileIndex at = TileXY(*x, *y);
-		const RailType rt = IsPlainRailTile(at) ? GetRailType(at) : RAILTYPE_RAIL;
+		RailType rt = IsPlainRailTile(at) ? GetRailType(at) : RAILTYPE_RAIL;
+		for (size_t k = 5; k < argv.size(); k++) {
+			if (argv[k] == "e") rt = RAILTYPE_ELECTRIC;
+			if (argv[k] == "zvedni" && k + 1 < argv.size()) {
+				auto corners = ParseInteger(argv[k + 1]);
+				if (corners.has_value()) Command<Commands::TerraformLand>::Do(DoCommandFlag::Execute, at, static_cast<Slope>(*corners), true);
+			}
+		}
 		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, rt, static_cast<Track>(*tr), false);
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);

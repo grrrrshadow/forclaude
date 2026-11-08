@@ -3400,7 +3400,13 @@ double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 	const double fx0 = std::floor(x), fy0 = std::floor(y), fx = x - fx0, fy = y - fy0;
 	const int ix = static_cast<int>(fx0), iy = static_cast<int>(fy0);
 	const double a = block_mean(ix, iy), b = block_mean(ix + 1, iy), c = block_mean(ix, iy + 1), d = block_mean(ix + 1, iy + 1);
-	return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+	const double on_plane = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+	if (v->type != VehicleType::Train) return on_plane;
+	/* On our track in 3D on its rails (ThreeDTrackRailTop(), by the settings from the eyes). A height within a unit of
+	 * the ground is stretched with it from the eyes (EyeBaseZ() of viewport.cpp), so its metres are a level's 5 m, not
+	 * 3 m: so much less here. */
+	const ThreeDEyeScope from_eyes;
+	return on_plane + ThreeDTrackRailTop(v->tile) * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH;
 }
 
 /** Keep what the card drew of a vehicle: laid again by its key while its next look is not made yet (CardDrawnBefore()). */
@@ -3506,6 +3512,14 @@ static const ThreeDVehicleObject *PlaceVehicleObject(const Vehicle *v, ZoomLevel
 	place.ax = static_cast<int>(std::lround(ox));
 	place.ay = static_cast<int>(std::lround(oy));
 	place.az = v->z_pos;
+	/* A train on our track in 3D on its rails (ThreeDTrackRailTop()), its box with it; where the track is drawn so (the
+	 * turned view, the objects facing north), not on the game's track of the view facing north. */
+	if (v->type == VehicleType::Train && (ViewportDrawingTurned() || ViewportDrawingNorthObjects())) {
+		const int rails = static_cast<int>(std::lround(ThreeDTrackRailTop(v->tile) * OBJECT_HEIGHT_PER_METRE));
+		place.az += rails;
+		zmin += rails;
+		zmax += rails;
+	}
 	if (pose != nullptr) {
 		int nx = static_cast<int>(std::lround(pose->x)), ny = static_cast<int>(std::lround(pose->y));
 		xmin += nx - v->x_pos; xmax += nx - v->x_pos; ymin += ny - v->y_pos; ymax += ny - v->y_pos;

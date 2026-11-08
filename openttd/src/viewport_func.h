@@ -73,6 +73,7 @@ bool ViewportDrawingNorthObjects();
 bool ViewportDrawingEye();
 bool ViewportDrawing3D();
 void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame = 0, int state = 0);
+void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing);
 void AddCabMissile(std::string_view name, double x, double y, double z, float facing, float pitch);
 void AddCabWaterFigure(std::string_view name, float size, double x, double y, double z, double base, float facing, int frame, int state, bool glows, float pitch = 0);
 void AddFirstPersonMissilesToEye();
