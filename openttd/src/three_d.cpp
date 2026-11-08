@@ -349,9 +349,39 @@ Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map)
 }
 
 /**
+ * The ground point drawn at a virtual screen coordinate of the turned view, not rounded, and its height: the line of
+ * sight walked down from the top of the world to where it first meets the ground (InverseRemapCoordsTurned()), then the
+ * height of the ground there taken a few times over.
+ * @param vx,vy the virtual screen coordinate
+ * @param[out] x,y,z the ground point
+ */
+static void InverseTurnedGroundF(double vx, double vy, double &x, double &y, double &z)
+{
+	const int max_x = Map::MaxX() * TILE_SIZE - 1;
+	const int max_y = Map::MaxY() * TILE_SIZE - 1;
+	auto ground = [&](double wx, double wy) {
+		const int ix = static_cast<int>(std::floor(wx)), iy = static_cast<int>(std::floor(wy));
+		return ix >= 0 && ix <= max_x && iy >= 0 && iy <= max_y ? GetSlopePixelZ(ix, iy) : GetSlopePixelZOutsideMap(ix, iy);
+	};
+	for (int top = _settings_game.construction.map_height_limit * TILE_HEIGHT, level = top; ; level -= TILE_HEIGHT / 2) {
+		z = std::max(level, 0);
+		InverseTurnedFlatF(vx, vy, z, x, y);
+		if (ground(x, y) >= z || z == 0) break;
+	}
+	for (int i = 0; i < 4; i++) {
+		z = ground(x, y);
+		InverseTurnedFlatF(vx, vy, z, x, y);
+	}
+}
+
+/**
  * Turn the map view to an angle. An angle within a tenth of a degree of north
  * is north: the usual drawing path, to the pixel. The ground point under the
- * middle of the main view becomes the pivot and stays under the middle.
+ * middle of the main view becomes the pivot and stays under the middle -- the
+ * point of the ground seen there, at its height (the player, test3: "the middle
+ * of the turn does not change with the zoom, then it turns badly zoomed in, the
+ * middle is somewhere far"): the point at height 0 under the middle was the
+ * ground's height / sqrt 2 off it, tiles on hills, out of a view zoomed in.
  * @param degrees the angle, any value; taken modulo 360
  */
 void SetViewYaw(float degrees)
@@ -365,10 +395,10 @@ void SetViewYaw(float degrees)
 
 	Window *w = FindWindowById(WindowClass::MainWindow, 0);
 	ViewportData *vp = (w != nullptr) ? w->viewport.get() : nullptr;
-	double wx = _pivot_x, wy = _pivot_y;
+	double wx = _pivot_x, wy = _pivot_y, wz = 0;
 	if (vp != nullptr) {
-		/* The ground point under the middle of the screen, in the turn so far. */
-		InverseTurnedFlatF(vp->dest_scrollpos_x + vp->virtual_width / 2, vp->dest_scrollpos_y + vp->virtual_height / 2, 0, wx, wy);
+		/* The ground point under the middle of the screen, in the turn so far, at the height of the ground there. */
+		InverseTurnedGroundF(vp->dest_scrollpos_x + vp->virtual_width / 2, vp->dest_scrollpos_y + vp->virtual_height / 2, wx, wy, wz);
 	}
 
 	_view_yaw = yaw;
@@ -381,7 +411,7 @@ void SetViewYaw(float degrees)
 	if (vp != nullptr) {
 		/* The pivot is drawn where it always was; put it back under the middle. */
 		double vx, vy;
-		ProjectTurnedF(wx, wy, 0, vx, vy);
+		ProjectTurnedF(wx, wy, wz, vx, vy);
 		int mask = ScaleByZoom(-1, vp->zoom);
 		vp->dest_scrollpos_x = vp->scrollpos_x = (static_cast<int>(std::lround(vx)) - vp->virtual_width / 2) & mask;
 		vp->dest_scrollpos_y = vp->scrollpos_y = (static_cast<int>(std::lround(vy)) - vp->virtual_height / 2) & mask;
