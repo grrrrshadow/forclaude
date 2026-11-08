@@ -80,8 +80,10 @@ constexpr uint32_t BED_ANIMAL_OTHERS = 10; ///< another lying on the bed, one in
 constexpr uint32_t LILY_TILES = 2;      ///< water lilies on a river's or a lake's tile one in so many
 constexpr uint32_t CATTAIL_BANKS = 45;  ///< cattails along so many banks in a hundred (the player: "the cattails somewhere, nothing elsewhere")
 constexpr double CATTAIL_APART_M = 0.55; ///< the cattails of a cluster so far apart along the bank
-constexpr double CATTAIL_OUT_M = 0.25;  ///< and in the water from it so far ...
-constexpr double CATTAIL_OUT_MORE_M = 0.45; ///< ... and up to so much farther
+constexpr double CATTAIL_OUT_M = 0.2;   ///< and in the water past the bank drawn on the tile (EYE_RIVER_BANK) so far ...
+constexpr double CATTAIL_OUT_MORE_M = 0.7; ///< ... and up to so much farther: there it is 0.3 to 1 m deep
+constexpr float CATTAIL_SIZE = 1.3f;     ///< as big against its 1.6 m (the player, test3: "the cattail is too small") ...
+constexpr float CATTAIL_SIZE_MORE = 0.3f; ///< ... and up to so much bigger: 2.1 to 2.6 m, 1 to 2 m of it over the water
 
 /** Of the tile, a number of its own for the things by chance on it (each its key). */
 uint32_t TileRandom(TileIndex t, uint32_t key)
@@ -544,12 +546,12 @@ void ForRiverPlants(TileIndex t, F fn)
 			const uint32_t hk = TileRandom(t, 300 + to_underlying(d) * 16 + k);
 			const ThreeDWaterPlant &p = *cattails[(hk >> 24) % cattails.size()];
 			const double along = middle + ((k - (count - 1) / 2.0) * CATTAIL_APART_M + (Fraction(hk, 0) - 0.5) * 0.3) * OBJECT_UNITS_PER_METRE;
-			const double out = (CATTAIL_OUT_M + CATTAIL_OUT_MORE_M * Fraction(hk, 12)) * OBJECT_UNITS_PER_METRE;
+			const double out = EYE_RIVER_BANK + (CATTAIL_OUT_M + CATTAIL_OUT_MORE_M * Fraction(hk, 12)) * OBJECT_UNITS_PER_METRE;
 			const double a = std::clamp(along, 0.5, TILE_SIZE - 0.5);
 			const double x = along_y ? edge + in * out : tx + a, y = along_y ? ty + a : edge + in * out;
 			const std::optional<double> surface = EyeWaterSurfaceZ(x, y), bed = EyeWaterBedZ(x, y);
 			if (!surface.has_value() || !bed.has_value()) continue;
-			const float size = p.scale * static_cast<float>(0.85 + 0.3 * Fraction(hk, 4));
+			const float size = p.scale * (CATTAIL_SIZE + CATTAIL_SIZE_MORE * static_cast<float>(Fraction(hk, 4)));
 			fn(RiverPlant{&p, false, size, x, y, *bed, *surface, static_cast<float>((hk >> 16) % 360)});
 		}
 	}

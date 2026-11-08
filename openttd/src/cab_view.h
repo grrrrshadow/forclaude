@@ -233,6 +233,13 @@ struct FirstPersonEye {
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);
 std::optional<double> EyeWaterSurfaceZ(double x, double y);
+/**
+ * How wide the bank a tile of a river or a canal has drawn along its edges by the land is, world units (its sprite's
+ * strip of grass and sand, about an eighth of the tile): there the water is shallow, its bed goes down only past it
+ * (EyeWaterDepth()), and the cattails stand in the water beyond it (the player, test3: "the cattail grows in the grass,
+ * it is to grow in the water").
+ */
+static constexpr double EYE_RIVER_BANK = 2.0;
 double EyeWaterDepth(double x, double y);
 std::optional<double> EyeWaterBedZ(double x, double y);
 double FirstPersonStandZ(double x, double y, double from);

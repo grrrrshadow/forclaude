@@ -14866,7 +14866,8 @@ std::optional<double> EyeWaterSurfaceZ(double x, double y)
  * How deep under the surface of the water the bed lies at a world point, units of height (the player, 7. 11.: "the sea's
  * first two tiles from the shore down under today's land, deeper we do not need; rivers and aqueducts a steep slope under
  * the water, they are a tile wide, at the bottom less"): from the nearest land (a tile not swum on, EyeSwimTile()) the
- * sea a level deeper a tile, two at most; a river or a canal a level within a quarter of a tile. 0 on land.
+ * sea a level deeper a tile, two at most; a river or a canal shallow over its bank drawn by the land (EYE_RIVER_BANK),
+ * past it a level within a quarter of a tile. 0 on land.
  */
 double EyeWaterDepth(double x, double y)
 {
@@ -14888,14 +14889,14 @@ double EyeWaterDepth(double x, double y)
 			nearest = std::min(nearest, std::hypot(ox, oy));
 		}
 	}
-	return narrow ? std::min(1.0, nearest / (TILE_SIZE / 4.0)) * TILE_HEIGHT : std::min(2.0, nearest / TILE_SIZE) * TILE_HEIGHT;
+	return narrow ? std::clamp((nearest - EYE_RIVER_BANK) / (TILE_SIZE / 4.0), 0.0, 1.0) * TILE_HEIGHT : std::min(2.0, nearest / TILE_SIZE) * TILE_HEIGHT;
 }
 
 /** How far the eyes see under the water, metres: farther all is the water's colour. */
 static constexpr double EYE_UNDER_WATER_SEEN_M = 22.0;
 /** How far about the eyes the bed under the water is drawn, tiles; how many pieces a tile's bed is of each way. */
 static constexpr int EYE_WATER_BED_TILES = 6;
-static constexpr int EYE_WATER_BED_PIECES = 4;
+static constexpr int EYE_WATER_BED_PIECES = 8; ///< a piece no wider than the bank of a river (EYE_RIVER_BANK): the bed goes down past it
 
 /**
  * The bed under the water about the diving walker's eyes (EyeWaterDepth()), as high as the land is from the eyes: sand,
