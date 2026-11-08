@@ -14000,6 +14000,57 @@ void AddCabGroundFigure(std::string_view name, double x, double y, double z, flo
 	_cab_figures.push_back(std::move(f));
 }
 
+/** A wire of our catenary in the view from the eyes (AddCabWire()): its ends, world units, their heights from the eyes. */
+struct CabWire {
+	double x0, y0, z0, x1, y1, z1;
+	uint32_t colour;
+};
+static std::vector<CabWire> _cab_wires;
+
+/**
+ * A wire of our catenary in the view from the eyes (DrawThreeDCatenary() of rail_cmd.cpp; the player, 8. 11.: "the
+ * wires as the fishing rod's line, simple wires"): from a point to a point so many metres over the ground at each, the
+ * ground lifted from the eyes as a level's 5 m (EyeLevelZ()), the metres over it kept; drawn as a line of a pixel or
+ * two however far (DrawEyeWires()).
+ * @param ground0,ground1 the ground's heights at its ends, units of height of the game
+ * @param colour Colour::data
+ */
+void AddCabWire(double x0, double y0, double ground0, double x1, double y1, double ground1, double metres, uint32_t colour)
+{
+	if (!_cab_collecting) return;
+	const double up = metres * OBJECT_HEIGHT_PER_METRE;
+	_cab_wires.push_back({x0, y0, EyeLevelZ(ground0) + up, x1, y1, EyeLevelZ(ground1) + up, colour});
+}
+
+/**
+ * The wires collected (AddCabWire()) as the fishing rod's line is drawn (ThreeDHeldThingTriangles()): each a band a pixel
+ * or two wide on the picture, at the depth of the wire, so that what is before it hides it; cut at the near plane.
+ */
+static void DrawEyeWires(const CabCanvas &cv, const CabEye &eye)
+{
+	const double half = std::max(0.6, cv.w / 1100.0);
+	const double near = _cab_near * 1.01, far = CAB_RANGE_TILES * TILE_SIZE;
+	for (const CabWire &w : _cab_wires) {
+		CabPoint a = CabToEye(eye, w.x0, w.y0, w.z0, 0.5, 0.5), b = CabToEye(eye, w.x1, w.y1, w.z1, 0.5, 0.5);
+		if ((a.f < near && b.f < near) || (a.f > far && b.f > far)) continue;
+		auto cut = [&](CabPoint &p, const CabPoint &q) {
+			const double t = (near - p.f) / (q.f - p.f);
+			p = {near, p.r + (q.r - p.r) * t, p.u + (q.u - p.u) * t, 0.5, 0.5};
+		};
+		if (a.f < near) cut(a, b);
+		if (b.f < near) cut(b, a);
+		const CabVertex pa = CabProject(eye, a), pb = CabProject(eye, b);
+		const double sx = pb.sx - pa.sx, sy = pb.sy - pa.sy, len = std::hypot(sx, sy);
+		if (len < 1e-3) continue;
+		/* Across it on the picture, so many pixels; at each end so much of the eye's units at its depth. */
+		const double nx = -sy / len * half, ny = sx / len * half;
+		auto side = [&](const CabPoint &p, double k) { return CabPoint{p.f, p.r + k * nx * p.f / eye.focal, p.u - k * ny * p.f / eye.focal, 0.5, 0.5}; };
+		uint32_t colour = w.colour;
+		CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, EyeColour(colour), 1, 1, {side(a, -1), side(b, -1), side(b, 1), side(a, 1)}, eye, 0);
+	}
+	_cab_wires.clear();
+}
+
 /**
  * A figure in the water in the view from the eyes (three_d_water_life.cpp): over the height it is lifted with
  * (EyeStandZ(): the bed under it, or the surface a water lily's leaves are at), its own metres kept; at night, one of
@@ -17017,6 +17068,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* What stands on a tile: 0 a billboard, 1 a building's box, 2 a station's box, 3 a bridge over the tile, 4 a
 	 * bridge's ramp, 5 nothing (a tunnel's portal, built anew). */
 	_cab_figures.clear();
+	_cab_wires.clear();
 	/* The figures from one on: standing on what stands on the land at a height (a building, a field), not found where they stand (EyeBaseZ()). */
 	auto stand_on = [](size_t from, double base) {
 		for (size_t k = from; k < _cab_figures.size(); k++) _cab_figures[k].base = base;
@@ -17631,6 +17683,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		DrawEyeRetainingWalls(cv, eye, founded, grounds);
 	}
+	/* The wires of our catenary the tiles put (AddCabWire()), as the fishing rod's line. */
+	DrawEyeWires(cv, eye);
 	/* The houses that are real 3D objects: their triangles with their texture, at the level of detail of their
 	 * distance -- about a texture pixel to a pixel of the picture. Their textures stay: on every core. */
 	{

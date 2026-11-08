@@ -818,6 +818,12 @@ SettingsContainer &GetSettingsTree()
 					SettingsPage *group = three_d->Add(new SettingsPage(g.title));
 					group->Add(new SettingEntry(g.map));
 					group->Add(new SettingEntry(g.eye));
+					/* The catenary's masts apart, and how far apart (DrawThreeDCatenary() of rail_cmd.cpp). */
+					if (g.title == STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY) {
+						group->Add(new SettingEntry("gui.three_d_catenary_masts_map"));
+						group->Add(new SettingEntry("gui.three_d_catenary_masts_eye"));
+						group->Add(new SettingEntry("gui.three_d_catenary_spacing"));
+					}
 				}
 			}
 			graphics->Add(new SettingEntry("gui.three_d_wheels"));

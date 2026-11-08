@@ -2612,6 +2612,161 @@ double ThreeDTrackRailTop(TileIndex tile)
 	return ThreeDTrackShownOn(tile) ? THREE_D_RAIL_TOP_M : 0.0;
 }
 
+/** Our catenary's wires over the ground, metres (objekty/nase/trakce.py CONTACT, CARRIER): the contact wire, the carrier wire. */
+static constexpr double THREE_D_CONTACT_M = 5.872, THREE_D_CARRIER_M = 7.272;
+/** Our mast's top and where its arm begins, metres (trakce.py): the boxes they fill on the map. */
+static constexpr double THREE_D_MAST_TOP_M = 8.85, THREE_D_ARM_LOW_M = 5.8;
+/** The wires' colours from the eyes (GetThreeDWires() has them from above): the contact wire copper, the carrier wire darker. */
+static const uint32_t THREE_D_CONTACT_COLOUR = Colour(92, 70, 52).data, THREE_D_CARRIER_COLOUR = Colour(54, 56, 58).data;
+
+/** Whether a tile's track has our catenary where it is drawn now: our 3D track, electrified, the catenary wanted (ThreeDGroupShown()), no bridge over it. */
+static bool ThreeDCatenaryOn(TileIndex tile)
+{
+	if (!ThreeDTrackShownOn(tile) || !HasRailCatenary(GetRailType(tile)) || _settings_game.vehicle.disable_elrails || IsBridgeAbove(tile)) return false;
+	return ThreeDGroupShown(ThreeDGroup::Catenary) && GetThreeDFigure("trakce_stozar") != nullptr;
+}
+
+/**
+ * Our catenary over our track on a tile (the player, 8. 11.: "such masts for the electrified track, for the catenary,
+ * but simple, the wires as the fishing rod's line"; "faithful to the view from above, so one on each tile"; "the spacing
+ * between the masts in the settings, as the spacing of the signals"; "2 may be over both"):
+ *  - the wires over each piece of track from edge to edge, the contact wire 5.5 m over the rails, the carrier wire
+ *    1.4 m over it, along a round curve's arc; from above thin square ropes (GetThreeDWires()), from the eyes lines
+ *    (AddCabWire());
+ *  - a mast (objekty/nase/trakce.py) at a corner of the tile by the middle of its edge the track crosses, as the game's
+ *    pylons stand at the tiles' sides, its arm out over the track: a straight track (X, Y) at the edge where it comes
+ *    in from the north, its mast at the corner on the north side of it -- tracks of the same way side by side two by
+ *    two, each two one mast at the corner between them, an arm to each --; a piece across a corner at that corner, its
+ *    arm to its middle;
+ *    a round piece at its middle on the outside of its turn. Every so many tiles (gui.three_d_catenary_spacing), none
+ *    where they are switched off (gui.three_d_catenary_masts_*): the wires alone.
+ * @param s the tile's slope after its foundation
+ * @param round the tile is of a round curve drawn round
+ */
+static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye)
+{
+	const TileIndex tile = ti->tile;
+	const int tx = TileX(tile), ty = TileY(tile);
+	const double ox = tx * TILE_SIZE, oy = ty * TILE_SIZE;
+	const double hpm = OBJECT_HEIGHT_PER_METRE, upm = OBJECT_UNITS_PER_METRE;
+	/* The ground's height at a point of the tile over ti->z, units: the plane the track lies on. */
+	auto ground = [&](double lx, double ly) -> double {
+		switch (s) {
+			case SLOPE_FLAT: return 0;
+			case SLOPE_SW: return lx / TILE_SIZE * TILE_HEIGHT;
+			case SLOPE_NE: return (TILE_SIZE - lx) / TILE_SIZE * TILE_HEIGHT;
+			case SLOPE_SE: return ly / TILE_SIZE * TILE_HEIGHT;
+			case SLOPE_NW: return (TILE_SIZE - ly) / TILE_SIZE * TILE_HEIGHT;
+			default: return GetPartialPixelZ(std::clamp(static_cast<int>(lx), 0, 15), std::clamp(static_cast<int>(ly), 0, 15), s);
+		}
+	};
+
+	/* The wires: from above gathered into the tile's object, from the eyes each a line. */
+	std::vector<ThreeDWire> wires;
+	auto wire = [&](double ax, double ay, double bx, double by) {
+		const double ga = ground(ax, ay), gb = ground(bx, by);
+		for (uint8_t k = 0; k < 2; k++) {
+			const double m = k == 0 ? THREE_D_CONTACT_M : THREE_D_CARRIER_M;
+			if (eye) {
+				AddCabWire(ox + ax, oy + ay, ti->z + ga, ox + bx, oy + by, ti->z + gb, m, k == 0 ? THREE_D_CONTACT_COLOUR : THREE_D_CARRIER_COLOUR);
+			} else {
+				wires.push_back({static_cast<float>(ax), static_cast<float>(ay), static_cast<float>(ga + m * hpm), static_cast<float>(bx), static_cast<float>(by), static_cast<float>(gb + m * hpm), k});
+			}
+		}
+	};
+
+	/* A mast at a point of the tile with its arms (facing, degrees, 0 along +x), each so many units long; from above
+	 * each in its box -- the mast a narrow column, an arm from the mast to its end, high up --, so that a train under the
+	 * arm is before or behind the mast as it is. */
+	const bool masts = eye ? _settings_client.gui.three_d_catenary_masts_eye : _settings_client.gui.three_d_catenary_masts_map;
+	const int every = std::max<int>(1, _settings_client.gui.three_d_catenary_spacing);
+	auto every_at = [every](int v) { return ((v % every) + every) % every == 0; };
+	auto mast = [&](double lx, double ly, std::initializer_list<float> arms, std::string_view arm_name, double arm_len) {
+		if (!masts) return;
+		const double px = ox + lx, py = oy + ly;
+		const int z = ti->z + static_cast<int>(std::lround(ground(lx, ly)));
+		if (eye) {
+			AddCabFigure("trakce_stozar", 1.0f, px, py, z, 0.0f);
+			for (float f : arms) AddCabFigure(arm_name, 1.0f, px, py, z, f);
+			return;
+		}
+		const int ix = static_cast<int>(std::lround(px)), iy = static_cast<int>(std::lround(py));
+		const int top = z + static_cast<int>(std::lround(THREE_D_MAST_TOP_M * hpm));
+		const std::array<int, 6> column{ix - 1, iy - 1, z, ix, iy, top};
+		AddThreeDFigureToViewportInBox("trakce_stozar", 1.0f, ix, iy, z, 0.0f, _cur_dpi->zoom, tile, 0, -1, 0, &column);
+		for (float f : arms) {
+			const double a = f * M_PI / 180.0, ex = px + std::cos(a) * arm_len, ey = py + std::sin(a) * arm_len;
+			const int bx0 = static_cast<int>(std::floor(std::min(px, ex))), by0 = static_cast<int>(std::floor(std::min(py, ey)));
+			const int bx1 = std::max(bx0, static_cast<int>(std::ceil(std::max(px, ex))) - 1), by1 = std::max(by0, static_cast<int>(std::ceil(std::max(py, ey))) - 1);
+			const std::array<int, 6> box{bx0, by0, z + static_cast<int>(std::lround(THREE_D_ARM_LOW_M * hpm)), bx1, by1, top};
+			AddThreeDFigureToViewportInBox(arm_name, 1.0f, ix, iy, z, f, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+		}
+	};
+	const double arm = TILE_SIZE / 2.0, arm_diagonal = TILE_SIZE / 2.0 / std::sqrt(2.0);
+	/* A neighbour's straight track of the same way beside, with our catenary: one mast between them. */
+	auto beside = [&](int dx, int dy, Track t) {
+		const int nx = tx + dx, ny = ty + dy;
+		if (nx < 0 || ny < 0 || nx >= static_cast<int>(Map::SizeX()) || ny >= static_cast<int>(Map::SizeY())) return false;
+		const TileIndex n = TileXY(nx, ny);
+		if (!ThreeDCatenaryOn(n) || !GetTrackBits(n).Test(t)) return false;
+		return !(RoundTrackDrawing() && IsRoundTrackTile(n) && !RoundTrackCentreLine(n, t, TILE_SIZE).empty());
+	};
+
+	for (Track t : track) {
+		if (round) {
+			/* Along its arc; its mast at its middle, on the outside of its turn (where the arc turns left, its centre is
+			 * on the left). */
+			const std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, t, 2.0 * upm);
+			if (!line.empty()) {
+				for (size_t i = 0; i + 1 < line.size(); i++) wire(line[i].x - ox, line[i].y - oy, line[i + 1].x - ox, line[i + 1].y - oy);
+				if (every_at(tx + ty)) {
+					const RoundTrackPoint &m = line[line.size() / 2];
+					const double turn = line.front().tx * line.back().ty - line.front().ty * line.back().tx;
+					const double side = turn > 0 ? -1.0 : 1.0; // the left normal (-ty, tx) times it: outward
+					const double nx = -m.ty * side, ny = m.tx * side;
+					mast(m.x - ox + nx * arm, m.y - oy + ny * arm, {static_cast<float>(std::atan2(-ny, -nx) * 180.0 / M_PI)}, "trakce_vyloznik", arm);
+				}
+				continue;
+			}
+		}
+		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+		wire(p.x - p.ax, p.y - p.ay, p.x + p.ax, p.y + p.ay);
+		switch (t) {
+			case Track::X:
+			case Track::Y: {
+				/* At its edge on the north (X: north-east, Y: north-west), at the corner on the north side of it; tracks
+				 * of the same way side by side two by two from the first on the north, each two the mast at the corner
+				 * between them, an arm to each. */
+				const bool x = t == Track::X;
+				if (!every_at(x ? tx : ty)) break;
+				const int sx = x ? 0 : 1, sy = x ? 1 : 0;
+				int before = 0;
+				while (before < 16 && beside(-sx * (before + 1), -sy * (before + 1), t)) before++;
+				if (before % 2 == 1) break; // the second of a two: the first has the mast
+				const float out = x ? 90.0f : 0.0f;
+				if (beside(sx, sy, t)) {
+					mast(sx * TILE_SIZE, sy * TILE_SIZE, {out + 180.0f, out}, "trakce_vyloznik", arm);
+				} else {
+					mast(0, 0, {out}, "trakce_vyloznik", arm);
+				}
+				break;
+			}
+			default: {
+				/* Across a corner: at that corner, its arm to its middle. */
+				if (!every_at(t == Track::Upper || t == Track::Lower ? tx - ty : tx + ty)) break;
+				const double cx = (t == Track::Lower || t == Track::Left) ? TILE_SIZE : 0, cy = (t == Track::Lower || t == Track::Right) ? TILE_SIZE : 0;
+				mast(cx, cy, {static_cast<float>(std::atan2(p.y - cy, p.x - cx) * 180.0 / M_PI)}, "trakce_vyloznik_sikmy", arm_diagonal);
+				break;
+			}
+		}
+	}
+	if (!eye && !wires.empty()) {
+		/* As thick as a pixel and a half at the zoom: a unit and a fifth at the normal one. */
+		const double thick = 1.2 * std::pow(2.0, to_underlying(_cur_dpi->zoom) - to_underlying(ZoomLevel::Normal));
+		AddThreeDTileObject(GetThreeDWires(tile, wires, thick), tile, ti->z);
+	}
+}
+
 /**
  * Our track in 3D (the player, test3: "our own 3D rails"; 8. 11.: "the rails from above on and in 3D on too by default",
  * "a very low embankment", "the sleepers over the embankment, a low embankment so one can walk over it"): the ground of
@@ -2702,6 +2857,8 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 		}
 		put(name, ox + p.x, oy + p.y, p.ax, p.ay, z, foot, tall, facing);
 	}
+	/* Its catenary over it, when it is electrified (DrawThreeDCatenary()). */
+	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
 	return true;
 }
 

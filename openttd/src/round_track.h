@@ -66,6 +66,7 @@ bool GetRoundTrackPose(const Vehicle *v, RoundTrackPose &pose);
 struct RoundTrackPoint {
 	double x = 0, y = 0;   ///< world units
 	double tx = 0, ty = 0; ///< its direction, a unit
+	bool over = false;     ///< past its piece's ends: at a switch over the straight way, on the tile beside
 };
 std::vector<RoundTrackPoint> RoundTrackCentreLine(TileIndex tile, Track track, double step);
 

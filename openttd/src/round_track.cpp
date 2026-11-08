@@ -1053,9 +1053,10 @@ std::vector<RoundTrackPoint> RoundTrackCentreLine(TileIndex tile, Track track, d
 		while (k < FINE - 1 && at[k + 1] < want) k++;
 		const double f = at[k + 1] > at[k] ? std::clamp((want - at[k]) / (at[k + 1] - at[k]), 0.0, 1.0) : 0.0;
 		Vec q, tg;
-		c.Eval(s[k] + (s[k + 1] - s[k]) * f, q, tg);
+		const double at_s = s[k] + (s[k + 1] - s[k]) * f;
+		c.Eval(at_s, q, tg);
 		tg = Unit(tg);
-		out.push_back({q.x, q.y, tg.x, tg.y});
+		out.push_back({q.x, q.y, tg.x, tg.y, at_s < -1e-6 || at_s > c.len + 1e-6});
 	}
 	return out;
 }

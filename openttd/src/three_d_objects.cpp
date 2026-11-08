@@ -4924,6 +4924,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 		double x, y;   ///< world units from the tile's north corner
 		double tx, ty; ///< the way along, a unit
 		double s;      ///< the length along to it, world units
+		bool over;     ///< over the straight way of a switch beside (RoundTrackPoint::over)
 	};
 	const double ox = TileX(tile) * TILE_SIZE, oy = TileY(tile) * TILE_SIZE;
 	std::vector<At> at;
@@ -4936,10 +4937,10 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 			if (wrap > at.back().s + 1e-6 && wrap < s - 1e-6) {
 				const double f = (wrap - at.back().s) / (s - at.back().s);
 				const At &a = at.back();
-				at.push_back({a.x + (p.x - ox - a.x) * f, a.y + (p.y - oy - a.y) * f, p.tx, p.ty, wrap});
+				at.push_back({a.x + (p.x - ox - a.x) * f, a.y + (p.y - oy - a.y) * f, p.tx, p.ty, wrap, a.over && p.over});
 			}
 		}
-		at.push_back({p.x - ox, p.y - oy, p.tx, p.ty, s});
+		at.push_back({p.x - ox, p.y - oy, p.tx, p.ty, s, p.over});
 	}
 	const double total = at.back().s;
 
@@ -4988,12 +4989,15 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 		const double snx = mnx / ml, sny = mny / ml;
 		const double v0 = std::fmod(a.s, TILE_SIZE) / TILE_SIZE, v1 = v0 + (b.s - a.s) / TILE_SIZE;
 		auto across = [&](const At &p, double nx, double ny, double off, double z) { return std::array<double, 3>{p.x + nx * off, p.y + ny * off, z}; };
+		/* Over the straight way of a switch the straight piece's bed and sleepers are there already: only the rails, on
+		 * them (the player: "the little step too"). */
+		const bool over = a.over && b.over;
 		/* The bed: its top, its left side (+n), its right side. */
-		quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
+		if (!over) quad(1, {across(a, anx, any, half_bed, bed_top), across(b, bnx, bny, half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top), across(a, anx, any, -half_bed, bed_top)},
 				{{{t0, v0}, {t0, v1}, {t1, v1}, {t1, v0}}}, 0, 0, 1);
-		quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
+		if (!over) quad(1, {across(a, anx, any, half_bed, 0), across(b, bnx, bny, half_bed, 0), across(b, bnx, bny, half_bed, bed_top), across(a, anx, any, half_bed, bed_top)},
 				{{{sl, v0}, {sl, v1}, {t0, v1}, {t0, v0}}}, snx, sny, 0);
-		quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
+		if (!over) quad(1, {across(b, bnx, bny, -half_bed, 0), across(a, anx, any, -half_bed, 0), across(a, anx, any, -half_bed, bed_top), across(b, bnx, bny, -half_bed, bed_top)},
 				{{{sr, v1}, {sr, v0}, {t1, v0}, {t1, v1}}}, -snx, -sny, 0);
 		/* The rails: each its two sides and its head's top. */
 		for (int side : {-1, 1}) {
@@ -5018,6 +5022,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 		dx /= dl;
 		dy /= dl;
 		const double nx = -dy, ny = dx;
+		if (a.over && b.over) continue;
 		/* Its corners: along it (its width) and across (its length), as koleje.py's sleeper(): u along its length, v across. */
 		auto p = [&](double along, double acr, double z) { return std::array<double, 3>{cx + dx * along + nx * acr, cy + dy * along + ny * acr, z}; };
 		quad(2, {p(-half_w, half_l, z1), p(half_w, half_l, z1), p(half_w, -half_l, z1), p(-half_w, -half_l, z1)}, {{{0, 0}, {0, 1}, {1, 1}, {1, 0}}}, 0, 0, 1);
@@ -5030,6 +5035,89 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	o.top = static_cast<float>(rail_z1);
 	const ThreeDObject *out = made.get();
 	_track_arcs.emplace(key, TrackArcMade{std::move(made), now});
+	return out;
+}
+
+/** The wires of a tile made (GetThreeDWires()), kept by what they are; let go of when not drawn for a while. */
+static std::unordered_map<uint64_t, TrackArcMade> _three_d_wires;
+
+/**
+ * The wires of our catenary on a tile from above (DrawThreeDCatenary() of rail_cmd.cpp; the player, 8. 11.: "the wires
+ * as the fishing rod's line, simple wires"): each a thin square rope -- a flat band and an upright band across each
+ * other, seen from both sides --, as thick as a pixel and a half at the zoom it is drawn at, so that from above it is a
+ * line however far; the contact wire copper, the carrier wire darker. An object made here, standing at the tile's north
+ * corner, drawn as a house is (AddThreeDTileObject()).
+ * @param wires each wire's ends, world units from the tile's north corner and units of height over the height it stands at
+ * @param thick how thick, world units
+ */
+const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> wires, double thick)
+{
+	if (wires.empty()) return nullptr;
+	uint64_t key = 14695981039346656037ull;
+	auto mix = [&key](uint64_t v) {
+		key ^= v;
+		key *= 1099511628211ull;
+	};
+	mix(tile.base());
+	mix(static_cast<uint64_t>(std::lround(thick * 64)));
+	for (const ThreeDWire &w : wires) {
+		for (float v : {w.x0, w.y0, w.z0, w.x1, w.y1, w.z1}) mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(v * 64))));
+		mix(w.kind);
+	}
+	const auto now = std::chrono::steady_clock::now();
+	if (auto it = _three_d_wires.find(key); it != _three_d_wires.end()) {
+		it->second.used = now;
+		return it->second.obj.get();
+	}
+	if (_three_d_wires.size() > 1024) {
+		for (auto it = _three_d_wires.begin(); it != _three_d_wires.end();) {
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; });
+			if (made && now - it->second.used > std::chrono::seconds(60)) {
+				it = _three_d_wires.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+	auto made = std::make_unique<ThreeDObject>();
+	ThreeDObject &o = *made;
+	o.name = fmt::format("trakce_draty_{}", tile.base());
+	o.variants = 0; // no house's
+	o.tiles_x = o.tiles_y = 1;
+	/* Its colours, its other materials' (none its own): 1 the contact wire's, 2 the carrier wire's. */
+	o.texture_of = SIZE_MAX;
+	o.material_pngs = {nullptr, nullptr};
+	o.material_flats = {Colour(92, 70, 52).data, Colour(54, 56, 58).data};
+	o.material_levels.assign(2, nullptr);
+	std::vector<float> nrm;
+	const double h = thick / 2;
+	for (const ThreeDWire &w : wires) {
+		const double dx = w.x1 - w.x0, dy = w.y1 - w.y0, len = std::hypot(dx, dy);
+		if (len < 1e-6) continue;
+		const double nx = -dy / len * h, ny = dx / len * h;
+		const uint8_t tex = w.kind == 0 ? 1 : 2;
+		/* The flat band across it, the upright band along it: two quads, each seen from both sides. */
+		const std::array<std::array<double, 3>, 4> flat{{{w.x0 + nx, w.y0 + ny, w.z0}, {w.x1 + nx, w.y1 + ny, w.z1}, {w.x1 - nx, w.y1 - ny, w.z1}, {w.x0 - nx, w.y0 - ny, w.z0}}};
+		const std::array<std::array<double, 3>, 4> upright{{{w.x0, w.y0, w.z0 - h}, {w.x1, w.y1, w.z1 - h}, {w.x1, w.y1, w.z1 + h}, {w.x0, w.y0, w.z0 + h}}};
+		for (const auto *q : {&flat, &upright}) {
+			const uint32_t base = static_cast<uint32_t>(o.pos.size() / 3);
+			const bool up = q == &upright;
+			for (const auto &p : *q) {
+				o.pos.insert(o.pos.end(), {static_cast<float>(p[0]), static_cast<float>(p[1]), static_cast<float>(p[2])});
+				o.uv.insert(o.uv.end(), {0.5f, 0.5f});
+				nrm.insert(nrm.end(), {up ? static_cast<float>(nx / h) : 0.0f, up ? static_cast<float>(ny / h) : 0.0f, up ? 0.0f : 1.0f});
+				o.corner_tex.push_back(tex);
+			}
+			o.tri.insert(o.tri.end(), {base, base + 1, base + 2, base, base + 2, base + 3});
+			o.tri_tex.insert(o.tri_tex.end(), {tex, tex});
+			o.facing.insert(o.facing.end(), {0, 0});
+		}
+		o.top = std::max({o.top, w.z0 + static_cast<float>(h), w.z1 + static_cast<float>(h)});
+	}
+	if (o.tri.empty()) return nullptr;
+	o.light = CornerLight(nrm);
+	const ThreeDObject *out = made.get();
+	_three_d_wires.emplace(key, TrackArcMade{std::move(made), now});
 	return out;
 }
 

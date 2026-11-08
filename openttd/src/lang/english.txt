@@ -2265,6 +2265,13 @@ STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Catenary in 3D 
 STR_CONFIG_SETTING_THREE_D_CATENARY_MAP_HELPTEXT                :On the map, the turned view and the small views: the catenary of 3D masts and wires. Off: the catenary of the game
 STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Catenary in 3D from the eyes: {STRING2}
 STR_CONFIG_SETTING_THREE_D_CATENARY_EYE_HELPTEXT                :In the view from the first person and from the cab: the catenary of 3D masts and wires. Off: the catenary of the game
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP                   :Catenary masts from above: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP_HELPTEXT          :The masts of the 3D catenary on the map, in the turned view and the small views. Off: only its wires
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE                   :Catenary masts from the eyes: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE_HELPTEXT          :The masts of the 3D catenary in the view from the first person and from the cab. Off: only its wires
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING                     :Catenary masts every: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_HELPTEXT            :How far apart the masts of the 3D catenary stand along the track, as the distance the signals are dragged at
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_VALUE               :{COMMA} tile{P 0 "" s}
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Wheels of 3D vehicles turn: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :The wheels of vehicles drawn from 3D objects turn as they go and the front ones steer in the curves (seen up close, from the cab and the first person). Off, the wheels stand still
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D pictures drawn by the graphics card: {STRING2}

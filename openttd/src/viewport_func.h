@@ -76,6 +76,7 @@ void AddCabFigure(std::string_view name, float size, double x, double y, double 
 void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing);
 struct ThreeDObject;
 void AddThreeDTileObject(const ThreeDObject *obj, TileIndex origin, int z);
+void AddCabWire(double x0, double y0, double ground0, double x1, double y1, double ground1, double metres, uint32_t colour);
 void AddCabMissile(std::string_view name, double x, double y, double z, float facing, float pitch);
 void AddCabWaterFigure(std::string_view name, float size, double x, double y, double z, double base, float facing, int frame, int state, bool glows, float pitch = 0);
 void AddFirstPersonMissilesToEye();

@@ -265,6 +265,9 @@ struct GUISettings {
 	bool three_d_rails_eye;       ///< The same from the eyes.
 	bool three_d_catenary_map;    ///< The catenary from above of 3D masts and wires; off, the game's.
 	bool three_d_catenary_eye;    ///< The same from the eyes.
+	bool three_d_catenary_masts_map; ///< Of that catenary from above its masts; off, its wires alone.
+	bool three_d_catenary_masts_eye; ///< The same from the eyes.
+	uint8_t three_d_catenary_spacing; ///< Its masts every so many tiles (the player, 8. 11.: "as the spacing of the signals is set").
 	bool three_d_wheels;          ///< The wheels of the 3D vehicles turn as they go and the front ones steer; off, they stand still in the model.
 	bool three_d_gpu;             ///< The 3D pictures drawn by the graphics card (three_d_gpu.h); off, by the processor.
 	bool night;                   ///< The night (the player's dark mode, in the help menu by the console): the map darkened, the vehicles' lights on.

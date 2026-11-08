@@ -1445,6 +1445,12 @@ enum class ThreeDBridgePiece : uint8_t {
 static constexpr uint THREE_D_AQUEDUCT = 13; // MAX_BRIDGES of bridge.h (a static_assert in three_d_objects.cpp)
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map = false, int wall = -1);
 const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete);
+/** A wire of our catenary (GetThreeDWires()): its ends, world units from its tile's north corner and units of height over the height the wires stand at. */
+struct ThreeDWire {
+	float x0, y0, z0, x1, y1, z1;
+	uint8_t kind; ///< 0 the contact wire, 1 the carrier wire
+};
+const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> wires, double thick);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTile(IndustryGfx gfx);
 bool ThreeDOriginalIndustryTileStands(TileIndex tile, const ThreeDIndustryTileParts &parts);
 const ThreeDIndustryTileParts *GetThreeDOriginalIndustryTileAt(TileIndex tile);

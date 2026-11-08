@@ -2373,6 +2373,13 @@ STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Troleje ve 3D s
 STR_CONFIG_SETTING_THREE_D_CATENARY_MAP_HELPTEXT                :Na mapě, v otočeném pohledu a v malých oknech: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
 STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Troleje ve 3D z očí: {STRING2}
 STR_CONFIG_SETTING_THREE_D_CATENARY_EYE_HELPTEXT                :V pohledu z první osoby a z kabiny: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP                   :Sloupy trakce shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_MAP_HELPTEXT          :Sloupy 3D trakčního vedení na mapě, v otočeném pohledu a v malých oknech. Vypnuto: jen dráty
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE                   :Sloupy trakce z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MASTS_EYE_HELPTEXT          :Sloupy 3D trakčního vedení v pohledu z první osoby a z kabiny. Vypnuto: jen dráty
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING                     :Sloupy trakce každých: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_HELPTEXT            :Jak daleko od sebe stojí sloupy 3D trakčního vedení podél trati, jako rozestup návěstidel při stavbě tahem
+STR_CONFIG_SETTING_THREE_D_CATENARY_SPACING_VALUE               :{COMMA} polí
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING2}
