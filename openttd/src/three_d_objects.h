@@ -172,6 +172,20 @@ struct ThreeDObjectFigure {
 /** The animals the spit (the figure "rozen") has, by its frames: the piglet, the calf, the lamb. */
 static constexpr int THREE_D_GRILL_ANIMALS = 3;
 
+/*
+ * The fireplace, one for all (the player, test3: "the fireplace did not burn; make one shared fireplace, not tuned each
+ * time"): the forest cabin's ("ohniste" of les_paseka_srub, by the forest, the palm plantation's hut and a walker's
+ * tent alike), its fire (the torch's flame, its frames alone, "ohen_ohniste" of objekty/nase) burning by day and by
+ * night, and over it the trestles of the pitch's grill without its bricks (their ends beyond so far from the middle,
+ * the colleague's domy/hospoda.py gril()) and the spit in their forks as there (dum_20_stadion "akce" "rozen").
+ */
+static constexpr std::string_view THREE_D_FIRE_FLAMES = "ohen_ohniste";
+static constexpr float THREE_D_FIRE_FLAMES_SCALE = 4.0f; ///< the torch's flame so many times its size: a fire 0.8 m high under the spit (1 m)
+static constexpr std::string_view THREE_D_FIRE_TRESTLES = "kozy_grilu";
+static constexpr float THREE_D_FIRE_TRESTLES_M = 0.9f;
+static constexpr std::string_view THREE_D_FIRE_SPIT = "rozen";
+static constexpr float THREE_D_FIRE_SPIT_UP_M = 1.01f, THREE_D_FIRE_SPIT_SCALE = 1.08f;
+
 /** A door of a building ("dvere"): people come out of it and go in (three_d_walkers.h). */
 struct ThreeDObjectDoor {
 	float at[2] = {};     ///< "poloha": where it is, metres in the building's frame
@@ -965,6 +979,7 @@ struct ThreeDVehicleObject {
 	std::vector<std::string> skip_nodes; ///< nodes of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni"; a saucer's frames: its beam and its sheep)
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
 	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
+	bool frames_only = false;       ///< "jen_snimky": of its file only its frames' nodes, not the rest drawn in each (the torch's flame without its stick: the fireplaces' fire)
 	float ends_beyond = 0;          ///< "jen_konce_m": only its triangles all so far or farther from its origin along its own x, metres; 0 all (the grill's trestles without its bricks, as ThreeDObjectFigure::beyond)
 	float keep_above = NAN;         ///< only its triangles all so high over its origin or higher, metres (a water lily's leaves, "<jmeno>/hladina"); NAN all
 	bool night_glass = false;       ///< a light's thing ("kategorie": "svetlo", the lantern): its glass ("noc") part of it, lit by its own light
@@ -1428,7 +1443,9 @@ struct ThreeDForestPart {
 	std::vector<ThreeDForestPlace> animals;   ///< "zvirata"
 	std::vector<ThreeDForestPlace> ghosts;    ///< "noc_postavy", at night
 	std::vector<ThreeDObjectFigure> vehicles; ///< "vozidla": vehicles of the sets standing on it, as figures "vozidlo:..." (GetThreeDStandingVehicle(): the horse by the cabin); none without their package
-	std::vector<ThreeDObjectFigure> with_girls; ///< its girls and its vehicles, the figures drawn after a delivery of studentky
+	std::vector<ThreeDObjectFigure> fire_flames; ///< its fire burning (THREE_D_FIRE_FLAMES), none without a fire
+	std::vector<ThreeDObjectFigure> standing; ///< its vehicles and its fire, the figures drawn always
+	std::vector<ThreeDObjectFigure> with_girls; ///< its girls, its vehicles and its fire, the figures drawn after a delivery of studentky
 	/* The spit over its fire (the forester's cabin's fireplace, where its embers glow, "svetlo_00" of its night). */
 	const ThreeDObject *grill = nullptr;      ///< the trestles of the pitch's grill (an add-on, without its bricks) over the fire; nullptr no fire
 	std::array<ThreeDObjectFigure, THREE_D_GRILL_ANIMALS> spit; ///< the spit on it, each with an animal of its own (ThreeDObjectFigure::frame)

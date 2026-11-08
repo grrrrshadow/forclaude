@@ -231,8 +231,9 @@ struct WalkerTentPart {
 	float up_m;              ///< metres over the ground
 	float facing;            ///< degrees in the world its +x looks to
 	float scale;             ///< its size against its true metres
-	int frame;               ///< its frame (the spit's animal), 0 none
+	int frame;               ///< its frame (the spit's animal), 0 none, -1 by the game's tick (the fire)
 	int state;               ///< its state (the cloth's colour), 0 as it is
+	bool inside;             ///< in the tent (the barrel): from the eyes only; on the map the figures are laid one over another, it showed through the cloth (the player, test3)
 };
 
 extern std::vector<WalkerTent> _walker_tents;

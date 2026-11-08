@@ -1129,6 +1129,7 @@ struct GlbReadOptions {
 	const std::vector<std::string> *marks = nullptr; ///< a second marking of nodes by name, as groups (GlbMesh::tri_mark): a part's wheels
 	std::string_view glass_suffix; ///< the nodes whose names end so (and their children) are glass (GlbMesh::tri_glass)
 	bool points_only = false;     ///< only the places (points), no mesh read: the lights at the back of an add-on's parts
+	bool frames_only = false;     ///< with frame_prefix, only the meshes under the frame's node (the torch's flame without its stick)
 	/** With groups and only_groups, the nodes whose materials are taken as textures first, in the order they are met, before
 	 * only those of groups are read: the textures of an add-on the same whatever of its nodes are read. */
 	const std::vector<std::string> *material_groups = nullptr;
@@ -1462,7 +1463,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					if (node.contains("children")) for (const auto &c : node.at("children")) seen.emplace_back(c.get<int>(), in);
 				}
 			}
-			const bool inside_at_first = only_node.empty() && !o.only_night && !(o.only_groups && groups != nullptr);
+			const bool inside_at_first = only_node.empty() && !o.only_night && !(o.only_groups && groups != nullptr) && !(o.frames_only && !frame_prefix.empty());
 			for (int r : roots) todo.push_back({r, identity, inside_at_first, 0, 0, false});
 			size_t visited = 0;
 			while (!todo.empty() && visited++ < 100000) {
@@ -1494,6 +1495,7 @@ static bool ReadGlbMesh(const std::string &path, GlbMesh &mesh, const GlbReadOpt
 					if (name.starts_with(frame_prefix)) {
 						auto number = ParseInteger<int>(std::string_view(name).substr(frame_prefix.size()), 10);
 						if (!number.has_value() || *number != frame) continue;
+						if (o.frames_only) inside = true;
 					}
 				}
 				Matrix m = multiply(parent, local(node));
@@ -3814,7 +3816,6 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 		o.points = &fire;
 		ReadGlbMesh(folder + file, mesh, o);
 	}
-	static constexpr float SPIT_UP_M = 1.01f, SPIT_SCALE = 1.08f, TRESTLES_M = 0.9f;
 
 	/* Turned about the middle of the tile by quarter turns: exactly, no rounding of the sines. */
 	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE) / 2;
@@ -3885,17 +3886,22 @@ static void ReadForestPart(const nlohmann::json &e, const std::string &folder, s
 			grill.variants = 0; // no house's
 			ThreeDObjectFigure &stand = grill.addon_places.emplace_back(at);
 			stand.figure = "gril_090fce5f";
-			stand.beyond = TRESTLES_M;
+			stand.beyond = THREE_D_FIRE_TRESTLES_M;
 			r.grill = _three_d_objects.size();
 			_three_d_objects.push_back(std::move(grill));
 			for (int animal = 0; animal < THREE_D_GRILL_ANIMALS; animal++) {
 				ThreeDObjectFigure &spit = r.rest.spit[animal];
 				spit = at;
-				spit.figure = "rozen";
-				spit.at[2] = SPIT_UP_M;
-				spit.scale = SPIT_SCALE;
+				spit.figure = THREE_D_FIRE_SPIT;
+				spit.at[2] = THREE_D_FIRE_SPIT_UP_M;
+				spit.scale = THREE_D_FIRE_SPIT_SCALE;
 				spit.frame = animal;
 			}
+			/* Its fire burning, as every fireplace's (THREE_D_FIRE_FLAMES): on the embers, by day and by night. */
+			ThreeDObjectFigure &flames = r.rest.fire_flames.emplace_back(at);
+			flames.figure = THREE_D_FIRE_FLAMES;
+			flames.scale = THREE_D_FIRE_FLAMES_SCALE;
+			flames.frame = -1;
 		}
 	}
 }
@@ -3920,8 +3926,10 @@ static const ThreeDForestPart *GetThreeDForestPart(std::string_view part, int tu
 				p = turns[k].rest;
 				p.ground = turns[k].ground != SIZE_MAX ? &_three_d_objects[turns[k].ground] : nullptr;
 				p.grill = turns[k].grill != SIZE_MAX ? &_three_d_objects[turns[k].grill] : nullptr;
+				p.standing = p.vehicles;
+				p.standing.insert(p.standing.end(), p.fire_flames.begin(), p.fire_flames.end());
 				p.with_girls = p.girls;
-				p.with_girls.insert(p.with_girls.end(), p.vehicles.begin(), p.vehicles.end());
+				p.with_girls.insert(p.with_girls.end(), p.standing.begin(), p.standing.end());
 			}
 		}
 	}
@@ -5910,6 +5918,8 @@ static void ReadThreeDVehicleObjects()
 					 * without its bricks, as over the forest's fire). */
 					fig.to_middle = e.value("na_stred", false);
 					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
+					/* Only its frames' nodes ("jen_snimky"): the torch's flame without its stick, the fire of the fireplaces. */
+					fig.frames_only = e.value("jen_snimky", false);
 					/* A figure of poses (the player, 18. 10.: "the figures modular, one figure object everywhere with what it
 					 * has to do -- walk, smoke"; hra/3d/POSTAVY-MODULARNI-A-STADION.md): one file with bones ("kostra", else
 					 * "soubor"), each pose ("pozy") an animation of it ("animace", else the pose's name), a figure of its own
@@ -8465,6 +8475,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	for (const std::string &n : this->skip_nodes) key += "|x" + n;
 	if (this->to_ground) key += "|g";
 	if (this->to_middle) key += "|m";
+	if (this->frames_only) key += "|f";
 	if (this->ends_beyond > 0) key += fmt::format("|e{}", this->ends_beyond);
 	if (!std::isnan(this->keep_above)) key += fmt::format("|c{}", this->keep_above);
 	if (!std::isnan(this->floors_over)) key += fmt::format("|w{}", this->floors_over);
@@ -8650,12 +8661,13 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			o.skip_night = true;
 			o.groups = &marked;
 			if (!ReadGlbMesh(this->file, mesh, o)) return nullptr;
-		} else if (!this->skip_nodes.empty() || this->night_glass) {
-			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept. */
+		} else if (!this->skip_nodes.empty() || this->night_glass || this->frames_only) {
+			/* A node left out (the rocket shot), the lights at night as they are or a light's glass kept, its frames alone. */
 			GlbReadOptions o;
 			o.all_nodes = true;
 			o.frame_prefix = this->frame_prefix;
 			o.frame = frame;
+			o.frames_only = this->frames_only;
 			o.only_node = this->only_node;
 			o.skip_nodes = &this->skip_nodes;
 			o.skip_night = !this->night_glass;

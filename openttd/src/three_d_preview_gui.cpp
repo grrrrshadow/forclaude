@@ -495,7 +495,7 @@ static bool IndustryPlacements(const Industry *ind, float yaw, std::vector<Three
 		for (TileIndex tile : ind->location) {
 			const ThreeDForestPart *forest = ThreeDGameForestPartAt(tile);
 			if (forest == nullptr || forest->ground == nullptr || GetIndustryIndex(tile) != ind->index) continue;
-			lay(tile, forest->ground, nullptr, girls && IsIndustryCompleted(tile) ? forest->with_girls : forest->vehicles, 0);
+			lay(tile, forest->ground, nullptr, girls && IsIndustryCompleted(tile) ? forest->with_girls : forest->standing, 0);
 		}
 	} else if (ind->type != IT_MARIJUANA_PLANTATION && ind->type != IT_POTATO_FIELD) {
 		/* An industry of the original game from the parts the industries share, as the map lays it

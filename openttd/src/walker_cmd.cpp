@@ -598,13 +598,9 @@ static const WalkerTentLayout &TentLayout(uint8_t item)
 	return item == to_underlying(WalkerItem::CampingTent) ? CAMPING : CELTIC;
 }
 
-/** The figures of the fireplace, the grill's trestles and its spit, and the barrel (objekty/nase, objekty/doplnky). */
+/** The figures of the fireplace (the forest cabin's, objekty/nase; its fire, trestles and spit as every fireplace's, THREE_D_FIRE_FLAMES) and the barrel (objekty/doplnky). */
 static constexpr std::string_view TENT_FIRE = "ohniste_stanu";
-static constexpr std::string_view TENT_TRESTLES = "kozy_grilu";
-static constexpr std::string_view TENT_SPIT = "rozen";
 static constexpr std::string_view TENT_BARREL = "sud_s_pipou_99914b93";
-/** The spit over the fire as over the forest's (ReadForestPart()): its rod so high in the forks, sized so. */
-static constexpr float TENT_SPIT_UP_M = 1.01f, TENT_SPIT_SCALE = 1.08f;
 /** How near the walker the fireplace and the barrel keep it, metres. */
 static constexpr double TENT_FIRE_R_M = 0.75, TENT_BARREL_R_M = 0.4;
 
@@ -693,16 +689,18 @@ void ForWalkerTentParts(const WalkerTent &t, const std::function<void(const Walk
 	}
 	double x, y;
 	TentToWorld(t, 0, 0, x, y);
-	f({l.figure, x, y, 0.0f, facing, 1.0f, 0, state});
+	f({l.figure, x, y, 0.0f, facing, 1.0f, 0, state, false});
 	TentToWorld(t, l.barrel[0], l.barrel[1], x, y);
-	f({TENT_BARREL, x, y, 0.0f, facing, 1.0f, 0, 0});
+	f({TENT_BARREL, x, y, 0.0f, facing, 1.0f, 0, 0, true});
 	TentToWorld(t, l.fire[0], l.fire[1], x, y);
-	f({TENT_FIRE, x, y, 0.0f, facing, 1.0f, 0, 0});
+	f({TENT_FIRE, x, y, 0.0f, facing, 1.0f, 0, 0, false});
+	/* Its fire burning, as every fireplace's. */
+	f({THREE_D_FIRE_FLAMES, x, y, 0.0f, facing, THREE_D_FIRE_FLAMES_SCALE, -1, 0, false});
 	if (const int animal = ThreeDForestGrill(TileIndex{t.tile}); animal >= 0) {
 		/* Along the entrance, as one sits by the fire looking at the tent. */
 		const float spit = std::fmod(facing + 90.0f, 360.0f);
-		f({TENT_TRESTLES, x, y, 0.0f, spit, 1.0f, 0, 0});
-		f({TENT_SPIT, x, y, TENT_SPIT_UP_M, spit, TENT_SPIT_SCALE, animal, 0});
+		f({THREE_D_FIRE_TRESTLES, x, y, 0.0f, spit, 1.0f, 0, 0, false});
+		f({THREE_D_FIRE_SPIT, x, y, THREE_D_FIRE_SPIT_UP_M, spit, THREE_D_FIRE_SPIT_SCALE, animal, 0, false});
 	}
 }
 

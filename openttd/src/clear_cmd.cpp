@@ -21,6 +21,7 @@
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
 #include "walker_inventory.h"
+#include "timer/timer_game_tick.h"
 
 #include "table/strings.h"
 #include "table/sprites.h"
@@ -274,8 +275,10 @@ bool DrawWalkerTent(const TileInfo *ti)
 	ForWalkerTentParts(*t, [&](const WalkerTentPart &p) {
 		const double z = ti->z + p.up_m * OBJECT_HEIGHT_PER_METRE;
 		if (eye) {
-			AddCabFigure(p.figure, p.scale, p.x, p.y, z, p.facing, p.frame, p.state);
-		} else {
+			int frame = p.frame;
+			if (const ThreeDVehicleObject *fig = frame < 0 ? GetThreeDFigure(p.figure) : nullptr; fig != nullptr) frame = fig->FrameAt(TimerGameTick::counter, ti->tile.base());
+			AddCabFigure(p.figure, p.scale, p.x, p.y, z, p.facing, std::max(frame, 0), p.state);
+		} else if (!p.inside) {
 			AddThreeDFigureToViewport(p.figure, p.scale, static_cast<int>(std::lround(p.x)), static_cast<int>(std::lround(p.y)), static_cast<int>(std::lround(z)),
 					p.facing, _cur_dpi->zoom, ti->tile, 0, p.frame, p.state);
 		}
