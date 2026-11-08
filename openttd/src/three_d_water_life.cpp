@@ -58,18 +58,28 @@ constexpr int BED_TILES = 2;            ///< what lies on the beds is drawn so m
 constexpr double SEEN_M = 30.0;         ///< and the fish so near
 constexpr double SPAWN_NEAR_M = 10.0;   ///< the fish come so far from the walker ...
 constexpr double SPAWN_FAR_M = 30.0;    ///< ... to so far
-constexpr double BIG_SPAWN_FAR_M = 60.0; ///< the shark and the orca to so far
-constexpr double GONE_M = 80.0;         ///< and go when farther
+constexpr double BIG_SPAWN_FAR_M = 45.0; ///< the shark and the orca to so far (nearer than GONE_M)
+constexpr double GONE_M = 50.0;         ///< and go when farther (the eyes see 22 m under the water)
 constexpr int NEAR_WATER_TILES = 3;     ///< they come when the walker is so near the water
-constexpr uint SCHOOLS_KEPT = 3;        ///< schools of the small fish in the sea about the walker
-constexpr uint RIVER_SCHOOLS_KEPT = 2;  ///< and in a river
+constexpr uint SCHOOLS_KEPT = 5;        ///< schools of the small fish in the sea within SEEN_M of the walker
+constexpr uint RIVER_SCHOOLS_KEPT = 3;  ///< and in a river
 constexpr uint SCHOOL_MIN = 4, SCHOOL_MAX = 8; ///< fish in a school
-constexpr uint LONE_KEPT = 4;           ///< the fish swimming alone (the tuna, the fish of the rod)
+constexpr uint LONE_KEPT = 5;           ///< the fish swimming alone (the tuna, the fish of the rod)
+/**
+ * Before the diver's eyes (the player, test3: "I want to see a fish or two in the sea always", "I met the fish, but
+ * seldom"): so many of them (a school as one) within so far and so many degrees aside of its look; fewer, one comes
+ * out of the haze (the eyes see 22 m) from IN_VIEW_FROM_M to IN_VIEW_TO_M ahead, swimming across before it.
+ */
+constexpr uint IN_VIEW_WANT = 2;
+constexpr double IN_VIEW_M = 18.0;
+constexpr double IN_VIEW_DEG = 50.0;
+constexpr double IN_VIEW_FROM_M = 12.0, IN_VIEW_TO_M = 17.0;
+constexpr double IN_VIEW_NEAREST_M = 6.0; ///< or nearer, to so near, where the water ends sooner ahead
+constexpr size_t SWIMMERS_MOST = 80;    ///< no more fish come before the eyes while so many swim about (turning round and round)
 constexpr uint BIG_CHANCE = 30;         ///< a shark, an orca comes one time in so many it may (rarely)
 constexpr double BIG_FROM_M = 3.0;      ///< so long or longer it is one of those (the shark 4 m, the orca 7 m)
 constexpr double LONE_FROM_M = 1.0;     ///< so long or longer it swims alone (the tuna 1.5 m)
-constexpr double DODGE_M = 2.5;         ///< a fish keeps so far from the diver's eyes and its own half length
-constexpr double CLEAR_M = 0.3;         ///< and so far over the bed and under the surface
+constexpr double CLEAR_M = 0.3;       ///< and so far over the bed and under the surface
 constexpr uint64_t JUMP_EVERY = 1500;   ///< the orca leaps about so many ticks after the last time (and up to three times as long)
 constexpr uint64_t REST_TICKS = 300;    ///< and rests ("klid") so long, now and then
 constexpr double LEAP_M = 2.0;          ///< it leaps out of the water so high over its height, metres
@@ -218,8 +228,8 @@ const Swimmer *LeaderOf(const Swimmer &s)
 	return nullptr;
 }
 
-/** A tick of its swimming. */
-void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now, bool diver, double dx, double dy, double dz)
+/** A tick of its swimming: its own ways, the diver or none (the player, test3: "let the fish swim as they will"). */
+void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now)
 {
 	const double length_m = a.size[0] * a.scale;
 	/* Its poses: the orca resting now and then and leaping out of the water. */
@@ -272,16 +282,6 @@ void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now, bool diver, doub
 		s.level = first->level;
 		speed_m *= std::clamp(0.7 + far_m, 0.7, 2.0);
 	}
-	/* Away from the diver, faster. */
-	if (diver) {
-		const double away_m = std::hypot(s.x - dx, s.y - dy) / OBJECT_UNITS_PER_METRE;
-		const double up_m = std::abs(s.z - dz) / M_UP;
-		if (away_m < DODGE_M + length_m * 0.5 && up_m < DODGE_M + length_m * 0.5) {
-			s.want = std::atan2(s.y - dy, s.x - dx);
-			speed_m *= 1.8;
-			turn *= 2;
-		}
-	}
 	/* Before it the shore or the bed too high (the shallows): it turns, there it does not go. */
 	const double look = std::max(1.0, length_m) * OBJECT_UNITS_PER_METRE;
 	const double ax = s.x + std::cos(s.heading) * look, ay = s.y + std::sin(s.heading) * look;
@@ -310,13 +310,16 @@ void Swim(Swimmer &s, const ThreeDWaterAnimal &a, uint64_t now, bool diver, doub
 	s.pitch += (pitch - s.pitch) * 0.1f;
 }
 
-/** The fish of a water about the walker: how many schools, how many alone, and of each big one. */
-uint Count(Water water, Kind kind, std::string_view name = {})
+/**
+ * The fish of a water about the walker (within SEEN_M of it; those swum farther do not keep others away till they
+ * go): how many schools, how many alone, and of each big one.
+ */
+uint Count(Water water, Kind kind, double wx, double wy, std::string_view name = {})
 {
 	uint n = 0;
 	uint32_t last_school = 0;
 	for (const Swimmer &s : _swimmers) {
-		if (s.water != water) continue;
+		if (s.water != water || std::hypot(s.x - wx, s.y - wy) > SEEN_M * OBJECT_UNITS_PER_METRE) continue;
 		const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(s.kind);
 		if (a == nullptr || KindOf(*a) != kind || (!name.empty() && s.kind != name)) continue;
 		if (s.school != 0) {
@@ -396,19 +399,64 @@ void Spawn(double wx, double wy, uint64_t now)
 	std::vector<const ThreeDWaterAnimal *> kinds;
 	for (const ThreeDWaterAnimal &a : GetThreeDWaterAnimals()) {
 		if (!a.swims || a.sea != (water == Water::Sea) || KindOf(a) != kind) continue;
-		if (kind == Kind::Big && Count(water, kind, a.name) > 0) continue;
+		/* A shark, an orca: one at most however far it swam. */
+		if (kind == Kind::Big && std::any_of(_swimmers.begin(), _swimmers.end(), [&](const Swimmer &s) { return s.kind == a.name; })) continue;
 		kinds.push_back(&a);
 	}
 	if (kinds.empty()) return;
 	const uint kept = kind == Kind::School ? (water == Water::Sea ? SCHOOLS_KEPT : RIVER_SCHOOLS_KEPT) : kind == Kind::Lone ? LONE_KEPT : 2;
-	if (Count(water, kind) >= kept) return;
+	if (Count(water, kind, wx, wy) >= kept) return;
 	if (kind == Kind::Big && InteractiveRandomRange(BIG_CHANCE) != 0) return;
 	const ThreeDWaterAnimal &a = *kinds[InteractiveRandomRange(static_cast<uint32_t>(kinds.size()))];
 	if (!Swimmable(a, water, x, y)) return;
 	Put(a, water, x, y, InteractiveRandomRange(3600) * M_PI / 1800.0, now);
 }
 
-/** Every tick: they swim; those left far behind go; now and then more come (Spawn()). */
+/**
+ * Before the diver's eyes a fish or two always (IN_VIEW_WANT): fewer within IN_VIEW_M ahead, a school or one alone
+ * comes out of the haze ahead, aslant across the look, towards the diver.
+ * @param heading the way the diver looks, radians
+ */
+void SpawnInView(double wx, double wy, double heading)
+{
+	if (_swimmers.size() >= SWIMMERS_MOST) return;
+	uint seen = 0;
+	uint32_t last_school = 0;
+	for (const Swimmer &s : _swimmers) {
+		if (s.school != 0 && s.school == last_school) continue;
+		const double dx = s.x - wx, dy = s.y - wy;
+		if (std::hypot(dx, dy) > IN_VIEW_M * OBJECT_UNITS_PER_METRE) continue;
+		if (std::abs(std::remainder(std::atan2(dy, dx) - heading, 2 * M_PI)) > IN_VIEW_DEG * M_PI / 180.0) continue;
+		if (s.school != 0) last_school = s.school;
+		seen++;
+	}
+	if (seen >= IN_VIEW_WANT) return;
+	/* Where: in the haze ahead, or nearer where the water ends sooner (the far bank of a river is a tile across). */
+	const Kind kind = InteractiveRandomRange(3) == 0 ? Kind::Lone : Kind::School;
+	double x = 0, y = 0;
+	Water water = Water::None;
+	std::vector<const ThreeDWaterAnimal *> kinds;
+	for (int attempt = 0; attempt < 6 && kinds.empty(); attempt++) {
+		const double angle = heading + (static_cast<int>(InteractiveRandomRange(2 * 35 + 1)) - 35) * M_PI / 180.0;
+		const double from_m = attempt < 3 ? IN_VIEW_FROM_M : IN_VIEW_NEAREST_M;
+		const double dist = (from_m + InteractiveRandomRange(1001) / 1000.0 * (IN_VIEW_TO_M - from_m)) * OBJECT_UNITS_PER_METRE;
+		x = wx + std::cos(angle) * dist;
+		y = wy + std::sin(angle) * dist;
+		water = WaterAt(x, y);
+		if (water == Water::None) continue;
+		/* A school twice as often as one alone; never one of the big ones (they come as they do, rarely). */
+		for (const ThreeDWaterAnimal &a : GetThreeDWaterAnimals()) {
+			if (a.swims && a.sea == (water == Water::Sea) && KindOf(a) == kind && Swimmable(a, water, x, y)) kinds.push_back(&a);
+		}
+	}
+	if (kinds.empty()) return;
+	const ThreeDWaterAnimal &a = *kinds[InteractiveRandomRange(static_cast<uint32_t>(kinds.size()))];
+	/* Towards the diver and aside, so that it swims through the look. */
+	const double towards = std::atan2(wy - y, wx - x) + (InteractiveRandomRange(2) == 0 ? 1 : -1) * (30 + InteractiveRandomRange(41)) * M_PI / 180.0;
+	Put(a, water, x, y, towards, TimerGameTick::counter);
+}
+
+/** Every tick: they swim; those left far behind go; now and then more come (Spawn()), before a diver's eyes always (SpawnInView()). */
 const IntervalTimer<TimerGameTick> _water_life_timer({TimerGameTick::Priority::None, 1}, [](auto) {
 	double wx = 0, wy = 0;
 	if (_game_mode != GameMode::Normal || !FirstPersonWalkerAt(wx, wy) || GetThreeDWaterAnimals().empty()) {
@@ -428,9 +476,10 @@ const IntervalTimer<TimerGameTick> _water_life_timer({TimerGameTick::Priority::N
 	}
 	for (Swimmer &s : _swimmers) {
 		const ThreeDWaterAnimal *a = GetThreeDWaterAnimal(s.kind);
-		if (a != nullptr) Swim(s, *a, now, diver, wx, wy, dz);
+		if (a != nullptr) Swim(s, *a, now);
 	}
 	if (now % 16 == 0) Spawn(wx, wy, now);
+	if (diver && now % 16 == 8) SpawnInView(wx, wy, FirstPersonWalkerHeading());
 });
 
 /** What lies on a tile's bed in the view from the eyes: its plants, now and then an animal of the sea, each where its tile has it. */
