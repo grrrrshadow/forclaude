@@ -3339,6 +3339,12 @@ void UpdateWindows()
 	 * But still empty the invalidation queues above. */
 	if (_network_dedicated) return;
 
+	/* The small views the card draws following their vehicles moved before the drawing, the vehicle in the middle of
+	 * them where it is now (ViewportMovesBeforeDrawing()); following, moved again below they stay. */
+	for (Window *w : Window::Iterate()) {
+		if (w->viewport != nullptr && !w->IsShaded() && ViewportMovesBeforeDrawing(*w)) UpdateViewportPosition(w, delta_ms.count());
+	}
+
 	const auto blocks_started = std::chrono::steady_clock::now();
 	DrawDirtyBlocks();
 	FrameDiaryWindowsBlocks(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - blocks_started).count());

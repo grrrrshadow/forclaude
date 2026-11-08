@@ -9282,6 +9282,21 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: okno kup {} do depa {},{}", bought, TileX(depot), TileY(depot));
 			return true;
 		}
+		if (argv[2] == "zoom" && argv.size() > 3) {
+			/* 'okno zoom <level>': the views of the vehicles' windows zoomed so (the player's test3: "the car hops in its
+			 * window, the most zoomed in"). */
+			const ZoomLevel want = static_cast<ZoomLevel>(Clamp(ParseInteger<int>(argv[3]).value_or(0), to_underlying(ZoomLevel::Min), to_underlying(ZoomLevel::Max)));
+			int zoomed = 0;
+			for (Window *vw : Window::Iterate()) {
+				if (vw->window_class != WindowClass::VehicleView || vw->viewport == nullptr) continue;
+				for (int guard = 0; vw->viewport->zoom != want && guard < 16; guard++) {
+					if (!DoZoomInOutWindow(vw->viewport->zoom > want ? ZOOM_IN : ZOOM_OUT, vw)) break;
+				}
+				zoomed++;
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: okno zoom {}, oken {}", to_underlying(want), zoomed);
+			return true;
+		}
 		if (argv[2] == "vozidla" || argv[2] == "depo") {
 			/* 'okno vozidla [pocet]': the windows of so many vehicles (all without), each where the game opens it;
 			 * 'okno depo': the window of the depot of the first road vehicle (the player's log of 5. 11.: buying in a

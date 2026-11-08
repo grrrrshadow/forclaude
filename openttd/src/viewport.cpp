@@ -9458,6 +9458,22 @@ static bool SmallViewMovesOnCard(const Viewport &vp)
 	return it != _small_views_on_card.end() && it->second->card.vp == &vp && it->second->card.shown;
 }
 
+/**
+ * Whether the view of a window is moved before the dirty blocks are drawn (UpdateWindows()), not after them: a small
+ * view the card draws following its vehicle (the player, test3: "in the car's window the car hops, the most zoomed in;
+ * a horse going by walks smoothly"). Its move only tells all of it changed (SetViewportPosition()), the card moving its
+ * picture with it at the next drawing. Moved after the drawing, the card laid the vehicle where it is now into the
+ * picture of where the view was a frame before: the vehicle shown ahead of the middle of the window by what it went in
+ * that frame, more or less every frame. The game's own views keep moving after the drawing: the screen is moved with
+ * them at once there, the blocks the vehicle told dirty are where it was drawn.
+ * @param w the window
+ */
+bool ViewportMovesBeforeDrawing(const Window &w)
+{
+	if (w.viewport == nullptr || w.viewport->follow_vehicle == VehicleID::Invalid() || &w == GetMainWindow()) return false;
+	return SmallViewMovesOnCard(*w.viewport);
+}
+
 uint64_t _small_card_dirty_passes = 0; ///< Rig, the diary: the dirty parts of the small views the card laid at once (TurnedCardLaySmallViewsDirty())
 
 /**
