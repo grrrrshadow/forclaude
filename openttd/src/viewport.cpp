@@ -2233,7 +2233,7 @@ void TurnedTimingsPrint()
 	if (t.moving > 0) IConsolePrint(CC_DEFAULT, "test3d: vrstva aut {}x, {:.1f} ms", t.moving, t.moving_ms);
 	if (t.small_old > 0) {
 		const int *w = t.small_old_why;
-		IConsolePrint(CC_DEFAULT, "test3d: male okna postaru {} bloku (vypnuto {}, mapa otocena {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {}), modely v nich {:.1f} ms", t.small_old, w[0], w[1], w[2], w[3], w[4], w[5], w[6], t.models_small);
+		IConsolePrint(CC_DEFAULT, "test3d: male okna postaru {} bloku (vypnuto {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {}), modely v nich {:.1f} ms", t.small_old, w[0], w[2], w[3], w[4], w[5], w[6], t.models_small);
 	}
 	/* With a window the console is not written out: the diary too (the rig). */
 	extern uint64_t _turned_card_view_passes, _turned_card_view_moves, _turned_card_band_passes, _turned_card_band_blocks[2];
@@ -2515,7 +2515,7 @@ std::string TakeTurnedTimesForDiary(int frames)
 			t.standing_processor[0] + t.standing_processor[1], t.standing_processor[0], t.standing_processor[1]);
 	if (t.small_old > 0) {
 		const int *w = t.small_old_why;
-		s += fmt::format("; male okna postaru {} bloku (vypnuto {}, mapa otocena {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {})", t.small_old, w[0], w[1], w[2], w[3], w[4], w[5], w[6]);
+		s += fmt::format("; male okna postaru {} bloku (vypnuto {}, snimek obrazovky {}, zem nebo stojici bez karty {}, blitter {}, karta neukazuje {}, karta plna {})", t.small_old, w[0], w[2], w[3], w[4], w[5], w[6]);
 	}
 	/* The small views with their pictures on the card, and how many gave theirs up to another (SmallViewOnCardOf()). */
 	extern size_t SmallViewsOnCardCount();
@@ -9420,23 +9420,26 @@ static int TurnedCardLayChanged(const Viewport &vp, int left, int top, int right
 	return 0;
 }
 
-/** Whether the small views facing north are drawn by the card now (SmallViewOnCard), each its own picture on it. */
+/**
+ * Whether the small views facing north are drawn by the card now (SmallViewOnCard), each its own picture on it: the main
+ * view turned too, each drawn with its camera facing north (ThreeDNorthCamera).
+ */
 static bool SmallViewsOnCardNow()
 {
-	if (!_small_views_on_card_on || !IsViewDrawnTurned() || IsViewTurned() || _screen_disable_anim) return false;
+	if (!_small_views_on_card_on || !IsViewDrawnTurned() || _screen_disable_anim) return false;
 	if (!_turned_card_ground_on || !_turned_card_standing_on || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return false;
 	return BlitterFactory::GetCurrentBlitter()->GetName() == "40bpp-anim" && ThreeDGpuShows() && ThreeDGpuReady();
 }
 
 /**
  * For the diary of the frames: why a small view facing north is not drawn by the card (SmallViewsOnCardNow()) -- 0 switched
- * off, 1 the main view turned, 2 drawn for a screenshot or the like, 3 the card's ground or standing things off, 4 not the
- * blitter the card shows through, 5 the card not showing or not ready, 6 the card's views all taken.
+ * off, 2 drawn for a screenshot or the like, 3 the card's ground or standing things off, 4 not the blitter the card shows
+ * through, 5 the card not showing or not ready, 6 the card's views all taken. (1, the main view turned, is no reason any
+ * more: the small view has its own camera facing north.)
  */
 static int SmallViewsOffCardWhy()
 {
 	if (!_small_views_on_card_on) return 0;
-	if (IsViewTurned()) return 1;
 	if (_screen_disable_anim) return 2;
 	if (!_turned_card_ground_on || !_turned_card_standing_on || !_turned_ground_card || !_turned_ground_kept || _turned_ground_check) return 3;
 	if (BlitterFactory::GetCurrentBlitter()->GetName() != "40bpp-anim") return 4;
@@ -9490,6 +9493,8 @@ static void TurnedCardLaySmallViewsDirty(int left, int top, int right, int botto
 	for (auto &[view, small] : _small_views_on_card) {
 		const Viewport &vp = *view;
 		if (right <= vp.left || bottom <= vp.top || left >= vp.left + vp.width || top >= vp.top + vp.height) continue;
+		/* Facing north as it is drawn (ViewportDoDraw()), whatever the main view's angle. */
+		ThreeDNorthCamera north_camera;
 		AutoRestoreBackup card(_tcg, &small->card);
 		AutoRestoreBackup ground(_tg, &small->ground);
 		AutoRestoreBackup version(_tg_version, &small->version);
@@ -9575,6 +9580,10 @@ ViewportData::~ViewportData()
 
 void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom)
 {
+	/* A small view faces north whatever the main view's angle (ThreeDNorthCamera): drawn so, by the card or the old way. */
+	const Window *main_window = GetMainWindow();
+	std::optional<ThreeDNorthCamera> north_camera;
+	if (main_window == nullptr || main_window->viewport == nullptr || static_cast<const Viewport *>(main_window->viewport.get()) != &vp) north_camera.emplace();
 	/* A small view facing north drawn by the card as the main view (SmallViewOnCard): its pictures and kept ground. */
 	SmallViewOnCard *small = IsViewportTurned(vp) ? nullptr : SmallViewOnCardOf(vp);
 	AutoRestoreBackup small_card(_tcg, small != nullptr ? &small->card : &_turned_card_ground);
@@ -9631,8 +9640,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 		ViewportDoDrawTurned(whole_on_card || band == 2, band == 1);
 	} else {
 		/* Drawn as the game drew it (a small view the card does not draw, the 3D off): its picture on the card shown no
-		 * more (TurnedCardGround). A small view facing north draws the houses that are 3D objects as the objects, while
-		 * the main view is not turned (they are laid with its turn, MapLay()). */
+		 * more (TurnedCardGround). A small view facing north draws the houses that are 3D objects as the objects, laid
+		 * with its own camera facing north whatever the main view's angle (MapLay(), ThreeDNorthCamera). */
 		if (_turned_card_ground.vp == &vp) {
 			AutoRestoreBackup main_card(_tcg, &_turned_card_ground);
 			HideTurnedCardGround();

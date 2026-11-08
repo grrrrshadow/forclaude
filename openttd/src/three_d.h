@@ -208,6 +208,23 @@ void RotateViewByDrag(int pixels);
 void ResetViewYaw();
 void ThreeDViewForBuilding();
 
+/**
+ * The camera facing north while this lives, the main view's turn back after: a small view (a vehicle window, an extra
+ * view) drawn while the main view is turned. The small views keep facing north (IsViewportTurned()); the card draws
+ * them as it draws the map facing north, whatever the main view's angle (the player, test3: "the car's window is drawn
+ * by the processor, we must finish the move to the GPU").
+ */
+class ThreeDNorthCamera {
+public:
+	ThreeDNorthCamera();
+	~ThreeDNorthCamera();
+	ThreeDNorthCamera(const ThreeDNorthCamera &) = delete;
+	ThreeDNorthCamera &operator=(const ThreeDNorthCamera &) = delete;
+private:
+	float yaw;           ///< the main view's angle
+	double c, s, px, py; ///< its turn (GetViewTurn())
+};
+
 void TurnWorldPoint(double x, double y, double &xr, double &yr);
 void GetViewTurn(double &c, double &s, double &px, double &py);
 void UnturnWorldPoint(double xr, double yr, double &x, double &y);

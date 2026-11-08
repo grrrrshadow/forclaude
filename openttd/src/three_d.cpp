@@ -150,6 +150,26 @@ void GetViewTurn(double &c, double &s, double &px, double &py)
 	py = _pivot_y;
 }
 
+/** Facing north now: no turn, about the world's corner (what is kept of a small view does not change with the main view's pivot). */
+ThreeDNorthCamera::ThreeDNorthCamera() : yaw(_view_yaw), c(_turn_c), s(_turn_s), px(_pivot_x), py(_pivot_y)
+{
+	_view_yaw = 0.0f;
+	_turn_c = 1.0;
+	_turn_s = 0.0;
+	_pivot_x = 0.0;
+	_pivot_y = 0.0;
+}
+
+/** The main view's turn again. */
+ThreeDNorthCamera::~ThreeDNorthCamera()
+{
+	_view_yaw = this->yaw;
+	_turn_c = this->c;
+	_turn_s = this->s;
+	_pivot_x = this->px;
+	_pivot_y = this->py;
+}
+
 /**
  * Turn a point of the turned world back: the inverse of TurnWorldPoint().
  * @param xr,yr the point of the turned world
