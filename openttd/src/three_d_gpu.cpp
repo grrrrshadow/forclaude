@@ -1467,6 +1467,25 @@ void main()
 			if (r > 1e-4) t.rgb = sum / r;
 		}
 	}
+	/* The edge of a river's bank (THREE_D_GPU_BANK_EDGE + its sides of the land, DrawEyeWater() of viewport.cpp): our
+	 * grass where the world point the pixel shows is inside the bank's wavy edge (EyeRiverBankInside(), CabBankTexel():
+	 * THREE_D_GPU_BANK_REACH 1.75 units in from a side of the land, waves of 8 and 16/3 units along it), else the water's
+	 * colour of the texel -- round however near. The point known within a run of our grass, of whole tiles of 16 units. */
+	int bank_mark = int(t.a * 255.0 + 0.5);
+	if ((how & 32) != 0 && u_grass_units > 0.0 && bank_mark > 234 && bank_mark < 250) {
+		float f = 1.0 / gl_FragCoord.w;
+		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x;
+		vec2 world = u_grass_eye + vec2(f * u_eye_dir.x + side * u_eye_dir.z, f * u_eye_dir.y + side * u_eye_dir.w);
+		vec2 l = world - 16.0 * floor(world / 16.0);
+		vec2 reach = 1.75 + 0.2 * sin(world * 0.7853982) + 0.15 * sin(world * 1.1780972 + 1.3);
+		int sides = bank_mark - 234;
+		float inside = -1e9;
+		if ((sides & 1) != 0) inside = max(inside, reach.y - l.x);
+		if ((sides & 2) != 0) inside = max(inside, reach.x - (16.0 - l.y));
+		if ((sides & 4) != 0) inside = max(inside, reach.y - (16.0 - l.x));
+		if ((sides & 8) != 0) inside = max(inside, reach.x - l.y);
+		t = inside > 0.0 ? vec4(3.0 / 255.0, 128.0 / 255.0, 0.0, 252.0 / 255.0) : vec4(t.rgb, 1.0);
+	}
 	/* Our grass's texel of the ground (THREE_D_GPU_EYE_GRASS): its colour our grass's picture at the world point the pixel
 	 * shows, between its four texels, repeated; tinted to its kind (red), lit as the game's grass is there (green,
 	 * 128ths) -- DrawOurGrass() and CabGrassTexel() of viewport.cpp. */

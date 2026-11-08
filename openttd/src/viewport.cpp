@@ -3131,6 +3131,41 @@ static bool EyeNarrowWaterTile(int x, int y)
 	return IsTileType(tile, TileType::Water) && IsWater(tile) && (IsRiver(tile) || IsCanal(tile));
 }
 
+/** The sides of a river's or a canal's tile by the land (THREE_D_GPU_BANK_EDGE): 1 north-east (x - 1), 2 south-east (y + 1), 4 south-west (x + 1), 8 north-west (y - 1). */
+static uint8_t EyeRiverLandSides(int x, int y)
+{
+	static constexpr int DX[4] = {-1, 0, 1, 0}, DY[4] = {0, 1, 0, -1};
+	uint8_t sides = 0;
+	for (int k = 0; k < 4; k++) {
+		const int nx = x + DX[k], ny = y + DY[k];
+		/* Past the map's edge, and its edge's own tiles (void), the water goes on. */
+		if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
+		const TileIndex n = TileXY(nx, ny);
+		if ((IsTileType(n, TileType::Water) && IsWater(n)) || (IsTileType(n, TileType::Station) && IsBuoy(n))) continue;
+		sides |= 1 << k;
+	}
+	return sides;
+}
+
+/**
+ * How far a world point of a river's or a canal's tile is inside its bank's edge, world units (over 0 our grass, under
+ * the water): the bank THREE_D_GPU_BANK_REACH in from each side of the land, a gentle wave along it -- of the world's
+ * coordinate, so that it runs on over the tiles, its waves of 8 and 16/3 units, as the card has them (EYE_TRI_FRAGMENT
+ * of three_d_gpu.cpp, where it knows the point only within a run of our grass, tiles of 16 units).
+ * @param lx,ly the point within the tile, world units (past its edges by the land: on the land, inside)
+ * @param sides the tile's sides of the land (EyeRiverLandSides())
+ */
+static double EyeRiverBankInside(double lx, double ly, double wx, double wy, uint8_t sides)
+{
+	auto reach = [](double along) { return THREE_D_GPU_BANK_REACH + 0.2 * std::sin(along * (2 * M_PI / 8.0)) + 0.15 * std::sin(along * (2 * M_PI * 3.0 / TILE_SIZE) + 1.3); };
+	double best = -1e9;
+	if ((sides & 1) != 0) best = std::max(best, reach(wy) - lx);
+	if ((sides & 2) != 0) best = std::max(best, reach(wx) - (TILE_SIZE - ly));
+	if ((sides & 4) != 0) best = std::max(best, reach(wy) - (TILE_SIZE - lx));
+	if ((sides & 8) != 0) best = std::max(best, reach(wx) - ly);
+	return best;
+}
+
 /** Whether a pixel of the ground is the water's: blue (not a coast's sand or foam, a canal's banks). */
 static inline bool EyeWaterPixel(uint32_t p)
 {
@@ -3192,6 +3227,29 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bo
 	auto at = [&](int i, int j) { return static_cast<size_t>(j) * tw + i; };
 	auto light = [](uint32_t p) { const Colour c(p); return (c.r * 77 + c.g * 150 + c.b * 29) >> 8; };
 	static constexpr int R = 3; // a window of seven, as the roads'
+	/* The water about a pixel: the mean of the water's pixels in the window of a near lightness (of any where the pixel is
+	 * not the water's: the sprite's grass of a river's bank); the river's blue where none. */
+	auto water_about = [&](int i, int j, uint32_t p) {
+		const bool own_water = EyeWaterPixel(p);
+		const int want = light(p);
+		uint32_t r = 0, g = 0, b = 0, cnt = 0;
+		for (int qy = std::max(0, j - R); qy <= std::min(th - 1, j + R); qy++) {
+			for (int qx = std::max(0, i - R); qx <= std::min(tw - 1, i + R); qx++) {
+				const uint32_t q = own[at(qx, qy)];
+				if (!EyeWaterPixel(q) || (own_water && std::abs(light(q) - want) > 40)) continue;
+				const Colour c(q);
+				r += c.r;
+				g += c.g;
+				b += c.b;
+				cnt++;
+			}
+		}
+		return cnt == 0 ? Colour(52, 84, 150).data : Colour(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt)).data;
+	};
+	/* A river's or a canal's: its sides by the land (EyeRiverLandSides()). */
+	const uint8_t sides = bank != nullptr ? EyeRiverLandSides(bank->tile_x, bank->tile_y) : 0;
+	/* How far from the bank's edge a texel shows the edge's wave itself (THREE_D_GPU_BANK_EDGE): a texel is about a third of a unit across. */
+	static constexpr double EDGE_BAND = 0.75;
 	for (int j = 0; j < th; j++) {
 		for (int i = 0; i < tw; i++) {
 			const uint32_t p = own[at(i, j)];
@@ -3200,42 +3258,42 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bo
 			if (x < 0 || y < 0 || x >= dw || y >= dh) continue;
 			uint32_t out = p;
 			if (bank != nullptr) {
-				/* The world point the pixel shows (as DrawOurGrass()): on the bank, or the sprite's grass, our grass. */
-				bool grass = !EyeWaterPixel(p);
-				if (!grass) {
-					const double a = (t.left + i * s + s / 2.0) / (2.0 * ZOOM_BASE), b = (t.top + j * s + s / 2.0) / ZOOM_BASE;
-					double z = bank->base_z, wx = 0, wy = 0;
-					for (int k = 0; k < 3; k++) {
-						wx = (b + z - a) / 2;
-						wy = (b + z + a) / 2;
-						const int fx = std::clamp(static_cast<int>(std::floor(wx)) - bank->tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-						const int fy = std::clamp(static_cast<int>(std::floor(wy)) - bank->tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-						z = bank->base_z + GetPartialPixelZ(fx, fy, bank->slope);
-					}
-					grass = EyeOnRiverBank(wx, wy);
+				/* The world point the pixel shows (as DrawOurGrass()). Our grass inside the bank's edge, the water outside it,
+				 * and about the edge the water's colour marked so that the card (or CabBankTexel()) puts the edge's wave where
+				 * the pixel of the view shows it, round however near; the sprite's own grass of the bank, its big pixels, not
+				 * (the player, test3: "round off the original big pixels of the grass"). Where a tile meets the land at a corner
+				 * alone, its bank there (EyeOnRiverBank()) as the texels are. */
+				const double a = (t.left + i * s + s / 2.0) / (2.0 * ZOOM_BASE), b = (t.top + j * s + s / 2.0) / ZOOM_BASE;
+				double z = bank->base_z, wx = 0, wy = 0;
+				for (int k = 0; k < 3; k++) {
+					wx = (b + z - a) / 2;
+					wy = (b + z + a) / 2;
+					const int fx = std::clamp(static_cast<int>(std::floor(wx)) - bank->tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+					const int fy = std::clamp(static_cast<int>(std::floor(wy)) - bank->tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+					z = bank->base_z + GetPartialPixelZ(fx, fy, bank->slope);
 				}
-				if (grass) {
+				/* Within the tile (a pixel of its sprite may show a point a hair over its edge, on the land there). */
+				const double lx = wx - bank->tile_x * static_cast<double>(TILE_SIZE), ly = wy - bank->tile_y * static_cast<double>(TILE_SIZE);
+				const double inside = sides != 0 ? EyeRiverBankInside(lx, ly, wx, wy, sides) : -1e9;
+				if (inside > EDGE_BAND || (sides == 0 && EyeOnRiverBank(wx, wy))) {
 					dst[static_cast<size_t>(y) * d->pitch + x] = Colour(3, 128, 0, THREE_D_GPU_GRASS).data;
 					continue;
 				}
-			}
-			if (mark && EyeWaterPixel(p)) {
-				if (smooth) {
-					const int want = light(p);
-					uint32_t r = 0, g = 0, b = 0, cnt = 0;
-					for (int qy = std::max(0, j - R); qy <= std::min(th - 1, j + R); qy++) {
-						for (int qx = std::max(0, i - R); qx <= std::min(tw - 1, i + R); qx++) {
-							const uint32_t q = own[at(qx, qy)];
-							if (!EyeWaterPixel(q) || std::abs(light(q) - want) > 40) continue;
-							const Colour c(q);
-							r += c.r;
-							g += c.g;
-							b += c.b;
-							cnt++;
-						}
-					}
-					out = Colour(static_cast<uint8_t>(r / cnt), static_cast<uint8_t>(g / cnt), static_cast<uint8_t>(b / cnt)).data;
+				if (inside > -EDGE_BAND) {
+					dst[static_cast<size_t>(y) * d->pitch + x] = (water_about(i, j, p) & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_BANK_EDGE + sides) << 24;
+					continue;
 				}
+				/* The water past the edge: the sprite's grass there the water's too. */
+				if (!EyeWaterPixel(p)) {
+					out = water_about(i, j, p);
+					if (!mark) {
+						dst[static_cast<size_t>(y) * d->pitch + x] = out;
+						continue;
+					}
+				}
+			}
+			if (mark && (EyeWaterPixel(p) || bank != nullptr)) {
+				if (smooth && EyeWaterPixel(p)) out = water_about(i, j, p);
 				out = (out & 0x00FFFFFF) | static_cast<uint32_t>(THREE_D_GPU_WATER_SURFACE) << 24;
 			}
 			dst[static_cast<size_t>(y) * d->pitch + x] = out;
@@ -12021,6 +12079,22 @@ static uint32_t CabGrassTexel(uint32_t p, const CabEye &eye, double sx, double s
 }
 
 /**
+ * A texel of the edge of a river's bank of the ground of the view from the eyes (THREE_D_GPU_BANK_EDGE, DrawEyeWater()),
+ * as the card's EYE_TRI_FRAGMENT puts it: our grass where the world point the pixel shows is inside the bank's wavy
+ * edge (EyeRiverBankInside()), else its water's colour.
+ */
+static uint32_t CabBankTexel(uint32_t p, const CabEye &eye, double sx, double sy, double iw)
+{
+	const uint8_t sides = static_cast<uint8_t>((p >> 24) - THREE_D_GPU_BANK_EDGE);
+	double x, y, zu;
+	CabPixelInWorld(eye, sx, sy, static_cast<float>(iw), x, y, zu);
+	/* Within its tile: the edge's texels lie well inside it, a unit or two in from its side. */
+	const double lx = x - TILE_SIZE * std::floor(x / TILE_SIZE), ly = y - TILE_SIZE * std::floor(y / TILE_SIZE);
+	if (EyeRiverBankInside(lx, ly, x, y, sides) > 0) return CabGrassTexel(Colour(3, 128, 0, THREE_D_GPU_GRASS).data, eye, sx, sy, iw);
+	return p | 0xFF000000u;
+}
+
+/**
  * Fill a triangle of the picture with a texture in perspective, its rows from row_lo up to row_hi only (a stripe of
  * the picture, CabFlushBatch()): 1/depth and the texture pixel over depth change linearly across the picture, so
  * each pixel's texture pixel is their quotient. A pixel is drawn where the triangle is nearer than what is there.
@@ -12101,7 +12175,14 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 			}
 			if (p == 0) continue;
 			if ((fill_holes & CAB_ROAD) != 0) p = CabRoadTexel(tex, tw, th, uw * inv, vw * inv, p);
-			if ((fill_holes & CAB_GRASS) != 0 && grass_eye != nullptr && static_cast<uint8_t>(p >> 24) == THREE_D_GPU_GRASS) p = CabGrassTexel(p, *grass_eye, x + 0.5, yc, iw);
+			if ((fill_holes & CAB_GRASS) != 0 && grass_eye != nullptr) {
+				const uint8_t mark = static_cast<uint8_t>(p >> 24);
+				if (mark > THREE_D_GPU_BANK_EDGE && mark < THREE_D_GPU_BANK_EDGE + 16) {
+					p = CabBankTexel(p, *grass_eye, x + 0.5, yc, iw);
+				} else if (mark == THREE_D_GPU_GRASS) {
+					p = CabGrassTexel(p, *grass_eye, x + 0.5, yc, iw);
+				}
+			}
 			const uint32_t lit = light == 256 ? p : ShadedPixel(p, light);
 			if (alpha < 256) {
 				const uint a = (fill_holes & CAB_TEXEL_ALPHA) != 0 ? alpha * Colour(p).a / 255 : alpha;

@@ -267,6 +267,15 @@ static constexpr uint8_t THREE_D_GPU_WATER_SURFACE = 251;
 /** A texel of the ground of the view from the eyes of our grass (DrawOurGrass() of viewport.cpp), by its alpha: no colour, its
  * red which tint of ThreeDGpuEyeFrame::grass_tint, its green its light in 128ths (the game's grass on that slope). */
 static constexpr uint8_t THREE_D_GPU_GRASS = 252;
+/**
+ * A texel of the ground of the view from the eyes on the edge of a river's bank (DrawEyeWater() of viewport.cpp; the player,
+ * test3: "round off the big pixels, the edge between the grass and the water is in squares"), its alpha this and the
+ * tile's sides of the land (1 north-east, 2 south-east, 4 south-west, 8 north-west): its colour the water's; our grass
+ * where the point the pixel shows is within the bank's wavy edge (EyeRiverBankInside()), else the water.
+ */
+static constexpr uint8_t THREE_D_GPU_BANK_EDGE = 234;
+/** The bank's edge: so far in from the side of the land, world units, less a wave along it (EyeRiverBankInside(), the card's alike). */
+static constexpr float THREE_D_GPU_BANK_REACH = 1.75f;
 
 /** Triangles of the eye's frame of one texture, in the order they are drawn: corners first to first + count. */
 struct ThreeDGpuEyeRun {
