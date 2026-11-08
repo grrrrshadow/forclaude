@@ -2089,6 +2089,39 @@ int WarningSignalCount()
 	return Clamp<int>(_settings_game.vehicle.train_warning_signals, 1, 3);
 }
 
+/** Our Czech light signal's top over its foot, metres (objekty/nase/navestidlo.py): its box on the map. */
+static constexpr double THREE_D_SIGNAL_TOP_M = 5.3;
+
+/**
+ * Our Czech light signal (the player, 8. 11.: "the lights one Czech", "2 yes"; objekty/nase/navestidlo.py) at a signal on
+ * our 3D track, of whatever kind and variant, instead of its sprite: at its place beside the track, its lights to the
+ * trains it stands for (against its trackdir), lit as it shows -- red stop, green clear, the top yellow the warning.
+ * @param td the trackdir the signal is for
+ * @param x,y,z where it stands, world units and units of height
+ * @return whether it was drawn so: no sprite of the game's
+ */
+static bool DrawThreeDSignal(TileIndex tile, Trackdir td, SignalAspect aspect, int x, int y, int z)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	if (!ThreeDTrackShownOn(tile) || GetThreeDFigure("cz_navestidlo") == nullptr) return false;
+	/* The way a train goes along each trackdir, world units: NE, SE, E, E, S, S, -, -, SW, NW, W, W, N, N, -, -. */
+	static constexpr std::array<std::array<int8_t, 2>, 16> GOES{{
+		{{-1, 0}}, {{0, 1}}, {{-1, 1}}, {{-1, 1}}, {{1, 1}}, {{1, 1}}, {{0, 0}}, {{0, 0}},
+		{{1, 0}}, {{0, -1}}, {{1, -1}}, {{1, -1}}, {{-1, -1}}, {{-1, -1}}, {{0, 0}}, {{0, 0}},
+	}};
+	const auto &g = GOES[to_underlying(td) & 15];
+	const float facing = static_cast<float>(std::atan2(-g[1], -g[0]) * 180.0 / M_PI);
+	const std::string_view name = aspect == SignalAspect::Red ? "cz_navestidlo_cervena" : aspect == SignalAspect::Warning ? "cz_navestidlo_zluta" : "cz_navestidlo_zelena";
+	if (eye) {
+		AddCabFigure(name, 1.0f, x, y, z, facing);
+		return true;
+	}
+	const std::array<int, 6> box{x - 1, y - 1, z, x, y, z + static_cast<int>(std::lround(THREE_D_SIGNAL_TOP_M * OBJECT_HEIGHT_PER_METRE))};
+	AddThreeDFigureToViewportInBox(name, 1.0f, x, y, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+	return true;
+}
+
 /**
  * Draw one signal, of a kind and variant said outright rather than read off
  * the tile: a tunnel or bridge portal carries a signal too and keeps it
@@ -2123,6 +2156,9 @@ static void DrawSignalSprite(TileIndex tile, const RailTypeInfo *rti, Track trac
 	 * with. */
 	SignalAspect aspect = condition == SignalState::Red ? SignalAspect::Red : SignalAspect::Green;
 	if (aspect == SignalAspect::Green && IsPathSignalWarning(tile, td)) aspect = SignalAspect::Warning;
+
+	/* On our 3D track our Czech light signal (DrawThreeDSignal()). */
+	if (DrawThreeDSignal(tile, td, aspect, x, y, GetSafeSlopeZ(x, y, track))) return;
 
 	/* The rail type's own signals first, as the patchpack orders it: a set
 	 * that draws signals for one kind of track means them for that track. A

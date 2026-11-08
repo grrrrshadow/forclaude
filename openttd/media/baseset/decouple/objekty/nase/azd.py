@@ -110,8 +110,9 @@ MATS = {
 }
 
 
-def write(path, name, parts):
-    """parts: (material, triangles (n, 3, 3) in the post's frame, z up); flat normals; glTF Y up (x, z, -y)."""
+def write(path, name, parts, specs=None):
+    """parts: (material, triangles (n, 3, 3) in the post's frame, z up); flat normals; glTF Y up (x, z, -y). specs: a
+    material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS and COLOURS (navestidlo.py's own)."""
     blob = bytearray()
     views, accessors, materials, primitives = [], [], [], []
 
@@ -134,7 +135,11 @@ def write(path, name, parts):
         nrm = np.repeat(n, 3, axis=0)
         g_pos = np.stack([pos[:, 0], pos[:, 2], -pos[:, 1]], 1).astype(np.float32)
         g_nrm = np.stack([nrm[:, 0], nrm[:, 2], -nrm[:, 1]], 1).astype(np.float32)
-        idx = np.arange(len(g_pos), dtype=np.uint32)
+        # The corners shared where their place and their normal are the same (a flat face's triangles).
+        rows = np.concatenate([g_pos, g_nrm], 1)
+        rows, idx = np.unique(np.round(rows, 5), axis=0, return_inverse=True)
+        g_pos, g_nrm = rows[:, :3].astype(np.float32).copy(), rows[:, 3:].astype(np.float32).copy()
+        idx = idx.ravel().astype(np.uint32)
         a = len(accessors)
         accessors += [
             {'bufferView': view(g_pos.tobytes(), 34962), 'componentType': 5126, 'count': len(g_pos), 'type': 'VEC3',
@@ -142,7 +147,7 @@ def write(path, name, parts):
             {'bufferView': view(g_nrm.tobytes(), 34962), 'componentType': 5126, 'count': len(g_nrm), 'type': 'VEC3'},
             {'bufferView': view(idx.tobytes(), 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'},
         ]
-        spec = MATS.get(mat, {'baseColorFactor': COLOURS.get(mat, [0.8, 0.8, 0.8, 1.0])})
+        spec = (specs or {}).get(mat) or MATS.get(mat, {'baseColorFactor': COLOURS.get(mat, [0.8, 0.8, 0.8, 1.0])})
         m = {'name': f'{name}_{mat}', 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 1.0, 'baseColorFactor': spec['baseColorFactor']},
              'doubleSided': True}
         if 'emissiveFactor' in spec:

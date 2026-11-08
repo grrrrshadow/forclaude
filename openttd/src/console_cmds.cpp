@@ -12133,6 +12133,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				if (rr.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej silnice na {},{}: NEJDE", TileX(rt_tile), TileY(rt_tile));
 			}
 		}
+		/* 'navest': a block signal each way on the track (our Czech light signal on it, DrawThreeDSignal()); 'cervena'
+		 * both at stop. */
+		if (r.Succeeded() && !done && std::find(argv.begin(), argv.end(), "navest") != argv.end()) {
+			const CommandCost rs = Command<Commands::BuildSignal>::Do(DoCommandFlag::Execute, at, static_cast<Track>(*tr), SignalType::Block, SignalVariant::Electric, false, false, false, SignalType::Block, SignalType::Path, 0, 0);
+			if (rs.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej navest na {},{}: NEJDE", *x, *y);
+			UpdateSignalsInBuffer();
+			if (rs.Succeeded() && std::find(argv.begin(), argv.end(), "cervena") != argv.end()) SetSignalStates(at, 0);
+			MarkTileDirtyByTile(at);
+		}
 		UpdateSignalsInBuffer(); // as a command from the game would
 		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE ({})", *tr, *x, *y, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
 		return true;
