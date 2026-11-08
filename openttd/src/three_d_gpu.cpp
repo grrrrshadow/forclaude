@@ -1287,23 +1287,25 @@ void main()
 const char *const STANDING_FACES_VERTEX = R"(#version 330 core
 layout(location = 0) in vec2 a_pos;
 layout(location = 1) in vec2 a_uv;
+layout(location = 2) in float a_near;
 uniform vec2 u_size;
 noperspective out vec2 v_uv;
+noperspective out float v_near;
 void main()
 {
 	gl_Position = vec4(a_pos / u_size * 2.0 - 1.0, 0.0, 1.0);
 	v_uv = a_uv;
+	v_near = a_near;
 }
 )";
 
-const char *const STANDING_FACES_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL STANDING_NEAR_GLSL R"(
+const char *const STANDING_FACES_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
 uniform sampler2D u_texture;
 uniform vec4 u_bounds;
 uniform int u_fill;
-uniform float u_order;
-uniform vec4 u_lo;
-uniform vec4 u_hi;
+uniform vec2 u_depth;
 noperspective in vec2 v_uv;
+noperspective in float v_near;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
 layout(location = 2) out vec4 o_order;
@@ -1325,17 +1327,11 @@ void main()
 		}
 	}
 	if (t == vec4(0.0)) discard;
-	/* How near this pixel of it is: by its box (u_lo, u_hi as STANDING_BOX_VERTEX's), or its order alone. */
-	float order = u_order, depth = NearDepth(u_order / 32.0 - 262144.0);
-	if (u_hi.w < 0.5) {
-		float near = PixelNear(u_lo.xyz, u_hi.xyz, u_lo.w);
-		order = NearOrder(near);
-		depth = NearDepth(near);
-	}
+	/* How near this pixel of it is: across the face from its corners (ThreeDGpuStandingFaces::corners). */
 	o_colour = vec4(t.rgb, 1.0);
 	o_lit = vec4(0.0, 0.0, 0.0, 1.0);
-	o_order = OrderColour(order);
-	gl_FragDepth = depth;
+	o_order = OrderColour(NearOrder(v_near));
+	gl_FragDepth = clamp((v_near - u_depth.x) / u_depth.y, 0.0, 1.0);
 }
 )";
 
@@ -2727,10 +2723,13 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glGenBuffers(1, &_standing_faces_vbo);
 	gl.glBindVertexArray(_standing_faces_vao);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_faces_vbo);
-	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), nullptr);
+	static constexpr GLsizei FACE = ThreeDGpuStandingFaces::FLOATS * sizeof(float);
+	gl.glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, FACE, nullptr);
 	gl.glEnableVertexAttribArray(0);
-	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), reinterpret_cast<const void *>(2 * sizeof(float)));
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, FACE, reinterpret_cast<const void *>(2 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
+	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, FACE, reinterpret_cast<const void *>(4 * sizeof(float)));
+	gl.glEnableVertexAttribArray(2);
 	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_standing_tri_vao);
 	gl.glGenBuffers(1, &_standing_tri_vbo);
@@ -4329,7 +4328,8 @@ static bool MovingPicturesOfSize(ViewPictures &v)
 /**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
  * (ThreeDGpuStanding): the block cleared, far first, each pixel of each thing where it is nearer than what is there --
- * a picture's by its box (ThreeDGpuStandingItem::box), a building's by its triangles (ThreeDGpuStandingBuilding), the
+ * a picture's by its box (ThreeDGpuStandingItem::box), a box's faces by their corners (ThreeDGpuStandingFaces), a
+ * building's by its triangles (ThreeDGpuStandingBuilding), the
  * figures on it in its depth --, the order of each pixel laid with it. Not
  * all laid (one bigger than the card's textures, a texture it cannot hold, an error), the block left clear: the
  * processor draws what stands on it. Or the moving things of the view laid over what stands (ThreeDGpuStanding::moving).
@@ -4400,7 +4400,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (static_cast<size_t>(item.faces) < s.faces.size()) {
 				const std::vector<float> &c = s.faces[item.faces].corners;
 				float x0 = FLT_MAX, y0 = FLT_MAX, x1 = -FLT_MAX, y1 = -FLT_MAX;
-				for (size_t i = 0; i + 3 < c.size(); i += 4) {
+				for (size_t i = 0; i + ThreeDGpuStandingFaces::FLOATS - 1 < c.size(); i += ThreeDGpuStandingFaces::FLOATS) {
 					x0 = std::min(x0, c[i]);
 					x1 = std::max(x1, c[i]);
 					y0 = std::min(y0, c[i + 1]);
@@ -4826,10 +4826,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_bounds"), static_cast<float>(place[0]), static_cast<float>(place[1]), static_cast<float>(f.texture->width), static_cast<float>(f.texture->height));
 		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_fill"), f.fill ? 1 : 0);
 		gl.glUniform1f(gl.glGetUniformLocation(fp, "u_order"), static_cast<float>(order));
-		/* Each pixel where it is nearer than what is there, by its box (STANDING_NEAR_GLSL). */
-		near_uniforms(fp);
-		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_lo"), item.box[0], item.box[1], item.box[2], item.mid);
-		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_hi"), item.box[3], item.box[4], item.box[5], item.boxed ? 0.0f : 2.0f);
+		/* Each pixel where it is nearer than what is there, by how near its corners are (STANDING_FACES_FRAGMENT). */
+		gl.glUniform2f(gl.glGetUniformLocation(fp, "u_depth"), s.depth[0], std::max(1e-3f, s.depth[1]));
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, texture);
 		if (!s.moving) {
@@ -4837,17 +4835,19 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		} else {
 			gl.glDisable(GL_DEPTH_TEST);
 		}
+		constexpr size_t N = ThreeDGpuStandingFaces::FLOATS;
 		face_corners.resize(f.corners.size());
-		for (size_t i = 0; i + 3 < f.corners.size(); i += 4) {
+		for (size_t i = 0; i + N - 1 < f.corners.size(); i += N) {
 			face_corners[i] = f.corners[i] + s.view_x;
 			face_corners[i + 1] = f.corners[i + 1] + s.view_y;
 			face_corners[i + 2] = f.corners[i + 2];
 			face_corners[i + 3] = f.corners[i + 3];
+			face_corners[i + 4] = f.corners[i + 4];
 		}
 		gl.glBindVertexArray(_standing_faces_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_faces_vbo);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(face_corners.size() * sizeof(float)), face_corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(face_corners.size() / 4));
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(face_corners.size() / N));
 		return true;
 	};
 	bool all = true;

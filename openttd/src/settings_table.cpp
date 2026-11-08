@@ -453,10 +453,13 @@ static void ThreeDChanged(int32_t)
 	MarkWholeScreenDirty();
 }
 
-/** The houses of the towns as their 3D objects or the original houses (gui.three_d_houses), the wheels turning or not (gui.three_d_wheels): every view drawn anew. */
+/** A group of the 3D in 3D or the game's, from above or from the eyes (gui.three_d_houses_map and the others, ThreeDGroupShown()), the wheels turning or not (gui.three_d_wheels): every view drawn anew. */
 static void ThreeDHousesChanged(int32_t)
 {
 	MarkWholeScreenDirty();
+	/* The view from the eyes too (its groups by their own settings, ThreeDGroupShown()). */
+	extern void RedrawFirstPersonPicture();
+	RedrawFirstPersonPicture();
 }
 
 /** The graphics card drawing the 3D pictures switched on or off (gui.three_d_gpu): the pictures made from now on so. */

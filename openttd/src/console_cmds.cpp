@@ -11948,6 +11948,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					best = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end, ry), TileXY(x0 + 6, ry), TransportType::Rail, b, RAILTYPE_RAIL, INVALID_ROADTYPE);
 					if (best.Succeeded()) {
 						IConsolePrint(CC_DEFAULT, "test3d: most typu {} z {},{} na {},{}", b, x0 + 6, ry, x0 + bridge_end, ry);
+						/* A road bridge of the type beside it, two tiles on (its deck's road between the 3D pieces, the player,
+						 * 8. 11.: "bits of the old 8bpp bridges, switch the 8bpp original off when we replace it by an object"). */
+						CommandCost road = Command<Commands::BuildBridge>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end, ry + 2), TileXY(x0 + 6, ry + 2), TransportType::Road, b, INVALID_RAILTYPE, ROADTYPE_ROAD);
+						IConsolePrint(CC_DEFAULT, "test3d: silnicni most typu {} na {},{}: {}", b, x0 + 6, ry + 2, road.Succeeded() ? "postaven" : err(road));
 						break;
 					}
 				}

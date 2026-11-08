@@ -441,6 +441,13 @@ static constexpr NWidgetPart _nested_first_person_widgets[] = {
 	EndContainer(),
 };
 
+/** A house's 3D object as the view from the eyes has it (ThreeDGroupShown() by the setting for the eyes): what the walker walks about, goes into, looks at. */
+static const ThreeDObject *EyeHouseObject(HouseID north, TileIndex origin)
+{
+	const ThreeDEyeScope eye;
+	return GetThreeDHouseObjectAt(north, origin);
+}
+
 /**
  * Whether the walker can stand on a world point: not in a house, an industry's building (a field is walked), a
  * station's building (a platform or a stop is walked), an object, the water or off the map.
@@ -467,7 +474,7 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			if (!IsHouseCompleted(tile)) return false;
 			HouseID north = GetHouseType(tile);
 			const TileIndex origin = tile + GetHouseNorthPart(north);
-			const ThreeDObject *obj = GetThreeDHouseObjectAt(north, origin);
+			const ThreeDObject *obj = EyeHouseObject(north, origin);
 			if (obj == nullptr) return false;
 			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
 			const double up = feet(origin);
@@ -539,7 +546,7 @@ static double FirstPersonWallTop(double x, double y)
 	const ThreeDObject *obj = nullptr;
 	if (IsTileType(tile, TileType::House) && IsHouseCompleted(tile)) {
 		HouseID north = GetHouseType(tile);
-		obj = GetThreeDHouseObjectAt(north, tile + GetHouseNorthPart(north));
+		obj = EyeHouseObject(north, tile + GetHouseNorthPart(north));
 	} else if (IsTileType(tile, TileType::Industry) && IsIndustryCompleted(tile)) {
 		obj = GetThreeDIndustryObjectOf(Industry::GetByTile(tile));
 	}
@@ -1224,7 +1231,7 @@ struct FirstPersonWindow : Window {
 					const TileIndex origin = tile + GetHouseNorthPart(north);
 					if (std::ranges::find(seen, origin) != seen.end()) continue;
 					seen.push_back(origin);
-					consider(origin, GetThreeDHouseEvent(GetThreeDHouseObjectAt(north, origin), origin), true);
+					consider(origin, GetThreeDHouseEvent(EyeHouseObject(north, origin), origin), true);
 					continue;
 				}
 				if (!close || !IsTileType(tile, TileType::Industry)) continue;
@@ -3616,7 +3623,7 @@ std::string RigFirstPersonFreeMap(int tiles, int step_cm)
 				if (IsTileType(tile, TileType::House)) {
 					HouseID north = GetHouseType(tile);
 					const TileIndex origin = tile + GetHouseNorthPart(north);
-					if (GetThreeDHouseObjectAt(north, origin) == nullptr) ch = 'X';
+					if (EyeHouseObject(north, origin) == nullptr) ch = 'X';
 				}
 			}
 			line += (r == 0 && c == 0) ? 'o' : ch;

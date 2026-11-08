@@ -448,7 +448,8 @@ struct ThreeDGpuStandingVehicle {
 struct ThreeDGpuStandingFaces {
 	std::shared_ptr<const ThreeDGpuStandingPicture> texture; ///< its sprites drawn north-up as they are (Colour::data, 0 nothing)
 	uint64_t key = 0;           ///< kept on the card by it among the pictures; 0 this block's alone
-	std::vector<float> corners; ///< x, y on the block, u, v in the texture, pixels; three a triangle
+	std::vector<float> corners; ///< x, y on the block, u, v in the texture, pixels, how near in the world (xr + yr + 2 z, ThreeDGpuStanding::depth); three a triangle
+	static constexpr size_t FLOATS = 5; ///< of a corner
 	bool fill = true;
 };
 

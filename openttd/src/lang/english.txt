@@ -2244,10 +2244,27 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :The 8x and 4x z
 STR_CONFIG_SETTING_THREE_D                                      :3D: turning previews and turning the map view: {STRING2}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vehicles (trains, road vehicles, ships, aircraft) at the original game's size, bigger (BRYLE); off smaller (CZTR): {STRING2}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Every vehicle the game draws from its 3D object (the GRFs with objects: not from their pictures), all at once: at the size of the original game, as the bigger sets draw (BRYLE), 20% bigger; off, smaller, at the scale of CZTR. The length of trains and road vehicles is the object's, so a train is as long as it looks. For a new game: set it in the main menu before starting one
-STR_CONFIG_SETTING_THREE_D_HOUSES                               :Town houses: {STRING2}
-STR_CONFIG_SETTING_THREE_D_HOUSES_HELPTEXT                      :How the houses of the towns look: as 3D objects (the houses the game uses now), or as the original houses of OpenTTD the way this game drew them before the 3D objects - simple boxes when the view turns and in the view from the eyes, their original pictures when the view faces north. The bridges and aqueducts go with them: 3D with the 3D houses, the original ones with the original houses
-STR_CONFIG_SETTING_THREE_D_HOUSES_OBJECTS                       :3D houses
-STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :original OpenTTD houses (simple boxes)
+STR_CONFIG_SETTING_THREE_D_GROUPS                               :3D
+STR_CONFIG_SETTING_THREE_D_GROUP_HOUSES                         :Houses
+STR_CONFIG_SETTING_THREE_D_HOUSES_MAP                           :Houses in 3D from above: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_MAP_HELPTEXT                  :On the map, the turned view and the small views: the houses of the towns as 3D objects. Off: the original houses of OpenTTD the way this game drew them before the 3D objects - simple boxes when the view turns, their original pictures when the view faces north
+STR_CONFIG_SETTING_THREE_D_HOUSES_EYE                           :Houses in 3D from the eyes: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_EYE_HELPTEXT                  :In the view from the first person and from the cab: the houses of the towns as 3D objects. Off: the original houses of OpenTTD as simple boxes
+STR_CONFIG_SETTING_THREE_D_GROUP_BRIDGES                        :Bridges
+STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP                          :Bridges in 3D from above: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP_HELPTEXT                 :On the map, the turned view and the small views: the bridges and aqueducts of their 3D pieces. Off: the bridges of the game
+STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE                          :Bridges in 3D from the eyes: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE_HELPTEXT                 :In the view from the first person and from the cab: the bridges and aqueducts of their 3D pieces. Off: the bridges of the game
+STR_CONFIG_SETTING_THREE_D_GROUP_RAILS                          :Rails
+STR_CONFIG_SETTING_THREE_D_RAILS_MAP                            :Rails in 3D from above: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_MAP_HELPTEXT                   :On the map, the turned view and the small views: the rails of 3D sleepers, rails and ballast. Off: the rails of the game or of a set (CZTR has its own)
+STR_CONFIG_SETTING_THREE_D_RAILS_EYE                            :Rails in 3D from the eyes: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_EYE_HELPTEXT                   :In the view from the first person and from the cab: the rails of 3D sleepers, rails and ballast. Off: the rails of the game or of a set
+STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY                       :Catenary
+STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Catenary in 3D from above: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MAP_HELPTEXT                :On the map, the turned view and the small views: the catenary of 3D masts and wires. Off: the catenary of the game
+STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Catenary in 3D from the eyes: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_EYE_HELPTEXT                :In the view from the first person and from the cab: the catenary of 3D masts and wires. Off: the catenary of the game
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Wheels of 3D vehicles turn: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :The wheels of vehicles drawn from 3D objects turn as they go and the front ones steer in the curves (seen up close, from the cab and the first person). Off, the wheels stand still
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D pictures drawn by the graphics card: {STRING2}

@@ -257,7 +257,14 @@ struct GUISettings {
 	uint32_t sprite_cache_size_mb; ///< Memory for the sprite cache in MB with a 32bpp blitter (a quarter of it with 8bpp), the player's to set: more sets and finer zoom want more, else the game loads sprites over and over.
 	bool sprite_mitchell; ///< The 8x and the 4x a 32bpp set has not got made straight from its finest level with Mitchell's filter (DownscaleMitchell()), not by halves with a 2x2 mean: sharper, and about twice the time to load a sprite.
 	bool three_d; ///< The 3D of this game (three_d.h): the previews that turn and the map view turned to any angle. Off, nothing of it is there.
-	uint8_t three_d_houses; ///< The houses of the towns: 0 the 3D objects (three_d_objects.h); 1 the original houses of OpenTTD, the boxes of their hand tables in 3D and their pictures facing north.
+	bool three_d_houses_map;      ///< The houses of the towns from above as 3D objects (three_d_objects.h); off, the original houses of OpenTTD, the boxes of their hand tables turned and their pictures facing north.
+	bool three_d_houses_eye;      ///< The same from the eyes; off, the boxes of their hand tables.
+	bool three_d_bridges_map;     ///< The bridges and aqueducts from above of their 3D pieces; off, the game's.
+	bool three_d_bridges_eye;     ///< The same from the eyes.
+	bool three_d_rails_map;       ///< The rails from above of 3D sleepers, rails and ballast; off, the game's (a set's, CZTR).
+	bool three_d_rails_eye;       ///< The same from the eyes.
+	bool three_d_catenary_map;    ///< The catenary from above of 3D masts and wires; off, the game's.
+	bool three_d_catenary_eye;    ///< The same from the eyes.
 	bool three_d_wheels;          ///< The wheels of the 3D vehicles turn as they go and the front ones steer; off, they stand still in the model.
 	bool three_d_gpu;             ///< The 3D pictures drawn by the graphics card (three_d_gpu.h); off, by the processor.
 	bool night;                   ///< The night (the player's dark mode, in the help menu by the console): the map darkened, the vehicles' lights on.

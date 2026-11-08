@@ -4801,9 +4801,9 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 const ThreeDObject *GetThreeDBridgePiece(uint type, ThreeDBridgePiece piece, int quarter_turns, bool map, int wall)
 {
 	if (type > THREE_D_AQUEDUCT || !ThreeDObjectsIndexRead()) return nullptr;
-	/* With the original houses wanted (gui.three_d_houses) the original bridges too (the player, 4. 11.: "when the 3D
-	 * houses are switched off, the 3D bridges are off too"). */
-	if (_settings_client.gui.three_d_houses != 0) return nullptr;
+	/* The original bridges wanted there (ThreeDGroupShown(); the player, 8. 11.: the bridges a group of their own, no
+	 * more with the houses). */
+	if (!ThreeDGroupShown(ThreeDGroup::Bridges)) return nullptr;
 	const int q = quarter_turns & 3;
 	if (wall >= 0 && static_cast<size_t>(wall) < BRIDGE_WALL_MATERIALS && (piece == ThreeDBridgePiece::Pillar || piece == ThreeDBridgePiece::PillarFoot)) {
 		const auto &walled = (map ? _three_d_bridge_wall_map_pieces : _three_d_bridge_wall_pieces)[wall][type];
@@ -10896,6 +10896,37 @@ bool GetThreeDFieldTile(const ThreeDPlantationTile &tile, ThreeDFieldTile &out)
 	return true;
 }
 
+/** How many ThreeDEyeScope stand: what is asked for is for the view from the eyes. */
+static int _three_d_eye_scopes = 0;
+
+ThreeDEyeScope::ThreeDEyeScope()
+{
+	_three_d_eye_scopes++;
+}
+
+ThreeDEyeScope::~ThreeDEyeScope()
+{
+	_three_d_eye_scopes--;
+}
+
+/**
+ * Whether a group of the 3D is shown in 3D where it is asked for: from the eyes -- drawing them (ViewportDrawingEye())
+ * or the walker's steps there (ThreeDEyeScope) -- by its setting for the eyes, else by its setting from above (the map,
+ * the small views, the walkers and the creatures of the towns).
+ */
+bool ThreeDGroupShown(ThreeDGroup group)
+{
+	const bool eye = ViewportDrawingEye() || _three_d_eye_scopes > 0;
+	const GUISettings &g = _settings_client.gui;
+	switch (group) {
+		case ThreeDGroup::Houses: return eye ? g.three_d_houses_eye : g.three_d_houses_map;
+		case ThreeDGroup::Bridges: return eye ? g.three_d_bridges_eye : g.three_d_bridges_map;
+		case ThreeDGroup::Rails: return eye ? g.three_d_rails_eye : g.three_d_rails_map;
+		case ThreeDGroup::Catenary: return eye ? g.three_d_catenary_eye : g.three_d_catenary_map;
+	}
+	return true;
+}
+
 /**
  * The 3D object of an original house.
  * @param north_house the house of its north tile
@@ -10908,8 +10939,8 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, 
 	 * "I am nostalgic, the white house of many storeys, tall, I would keep"): the tall office block. */
 	static constexpr HouseID KEPT_AS_HAND_TABLE[] = {0x1c};
 	if (std::ranges::find(KEPT_AS_HAND_TABLE, north_house) != std::end(KEPT_AS_HAND_TABLE)) return nullptr;
-	/* The original houses of OpenTTD wanted instead (gui.three_d_houses): no house is a 3D object. */
-	if (_settings_client.gui.three_d_houses != 0) return nullptr;
+	/* The original houses of OpenTTD wanted instead, there (ThreeDGroupShown()): no house is a 3D object. */
+	if (!ThreeDGroupShown(ThreeDGroup::Houses)) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	if (theme != 0) {
 		auto themed = _three_d_house_objects.find(std::make_tuple(theme, north_house, colour_slot & 3));
@@ -10928,7 +10959,7 @@ const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, 
 const ThreeDObject *GetThreeDHouseObjectAny(HouseID north_house, uint colour_slot, uint8_t theme)
 {
 	if (north_house < NEW_HOUSE_OFFSET) return GetThreeDHouseObject(north_house, colour_slot, theme);
-	if (_settings_client.gui.three_d_houses != 0) return nullptr;
+	if (!ThreeDGroupShown(ThreeDGroup::Houses)) return nullptr;
 	if (!_three_d_objects_read) ReadThreeDObjects();
 	const HouseSpec *hs = HouseSpec::Get(north_house);
 	if (hs == nullptr || hs->grf_prop.grffile == nullptr) return nullptr;

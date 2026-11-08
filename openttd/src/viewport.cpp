@@ -4414,7 +4414,7 @@ struct TurnedFacesOut {
 	std::shared_ptr<const ThreeDGpuStandingPicture> texture;
 	uint64_t key = 0;
 	int textures = 0;           ///< how many MakeTurnedTexture() made (more than one: drawn apart)
-	std::vector<float> corners; ///< x, y on the block, u, v in the texture, three a triangle
+	std::vector<float> corners; ///< x, y on the block, u, v in the texture, how near (ThreeDGpuStandingFaces::corners), three a triangle
 	bool fill = true;
 };
 static TurnedFacesOut *_turned_faces_out = nullptr;
@@ -4611,14 +4611,25 @@ static void DrawTurnedFaces(const DrawPixelInfo &frame, const ParentSpriteToDraw
 		return r;
 	};
 	if (_turned_faces_out != nullptr) {
-		/* For the card: the triangles, as they would be drawn. */
+		/* For the card: the triangles, as they would be drawn, and how near each corner is in the world (xr + yr + 2 z,
+		 * TurnedSprite::near): each pixel of a face laid by where it is, the deck of a bridge under its railings -- not by
+		 * the box of the game's sprite (a bridge's floor as tall as its sprite was laid over the 3D railings). */
 		TurnedFacesOut &out = *_turned_faces_out;
 		out.fill = fill;
+		auto near_of = [&](const BoxVertex &b) {
+			double wx, wy, xr, yr;
+			stand(b.x, b.y, wx, wy);
+			TurnWorldPoint(ps.box_ox + wx, ps.box_oy + wy, xr, yr);
+			return static_cast<float>(xr + yr + 2.0 * (ps.box_oz + b.z));
+		};
 		for (const BoxFace &face : faces) {
 			const TurnedVertex a = vertex(face.v[0]);
+			const float a_near = near_of(face.v[0]);
 			for (size_t i = 1; i + 1 < face.v.size(); i++) {
-				for (const TurnedVertex &c : {a, vertex(face.v[i]), vertex(face.v[i + 1])}) {
-					out.corners.insert(out.corners.end(), {static_cast<float>(c.x), static_cast<float>(c.y), static_cast<float>(c.u), static_cast<float>(c.v)});
+				const TurnedVertex b = vertex(face.v[i]), c = vertex(face.v[i + 1]);
+				const float b_near = near_of(face.v[i]), c_near = near_of(face.v[i + 1]);
+				for (const auto &[p, n] : {std::pair{a, a_near}, std::pair{b, b_near}, std::pair{c, c_near}}) {
+					out.corners.insert(out.corners.end(), {static_cast<float>(p.x), static_cast<float>(p.y), static_cast<float>(p.u), static_cast<float>(p.v), n});
 				}
 			}
 		}
@@ -4799,6 +4810,8 @@ static constexpr int16_t TURNED_DECK_ON_PIECES = 1; ///< the floor alone, no sid
 static constexpr int16_t TURNED_DECK_WATER = 2;     ///< an aqueduct's: only between the walls of its trough
 /** How far over the 3D pieces' deck their bridge's floor is laid on the map, units of height. */
 static constexpr int TURNED_OVER_PIECES = 1;
+/** Half the band across a bridge's floor sprite its way is in, world units (TurnedDeckAcross()): two lanes of a road, a track with its sleepers. */
+static constexpr double TURNED_WAY_HALF = 3.0;
 /** Half the width of an aqueduct's water between the walls of its 3D trough, metres (the colleague's hra/3d/PROSBA-AKVADUKTY.md: "y ±5.5 m"). */
 static constexpr double AQUEDUCT_WATER_HALF_M = 5.5;
 
@@ -4807,10 +4820,19 @@ static void TurnedDeckAcross(int16_t bits, double &c0, double &c1)
 {
 	c0 = 1;
 	c1 = TILE_SIZE - 1;
-	if ((bits & TURNED_DECK_WATER) == 0) return;
-	const double half = AQUEDUCT_WATER_HALF_M * OBJECT_UNITS_PER_METRE;
-	c0 = TILE_SIZE / 2.0 - half;
-	c1 = TILE_SIZE / 2.0 + half;
+	if ((bits & TURNED_DECK_WATER) != 0) {
+		const double half = AQUEDUCT_WATER_HALF_M * OBJECT_UNITS_PER_METRE;
+		c0 = TILE_SIZE / 2.0 - half;
+		c1 = TILE_SIZE / 2.0 + half;
+		return;
+	}
+	/* On 3D pieces only the way of the floor's sprite, its road or its track, in its middle band: its railings, kerbs
+	 * and posts at its edges left to the pieces' (the player, 8. 11.: "bits of the old 8bpp bridges, switch the 8bpp
+	 * original off when we replace it by an object"), as an aqueduct's water. */
+	if ((bits & TURNED_DECK_ON_PIECES) != 0) {
+		c0 = TILE_SIZE / 2.0 - TURNED_WAY_HALF;
+		c1 = TILE_SIZE / 2.0 + TURNED_WAY_HALF;
+	}
 }
 
 /** Across an aqueduct's trough sprite, the band of its water alone, not its walls: where its water on 3D pieces is dressed from. */
@@ -8436,7 +8458,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 						TurnedObject &to = _turned_objects.emplace_back(obj, origin, GetTileMaxPixelZ(origin), nullptr, GetThreeDHouseEvent(obj, origin));
 						for (size_t k = 0; k < obj->door_wings.size(); k++) to.with.push_back(GetThreeDDoorWing(obj, origin, k));
 					}
-				} else if (north >= NEW_HOUSE_OFFSET && _settings_client.gui.three_d_houses == 0) {
+				} else if (north >= NEW_HOUSE_OFFSET && ThreeDGroupShown(ThreeDGroup::Houses)) {
 					/* A set's house without an object (ITL Houses): its boxes below, the set told of once. */
 					NoteThreeDHouseBoxed(north);
 				}

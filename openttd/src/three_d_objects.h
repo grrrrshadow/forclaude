@@ -1343,6 +1343,26 @@ void ResetThreeDVehicleObjects();
 const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid);
 std::string DescribeThreeDVehicleObjects();
 
+/**
+ * The groups of the 3D, each shown in 3D or as the game's from above and from the eyes apart (the player, 8. 11.:
+ * "groups, houses, bridges, rails, catenary, and each of them off from above and off from the first person view").
+ */
+enum class ThreeDGroup : uint8_t {
+	Houses,   ///< the houses of the towns as 3D objects (gui.three_d_houses_map, _eye)
+	Bridges,  ///< the bridges and aqueducts of 3D pieces (gui.three_d_bridges_map, _eye)
+	Rails,    ///< the rails of 3D sleepers, rails and ballast (gui.three_d_rails_map, _eye)
+	Catenary, ///< the catenary of 3D masts and wires (gui.three_d_catenary_map, _eye)
+};
+bool ThreeDGroupShown(ThreeDGroup group);
+/** What is asked for while one stands is for the view from the eyes (the walker's own steps there, not drawing): ThreeDGroupShown() by its settings. */
+class ThreeDEyeScope {
+public:
+	ThreeDEyeScope();
+	~ThreeDEyeScope();
+	ThreeDEyeScope(const ThreeDEyeScope &) = delete;
+	ThreeDEyeScope &operator=(const ThreeDEyeScope &) = delete;
+};
+
 const ThreeDObject *GetThreeDHouseObject(HouseID north_house, uint colour_slot, uint8_t theme = 0);
 std::span<const ThreeDObjectFigure> GetThreeDHouseEvent(const ThreeDObject *obj, TileIndex origin);
 extern bool _three_d_event_forced;

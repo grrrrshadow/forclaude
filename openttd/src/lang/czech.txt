@@ -2352,10 +2352,27 @@ STR_CONFIG_SETTING_SPRITE_MITCHELL_HELPTEXT                     :Přiblížení 
 STR_CONFIG_SETTING_THREE_D                                      :3D: náhledy a otáčení herní plochy: {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE                         :3D vozidla (vlaky, auta, lodě, letadla) ve velikosti původní hry, větší (BRÝLE); vypnuto menší (CZTR): {STRING}
 STR_CONFIG_SETTING_OBJECT_ORIGINAL_SIZE_HELPTEXT                :Všechna vozidla, která hra kreslí z jejich 3D objektu (GRF s objekty, ne z obrázků), najednou: velikost původní hry jako větší sady (BRÝLE), o 20 % větší; vypnuto menší, v měřítku CZTR. Délku vlaků a aut určuje objekt, takže vlak je dlouhý, jak vypadá. Pro novou hru: nastav v hlavním menu před založením hry
-STR_CONFIG_SETTING_THREE_D_HOUSES                               :Domy ve městech: {STRING}
-STR_CONFIG_SETTING_THREE_D_HOUSES_HELPTEXT                      :Jak vypadají domy ve městech: jako 3D objekty (domy, které hra používá teď), nebo jako originální domy OpenTTD tak, jak je hra kreslila před 3D objekty – jednoduché krabice při otáčení a v pohledu z očí, původní obrázky při pohledu na sever. Mosty a akvadukty jdou s nimi: 3D s 3D domy, původní s původními domy
-STR_CONFIG_SETTING_THREE_D_HOUSES_OBJECTS                       :3D domy
-STR_CONFIG_SETTING_THREE_D_HOUSES_ORIGINAL                      :originální domy OpenTTD (jednoduché krabice)
+STR_CONFIG_SETTING_THREE_D_GROUPS                               :3D
+STR_CONFIG_SETTING_THREE_D_GROUP_HOUSES                         :Domy
+STR_CONFIG_SETTING_THREE_D_HOUSES_MAP                           :Domy ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_MAP_HELPTEXT                  :Na mapě, v otočeném pohledu a v malých oknech: domy ve městech jako 3D objekty. Vypnuto: originální domy OpenTTD tak, jak je hra kreslila před 3D objekty – jednoduché krabice při otáčení, původní obrázky při pohledu na sever
+STR_CONFIG_SETTING_THREE_D_HOUSES_EYE                           :Domy ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_HOUSES_EYE_HELPTEXT                  :V pohledu z první osoby a z kabiny: domy ve městech jako 3D objekty. Vypnuto: originální domy OpenTTD jako jednoduché krabice
+STR_CONFIG_SETTING_THREE_D_GROUP_BRIDGES                        :Mosty
+STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP                          :Mosty ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP_HELPTEXT                 :Na mapě, v otočeném pohledu a v malých oknech: mosty a akvadukty z 3D dílů. Vypnuto: mosty hry
+STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE                          :Mosty ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE_HELPTEXT                 :V pohledu z první osoby a z kabiny: mosty a akvadukty z 3D dílů. Vypnuto: mosty hry
+STR_CONFIG_SETTING_THREE_D_GROUP_RAILS                          :Koleje
+STR_CONFIG_SETTING_THREE_D_RAILS_MAP                            :Koleje ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_MAP_HELPTEXT                   :Na mapě, v otočeném pohledu a v malých oknech: koleje z 3D pražců, kolejnic a štěrku. Vypnuto: koleje hry nebo sady (CZTR má své)
+STR_CONFIG_SETTING_THREE_D_RAILS_EYE                            :Koleje ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_RAILS_EYE_HELPTEXT                   :V pohledu z první osoby a z kabiny: koleje z 3D pražců, kolejnic a štěrku. Vypnuto: koleje hry nebo sady
+STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY                       :Troleje
+STR_CONFIG_SETTING_THREE_D_CATENARY_MAP                         :Troleje ve 3D shora: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_MAP_HELPTEXT                :Na mapě, v otočeném pohledu a v malých oknech: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
+STR_CONFIG_SETTING_THREE_D_CATENARY_EYE                         :Troleje ve 3D z očí: {STRING2}
+STR_CONFIG_SETTING_THREE_D_CATENARY_EYE_HELPTEXT                :V pohledu z první osoby a z kabiny: troleje z 3D stožárů a drátů. Vypnuto: troleje hry
 STR_CONFIG_SETTING_THREE_D_WHEELS                               :Kola 3D vozidel se točí: {STRING2}
 STR_CONFIG_SETTING_THREE_D_WHEELS_HELPTEXT                      :Kola vozidel kreslených z 3D objektů se za jízdy točí a přední v zatáčkách zatáčí (vidět zblízka, z kabiny a z první osoby). Vypnuto: kola stojí
 STR_CONFIG_SETTING_THREE_D_GPU                                  :3D obrázky kreslí grafická karta: {STRING2}
