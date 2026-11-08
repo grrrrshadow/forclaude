@@ -7809,9 +7809,8 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	for (size_t at = 0; at < parts.size();) {
 		size_t end = at + 1;
 		while (end < parts.size() && !parts[end].own_depth) end++;
-		/* The depths of all drawn in one depth, and the rectangle they cover. */
+		/* The rectangle all drawn in one depth cover. */
 		const double most = std::numeric_limits<double>::max();
-		double dn = most, df = -most;
 		double rx0 = most, ry0 = most, rx1 = -most, ry1 = -most;
 		auto cover = [&](double x0, double y0, double x1, double y1) {
 			rx0 = std::min(rx0, x0);
@@ -7822,22 +7821,12 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 		for (size_t k = at; k < end; k++) {
 			Part &p = parts[k];
 			if (!p.shape.tri.empty()) {
-				/* Its box's corners: how near and where any corner of it is lies between theirs. */
+				/* Its box's corners: where any corner of it is lies between theirs. */
 				const std::array<float, 6> &b = TurnedShapeBox(p.shape);
 				for (int c = 0; c < 8; c++) {
 					double sx, sy, d;
 					place(b[(c & 1) ? 1 : 0], b[(c & 2) ? 3 : 2], b[(c & 4) ? 5 : 4], sx, sy, d);
-					dn = std::min(dn, d);
-					df = std::max(df, d);
 					cover(sx, sy, sx, sy);
-				}
-			}
-			if (p.o != nullptr && _night_windows_now) {
-				for (size_t i = 0; i + 2 < p.o->night_pos.size(); i += 3) {
-					double sx, sy, d;
-					place(p.o->night_pos[i], p.o->night_pos[i + 1], p.o->night_pos[i + 2], sx, sy, d);
-					dn = std::min(dn, d);
-					df = std::max(df, d + 0.05);
 				}
 			}
 			/* Its figures and plants as DrawObjectInto() stands them. */
@@ -7861,8 +7850,6 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				const double near = xr + yr + 2 * (wz - oz + height / 2.0);
 				const int px = static_cast<int>(std::lround(sx)) + (pic != nullptr ? pic->left : card->left), py = static_cast<int>(std::lround(sy)) + (pic != nullptr ? pic->top : card->top);
 				const Part::Figure &fig = p.figures.emplace_back(Part::Figure{pic, px, py, near, std::move(card)});
-				dn = std::min(dn, near);
-				df = std::max(df, near + 0.05);
 				cover(px, py, px + fig.Width(), py + fig.Height());
 			};
 			if (p.o != nullptr) {
@@ -7873,9 +7860,11 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			}
 			for (const ThreeDObjectFigure &f : p.more) stand(f, false);
 		}
-		/* How near, 0-1 of their span. */
-		const double span = df > dn ? df - dn : 1.0;
-		const double scale = 0.998 / span, offset = 0.001 - dn * scale;
+		/* How near, as the depth of all laid on the block (ThreeDGpuStanding::depth: its triangles where they are nearer
+		 * than what else stands there, the ship by the lock's walls): its d over its own ground, the block's over the
+		 * world's. */
+		const double scale = 1.0 / std::max(1e-3, static_cast<double>(out.depth[1]));
+		const double offset = (2.0 * oz - out.depth[0]) * scale;
 		auto depth_of = [&](double d) { return static_cast<float>(std::clamp(d * scale + offset, 0.0, 1.0)); };
 		bool cleared = false;
 		for (size_t k = at; k < end; k++) {
@@ -8203,13 +8192,60 @@ static uint32_t TurnedOrder(double near)
 	return static_cast<uint32_t>(std::clamp<double>(std::round(k), 1.0, static_cast<double>((1u << THREE_D_GPU_ORDER_BITS) - 1)));
 }
 
-/** What stands on a block for the card, in its place in the order (TurnedOrder()). */
+/**
+ * What stands on a block for the card, in its place in the order (TurnedOrder()), with its box: each pixel of it laid
+ * by how near it is there (ThreeDGpuStandingItem::box).
+ */
 static void AddTurnedStandingThingInOrder(ThreeDGpuStanding &out, const DrawPixelInfo &frame, const TurnedSprite &s)
 {
 	const size_t from = out.items.size();
 	AddTurnedStandingThing(out, frame, *s.ps);
 	const uint32_t order = TurnedOrder(s.near);
-	for (size_t k = from; k < out.items.size(); k++) out.items[k].order = order;
+	/* Its box, world units from its lowest corner to past its highest (the game's boxes count their last unit in). */
+	const ParentSpriteToDraw &ps = *s.ps;
+	const std::array<float, 6> box = {
+		static_cast<float>(std::min(ps.xmin, ps.xmax)), static_cast<float>(std::min(ps.ymin, ps.ymax)), static_cast<float>(std::min(ps.zmin, ps.zmax)),
+		static_cast<float>(std::max(ps.xmin, ps.xmax) + 1), static_cast<float>(std::max(ps.ymin, ps.ymax) + 1), static_cast<float>(std::max(ps.zmin, ps.zmax) + 1),
+	};
+	double xr, yr;
+	TurnWorldPoint((box[0] + box[3]) * 0.5, (box[1] + box[4]) * 0.5, xr, yr);
+	for (size_t k = from; k < out.items.size(); k++) {
+		ThreeDGpuStandingItem &item = out.items[k];
+		item.order = order;
+		item.box = box;
+		item.mid = static_cast<float>(xr + yr);
+		item.boxed = true;
+	}
+}
+
+/**
+ * The card told how near each pixel laid on a block is (ThreeDGpuStanding::turn, place, depth): the view's turn, where
+ * the pixels of the view's picture are (its view_x, view_y set), and the depth of all on it -- from the nearest to the
+ * furthest corner of the boxes of what stands on it, a little more: no wider than it must be, so that a building's
+ * glass a hair before its wall is still before it there (the depth's float has 24 bits; over the block's whole height
+ * the glass and the wall behind were one, the wall laid over it in stripes).
+ */
+static void TurnedStandingNear(ThreeDGpuStanding &s, const DrawPixelInfo &frame, std::span<const TurnedSprite> standing)
+{
+	double c, sn, px, py;
+	GetViewTurn(c, sn, px, py);
+	s.turn = {static_cast<float>(c), static_cast<float>(sn), static_cast<float>(px), static_cast<float>(py)};
+	const int scale = ScaleByZoom(1, frame.zoom);
+	s.place = {static_cast<float>(frame.left / scale - s.view_x), static_cast<float>(frame.top / scale - s.view_y), static_cast<float>(scale), static_cast<float>(ZOOM_BASE)};
+	double near0 = std::numeric_limits<double>::max(), near1 = std::numeric_limits<double>::lowest();
+	for (const TurnedSprite &t : standing) {
+		const ParentSpriteToDraw &ps = *t.ps;
+		for (int k = 0; k < 4; k++) {
+			double xr, yr;
+			TurnWorldPoint((k & 1) ? std::max(ps.xmin, ps.xmax) + 1 : std::min(ps.xmin, ps.xmax), (k & 2) ? std::max(ps.ymin, ps.ymax) + 1 : std::min(ps.ymin, ps.ymax), xr, yr);
+			near0 = std::min(near0, xr + yr + 2.0 * std::min(ps.zmin, ps.zmax));
+			near1 = std::max(near1, xr + yr + 2.0 * (std::max(ps.zmin, ps.zmax) + 1));
+		}
+	}
+	/* Past the boxes: what of a picture stands out of its box (its upright plane), a figure on a building. */
+	static constexpr double MARGIN = 3 * 64.0;
+	if (near0 > near1) near0 = near1 = static_cast<double>(frame.top) / ZOOM_BASE;
+	s.depth = {static_cast<float>(near0 - MARGIN), static_cast<float>(near1 - near0 + 2 * MARGIN)};
 }
 
 /** The things that move on the turned view collected for a block (the moving layer, ThreeDGpuStanding::moving): the vehicles, the walkers and the cars of the towns, the creatures. */
@@ -8746,6 +8782,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		on_card.view = _tcg->view;
 		on_card.view_w = _tcg->w;
 		on_card.view_h = _tcg->h;
+		TurnedStandingNear(on_card, frame, standing);
 		/* Its lit pixels stay on the card: the glows by them are the video driver's (_night_card_lit). */
 		on_card.read_lit = false;
 		/* Only the parts of it that changed, when so laid (TurnedCardLayChanged()): what reaches into them, there. */
@@ -9566,6 +9603,7 @@ void TurnedCardLayMovers()
 	movers.view_y = frame.top / vs - g.t;
 	movers.width = fw;
 	movers.height = fh;
+	TurnedStandingNear(movers, frame, standing);
 	for (const TurnedSprite &s : standing) AddTurnedStandingThingInOrder(movers, frame, s);
 	const bool laid = ThreeDGpuDrawStanding(movers);
 	_night_lit.clear();

@@ -944,21 +944,37 @@ static bool DrawThreeDLock(const TileInfo *ti, LockPart part, DiagDirection dir)
 	const double m = OBJECT_UNITS_PER_METRE;
 	const double half = TILE_SIZE / 2.0;
 	static constexpr double WALL_T_M = 1.6;      // zdymadlo.py WALL_T
+	static constexpr double LEAF_T_M = 0.5;      // zdymadlo.py LEAF_T
+	static constexpr double LEVEL_M = 3.0;       // zdymadlo.py LEVEL_M
+	static constexpr double OVER_M = 1.0;        // zdymadlo.py OVER_M
 	static constexpr double GATE_ANGLE_DEG = 18.0; // zdymadlo.py GATE_ANGLE
 	const double leaf_l = (TILE_SIZE / m - 2 * WALL_T_M) / 2 / std::cos(GATE_ANGLE_DEG * M_PI / 180.0); // zdymadlo.py LEAF_L, metres
-	auto put = [&](std::string_view name, double x, double y, double z, float facing) {
+	/* Each in the box it fills (AddThreeDFigureToViewportInBox()): a thing standing from (x0, y0) to (x1, y1), so many
+	 * metres tall -- each pixel of it laid by how near the box is there, a wall before the leaf and the ship behind it
+	 * (the player, test3: "the gates, the ship through the lock's concrete"). */
+	auto box = [&](double x0, double y0, double x1, double y1, double tall) {
+		const int bx0 = static_cast<int>(std::lround(std::min(x0, x1))), by0 = static_cast<int>(std::lround(std::min(y0, y1)));
+		const int bx1 = std::max(bx0, static_cast<int>(std::lround(std::max(x0, x1))) - 1), by1 = std::max(by0, static_cast<int>(std::lround(std::max(y0, y1))) - 1);
+		return std::array<int, 6>{bx0, by0, ti->z, bx1, by1, ti->z + std::max(1, static_cast<int>(std::lround(tall * OBJECT_HEIGHT_PER_METRE))) - 1};
+	};
+	auto put = [&](std::string_view name, double x, double y, double z, float facing, const std::array<int, 6> &in) {
 		if (eye) {
 			AddCabFigure(name, 1.0f, x, y, z, facing);
 		} else {
-			AddThreeDFigureToViewport(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, _cur_dpi->zoom, ti->tile);
+			AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), static_cast<int>(std::lround(z)), facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &in);
 		}
 	};
-	/* The walls, at the sides of the tile, along it, a third at a time from its lower end up. */
+	/* The walls, at the sides of the tile, along it, a third at a time from its lower end up: their top a metre over the
+	 * upper water (zdymadlo.py), on the upper tile a metre over its own. */
+	const double wall_tall = part == LockPart::Upper ? OVER_M : LEVEL_M + OVER_M;
 	for (int side : {-1, 1}) {
 		const double off = half - WALL_T_M / 2 * m;
 		for (int k = 0; k < 3; k++) {
 			const double along = (k - 1) * (TILE_SIZE / 3.0);
-			put(wall_of(k),cx + side * px * off + ax * along, cy + side * py * off + ay * along, ti->z, up_deg);
+			const double mx = cx + side * px * off + ax * along, my = cy + side * py * off + ay * along;
+			const double ha = TILE_SIZE / 6.0, hc = WALL_T_M / 2 * m;
+			const double hx = std::abs(ax) * ha + std::abs(px) * hc, hy = std::abs(ay) * ha + std::abs(py) * hc;
+			put(wall_of(k), mx, my, ti->z, up_deg, box(mx - hx, my - hy, mx + hx, my + hy, wall_tall));
 		}
 	}
 	if (part == LockPart::Middle) return true;
@@ -982,9 +998,14 @@ static bool DrawThreeDLock(const TileInfo *ti, LockPart part, DiagDirection dir)
 			fx = -side * px * c + ax * s;
 			fy = -side * py * c + ay * s;
 		}
-		/* Hung from its middle, half its length from the hinge. */
+		/* Hung from its middle, half its length from the hinge; its box from the hinge to its end, as thick as it is, its
+		 * handrail a metre over its top (zdymadlo.py). */
 		const double mid = leaf_l / 2 * m;
-		put(leaf, hx + fx * mid, hy + fy * mid, ti->z, static_cast<float>(std::atan2(fy, fx) * 180.0 / M_PI));
+		const double ex = hx + fx * leaf_l * m, ey = hy + fy * leaf_l * m;
+		const double t = LEAF_T_M / 2 * m, tx = std::abs(fy) * t, ty = std::abs(fx) * t;
+		const double leaf_tall = (part == LockPart::Upper ? OVER_M : LEVEL_M + OVER_M) + 1.0;
+		put(leaf, hx + fx * mid, hy + fy * mid, ti->z, static_cast<float>(std::atan2(fy, fx) * 180.0 / M_PI),
+				box(std::min(hx, ex) - tx, std::min(hy, ey) - ty, std::max(hx, ex) + tx, std::max(hy, ey) + ty, leaf_tall));
 	}
 	return true;
 }

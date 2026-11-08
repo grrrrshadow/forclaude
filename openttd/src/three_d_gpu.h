@@ -405,15 +405,15 @@ static constexpr uint8_t THREE_D_GPU_LIT_ALPHA = 254;
 
 /**
  * A building of the turned map drawn by the card among what stands on a block (ThreeDGpuStandingItem::building), as
- * DrawObjectInto() of viewport.cpp draws it: its triangles through a depth of its own -- cleared over its rectangle
- * first, unless it is a part drawn with the one before (the farm's hay, the doors) --, the figures on it after them, at
- * night its lit glass over them.
+ * DrawObjectInto() of viewport.cpp draws it: its triangles through the depth of all laid on the block
+ * (ThreeDGpuStanding::depth), each pixel where it is nearer than what is there, the figures on it after them, at night
+ * its lit glass over them.
  */
 struct ThreeDGpuStandingBuilding {
 	ThreeDGpuBuilding building;
-	ThreeDGpuMatrix matrix{};             ///< a corner (world units from its north corner) to the block: x, y pixels, z how near, 0-1
-	bool clear = true;                    ///< its depth cleared first over clear_x, clear_y, clear_w, clear_h (pixels of the block)
-	int clear_x = 0, clear_y = 0, clear_w = 0, clear_h = 0;
+	ThreeDGpuMatrix matrix{};             ///< a corner (world units from its north corner) to the block: x, y pixels, z how near, 0-1 (ThreeDGpuStanding::depth)
+	bool clear = true;                    ///< the first of the parts drawn in one (not the farm's hay, the doors)
+	int clear_x = 0, clear_y = 0, clear_w = 0, clear_h = 0; ///< the rectangle it and its figures cover, pixels of the block
 	/** At night its lit glass: each triangle's corners on the block already -- x, y pixels, z how near (0-1, as the
 	 * matrix's), u, v of its texture (0-1), 256 --, drawn as they are where they are nearer, marked lit. */
 	std::vector<float> night;
@@ -468,6 +468,16 @@ struct ThreeDGpuStandingItem {
 	 * a picture of its own by each pixel it covers, the moving things laid over it each frame only where they come
 	 * later (ThreeDGpuStanding::moving). */
 	uint32_t order = 0;
+	/**
+	 * Its box in the world (xmin, ymin, zmin, xmax, ymax, zmax, world units) when boxed: how near each pixel of it is,
+	 * where the view's ray through the pixel meets the box nearest -- or, past the box, on the upright plane through its
+	 * middle (mid, xr + yr of the turned world there) --, not one number for all of it (the player, test3: "what is
+	 * behind is drawn on top, the gates, the ship through the lock's concrete": a ship two tiles long between the walls,
+	 * its middle further than the wall by its stern). Laid by that, and the order kept by each pixel with it.
+	 */
+	std::array<float, 6> box{};
+	float mid = 0;
+	bool boxed = false;
 };
 /** The bits of ThreeDGpuStandingItem::order: kept in three channels of 8 bits on the card. */
 static constexpr int THREE_D_GPU_ORDER_BITS = 24;
@@ -489,6 +499,16 @@ struct ThreeDGpuStanding {
 	std::vector<ThreeDGpuStandingItem> items;
 	std::vector<ThreeDGpuStandingBuilding> buildings;
 	std::vector<ThreeDGpuStandingFaces> faces;
+	/** The view's turn (TurnWorldPoint() of three_d.h): its cosine and sine, the world point it turns about. */
+	std::array<float, 4> turn{1, 0, 0, 0};
+	/** A pixel of the view's picture to the view's virtual place: (pixel + place[0], pixel + place[1]) * place[2]; ZOOM_BASE in place[3]. */
+	std::array<float, 4> place{0, 0, 1, 1};
+	/**
+	 * How near is laid as depth (0-1): near minus depth[0], over depth[1] -- one for all laid on the block, the things'
+	 * boxes and the buildings' triangles alike, so that each pixel of each is laid where it is nearer than what is there
+	 * (ThreeDGpuStandingItem::box). How near: xr + yr + 2 z of the turned world (TurnedSprite::near of viewport.cpp).
+	 */
+	std::array<float, 2> depth{0, 1};
 	/** At night: which pixels of the block are lit once all is laid (the glows of the lights only where they are
 	 * seen, DrawNight() of viewport.cpp), read back into lit, a byte a pixel, top row first. */
 	bool read_lit = false;

@@ -30,6 +30,7 @@
 #include "tile_type.h"
 #include "spriteloader/spriteloader.hpp"
 
+#include <array>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -118,6 +119,7 @@ void AddThreeDEffectsToViewport(ZoomLevel zoom);
 bool AddThreeDObjectToViewport(const struct ThreeDVehicleObject *obj, float scale, int x, int y, int z, float facing, ZoomLevel zoom, bool lit = false);
 const std::vector<ThreeDPictureLight> *GetThreeDObjectLights(const struct ThreeDVehicleObject *obj, float scale, float facing, ZoomLevel zoom);
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile = INVALID_TILE, uint32_t phase = 0, int frame = -1, int state = 0);
+bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box);
 struct ThreeDModelPicture;
 const ThreeDModelPicture *GetThreeDFigurePicture(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height = nullptr, int frame = -1, float yaw = NAN, int z = INT_MIN, int x = 0, int y = 0, int *up = nullptr, int state = 0);
 struct ThreeDGpuStandingVehicle;

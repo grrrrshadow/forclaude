@@ -758,7 +758,9 @@ GpuProgram _clear_program;
 bool _clear_program_ok = false;
 GpuProgram _standing_copy_program; ///< what stands copied under the moving things (COPY_FRAGMENT)
 bool _standing_copy_ok = false;
-GLuint _standing_order_vao = 0;    ///< the pictures laid with their order (ThreeDGpuStandingItem::order): x, y, z, u, v, order
+GLuint _standing_order_vao = 0;    ///< the pictures laid with their order and box (ThreeDGpuStandingItem::order, ::box): x, y, z, u, v, order, lowest corner and middle, highest corner and how
+/** The floats of a corner of a picture laid (_standing_order_vao, STANDING_BOX_VERTEX). */
+static constexpr int STANDING_BOXED_FLOATS = 14;
 /** The diary: the moving things laid over the views (ThreeDGpuStanding::moving) -- times, things, pixels copied, card ms. */
 std::atomic<uint64_t> _gpu_moving_passes = 0, _gpu_moving_things = 0, _gpu_moving_copied = 0;
 std::atomic<double> _gpu_moving_ms = 0;
@@ -1108,14 +1110,82 @@ void main()
 	"\tfloat r = floor(k / 65536.0);\n" \
 	"\tfloat g = floor((k - r * 65536.0) / 256.0);\n" \
 	"\treturn vec4(r, g, k - r * 65536.0 - g * 256.0, 255.0) / 255.0;\n" \
+	"}\n" \
+	"float NearOrder(float near)\n" \
+	"{\n" \
+	"\treturn clamp(floor((near + 262144.0) * 32.0 + 0.5), 1.0, 16777215.0);\n" \
 	"}\n"
 
-const char *const STANDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
+/* How near a pixel of a thing standing on the turned map is (ThreeDGpuStandingItem::box): the view's ray through the
+ * pixel -- each point of it at w = xr + yr of the turned world, its height w - v, how near 3 w - 2 v -- where it meets
+ * the thing's box nearest; past the box, on the upright plane through its middle (mid). Its depth 0-1 as the
+ * buildings' (ThreeDGpuStanding::depth). With STANDING_ORDER_GLSL. */
+#define STANDING_NEAR_GLSL \
+	"uniform vec4 u_place;\n" \
+	"uniform vec4 u_turn;\n" \
+	"uniform vec2 u_depth;\n" \
+	"void Slab(float p0, float d, float lo, float hi, inout vec2 w)\n" \
+	"{\n" \
+	"\tif (abs(d) < 1e-6) {\n" \
+	"\t\tif (p0 < lo || p0 > hi) w = vec2(1e30, -1e30);\n" \
+	"\t\treturn;\n" \
+	"\t}\n" \
+	"\tfloat t0 = (lo - p0) / d, t1 = (hi - p0) / d;\n" \
+	"\tw = vec2(max(w.x, min(t0, t1)), min(w.y, max(t0, t1)));\n" \
+	"}\n" \
+	"float PixelNear(vec3 lo, vec3 hi, float mid)\n" \
+	"{\n" \
+	"\tvec2 at = (gl_FragCoord.xy + u_place.xy) * u_place.z;\n" \
+	"\tfloat u = at.x / (2.0 * u_place.w), v = at.y / u_place.w;\n" \
+	"\tfloat c = u_turn.x, s = u_turn.y;\n" \
+	"\tfloat x0 = u_turn.z + c * (-0.5 * u - u_turn.z) + s * (0.5 * u - u_turn.w);\n" \
+	"\tfloat y0 = u_turn.w - s * (-0.5 * u - u_turn.z) + c * (0.5 * u - u_turn.w);\n" \
+	"\tvec2 w = vec2(-1e30, 1e30);\n" \
+	"\tSlab(x0, 0.5 * (c + s), lo.x, hi.x, w);\n" \
+	"\tSlab(y0, 0.5 * (c - s), lo.y, hi.y, w);\n" \
+	"\tSlab(-v, 1.0, lo.z, hi.z, w);\n" \
+	"\treturn 3.0 * (w.x <= w.y ? w.y : mid) - 2.0 * v;\n" \
+	"}\n" \
+	"float NearDepth(float near)\n" \
+	"{\n" \
+	"\treturn clamp((near - u_depth.x) / u_depth.y, 0.0, 1.0);\n" \
+	"}\n"
+
+/* The pictures laid on the turned map (DrawStandingOnCard()), as STANDING_VERTEX with each one's box after its order
+ * (ThreeDGpuStandingItem::box): its lowest corner and middle, its highest corner and how its depth comes -- 0 by its
+ * box, 1 as given (a_pos.z: a figure in a building's depth), 2 as given, its order alone. */
+const char *const STANDING_BOX_VERTEX = R"(#version 330 core
+layout(location = 0) in vec3 a_pos;
+layout(location = 1) in vec2 a_uv;
+layout(location = 2) in float a_order;
+layout(location = 3) in vec4 a_lo;
+layout(location = 4) in vec4 a_hi;
+uniform vec2 u_size;
+noperspective out vec2 v_uv;
+flat out float v_order;
+flat out vec4 v_lo;
+flat out vec4 v_hi;
+flat out float v_depth;
+void main()
+{
+	gl_Position = vec4(a_pos.xy / u_size * 2.0 - 1.0, a_pos.z * 2.0 - 1.0, 1.0);
+	v_uv = a_uv;
+	v_order = a_order;
+	v_lo = a_lo;
+	v_hi = a_hi;
+	v_depth = a_pos.z;
+}
+)";
+
+const char *const STANDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL STANDING_NEAR_GLSL R"(
 uniform sampler2D u_texture;
 uniform int u_moving;
 uniform sampler2D u_orders;
 noperspective in vec2 v_uv;
 flat in float v_order;
+flat in vec4 v_lo;
+flat in vec4 v_hi;
+flat in float v_depth;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
 layout(location = 2) out vec4 o_order;
@@ -1123,17 +1193,25 @@ void main()
 {
 	vec4 t = texelFetch(u_texture, ivec2(floor(v_uv)), 0);
 	if (t.a == 0.0) discard;
-	/* A thing that moves (ThreeDGpuStanding::moving): hidden where what stands there comes later. */
+	/* How near this pixel of it is: by its box, or as given. */
+	float order = v_order, depth = v_depth;
+	if (v_hi.w < 0.5) {
+		float near = PixelNear(v_lo.xyz, v_hi.xyz, v_lo.w);
+		order = NearOrder(near);
+		depth = NearDepth(near);
+	}
+	/* A thing that moves (ThreeDGpuStanding::moving): hidden where what stands there is nearer. */
 	if (u_moving != 0) {
 		vec4 o = texelFetch(u_orders, ivec2(gl_FragCoord.xy), 0);
 		float under = floor(o.r * 255.0 + 0.5) * 65536.0 + floor(o.g * 255.0 + 0.5) * 256.0 + floor(o.b * 255.0 + 0.5);
-		if (v_order < under) discard;
+		if (order < under) discard;
 	}
 	float lit = abs(t.a * 255.0 - 254.0) < 0.5 ? 1.0 : 0.0;
 	float a = lit > 0.5 ? 1.0 : t.a;
 	o_colour = vec4(t.rgb, a);
 	o_lit = vec4(lit, 0.0, 0.0, a);
-	o_order = a >= 0.5 ? OrderColour(v_order) : vec4(0.0);
+	o_order = a >= 0.5 ? OrderColour(order) : vec4(0.0);
+	gl_FragDepth = depth;
 }
 )";
 
@@ -1218,11 +1296,13 @@ void main()
 }
 )";
 
-const char *const STANDING_FACES_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL R"(
+const char *const STANDING_FACES_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL STANDING_NEAR_GLSL R"(
 uniform sampler2D u_texture;
 uniform vec4 u_bounds;
 uniform int u_fill;
 uniform float u_order;
+uniform vec4 u_lo;
+uniform vec4 u_hi;
 noperspective in vec2 v_uv;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
@@ -1245,9 +1325,17 @@ void main()
 		}
 	}
 	if (t == vec4(0.0)) discard;
+	/* How near this pixel of it is: by its box (u_lo, u_hi as STANDING_BOX_VERTEX's), or its order alone. */
+	float order = u_order, depth = NearDepth(u_order / 32.0 - 262144.0);
+	if (u_hi.w < 0.5) {
+		float near = PixelNear(u_lo.xyz, u_hi.xyz, u_lo.w);
+		order = NearOrder(near);
+		depth = NearDepth(near);
+	}
 	o_colour = vec4(t.rgb, 1.0);
 	o_lit = vec4(0.0, 0.0, 0.0, 1.0);
-	o_order = OrderColour(u_order);
+	o_order = OrderColour(order);
+	gl_FragDepth = depth;
 }
 )";
 
@@ -1262,6 +1350,7 @@ uniform int u_night;
 uniform float u_order;
 noperspective in vec2 v_uv;
 noperspective in float v_light;
+noperspective in float v_near;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
 layout(location = 2) out vec4 o_order;
@@ -1293,7 +1382,8 @@ void main()
 	}
 	o_colour = vec4(c / 255.0 * a, a);
 	o_lit = vec4(u_night != 0 ? 1.0 : 0.0, 0.0, 0.0, a);
-	o_order = a >= 0.5 ? OrderColour(u_order) : vec4(0.0);
+	/* Its order by how near this pixel of it is (its depth as all laid on the block, ThreeDGpuStanding::depth). */
+	o_order = a >= 0.5 ? OrderColour(NearOrder(v_near)) : vec4(0.0);
 }
 )";
 
@@ -2560,7 +2650,7 @@ bool StartCard(std::string &why, std::string &describe)
 		_ground_program_ok = MakeProgram(_ground_program, GROUND_VERTEX, GROUND_FRAGMENT, ground_why);
 		if (!_ground_program_ok) Diary("zem plochy kresli procesor: " + ground_why, true);
 		std::string standing_why;
-		_standing_program_ok = MakeProgram(_standing_program, STANDING_VERTEX, STANDING_FRAGMENT, standing_why) &&
+		_standing_program_ok = MakeProgram(_standing_program, STANDING_BOX_VERTEX, STANDING_FRAGMENT, standing_why) &&
 				MakeProgram(_standing_building_program, MAP_BUILDING_VERTEX, STANDING_BUILDING_FRAGMENT, standing_why);
 		if (!_standing_program_ok) Diary("co stoji na plose kresli procesor: " + standing_why, true);
 		std::string faces_why;
@@ -2616,16 +2706,22 @@ bool StartCard(std::string &why, std::string &describe)
 	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
 	gl.glBindVertexArray(0);
-	/* The same corners with their order after them (ThreeDGpuStandingItem::order), for the pictures laid. */
+	/* The same corners with their order and their box after them (ThreeDGpuStandingItem::order, ::box), for the pictures
+	 * laid (STANDING_BOX_VERTEX). */
 	gl.glGenVertexArrays(1, &_standing_order_vao);
 	gl.glBindVertexArray(_standing_order_vao);
 	gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
-	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), nullptr);
+	static constexpr GLsizei BOXED = STANDING_BOXED_FLOATS * sizeof(float);
+	gl.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, BOXED, nullptr);
 	gl.glEnableVertexAttribArray(0);
-	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(3 * sizeof(float)));
+	gl.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, BOXED, reinterpret_cast<const void *>(3 * sizeof(float)));
 	gl.glEnableVertexAttribArray(1);
-	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const void *>(5 * sizeof(float)));
+	gl.glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, BOXED, reinterpret_cast<const void *>(5 * sizeof(float)));
 	gl.glEnableVertexAttribArray(2);
+	gl.glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, BOXED, reinterpret_cast<const void *>(6 * sizeof(float)));
+	gl.glEnableVertexAttribArray(3);
+	gl.glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, BOXED, reinterpret_cast<const void *>(10 * sizeof(float)));
+	gl.glEnableVertexAttribArray(4);
 	gl.glBindVertexArray(0);
 	gl.glGenVertexArrays(1, &_standing_faces_vao);
 	gl.glGenBuffers(1, &_standing_faces_vbo);
@@ -4232,8 +4328,9 @@ static bool MovingPicturesOfSize(ViewPictures &v)
 
 /**
  * What stands on a block of the turned map laid by the card into the picture of the view's standing things
- * (ThreeDGpuStanding): the block cleared, each picture laid over those before it, far first; a building drawn through
- * a depth of its own (ThreeDGpuStandingBuilding), the figures on it in its depth; the order of each laid with it. Not
+ * (ThreeDGpuStanding): the block cleared, far first, each pixel of each thing where it is nearer than what is there --
+ * a picture's by its box (ThreeDGpuStandingItem::box), a building's by its triangles (ThreeDGpuStandingBuilding), the
+ * figures on it in its depth --, the order of each pixel laid with it. Not
  * all laid (one bigger than the card's textures, a texture it cannot hold, an error), the block left clear: the
  * processor draws what stands on it. Or the moving things of the view laid over what stands (ThreeDGpuStanding::moving).
  */
@@ -4280,11 +4377,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glViewport(0, 0, s.view_w, s.view_h);
 	gl.glEnable(GL_SCISSOR_TEST);
 	gl.glClearColor(0, 0, 0, 0);
-	/* What stands cleared where it is laid (its order with it); the moving things' picture is copied into below. */
+	/* What stands cleared where it is laid (its order with it), and its depth -- one for all laid on it, each pixel laid
+	 * where it is nearer than what is there (ThreeDGpuStanding::depth); the moving things' picture is copied into below. */
 	for (const std::array<int, 4> &c : clips) {
 		if (s.moving) break;
 		gl.glScissor(c[0], c[1], c[2], c[3]);
-		ClearInScissor(GL_COLOR_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
+		ClearInScissor(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT, c[0], c[1], c[2], c[3], 0.0f);
 	}
 	/* The part being laid: everything that reaches into it laid there, cut to it, each part in turn. */
 	std::array<int, 4> clip = clips.empty() ? std::array<int, 4>{s.view_x, s.view_y, 0, 0} : clips.front();
@@ -4382,8 +4480,15 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	gl.glClearDepth(0.0);
 	gl.glFrontFace(GL_CCW);
 	const GLuint p = _standing_program.program;
+	/* How near each pixel is (STANDING_NEAR_GLSL): the view's turn, where its pixels are, the depth of all on the block. */
+	auto near_uniforms = [&](GLuint program) {
+		gl.glUniform4f(gl.glGetUniformLocation(program, "u_place"), s.place[0], s.place[1], s.place[2], s.place[3]);
+		gl.glUniform4f(gl.glGetUniformLocation(program, "u_turn"), s.turn[0], s.turn[1], s.turn[2], s.turn[3]);
+		gl.glUniform2f(gl.glGetUniformLocation(program, "u_depth"), s.depth[0], std::max(1e-3f, s.depth[1]));
+	};
 	auto use_pictures = [&]() {
 		gl.glUseProgram(p);
+		near_uniforms(p);
 		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(s.view_w), static_cast<float>(s.view_h));
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_texture"), 0);
 		/* The moving things laid only where they come later than what stands there (its order). */
@@ -4406,18 +4511,44 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	};
 	std::vector<float> corners;
 	GLuint drawing = 0;
-	bool in_depth = false; ///< the pictures being gathered are laid in the depth of the building before them
+	/* What stands laid where it is nearer than what is there, each pixel by its box (STANDING_NEAR_GLSL); the moving
+	 * things by the order kept under them. */
 	auto flush = [&]() {
 		if (corners.empty()) return;
-		if (in_depth) {
+		if (!s.moving) {
 			gl.glEnable(GL_DEPTH_TEST);
 		} else {
 			gl.glDisable(GL_DEPTH_TEST);
 		}
 		gl.glBindTexture(GL_TEXTURE_2D, drawing);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 6));
+		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / STANDING_BOXED_FLOATS));
 		corners.clear();
+	};
+	/* A picture's rectangle laid at x0, y0 - x1, y1 of the view's picture from u0, v0 - u1, v1 of its texture: its order,
+	 * and how near each pixel is -- by its box; in the depth of the building before it as given (a figure on it); or by
+	 * its order alone. */
+	auto lay_rect = [&](const ThreeDGpuStandingItem &item, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1) {
+		const float o = static_cast<float>(item.order);
+		float how = 0.0f, z = 0.0f;
+		if (!s.moving && item.depth >= 0) {
+			how = 1.0f;
+			z = std::min(1.0f, item.depth);
+		} else if (!item.boxed) {
+			how = 2.0f;
+			z = std::clamp((static_cast<float>(item.order) / 32.0f - 262144.0f - s.depth[0]) / std::max(1e-3f, s.depth[1]), 0.0f, 1.0f);
+		}
+		const std::array<float, 8> box = {item.box[0], item.box[1], item.box[2], item.mid, item.box[3], item.box[4], item.box[5], how};
+		auto corner = [&](float x, float y, float u, float v) {
+			corners.insert(corners.end(), {x, y, z, u, v, o});
+			corners.insert(corners.end(), box.begin(), box.end());
+		};
+		corner(x0, y0, u0, v0);
+		corner(x1, y0, u1, v0);
+		corner(x1, y1, u1, v1);
+		corner(x0, y0, u0, v0);
+		corner(x1, y1, u1, v1);
+		corner(x0, y1, u0, v1);
 	};
 	/* A building: its depth cleared over its rectangle, its triangles by texture and side, at night its lit glass. */
 	std::vector<GLuint> textures;
@@ -4449,15 +4580,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			}
 			textures.push_back(g != nullptr ? g->name : 0);
 		}
-		if (b.clear) {
-			const int x0 = std::max(clip[0], s.view_x + b.clear_x), y0 = std::max(clip[1], s.view_y + b.clear_y);
-			const int x1 = std::min(clip[0] + clip[2], s.view_x + b.clear_x + b.clear_w), y1 = std::min(clip[1] + clip[3], s.view_y + b.clear_y + b.clear_h);
-			if (x1 > x0 && y1 > y0) {
-				gl.glScissor(x0, y0, x1 - x0, y1 - y0);
-				ClearInScissor(GL_DEPTH_BUFFER_BIT, x0, y0, x1 - x0, y1 - y0, 0.0f);
-				gl.glScissor(clip[0], clip[1], clip[2], clip[3]);
-			}
-		}
+		/* Its depth not cleared: its triangles laid in the depth of all on the block (ThreeDGpuStanding::depth), where
+		 * they are nearer than what is there. */
 		const ThreeDGpuMatrix m = Multiply(to_view, b.matrix);
 		/* Which of its cells reach into the block (GpuBuilding::boxes): their corners through the matrix to the
 		 * view's pixels, against the block's; a cell it cannot tell of drawn. */
@@ -4490,7 +4614,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				all_cells = false;
 			}
 		}
-		/* None of it in the part: its depth cleared all the same (what stands on it is laid in it), nothing drawn. */
+		/* None of it in the part: nothing drawn. */
 		if (b.night.empty() && std::ranges::none_of(cell_in, [](uint8_t in) { return in != 0; })) return true;
 		const GpuProgram &bp = _standing_building_program;
 		gl.glUseProgram(bp.program);
@@ -4498,6 +4622,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		const GLint night_at = gl.glGetUniformLocation(bp.program, "u_night");
 		gl.glUniform1i(night_at, 0);
 		gl.glUniform1f(gl.glGetUniformLocation(bp.program, "u_order"), static_cast<float>(order));
+		/* How near its depth's 0 and 1 are: each pixel's order by it (STANDING_BUILDING_FRAGMENT). */
+		gl.glUniform2f(bp.depth_range, s.depth[0], s.depth[0] + std::max(1e-3f, s.depth[1]));
 		gl.glUniformMatrix4fv(bp.matrix, 1, GL_TRUE, m.data());
 		gl.glEnable(GL_DEPTH_TEST);
 		gl.glBindVertexArray(on->vao);
@@ -4684,8 +4810,9 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	};
 	/* A box: its texture among the pictures (kept by its key), its faces' triangles over what is there. */
 	std::vector<float> face_corners;
-	auto draw_faces = [&](const ThreeDGpuStandingFaces &f, uint32_t order) {
+	auto draw_faces = [&](const ThreeDGpuStandingFaces &f, const ThreeDGpuStandingItem &item) {
 		if (f.texture == nullptr || f.corners.empty()) return true;
+		const uint32_t order = item.order;
 		ThreeDGpuStandingItem as_picture;
 		as_picture.picture = f.texture;
 		as_picture.key = f.key != 0 ? ((f.key & (STANDING_FACES_KEY - 1)) | STANDING_FACES_KEY) : 0;
@@ -4699,9 +4826,17 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_bounds"), static_cast<float>(place[0]), static_cast<float>(place[1]), static_cast<float>(f.texture->width), static_cast<float>(f.texture->height));
 		gl.glUniform1i(gl.glGetUniformLocation(fp, "u_fill"), f.fill ? 1 : 0);
 		gl.glUniform1f(gl.glGetUniformLocation(fp, "u_order"), static_cast<float>(order));
+		/* Each pixel where it is nearer than what is there, by its box (STANDING_NEAR_GLSL). */
+		near_uniforms(fp);
+		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_lo"), item.box[0], item.box[1], item.box[2], item.mid);
+		gl.glUniform4f(gl.glGetUniformLocation(fp, "u_hi"), item.box[3], item.box[4], item.box[5], item.boxed ? 0.0f : 2.0f);
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindTexture(GL_TEXTURE_2D, texture);
-		gl.glDisable(GL_DEPTH_TEST);
+		if (!s.moving) {
+			gl.glEnable(GL_DEPTH_TEST);
+		} else {
+			gl.glDisable(GL_DEPTH_TEST);
+		}
 		face_corners.resize(f.corners.size());
 		for (size_t i = 0; i + 3 < f.corners.size(); i += 4) {
 			face_corners[i] = f.corners[i] + s.view_x;
@@ -4724,7 +4859,7 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 			if (in_some[k] == 0 || !reaches(clip, reach[k])) continue;
 			if (item.faces >= 0) {
 				flush();
-				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces], item.order)) {
+				if (!_standing_faces_ok || static_cast<size_t>(item.faces) >= s.faces.size() || !draw_faces(s.faces[item.faces], item)) {
 					_gpu_standing_failed[0]++;
 					if (_gpu_standing_failed_told < 40) {
 						_gpu_standing_failed_told++;
@@ -4757,19 +4892,16 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 					drawing = 0;
 					if (!shrunk) continue;
 				}
-				/* Among the triangles of the building before it (a figure on it) where it is nearer, as a picture is. */
-				const bool depth = !s.moving && item.depth >= 0;
-				if (_standing_atlas != drawing || depth != in_depth) {
+				/* Laid as a picture is, each pixel where it is nearer. */
+				if (_standing_atlas != drawing) {
 					flush();
 					drawing = _standing_atlas;
-					in_depth = depth;
 				}
 				const float w = static_cast<float>(v.width), h = static_cast<float>(v.height);
 				const float times = static_cast<float>(1 << std::clamp(item.up, 0, 3));
 				const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w * times, y1 = y0 + h * times;
 				const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-				const float z = depth ? std::min(1.0f, item.depth) : 0.0f, o = static_cast<float>(item.order);
-				corners.insert(corners.end(), {x0, y0, z, u0, v0, o, x1, y0, z, u1, v0, o, x1, y1, z, u1, v1, o, x0, y0, z, u0, v0, o, x1, y1, z, u1, v1, o, x0, y1, z, u0, v1, o});
+				lay_rect(item, x0, y0, x1, y1, u0, v0, u1, v1);
 				if (s.moving) _gpu_moving_things++;
 				continue;
 			}
@@ -4798,17 +4930,14 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 				all = false;
 				break;
 			}
-			const bool depth = !s.moving && item.depth >= 0;
-			if (texture != drawing || depth != in_depth) {
+			if (texture != drawing) {
 				flush();
 				drawing = texture;
-				in_depth = depth;
 			}
 			const float w = static_cast<float>(item.picture->width), h = static_cast<float>(item.picture->height);
 			const float x0 = static_cast<float>(s.view_x + item.x), y0 = static_cast<float>(s.view_y + item.y), x1 = x0 + w, y1 = y0 + h;
 			const float u0 = static_cast<float>(place[0]), v0 = static_cast<float>(place[1]), u1 = u0 + w, v1 = v0 + h;
-			const float z = depth ? std::min(1.0f, item.depth) : 0.0f, o = static_cast<float>(item.order);
-			corners.insert(corners.end(), {x0, y0, z, u0, v0, o, x1, y0, z, u1, v0, o, x1, y1, z, u1, v1, o, x0, y0, z, u0, v0, o, x1, y1, z, u1, v1, o, x0, y1, z, u0, v1, o});
+			lay_rect(item, x0, y0, x1, y1, u0, v0, u1, v1);
 			if (s.moving) _gpu_moving_things++;
 		}
 		flush();

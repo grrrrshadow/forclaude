@@ -5137,6 +5137,18 @@ std::optional<bool> GetThreeDFigureOnCard(std::string_view name, float scale, fl
  */
 bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state)
 {
+	return AddThreeDFigureToViewportInBox(name, scale, x, y, z, facing, zoom, tile, phase, frame, state, nullptr);
+}
+
+/**
+ * A figure standing on the turned map as AddThreeDFigureToViewport(), in the box it fills -- not a small one about its
+ * feet: each pixel of a thing long or wide (the wall of a lock, a leaf of its gate) laid by how near the box is there
+ * (ThreeDGpuStandingItem::box), as the ship between the walls is by its own (the player, test3: "what is behind is
+ * drawn on top, the gates, the ship through the lock's concrete").
+ * @param box its box, world units, inclusive: xmin, ymin, zmin, xmax, ymax, zmax; nullptr the small one about its feet
+ */
+bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, int y, int z, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int frame, int state, const std::array<int, 6> *box)
+{
 	int height = 0, up = 0;
 	bool later = false;
 	/* Drawn by the card with the block's vehicles, no picture of it (CardVehicle()), coarser a little sooner than a
@@ -5156,7 +5168,11 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 		switch (CardVehicle(*p, card, lights)) {
 			case CardMade::Drawn:
 				if (card == nullptr) return false;
-				AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+				if (box != nullptr) {
+					AddTurnedVehicleOnCard(std::move(card), x, y, z, (*box)[0], (*box)[1], (*box)[2], (*box)[3], (*box)[4], (*box)[5], up);
+				} else {
+					AddTurnedVehicleOnCard(std::move(card), x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+				}
 				return true;
 			case CardMade::NotYet:
 				/* A dragon's wings reach aside further than it is tall. */
@@ -5170,7 +5186,11 @@ bool AddThreeDFigureToViewport(std::string_view name, float scale, int x, int y,
 	if (!p.has_value()) return false;
 	const ThreeDModelPicture *pic = RequestedPicture(std::move(*p), later);
 	if (pic == nullptr) return false;
-	AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+	if (box != nullptr) {
+		AddTurnedVehiclePicture(pic, x, y, z, (*box)[0], (*box)[1], (*box)[2], (*box)[3], (*box)[4], (*box)[5], up);
+	} else {
+		AddTurnedVehiclePicture(pic, x, y, z, x - 1, y - 1, z, x + 1, y + 1, z + height, up);
+	}
 	return true;
 }
 
