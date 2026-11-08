@@ -516,6 +516,10 @@ Foundation GetRailFoundation(Slope tileh, TrackBits bits);
 bool ThreeDTrackShownOn(TileIndex tile);
 double ThreeDTrackRailTop(TileIndex tile);
 double ThreeDTrackStandOver(TileIndex tile, double lx, double ly);
+TrackBits ThreeDTrackBitsOf(TileIndex tile);
+double ThreeDRoadOverTrack(TileIndex tile, double x, double y);
+struct TileInfo;
+bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool crossing);
 
 
 bool HasRailTypeAvail(const CompanyID company, const RailType railtype);

@@ -1757,8 +1757,12 @@ static void DrawTile_Road(TileInfo *ti)
 
 			PaletteID pal = PAL_NONE;
 
+			/* Our 3D track across the road, with its panels and ramps (DrawThreeDTrackOn()): the road alone under it, no
+			 * rails nor crossing of the game's. */
+			const bool three_d = DrawThreeDTrackOn(ti, axis, DiagDirection::Invalid, true);
+
 			/* Draw base ground */
-			if (rti->UsesOverlay()) {
+			if (three_d || rti->UsesOverlay()) {
 				SpriteID image = SPR_ROAD_Y + to_underlying(axis);
 
 				Roadside roadside = GetRoadside(ti->tile);
@@ -1809,7 +1813,9 @@ static void DrawTile_Road(TileInfo *ti)
 
 			/* Draw rail/PBS overlay */
 			bool draw_pbs = _game_mode != GameMode::Menu && _settings_client.gui.show_track_reservation && HasCrossingReservation(ti->tile);
-			if (rti->UsesOverlay()) {
+			if (three_d) {
+				/* Its rails are ours. */
+			} else if (rti->UsesOverlay()) {
 				pal = draw_pbs ? PALETTE_CRASH : PAL_NONE;
 				SpriteID rail = GetCustomRailSprite(rti, ti->tile, RailSpriteType::Crossing) + to_underlying(axis);
 				DrawGroundSprite(rail, pal);

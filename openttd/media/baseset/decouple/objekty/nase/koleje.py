@@ -13,6 +13,12 @@ of rail_cmd.cpp), our own geometry and our own pictures. Written beside this scr
   kolej_svah_beton.glb
   kolej_svah_oci_drevo.glb  the same up a level of the view from the eyes (5 m, EYE_LEVEL_STRETCH)
   kolej_svah_oci_beton.glb
+  kolej_pul_drevo.glb       a straight piece half the tile long: a depot's, from its door to its middle
+  kolej_pul_beton.glb
+  kolej_prejezd_drevo.glb   a level crossing's piece: the straight piece the tile long, over it where the road goes
+  kolej_prejezd_beton.glb   (9.2 m along the track) concrete panels as high as the rails' heads 4.4 m across the track,
+                            the grooves inside the rails' heads in them, a ramp of asphalt down to the road 2.5 m each
+                            side (the road vehicles over it lifted so, ThreeDRoadOverTrack())
 
 glTF's Y up. Along +X, centred on the origin along and across (Z); its foot at Y 0 on the ground at its middle (a
 slope's half way up). The embankment one block 0.12 m high and 3.4 m across: its top and its two sides, no ends (the next
@@ -212,10 +218,62 @@ def piece(length, climb, kind):
 MATERIALS = {
     'kolejnice': ('colour', [0.38, 0.26, 0.19, 1.0]),
     'hlava': ('colour', [0.70, 0.71, 0.74, 1.0]),
+    'asfalt': ('colour', [0.25, 0.25, 0.26, 1.0]),
 }
 
+PANEL_HALF = 2.2                   # a crossing's panels each side of the track's middle (ThreeDRoadOverTrack())
+RAMP = 2.5                         # its ramps of asphalt down to the road
+ROAD_HALF = 4.6                    # the road's half width along the track: the panels and ramps only over it
+PANEL_SINK = 0.004                 # the panels' top so much under the rails' heads (their bright tops over it)
+PANEL_TEX_W, PANEL_TEX_H = 64, 256
 
-def write(path, mesh, name, texture, sleeper):
+
+def panel_png(length):
+    """A crossing's concrete panels from above: u across (the panels' width), v along the track; their seams every
+    1.2 m or so, the grooves inside the rails' heads dark."""
+    w, h = PANEL_TEX_W, PANEL_TEX_H
+    im = Image.new('RGB', (w, h), (150, 148, 142))
+    rnd = random.Random(17)
+    px = im.load()
+    for y in range(h):
+        for x in range(w):
+            n = rnd.randint(-7, 7)
+            px[x, y] = (150 + n, 148 + n, 142 + n)
+    panels = max(1, round(length / 1.2))
+    for k in range(panels + 1):
+        y = min(h - 1, int(k * h / panels))
+        for x in range(w):
+            px[x, y] = (96, 95, 92)
+    for x in (w // 2 - 1, w // 2):
+        for y in range(h):
+            px[x, y] = (110, 108, 104)
+    per_m = w / (2 * PANEL_HALF)
+    for side in (-1, 1):
+        c = w / 2 + side * (GAUGE / 2) * per_m
+        inner = c - side * 2.0
+        for y in range(h):
+            for x in (int(round(inner)) - 1, int(round(inner))):
+                if 0 <= x < w:
+                    px[x, y] = (40, 38, 36)
+    return png(im)
+
+
+def crossing(length, kind):
+    """A level crossing's piece along +X: the track the tile long (piece()), over it where the road goes its panels a
+    hair under the rails' heads, its ramps and their ends."""
+    m = piece(length, 0.0, kind)
+    x0, x1 = -ROAD_HALF, ROAD_HALF
+    top, a, b = RAIL_TOP_M - PANEL_SINK, PANEL_HALF, PANEL_HALF + RAMP
+    m.quad('panel', [(x0, top, a), (x1, top, a), (x1, top, -a), (x0, top, -a)], [(1, 0), (1, 1), (0, 1), (0, 0)])
+    m.quad('asfalt', [(x0, 0, b), (x1, 0, b), (x1, top, a), (x0, top, a)], [(0, 0)] * 4)
+    m.quad('asfalt', [(x1, 0, -b), (x0, 0, -b), (x0, top, -a), (x1, top, -a)], [(0, 0)] * 4)
+    m.quad('asfalt', [(x1, 0, b), (x1, 0, -b), (x1, top, -a), (x1, top, a)], [(0, 0)] * 4)
+    m.quad('asfalt', [(x0, 0, -b), (x0, 0, b), (x0, top, a), (x0, top, -a)], [(0, 0)] * 4)
+    return m
+
+
+def write(path, mesh, name, pictures):
+    """The pieces' glb: `pictures` a material's texture (png) by its name, the others their colour (MATERIALS)."""
     blob = bytearray()
     views = []
 
@@ -252,8 +310,8 @@ def write(path, mesh, name, texture, sleeper):
         ]
         triangles += len(idx) // 3
         m = {'name': name + '_' + mat, 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 1.0}}
-        if mat in ('nasep', 'prazec'):
-            images.append({'bufferView': view(texture if mat == 'nasep' else sleeper), 'mimeType': 'image/png'})
+        if mat in pictures:
+            images.append({'bufferView': view(pictures[mat]), 'mimeType': 'image/png'})
             textures.append({'source': len(images) - 1, 'sampler': 0})
             m['pbrMetallicRoughness']['baseColorTexture'] = {'index': len(textures) - 1}
         else:
@@ -293,7 +351,11 @@ def main():
     for kind in ('drevo', 'beton'):
         for name, length, climb in (('rovna', TILE_M, 0.0), ('sikma', DIAGONAL_M, 0.0), ('svah', TILE_M, LEVEL_MAP_M), ('svah_oci', TILE_M, LEVEL_EYE_M)):
             full = f'kolej_{name}_{kind}'
-            write(os.path.join(HERE, full + '.glb'), piece(length, climb, kind), full, top_png(length, kind), sleeper_png(kind))
+            write(os.path.join(HERE, full + '.glb'), piece(length, climb, kind), full, {'nasep': top_png(length, kind), 'prazec': sleeper_png(kind)})
+        full = f'kolej_pul_{kind}'
+        write(os.path.join(HERE, full + '.glb'), piece(TILE_M / 2, 0.0, kind), full, {'nasep': top_png(TILE_M / 2, kind), 'prazec': sleeper_png(kind)})
+        full = f'kolej_prejezd_{kind}'
+        write(os.path.join(HERE, full + '.glb'), crossing(TILE_M, kind), full, {'nasep': top_png(TILE_M, kind), 'prazec': sleeper_png(kind), 'panel': panel_png(2 * ROAD_HALF)})
     print(f'hlava kolejnice {RAIL_TOP_M:.3f} m nad zemi, sikmy kus {DIAGONAL_M:.2f} m')
 
 

@@ -2542,11 +2542,41 @@ static const TrackIndexArray<ThreeDTrackPiece> THREE_D_TRACK_PIECES = {{{
  * Whether a tile's track is ours in 3D where it is drawn now (the player, 8. 11.: "the rails from above on and in 3D on
  * too by default"; ThreeDGroupShown(): from above or from the eyes by their settings): a plain rail of the normal
  * railways (not a monorail, not a maglev), not on the half of a tile's foundation nor by the water. A piece of a round
- * curve too (round_track.h; the player, 8. 11.: "the curves in 3D, yes"): laid along its arc (DrawThreeDTrack()).
+ * curve too (round_track.h; the player, 8. 11.: "the curves in 3D, yes"): laid along its arc (DrawThreeDTrack()). And a
+ * station's, a waypoint's, a depot's, a level crossing's (ThreeDTrackOtherOn()).
  */
+/**
+ * The tracks of a tile our 3D track may lie on, of any kind: plain rail's pieces; a rail station's, a waypoint's, a
+ * level crossing's, a depot's the one along its way; none of another tile.
+ */
+TrackBits ThreeDTrackBitsOf(TileIndex tile)
+{
+	if (!IsValidTile(tile)) return {};
+	switch (GetTileType(tile)) {
+		case TileType::Railway: return IsPlainRail(tile) ? GetTrackBits(tile) : TrackBits{DiagDirToDiagTrack(GetRailDepotDirection(tile))};
+		case TileType::Station: return HasStationRail(tile) ? TrackBits{AxisToTrack(GetRailStationAxis(tile))} : TrackBits{};
+		case TileType::Road: return IsLevelCrossing(tile) ? TrackBits{AxisToTrack(GetCrossingRailAxis(tile))} : TrackBits{};
+		default: return {};
+	}
+}
+
+/**
+ * Whether our 3D track is on a tile of another kind than plain rail (the player, 8. 11.: "finish the 3D track";
+ * DrawThreeDTrackOn()): a rail station's or a waypoint's -- not a set's station, which keeps its own look --, a depot's,
+ * a level crossing's; of the normal railways.
+ */
+static bool ThreeDTrackOtherOn(TileIndex tile)
+{
+	if (ThreeDTrackBitsOf(tile).None()) return false;
+	if (GetRailTypeInfo(GetRailType(tile))->acceleration_type != VehicleAccelerationModel::Normal) return false;
+	if (IsTileType(tile, TileType::Station) && IsCustomStationSpecIndex(tile)) return false;
+	return GetThreeDFigure("kolej_rovna_drevo") != nullptr;
+}
+
 bool ThreeDTrackShownOn(TileIndex tile)
 {
-	if (!ThreeDEnabled() || !IsValidTile(tile) || !IsPlainRailTile(tile) || !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
+	if (!ThreeDEnabled() || !IsValidTile(tile) || !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
+	if (!IsPlainRailTile(tile)) return ThreeDTrackOtherOn(tile);
 	if (GetRailTypeInfo(GetRailType(tile))->acceleration_type != VehicleAccelerationModel::Normal) return false;
 	if (GetRailGroundType(tile) == RailGroundType::HalfTileWater) return false;
 	const TrackBits track = GetTrackBits(tile);
@@ -2582,7 +2612,11 @@ double ThreeDTrackStandOver(TileIndex tile, double lx, double ly)
 	/* A round piece (the view from the eyes draws the round curves when they are on): along its arc. */
 	const bool round = RoundTrackEnabled() && IsRoundTrackTile(tile);
 	const double wx = TileX(tile) * TILE_SIZE + lx, wy = TileY(tile) * TILE_SIZE + ly;
-	for (Track t : GetTrackBits(tile)) {
+	/* A level crossing: on its panels and its ramps, as the cars; beside the road on its track. */
+	if (IsLevelCrossingTile(tile)) {
+		if (const double over = ThreeDRoadOverTrack(tile, wx, wy); over > 0) return over;
+	}
+	for (Track t : ThreeDTrackBitsOf(tile)) {
 		if (round) {
 			const std::vector<RoundTrackPoint> line = RoundTrackCentreLine(tile, t, THREE_D_ARC_STEP);
 			if (!line.empty()) {
@@ -2642,8 +2676,9 @@ static bool ThreeDCatenaryOn(TileIndex tile)
  *    where they are switched off (gui.three_d_catenary_masts_*): the wires alone.
  * @param s the tile's slope after its foundation
  * @param round the tile is of a round curve drawn round
+ * @param half_from a depot's track: only its wires from the edge its door is at to its middle, no mast; DiagDirection::Invalid none
  */
-static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye)
+static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye, DiagDirection half_from = DiagDirection::Invalid)
 {
 	const TileIndex tile = ti->tile;
 	const int tx = TileX(tile), ty = TileY(tile);
@@ -2708,7 +2743,7 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 		const int nx = tx + dx, ny = ty + dy;
 		if (nx < 0 || ny < 0 || nx >= static_cast<int>(Map::SizeX()) || ny >= static_cast<int>(Map::SizeY())) return false;
 		const TileIndex n = TileXY(nx, ny);
-		if (!ThreeDCatenaryOn(n) || !GetTrackBits(n).Test(t)) return false;
+		if (!ThreeDCatenaryOn(n) || !ThreeDTrackBitsOf(n).Test(t)) return false;
 		return !(RoundTrackDrawing() && IsRoundTrackTile(n) && !RoundTrackCentreLine(n, t, TILE_SIZE).empty());
 	};
 
@@ -2730,6 +2765,11 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
 			}
 		}
 		const ThreeDTrackPiece &p = THREE_D_TRACK_PIECES[t];
+		if (half_from != DiagDirection::Invalid) {
+			const TileIndexDiffC d = TileIndexDiffCByDiagDir(half_from);
+			wire(8 + d.x * 8, 8 + d.y * 8, 8, 8);
+			continue;
+		}
 		wire(p.x - p.ax, p.y - p.ay, p.x + p.ax, p.y + p.ay);
 		switch (t) {
 			case Track::X:
@@ -2859,6 +2899,74 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	}
 	/* Its catenary over it, when it is electrified (DrawThreeDCatenary()). */
 	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
+	return true;
+}
+
+/**
+ * A level crossing's panels each side of the track's middle and its ramps down to the road; how far along the track
+ * from the tile's middle they go, the road's half width; metres (koleje.py PANEL_HALF, RAMP, ROAD_HALF).
+ */
+static constexpr double THREE_D_PANEL_HALF_M = 2.2, THREE_D_RAMP_M = 2.5, THREE_D_CROSSING_ROAD_HALF_M = 4.6;
+
+/**
+ * How high a road vehicle (or the walker) stands over the road at a point of a level crossing with our 3D track
+ * (DrawThreeDTrackOn(); objekty/nase/koleje.py "prejezd"), metres: on its panels as high as the rails' heads, down its
+ * ramps to the road each side; 0 off them -- beside the road the track as anywhere --, or where the crossing is the game's.
+ * @param x,y the point, world units
+ */
+double ThreeDRoadOverTrack(TileIndex tile, double x, double y)
+{
+	if (!IsValidTile(tile) || !IsLevelCrossingTile(tile) || !ThreeDTrackShownOn(tile)) return 0.0;
+	const bool along_x = GetCrossingRailAxis(tile) == Axis::X;
+	const double mx = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, my = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	if (std::abs(along_x ? x - mx : y - my) / OBJECT_UNITS_PER_METRE > THREE_D_CROSSING_ROAD_HALF_M) return 0.0;
+	const double d = std::abs(along_x ? y - my : x - mx) / OBJECT_UNITS_PER_METRE;
+	if (d <= THREE_D_PANEL_HALF_M) return THREE_D_RAIL_TOP_M;
+	return THREE_D_RAIL_TOP_M * std::max(0.0, 1.0 - (d - THREE_D_PANEL_HALF_M) / THREE_D_RAMP_M);
+}
+
+/**
+ * Our 3D track on a tile of another kind than plain rail (the player, 8. 11.: "finish the 3D track"): a rail station's or
+ * a waypoint's (their platforms and buildings the game's), a depot's from its door to its middle, a level crossing's --
+ * its concrete panels as high as the rails' heads across the track and its ramps for the road (ThreeDRoadOverTrack()).
+ * A straight piece along its way, as on plain rail (DrawThreeDTrack()), on the tile flat after its foundation; its
+ * catenary over it (a depot's wires alone). The ground under it the caller's.
+ * @param axis the way of the track
+ * @param door a depot's: the edge its door is at; DiagDirection::Invalid the whole tile
+ * @param crossing a level crossing's piece
+ * @return whether it was drawn so: the caller leaves out its sprites of the track
+ */
+bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool crossing)
+{
+	const bool eye = ViewportDrawingEye();
+	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
+	if (!ThreeDTrackShownOn(ti->tile) || ti->tileh != SLOPE_FLAT) return false;
+	if (crossing && GetThreeDFigure("kolej_prejezd_drevo") == nullptr) return false;
+	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
+	const bool half = door != DiagDirection::Invalid;
+	const std::string_view name = crossing ? (concrete ? "kolej_prejezd_beton" : "kolej_prejezd_drevo") : half ? (concrete ? "kolej_pul_beton" : "kolej_pul_drevo") : (concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	/* Its middle: the tile's, a depot's half way from its door to it. */
+	double mx = TILE_SIZE / 2.0, my = TILE_SIZE / 2.0;
+	if (half) {
+		const TileIndexDiffC d = TileIndexDiffCByDiagDir(door);
+		mx += d.x * TILE_SIZE / 4.0;
+		my += d.y * TILE_SIZE / 4.0;
+	}
+	const float facing = axis == Axis::X ? 0.0f : 90.0f;
+	const double x = TileX(ti->tile) * TILE_SIZE + mx, y = TileY(ti->tile) * TILE_SIZE + my;
+	if (eye) {
+		AddCabGroundFigure(name, x, y, ti->z, facing);
+	} else {
+		/* Its box: along it to its ends, across it its embankment (a crossing's panels and ramps). */
+		const double along = (half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0), across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
+		const double hx = axis == Axis::X ? along : across, hy = axis == Axis::X ? across : along;
+		const int bx0 = static_cast<int>(std::lround(x - hx)), by0 = static_cast<int>(std::lround(y - hy));
+		const int bx1 = std::max(bx0, static_cast<int>(std::lround(x + hx)) - 1), by1 = std::max(by0, static_cast<int>(std::lround(y + hy)) - 1);
+		const int tall = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+		const std::array<int, 6> box{bx0, by0, ti->z, bx1, by1, ti->z + tall - 1};
+		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+	}
+	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, door);
 	return true;
 }
 
@@ -3136,6 +3244,9 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		if (ti->tileh != SLOPE_FLAT) DrawFoundation(ti, Foundation::Leveled);
 
+		/* Our 3D track from its door to its middle (DrawThreeDTrackOn()): its ground plain, no track of the game's. */
+		const bool three_d = DrawThreeDTrackOn(ti, DiagDirToAxis(dir), dir, false);
+
 		if (IsInvisibilitySet(TransparencyOption::Buildings)) {
 			/* Draw rail instead of depot */
 			dts = &_depot_invisible_gfx_table[dir];
@@ -3144,7 +3255,7 @@ static void DrawTile_Rail(TileInfo *ti)
 		}
 
 		SpriteID image;
-		if (rti->UsesOverlay()) {
+		if (three_d || rti->UsesOverlay()) {
 			image = SPR_FLAT_GRASS_TILE;
 		} else {
 			image = dts->ground.sprite;
@@ -3162,7 +3273,9 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		DrawGroundSprite(image, GroundSpritePaletteTransform(image, PAL_NONE, pal));
 
-		if (rti->UsesOverlay()) {
+		if (three_d) {
+			/* Its track is ours. */
+		} else if (rti->UsesOverlay()) {
 			SpriteID ground = GetCustomRailSprite(rti, ti->tile, RailSpriteType::Ground);
 
 			switch (GetRailDepotDirection(ti->tile)) {

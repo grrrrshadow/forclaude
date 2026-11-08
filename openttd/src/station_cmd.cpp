@@ -3519,7 +3519,11 @@ static void DrawTile_Station(TileInfo *ti)
 		draw_ground = true;
 	}
 
-	if (draw_ground && !IsAnyRoadStop(ti->tile)) {
+	if (draw_ground && !IsAnyRoadStop(ti->tile) && HasStationRail(ti->tile) && DrawThreeDTrackOn(ti, GetRailStationAxis(ti->tile), DiagDirection::Invalid, false)) {
+		/* Our 3D track along it (DrawThreeDTrackOn()): under it the gravel of the railway's junctions, its platforms
+		 * and buildings the game's. */
+		DrawGroundSprite(rti->UsesOverlay() ? SPR_FLAT_GRASS_TILE : rti->base_sprites.ground + 4, PAL_NONE);
+	} else if (draw_ground && !IsAnyRoadStop(ti->tile)) {
 		SpriteID image = t->ground.sprite;
 		PaletteID pal  = t->ground.pal;
 		RailTrackOffset overlay_offset;

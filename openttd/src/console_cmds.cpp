@@ -12087,9 +12087,32 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				if (corners.has_value()) Command<Commands::TerraformLand>::Do(DoCommandFlag::Execute, at, static_cast<Slope>(*corners), true);
 			}
 		}
-		CommandCost r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, rt, static_cast<Track>(*tr), false);
+		/* 'stanice <length>': a rail station along the track (0 X, 1 Y) so many tiles long from the tile; 'depo <0..3>' a
+		 * depot whose door is at that edge (NE, SE, SW, NW); 'silnice' a road across the track after it, a level crossing,
+		 * with a tile of road each side -- the 3D track there (DrawThreeDTrackOn()). */
+		CommandCost r;
+		const Axis axis = *tr == 1 ? Axis::Y : Axis::X;
+		bool done = false;
+		for (size_t k = 5; k + 1 < argv.size(); k++) {
+			if (argv[k] == "stanice") {
+				r = Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, at, rt, axis, 1, static_cast<uint8_t>(ParseInteger(argv[k + 1]).value_or(1)), STAT_CLASS_DFLT, 0, StationID::Invalid(), false);
+				done = true;
+			} else if (argv[k] == "depo") {
+				r = Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, at, rt, static_cast<DiagDirection>(ParseInteger(argv[k + 1]).value_or(0) & 3));
+				done = true;
+			}
+		}
+		if (!done) r = Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at, rt, static_cast<Track>(*tr), false);
+		if (r.Succeeded() && !done && std::find(argv.begin(), argv.end(), "silnice") != argv.end()) {
+			const Axis road = axis == Axis::X ? Axis::Y : Axis::X;
+			const TileIndexDiff step = road == Axis::X ? TileDiffXY(1, 0) : TileDiffXY(0, 1);
+			for (TileIndex rt_tile : {at - step, at, at + step}) {
+				const CommandCost rr = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, rt_tile, AxisToRoadBits(road), ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				if (rr.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej silnice na {},{}: NEJDE", TileX(rt_tile), TileY(rt_tile));
+			}
+		}
 		UpdateSignalsInBuffer(); // as a command from the game would
-		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE", *tr, *x, *y);
+		if (r.Failed()) IConsolePrint(CC_ERROR, "test3d: kolej {} na {},{}: NEJDE ({})", *tr, *x, *y, r.GetErrorMessage() == INVALID_STRING_ID ? "?" : GetString(r.GetErrorMessage()));
 		return true;
 	} else if (what == "casy") {
 		/* The rig: where the turned view's time went since the last 'casy' (the round curves, the pictures of vehicles). */
