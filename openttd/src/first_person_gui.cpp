@@ -2611,6 +2611,7 @@ struct FirstPersonWindow : Window {
 		this->SetWidgetLoweredState(WID_FP_LOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_LOAD);
 		this->SetWidgetLoweredState(WID_FP_UNLOAD, rv != nullptr && rv->cab_cargo == Vehicle::CAB_CARGO_UNLOAD);
 		this->SetWidgetsDisabledState(rv == nullptr || rv->owner != _local_company || rv->type != VehicleType::Road, WID_FP_LOAD, WID_FP_UNLOAD);
+		this->GetWidget<NWidgetCore>(WID_FP_CENTRE)->SetToolTip(rv != nullptr ? STR_FIRST_PERSON_STAND_TOOLTIP : STR_FIRST_PERSON_CENTRE_TOOLTIP);
 		this->DrawWidgets();
 	}
 
@@ -2618,6 +2619,8 @@ struct FirstPersonWindow : Window {
 	{
 		/* Its route, or the wheel again (as the cab view's). */
 		if (widget == WID_FP_ROUTE) return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
+		/* Riding, the driver's stand at the front or at the back of the vehicle (CabViewCamera::rear). */
+		if (widget == WID_FP_CENTRE && this->Riding() != nullptr) return GetString(this->camera.rear ? STR_FIRST_PERSON_STAND_BACK : STR_FIRST_PERSON_STAND_FRONT);
 		if (widget == WID_FP_CAMERA) return CabCameraText();
 		if (widget == WID_FP_CONTROLS) return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
 		return this->Window::GetWidgetString(widget, stringid);
@@ -2625,6 +2628,11 @@ struct FirstPersonWindow : Window {
 
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
 	{
+		if (widget == WID_FP_CENTRE) {
+			/* On the map, or the driver's stand when riding (as wide as its longest). */
+			for (StringID s : {STR_FIRST_PERSON_CENTRE, STR_FIRST_PERSON_STAND_FRONT, STR_FIRST_PERSON_STAND_BACK}) size.width = std::max(size.width, GetStringBoundingBox(s).width + padding.width);
+			return;
+		}
 		if (widget != WID_FP_CAMERA) return;
 		const Dimension d = CabCameraTextSize();
 		size.width = std::max(size.width, d.width + padding.width);
@@ -2774,6 +2782,15 @@ struct FirstPersonWindow : Window {
 				this->SetDirty();
 				break;
 			case WID_FP_CENTRE:
+				/* Riding (the player, test4: "instead of the button 'On the map' the driver's stand changes by clicking one
+				 * button"): to the other end of the vehicle, the eye turned at once. */
+				if (this->Riding() != nullptr) {
+					this->camera.rear = !this->camera.rear;
+					this->camera.valid = false;
+					this->camera.head = 0;
+					this->SetDirty();
+					break;
+				}
 				/* The map shows again: the view a window. */
 				if (this->full) this->ToggleFull();
 				ScrollMainWindowTo(static_cast<int>(this->walker.x), static_cast<int>(this->walker.y), static_cast<int>(FirstPersonFeetZ(this->walker)));

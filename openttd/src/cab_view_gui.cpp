@@ -990,6 +990,17 @@ std::string DescribeCarHorn()
  * looks about (CabViewWindow::OnRightClick(), OnScroll()), let go.
  * @return how the head is turned then
  */
+/** The rig ('test3d kabina zadni'): the cab view open at the other end of its vehicle (CabViewCamera::rear), as the first person's button does. */
+std::string RigCabRear()
+{
+	CabViewWindow *cw = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
+	if (cw == nullptr) return "zadna kabina";
+	cw->camera.rear = !cw->camera.rear;
+	cw->camera.valid = false;
+	cw->SetDirty();
+	return cw->camera.rear ? "stanoviste vzadu" : "stanoviste vpredu";
+}
+
 std::string RigCabLook(int dx, int dy)
 {
 	/* The cab view open, else the vehicle the walker rides in (boarded with E). */

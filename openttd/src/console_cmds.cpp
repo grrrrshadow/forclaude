@@ -10261,8 +10261,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'vagony <jmeno> [pocet] [x y] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight railway along
 		 * x with a shed at each end and a train between them: the fastest engine and so many wagons whose name has the
 		 * text in it (the colleague's wagons as 3D objects), or so many of the engine so named; refitted, filled and
-		 * configured as 'auta' does. */
+		 * configured as 'auta' does; 'lok=<text>' the wagons behind the engine of that name (the Sergej). */
 		std::string wanted(argv[2]);
+		std::string loco_wanted;
 		bool full = false;
 		uint8_t subtype = 0;
 		CargoType refit_to = INVALID_CARGO;
@@ -10271,6 +10272,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const size_t colon = argv[k].find(':');
 			if (argv[k] == "plny") {
 				full = true;
+			} else if (argv[k].starts_with("lok=")) {
+				loco_wanted = argv[k].substr(4);
 			} else if (argv[k].size() >= 2 && argv[k].starts_with("p") && ParseInteger<uint8_t>(argv[k].substr(1)).has_value()) {
 				subtype = *ParseInteger<uint8_t>(argv[k].substr(1));
 			} else if (argv[k].starts_with("v") && colon != std::string_view::npos) {
@@ -10343,7 +10346,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (!IsEngineBuildable(e->index, VehicleType::Train, _current_company)) continue;
 			const bool is_wagon = e->VehInfo<RailVehicleInfo>().railveh_type == RailVehicleType::Wagon;
 			if (asked == nullptr && GetString(STR_ENGINE_NAME, e->index).find(wanted) != std::string::npos) asked = e;
-			if (!is_wagon && HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL) && CountArticulatedParts(e->index) == 0 && (loco == nullptr || e->GetDisplayMaxSpeed() > loco->GetDisplayMaxSpeed())) loco = e;
+			const bool named = !is_wagon && !loco_wanted.empty() && GetString(STR_ENGINE_NAME, e->index).find(loco_wanted) != std::string::npos;
+			if (!is_wagon && HasPowerOnRail(e->VehInfo<RailVehicleInfo>().railtypes, RAILTYPE_RAIL) && (CountArticulatedParts(e->index) == 0 || named)) {
+				const bool loco_named = loco != nullptr && !loco_wanted.empty() && GetString(STR_ENGINE_NAME, loco->index).find(loco_wanted) != std::string::npos;
+				if (loco == nullptr || (named && !loco_named) || (named == loco_named && e->GetDisplayMaxSpeed() > loco->GetDisplayMaxSpeed())) loco = e;
+			}
 		}
 		if (asked == nullptr) {
 			IConsolePrint(CC_ERROR, "test3d: vagony: zadny vuz '{}'", wanted);
@@ -11724,6 +11731,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
 						to_underlying(cv->direction), to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
 			}
+			return true;
+		}
+		if (argv.size() > 2 && argv[2] == "zadni") {
+			/* 'kabina zadni': the cab view open at the other end of its vehicle and back (RigCabRear()). */
+			extern std::string RigCabRear();
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigCabRear());
 			return true;
 		}
 		if (argv.size() > 2 && argv[2] == "zavri") {

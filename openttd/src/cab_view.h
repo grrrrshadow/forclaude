@@ -62,6 +62,12 @@ struct CabViewCamera {
 	int billboards = 0;   ///< rig: billboards drawn in the last picture
 	double stage[7] = {}; ///< rig: the milliseconds of the stages of collecting the last picture (CollectEyeFrame())
 	bool msts = false;    ///< the desk of a cab of MSTS is drawn over the picture (simtrains_cab.h): the eye where its cab has it, as wide as MSTS sees, the model not drawn about it
+	/**
+	 * The driver at the other end of the vehicle whose cab the eye is in, looking back along it (the player, test4: "we
+	 * need to change the driver's stand to the front of the locomotive and to the back, by clicking one button"): the
+	 * eye of its cab mirrored through its middle.
+	 */
+	bool rear = false;
 };
 
 /** The tangent of half the field of view up and down of a cab of MSTS: 45 degrees, as MSTS and Open Rails see (its desk of 640 by 480 fills it). */

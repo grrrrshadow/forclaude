@@ -2412,6 +2412,9 @@ STR_FIRST_PERSON_HERE                                           :Sem
 STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Postav chodce tam, kam se dívá hlavní pohled
 STR_FIRST_PERSON_CENTRE                                         :Na mapě
 STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž místo chodce v hlavním pohledu
+STR_FIRST_PERSON_STAND_FRONT                                    :Stanoviště vpředu
+STR_FIRST_PERSON_STAND_BACK                                     :Stanoviště vzadu
+STR_FIRST_PERSON_STAND_TOOLTIP                                  :{BLACK}Přesednout na druhé stanoviště: dopředu nebo dozadu vozidla
 STR_FIRST_PERSON_RUN                                            :Běh
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Běhat místo chůze (běží se i s podrženým Shiftem)
 STR_FIRST_PERSON_WHERE                                          :U města {TOWN}, dlaždice {NUM}, {NUM}, směr {NUM}°

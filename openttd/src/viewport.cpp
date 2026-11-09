@@ -17461,22 +17461,28 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * first piece drawn from its object, a cab or none: the eye over it. */
 	ThreeDEyeVehicle own_model;
 	bool in_model_cab = false, over_model = false;
+	/* The vehicle the eye is in: not drawn from it but its model about the eye; the rest of its train is (the player,
+	 * test4: "driving the Sergej I see no wagons, coupled nor at the platform"). */
+	const Vehicle *cab_vehicle = v;
 	if (walker == nullptr && ThreeDEnabled()) {
 		for (const Vehicle *u = v->First(); u != nullptr && !in_model_cab && !over_model; u = u->Next()) {
 			ThreeDEyeVehicle ev;
 			/* The eye in the cab of any model: its index's, or one guessed from its windscreen (GuessedCabEye()). */
 			if (!GetThreeDEyeVehicle(u, ev) || ev.obj == nullptr || (!roof && !CabEyeOf(*ev.obj).has_value())) continue;
 			own_model = ev;
+			cab_vehicle = u;
 			(roof ? over_model : in_model_cab) = true;
 		}
 	}
+	/* At the other end of it (CabViewCamera::rear), looking back. */
+	const bool rear = in_model_cab && camera.rear && !camera.msts;
 	if (walker != nullptr) {
 		/* The walker looks where the player turns it, at once. */
 		target = walker->heading;
 		camera.valid = false;
 	} else if ((in_model_cab || over_model) && !v->cab_free) {
-		/* The cab of a model, or over it: as the model faces, which turns smoothly already. */
-		target = own_model.facing * M_PI / 180.0;
+		/* The cab of a model, or over it: as the model faces, which turns smoothly already; at its back end the other way. */
+		target = own_model.facing * M_PI / 180.0 + (rear ? M_PI : 0.0);
 		camera.valid = false;
 	} else if (v->cab_free) {
 		/* Driven freely (cab_drive.h): its own heading, finer than the eight directions. */
@@ -17523,7 +17529,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Looking out through the glass, or else from before the cab (CabEyeAhead()); in a cab of MSTS where it has the eye. */
 		const double go = camera.msts ? 0.0 : CabEyeAhead(m, m.PartsOf(own_model.state), ta);
 		const std::array<double, 3> cab = CabEyeOf(m).value_or(std::array<double, 3>{m.cab[0], m.cab[1], m.cab[2]});
-		const double kx = cab[0] + go * std::cos(ta), ky = cab[1] - go * std::sin(ta);
+		/* At its back end: the eye mirrored through the model's middle (a locomotive of two cabs alike, the Sergej). */
+		const double mirror = rear ? -1.0 : 1.0;
+		const double kx = mirror * (cab[0] + go * std::cos(ta)), ky = mirror * (cab[1] - go * std::sin(ta));
 		const double cx = kx * std::cos(ta) - ky * std::sin(ta), cy = kx * std::sin(ta) + ky * std::cos(ta);
 		/* Up a slope the cab tipped with the model about its middle (CabDrawFigureModel(): its front up, as steep as the
 		 * ground from the eyes, 19 degrees up a level), the eye in it: in metres along it and up. */
@@ -17533,8 +17541,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		eye.x = own_model.x + along * bfx - cy * across * bfy;
 		eye.y = own_model.y + along * bfy + cy * across * bfx;
 		eye.z = EyeStandZ(own_model.x, own_model.y, own_model.z) + (mx * std::sin(pa) + mz * std::cos(pa)) * OBJECT_HEIGHT_PER_METRE;
-		cab_pitch = pa;
-		own_model.facing = static_cast<float>(camera.heading * 180.0 / M_PI);
+		cab_pitch = rear ? -pa : pa;
+		own_model.facing = static_cast<float>((camera.heading - (rear ? M_PI : 0.0)) * 180.0 / M_PI);
 	} else {
 		const double type_z = v->type == VehicleType::Train ? CAB_EYE_Z_TRAIN : v->type == VehicleType::Road ? CAB_EYE_Z_ROAD : v->type == VehicleType::Ship ? CAB_EYE_Z_SHIP : CAB_EYE_Z_AIRCRAFT;
 		/* The vehicle's height from the eyes: up a hill on the plane of the slope, not the game's steps (ThreeDVehicleEyeZ()). */
@@ -18591,8 +18599,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	extern VehicleID FirstPersonBoatAboard();
 	const VehicleID boat_aboard = FirstPersonBoatAboard();
 	for (const Vehicle *u : Vehicle::Iterate()) {
-		/* The vehicle itself only seen from over its roof: all of it, its driver too. */
-		if (u->First() == own && !roof) continue;
+		/* The vehicle the eye is in only seen from over its roof, its driver too; the rest of its train as any other. */
+		if (u == cab_vehicle && !roof) continue;
 		if (u->vehstatus.Test(VehState::Hidden)) {
 			/* Hidden in the tunnel the eye is in: seen there. */
 			bool same_tunnel = in_tunnel.has_value() && (u->type == VehicleType::Train || u->type == VehicleType::Road) && (u->tile == in_tunnel->a || u->tile == in_tunnel->b);

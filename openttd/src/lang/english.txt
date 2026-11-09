@@ -2304,6 +2304,9 @@ STR_FIRST_PERSON_HERE                                           :Here
 STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Put the walker where the main view looks
 STR_FIRST_PERSON_CENTRE                                         :On the map
 STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the walker's place in the main view
+STR_FIRST_PERSON_STAND_FRONT                                    :Driver's stand at the front
+STR_FIRST_PERSON_STAND_BACK                                     :Driver's stand at the back
+STR_FIRST_PERSON_STAND_TOOLTIP                                  :{BLACK}Move to the other driver's stand: the front or the back of the vehicle
 STR_FIRST_PERSON_RUN                                            :Run
 STR_FIRST_PERSON_RUN_TOOLTIP                                    :{BLACK}Run instead of walking (holding Shift runs too)
 STR_FIRST_PERSON_WHERE                                          :Near {TOWN}, tile {NUM}, {NUM}, facing {NUM}°
