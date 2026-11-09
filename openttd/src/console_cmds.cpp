@@ -10816,6 +10816,45 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (!x1.has_value() || !y1.has_value() || !x2.has_value() || !y2.has_value()) return true;
 		CommandCost r = Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(*x2, *y2), TileXY(*x1, *y1), WaterClass::Canal, false);
 		IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: kanal {}", r.Succeeded() ? std::string("postaven") : RefusalReason(r));
+	} else if (what == "svahy") {
+		/* 'svahy': every inclined slope by water on the map tried for a dock and for a lock (only tried, not built), what
+		 * refuses them counted with a tile of each (the player, test3: "I want to build the harbour and the lock on every
+		 * right inclined slope"). */
+		if (!Company::IsValidID(CompanyID::Begin())) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			DoStartupNewCompany(false, CompanyID::Invalid());
+		}
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+		std::map<std::string, std::pair<int, TileIndex>> dock, lock;
+		/* What lies below and above it: the tile's type, its slope, its water's class (0 sea, 1 canal, 2 river). */
+		auto about = [](TileIndex t) {
+			if (!IsValidTile(t)) return std::string("mimo");
+			return fmt::format("{}/{}{}", to_underlying(GetTileType(t)), to_underlying(GetTileSlope(t)), HasTileWaterClass(t) ? fmt::format("/w{}", to_underlying(GetWaterClass(t))) : std::string());
+		};
+		auto note = [&](std::map<std::string, std::pair<int, TileIndex>> &m, const CommandCost &r, TileIndex t) {
+			auto &e = m[r.Succeeded() ? std::string("jde") : RefusalReason(r)];
+			if (e.first++ < 4 && !r.Succeeded()) {
+				const DiagDirection d = GetInclinedSlopeDirection(GetTileSlope(t));
+				const TileIndex l1 = TileAddByDiagDir(t, ReverseDiagDir(d)), l2 = TileAddByDiagDir(l1, ReverseDiagDir(d)), h1 = TileAddByDiagDir(t, d);
+				IConsolePrint(CC_DEFAULT, "test3d: svahy {} {},{} sam {} dole {} dal {} nahore {}", &m == &dock ? "pristav" : "zdymadlo", TileX(t), TileY(t), about(t), about(l1), about(l2), about(h1));
+			}
+			if (e.first == 1) e.second = t;
+		};
+		for (const auto t : Map::Iterate()) {
+			const DiagDirection up = GetInclinedSlopeDirection(GetTileSlope(t));
+			if (up == DiagDirection::Invalid) continue;
+			const TileIndex low = TileAddByDiagDir(t, ReverseDiagDir(up)), high = TileAddByDiagDir(t, up);
+			if (!IsValidTile(low) || !IsValidTile(high)) continue;
+			if (IsTileType(low, TileType::Water)) note(dock, Command<Commands::BuildDock>::Do(DoCommandFlags{}, t, NEW_STATION, false), t);
+			if (IsTileType(low, TileType::Water) || IsTileType(t, TileType::Water)) note(lock, Command<Commands::BuildLock>::Do(DoCommandFlags{}, t), t);
+		}
+		for (const auto &[what_of, m] : {std::pair<const char *, const std::map<std::string, std::pair<int, TileIndex>> *>{"pristav", &dock}, {"zdymadlo", &lock}}) {
+			for (const auto &[why, e] : *m) {
+				IConsolePrint(CC_DEFAULT, "test3d: svahy {}: {} x {} (napr. {},{} svah {} nizko {})", what_of, e.first, why, TileX(e.second), TileY(e.second),
+						to_underlying(GetTileSlope(e.second)), to_underlying(GetTileType(TileAddByDiagDir(e.second, ReverseDiagDir(GetInclinedSlopeDirection(GetTileSlope(e.second)))))));
+			}
+		}
 	} else if (what == "kytky") {
 		/* The marijuana the walker planted (walker_inventory.h): 'kytky' lists them; 'kytky zasad' plants a seedling of
 		 * the inventory in front of the walker (one given when it has none); 'kytky stari <days>' makes them all so many
