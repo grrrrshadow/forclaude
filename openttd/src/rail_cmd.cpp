@@ -3103,13 +3103,14 @@ static constexpr int THREE_D_CROSSING_BLINK_TICKS = 18;
  * behind its lenses, so that its lit light (DrawThreeDLitLight()) is nearer from the front --, its top, where its
  * barrier turns and how long it is; its lenses (ahead, aside, up).
  */
-static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.15, THREE_D_POST_Y0 = -0.35, THREE_D_POST_Y1 = 0.9, THREE_D_POST_TOP_M = 3.8;
-static constexpr double THREE_D_POST_LENS_X = 0.17, THREE_D_POST_LEFT_Y = 0.336, THREE_D_POST_RIGHT_Y = 0.661, THREE_D_POST_WHITE_Y = 0.498, THREE_D_POST_RED_Z = 3.033, THREE_D_POST_WHITE_Z = 2.707;
-static constexpr double THREE_D_BARRIER_X = 0.06, THREE_D_BARRIER_Y = 0.25, THREE_D_BARRIER_Z = 1.45, THREE_D_BARRIER_LEN = 5.0;
+static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.10, THREE_D_POST_Y0 = -0.56, THREE_D_POST_Y1 = 0.95, THREE_D_POST_TOP_M = 3.8;
+static constexpr double THREE_D_POST_LENS_X = 0.108, THREE_D_POST_LEFT_Y = -0.16, THREE_D_POST_RIGHT_Y = 0.16, THREE_D_POST_WHITE_Y = 0.0, THREE_D_POST_RED_Z = 2.80, THREE_D_POST_WHITE_Z = 2.50;
+static constexpr double THREE_D_BARRIER_X = 0.18, THREE_D_BARRIER_Y = 0.68, THREE_D_BARRIER_Z = 1.05, THREE_D_BARRIER_LEN = 5.0;
 
 /**
- * The posts of our level crossing (the player, 8. 11.: "the lights one Czech and the crossing", "1 yes"): the AŽD post of
- * the player's model, for each way the road's traffic comes the one on its right before the track (on its left driving
+ * The posts of our level crossing (the player, 8. 11.: "the lights one Czech and the crossing", "1 yes"): our AŽD post
+ * (azd.py; the player, 9. 11.: "make it yourself properly, straight, small MB, whole" -- the player's model had its head
+ * beside the mast and its cross behind it), for each way the road's traffic comes the one on its right before the track (on its left driving
  * on the left: the mirrored post), its warning lights to it, its barrier over the right half of the road. The crossing
  * closed (IsCrossingBarred(): a train is coming) the barriers down and the two red lights in turn; open, the barriers up
  * and the white light blinking slowly. On the map the tile drawn again as the lights change (NoteThreeDBlinking()).

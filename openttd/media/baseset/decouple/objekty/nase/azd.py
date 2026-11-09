@@ -1,78 +1,75 @@
 #!/usr/bin/env python3
 """
-Přejezd AŽD (the player, 8. 11.: "semafory jeden český a přejezd"; "1 jo": the posts of the AŽD level crossing from the
-player's model, the barriers our own so they go down): the pieces the game stands at a level crossing with our 3D track
-(DrawThreeDCrossingPosts() of rail_cmd.cpp). Of the model "Přejezd AŽD Vranovice" (3D Warehouse, SketchUp 2021) its post
-with the warning lights, the St Andrew's cross over them, the barrier's drive and the footing -- read by skp_cti.py
-(grrrrf hra/temata/nastroje/) into an npz:
+Přejezd AŽD (the player, 8. 11.: "semafory jeden český a přejezd"; 9. 11.: "make it yourself properly, so that it is
+straight and of small MB, whole"): the pieces the game stands at a level crossing with our 3D track
+(DrawThreeDCrossingPosts() of rail_cmd.cpp), all our own, of boxes, prisms and discs in flat colours -- the player's
+SketchUp model of the AŽD crossing at Vranovice had its lights' head on an arm beside the mast and its cross behind it.
 
-    python3 -I skp_cti.py AZD.skp azd.npz
-    python3 azd.py azd.npz
+    python3 -I -B azd.py
 
 Written beside this script, each also mirrored (_z: the road on its other side, for driving on the left):
 
-  azd_sloupek.glb        the post, its lights out: its foot at the origin, its lights to +x (to the drivers coming), the
-                         road at -y; its two red lenses and its white one always there, dull (the player, 9. 11.: "it
-                         goes out but the light is still there, there must always be a red and a white circle")
-  azd_svetlo_l.glb       its left red light lit alone, in the post's frame: a disc of its own light over the lens (glTF
-                         emissiveFactor), drawn with the post (the player, 9. 11.: "only another colour of the light ... one
-                         object": not the whole post again for each light)
+  azd_sloupek.glb        the post (výstražník AŽD), its lights out: its foot at the origin, its lights to +x (to the
+                         drivers coming), the road at -y. A round mast on a concrete footing; on it, in its middle,
+                         the head: a black plate with a white edge, two red lenses side by side and a white one under
+                         them between, each under its hood, always there, dull (the player: "it goes out but the light
+                         is still there, there must always be a red and a white circle"); over it the St Andrew's cross
+                         A32a, white with a red edge, in front of the mast, its back grey; beside the mast, away from the
+                         road, the barrier's drive, its axle in front of it, out of the way of the mast and the head.
+  azd_svetlo_l.glb       its left red light (as the drivers see it) lit alone, in the post's frame: a disc of its own
+                         light over the lens (glTF emissiveFactor), drawn with the post (the player: "only another
+                         colour of the light ... one object")
   azd_svetlo_p.glb       its right red light lit (the crossing closed: the two in turn)
   azd_svetlo_b.glb       its white light lit (the crossing open: it blinks slowly)
-  azd_zavora_dole.glb    the barrier down: from its drive over the road, red and white, 5 m
-  azd_zavora_nahore.glb  the barrier up, straight up from its drive
+  azd_zavora_dole.glb    the barrier down: from its axle over the road, red and white, 5 m
+  azd_zavora_nahore.glb  the barrier up, straight up from its axle
 
-The post's materials their colours (the model's textures of grey metal flat grey), a face's front and back each its own
-(skp_cti.py's FM and FMZ; a face of two seen from each side as it is: two triangles, each seen from its side only, the
-back's 5 mm behind -- in the same plane the two fought over which is nearer, the front's red only specks). Its
-St Andrew's cross moved from behind the mast to the front of it (the player, 9. 11.: "the sign is turned, the cross":
-its red and white face to the drivers, the mast hid it). Its lenses our own discs a little in
-front of its black face (the model's red lenses lie in the face's very plane and its white one is not there at all), where
-its hoods are: dull red and dull white, the lit one a disc of a deep red (the player: "darker, this is too orange") or of
-white over it.
-glTF's Y up: (x, z, -y) of the model's frame.
+The lit red a deep one (the player: "darker, this is too orange"). A face of two colours, the cross's (white and red in
+front, grey behind), is its front's triangles seen from the front only and its back's 5 mm behind (in one plane the two
+fight over which is nearer). glTF's Y up: (x, z, -y) of the post's frame. The rail_cmd.cpp constants THREE_D_POST_*
+and THREE_D_BARRIER_* are this script's measures.
 """
 import json
 import math
 import os
 import struct
-import sys
 
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# The model's groups (skp_cti.py's FG) of the post on the west: its mast, its head with the lights, its cross; its drive
-# and its footing are of groups with the other post's (4, 5), taken where they are by it.
-POST_GROUPS = (3, 6, 7)
-MAST_GROUP, HEAD_GROUP, CROSS_GROUP = 3, 6, 7
-BACK_GAP = 0.005                   # a face's back of its own colour behind its front, metres
-SHARED_GROUPS = (4, 5)
-POLE_X, POLE_Y = -7.69, -3.99      # the mast's middle in the model, metres
-LIGHTS_FACE = -1.0                 # its lights face -x in the model: turned half round to +x
-LENS_X = -7.843                    # the lenses' plane in the model (its black face's)
-# y, z of each lens in the model: the red ones its own ([Color_A01], [Color_A09]), the white one under its hood between them
-LENSES = {'l': (-4.326, 3.033), 'p': (-4.651, 3.033), 'bile': (-4.488, 2.707)}
-LENS_R = 0.12
-LENS_MATS = ('[Color_A01]', '[Color_A09]')  # the model's red lenses: in its face's plane, ours instead
-PIVOT = (0.06, 0.25, 1.45)         # the barrier's pivot on its drive, in the post's frame (lights to +x)
+
+# The post's measures, metres, in its frame (+x to the drivers, +y to the lights' left: away from the road, z up).
+MAST_R, MAST_TOP, MAST_SIDES = 0.05, 3.55, 12
+FOOT = (-0.3, 0.3, -0.3, 0.95, -0.1, 0.08)           # the concrete footing, under the mast and the drive
+PLATE = (0.06, 0.10, -0.32, 0.32, 2.32, 2.98)          # the head's black plate
+EDGE = 0.03                                            # its white edge
+HOLDER = (0.04, 0.06, -0.06, 0.06, 2.4, 2.9)           # the head's holder on the mast
+LENS_X = 0.104                                         # the lenses, before the plate's white edge
+LENSES = {'l': (-0.16, 2.80), 'p': (0.16, 2.80), 'b': (0.0, 2.50)}  # y, z: the drivers' left and right red, the white
+LENS_R = 0.1
+HOOD_R, HOOD_X = 0.12, 0.2                             # a lens's hood: a half tube over it, so far out
+CROSS_Z, CROSS_LEN, CROSS_W, CROSS_RIM = 3.42, 1.2, 0.15, 0.03   # the cross A32a: its middle, each board, its red edge
+CROSS_SLOPE = 30.0                                     # each board's slope, degrees
+CROSS_X = (0.06, 0.08)                                 # the back board's back and front; the front board 2 cm before
+DRIVE = (-0.16, 0.11, 0.48, 0.86, 0.08, 1.25)          # the barrier's drive
+PIVOT = (0.18, 0.68, 1.05)                             # the barrier's axle: before the drive, up beside the cross's arms
 BOOM_LEN, BOOM_HALF = 5.0, 0.045
 STRIPE = 0.5
-COLOURS = {
-    'seda': [0.68, 0.69, 0.71, 1.0],
-    'seda1': [0.68, 0.69, 0.71, 1.0],
-    '[Color_003]': [0.67, 0.67, 0.67, 1.0],
-    '[Color_A01]': [0.78, 0.05, 0.05, 1.0],   # the cross's red frame (the head's red lenses ours, LENS_MATS)
-    '[Color_001]': [0.93, 0.93, 0.92, 1.0],
-    '[Color_008]': [0.12, 0.12, 0.12, 1.0],
-    'zluta': [0.92, 0.8, 0.12, 1.0],
-    'vychozi': [0.92, 0.92, 0.92, 1.0],
+BACK_GAP = 0.005                                       # a face's back of its own colour behind its front
+
+MATS = {
+    'beton': {'baseColorFactor': [0.62, 0.62, 0.6, 1.0]},
+    'stozar': {'baseColorFactor': [0.66, 0.67, 0.69, 1.0]},
+    'pohon': {'baseColorFactor': [0.56, 0.58, 0.6, 1.0]},
+    'cerna': {'baseColorFactor': [0.08, 0.08, 0.08, 1.0]},
+    'cervena': {'baseColorFactor': [0.78, 0.08, 0.07, 1.0]},
+    'bila': {'baseColorFactor': [0.93, 0.93, 0.92, 1.0]},
+    'zavazi': {'baseColorFactor': [0.18, 0.18, 0.19, 1.0]},
+    'cocka_cervena': {'baseColorFactor': [0.3, 0.02, 0.03, 1.0]},     # a red lens out
+    'cocka_bila': {'baseColorFactor': [0.62, 0.62, 0.6, 1.0]},         # the white one out
+    'svetlo_cervene': {'baseColorFactor': [0.78, 0.0, 0.02, 1.0], 'emissiveFactor': [0.78, 0.0, 0.02]},
+    'svetlo_bile': {'baseColorFactor': [1.0, 0.98, 0.9, 1.0], 'emissiveFactor': [1.0, 0.98, 0.9]},
 }
-
-
-def to_post(p):
-    """A point of the model into the post's frame: its mast's foot the origin, its lights to +x."""
-    x, y, z = p[..., 0] - POLE_X, p[..., 1] - POLE_Y, p[..., 2]
-    return np.stack([x * LIGHTS_FACE, y * LIGHTS_FACE, z], axis=-1)
 
 
 def box(x0, x1, y0, y1, z0, z1):
@@ -86,6 +83,11 @@ def box(x0, x1, y0, y1, z0, z1):
     return np.array(tris, float)
 
 
+def quad_x(x, y0, y1, z0, z1):
+    """A rectangle facing +x."""
+    return np.array([[(x, y0, z0), (x, y1, z0), (x, y1, z1)], [(x, y0, z0), (x, y1, z1), (x, y0, z1)]], float)
+
+
 def disc(cx, cy, cz, r, n=12):
     """A disc facing +x at a point."""
     tris = []
@@ -95,8 +97,85 @@ def disc(cx, cy, cz, r, n=12):
     return np.array(tris, float)
 
 
+def prism(r, z0, z1, n):
+    """A round mast: n sides and its top, its foot open (on the footing)."""
+    tris = []
+    for k in range(n):
+        a0, a1 = 2 * math.pi * k / n, 2 * math.pi * (k + 1) / n
+        p0, p1 = (r * math.cos(a0), r * math.sin(a0)), (r * math.cos(a1), r * math.sin(a1))
+        tris.append([(*p0, z0), (*p1, z0), (*p1, z1)])
+        tris.append([(*p0, z0), (*p1, z1), (*p0, z1)])
+        tris.append([(0, 0, z1), (*p0, z1), (*p1, z1)])
+    return np.array(tris, float)
+
+
+def hood(cy, cz):
+    """A lens's hood: the upper half of a tube round it, from the plate out."""
+    tris, n = [], 6
+    for k in range(n):
+        a0, a1 = math.pi * k / n, math.pi * (k + 1) / n
+        q0 = (cy + HOOD_R * math.cos(a0), cz + HOOD_R * math.sin(a0))
+        q1 = (cy + HOOD_R * math.cos(a1), cz + HOOD_R * math.sin(a1))
+        x0, x1 = PLATE[1], HOOD_X
+        tris.append([(x0, *q0), (x1, *q0), (x1, *q1)])
+        tris.append([(x0, *q0), (x1, *q1), (x0, *q1)])
+    return np.array(tris, float)
+
+
+def board(slope, xb, xf):
+    """One board of the cross, sloping so many degrees, from xb to xf: its front red with a white middle 2.5 mm before it
+    (seen from the front only), its sides and back grey 5 mm behind (seen from behind only)."""
+    a = math.radians(slope)
+    u, v = np.array([0.0, math.cos(a), math.sin(a)]), np.array([0.0, -math.sin(a), math.cos(a)])
+    mid = np.array([0.0, 0.0, CROSS_Z])
+
+    def rect(x, hl, hw):
+        c = [mid + s * hl * u + t * hw * v for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+        c = [(x, p[1], p[2]) for p in c]
+        return np.array([[c[0], c[1], c[2]], [c[0], c[2], c[3]]], float)
+    hl, hw = CROSS_LEN / 2, CROSS_W / 2
+    front = rect(xf, hl, hw)
+    if np.cross(front[0, 1] - front[0, 0], front[0, 2] - front[0, 0])[0] < 0:
+        front = front[:, ::-1]
+    white = rect(xf + 0.0025, hl - CROSS_RIM, hw - CROSS_RIM)
+    if np.cross(white[0, 1] - white[0, 0], white[0, 2] - white[0, 0])[0] < 0:
+        white = white[:, ::-1]
+    # its back and its four edges: a box round the board, faces turned out, then pulled 5 mm in at its front
+    back = rect(xb, hl, hw)[:, ::-1]
+    if np.cross(back[0, 1] - back[0, 0], back[0, 2] - back[0, 0])[0] > 0:
+        back = back[:, ::-1]
+    corners = [mid + s * hl * u + t * hw * v for s, t in ((-1, -1), (1, -1), (1, 1), (-1, 1))]
+    edges = []
+    for i in range(4):
+        p, q = corners[i], corners[(i + 1) % 4]
+        e = np.array([[(xb, p[1], p[2]), (xf - BACK_GAP, p[1], p[2]), (xf - BACK_GAP, q[1], q[2])],
+                      [(xb, p[1], p[2]), (xf - BACK_GAP, q[1], q[2]), (xb, q[1], q[2])]], float)
+        out = (p + q) / 2 - mid
+        n = np.cross(e[0, 1] - e[0, 0], e[0, 2] - e[0, 0])
+        if np.dot(n[1:], out[1:]) < 0:
+            e = e[:, ::-1]
+        edges.append(e)
+    return [('cervena|1', front), ('bila|1', white), ('stozar|1', np.concatenate([back] + edges))]
+
+
+def post():
+    parts = [('beton', box(*FOOT)), ('stozar', prism(MAST_R, FOOT[5], MAST_TOP, MAST_SIDES)),
+             ('pohon', box(*DRIVE)), ('pohon', box(DRIVE[1], PIVOT[0] - BOOM_HALF, PIVOT[1] - 0.03, PIVOT[1] + 0.03, PIVOT[2] - 0.03, PIVOT[2] + 0.03)),
+             ('stozar', box(*HOLDER)), ('cerna', box(*PLATE))]
+    x0, x1, y0, y1, z0, z1 = PLATE
+    xe = x1 + 0.001
+    parts += [('bila', quad_x(xe, y0, y1, z1 - EDGE, z1)), ('bila', quad_x(xe, y0, y1, z0, z0 + EDGE)),
+              ('bila', quad_x(xe, y0, y0 + EDGE, z0 + EDGE, z1 - EDGE)), ('bila', quad_x(xe, y1 - EDGE, y1, z0 + EDGE, z1 - EDGE))]
+    for k, (ly, lz) in LENSES.items():
+        parts.append(('cocka_bila' if k == 'b' else 'cocka_cervena', disc(LENS_X, ly, lz, LENS_R)))
+        parts.append(('cerna', hood(ly, lz)))
+    parts += board(CROSS_SLOPE, *CROSS_X)
+    parts += board(-CROSS_SLOPE, CROSS_X[1] + 0.002, CROSS_X[1] + 0.02)
+    return parts
+
+
 def boom(up):
-    """The barrier from its pivot: down across the road (-y), or straight up; red and white stripes, a weight behind."""
+    """The barrier from its axle: down across the road (-y), or straight up; red and white stripes, a weight behind."""
     parts = []
     px, py, pz = PIVOT
     h = BOOM_HALF
@@ -107,7 +186,7 @@ def boom(up):
             parts.append(('cervena' if k % 2 == 0 else 'bila', box(px - h, px + h, py - h, py + h, pz + a, pz + b)))
         else:
             parts.append(('cervena' if k % 2 == 0 else 'bila', box(px - h, px + h, py - b, py - a, pz - h, pz + h)))
-    w = 0.08
+    w = 0.06
     if up:
         parts.append(('zavazi', box(px - w, px + w, py - w, py + w, pz - 0.55, pz - 0.05)))
     else:
@@ -115,20 +194,9 @@ def boom(up):
     return parts
 
 
-MATS = {
-    'cervena': {'baseColorFactor': [0.78, 0.08, 0.07, 1.0]},
-    'bila': {'baseColorFactor': [0.93, 0.93, 0.92, 1.0]},
-    'zavazi': {'baseColorFactor': [0.18, 0.18, 0.19, 1.0]},
-    'cocka_cervena': {'baseColorFactor': [0.3, 0.02, 0.03, 1.0]},     # a red lens out
-    'cocka_bila': {'baseColorFactor': [0.62, 0.62, 0.6, 1.0]},         # the white one out
-    'svetlo_cervene': {'baseColorFactor': [0.78, 0.0, 0.02, 1.0], 'emissiveFactor': [0.78, 0.0, 0.02]},
-    'svetlo_bile': {'baseColorFactor': [1.0, 0.98, 0.9, 1.0], 'emissiveFactor': [1.0, 0.98, 0.9]},
-}
-
-
 def write(path, name, parts, specs=None):
     """parts: (material, triangles (n, 3, 3) in the post's frame, z up); flat normals; glTF Y up (x, z, -y). specs: a
-    material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS and COLOURS (navestidlo.py's own).
+    material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS (navestidlo.py's own).
     A material 'name|1' is that one seen from the front of its triangles only (a face's side of its own colour)."""
     blob = bytearray()
     views, accessors, materials, primitives = [], [], [], []
@@ -165,7 +233,7 @@ def write(path, name, parts, specs=None):
             {'bufferView': view(idx.tobytes(), 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'},
         ]
         base, one_side = (mat[:-2], True) if mat.endswith('|1') else (mat, False)
-        spec = (specs or {}).get(base) or MATS.get(base, {'baseColorFactor': COLOURS.get(base, [0.8, 0.8, 0.8, 1.0])})
+        spec = (specs or {}).get(base) or MATS.get(base, {'baseColorFactor': [0.8, 0.8, 0.8, 1.0]})
         m = {'name': f'{name}_{mat}', 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 1.0, 'baseColorFactor': spec['baseColorFactor']},
              'doubleSided': not one_side}
         if 'emissiveFactor' in spec:
@@ -198,44 +266,14 @@ def mirrored(parts):
 
 
 def main():
-    d = np.load(sys.argv[1], allow_pickle=False)
-    V, F, FM, FG = d['V'], d['F'], d['FM'], d['FG']
-    FMZ = d['FMZ'] if 'FMZ' in d.files else FM   # the faces' backs (skp_cti.py of 9. 11.)
-    names = [m['jmeno'] for m in json.loads(str(d['mats']))]
-    T = V[F].astype(float)
-    near = np.abs(T[:, :, 0].mean(1) - POLE_X) < 1.5
-    keep = np.isin(FG, POST_GROUPS) | (np.isin(FG, SHARED_GROUPS) & near)
-    # The cross before the mast, its back a centimetre from it (its lights' way -x in the model).
-    cross = keep & (FG == CROSS_GROUP)
-    mast_front = T[keep & (FG == MAST_GROUP)][..., 0].min()
-    T[cross, :, 0] += mast_front - 0.01 - T[cross][..., 0].max()
-    # The head's red lenses lie in its face's plane: ours instead (the cross's red frame is of the same material).
-    lens_mats = [names.index(n) for n in LENS_MATS if n in names]
-    keep &= ~((FG == HEAD_GROUP) & np.isin(FM, lens_mats))
-    post = []
-    for a, b in sorted(set(zip(FM[keep].tolist(), FMZ[keep].tolist()))):
-        tris = to_post(T[keep & (FM == a) & (FMZ == b)])  # a half turn: the faces keep their winding
-        if a == b:
-            post.append((names[a], tris))
-        else:
-            n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
-            n /= np.maximum(np.linalg.norm(n, axis=1), 1e-12)[:, None]
-            post.append((names[a] + '|1', tris))
-            post.append((names[b] + '|1', tris[:, ::-1] - BACK_GAP * n[:, None, :]))
-    lights = {}
-    for k, (ly, lz) in LENSES.items():
-        p = to_post(np.array([LENS_X, ly, lz]))
-        post.append(('cocka_bila' if k == 'bile' else 'cocka_cervena', disc(p[0] + 0.01, p[1], p[2], LENS_R)))
-        lights[k] = [('svetlo_bile' if k == 'bile' else 'svetlo_cervene', disc(p[0] + 0.02, p[1], p[2], LENS_R + 0.005))]
-        print('cocka', k, np.round(p, 3))
-    pieces = {'azd_sloupek': post, 'azd_svetlo_l': lights['l'], 'azd_svetlo_p': lights['p'], 'azd_svetlo_b': lights['bile'],
+    lights = {k: [('svetlo_bile' if k == 'b' else 'svetlo_cervene', disc(LENS_X + 0.004, ly, lz, LENS_R + 0.005))] for k, (ly, lz) in LENSES.items()}
+    pieces = {'azd_sloupek': post(), 'azd_svetlo_l': lights['l'], 'azd_svetlo_p': lights['p'], 'azd_svetlo_b': lights['b'],
               'azd_zavora_dole': boom(False), 'azd_zavora_nahore': boom(True)}
     for name, parts in pieces.items():
         write(os.path.join(HERE, name + '.glb'), name, parts)
         write(os.path.join(HERE, name + '_z.glb'), name + '_z', mirrored(parts))
-    lo = np.concatenate([t.reshape(-1, 3) for _, t in post]).min(0)
-    hi = np.concatenate([t.reshape(-1, 3) for _, t in post]).max(0)
-    print('sloupek', np.round(lo, 2), np.round(hi, 2))
+    p = np.concatenate([t.reshape(-1, 3) for _, t in pieces['azd_sloupek']])
+    print('sloupek', np.round(p.min(0), 3), np.round(p.max(0), 3))
 
 
 if __name__ == '__main__':
