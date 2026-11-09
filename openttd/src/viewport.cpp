@@ -16185,6 +16185,84 @@ static void CabGroundPlane(Slope slope, int base_z, double x, double y, double &
 	z = base_z + zm + rise_x * (x - m) + rise_y * (y - m);
 }
 
+/** A piece of a way on a tile (AddOurGrass()): its centre line from a to b, tile units from the tile's north corner, and how far our tufts keep off it. */
+struct WayPiece {
+	double ax, ay, bx, by;
+	double keep;
+	/** How far a point of the tile is from the centre line. */
+	double DistanceTo(double x, double y) const
+	{
+		const double dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
+		const double f = len2 > 0 ? std::clamp(((x - ax) * dx + (y - ay) * dy) / len2, 0.0, 1.0) : 0.0;
+		return std::hypot(x - (ax + f * dx), y - (ay + f * dy));
+	}
+};
+
+/** Half a tuft of our grass (trava_trs, 2 m across), world units: a tuft's middle keeps so much more off a way. */
+static constexpr double CAB_TUFT_HALF = 1.0 * OBJECT_UNITS_PER_METRE;
+/** Our track's embankment's half (rail_cmd.cpp THREE_D_TRACK_HALF_M), and its round curves' bulge off a corner piece's chord, world units. */
+static constexpr double CAB_WAY_TRACK_HALF = 1.7 * OBJECT_UNITS_PER_METRE, CAB_WAY_CURVE_BULGE = 1.0;
+/** A road's surface's half (as the level crossing's, rail_cmd.cpp THREE_D_CROSSING_ROAD_HALF_M), world units. */
+static constexpr double CAB_WAY_ROAD_HALF = 4.6 * OBJECT_UNITS_PER_METRE;
+
+/**
+ * The pieces of a way on a tile our tufts keep off (AddOurGrass()): a plain track's on grass (its fences too) -- its
+ * tracks' centre lines, the embankment's half and a tuft's, a corner piece more (the round curves) --, a road's or a
+ * level crossing's with grass verges -- its road's halves from the middle to the edges it goes to, the surface's half
+ * and a tuft's; a crossing's track too.
+ * @return whether the tile has our tufts at all: its ground grass, not on a foundation (a way along an incline has none)
+ */
+static bool WayKeepsOff(TileIndex tile, Slope slope, std::vector<WayPiece> &way)
+{
+	const double h = TILE_SIZE, m = TILE_SIZE / 2.0;
+	/* Flat, or a way along its incline only (across it the game levels it on a foundation). */
+	auto along_incline = [&](bool x_axis, bool y_axis) {
+		if (slope == SLOPE_FLAT) return true;
+		if (IsSteepSlope(slope) || !IsInclinedSlope(slope)) return false;
+		const Axis a = DiagDirToAxis(GetInclinedSlopeDirection(slope));
+		return a == Axis::X ? !y_axis : !x_axis;
+	};
+	auto track = [&](Track t) {
+		const double keep = CAB_WAY_TRACK_HALF + CAB_TUFT_HALF;
+		switch (t) {
+			case Track::X: way.push_back({0, m, h, m, keep}); break;
+			case Track::Y: way.push_back({m, 0, m, h, keep}); break;
+			case Track::Upper: way.push_back({0, m, m, 0, keep + CAB_WAY_CURVE_BULGE}); break;
+			case Track::Lower: way.push_back({m, h, h, m, keep + CAB_WAY_CURVE_BULGE}); break;
+			case Track::Left: way.push_back({m, 0, h, m, keep + CAB_WAY_CURVE_BULGE}); break;
+			case Track::Right: way.push_back({0, m, m, h, keep + CAB_WAY_CURVE_BULGE}); break;
+			default: break;
+		}
+	};
+	if (IsTileType(tile, TileType::Railway)) {
+		if (!IsPlainRail(tile)) return false;
+		const RailGroundType g = GetRailGroundType(tile);
+		if (g == RailGroundType::Barren || g == RailGroundType::SnowOrDesert || g == RailGroundType::HalfTileWater || g == RailGroundType::HalfTileSnow) return false;
+		const TrackBits bits = GetTrackBits(tile);
+		if (!along_incline(bits.Any({Track::X, Track::Upper, Track::Lower, Track::Left, Track::Right}), bits.Any({Track::Y, Track::Upper, Track::Lower, Track::Left, Track::Right}))) return false;
+		for (Track t : bits) track(t);
+		return true;
+	}
+	if (!IsTileType(tile, TileType::Road) || !(IsNormalRoad(tile) || IsLevelCrossing(tile))) return false;
+	const Roadside side = GetRoadside(tile);
+	if (side != Roadside::Grass && side != Roadside::GrassRoadWorks) return false;
+	const double keep = CAB_WAY_ROAD_HALF + CAB_TUFT_HALF;
+	if (IsLevelCrossing(tile)) {
+		const bool road_x = GetCrossingRoadAxis(tile) == Axis::X;
+		if (!along_incline(true, true)) return false;
+		way.push_back(road_x ? WayPiece{0, m, h, m, keep} : WayPiece{m, 0, m, h, keep});
+		track(road_x ? Track::Y : Track::X);
+		return true;
+	}
+	const RoadBits bits = GetAllRoadBits(tile);
+	if (!along_incline(bits.Any({RoadBit::NE, RoadBit::SW}), bits.Any({RoadBit::NW, RoadBit::SE}))) return false;
+	if (bits.Test(RoadBit::NE)) way.push_back({m, m, 0, m, keep});
+	if (bits.Test(RoadBit::SW)) way.push_back({m, m, h, m, keep});
+	if (bits.Test(RoadBit::NW)) way.push_back({m, m, m, 0, keep});
+	if (bits.Test(RoadBit::SE)) way.push_back({m, m, m, h, keep});
+	return true;
+}
+
 /**
  * Our grass on a tile of the temperate climate about the walker (the player, 3. 11.: "denser grass, like stubble at
  * least, simple, colourful by its colouring ... the tuft can be modular, with flowers to add"; on the farm's field
@@ -16192,12 +16270,18 @@ static void CabGroundPlane(Slope slope, int base_z, double x, double y, double &
  * rows, each turned anyhow and sheared to the ground under it (CabGroundPlane()) -- as many as the tile is grown over,
  * rough land (under trees too) all of them and taller, bare land none --, and our flowers (trava_kvitky) here and
  * there among them. Not on the land of a themed town.
+ * About the ways too (the player, 9. 11.: "why is the grass about the tracks and the road another? put our 3D grass
+ * there"; "it looks odd when about the road the grass is other than around"): a plain track's of grass (its fences
+ * too) and a road's or a level crossing's with grass verges, all of them as a meadow's, off the track's embankment
+ * and the road's surface (WayKeepsOff()); not on a foundation (its top is not the ground they are laid on).
  */
 static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 {
 	if (!OurGrassOn(true) || GetThemedLand(tile) != ThemedLand::None) return;
 	int thirds = 0;
 	bool rough = false;
+	/* A way's pieces on the tile (tile units from its north corner) and how far the tufts keep off each. */
+	std::vector<WayPiece> way;
 	/* A river's or a canal's bank (EyeOnRiverBank()): its tufts on it alone, as a meadow's. */
 	const bool bank = IsTileType(tile, TileType::Water) && IsWater(tile) && (IsRiver(tile) || IsCanal(tile));
 	/* A coast (the player, test3: "the banks are bare without our 3D grass"): its tufts where its land rises from the
@@ -16214,6 +16298,9 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 		} else {
 			return;
 		}
+	} else if (IsTileType(tile, TileType::Railway) || IsTileType(tile, TileType::Road)) {
+		if (!WayKeepsOff(tile, slope, way)) return;
+		thirds = 3;
 	} else if (IsTileType(tile, TileType::Trees)) {
 		if (GetTreeGround(tile) == TreeGround::Grass) {
 			thirds = GetTreeDensity(tile);
@@ -16238,6 +16325,9 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 	 * steps: without the card its picture is shared by all alike (GetThreeDPlantPicture()). */
 	auto lay = [&](std::string_view name, double x, double y, float size, float stretch) {
 		if (bank && !EyeOnRiverBank(x0 + x, y0 + y)) return;
+		for (const WayPiece &w : way) {
+			if (w.DistanceTo(x, y) < w.keep) return;
+		}
 		double z, rise_x, rise_y;
 		CabGroundPlane(slope, base_z, x, y, z, rise_x, rise_y);
 		/* On a coast only its land (DrawEyeWater()), the tuft a little up it: under, its water. */
@@ -17750,7 +17840,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 		}
 		/* Our grass about the walker (AddOurGrass()). */
-		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
+		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water || tile_type == TileType::Railway || tile_type == TileType::Road) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
 			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh);
 		}
 		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
