@@ -2597,7 +2597,6 @@ STR_CAB_VIEW_STATE_LOADING                                      :{YELLOW}Naklád
 STR_CAB_VIEW_STATE_BROKEN                                       :{RED}Porucha
 STR_CAB_VIEW_LOAD                                               :Náklad: {NUM}%
 STR_CAB_VIEW_BUTTON                                             :{BLACK}Kabina
-STR_CAB_VIEW_BUTTON_TOOLTIP                                     :{BLACK}Pohled z kabiny: svět před vozidlem ve 3D
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :Herní plocha se otáčí do libovolného úhlu: držet prostřední tlačítko myši a táhnout do strany, nebo klávesy Y a N (15 stupňů na stisk, s Ctrl 45). Dvojklik prostředním tlačítkem, Home nebo mezerník (když není co zavřít) vrátí pohled do normálu, na sever. Otočený pohled je jen na koukání: pro stavění je 2D, pohled na sever. Vozidla, nádraží a vlastní budovy této hry se otáčejí s ní ze svých osmi směrů, původní domy jako krabice z vlastních obrázků. Vozidlo v nákupu a vlastní průmysly této hry mají náhled, který se točí. Vypnuto: hra je, jaká vždycky byla, do pixelu
 
 ###length 5

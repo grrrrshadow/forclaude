@@ -9,7 +9,6 @@
 /** @file vehicle_gui.cpp The base GUI for all vehicles. */
 
 #include "stdafx.h"
-#include "cab_view.h"
 #include "vehicle_config.h"
 #include "debug.h"
 #include "company_func.h"
@@ -3109,8 +3108,6 @@ static constexpr std::initializer_list<NWidgetPart> _nested_vehicle_view_widgets
 			EndContainer(),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_ORDERS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_ORDERS),
 			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_SHOW_DETAILS), SetMinimalSize(18, 18), SetSpriteTip(SPR_SHOW_VEHICLE_DETAILS),
-			/* The view from the cab (cab_view.h): the player drives from here on the phone, so a button, not a key. */
-			NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_VV_CAB_VIEW), SetMinimalSize(18, 18), SetSpriteTip(SPR_IMG_ZOOMIN, STR_CAB_VIEW_BUTTON_TOOLTIP),
 			NWidget(WWT_PANEL, Colours::Grey), SetMinimalSize(18, 0), SetResize(0, 1), EndContainer(),
 		EndContainer(),
 	EndContainer(),
@@ -3945,10 +3942,6 @@ public:
 					ShowOrdersWindow(v);
 				}
 				break;
-			case WID_VV_CAB_VIEW: // the view from the cab (cab_view.h)
-				ShowCabViewWindow(v);
-				break;
-
 			case WID_VV_SHOW_DETAILS: // show details
 				if (_ctrl_pressed) {
 					ShowCompanyGroupForVehicle(v);
