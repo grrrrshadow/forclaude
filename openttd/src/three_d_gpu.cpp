@@ -514,6 +514,15 @@ uint64_t _gpu_standing_triangles[2] = {}; ///< the triangles of the buildings am
 uint64_t _gpu_eye_batches = 0;   ///< the batches of meshes alike of the view from the eyes it drew at once since the last ThreeDGpuTimes() (EyeObjectDraws::Batch)
 uint64_t _gpu_eye_instances = 0; ///< and the meshes in them
 uint64_t _gpu_eye_single = 0;    ///< and the meshes it drew each on its own (a wheel that turns)
+uint64_t _gpu_eye_frames = 0;    ///< the pictures from the eyes it drew since the last ThreeDGpuTimes()
+uint64_t _gpu_eye_triangles = 0; ///< and the triangles in them, each instance's (buildings, figures, glass)
+uint64_t _gpu_eye_calls = 0;     ///< and its draw calls for them
+uint64_t _gpu_eye_kinds = 0;     ///< the different objects of their batches, summed: fewer than the batches, an object split (its detail, paint, side)
+uint64_t _gpu_eye_steps = 0;     ///< the steps of objects of the pictures (ThreeDGpuEyeStep::Kind::Objects), each batched on its own
+uint64_t _gpu_eye_pixels = 0;    ///< and their pixels (whether the card is held up by the triangles or by the pixels)
+/** The triangles and instances of each object from the eyes since the last ThreeDGpuTimes(): what the card draws most. */
+static std::map<std::string, std::pair<uint64_t, uint64_t>, std::less<>> _gpu_eye_most;
+static std::mutex _gpu_eye_most_mutex;
 /**
  * The blocks of the turned map whose standing things the card gave back to the processor since the last ThreeDGpuTimes()
  * (DrawStandingOnCard(): one thing it cannot lay, the processor draws the whole block -- the buildings by their
@@ -5235,6 +5244,8 @@ void DrawEyeObjects(const EyeObjectDraws &o, float near_plane)
 			const bool first = FirstDraw(fmt::format("budovy z oci, strany {}", cull ? (r.facing > 0 ? "cw" : "ccw") : "obe"));
 			gl.glDrawArrays(GL_TRIANGLES, r.first, r.count);
 			FirstDrawDone(first);
+			_gpu_eye_triangles += r.count / 3;
+			_gpu_eye_calls++;
 		}
 	}
 	gl.glDisable(GL_CULL_FACE);
@@ -5290,6 +5301,8 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 			const bool first = FirstDraw(MeshDrawKind(glass, false, *d.shape, d.mesh->bones != nullptr, r.facing, -determinant));
 			gl.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)));
 			FirstDrawDone(first);
+			_gpu_eye_triangles += r.count / 3;
+			_gpu_eye_calls++;
 		}
 	}
 	/* The batches of meshes alike (EyeObjectDraws::Batch): the shape's triangles once for all its instances, their
@@ -5331,6 +5344,8 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 				const bool first = FirstDraw(MeshDrawKind(glass, true, *b.shape, false, r.facing, -b.mirrored));
 				gl.glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(r.count), GL_UNSIGNED_INT, reinterpret_cast<const void *>(static_cast<uintptr_t>(r.first) * sizeof(uint32_t)), count);
 				FirstDrawDone(first);
+				_gpu_eye_triangles += static_cast<uint64_t>(r.count / 3) * count;
+				_gpu_eye_calls++;
 			}
 			/* The shape's VAO as it was: its own attributes alone. */
 			for (GLuint a = 4; a <= 8; a++) {
@@ -5350,6 +5365,52 @@ void DrawEyeMeshes(const EyeObjectDraws &o, float near_plane, bool glass)
 	if (glass) gl.glDisable(GL_BLEND);
 	gl.glBindVertexArray(0);
 	ClearPaintUnits();
+}
+
+/**
+ * For the diary (ThreeDGpuTimes()): the objects of a picture from the eyes drawn -- each one's triangles of all its
+ * instances, and how many of them --, and how many different objects its batches were of.
+ */
+static void NoteEyeObjectsDrawn(const EyeObjectDraws &o, bool picture = true, int width = 0, int height = 0)
+{
+	auto triangles = [](const ThreeDGpuTriangles &t) {
+		uint64_t n = 0;
+		for (const auto *runs : {&t.opaque, &t.glass}) {
+			for (const ThreeDGpuTriangles::Run &r : *runs) n += r.count / 3;
+		}
+		return n;
+	};
+	std::map<std::string_view, std::pair<uint64_t, uint64_t>> drawn;
+	for (const EyeObjectDraws::Batch &b : o.batches) {
+		const uint64_t count = b.instances.size() / 20;
+		auto &d = drawn[b.mesh->name];
+		d.first += triangles(*b.mesh->triangles) * count;
+		d.second += count;
+	}
+	const size_t kinds = drawn.size();
+	for (const EyeObjectDraws::Draw &b : o.draws) {
+		auto &d = drawn["(budovy)"];
+		for (const GpuBuilding::Run &r : b.on->runs) d.first += r.count / 3;
+		d.second++;
+	}
+	for (const EyeObjectDraws::MeshDraw &m : o.mesh_draws) {
+		auto &d = drawn[m.mesh->name];
+		d.first += triangles(*m.mesh->triangles);
+		d.second++;
+	}
+	std::lock_guard lock(_gpu_eye_most_mutex);
+	if (picture) {
+		_gpu_eye_frames++;
+		_gpu_eye_pixels += static_cast<uint64_t>(width) * height;
+	}
+	_gpu_eye_steps++;
+	_gpu_eye_kinds += kinds;
+	for (const auto &[name, d] : drawn) {
+		auto it = _gpu_eye_most.find(name);
+		if (it == _gpu_eye_most.end()) it = _gpu_eye_most.emplace(std::string(name), std::pair<uint64_t, uint64_t>{0, 0}).first;
+		it->second.first += d.first;
+		it->second.second += d.second;
+	}
 }
 
 /**
@@ -5383,6 +5444,7 @@ bool DrawEyeOnCard(ThreeDGpuEyePicture &pic)
 	/* The glass after all else, over what is behind it, its depth written (what is behind it of the eye's own picture
 	 * is laid under it there). */
 	DrawEyeMeshes(objects, pic.near_plane, true);
+	NoteEyeObjectsDrawn(objects, true, w, h);
 	const size_t n = static_cast<size_t>(w) * h;
 	pic.pixels.resize(n);
 	pic.depth.resize(n);
@@ -5816,6 +5878,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 	/* The figures' glass, after what is solid; seen through, its depth not kept (what is behind it is lit, hazed and
 	 * seen to be hidden as it is). */
 	std::vector<size_t> glass_waiting;
+	bool noted = false; // the picture counted for the diary (NoteEyeObjectsDrawn())
 	auto glass = [&]() {
 		if (glass_waiting.empty()) return;
 		geometry();
@@ -5887,6 +5950,8 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				geometry();
 				DrawEyeObjects(objects[i], depth_scale);
 				glass_waiting.push_back(i);
+				NoteEyeObjectsDrawn(objects[i], !noted, w, h);
+				noted = true;
 				break;
 			case Kind::Lay: {
 				if (s.lay_px.size() < static_cast<size_t>(w) * h || s.lay_z.size() < static_cast<size_t>(w) * h) break;
@@ -6630,6 +6695,25 @@ std::string ThreeDGpuTimes()
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
+	{
+		/* A picture from the eyes as the card drew it: its triangles and draw calls, the batches' objects, the most drawn. */
+		std::lock_guard most_lock(_gpu_eye_most_mutex);
+		if (_gpu_eye_frames > 0) {
+			const double f = static_cast<double>(_gpu_eye_frames);
+			s += fmt::format("; a picture from the eyes {:.0f} thousand pixels, {:.0f} thousand triangles in {:.0f} draw calls, {:.1f} steps of objects, batches of {:.0f} objects in {:.0f}",
+					_gpu_eye_pixels / f / 1000.0, _gpu_eye_triangles / f / 1000.0, _gpu_eye_calls / f, _gpu_eye_steps / f, _gpu_eye_kinds / f, _gpu_eye_batches / f);
+			std::vector<std::pair<uint64_t, const std::string *>> most;
+			for (const auto &[name, d] : _gpu_eye_most) most.emplace_back(d.first, &name);
+			const size_t shown = std::min<size_t>(5, most.size());
+			std::partial_sort(most.begin(), most.begin() + shown, most.end(), std::greater<>());
+			for (size_t i = 0; i < shown; i++) {
+				const auto &d = _gpu_eye_most[*most[i].second];
+				s += fmt::format("{} {} ({:.0f}x, {:.0f} thousand triangles)", i == 0 ? ", most" : ",", *most[i].second, d.second / f, d.first / f / 1000.0);
+			}
+		}
+		_gpu_eye_frames = _gpu_eye_triangles = _gpu_eye_calls = _gpu_eye_kinds = _gpu_eye_steps = _gpu_eye_pixels = 0;
+		_gpu_eye_most.clear();
+	}
 	_gpu_eye_batches = _gpu_eye_instances = _gpu_eye_single = 0;
 	if (_gpu_standing_triangles[1] > 0) s += fmt::format("; of the buildings' {} triangles in the blocks {} drawn, in the cells there", _gpu_standing_triangles[1], _gpu_standing_triangles[0]);
 	const uint64_t standing_failed = _gpu_standing_failed[0] + _gpu_standing_failed[1] + _gpu_standing_failed[2] + _gpu_standing_failed[3];

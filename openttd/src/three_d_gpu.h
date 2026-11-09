@@ -110,6 +110,7 @@ struct ThreeDGpuMesh {
 	 * (ThreeDVehicleShape::corner_joints); nullptr, the shape as it is. */
 	std::shared_ptr<const ThreeDBonesFrame> bones;
 	uint32_t glow_all = 0;              ///< its own light over all its materials, as ThreeDVehicleShape::Glow() gives a material's (a thing of the sea at night); 0 each its own
+	std::string_view name;              ///< what it is (its object's name): the diary names what the card draws most (ThreeDGpuTimes())
 	/** The own light of its triangles of a texture. */
 	uint32_t Glow(size_t texture) const;
 };

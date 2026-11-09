@@ -15376,7 +15376,10 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	const double pixels_per_metre = eye.focal * across / std::max(mid.f, CAB_NEAR);
 	model.fig = fig;
 	model.whole = whole;
-	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre);
+	/* A plant (our grass's tufts, 329 triangles, some 600 of them in a meadow's view, half its triangles) simpler however
+	 * few its triangles: the meadow 352 -> 291 thousand triangles, 0.9 % of its pixels other, far off. (Its corners
+	 * twice as far apart, 242 thousand, but the grass halfway off sparser to see.) */
+	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre, fg.plant ? 0 : ThreeDVehicleShape::SIMPLER_FEWEST);
 	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
 	 * a vehicle's body painted as its state has it, its add-ons coloured -- by the graphics card as it draws them, the
 	 * textures as they are (the player, 29. 10.: "3 cars I see take the last 750 MB"); else painted by the processor. */
@@ -15805,6 +15808,7 @@ static bool EyeFigureOnCard(const CabEye &eye, int width, int height, double nea
 		g.paints = paints;
 		g.bones = bones;
 		g.glow_all = fg.glow;
+		g.name = model.fig->name;
 	};
 	/* A thing that turns, about its axis through its centre (CabFigureModel::spin): its corners at R (p - c) + c. */
 	const M3 &spin = model.spin;

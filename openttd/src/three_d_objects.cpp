@@ -8256,15 +8256,16 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
  * texture of the first of them, the triangles left with three corners kept. A cell joins only corners facing much
  * the same way and of the same texture, so the edges of a body stay. The lights and the textures stay the shape's.
  * @param cell_m the size of a cell asked for, metres of the model; below 2 cm the shape itself
+ * @param fewest a shape of fewer triangles is drawn as it is (SIMPLER_FEWEST; a plant drawn by the hundred, any)
  */
-const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
+const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, size_t fewest) const
 {
-	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
+	if (!(cell_m >= 0.02) || this->tri.size() < 3 * fewest) return this;
 	/* Not waited for (ThreeDLazyNoWait; the card drawing the map's figures): the shape itself meanwhile, the simpler one
 	 * made in the background -- nothing of it missing (Missed()), drawn whole it looks the same (the player, 31. 10.:
 	 * "go on with the GPU"; the card gave the walking Mat up for a picture made on the main thread till each frame's
 	 * simpler shape came). */
-	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m);
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, fewest);
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
 	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
@@ -8272,12 +8273,12 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m) const
 }
 
 /** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */
-const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m) const
+const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m, size_t fewest) const
 {
-	if (!(cell_m >= 0.02) || this->tri.size() < 3 * 512) return this;
+	if (!(cell_m >= 0.02) || this->tri.size() < 3 * fewest) return this;
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
 	const std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m] { this->Simpler(cell_m); })) return this;
+	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m, fewest] { this->Simpler(cell_m, fewest); })) return this;
 	return made.get();
 }
 

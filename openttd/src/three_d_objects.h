@@ -581,8 +581,10 @@ struct ThreeDVehicleShape {
 
 	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
 	static constexpr int SIMPLER_LEVELS = 6;
-	const ThreeDVehicleShape *Simpler(double cell_m) const;
-	const ThreeDVehicleShape *TrySimpler(double cell_m) const;
+	/** A shape of fewer triangles than this is drawn as it is (Simpler()): a simpler one saves little -- unless it is drawn by the hundred. */
+	static constexpr size_t SIMPLER_FEWEST = 512;
+	const ThreeDVehicleShape *Simpler(double cell_m, size_t fewest = SIMPLER_FEWEST) const;
+	const ThreeDVehicleShape *TrySimpler(double cell_m, size_t fewest = SIMPLER_FEWEST) const;
 	size_t Bytes() const;
 private:
 	/** Its simpler shapes, made the first time each is asked for; a copy of the shape has none of its own yet. */
