@@ -618,8 +618,8 @@
   },
   "meritko": 2,
   "rozmer_m": [
-   0.4,
-   0.15,
+   0.91,
+   0.23,
    0.6
   ],
   "kde": "ulice",
@@ -627,7 +627,7 @@
   "trojuhelniku": 18556,
   "autor": "3d dog cute, Tech developers (Sketchfab, CC BY 4.0, https://sketchfab.com/3d-models/3d-dog-cute-206d1a40d4654d1e940c9ec05b2cc14f), převod tvorove/par13_zvirata.py bez renderu",
   "licence": "CC BY 4.0 (uvést Tech developers; změny: otočený, zmenšený na skutečnou velikost)",
-  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku"
+  "poznamka": "skutečné metry, meritko 2 jako holky, čelem k +x, počátek mezi nohama na zemi; bez kostry, jedna póza (stojí), glb z gltfpacku; od 7. 11. stojí na nohou (hráč: „screenshot pes je hlavou dolu“): model má nahoru osu Z, převod ho nejdřív otočí o −90° kolem X (osa nahoru, tvorove/pes_roztomily_osa.py)"
  },
  {
   "soubor": "vlk_sedy.glb",
