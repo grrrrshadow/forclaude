@@ -10,15 +10,18 @@ osobacky/) into an npz:
 
 Written beside this script:
 
-  cz_navestidlo.glb          the signal, its lights out: its mast's foot at the origin, its lights to +x (to the trains
-                             coming), the head on the mast's top: top down yellow, green, red, white
-  cz_navestidlo_cervena.glb  its red lit (stop: the game's red)
-  cz_navestidlo_zelena.glb   its green lit (clear)
-  cz_navestidlo_zluta.glb    its top yellow lit (caution: the next signal at stop, the game's warning aspect)
+  cz_navestidlo.glb       the signal, its lights out: its mast's foot at the origin, its lights to +x (to the trains
+                          coming), the head on the mast's top: top down yellow, green, red, white
+  cz_svetlo_cervena.glb   its red light lit alone, in the signal's frame: a disc of its own light over the red lens (stop:
+                          the game's red), drawn with the signal (the player, 9. 11.: "it is only another colour of the
+                          light ... one object": not the whole signal again for each light)
+  cz_svetlo_zelena.glb    its green lit (clear)
+  cz_svetlo_zluta.glb     its top yellow lit (caution: the next signal at stop, the game's warning aspect)
 
 The model's faces twice over (SketchUp's front and back): of two on the same three points the one with its own colour
-kept. Its materials their colours (its one texture, the mast's light grey, flat); its domed lenses flat dark discs, the
-lit one a disc of its own light over it (glTF emissiveFactor).
+kept. Its materials their colours (its one texture, the mast's light grey, flat); its domed lenses flat discs, each of its
+own colour dull, always there (the player, 9. 11., of the AŽD posts: "it goes out but the light is still there"), the
+lit one a disc of its own light over it (glTF emissiveFactor; its red a deep one: "darker, this is too orange").
 """
 import json
 import os
@@ -34,19 +37,21 @@ MAST_X = -0.30                     # the mast's middle in the model (its foot th
 LENS_X = 0.245                     # the lenses' fronts
 LENS_R = 0.085
 LAMPS = {'zluta': 4.85, 'zelena': 4.51, 'cervena': 4.25, 'bila': 3.91}
-LIT = {'zluta': [1.0, 0.78, 0.05], 'zelena': [0.1, 1.0, 0.35], 'cervena': [1.0, 0.1, 0.05]}
+LIT = {'zluta': [1.0, 0.78, 0.05], 'zelena': [0.1, 1.0, 0.35], 'cervena': [0.78, 0.0, 0.02]}
+OUT = {'zluta': [0.36, 0.27, 0.03], 'zelena': [0.03, 0.28, 0.1], 'cervena': [0.3, 0.02, 0.03], 'bila': [0.55, 0.55, 0.53]}
 SPECS = {
     'cerna': {'baseColorFactor': [0.08, 0.08, 0.08, 1.0]},
     'material_1': {'baseColorFactor': [0.86, 0.86, 0.86, 1.0]},   # its texture's mean, a light grey
     'material': {'baseColorFactor': [0.89, 0.88, 0.87, 1.0]},
     'seda': {'baseColorFactor': [0.6, 0.6, 0.6, 1.0]},
-    'svetlo': {'baseColorFactor': [0.16, 0.1, 0.1, 1.0]},          # a lens, dark till lit
     'cervena': {'baseColorFactor': [0.8, 0.06, 0.05, 1.0]},
     'bila': {'baseColorFactor': [0.95, 0.95, 0.95, 1.0]},
     'Color_E01': {'baseColorFactor': [0.95, 0.85, 0.1, 1.0]},
 }
 for k, c in LIT.items():
     SPECS['svetlo_' + k] = {'baseColorFactor': c + [1.0], 'emissiveFactor': c}
+for k, c in OUT.items():
+    SPECS['cocka_' + k] = {'baseColorFactor': c + [1.0]}      # a lens out, of its colour
 
 
 def without_twins(T, FM, has_colour):
@@ -71,14 +76,14 @@ def main():
     keep = without_twins(T, FM, [m['jmeno'] != 'material' or m['barva'] is not None for m in mats])
     T, FM = T[keep], FM[keep]
     T[..., 0] -= MAST_X
-    # Its domed lenses (a thousand triangles) flat discs, dark till lit.
+    # Its domed lenses (a thousand triangles) flat discs, each of its colour, dull till lit.
     parts = [(names[mi], T[FM == mi]) for mi in sorted(set(FM.tolist())) if names[mi] != 'svetlo']
-    parts += [('svetlo', disc(LENS_X - MAST_X - 0.01, 0.0, z, LENS_R)) for z in LAMPS.values()]
+    parts += [('cocka_' + k, disc(LENS_X - MAST_X - 0.01, 0.0, z, LENS_R)) for k, z in LAMPS.items()]
     print('trojuhelniku', len(T), 'box', np.round(T.reshape(-1, 3).min(0), 2), np.round(T.reshape(-1, 3).max(0), 2))
     lens_x = LENS_X - MAST_X
     write(os.path.join(HERE, 'cz_navestidlo.glb'), 'cz_navestidlo', parts, SPECS)
     for k in LIT:
-        write(os.path.join(HERE, f'cz_navestidlo_{k}.glb'), f'cz_navestidlo_{k}', parts + [('svetlo_' + k, disc(lens_x, 0.0, LAMPS[k], LENS_R))], SPECS)
+        write(os.path.join(HERE, f'cz_svetlo_{k}.glb'), f'cz_svetlo_{k}', [('svetlo_' + k, disc(lens_x, 0.0, LAMPS[k], LENS_R))], SPECS)
 
 
 if __name__ == '__main__':

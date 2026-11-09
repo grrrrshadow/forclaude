@@ -2091,6 +2091,31 @@ int WarningSignalCount()
 
 /** Our Czech light signal's top over its foot, metres (objekty/nase/navestidlo.py): its box on the map. */
 static constexpr double THREE_D_SIGNAL_TOP_M = 5.3;
+/** Its lenses' fronts ahead of its mast, metres; the heights of its yellow, green and red lights (navestidlo.py LAMPS). */
+static constexpr double THREE_D_SIGNAL_LENS_M = 0.545, THREE_D_SIGNAL_YELLOW_M = 4.85, THREE_D_SIGNAL_GREEN_M = 4.51, THREE_D_SIGNAL_RED_M = 4.25;
+
+/**
+ * A light lit of one of our objects of lights (the Czech signal, the AŽD posts): its own small object -- a disc of its
+ * own light over the lens, in the object's frame -- drawn with it at its place and its facing (the player, 9. 11.: "it
+ * is only another colour of the light ... one object"). On the map in a box of its own at the lens, in front of the
+ * object's box (its mast's): nearer from the front, behind it from the back.
+ * @param x,y,z the object's place, world units and units of height: as exact as the object's own (from the eye a light at
+ *              a place rounded to whole units stood half a metre off its lens)
+ * @param ahead,aside,up where the lens is in the object's frame (+x its lights' way, +y to their left), metres
+ */
+static void DrawThreeDLitLight(TileIndex tile, std::string_view name, double x, double y, int z, float facing, double ahead, double aside, double up, bool eye)
+{
+	if (eye) {
+		AddCabFigure(name, 1.0f, x, y, z, facing);
+		return;
+	}
+	const double a = facing * M_PI / 180.0, upm = OBJECT_UNITS_PER_METRE;
+	const double lx = x + (ahead * std::cos(a) - aside * std::sin(a)) * upm, ly = y + (ahead * std::sin(a) + aside * std::cos(a)) * upm;
+	const int lz = z + static_cast<int>(std::lround(up * OBJECT_HEIGHT_PER_METRE));
+	const int bx = static_cast<int>(std::floor(lx)), by = static_cast<int>(std::floor(ly));
+	const std::array<int, 6> box{bx, by, lz - 1, bx, by, lz + 1};
+	AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+}
 
 /**
  * Our Czech light signal (the player, 8. 11.: "the lights one Czech", "2 yes"; objekty/nase/navestidlo.py) at a signal on
@@ -2112,13 +2137,20 @@ static bool DrawThreeDSignal(TileIndex tile, Trackdir td, SignalAspect aspect, i
 	}};
 	const auto &g = GOES[to_underlying(td) & 15];
 	const float facing = static_cast<float>(std::atan2(-g[1], -g[0]) * 180.0 / M_PI);
-	const std::string_view name = aspect == SignalAspect::Red ? "cz_navestidlo_cervena" : aspect == SignalAspect::Warning ? "cz_navestidlo_zluta" : "cz_navestidlo_zelena";
+	/* The signal, one object, its lights out; its lit light over it, of the colour it shows. */
 	if (eye) {
-		AddCabFigure(name, 1.0f, x, y, z, facing);
-		return true;
+		AddCabFigure("cz_navestidlo", 1.0f, x, y, z, facing);
+	} else {
+		const std::array<int, 6> box{x - 1, y - 1, z, x, y, z + static_cast<int>(std::lround(THREE_D_SIGNAL_TOP_M * OBJECT_HEIGHT_PER_METRE))};
+		AddThreeDFigureToViewportInBox("cz_navestidlo", 1.0f, x, y, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
 	}
-	const std::array<int, 6> box{x - 1, y - 1, z, x, y, z + static_cast<int>(std::lround(THREE_D_SIGNAL_TOP_M * OBJECT_HEIGHT_PER_METRE))};
-	AddThreeDFigureToViewportInBox(name, 1.0f, x, y, z, facing, _cur_dpi->zoom, tile, 0, -1, 0, &box);
+	if (aspect == SignalAspect::Red) {
+		DrawThreeDLitLight(tile, "cz_svetlo_cervena", x, y, z, facing, THREE_D_SIGNAL_LENS_M, 0, THREE_D_SIGNAL_RED_M, eye);
+	} else if (aspect == SignalAspect::Warning) {
+		DrawThreeDLitLight(tile, "cz_svetlo_zluta", x, y, z, facing, THREE_D_SIGNAL_LENS_M, 0, THREE_D_SIGNAL_YELLOW_M, eye);
+	} else {
+		DrawThreeDLitLight(tile, "cz_svetlo_zelena", x, y, z, facing, THREE_D_SIGNAL_LENS_M, 0, THREE_D_SIGNAL_GREEN_M, eye);
+	}
 	return true;
 }
 
@@ -3066,8 +3098,13 @@ static void PutThreeDStraight(const TileInfo *ti, std::string_view name, Axis ax
 static constexpr double THREE_D_CROSSING_POST_TRACK_M = 5.6, THREE_D_CROSSING_POST_SIDE_M = 5.0;
 /** How long a light of theirs is on, and off, the game's ticks: half a second, the red ones in turn, the white one by itself. */
 static constexpr int THREE_D_CROSSING_BLINK_TICKS = 18;
-/** In a post's frame (azd.py: its lights to +x, the road at -y; metres): its footprint, its top, where its barrier turns and how long it is. */
-static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.4, THREE_D_POST_Y0 = -0.35, THREE_D_POST_Y1 = 0.9, THREE_D_POST_TOP_M = 3.8;
+/**
+ * In a post's frame (azd.py: its lights to +x, the road at -y; metres): its box on the map -- its mast and its head
+ * behind its lenses, so that its lit light (DrawThreeDLitLight()) is nearer from the front --, its top, where its
+ * barrier turns and how long it is; its lenses (ahead, aside, up).
+ */
+static constexpr double THREE_D_POST_X0 = -0.3, THREE_D_POST_X1 = 0.15, THREE_D_POST_Y0 = -0.35, THREE_D_POST_Y1 = 0.9, THREE_D_POST_TOP_M = 3.8;
+static constexpr double THREE_D_POST_LENS_X = 0.17, THREE_D_POST_LEFT_Y = 0.336, THREE_D_POST_RIGHT_Y = 0.661, THREE_D_POST_WHITE_Y = 0.498, THREE_D_POST_RED_Z = 3.033, THREE_D_POST_WHITE_Z = 2.707;
 static constexpr double THREE_D_BARRIER_X = 0.06, THREE_D_BARRIER_Y = 0.25, THREE_D_BARRIER_Z = 1.45, THREE_D_BARRIER_LEN = 5.0;
 
 /**
@@ -3086,7 +3123,11 @@ static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye
 	const bool phase = (TimerGameTick::counter / THREE_D_CROSSING_BLINK_TICKS) % 2 == 0;
 	const std::string_view lit = closed ? (phase ? "_l" : "_p") : (phase ? "_b" : "");
 	const std::string_view mirror = on_left ? "_z" : "";
-	const std::string post = fmt::format("azd_sloupek{}{}", lit, mirror);
+	const std::string post = fmt::format("azd_sloupek{}", mirror);
+	const std::string light = fmt::format("azd_svetlo{}{}", lit, mirror);
+	/* The lit light's lens in the post's frame (mirrored driving on the left). */
+	const double light_y = (lit == "_l" ? THREE_D_POST_LEFT_Y : lit == "_p" ? THREE_D_POST_RIGHT_Y : THREE_D_POST_WHITE_Y) * (on_left ? -1.0 : 1.0);
+	const double light_z = lit == "_b" ? THREE_D_POST_WHITE_Z : THREE_D_POST_RED_Z;
 	const std::string barrier = fmt::format("azd_zavora_{}{}", closed ? "dole" : "nahore", mirror);
 	const double upm = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
 	const double mx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, my = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
@@ -3099,6 +3140,7 @@ static void DrawThreeDCrossingPosts(const TileInfo *ti, Axis rail_axis, bool eye
 		/* Its lights to the traffic coming: its frame's +x against the way. */
 		const double fa = std::atan2(-dy, -dx), ca = std::cos(fa), sa = std::sin(fa);
 		const float facing = static_cast<float>(fa * 180.0 / M_PI);
+		if (!lit.empty()) DrawThreeDLitLight(ti->tile, light, px, py, ti->z, facing, THREE_D_POST_LENS_X, light_y, light_z, eye);
 		if (eye) {
 			AddCabFigure(post, 1.0f, px, py, ti->z, facing);
 			AddCabFigure(barrier, 1.0f, px, py, ti->z, facing);

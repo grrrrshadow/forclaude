@@ -12,14 +12,20 @@ with the warning lights, the St Andrew's cross over them, the barrier's drive an
 Written beside this script, each also mirrored (_z: the road on its other side, for driving on the left):
 
   azd_sloupek.glb        the post, its lights out: its foot at the origin, its lights to +x (to the drivers coming), the
-                         road at -y
-  azd_sloupek_l.glb      the same, its left red light lit (a disc of its own light over the lens, glTF emissiveFactor)
-  azd_sloupek_p.glb      its right red light lit (the crossing closed: the two in turn)
-  azd_sloupek_b.glb      its white light lit (the crossing open: it blinks slowly)
+                         road at -y; its two red lenses and its white one always there, dull (the player, 9. 11.: "it
+                         goes out but the light is still there, there must always be a red and a white circle")
+  azd_svetlo_l.glb       its left red light lit alone, in the post's frame: a disc of its own light over the lens (glTF
+                         emissiveFactor), drawn with the post (the player, 9. 11.: "only another colour of the light ... one
+                         object": not the whole post again for each light)
+  azd_svetlo_p.glb       its right red light lit (the crossing closed: the two in turn)
+  azd_svetlo_b.glb       its white light lit (the crossing open: it blinks slowly)
   azd_zavora_dole.glb    the barrier down: from its drive over the road, red and white, 5 m
   azd_zavora_nahore.glb  the barrier up, straight up from its drive
 
-The post's materials their colours (the model's textures of grey metal flat grey); the lenses dark till lit.
+The post's materials their colours (the model's textures of grey metal flat grey). Its lenses our own discs a little in
+front of its black face (the model's red lenses lie in the face's very plane and its white one is not there at all), where
+its hoods are: dull red and dull white, the lit one a disc of a deep red (the player: "darker, this is too orange") or of
+white over it.
 glTF's Y up: (x, z, -y) of the model's frame.
 """
 import json
@@ -37,9 +43,11 @@ POST_GROUPS = (3, 6, 7)
 SHARED_GROUPS = (4, 5)
 POLE_X, POLE_Y = -7.69, -3.99      # the mast's middle in the model, metres
 LIGHTS_FACE = -1.0                 # its lights face -x in the model: turned half round to +x
-LENS_X = -7.86                     # the lenses' plane in the model
-LENSES = {'l': (-4.28, 3.06), 'p': (-4.60, 3.06), 'bile': (-4.47, 2.78)}  # y, z of each lens in the model
-LENS_R = 0.085
+LENS_X = -7.843                    # the lenses' plane in the model (its black face's)
+# y, z of each lens in the model: the red ones its own ([Color_A01], [Color_A09]), the white one under its hood between them
+LENSES = {'l': (-4.326, 3.033), 'p': (-4.651, 3.033), 'bile': (-4.488, 2.707)}
+LENS_R = 0.12
+LENS_MATS = ('[Color_A01]', '[Color_A09]')  # the model's red lenses: in its face's plane, ours instead
 PIVOT = (0.06, 0.25, 1.45)         # the barrier's pivot on its drive, in the post's frame (lights to +x)
 BOOM_LEN, BOOM_HALF = 5.0, 0.045
 STRIPE = 0.5
@@ -105,7 +113,9 @@ MATS = {
     'cervena': {'baseColorFactor': [0.78, 0.08, 0.07, 1.0]},
     'bila': {'baseColorFactor': [0.93, 0.93, 0.92, 1.0]},
     'zavazi': {'baseColorFactor': [0.18, 0.18, 0.19, 1.0]},
-    'svetlo_cervene': {'baseColorFactor': [1.0, 0.12, 0.06, 1.0], 'emissiveFactor': [1.0, 0.12, 0.06]},
+    'cocka_cervena': {'baseColorFactor': [0.3, 0.02, 0.03, 1.0]},     # a red lens out
+    'cocka_bila': {'baseColorFactor': [0.62, 0.62, 0.6, 1.0]},         # the white one out
+    'svetlo_cervene': {'baseColorFactor': [0.78, 0.0, 0.02, 1.0], 'emissiveFactor': [0.78, 0.0, 0.02]},
     'svetlo_bile': {'baseColorFactor': [1.0, 0.98, 0.9, 1.0], 'emissiveFactor': [1.0, 0.98, 0.9]},
 }
 
@@ -188,14 +198,18 @@ def main():
     keep = np.isin(FG, POST_GROUPS) | (np.isin(FG, SHARED_GROUPS) & near)
     post = []
     for mi in sorted(set(FM[keep].tolist())):
+        if names[mi] in LENS_MATS:
+            continue
         sel = keep & (FM == mi)
         post.append((names[mi], to_post(T[sel])))  # a half turn: the faces keep their winding
     lights = {}
     for k, (ly, lz) in LENSES.items():
         p = to_post(np.array([LENS_X, ly, lz]))
-        lights[k] = [('svetlo_bile' if k == 'bile' else 'svetlo_cervene', disc(p[0] + 0.015, p[1], p[2], LENS_R))]
-    pieces = {'azd_sloupek': post, 'azd_sloupek_l': post + lights['l'], 'azd_sloupek_p': post + lights['p'],
-              'azd_sloupek_b': post + lights['bile'], 'azd_zavora_dole': boom(False), 'azd_zavora_nahore': boom(True)}
+        post.append(('cocka_bila' if k == 'bile' else 'cocka_cervena', disc(p[0] + 0.01, p[1], p[2], LENS_R)))
+        lights[k] = [('svetlo_bile' if k == 'bile' else 'svetlo_cervene', disc(p[0] + 0.02, p[1], p[2], LENS_R + 0.005))]
+        print('cocka', k, np.round(p, 3))
+    pieces = {'azd_sloupek': post, 'azd_svetlo_l': lights['l'], 'azd_svetlo_p': lights['p'], 'azd_svetlo_b': lights['bile'],
+              'azd_zavora_dole': boom(False), 'azd_zavora_nahore': boom(True)}
     for name, parts in pieces.items():
         write(os.path.join(HERE, name + '.glb'), name, parts)
         write(os.path.join(HERE, name + '_z.glb'), name + '_z', mirrored(parts))
