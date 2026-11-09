@@ -8903,6 +8903,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (m == nullptr) m = GetThreeDFigure(argv[3]);
 		const ThreeDVehicleShape *shape = m != nullptr ? m->GetShape(0, m->PartsOf(0)) : nullptr;
 		if (shape == nullptr) {
+			/* A building's (ThreeDObject::GetShape(), levels of ThreeDShapeLevel()). */
+			if (const ThreeDObject *o = GetThreeDObjectByName(argv[3]); o != nullptr) {
+				std::string line = fmt::format("test3d: zjednoduseni domu {}:", argv[3]);
+				for (int level = 0; level < THREE_D_SHAPE_LEVELS; level++) {
+					const auto start = std::chrono::steady_clock::now();
+					const size_t tris = o->GetShape(level).tri.size() / 3;
+					line += fmt::format(" {} {} ({:.0f} ms)", level, tris, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+				}
+				IConsolePrint(CC_DEFAULT, "{}", line);
+				return true;
+			}
 			IConsolePrint(CC_ERROR, "test3d: model {} neni", argv[3]);
 			return true;
 		}
