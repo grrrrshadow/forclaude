@@ -2881,6 +2881,8 @@ static void DrawThreeDCatenary(const TileInfo *ti, TrackBits track, Slope s, boo
  * @param track its tracks
  * @return whether it was drawn so: its sprites of the track left out
  */
+static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye);
+
 static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 {
 	const bool eye = ViewportDrawingEye();
@@ -2958,6 +2960,8 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 			foot = z;
 		}
 		put(name, ox + p.x, oy + p.y, p.ax, p.ay, z, foot, tall, facing);
+		/* At a dead end of a straight piece on the level its buffer stop (DrawThreeDBufferStops()). */
+		if (s == SLOPE_FLAT) DrawThreeDBufferStops(ti, t, ti->z, eye);
 	}
 	/* Its catenary over it, when it is electrified (DrawThreeDCatenary()). */
 	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, track, s, round, eye);
@@ -2991,6 +2995,50 @@ double ThreeDRoadOverTrack(TileIndex tile, double x, double y)
 static int ThreeDRailsTall()
 {
 	return std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
+}
+
+/**
+ * Our buffer stop (objekty/nase/zarazedlo.py): from its buffers back along the track (its own piece of track: 1.8 m),
+ * across it each way, its top; metres.
+ */
+static constexpr double THREE_D_STOP_LONG_M = 1.55, THREE_D_STOP_STUB_M = 1.8, THREE_D_STOP_HALF_M = 1.15, THREE_D_STOP_TOP_M = 2.25;
+
+/**
+ * Our Štůrc buffer stop (the player, 8. 11.: "the buffer stop on the track", "yes the buffer stop"; objekty/nase/zarazedlo.py)
+ * at each dead end of a straight piece of our track: where at an end of it no track goes on from the tile's edge (the
+ * next tile's track entered from there: a depot by its door, a tunnel or a bridge by its mouth), its buffers to the
+ * trains. A train's front comes to the very edge before it turns back: the buffers there, the stop beyond on its own
+ * piece of track, where the next tile is free land level with it; else within the tile, its back at the edge.
+ * @param z the track's height, units (the tile flat after its foundation)
+ */
+static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye)
+{
+	if ((t != Track::X && t != Track::Y) || GetThreeDFigure("zarazedlo") == nullptr) return;
+	const Axis axis = t == Track::X ? Axis::X : Axis::Y;
+	for (const DiagDirection dir : {AxisToDiagDir(axis), ReverseDiagDir(AxisToDiagDir(axis))}) {
+		const TileIndexDiffC d = TileIndexDiffCByDiagDir(dir);
+		const TileIndex n = AddTileIndexDiffCWrap(ti->tile, d);
+		if (n != INVALID_TILE && GetTileTrackStatus(n, TransportType::Rail, RoadTramType::Invalid, ReverseDiagDir(dir)).trackdirs.Any(DiagdirReachesTrackdirs(dir))) continue;
+		/* Its buffers at the middle of that edge, facing back into the tile, the stop beyond on its piece of track; or
+		 * within the tile, its back at the edge. */
+		const bool beyond = n != INVALID_TILE && (IsTileType(n, TileType::Clear) || IsTileType(n, TileType::Trees)) && GetTileSlope(n) == SLOPE_FLAT && GetTilePixelZ(n) == z;
+		const double upm = OBJECT_UNITS_PER_METRE, back = (beyond ? THREE_D_STOP_STUB_M : THREE_D_STOP_LONG_M) * upm;
+		const double edge_x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.x * TILE_SIZE / 2.0, edge_y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0 + d.y * TILE_SIZE / 2.0;
+		const double bx = beyond ? edge_x : edge_x - d.x * back, by = beyond ? edge_y : edge_y - d.y * back;
+		const std::string_view name = beyond ? "zarazedlo_kolej" : "zarazedlo";
+		const float facing = static_cast<float>(std::atan2(-d.y, -d.x) * 180.0 / M_PI);
+		if (eye) {
+			AddCabFigure(name, 1.0f, bx, by, z, facing);
+			continue;
+		}
+		const double across = THREE_D_STOP_HALF_M * upm, fx = bx + d.x * back, fy = by + d.y * back;
+		const double x0 = std::min(bx, fx) - (axis == Axis::Y ? across : 0), x1 = std::max(bx, fx) + (axis == Axis::Y ? across : 0);
+		const double y0 = std::min(by, fy) - (axis == Axis::X ? across : 0), y1 = std::max(by, fy) + (axis == Axis::X ? across : 0);
+		const int bx0 = static_cast<int>(std::floor(x0)), by0 = static_cast<int>(std::floor(y0));
+		const std::array<int, 6> box{bx0, by0, z, std::max(bx0, static_cast<int>(std::ceil(x1)) - 1), std::max(by0, static_cast<int>(std::ceil(y1)) - 1),
+				z + static_cast<int>(std::lround(THREE_D_STOP_TOP_M * OBJECT_HEIGHT_PER_METRE))};
+		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(bx)), static_cast<int>(std::lround(by)), z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+	}
 }
 
 /**
@@ -3118,8 +3166,9 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	/* Across it its embankment, a crossing's panels and ramps. */
 	const double across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
 	PutThreeDStraight(ti, name, axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0, across, ti->z, ThreeDRailsTall());
-	/* A level crossing's AŽD posts with their lights and barriers. */
+	/* A level crossing's AŽD posts with their lights and barriers; a station's track ending at its edge, its buffer stop. */
 	if (crossing) DrawThreeDCrossingPosts(ti, axis, eye);
+	if (!crossing && !half) DrawThreeDBufferStops(ti, AxisToTrack(axis), ti->z, eye);
 	if (ThreeDCatenaryOn(ti->tile)) DrawThreeDCatenary(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye, door);
 	return true;
 }
