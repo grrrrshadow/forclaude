@@ -579,12 +579,14 @@ struct ThreeDVehicleShape {
 	/** Whether a triangle of a part sits at the driver's seat: not drawn from the own cab's eye. */
 	static bool AtDriverSeat(uint8_t part) { return part == PART_DRIVER || (part >= PART_SEAT && part < PART_SEAT + ThreeDParts::COUNT); }
 
-	/** How many simpler shapes of it there may be (Simpler()): its corners joined in cells of 2, 4, ... 64 cm. */
-	static constexpr int SIMPLER_LEVELS = 6;
-	/** A shape of fewer triangles than this is drawn as it is (Simpler()): a simpler one saves little -- unless it is drawn by the hundred. */
+	/** How many simpler shapes of it there may be (Simpler()): of cells of 1, 2, 4, ... 64 cm (a plant's from 2 cm). */
+	static constexpr int SIMPLER_LEVELS = 7;
+	/** The cell of the first of them, metres. */
+	static constexpr double SIMPLER_CELL_M = 0.01;
+	/** A shape of fewer triangles than this is drawn as it is (Simpler()): a simpler one saves little -- unless it is a plant, drawn by the hundred. */
 	static constexpr size_t SIMPLER_FEWEST = 512;
-	const ThreeDVehicleShape *Simpler(double cell_m, size_t fewest = SIMPLER_FEWEST) const;
-	const ThreeDVehicleShape *TrySimpler(double cell_m, size_t fewest = SIMPLER_FEWEST) const;
+	const ThreeDVehicleShape *Simpler(double cell_m, bool plant = false) const;
+	const ThreeDVehicleShape *TrySimpler(double cell_m, bool plant = false) const;
 	size_t Bytes() const;
 private:
 	/** Its simpler shapes, made the first time each is asked for; a copy of the shape has none of its own yet. */

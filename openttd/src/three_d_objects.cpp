@@ -8079,10 +8079,138 @@ const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame, const Thre
 	return this->frame_shapes[frame].get();
 }
 
-/** The simpler shape of a shape at a level (ThreeDVehicleShape::Simpler()): its corners joined in cells of 2 cm times two to the level. */
-static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVehicleShape &shape, int level)
+/**
+ * The simpler shape of a shape not on bones (MakeSimplerShape()) by meshoptimizer's simplifier (MIT, 3rdparty/meshoptimizer;
+ * the player's point 1 of what is good in Godot, TEMATA 183): its edges collapsed as long as its surface moves no farther
+ * than the error, its pieces smaller than that left out (a bolt, a tuft's blade). Its corners stay where they are, each a
+ * corner of the shape -- their places in the textures, normals and wheels as they were. Corners of one place stay apart
+ * where the shape has them apart -- another place in the texture, another texture, part, glass, side out or wheel --: a
+ * seam the simplifier keeps, so that a triangle keeps its texture and its kind. Where the corners of one place differ in
+ * their normals alone (a model of flat faces), they are one for the simplifier, and each triangle left takes of them the
+ * one facing as it faces.
+ * (The cells of MakeSimplerShape() joined only corners closer than a cell: the colleague's lorries, a Tatra 138 155
+ * thousand triangles from a few metres, the farm's ripe wheat 1.5 thousand each by the hundred; the player's log #355.)
+ * @param error how far its surface may move, metres
+ */
+static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehicleShape &shape, double error)
 {
-	const double cell = 0.02 * (1 << level);
+	const size_t corners = shape.pos.size() / 3, triangles = shape.tri.size() / 3;
+	auto out = std::make_shared<ThreeDVehicleShape>();
+	if (corners == 0 || triangles == 0) return out;
+	const bool has_nrm = shape.nrm.size() == shape.pos.size(), has_uv = shape.uv.size() == corners * 2;
+	const bool wheels = shape.corner_wheel.size() == corners;
+	/* A triangle's kind: its texture, part, glass and side out. */
+	auto kind_of = [&shape](size_t t) {
+		return static_cast<uint32_t>(t < shape.tri_tex.size() ? shape.tri_tex[t] : 0) | static_cast<uint32_t>(t < shape.tri_part.size() ? shape.tri_part[t] : 0) << 8 |
+				static_cast<uint32_t>(t < shape.tri_glass.size() ? shape.tri_glass[t] : 0) << 16 | static_cast<uint32_t>(static_cast<uint8_t>(t < shape.facing.size() ? shape.facing[t] : 0)) << 24;
+	};
+	/* The corners as the simplifier has them: one for each place, place in the texture, wheel and kind of triangle. */
+	using Key = std::array<uint32_t, 7>;
+	struct KeyHash {
+		size_t operator()(const Key &k) const
+		{
+			uint64_t h = 0;
+			for (uint32_t v : k) h = (h ^ v) * 0x9E3779B97F4A7C15ull;
+			return static_cast<size_t>(h ^ (h >> 29));
+		}
+	};
+	std::unordered_map<Key, uint32_t, KeyHash> welded;
+	welded.reserve(corners);
+	std::vector<float> wpos;
+	std::vector<uint32_t> windex(shape.tri.size());
+	std::vector<uint32_t> wkind;
+	/* The corners of the shape of each, the first in wfirst, the next of each in wnext (UINT32_MAX none). */
+	std::vector<uint32_t> wfirst, wnext(shape.tri.size(), UINT32_MAX), wcorner(shape.tri.size());
+	for (size_t t = 0; t < triangles; t++) {
+		const uint32_t k = kind_of(t);
+		for (int c = 0; c < 3; c++) {
+			const uint32_t i = shape.tri[t * 3 + c];
+			Key key{std::bit_cast<uint32_t>(shape.pos[i * 3]), std::bit_cast<uint32_t>(shape.pos[i * 3 + 1]), std::bit_cast<uint32_t>(shape.pos[i * 3 + 2]),
+					has_uv ? std::bit_cast<uint32_t>(shape.uv[i * 2]) : 0u, has_uv ? std::bit_cast<uint32_t>(shape.uv[i * 2 + 1]) : 0u, wheels ? shape.corner_wheel[i] : 0u, k};
+			auto [it, added] = welded.try_emplace(key, static_cast<uint32_t>(wfirst.size()));
+			const uint32_t w = it->second;
+			if (added) {
+				wpos.insert(wpos.end(), {shape.pos[i * 3], shape.pos[i * 3 + 1], shape.pos[i * 3 + 2]});
+				wkind.push_back(k);
+				wfirst.push_back(UINT32_MAX);
+			}
+			windex[t * 3 + c] = w;
+			/* Each corner of the shape once in the list of its welded corner. */
+			bool listed = false;
+			for (uint32_t n = wfirst[w]; n != UINT32_MAX && !listed; n = wnext[n]) listed = wcorner[n] == i;
+			if (!listed) {
+				const size_t slot = t * 3 + c;
+				wcorner[slot] = i;
+				wnext[slot] = wfirst[w];
+				wfirst[w] = static_cast<uint32_t>(slot);
+			}
+		}
+	}
+	std::vector<uint32_t> kept(windex.size());
+	float result_error = 0;
+	const size_t count = meshopt_simplify(kept.data(), windex.data(), windex.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), 0, static_cast<float>(error),
+			meshopt_SimplifyErrorAbsolute, &result_error);
+	/* The triangles left, each corner the shape's of its place facing most as the triangle faces. */
+	std::vector<uint32_t> new_of(corners, UINT32_MAX);
+	auto corner = [&](uint32_t w, const double n[3]) {
+		uint32_t best = wcorner[wfirst[w]];
+		if (has_nrm) {
+			double best_dot = -2;
+			for (uint32_t s = wfirst[w]; s != UINT32_MAX; s = wnext[s]) {
+				const uint32_t i = wcorner[s];
+				const double d = n[0] * shape.nrm[i * 3] + n[1] * shape.nrm[i * 3 + 1] + n[2] * shape.nrm[i * 3 + 2];
+				if (d > best_dot) {
+					best_dot = d;
+					best = i;
+				}
+			}
+		}
+		if (new_of[best] == UINT32_MAX) {
+			new_of[best] = static_cast<uint32_t>(out->pos.size() / 3);
+			out->pos.insert(out->pos.end(), {shape.pos[best * 3], shape.pos[best * 3 + 1], shape.pos[best * 3 + 2]});
+			if (has_nrm) out->nrm.insert(out->nrm.end(), {shape.nrm[best * 3], shape.nrm[best * 3 + 1], shape.nrm[best * 3 + 2]});
+			if (has_uv) out->uv.insert(out->uv.end(), {shape.uv[best * 2], shape.uv[best * 2 + 1]});
+			if (wheels) out->corner_wheel.push_back(shape.corner_wheel[best]);
+		}
+		return new_of[best];
+	};
+	for (size_t t = 0; t + 2 < count; t += 3) {
+		const float *a = &wpos[kept[t] * 3], *b = &wpos[kept[t + 1] * 3], *c = &wpos[kept[t + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+		double n[3] = {uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx};
+		const double l = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+		if (l > 0) for (double &v : n) v /= l;
+		const uint32_t k = wkind[kept[t]];
+		out->tri.insert(out->tri.end(), {corner(kept[t], n), corner(kept[t + 1], n), corner(kept[t + 2], n)});
+		out->tri_tex.push_back(static_cast<uint8_t>(k & 0xFF));
+		if (!shape.tri_part.empty()) out->tri_part.push_back(static_cast<uint8_t>(k >> 8));
+		if (!shape.tri_glass.empty()) out->tri_glass.push_back(static_cast<uint8_t>(k >> 16));
+		if (!shape.facing.empty()) out->facing.push_back(static_cast<int8_t>(static_cast<uint8_t>(k >> 24)));
+	}
+	return out;
+}
+
+/**
+ * The simpler shape of a shape at a level (ThreeDVehicleShape::Simpler()): of 1 cm times two to the level.
+ * @param plant a plant's: its corners joined in the cells, its blades dropped one by one where a cell takes a blade's
+ *              foot -- meshoptimizer keeps a blade of one triangle whole, or with its small pieces left out drops them
+ *              all at once (a tuft of 329 triangles 11 at 4 cm: a bare meadow off a way)
+ */
+static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVehicleShape &shape, int level, bool plant)
+{
+	const double cell = ThreeDVehicleShape::SIMPLER_CELL_M * (1 << level);
+	/* A model not on bones: by meshoptimizer, the surface off by no more than half a cell (about a pixel where the cell is two). */
+	if (shape.corner_joints.empty() && !plant) {
+		std::shared_ptr<ThreeDVehicleShape> out = MeshoptSimplerShape(shape, cell / 2);
+		out->tex_addon = shape.tex_addon;
+		out->tex_glow = shape.tex_glow;
+		out->tex_alpha = shape.tex_alpha;
+		out->glass_alpha = shape.glass_alpha;
+		out->x0 = shape.x0; out->x1 = shape.x1; out->y0 = shape.y0; out->y1 = shape.y1; out->z0 = shape.z0; out->z1 = shape.z1;
+		ShrinkShape(*out);
+		Debug(misc, 3, "3D shape simpler at {} cm (meshoptimizer): {} of {} triangles", std::lround(cell * 100), out->tri.size() / 3, shape.tri.size() / 3);
+		return out;
+	}
 	const size_t corners = shape.pos.size() / 3;
 	const bool has_nrm = shape.nrm.size() == shape.pos.size(), has_uv = shape.uv.size() == corners * 2;
 	/* Each corner's texture and part: its first triangle's. */
@@ -8251,34 +8379,34 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
 
 /**
  * A simpler shape of this one for a model drawn small (the view from the eyes; the player, 16. 10.: "save when they
- * are far, it need not be drawn in detail far"): its corners joined in cells of about the size asked for -- 2, 4,
- * ... 64 cm, made the first time each is asked for -- each cell's corners one at their middle, at the place in the
- * texture of the first of them, the triangles left with three corners kept. A cell joins only corners facing much
- * the same way and of the same texture, so the edges of a body stay. The lights and the textures stay the shape's.
- * @param cell_m the size of a cell asked for, metres of the model; below 2 cm the shape itself
- * @param fewest a shape of fewer triangles is drawn as it is (SIMPLER_FEWEST; a plant drawn by the hundred, any)
+ * are far, it need not be drawn in detail far"), for a cell of about the size asked for -- 1, 2, 4 ... 64 cm, made the
+ * first time each is asked for (MakeSimplerShape()): a model's surface off by no more than half the cell
+ * (meshoptimizer), a plant's corners joined in the cells. The lights and the textures stay the shape's.
+ * @param cell_m the size of a cell asked for, metres of the model; below 1 cm (a plant's 2 cm) the shape itself
+ * @param plant a plant's (our grass's tufts, the farm's wheat; by the hundred): however few its triangles, its corners
+ *              joined in the cells (MakeSimplerShape())
  */
-const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, size_t fewest) const
+const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant) const
 {
-	if (!(cell_m >= 0.02) || this->tri.size() < 3 * fewest) return this;
+	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
 	/* Not waited for (ThreeDLazyNoWait; the card drawing the map's figures): the shape itself meanwhile, the simpler one
 	 * made in the background -- nothing of it missing (Missed()), drawn whole it looks the same (the player, 31. 10.:
 	 * "go on with the GPU"; the card gave the walking Mat up for a picture made on the main thread till each frame's
 	 * simpler shape came). */
-	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, fewest);
-	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
+	if (_lazy_no_wait > 0 && !_three_d_load_at_once) return this->TrySimpler(cell_m, plant);
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
 	std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level] { return MakeSimplerShape(*this, level); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
+	MakeOnce(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, level, plant] { return MakeSimplerShape(*this, level, plant); }, [&made](std::shared_ptr<const ThreeDVehicleShape> out) { made = std::move(out); });
 	return made != nullptr ? made.get() : this;
 }
 
 /** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */
-const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m, size_t fewest) const
+const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m, bool plant) const
 {
-	if (!(cell_m >= 0.02) || this->tri.size() < 3 * fewest) return this;
-	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / 0.02))));
+	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
+	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
 	const std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
-	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m, fewest] { this->Simpler(cell_m, fewest); })) return this;
+	if (!MadeOrAsked(this, LAZY_SIMPLER + level, [&made] { return made != nullptr; }, [this, cell_m, plant] { this->Simpler(cell_m, plant); })) return this;
 	return made.get();
 }
 

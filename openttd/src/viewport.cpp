@@ -15379,7 +15379,7 @@ static bool CabFigureReady(const CabEye &eye, const CabFigure &fg, bool by_card,
 	/* A plant (our grass's tufts, 329 triangles, some 600 of them in a meadow's view, half its triangles) simpler however
 	 * few its triangles: the meadow 352 -> 291 thousand triangles, 0.9 % of its pixels other, far off. (Its corners
 	 * twice as far apart, 242 thousand, but the grass halfway off sparser to see.) */
-	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre, fg.plant ? 0 : ThreeDVehicleShape::SIMPLER_FEWEST);
+	model.shape = fg.own_cab || fg.missile ? whole : whole->TrySimpler(_cab_detail_pixels / pixels_per_metre, fg.plant);
 	/* The textures at the detail of its distance, a texel to a pixel (the player, 16. 10.: "save when they are far");
 	 * a vehicle's body painted as its state has it, its add-ons coloured -- by the graphics card as it draws them, the
 	 * textures as they are (the player, 29. 10.: "3 cars I see take the last 750 MB"); else painted by the processor. */
@@ -16161,8 +16161,13 @@ static constexpr double CAB_COARSE = 14.0 * TILE_SIZE;
 static constexpr double CAB_PLANT_SOLID = 0.6 * TILE_SIZE;
 /** The wheat of the farm's fields is drawn this many tiles about the eye; farther, the field's ground. */
 static constexpr double CAB_WHEAT_TILES = 10.0;
-/** Our grass's tufts (objekty/nase/trava_trs) are laid this many tiles about the eye; farther, our grass's picture. */
-static constexpr double CAB_GRASS_TILES = 3.0;
+/**
+ * Our grass's tufts (objekty/nase/trava_trs) about the eye, all of them this near, metres; farther fewer and fewer to
+ * CAB_GRASS_FAR_M, beyond only our grass's picture (the player, 9. 11.: "we need the blades only a few metres about the
+ * walker"; they were laid three tiles, 44 m, about: 591 tufts, half of a meadow's triangles).
+ */
+static constexpr double CAB_GRASS_NEAR_M = 6.0;
+static constexpr double CAB_GRASS_FAR_M = 8.0;
 /** And a tile has so many of them along each side (a tuft is 2 x 2 m, the tile 14.8 m): fewer as it is grown over. */
 static constexpr int CAB_GRASS_TUFTS = 7;
 
@@ -16289,7 +16294,7 @@ static bool WayKeepsOff(TileIndex tile, Slope slope, std::vector<WayPiece> &way)
  * too) and a road's or a level crossing's with grass verges, all of them as a meadow's, off the track's embankment
  * and the road's surface (WayKeepsOff()); not on a foundation (its top is not the ground they are laid on).
  */
-static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
+static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope, double eye_x, double eye_y)
 {
 	if (!OurGrassOn(true) || GetThemedLand(tile) != ThemedLand::None) return;
 	int thirds = 0;
@@ -16347,6 +16352,17 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope)
 		/* On a coast only its land (DrawEyeWater()), the tuft a little up it: under, its water. */
 		if (coast && z - base_z < EYE_COAST_LAND + 1.0) return;
 		const float facing = static_cast<float>(45 * static_cast<int>(next() * 8));
+		/* Only about the eye (CAB_GRASS_NEAR_M), thinning out to CAB_GRASS_FAR_M: by a hash of its place, not of the
+		 * tile's numbers (those go on whether it is laid or not, the tufts after it as they were). */
+		const double metres = std::hypot(x0 + x - eye_x, y0 + y - eye_y) / OBJECT_UNITS_PER_METRE;
+		if (metres > CAB_GRASS_FAR_M) return;
+		if (metres > CAB_GRASS_NEAR_M) {
+			uint32_t h = static_cast<uint32_t>(std::lround((x0 + x) * 8)) * 2654435761u ^ static_cast<uint32_t>(std::lround((y0 + y) * 8)) * 2246822519u;
+			h ^= h >> 15;
+			h *= 0x2C1B3C6Du;
+			h ^= h >> 12;
+			if ((h & 0xFFFF) / 65536.0 > (CAB_GRASS_FAR_M - metres) / (CAB_GRASS_FAR_M - CAB_GRASS_NEAR_M)) return;
+		}
 		AddCabPlant(name, size, stretch, x0 + x, y0 + y, z, facing, static_cast<float>(rise_x), static_cast<float>(rise_y));
 	};
 	static constexpr float GRASS_HEIGHTS[3] = {0.85f, 1.0f, 1.2f};
@@ -17853,9 +17869,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				}
 			}
 		}
-		/* Our grass about the walker (AddOurGrass()). */
-		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water || tile_type == TileType::Railway || tile_type == TileType::Road) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_TILES * TILE_SIZE) {
-			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh);
+		/* Our grass about the walker (AddOurGrass()): a tile with a point that near. */
+		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water || tile_type == TileType::Railway || tile_type == TileType::Road) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_FAR_M * OBJECT_UNITS_PER_METRE + TILE_SIZE * 0.7072) {
+			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh, eye.x, eye.y);
 		}
 		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* A pasture (AddPastureTile()): its fences, its shelter or trough, its animals grazing, on the game's grass. */

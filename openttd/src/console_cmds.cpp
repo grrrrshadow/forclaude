@@ -8895,6 +8895,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: obal {}", _draw_road_consists_whole ? "zapnuty" : "vypnuty");
 		return true;
+	} else if (what == "model" && argv.size() > 3 && argv[2] == "zjednoduseni") {
+		/* 'model zjednoduseni <name> [rostlina]': its triangles whole and simpler at each level (ThreeDVehicleShape::Simpler(),
+		 * cells of 1, 2, 4 ... 64 cm), as the view from the eyes draws it farther and farther, and how long each took; as a
+		 * plant's (its corners joined in the cells). */
+		const ThreeDVehicleObject *m = GetThreeDVehicleObjectNamed(argv[3]);
+		if (m == nullptr) m = GetThreeDFigure(argv[3]);
+		const ThreeDVehicleShape *shape = m != nullptr ? m->GetShape(0, m->PartsOf(0)) : nullptr;
+		if (shape == nullptr) {
+			IConsolePrint(CC_ERROR, "test3d: model {} neni", argv[3]);
+			return true;
+		}
+		std::string line = fmt::format("test3d: zjednoduseni {}: cely {}", argv[3], shape->tri.size() / 3);
+		for (int level = 0; level < ThreeDVehicleShape::SIMPLER_LEVELS; level++) {
+			const double cell = ThreeDVehicleShape::SIMPLER_CELL_M * (1 << level);
+			const auto start = std::chrono::steady_clock::now();
+			const ThreeDVehicleShape *s = shape->Simpler(cell * 1.001, argv.size() > 4 && argv[4] == "rostlina");
+			line += fmt::format(", {} cm {} ({:.0f} ms)", std::lround(cell * 100), s->tri.size() / 3, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count());
+		}
+		IConsolePrint(CC_DEFAULT, "{}", line);
+		return true;
 	} else if (what == "model" && argv.size() > 2 && argv[2] == "kabiny") {
 		/* 'model kabiny': of every vehicle's model with the eye of a cab, where the cab view has it -- how far before
 		 * where its index has it, and whether glass one sees through is before it (then never before the glass). */
