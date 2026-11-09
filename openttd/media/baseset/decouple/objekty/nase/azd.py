@@ -22,7 +22,11 @@ Written beside this script, each also mirrored (_z: the road on its other side, 
   azd_zavora_dole.glb    the barrier down: from its drive over the road, red and white, 5 m
   azd_zavora_nahore.glb  the barrier up, straight up from its drive
 
-The post's materials their colours (the model's textures of grey metal flat grey). Its lenses our own discs a little in
+The post's materials their colours (the model's textures of grey metal flat grey), a face's front and back each its own
+(skp_cti.py's FM and FMZ; a face of two seen from each side as it is: two triangles, each seen from its side only, the
+back's 5 mm behind -- in the same plane the two fought over which is nearer, the front's red only specks). Its
+St Andrew's cross moved from behind the mast to the front of it (the player, 9. 11.: "the sign is turned, the cross":
+its red and white face to the drivers, the mast hid it). Its lenses our own discs a little in
 front of its black face (the model's red lenses lie in the face's very plane and its white one is not there at all), where
 its hoods are: dull red and dull white, the lit one a disc of a deep red (the player: "darker, this is too orange") or of
 white over it.
@@ -40,6 +44,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 # The model's groups (skp_cti.py's FG) of the post on the west: its mast, its head with the lights, its cross; its drive
 # and its footing are of groups with the other post's (4, 5), taken where they are by it.
 POST_GROUPS = (3, 6, 7)
+MAST_GROUP, HEAD_GROUP, CROSS_GROUP = 3, 6, 7
+BACK_GAP = 0.005                   # a face's back of its own colour behind its front, metres
 SHARED_GROUPS = (4, 5)
 POLE_X, POLE_Y = -7.69, -3.99      # the mast's middle in the model, metres
 LIGHTS_FACE = -1.0                 # its lights face -x in the model: turned half round to +x
@@ -55,10 +61,10 @@ COLOURS = {
     'seda': [0.68, 0.69, 0.71, 1.0],
     'seda1': [0.68, 0.69, 0.71, 1.0],
     '[Color_003]': [0.67, 0.67, 0.67, 1.0],
-    '[Color_001]': [0.89, 0.89, 0.89, 1.0],
+    '[Color_A01]': [0.78, 0.05, 0.05, 1.0],   # the cross's red frame (the head's red lenses ours, LENS_MATS)
+    '[Color_001]': [0.93, 0.93, 0.92, 1.0],
     '[Color_008]': [0.12, 0.12, 0.12, 1.0],
-    '[Color_A01]': [0.32, 0.04, 0.04, 1.0],   # a red lens, dark till lit
-    '[Color_A09]': [0.32, 0.04, 0.04, 1.0],
+    'zluta': [0.92, 0.8, 0.12, 1.0],
     'vychozi': [0.92, 0.92, 0.92, 1.0],
 }
 
@@ -122,7 +128,8 @@ MATS = {
 
 def write(path, name, parts, specs=None):
     """parts: (material, triangles (n, 3, 3) in the post's frame, z up); flat normals; glTF Y up (x, z, -y). specs: a
-    material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS and COLOURS (navestidlo.py's own)."""
+    material's glTF factors by its name (baseColorFactor, emissiveFactor) over MATS and COLOURS (navestidlo.py's own).
+    A material 'name|1' is that one seen from the front of its triangles only (a face's side of its own colour)."""
     blob = bytearray()
     views, accessors, materials, primitives = [], [], [], []
 
@@ -157,9 +164,10 @@ def write(path, name, parts, specs=None):
             {'bufferView': view(g_nrm.tobytes(), 34962), 'componentType': 5126, 'count': len(g_nrm), 'type': 'VEC3'},
             {'bufferView': view(idx.tobytes(), 34963), 'componentType': 5125, 'count': len(idx), 'type': 'SCALAR'},
         ]
-        spec = (specs or {}).get(mat) or MATS.get(mat, {'baseColorFactor': COLOURS.get(mat, [0.8, 0.8, 0.8, 1.0])})
+        base, one_side = (mat[:-2], True) if mat.endswith('|1') else (mat, False)
+        spec = (specs or {}).get(base) or MATS.get(base, {'baseColorFactor': COLOURS.get(base, [0.8, 0.8, 0.8, 1.0])})
         m = {'name': f'{name}_{mat}', 'pbrMetallicRoughness': {'metallicFactor': 0.0, 'roughnessFactor': 1.0, 'baseColorFactor': spec['baseColorFactor']},
-             'doubleSided': True}
+             'doubleSided': not one_side}
         if 'emissiveFactor' in spec:
             m['emissiveFactor'] = spec['emissiveFactor']
         materials.append(m)
@@ -192,16 +200,28 @@ def mirrored(parts):
 def main():
     d = np.load(sys.argv[1], allow_pickle=False)
     V, F, FM, FG = d['V'], d['F'], d['FM'], d['FG']
+    FMZ = d['FMZ'] if 'FMZ' in d.files else FM   # the faces' backs (skp_cti.py of 9. 11.)
     names = [m['jmeno'] for m in json.loads(str(d['mats']))]
-    T = V[F]
+    T = V[F].astype(float)
     near = np.abs(T[:, :, 0].mean(1) - POLE_X) < 1.5
     keep = np.isin(FG, POST_GROUPS) | (np.isin(FG, SHARED_GROUPS) & near)
+    # The cross before the mast, its back a centimetre from it (its lights' way -x in the model).
+    cross = keep & (FG == CROSS_GROUP)
+    mast_front = T[keep & (FG == MAST_GROUP)][..., 0].min()
+    T[cross, :, 0] += mast_front - 0.01 - T[cross][..., 0].max()
+    # The head's red lenses lie in its face's plane: ours instead (the cross's red frame is of the same material).
+    lens_mats = [names.index(n) for n in LENS_MATS if n in names]
+    keep &= ~((FG == HEAD_GROUP) & np.isin(FM, lens_mats))
     post = []
-    for mi in sorted(set(FM[keep].tolist())):
-        if names[mi] in LENS_MATS:
-            continue
-        sel = keep & (FM == mi)
-        post.append((names[mi], to_post(T[sel])))  # a half turn: the faces keep their winding
+    for a, b in sorted(set(zip(FM[keep].tolist(), FMZ[keep].tolist()))):
+        tris = to_post(T[keep & (FM == a) & (FMZ == b)])  # a half turn: the faces keep their winding
+        if a == b:
+            post.append((names[a], tris))
+        else:
+            n = np.cross(tris[:, 1] - tris[:, 0], tris[:, 2] - tris[:, 0])
+            n /= np.maximum(np.linalg.norm(n, axis=1), 1e-12)[:, None]
+            post.append((names[a] + '|1', tris))
+            post.append((names[b] + '|1', tris[:, ::-1] - BACK_GAP * n[:, None, :]))
     lights = {}
     for k, (ly, lz) in LENSES.items():
         p = to_post(np.array([LENS_X, ly, lz]))
