@@ -2256,8 +2256,6 @@ STR_CONFIG_SETTING_THREE_D_BRIDGES_MAP_HELPTEXT                 :On the map, the
 STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE                          :Bridges in 3D from the eyes: {STRING2}
 STR_CONFIG_SETTING_THREE_D_BRIDGES_EYE_HELPTEXT                 :In the view from the first person and from the cab: the bridges and aqueducts of their 3D pieces. Off: the bridges of the game
 STR_CONFIG_SETTING_THREE_D_GROUP_RAILS                          :Rails
-STR_CONFIG_SETTING_THREE_D_RAILS_MAP                            :Rails in 3D from above: {STRING2}
-STR_CONFIG_SETTING_THREE_D_RAILS_MAP_HELPTEXT                   :On the map, the turned view and the small views: the rails of 3D sleepers, rails and ballast. Off: the rails of the game or of a set (CZTR has its own)
 STR_CONFIG_SETTING_THREE_D_RAILS_EYE                            :Rails in 3D from the eyes: {STRING2}
 STR_CONFIG_SETTING_THREE_D_RAILS_EYE_HELPTEXT                   :In the view from the first person and from the cab: the rails of 3D sleepers, rails and ballast. Off: the rails of the game or of a set
 STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY                       :Catenary

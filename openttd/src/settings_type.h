@@ -261,7 +261,6 @@ struct GUISettings {
 	bool three_d_houses_eye;      ///< The same from the eyes; off, the boxes of their hand tables.
 	bool three_d_bridges_map;     ///< The bridges and aqueducts from above of their 3D pieces; off, the game's.
 	bool three_d_bridges_eye;     ///< The same from the eyes.
-	bool three_d_rails_map;       ///< The rails from above of 3D sleepers, rails and ballast; off, the game's (a set's, CZTR).
 	bool three_d_rails_eye;       ///< The same from the eyes.
 	bool three_d_catenary_map;    ///< The catenary from above of 3D masts and wires; off, the game's.
 	bool three_d_catenary_eye;    ///< The same from the eyes.

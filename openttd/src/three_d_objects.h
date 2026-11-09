@@ -1385,7 +1385,7 @@ std::string DescribeThreeDVehicleObjects();
 enum class ThreeDGroup : uint8_t {
 	Houses,   ///< the houses of the towns as 3D objects (gui.three_d_houses_map, _eye)
 	Bridges,  ///< the bridges and aqueducts of 3D pieces (gui.three_d_bridges_map, _eye)
-	Rails,    ///< the rails of 3D sleepers, rails and ballast (gui.three_d_rails_map, _eye)
+	Rails,    ///< the rails of 3D sleepers, rails and ballast, from the eyes only (gui.three_d_rails_eye)
 	Catenary, ///< the catenary of 3D masts and wires (gui.three_d_catenary_map, _eye)
 };
 bool ThreeDGroupShown(ThreeDGroup group);

@@ -811,12 +811,13 @@ SettingsContainer &GetSettingsTree()
 				static constexpr Group GROUPS[] = {
 					{STR_CONFIG_SETTING_THREE_D_GROUP_HOUSES, "gui.three_d_houses_map", "gui.three_d_houses_eye"},
 					{STR_CONFIG_SETTING_THREE_D_GROUP_BRIDGES, "gui.three_d_bridges_map", "gui.three_d_bridges_eye"},
-					{STR_CONFIG_SETTING_THREE_D_GROUP_RAILS, "gui.three_d_rails_map", "gui.three_d_rails_eye"},
+					/* The rails from above always the game's (ThreeDGroupShown()). */
+					{STR_CONFIG_SETTING_THREE_D_GROUP_RAILS, {}, "gui.three_d_rails_eye"},
 					{STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY, "gui.three_d_catenary_map", "gui.three_d_catenary_eye"},
 				};
 				for (const Group &g : GROUPS) {
 					SettingsPage *group = three_d->Add(new SettingsPage(g.title));
-					group->Add(new SettingEntry(g.map));
+					if (!g.map.empty()) group->Add(new SettingEntry(g.map));
 					group->Add(new SettingEntry(g.eye));
 					/* The catenary's masts apart, and how far apart (DrawThreeDCatenary() of rail_cmd.cpp). */
 					if (g.title == STR_CONFIG_SETTING_THREE_D_GROUP_CATENARY) {

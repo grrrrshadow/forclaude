@@ -11520,7 +11520,9 @@ bool ThreeDGroupShown(ThreeDGroup group)
 	switch (group) {
 		case ThreeDGroup::Houses: return eye ? g.three_d_houses_eye : g.three_d_houses_map;
 		case ThreeDGroup::Bridges: return eye ? g.three_d_bridges_eye : g.three_d_bridges_map;
-		case ThreeDGroup::Rails: return eye ? g.three_d_rails_eye : g.three_d_rails_map;
+		/* From above always the game's (the player, test4: "the 3D rails from above off by default and not to be used,
+		 * that is what the track sets are for"). */
+		case ThreeDGroup::Rails: return eye && g.three_d_rails_eye;
 		case ThreeDGroup::Catenary: return eye ? g.three_d_catenary_eye : g.three_d_catenary_map;
 	}
 	return true;
