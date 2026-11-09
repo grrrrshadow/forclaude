@@ -971,7 +971,7 @@ static bool AircraftFreeController(Aircraft *v)
 			u->cab_free = false;
 			u->cab_rejoin = false;
 		}
-		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 		return false;
 	}
 	if (v->cab_px / CAB_SUBUNIT != v->x_pos || v->cab_py / CAB_SUBUNIT != v->y_pos) {

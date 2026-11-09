@@ -6,7 +6,6 @@ add_files(
     bootstrap_widget.h
     bridge_widget.h
     build_vehicle_widget.h
-    cab_view_widget.h
     first_person_widget.h
     walker_inventory_widget.h
     cheat_widget.h

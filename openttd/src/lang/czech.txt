@@ -2542,19 +2542,6 @@ STR_ERROR_WALKER_TENT_NOT_FLAT                                  :{WHITE}... dla�
 STR_ERROR_WALKER_TENT_ALREADY                                   :{WHITE}... už tam stojí stan
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}Víc kytek už mít nemůžeš
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}Ještě neuzrála
-STR_CAB_VIEW_CAPTION                                            :{WHITE}Pohled z kabiny: {VEHICLE}
-STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vozidlo
-STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Otevřít okno vozidla
-STR_CAB_VIEW_CENTRE                                             :{BLACK}Na mapu
-STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Přesunout hlavní pohled na vozidlo
-STR_CAB_VIEW_STOP                                               :{BLACK}Zastavit
-STR_CAB_VIEW_GO                                                 :{BLACK}Jet
-STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Zastavit vozidlo, nebo ho zase rozjet
-STR_CAB_VIEW_LIMIT                                              :{YELLOW}drženo na {VELOCITY}
-STR_CAB_VIEW_STEERED                                            :{YELLOW}řízeno ručně
-STR_CAB_VIEW_FREE                                               :{YELLOW}ručně: volně
-STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}zpět k rozkazům
-STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}Pohled přes celou obrazovku, a zpět
 STR_CAB_VIEW_CAMERA                                             :{BLACK}Kamera: {STRING}
 STR_CAB_VIEW_CAMERA_TOOLTIP                                     :{BLACK}Další kamera: interiér okolo oka, bez interiéru, nad střechou; hlava se srovná dopředu. Totéž dělá klávesa C
 STR_CAB_VIEW_CONTROLS                                           :{BLACK}Ovládání: {STRING}
@@ -2586,17 +2573,6 @@ STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... stan
 STR_ERROR_CAB_NOTHING_WAITING                                   :{WHITE}... na zastávce nečeká nic, co auto veze
 STR_ERROR_CAB_FULL                                              :{WHITE}... auto je plné
 STR_ERROR_CAB_EMPTY                                             :{WHITE}... auto je prázdné
-STR_CAB_VIEW_SPEED                                              :{VELOCITY}
-STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
-STR_CAB_VIEW_NEXT_STOP                                          :Příští zastávka: {STATION}
-STR_CAB_VIEW_TO_DEPOT                                           :Příští zastávka: depo
-STR_CAB_VIEW_NO_DESTINATION                                     :Příští zastávka: žádná
-STR_CAB_VIEW_STATE_RUNNING                                      :{GREEN}Jede
-STR_CAB_VIEW_STATE_STOPPED                                      :{RED}Stojí
-STR_CAB_VIEW_STATE_LOADING                                      :{YELLOW}Nakládá
-STR_CAB_VIEW_STATE_BROKEN                                       :{RED}Porucha
-STR_CAB_VIEW_LOAD                                               :Náklad: {NUM}%
-STR_CAB_VIEW_BUTTON                                             :{BLACK}Kabina
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :Herní plocha se otáčí do libovolného úhlu: držet prostřední tlačítko myši a táhnout do strany, nebo klávesy Y a N (15 stupňů na stisk, s Ctrl 45). Dvojklik prostředním tlačítkem, Home nebo mezerník (když není co zavřít) vrátí pohled do normálu, na sever. Otočený pohled je jen na koukání: pro stavění je 2D, pohled na sever. Vozidla, nádraží a vlastní budovy této hry se otáčejí s ní ze svých osmi směrů, původní domy jako krabice z vlastních obrázků. Vozidlo v nákupu a vlastní průmysly této hry mají náhled, který se točí. Vypnuto: hra je, jaká vždycky byla, do pixelu
 
 ###length 5

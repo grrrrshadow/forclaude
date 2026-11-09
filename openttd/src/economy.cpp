@@ -2038,7 +2038,7 @@ void CabCargoStop(Vehicle *front)
 	front->cab_cargo = Vehicle::CAB_CARGO_NONE;
 	for (Vehicle *v = front; v != nullptr; v = v->Next()) v->cargo.KeepAll();
 	if (front->cargo_payment != nullptr && !front->current_order.IsType(OT_LOADING)) delete front->cargo_payment;
-	SetWindowDirty(WindowClass::CabView, front->index);
+	SetWindowDirty(WindowClass::FirstPerson, 0);
 	SetWindowDirty(WindowClass::FirstPerson, 0);
 }
 

@@ -357,12 +357,6 @@ enum class WindowClass : uint16_t {
 	VehicleView,
 
 	/**
-	 * The view from the cab of a vehicle, the world ahead in perspective (cab_view.h); %Window numbers:
-	 *   - #VehicleID = #CabViewWidgets
-	 */
-	CabView,
-
-	/**
 	 * The view from the first person (first_person_gui.cpp); %Window numbers:
 	 *   - 0 = #FirstPersonWidgets
 	 */

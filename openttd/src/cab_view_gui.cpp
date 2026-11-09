@@ -8,13 +8,10 @@
  */
 
 /**
- * @file cab_view_gui.cpp The window of the view from a vehicle's cab (cab_view.h).
- *
- * The world ahead of the vehicle, drawn anew every few hundredths of a second
- * while the window is open (DrawCabView() in viewport.cpp), and under it the
- * panel the player asked for from the video: the speed on a gauge and in
- * figures, the top speed, the next stop, what the vehicle is doing and how full
- * it is; buttons to its own window, to put the map on it and to stop it.
+ * @file cab_view_gui.cpp Driving a vehicle from its cab (cab_view.h): the arrows, the horn, the lights, the route,
+ * the cargo, the camera and the look about with the right button -- for the view from the first person in a vehicle
+ * (E gets in). The window of the cab view of its own is gone (the player, test4: "remove the cab view icon from the
+ * window of the train, the car, the plane, the ship; there will be no cab view, E gets in").
  */
 
 #include "stdafx.h"
@@ -50,7 +47,6 @@
 #include "engine_base.h"
 #include "sound_func.h"
 #include "newgrf_sound.h"
-#include "widgets/cab_view_widget.h"
 #include "widgets/first_person_widget.h"
 #include "video/video_driver.hpp"
 #include "fileio_func.h"
@@ -70,38 +66,6 @@
 #include <ctime>
 
 #include "safeguards.h"
-
-static constexpr NWidgetPart _nested_cab_view_widgets[] = {
-	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_CLOSEBOX, Colours::Grey),
-		NWidget(WWT_CAPTION, Colours::Grey, WID_CV_CAPTION), SetStringTip(STR_CAB_VIEW_CAPTION, STR_TOOLTIP_WINDOW_TITLE_DRAG_THIS),
-		NWidget(WWT_SHADEBOX, Colours::Grey),
-		NWidget(WWT_DEFSIZEBOX, Colours::Grey),
-		NWidget(WWT_PUSHIMGBTN, Colours::Grey, WID_CV_FULL), SetSpriteTip(SPR_LARGE_SMALL_WINDOW, STR_CAB_VIEW_FULL_TOOLTIP), SetAspect(1),
-		NWidget(WWT_STICKYBOX, Colours::Grey),
-	EndContainer(),
-	NWidget(WWT_PANEL, Colours::Grey),
-		NWidget(WWT_EMPTY, Colours::Invalid, WID_CV_CANVAS), SetMinimalSize(360, 240), SetResize(1, 1), SetFill(1, 1),
-	EndContainer(),
-	NWidget(WWT_PANEL, Colours::Grey, WID_CV_PANEL), SetMinimalSize(360, 50), SetResize(1, 0), SetFill(1, 0), EndContainer(),
-	/* No buttons to steer or brake: the arrows drive (the player, 27. 10.: "the buttons arrows left, right, brake need
-	 * not be in the cab view window any more"). */
-	NWidget(NWID_HORIZONTAL),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_VEHICLE), SetStringTip(STR_CAB_VIEW_VEHICLE, STR_CAB_VIEW_VEHICLE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CENTRE), SetStringTip(STR_CAB_VIEW_CENTRE, STR_CAB_VIEW_CENTRE_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_AUTO), SetStringTip(STR_CAB_VIEW_AUTO, STR_CAB_VIEW_AUTO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_LOAD), SetStringTip(STR_CAB_VIEW_LOAD_CARGO, STR_CAB_VIEW_LOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_TEXTBTN, Colours::Grey, WID_CV_UNLOAD), SetStringTip(STR_CAB_VIEW_UNLOAD_CARGO, STR_CAB_VIEW_UNLOAD_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_STOP), SetStringTip(STR_CAB_VIEW_STOP, STR_CAB_VIEW_STOP_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CAMERA), SetStringTip(STR_CAB_VIEW_CAMERA, STR_CAB_VIEW_CAMERA_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		/* A train of MSTS: driven by the arrows or by the keys of MSTS (the player, 31. 10.: "put a switch at the bottom
-		 * of the cab view window: controls MSTS / arrows"). */
-		NWidget(NWID_SELECTION, Colours::Invalid, WID_CV_CONTROLS_SEL),
-			NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_CV_CONTROLS), SetStringTip(STR_CAB_VIEW_CONTROLS, STR_CAB_VIEW_CONTROLS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		EndContainer(),
-		NWidget(WWT_RESIZEBOX, Colours::Grey),
-	EndContainer(),
-};
 
 /**
  * Whether the player can take a vehicle's wheel from its cab now and drive it freely (CmdCabDrive()): a road vehicle on
@@ -324,7 +288,7 @@ static void CabStandingRecord(const Vehicle *v, const CabArrows &arrows, Directi
 			v->cab_free ? "ano" : "ne", v->cab_rejoin ? "ano" : "ne", v->cab_yaw, to_underlying(v->direction),
 			v->cab_speed_limit, v->GetDisplaySpeed(), v->GetDisplayMaxSpeed(), TileX(v->tile), TileY(v->tile), to_underlying(GetTileType(v->tile)),
 			road, DescribeRoadVehFreeAhead(v), order, arrows.route ? "ANO (sipky neridi)" : "ne", now.base(),
-			aw == nullptr ? "zadne" : aw->window_class == WindowClass::CabView ? "kabina" : "oci", arrows.done.empty() ? "-" : arrows.done);
+			aw == nullptr ? "zadne" : "oci", arrows.done.empty() ? "-" : arrows.done);
 	fflush(*file);
 	lines++;
 }
@@ -541,7 +505,6 @@ void CabNextCamera(CabViewCamera &camera)
 	camera.head = 0;
 	camera.pitch = 0;
 	camera.eye_dz = -1;
-	SetWindowClassesDirty(WindowClass::CabView);
 	SetWindowClassesDirty(WindowClass::FirstPerson);
 	SetWindowClassesDirty(WindowClass::GameOptions);
 }
@@ -585,395 +548,20 @@ void CabLook::Move(CabViewCamera &camera, int dx, int dy)
 	camera.pitch = std::clamp(camera.pitch - dy * CAB_LOOK_MOUSE, -CAB_LOOK_PITCH_MAX, CAB_LOOK_PITCH_MAX);
 }
 
-/** The window of the view from a vehicle's cab; the window number is the vehicle. */
-struct CabViewWindow : Window {
-	mutable CabViewCamera camera{};   ///< the eye between frames
-	bool full = false;                 ///< over the whole screen
-	Rect before_full{};                ///< where it was before that
-	mutable CabViewPicture picture{}; ///< the last picture
-	mutable SimtrainsCabSeat seat{};  ///< a train of MSTS: the player at its desk, the desk over the view (simtrains_cab.h)
-
-	/* Drawn anew while the vehicle moves: about twenty-five times a second. */
-	IntervalTimer<TimerWindow> redraw{std::chrono::milliseconds(40), [this](auto) {
-		this->SetWidgetDirty(WID_CV_CANVAS);
-		this->SetWidgetDirty(WID_CV_PANEL);
-		this->SetWidgetDirty(WID_CV_STOP);
-	}};
-
-	CabLook look{}; ///< looking about with the right button (OnRightClick())
-
-	/* The arrows drive (CabArrows), looked at this often. */
-	CabArrows arrows{};
-	static constexpr int DRIVE_MS = 30;
-	IntervalTimer<TimerWindow> drive{std::chrono::milliseconds(DRIVE_MS), [this](auto) {
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v == nullptr) return;
-		const DirectionKeys keys = ArrowsWindow() == this ? _dirkeys : DirectionKeys{};
-		/* A train of MSTS: the arrows move its combined lever, with the keys of MSTS nothing (OnKeyPress()). */
-		if (!this->seat.Drive(v, keys, DRIVE_MS)) this->arrows.Drive(v, keys, DRIVE_MS);
-	}};
-
-	CabViewWindow(WindowDesc &desc, WindowNumber number) : Window(desc)
-	{
-		this->CreateNestedTree();
-		this->GetWidget<NWidgetStacked>(WID_CV_CONTROLS_SEL)->SetDisplayedPlane(IsSimtrainsTrain(Vehicle::GetIfValid(number)) ? 0 : SZSP_NONE);
-		this->FinishInitNested(number);
-		const Vehicle *v = Vehicle::GetIfValid(number);
-		if (v != nullptr) this->owner = v->owner;
-		/* Opened over the whole screen as boarding with E opens it (the player, 5. 11.); the button makes it a window. */
-		this->ToggleFull();
-	}
-
-	/** Over the whole screen between the toolbar and the status bar, as the view from the first person; or back where it was. */
-	void ToggleFull()
-	{
-		if (!this->full) {
-			this->before_full = {this->left, this->top, this->left + this->width, this->top + this->height};
-			this->full = true;
-			const int top = GetMainViewTop(), bottom = GetMainViewBottom();
-			this->left = 0;
-			this->top = top;
-			ResizeWindow(this, _screen.width - this->width, bottom - top - this->height, false);
-		} else {
-			this->full = false;
-			this->left = this->before_full.left;
-			this->top = this->before_full.top;
-			ResizeWindow(this, this->before_full.Width() - this->width, this->before_full.Height() - this->height, false);
-		}
-		MarkWholeScreenDirty();
-	}
-
-	void Close(int data = 0) override
-	{
-		/* Whoever steers from the cab lets go when leaving it: a ship or a road vehicle goes back to its orders. */
-		CabLetGo(Vehicle::GetIfValid(this->window_number));
-		DropEyeFrame(&this->camera);
-		VideoDriver::GetInstance()->HideThreeDPicture(this);
-		this->Window::Close(data);
-	}
-
-	void UpdateWidgetSize(WidgetID widget, Dimension &size, const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override
-	{
-		if (widget != WID_CV_CAMERA) return;
-		const Dimension d = CabCameraTextSize();
-		size.width = std::max(size.width, d.width + padding.width);
-	}
-
-	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
-	{
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		switch (widget) {
-			case WID_CV_CAPTION:
-				return GetString(STR_CAB_VIEW_CAPTION, this->window_number);
-			case WID_CV_STOP:
-				return GetString(v != nullptr && v->vehstatus.Test(VehState::Stopped) ? STR_CAB_VIEW_GO : STR_CAB_VIEW_STOP);
-			case WID_CV_AUTO:
-				/* Its route, or the wheel again. */
-				return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
-			case WID_CV_CAMERA:
-				return CabCameraText();
-			case WID_CV_CONTROLS:
-				return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
-			default:
-				return this->Window::GetWidgetString(widget, stringid);
-		}
-	}
-
-	void OnPaint() override
-	{
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v == nullptr) {
-			this->Close();
-			return;
-		}
-		/* A road vehicle, a ship and an aircraft can be steered: a train follows its rails. Only the company's. */
-		const bool ours = v->owner == _local_company;
-		this->SetWidgetDisabledState(WID_CV_AUTO, !ours);
-		this->SetWidgetsDisabledState(!ours || v->type != VehicleType::Road, WID_CV_LOAD, WID_CV_UNLOAD);
-		this->SetWidgetLoweredState(WID_CV_LOAD, v->cab_cargo == Vehicle::CAB_CARGO_LOAD);
-		this->SetWidgetLoweredState(WID_CV_UNLOAD, v->cab_cargo == Vehicle::CAB_CARGO_UNLOAD);
-		this->DrawWidgets();
-	}
-
-	void DrawWidget(const Rect &r, WidgetID widget) const override
-	{
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v == nullptr) return;
-		switch (widget) {
-			case WID_CV_CANVAS: {
-				int w = r.Width(), h = r.Height();
-				if (w <= 0 || h <= 0) return;
-				/* An engine of MSTS with its cab: in the cab (the camera Inside) its desk over the view (simtrains_cab.h). */
-				this->seat.Prepare(v, this->camera);
-				if (!DrawCabView(v, w, h, this->camera, this->picture)) {
-					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
-					return;
-				}
-				BlitEyePicture(*this, this->picture, r.left, r.top);
-				this->seat.Draw(v, this->camera, r.left, r.top, w, h);
-				break;
-			}
-			case WID_CV_PANEL:
-				this->DrawPanel(r, v);
-				break;
-			default:
-				break;
-		}
-	}
-
-	/** How full the vehicle is, per cent of what it can carry, over all its parts. */
-	static int LoadPercent(const Vehicle *v)
-	{
-		uint cap = 0, has = 0;
-		for (const Vehicle *u = v; u != nullptr; u = u->Next()) {
-			cap += u->cargo_cap;
-			has += u->cargo.StoredCount();
-		}
-		if (cap == 0) return 0;
-		return static_cast<int>(std::min<uint>(100, has * 100 / cap));
-	}
-
-	/** The panel under the view: the gauge, the figures, the next stop, the state and the load. */
-	void DrawPanel(const Rect &r, const Vehicle *v) const
-	{
-		GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
-		const PixelColour light = GetColourGradient(Colours::Grey, Shade::Lightest);
-		const PixelColour dim = GetColourGradient(Colours::Grey, Shade::Normal);
-		const PixelColour red = GetColourGradient(Colours::Red, Shade::Light);
-		const PixelColour blue = GetColourGradient(Colours::LightBlue, Shade::Light);
-
-		/* The gauge: a three-quarter arc, the needle from the bottom left round to the bottom right. */
-		int rad = std::max(8, std::min(r.Height() / 2 - 3, 24));
-		int gx = r.left + rad + 6, gy = r.top + r.Height() / 2;
-		uint speed = v->GetDisplaySpeed(), max_speed = std::max<uint>(1, v->GetDisplayMaxSpeed());
-		double frac = std::min(1.0, speed / static_cast<double>(max_speed));
-		const double start = 225.0 * M_PI / 180.0, sweep = 270.0 * M_PI / 180.0;
-		const int segments = 24;
-		for (int i = 0; i < segments; i++) {
-			double a0 = start - sweep * i / segments, a1 = start - sweep * (i + 1) / segments;
-			GfxDrawLine(gx + static_cast<int>(std::lround(rad * std::cos(a0))), gy - static_cast<int>(std::lround(rad * std::sin(a0))),
-					gx + static_cast<int>(std::lround(rad * std::cos(a1))), gy - static_cast<int>(std::lround(rad * std::sin(a1))), i < segments * 3 / 4 ? light : red);
-		}
-		double na = start - sweep * frac;
-		GfxDrawLine(gx, gy, gx + static_cast<int>(std::lround((rad - 2) * std::cos(na))), gy - static_cast<int>(std::lround((rad - 2) * std::sin(na))), red);
-		GfxFillRect(gx - 1, gy - 1, gx + 1, gy + 1, light);
-
-		/* The figures beside it. */
-		int tx = gx + rad + 8;
-		int ty = r.top + 4;
-		int text_right = tx + std::max(60, r.Width() / 3);
-		DrawString(tx, text_right, ty, GetString(STR_CAB_VIEW_SPEED, PackVelocity(speed, v->type)), TextColour::White, AlignmentH::Start, false, FontSize::Large);
-		DrawString(tx, text_right, ty + GetCharacterHeight(FontSize::Large) + 1, GetString(STR_CAB_VIEW_MAX_SPEED, PackVelocity(max_speed, v->type)), TextColour::Silver, AlignmentH::Start, false, FontSize::Small);
-
-		/* The next stop and the state. */
-		int lw = std::max(40, r.Width() / 6);
-		int lx = r.right - 4 - lw;
-		int sx = text_right + 8, sright = lx - 8;
-		std::string stop;
-		const Order &o = v->current_order;
-		if (o.IsType(OT_GOTO_STATION) || o.IsType(OT_LOADING)) {
-			stop = GetString(STR_CAB_VIEW_NEXT_STOP, o.GetDestination().ToStationID());
-		} else if (o.IsType(OT_GOTO_DEPOT)) {
-			stop = GetString(STR_CAB_VIEW_TO_DEPOT);
-		} else if (o.IsType(OT_GOTO_WAYPOINT)) {
-			stop = GetString(STR_CAB_VIEW_NEXT_STOP, o.GetDestination().ToStationID());
-		} else {
-			stop = GetString(STR_CAB_VIEW_NO_DESTINATION);
-		}
-		DrawString(sx, sright, ty, stop, TextColour::White);
-		StringID state = STR_CAB_VIEW_STATE_RUNNING;
-		if (v->vehstatus.Test(VehState::Stopped)) {
-			state = STR_CAB_VIEW_STATE_STOPPED;
-		} else if (v->breakdown_ctr != 0) {
-			state = STR_CAB_VIEW_STATE_BROKEN;
-		} else if (o.IsType(OT_LOADING)) {
-			state = STR_CAB_VIEW_STATE_LOADING;
-		}
-		int state_y = ty + GetCharacterHeight(FontSize::Normal) + 2;
-		std::string state_text = GetString(state);
-		DrawString(sx, sright, state_y, state_text, TextColour::FromString);
-		int note_x = sx + GetStringBoundingBox(state_text).width + 8;
-		if (v->cab_speed_limit != 0) {
-			/* Held to a speed from here: said beside the state. */
-			std::string limit = GetString(STR_CAB_VIEW_LIMIT, PackVelocity(v->cab_speed_limit, v->type));
-			DrawString(note_x, sright, state_y, limit, TextColour::FromString);
-			note_x += GetStringBoundingBox(limit).width + 8;
-		}
-		/* A train driven from its desk: where its controls stand (simtrains_cab.h). */
-		if (const std::string desk = SimtrainsDeskText(v); !desk.empty()) {
-			DrawString(note_x, sright, state_y, desk, TextColour::FromString);
-		}
-		if (v->cab_free) {
-			/* Driven freely: so, or on the way back to the orders. */
-			DrawString(note_x, sright, state_y, GetString(v->cab_rejoin ? STR_CAB_VIEW_FREE_BACK : STR_CAB_VIEW_FREE), TextColour::FromString);
-		} else if (v->cab_heading != Direction::Invalid) {
-			DrawString(note_x, sright, state_y, GetString(STR_CAB_VIEW_STEERED), TextColour::FromString);
-		}
-
-		/* The load, as a figure and a bar. */
-		int percent = LoadPercent(v);
-		DrawString(lx, r.right - 4, ty, GetString(STR_CAB_VIEW_LOAD, percent), TextColour::White, AlignmentH::End);
-		int by = ty + GetCharacterHeight(FontSize::Normal) + 4;
-		GfxFillRect(lx, by, r.right - 4, by + 4, dim);
-		if (percent > 0) GfxFillRect(lx, by, lx + (lw * percent) / 100, by + 4, blue);
-	}
-
-	EventState OnKeyPress(char32_t key, uint16_t keycode) override
-	{
-		/* The arrows are the driver's, read as held (Drive()). */
-		switch (keycode & ~WKC_SPECIAL_KEYS) {
-			case WKC_UP: case WKC_DOWN: case WKC_LEFT: case WKC_RIGHT:
-				return EventState::Handled;
-			default:
-				break;
-		}
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v == nullptr) return EventState::NotHandled;
-		/* A train of MSTS driven by the keys of MSTS (simtrains_cab.h). */
-		if (this->seat.Key(v, key, keycode)) {
-			this->SetWidgetDirty(WID_CV_PANEL);
-			return EventState::Handled;
-		}
-		/* I: the horn; F: the lights; T: its route, or the wheel again; C: the next camera. */
-		if (key == 'i' || key == 'I') {
-			CabHorn(v);
-			return EventState::Handled;
-		}
-		if (key == 'f' || key == 'F') {
-			CabToggleLights(v);
-			return EventState::Handled;
-		}
-		if (key == 't' || key == 'T') {
-			CabToggleRoute(v, this->arrows);
-			this->SetDirty();
-			return EventState::Handled;
-		}
-		/* C: the next camera, as its button. */
-		if (key == 'c' || key == 'C') {
-			CabNextCamera(this->camera);
-			return EventState::Handled;
-		}
-		return EventState::NotHandled;
-	}
-
-	bool OnRightClick([[maybe_unused]] Point pt, WidgetID widget) override
-	{
-		/* Looking about with the right button held (CabLook), as in a vehicle boarded with E. */
-		if (widget != WID_CV_CANVAS || _scrolling_viewport) return false;
-		this->look.Press(this->camera);
-		this->SetWidgetDirty(WID_CV_CANVAS);
-		return true;
-	}
-
-	void OnScroll(Point delta) override
-	{
-		this->look.Move(this->camera, delta.x, delta.y);
-		this->SetWidgetDirty(WID_CV_CANVAS);
-	}
-
-	void OnClick([[maybe_unused]] Point pt, WidgetID widget, [[maybe_unused]] int click_count) override
-	{
-		const Vehicle *v = Vehicle::GetIfValid(this->window_number);
-		if (v == nullptr) return;
-		switch (widget) {
-			case WID_CV_VEHICLE:
-				ShowVehicleViewWindow(v);
-				break;
-			case WID_CV_CENTRE:
-				ScrollMainWindowTo(v->x_pos, v->y_pos, v->z_pos);
-				break;
-			case WID_CV_STOP:
-				CabStartStop(v);
-				break;
-			case WID_CV_FULL:
-				/* Over the whole screen, and back where it was (the player: a button beside the pin). */
-				this->ToggleFull();
-				break;
-			case WID_CV_AUTO:
-				CabToggleRoute(v, this->arrows);
-				this->SetDirty();
-				break;
-			case WID_CV_CAMERA:
-				CabNextCamera(this->camera);
-				break;
-			case WID_CV_CONTROLS:
-				/* The arrows or the keys of MSTS at the desk of a train of MSTS. */
-				this->seat.ToggleControls();
-				this->SetDirty();
-				break;
-			case WID_CV_LOAD:
-			case WID_CV_UNLOAD:
-				CabCargo(v, widget == WID_CV_UNLOAD);
-				this->SetDirty();
-				break;
-			default:
-				break;
-		}
-	}
-};
-
-static WindowDesc _cab_view_desc(
-	WindowPosition::Automatic, {}, 0, 0,
-	WindowClass::CabView, WindowClass::None,
-	{},
-	_nested_cab_view_widgets
-);
-
 /**
  * The window the arrows are for (the player, 17. 10.: "while the cab view or the first person view is open, the arrows
- * always go to that window, not to the map"): the view from a cab or from the first person, the one with the focus,
- * else the front one open. None while an edit box takes the keys.
+ * always go to that window, not to the map"): the view from the first person, on foot or in a vehicle (the window of
+ * the cab view is gone, the player, test4: "no cab view, E gets in"). None while an edit box takes the keys.
  */
 Window *ArrowsWindow()
 {
 	if (_game_mode != GameMode::Normal || EditBoxInGlobalFocus()) return nullptr;
-	auto takes = [](const Window *w) { return w != nullptr && (w->window_class == WindowClass::CabView || w->window_class == WindowClass::FirstPerson); };
+	auto takes = [](const Window *w) { return w != nullptr && w->window_class == WindowClass::FirstPerson; };
 	if (takes(_focused_window)) return _focused_window;
 	for (Window *w : Window::IterateFromFront()) {
 		if (takes(w)) return w;
 	}
 	return nullptr;
-}
-
-/** Open the view from the cab of a vehicle, or bring it to the front. */
-void ShowCabViewWindow(const Vehicle *v)
-{
-	if (v == nullptr) return;
-	AllocateWindowDescFront<CabViewWindow>(_cab_view_desc, v->index);
-}
-
-/** Whether a view from a cab is open over the whole screen: the map under it is then not drawn (FirstPersonCoversMap()). */
-bool CabViewCoversMap()
-{
-	for (const Window *w : Window::Iterate()) {
-		if (w->window_class == WindowClass::CabView && static_cast<const CabViewWindow *>(w)->full) return true;
-	}
-	return false;
-}
-
-/** The rig: every cab view open, with how long its last picture took and what was in it. */
-std::string DescribeCabViews()
-{
-	std::string s;
-	for (const Window *w : Window::Iterate()) {
-		if (w->window_class != WindowClass::CabView) continue;
-		const CabViewWindow *cw = static_cast<const CabViewWindow *>(w);
-		s += fmt::format("kabina vozidla {}: {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu, smer {:.0f} stupnu", static_cast<int32_t>(w->window_number), cw->picture.width, cw->picture.height,
-				cw->camera.ms, cw->camera.collect_ms, cw->camera.draw_ms, cw->camera.tiles, cw->camera.billboards, cw->camera.heading * 180.0 / M_PI);
-		const Vehicle *v = Vehicle::GetIfValid(w->window_number);
-		if (v != nullptr) {
-			s += fmt::format(", volne {} yaw {} limit {} rychlost {} stoji {}", v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne");
-			if (v->type == VehicleType::Aircraft) s += fmt::format(" vyska {} cil {} stav {} na {},{}", v->z_pos, v->cab_altitude, Aircraft::From(v)->state, v->x_pos, v->y_pos);
-			if (v->type == VehicleType::Train) {
-				const Train *t = Train::From(v->First());
-				s += fmt::format(" cur {} pult MSTS {} rizen {} vykon {} edb {} brzda {} primocinna {} rychlobrzda {} smer {} tfp {} na {},{} rozkaz {} ({})", t->cur_speed, IsSimtrainsTrain(v) ? "ano" : "ne",
-						t->cab_driven, t->cab_power, t->cab_dynamic, t->cab_brake, t->cab_engine_brake, t->cab_emergency, t->cab_reverser, to_underlying(t->force_proceed),
-						TileX(t->tile), TileY(t->tile), to_underlying(t->current_order.GetType()), cw->seat.driver.done);
-			}
-		}
-		s += "; ";
-	}
-	return s.empty() ? "zadna kabina" : s;
 }
 
 /** The rig: the car's horn, as read from its file. */
@@ -985,35 +573,3 @@ std::string DescribeCarHorn()
 	return fmt::format("klakson zvuk {}: {} Hz, {} bitu, {} vzorku", *horn, e->rate, e->bits_per_sample, e->data->size() / (e->bits_per_sample / 8));
 }
 
-/**
- * The rig: the right button held on the picture of the cab view open and the hand moved so many pixels, as the player
- * looks about (CabViewWindow::OnRightClick(), OnScroll()), let go.
- * @return how the head is turned then
- */
-/** The rig ('test3d kabina zadni'): the cab view open at the other end of its vehicle (CabViewCamera::rear), as the first person's button does. */
-std::string RigCabRear()
-{
-	CabViewWindow *cw = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
-	if (cw == nullptr) return "zadna kabina";
-	cw->camera.rear = !cw->camera.rear;
-	cw->camera.valid = false;
-	cw->SetDirty();
-	return cw->camera.rear ? "stanoviste vzadu" : "stanoviste vpredu";
-}
-
-std::string RigCabLook(int dx, int dy)
-{
-	/* The cab view open, else the vehicle the walker rides in (boarded with E). */
-	extern const CabViewCamera *RigFirstPersonCabCamera();
-	CabViewWindow *cw = static_cast<CabViewWindow *>(FindWindowByClass(WindowClass::CabView));
-	Window *w = cw != nullptr ? static_cast<Window *>(cw) : FindWindowById(WindowClass::FirstPerson, 0);
-	const CabViewCamera *camera = cw != nullptr ? &cw->camera : RigFirstPersonCabCamera();
-	if (w == nullptr || camera == nullptr) return "zadna kabina";
-	const bool taken = w->OnRightClick({}, cw != nullptr ? WID_CV_CANVAS : WID_FP_CANVAS);
-	if (dx != 0 || dy != 0) w->OnScroll({dx, dy});
-	_scrolling_viewport = false;
-	_cursor.fix_at = false;
-	_look_pinned = false;
-	return fmt::format("{} ({}): otoceni {:.0f} stupnu, nahoru {:.0f}, kamera {}", taken ? "vzato" : "NEVZATO", cw != nullptr ? "okno kabiny" : "nastoupeno E",
-			camera->head * 180.0 / M_PI, camera->pitch * 180.0 / M_PI, to_underlying(CabCameraChosen()));
-}

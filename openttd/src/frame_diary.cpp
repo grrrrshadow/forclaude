@@ -157,7 +157,6 @@ std::string KindName(size_t kind)
 		case WindowClass::Statusbar: return "stav";
 		case WindowClass::News: return "zpravy";
 		case WindowClass::FirstPerson: return "oci";
-		case WindowClass::CabView: return "kabina";
 		default: return fmt::format("druh {}", kind);
 	}
 }
@@ -183,7 +182,6 @@ std::string TakeWindowPaints()
 const char *Looking()
 {
 	if (FindWindowById(WindowClass::FirstPerson, 0) != nullptr) return "oci";
-	if (FindWindowByClass(WindowClass::CabView) != nullptr) return "kabina";
 	return "mapa";
 }
 

@@ -56,6 +56,8 @@
 #include "three_d_walkers.h"
 #include "three_d_witches.h"
 #include "vehicle_base.h"
+#include "train.h"
+#include "aircraft.h"
 #include "cab_drive.h"
 #include "simtrains_cab.h"
 #include "engine_base.h"
@@ -3217,7 +3219,7 @@ TileIndex FirstPersonShopNearby()
 bool FirstPersonCoversMap()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
-	return (w != nullptr && w->full) || CabViewCoversMap();
+	return w != nullptr && w->full;
 }
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */
@@ -3834,6 +3836,105 @@ const CabViewCamera *RigFirstPersonCabCamera()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	return w != nullptr && w->Riding() != nullptr ? &w->camera : nullptr;
+}
+
+/*
+ * The rig in a vehicle ('test3d kabina ...'): the window of the cab view is gone (the player, test4: "no cab view, E
+ * gets in; in the rig remap the cab view to getting in with E"), the rig rides as the player does, in the view from
+ * the first person.
+ */
+
+/** The view from the first person, nullptr not open. */
+static FirstPersonWindow *RigFirstPerson()
+{
+	return static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+}
+
+/** The rig ('kabina <n>'): the walker gets into a vehicle as with E, the view from the first person opened first. */
+std::string RigRide(const Vehicle *v)
+{
+	if (v == nullptr) return "vozidlo neni";
+	if (RigFirstPerson() == nullptr) ShowFirstPersonWindow();
+	FirstPersonWindow *w = RigFirstPerson();
+	if (w == nullptr) return "pohled z prvni osoby nejde otevrit";
+	w->GetIn(v);
+	return fmt::format("nastoupeno do vozidla {} (typ {})", v->unitnumber, to_underlying(v->type));
+}
+
+/** The rig: the vehicle the walker rides in, nullptr none. */
+const Vehicle *RigRiding()
+{
+	const FirstPersonWindow *w = RigFirstPerson();
+	return w != nullptr ? w->Riding() : nullptr;
+}
+
+/** The rig ('kabina zavri'): out of the vehicle, as E again. */
+std::string RigRideOut()
+{
+	FirstPersonWindow *w = RigFirstPerson();
+	if (w == nullptr || w->Riding() == nullptr) return "nikdo nejede";
+	AutoRestoreBackup cur_company(_current_company, _local_company);
+	w->GetOut();
+	return "vystoupeno";
+}
+
+/**
+ * The rig ('kabina klik <tlacitko>'): a button of the view in a vehicle clicked as the player clicks it: trasa (its
+ * route or the wheel), nalozit, vylozit, kamera, cely (over the whole screen), zadni (the driver's stand at the other end).
+ */
+std::string RigRideClick(std::string_view name)
+{
+	static const std::pair<std::string_view, WidgetID> buttons[] = {
+		{"trasa", WID_FP_ROUTE}, {"nalozit", WID_FP_LOAD}, {"vylozit", WID_FP_UNLOAD}, {"kamera", WID_FP_CAMERA}, {"cely", WID_FP_FULL}, {"zadni", WID_FP_CENTRE},
+	};
+	FirstPersonWindow *w = RigFirstPerson();
+	const Vehicle *v = w != nullptr ? w->Riding() : nullptr;
+	WidgetID id = -1;
+	for (const auto &[n, wid] : buttons) if (name == n) id = wid;
+	if (id < 0 || v == nullptr) return "takove tlacitko neni, nebo nikdo nejede";
+	{
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		w->OnClick({}, id, 1);
+	}
+	return fmt::format("klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {} stanoviste {}", name, v->unitnumber, v->x_pos, v->y_pos,
+			to_underlying(v->direction), to_underlying(v->cab_heading), v->cab_free, v->cab_rejoin, v->cab_yaw, w->IsWidgetDisabled(id) ? "ano" : "ne", w->camera.rear ? "vzadu" : "vpredu");
+}
+
+/**
+ * The rig ('kabina hlava <dx> <dy>'): the right button held on the picture from the vehicle and the hand moved so many
+ * pixels, as the player looks about, let go.
+ * @return how the head is turned then
+ */
+std::string RigRideLook(int dx, int dy)
+{
+	FirstPersonWindow *w = RigFirstPerson();
+	if (w == nullptr || w->Riding() == nullptr) return "nikdo nejede";
+	const bool taken = w->OnRightClick({}, WID_FP_CANVAS);
+	if (dx != 0 || dy != 0) w->OnScroll({dx, dy});
+	_scrolling_viewport = false;
+	_cursor.fix_at = false;
+	_look_pinned = false;
+	return fmt::format("{}: otoceni {:.0f} stupnu, nahoru {:.0f}, kamera {}", taken ? "vzato" : "NEVZATO", w->camera.head * 180.0 / M_PI, w->camera.pitch * 180.0 / M_PI, to_underlying(CabCameraChosen()));
+}
+
+/** The rig ('kabina cas', after a key): the picture from the vehicle the walker rides in, how long it took and what was in it, and the vehicle. */
+std::string DescribeRiding()
+{
+	const FirstPersonWindow *w = RigFirstPerson();
+	const Vehicle *v = w != nullptr ? w->Riding() : nullptr;
+	if (v == nullptr) return "nikdo nejede";
+	std::string s = fmt::format("jizda ve vozidle {}: {}x{} px, {:.1f} ms (sber {:.1f}, kresleni {:.1f}), {} dlazdic, {} plakatu, smer {:.0f} stupnu, stanoviste {}", v->unitnumber, w->picture.width, w->picture.height,
+			w->camera.ms, w->camera.collect_ms, w->camera.draw_ms, w->camera.tiles, w->camera.billboards, w->camera.heading * 180.0 / M_PI, w->camera.rear ? "vzadu" : "vpredu");
+	s += fmt::format(", volne {} yaw {} limit {} rychlost {} stoji {} svetla {} (prani {})", v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne",
+			VehicleLightsOn(v) ? "sviti" : "nesviti", v->First()->cab_lights);
+	if (v->type == VehicleType::Aircraft) s += fmt::format(" vyska {} cil {} stav {} na {},{}", v->z_pos, v->cab_altitude, Aircraft::From(v)->state, v->x_pos, v->y_pos);
+	if (v->type == VehicleType::Train) {
+		const Train *t = Train::From(v->First());
+		s += fmt::format(" cur {} pult MSTS {} rizen {} vykon {} edb {} brzda {} primocinna {} rychlobrzda {} smer {} tfp {} na {},{} rozkaz {} ({})", t->cur_speed, IsSimtrainsTrain(v) ? "ano" : "ne",
+				t->cab_driven, t->cab_power, t->cab_dynamic, t->cab_brake, t->cab_engine_brake, t->cab_emergency, t->cab_reverser, to_underlying(t->force_proceed),
+				TileX(t->tile), TileY(t->tile), to_underlying(t->current_order.GetType()), w->seat.driver.done);
+	}
+	return s;
 }
 
 std::string RigFirstPersonLook(int dx, int moves, bool walk)

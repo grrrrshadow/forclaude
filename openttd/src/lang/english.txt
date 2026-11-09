@@ -2434,19 +2434,6 @@ STR_ERROR_WALKER_TENT_NOT_FLAT                                  :{WHITE}... the 
 STR_ERROR_WALKER_TENT_ALREADY                                   :{WHITE}... a tent already stands there
 STR_ERROR_WALKER_TOO_MANY_PLANTS                                :{WHITE}You can't have more plants
 STR_ERROR_WALKER_PLANT_NOT_RIPE                                 :{WHITE}It isn't ripe yet
-STR_CAB_VIEW_CAPTION                                            :{WHITE}Cab view: {VEHICLE}
-STR_CAB_VIEW_VEHICLE                                            :{BLACK}Vehicle
-STR_CAB_VIEW_VEHICLE_TOOLTIP                                    :{BLACK}Open the vehicle's window
-STR_CAB_VIEW_CENTRE                                             :{BLACK}On the map
-STR_CAB_VIEW_CENTRE_TOOLTIP                                     :{BLACK}Put the main view on the vehicle
-STR_CAB_VIEW_STOP                                               :{BLACK}Stop
-STR_CAB_VIEW_GO                                                 :{BLACK}Go
-STR_CAB_VIEW_STOP_TOOLTIP                                       :{BLACK}Stop the vehicle, or start it again
-STR_CAB_VIEW_LIMIT                                              :{YELLOW}held to {VELOCITY}
-STR_CAB_VIEW_STEERED                                            :{YELLOW}steered by hand
-STR_CAB_VIEW_FREE                                               :{YELLOW}by hand: free
-STR_CAB_VIEW_FREE_BACK                                          :{YELLOW}back to the orders
-STR_CAB_VIEW_FULL_TOOLTIP                                       :{BLACK}The view over the whole screen, and back
 STR_CAB_VIEW_CAMERA                                             :{BLACK}Camera: {STRING}
 STR_CAB_VIEW_CAMERA_TOOLTIP                                     :{BLACK}The next camera: the interior about the eye, without the interior, over the roof; the head looks ahead again. The key C does the same
 STR_CAB_VIEW_CONTROLS                                           :{BLACK}Controls: {STRING}
@@ -2478,17 +2465,6 @@ STR_ERROR_CAB_NOT_ACCEPTED                                      :{WHITE}... the 
 STR_ERROR_CAB_NOTHING_WAITING                                   :{WHITE}... nothing it can carry waits at the stop
 STR_ERROR_CAB_FULL                                              :{WHITE}... the vehicle is full
 STR_ERROR_CAB_EMPTY                                             :{WHITE}... the vehicle is empty
-STR_CAB_VIEW_SPEED                                              :{VELOCITY}
-STR_CAB_VIEW_MAX_SPEED                                          :max. {VELOCITY}
-STR_CAB_VIEW_NEXT_STOP                                          :Next stop: {STATION}
-STR_CAB_VIEW_TO_DEPOT                                           :Next stop: the depot
-STR_CAB_VIEW_NO_DESTINATION                                     :Next stop: none
-STR_CAB_VIEW_STATE_RUNNING                                      :{GREEN}Running
-STR_CAB_VIEW_STATE_STOPPED                                      :{RED}Stopped
-STR_CAB_VIEW_STATE_LOADING                                      :{YELLOW}Loading
-STR_CAB_VIEW_STATE_BROKEN                                       :{RED}Broken down
-STR_CAB_VIEW_LOAD                                               :Load: {NUM}%
-STR_CAB_VIEW_BUTTON                                             :{BLACK}Cab
 STR_CONFIG_SETTING_THREE_D_HELPTEXT                             :The map view turns to any angle: hold the middle mouse button and drag sideways, or press Y and N (15 degrees a press, with Ctrl 45). Two clicks of the middle button, Home, or the space bar with no news or error to close, put the view back to north. The turned view is for looking: build facing north, in 2D. Vehicles, stations and this game's own buildings turn with it from their eight directions, the original houses as boxes made of their own pictures. A vehicle in the purchase list and this game's own industries get a preview that turns. Off, the game is as it always was, to the pixel
 
 ###length 5

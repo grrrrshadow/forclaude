@@ -148,7 +148,6 @@
 #include "widgets/newgrf_widget.h"
 #include "widgets/settings_widget.h"
 #include "widgets/vehicle_widget.h"
-#include "widgets/cab_view_widget.h"
 #include "widgets/misc_widget.h"
 #include "widgets/order_widget.h"
 #include "widgets/town_widget.h"
@@ -10256,7 +10255,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		extern Window *ArrowsWindow();
 		const Window *aw = ArrowsWindow();
-		IConsolePrint(CC_DEFAULT, "test3d: sipky {:#x}, okno sipek {}", _dirkeys.base(), aw == nullptr ? "mapa" : aw->window_class == WindowClass::CabView ? "kabina" : "chodec");
+		IConsolePrint(CC_DEFAULT, "test3d: sipky {:#x}, okno sipek {}", _dirkeys.base(), aw == nullptr ? "mapa" : "chodec");
 	} else if (what == "vagony" && argv.size() > 2) {
 		/* 'vagony <jmeno> [pocet] [x y] [naklad] [p<podtyp>] [plny] [v<podrobnost>:<volba> ...]': a straight railway along
 		 * x with a shed at each end and a train between them: the fastest engine and so many wagons whose name has the
@@ -11694,8 +11693,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_ERROR, "test3d: stopni: takove vozidlo neni.");
 	} else if (what == "kabina") {
-		/* The view from the cab of the n-th visible vehicle (as 'vozidlo' counts them), for the rig; 'kabina cas' says how long the last picture took. */
-		extern std::string DescribeCabViews();
+		/* The rig in a vehicle as the player rides it: 'kabina <n>' the walker gets into the n-th visible vehicle (as
+		 * 'vozidlo' counts them) as with E, in the view from the first person -- the window of the cab view is gone
+		 * (the player, test4: "in the rig remap the cab view to getting in with E"); 'kabina cas' how long its last
+		 * picture took. */
+		extern std::string DescribeRiding();
+		extern const Vehicle *RigRiding();
 		/* As 'chodec': the rig's pictures at once, unless 'kabina vlakno 1'. */
 		static bool thread_chosen = false;
 		if (argv.size() > 3 && argv[2] == "vlakno") {
@@ -11706,65 +11709,40 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		if (!thread_chosen) _eye_synchronous = true;
 		if (argv.size() > 2 && argv[2] == "cas") {
-			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
+			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeRiding());
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klik") {
-			/* A click on a button of the cab view open: 'test3d kabina klik <trasa|stop|cely|nalozit|vylozit|kamera>' (the arrows steer and brake). */
-			static const std::pair<std::string_view, WidgetID> buttons[] = {
-				{"trasa", WID_CV_AUTO}, {"stop", WID_CV_STOP}, {"cely", WID_CV_FULL}, {"nalozit", WID_CV_LOAD}, {"vylozit", WID_CV_UNLOAD}, {"kamera", WID_CV_CAMERA},
-			};
-			WidgetID id = -1;
-			for (const auto &[name, wid] : buttons) if (argv[3] == name) id = wid;
-			Window *cw = FindWindowByClass(WindowClass::CabView);
-			if (id < 0 || cw == nullptr) {
-				IConsolePrint(CC_ERROR, "test3d kabina klik: no such button, or no cab view open.");
-				return true;
-			}
-			{
-				/* As the player's click: the local company is the current one (the rig's timer runs inside the tick, where nobody is). */
-				AutoRestoreBackup cur_company(_current_company, _local_company);
-				cw->OnClick({}, id, 1);
-			}
-			const Vehicle *cv = Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number));
-			if (cv != nullptr) {
-				IConsolePrint(CC_DEFAULT, "test3d: kabina klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {}", argv[3], cv->unitnumber, cv->x_pos, cv->y_pos,
-						to_underlying(cv->direction), to_underlying(cv->cab_heading), cv->cab_free, cv->cab_rejoin, cv->cab_yaw, cw->IsWidgetDisabled(id) ? "ano" : "ne");
-			}
+			/* 'kabina klik <trasa|nalozit|vylozit|kamera|cely|zadni>': a button of the view in the vehicle (RigRideClick()). */
+			extern std::string RigRideClick(std::string_view name);
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigRideClick(argv[3]));
 			return true;
 		}
 		if (argv.size() > 2 && argv[2] == "zadni") {
-			/* 'kabina zadni': the cab view open at the other end of its vehicle and back (RigCabRear()). */
-			extern std::string RigCabRear();
-			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigCabRear());
+			/* 'kabina zadni': the driver's stand at the other end of the vehicle and back (the button Stanoviste). */
+			extern std::string RigRideClick(std::string_view name);
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigRideClick("zadni"));
 			return true;
 		}
 		if (argv.size() > 2 && argv[2] == "zavri") {
-			/* 'kabina zavri': the cab view open closed, as the player closes it (whoever drives from it lets go). */
-			Window *cw = FindWindowByClass(WindowClass::CabView);
-			if (cw != nullptr) {
-				AutoRestoreBackup cur_company(_current_company, _local_company);
-				cw->Close();
-			}
-			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", cw != nullptr ? "zavrena" : "neni");
+			/* 'kabina zavri': out of the vehicle, as E again (whoever drove lets go). */
+			extern std::string RigRideOut();
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigRideOut());
 			return true;
 		}
 		if (argv.size() > 2 && argv[2] == "zivak") {
-			/* 'kabina zivak [posun <s>]': the vigilance device of the train of the cab view open, the game's time gone on
-			 * so many seconds for it first (simtrains_cab.cpp). */
-			Window *cw = FindWindowByClass(WindowClass::CabView);
-			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			/* 'kabina zivak [posun <s>]': the vigilance device of the train ridden, the game's time gone on so many
+			 * seconds for it first (simtrains_cab.cpp). */
 			extern std::string RigDeskVigilance(const Vehicle *v, int seconds);
 			const int seconds = argv.size() > 4 && argv[3] == "posun" ? number(4).value_or(0) : 0;
-			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigDeskVigilance(cv, seconds));
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigDeskVigilance(RigRiding(), seconds));
 			return true;
 		}
 		if (argv.size() == 4 && argv[2] == "pult" && argv[3] == "stav") {
-			/* 'kabina pult stav': what the desk of the train of the cab view open shows (SimtrainsDeskState). */
-			Window *cw = FindWindowByClass(WindowClass::CabView);
-			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			/* 'kabina pult stav': what the desk of the train ridden shows (SimtrainsDeskState). */
+			const Vehicle *cv = RigRiding();
 			if (cv == nullptr || cv->type != VehicleType::Train) {
-				IConsolePrint(CC_ERROR, "test3d kabina pult stav: no train's cab view open.");
+				IConsolePrint(CC_ERROR, "test3d kabina pult stav: nobody rides a train.");
 				return true;
 			}
 			const SimtrainsDeskState d = SimtrainsDeskStateOf(cv);
@@ -11776,18 +11754,17 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		if (argv.size() > 4 && argv[2] == "pult") {
 			/* 'kabina pult <rizen|vykon|edb|brzda|primocinna|rychlobrzda|smer|sberac> <0-255>': a control of the desk of the
-			 * train of the cab view open, as the player at it moves it (CmdTrainCabControl()); sberac 1 the pantograph down. */
+			 * train ridden, as the player at it moves it (CmdTrainCabControl()); sberac 1 the pantograph down. */
 			static const std::pair<std::string_view, TrainCabControl> controls[] = {
 				{"rizen", TrainCabControl::Driven}, {"vykon", TrainCabControl::Power}, {"edb", TrainCabControl::Dynamic}, {"brzda", TrainCabControl::Brake},
 				{"primocinna", TrainCabControl::EngineBrake}, {"rychlobrzda", TrainCabControl::Emergency}, {"smer", TrainCabControl::Reverser},
 				{"sberac", TrainCabControl::Pantograph},
 			};
-			Window *cw = FindWindowByClass(WindowClass::CabView);
-			const Vehicle *cv = cw != nullptr ? Vehicle::GetIfValid(static_cast<VehicleID>(cw->window_number)) : nullptr;
+			const Vehicle *cv = RigRiding();
 			std::optional<TrainCabControl> which;
 			for (const auto &[name, c] : controls) if (argv[3] == name) which = c;
 			if (cv == nullptr || cv->type != VehicleType::Train || !which.has_value()) {
-				IConsolePrint(CC_ERROR, "test3d kabina pult: no train's cab view open, or no such control.");
+				IConsolePrint(CC_ERROR, "test3d kabina pult: nobody rides a train, or no such control.");
 				return true;
 			}
 			AutoRestoreBackup cur_company(_current_company, _local_company);
@@ -11796,11 +11773,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			return true;
 		}
 		if (argv.size() > 4 && argv[2] == "hlava") {
-			/* The right button held down on the picture of the cab view open and the hand moved so many pixels right and
+			/* The right button held down on the picture from the vehicle and the hand moved so many pixels right and
 			 * down, as the player looks about (the player, 27. 10.: "look out of the right window"); 'hlava 0 0' twice
 			 * the two clicks that look ahead again. */
-			extern std::string RigCabLook(int dx, int dy);
-			IConsolePrint(CC_DEFAULT, "test3d: kabina hlava {}", RigCabLook(number(3).value_or(0), number(4).value_or(0)));
+			extern std::string RigRideLook(int dx, int dy);
+			IConsolePrint(CC_DEFAULT, "test3d: kabina hlava {}", RigRideLook(number(3).value_or(0), number(4).value_or(0)));
 			return true;
 		}
 		if (argv.size() > 3 && argv[2] == "klavesa") {
@@ -11809,7 +11786,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			extern std::string DescribeCarHorn();
 			Window *kw = ArrowsWindow();
 			if (kw == nullptr || argv[3].empty()) {
-				IConsolePrint(CC_ERROR, "test3d kabina klavesa: no cab view nor first person view open.");
+				IConsolePrint(CC_ERROR, "test3d kabina klavesa: no first person view open.");
 				return true;
 			}
 			EventState state;
@@ -11817,14 +11794,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				AutoRestoreBackup cur_company(_current_company, _local_company);
 				state = kw->OnKeyPress(static_cast<char32_t>(argv[3][0]), 0);
 			}
-			IConsolePrint(CC_DEFAULT, "test3d: kabina klavesa {}: {} v okne {}", argv[3], state == EventState::Handled ? "vzata" : "nevzata", kw->window_class == WindowClass::CabView ? "kabina" : "chodec");
+			IConsolePrint(CC_DEFAULT, "test3d: kabina klavesa {}: {}", argv[3], state == EventState::Handled ? "vzata" : "nevzata");
 			if (argv[3] == "i" || argv[3] == "I") IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCarHorn());
-			for (const Window *w : Window::Iterate()) {
-				if (w->window_class != WindowClass::CabView) continue;
-				const Vehicle *kv = Vehicle::GetIfValid(static_cast<VehicleID>(w->window_number));
-				if (kv != nullptr) IConsolePrint(CC_DEFAULT, "test3d: vozidlo {} svetla {} (prani {})", kv->unitnumber, VehicleLightsOn(kv) ? "sviti" : "nesviti", kv->First()->cab_lights);
-			}
-			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCabViews());
+			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeRiding());
 			return true;
 		}
 		auto n = number(2);
@@ -11841,8 +11813,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_ERROR, "test3d: vozidlo {} neni.", want);
 			return true;
 		}
-		ShowCabViewWindow(found);
-		IConsolePrint(CC_DEFAULT, "test3d: kabina vozidla {} (typ {}) otevrena", found->unitnumber, to_underlying(found->type));
+		extern std::string RigRide(const Vehicle *v);
+		IConsolePrint(CC_DEFAULT, "test3d: kabina {}", RigRide(found));
 	} else if (what == "motory") {
 		/* The rig: every rail engine whose name has the text (all without), with what 'zatacka' asks of it;
 		 * 'test3d motory auta [text]' the road vehicles instead, with their parts. */

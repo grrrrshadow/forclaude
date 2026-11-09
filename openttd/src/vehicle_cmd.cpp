@@ -1307,7 +1307,7 @@ CommandCost CmdSetCabSpeedLimit(DoCommandFlags flags, VehicleID veh_id, uint16_t
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		v->cab_speed_limit = limit;
-		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}
 	return CommandCost();
@@ -1345,7 +1345,7 @@ CommandCost CmdSetCabHeading(DoCommandFlags flags, VehicleID veh_id, uint8_t hea
 			v->cab_heading = heading == 0xFF ? Direction::Invalid : static_cast<Direction>(heading);
 		}
 		if (v->type == VehicleType::Ship) Ship::From(v)->path.clear();
-		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}
 	return CommandCost();
@@ -1402,7 +1402,6 @@ CommandCost CmdCabCargo(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 
 	if (flags.Test(DoCommandFlag::Execute)) {
 		CabCargoStart(v, st, unload);
-		SetWindowDirty(WindowClass::CabView, v->index);
 		SetWindowDirty(WindowClass::FirstPerson, 0);
 	}
 	return CommandCost();
@@ -1446,7 +1445,7 @@ CommandCost CmdTrainCabControl(DoCommandFlags flags, VehicleID veh_id, uint8_t c
 			case TrainCabControl::Pantograph: t->cab_pantograph_down = value != 0; break;
 			default: NOT_REACHED();
 		}
-		SetWindowDirty(WindowClass::CabView, t->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 		SetWindowDirty(WindowClass::VehicleView, t->index);
 	}
 	return CommandCost();
@@ -1555,7 +1554,7 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 				v->cab_speed_limit = CAB_SLOWEST;
 				break;
 		}
-		SetWindowDirty(WindowClass::CabView, v->index);
+		SetWindowDirty(WindowClass::FirstPerson, 0);
 		SetWindowDirty(WindowClass::VehicleView, v->index);
 	}
 	return CommandCost();
