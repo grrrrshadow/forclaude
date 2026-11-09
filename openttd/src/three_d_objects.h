@@ -111,6 +111,13 @@ struct ThreeDObjectTexture {
 	int h = 0;
 	std::vector<uint32_t> px;
 	ThreeDUniqueId uid; ///< for the graphics card (three_d_gpu.cpp)
+	/**
+	 * Of the finest level of a texture of few colours in cells (a palette, a mask of strips; DecodeTextureLevels()):
+	 * the coarsest level whose texels drawn from are each of one cell -- a coarser one mixes the cells' colours
+	 * (the colleague's Škoda 1202 and Ikarus, 8 texels to a colour: grey from afar, their paint gone; the player, #354).
+	 * 255: no such texture, every level is drawn.
+	 */
+	uint8_t coarsest = 255;
 };
 
 /**

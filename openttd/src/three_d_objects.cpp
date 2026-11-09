@@ -880,10 +880,19 @@ static int FinestLevel(const std::vector<ThreeDObjectTexture> &lv)
 	return static_cast<int>(lv.size()) - 1;
 }
 
+/**
+ * The level of a texture drawn for a level asked for: that one, or of a texture of few colours in cells no coarser
+ * than its cells (ThreeDObjectTexture::coarsest) -- the coarser levels mix their colours.
+ */
+static int DrawnLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
+{
+	return lv.empty() ? level : std::min<int>(level, lv.front().coarsest);
+}
+
 /** Whether a texture has a level with its pixels (or a coarser one, the coarsest there is). */
 static bool HasLevel(const std::vector<ThreeDObjectTexture> &lv, int level)
 {
-	return FinestLevel(lv) <= std::min(level, static_cast<int>(lv.size()) - 1);
+	return FinestLevel(lv) <= std::min(DrawnLevel(lv, level), static_cast<int>(lv.size()) - 1);
 }
 
 /** Let go of the pixels of the levels finer than a level; their sizes stay. */
@@ -975,7 +984,7 @@ static ThreeDTextureLevels ThreeDTextureLevelsOf(const ThreeDTextureBytes &png, 
 	static const std::vector<uint8_t> none;
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
 	DecodeTextureLevels(png != nullptr ? *png : none, *made, flat, true, cover.get(), soft);
-	DropFinerLevels(*made, finest);
+	DropFinerLevels(*made, DrawnLevel(*made, finest));
 	std::lock_guard lock(_texture_bytes_mutex);
 	if (_texture_levels.size() > 64) std::erase_if(_texture_levels, [](const auto &e) { return e.second.levels.expired(); });
 	_texture_levels[key] = TextureLevelsMade{png, made};
@@ -1003,7 +1012,7 @@ static ThreeDTextureLevels TextureLevelsOfFile(const std::string &file, uint32_t
 	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
 	const TextureCoverTriangles cover = TextureCover(of);
 	DecodeTextureLevels(png, *made, flat, true, cover.get());
-	DropFinerLevels(*made, finest);
+	DropFinerLevels(*made, DrawnLevel(*made, finest));
 	std::lock_guard lock(_texture_bytes_mutex);
 	_file_texture_levels[key] = made;
 	return made;
@@ -9564,6 +9573,7 @@ static const ThreeDObjectTexture *LevelOfKept(const ThreeDTextureLevels &place, 
 {
 	if (place == nullptr || place->empty()) return nullptr;
 	const std::vector<ThreeDObjectTexture> &lv = *place;
+	level = DrawnLevel(lv, level);
 	auto [it, added] = _texture_levels_asked.try_emplace(&lv, level);
 	if (!added) it->second = std::min(it->second, level);
 	return &lv[std::clamp<int>(level, FinestLevel(lv), static_cast<int>(lv.size()) - 1)];
@@ -9870,6 +9880,7 @@ size_t ThreeDVehicleObject::TrimTextures(std::set<const void *> &seen) const
 		} else {
 			while (keep > 0 && std::max(lv[keep - 1].w, lv[keep - 1].h) <= 256) keep--;
 		}
+		keep = DrawnLevel(lv, keep);
 		for (int i = 0; i < keep; i++) freed += lv[i].px.capacity() * sizeof(uint32_t);
 		DropFinerLevels(lv, keep);
 	};
@@ -11746,9 +11757,17 @@ static std::shared_ptr<const std::vector<uint8_t>> TexelsDrawnOf(int w, int h, c
 	return made;
 }
 
+/** A picture of no more colours drawn from than this is of cells (ThreeDObjectTexture::coarsest): a palette, a mask of strips. */
+static constexpr size_t CELL_COLOURS = 64;
+/** Texels of colours more apart than this in a channel are of two cells. */
+static constexpr int CELL_MIXED = 6;
+/** A level keeps its cells while no more than one of so many texels drawn from mixes two (0.5 %). */
+static constexpr size_t CELL_MIXED_SHARE = 200;
+
 /**
  * A texture's levels of detail from its picture: each texel opaque where its alpha is at least half, else none (0);
  * soft, its alpha as it is (a material "BLEND": see-through by it, ThreeDVehicleShape::BlendsByTexel()), none where 0.
+ * Of few colours in cells, the coarsest level that keeps them noted (ThreeDObjectTexture::coarsest).
  */
 static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<ThreeDObjectTexture> &levels, uint32_t flat, bool halved, const std::vector<float> *cover, bool soft)
 {
@@ -11807,6 +11826,21 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		ms_fill = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count() - ms_drawn;
 	}
 	const int w0 = t.w, h0 = t.h;
+	/* Few colours (a palette of them in cells, a mask of strips): a level coarser than its cells mixes them. */
+	bool few_colours = halved;
+	if (few_colours) {
+		std::vector<uint32_t> colours;
+		uint32_t last = 0;
+		for (size_t i = 0; i < t.px.size() && few_colours; i++) {
+			if (t.px[i] == 0 || t.px[i] == last || (!drawn.empty() && !drawn[i])) continue;
+			last = t.px[i];
+			if (std::ranges::find(colours, last) != colours.end()) continue;
+			colours.push_back(last);
+			few_colours = colours.size() <= CELL_COLOURS;
+		}
+	}
+	int unmixed = 0;
+	bool mixing = !few_colours;
 	levels.push_back(std::move(t));
 	while (halved && (levels.back().w > 1 || levels.back().h > 1)) {
 		const ThreeDObjectTexture &a = levels.back();
@@ -11818,10 +11852,12 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		 * the filled ones are not mixed in, and it is drawn from when any of them is (then filled again). */
 		std::vector<uint8_t> drawn_b;
 		if (!drawn.empty()) drawn_b.assign(b.px.size(), 0);
+		size_t texels = 0, mixed = 0;
 		for (int y = 0; y < b.h; y++) {
 			for (int x = 0; x < b.w; x++) {
 				uint r = 0, g = 0, bl = 0, n = 0, holes = 0, alpha = 0;
 				bool any_drawn = false;
+				uint8_t lo[3] = {255, 255, 255}, hi[3] = {0, 0, 0};
 				for (int k = 0; k < 4; k++) {
 					int sx = std::min(a.w - 1, x * 2 + (k & 1)), sy = std::min(a.h - 1, y * 2 + (k >> 1));
 					const size_t at = static_cast<size_t>(sy) * a.w + sx;
@@ -11838,6 +11874,15 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 					bl += c.b;
 					alpha += c.a;
 					n++;
+					const uint8_t ch[3] = {c.r, c.g, c.b};
+					for (int q = 0; q < 3; q++) {
+						lo[q] = std::min(lo[q], ch[q]);
+						hi[q] = std::max(hi[q], ch[q]);
+					}
+				}
+				if (!mixing && n > 0) {
+					texels++;
+					if (n > 1 && std::max({hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]}) > CELL_MIXED) mixed++;
 				}
 				const size_t to = static_cast<size_t>(y) * b.w + x;
 				if (soft) {
@@ -11855,7 +11900,14 @@ static void DecodeTextureLevels(const std::vector<uint8_t> &png, std::vector<Thr
 		if (!drawn.empty()) FillTexelsNotDrawn(b, drawn_b);
 		drawn = std::move(drawn_b);
 		levels.push_back(std::move(b));
+		/* Its cells whole yet: hardly a texel drawn from mixes two colours (their edges where a triangle draws over one). */
+		if (!mixing && texels > 0 && mixed * CELL_MIXED_SHARE <= texels) {
+			unmixed++;
+		} else {
+			mixing = true;
+		}
 	}
+	if (few_colours && !levels.empty()) levels.front().coarsest = static_cast<uint8_t>(unmixed);
 	if (cover != nullptr && !cover->empty() && w0 > 1) Debug(misc, 2, "3D texture {}x{}: cover of {} triangles {:.1f} ms, filled {:.1f} ms, all with the levels {:.1f} ms", w0, h0, cover->size() / 6, ms_drawn, ms_fill, std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - cover_start).count());
 }
 
