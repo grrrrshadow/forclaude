@@ -1185,6 +1185,7 @@ int ThreeDLoadCapacity(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed);
 void ThreeDLoadPlaces(const ThreeDLoadPiece &piece, const ThreeDLoadBed &bed, int count, std::vector<ThreeDLoadPlace> &out);
 int ThreeDLoadColourState(const ThreeDLoadPiece &piece, uint32_t label, uint32_t colour = 0);
 const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name);
+const std::vector<ThreeDVehicleObject> &GetThreeDVehicleObjects();
 std::optional<std::array<float, 3>> GetThreeDThingPlace(std::string_view thing, std::string_view node);
 std::optional<SoundID> GetThreeDThingSound(std::string_view thing, std::string_view sound);
 

@@ -8895,6 +8895,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: obal {}", _draw_road_consists_whole ? "zapnuty" : "vypnuty");
 		return true;
+	} else if (what == "model" && argv.size() > 2 && argv[2] == "kabiny") {
+		/* 'model kabiny': of every vehicle's model with the eye of a cab, where the cab view has it -- how far before
+		 * where its index has it, and whether glass one sees through is before it (then never before the glass). */
+		extern bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead, bool &glass);
+		int n = 0, out = 0;
+		for (const ThreeDVehicleObject &m : GetThreeDVehicleObjects()) {
+			if (argv.size() > 3 && m.package.find(argv[3]) == std::string::npos && m.name.find(argv[3]) == std::string::npos) continue;
+			/* Read now: the cab view takes the shape as read already. */
+			if (m.GetShape() == nullptr || m.GetShape(0, m.PartsOf(0)) == nullptr) continue;
+			std::array<double, 3> eye{};
+			double ahead = 0;
+			bool glass = false;
+			if (!DescribeCabEye(m, eye, ahead, glass)) continue;
+			n++;
+			if (ahead > 0) out++;
+			IConsolePrint(CC_DEFAULT, "test3d: kabina {} ({}{}): oko {:.2f} {:.2f} {:.2f}, pred sklo o {:.2f}, pruhledne sklo pred okem {}", m.name, m.package, m.has_cab ? "" : ", odhad",
+					eye[0], eye[1], eye[2], ahead, glass ? "ano" : "ne");
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: kabin {}, oko pred kabinou {}", n, out);
+		return true;
 	} else if (what == "model" && argv.size() > 3 && argv[2] == "rozmery") {
 		/* 'model rozmery <name>': where the parts of a vehicle's model are, by their textures, metres in its frame (x
 		 * forward, y left, z up) -- the cab of a model of MSTS by its driver's figure or its desk. */
@@ -8947,11 +8967,12 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			it->second[6]++;
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: model {}: oko kabiny {} {:.2f} {:.2f} {:.2f}", argv[3], m->has_cab ? "ano" : "ne", m->cab[0], m->cab[1], m->cab[2]);
-		extern bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead);
+		extern bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead, bool &glass);
 		std::array<double, 3> eye{};
 		double ahead = 0;
-		if (DescribeCabEye(*m, eye, ahead)) {
-			IConsolePrint(CC_DEFAULT, "test3d: model {}: oko v kabine {:.2f} {:.2f} {:.2f}, pred sklo o {:.2f}", argv[3], eye[0], eye[1], eye[2], ahead);
+		bool glass = false;
+		if (DescribeCabEye(*m, eye, ahead, glass)) {
+			IConsolePrint(CC_DEFAULT, "test3d: model {}: oko v kabine {:.2f} {:.2f} {:.2f}, pred sklo o {:.2f}, pruhledne sklo pred okem {}", argv[3], eye[0], eye[1], eye[2], ahead, glass ? "ano" : "ne");
 		}
 		for (const auto &[tex, b] : box) {
 			IConsolePrint(CC_DEFAULT, "test3d: model {} textura {} '{}': x {:.2f}..{:.2f} y {:.2f}..{:.2f} z {:.2f}..{:.2f}, {} trojuhelniku", argv[3], tex,

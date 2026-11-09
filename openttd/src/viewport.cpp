@@ -6836,20 +6836,27 @@ static constexpr double CAB_EYE_PAST_SOLID_M = 0.15;
 
 /**
  * How far ahead of where its index has it the eye of a model's cab is, metres along the way the model goes: none when
- * it looks out through the glass, else just past the solid of the model in front of it -- the roof's front edge, a
- * windscreen of the body not of the glass -- so that it sees out before the cab (the player, 26. 10., the Zetor of the
- * farm: "put the camera before the cab, the colleague will remake the Zetor").
+ * glass one sees through is anywhere before it -- the eye stays in the cab and looks out through it, past a dashboard
+ * or a pillar in between too (the player, 9. 11., #354: "the interior camera cannot be before the windscreen, it must
+ * be in the interior; before the glass only when it is opaque black glass") -- else just past the solid of the model in
+ * front of it -- the roof's front edge, a windscreen painted black on the body -- so that it sees out before the cab
+ * (the player, 26. 10., the Zetor of the farm: "put the camera before the cab, the colleague will remake the Zetor").
  * @param parts the parts its state shows
  * @param turn  how far its state turns the model, radians
+ * @param glass set to whether glass one sees through is before the eye, if given
  */
-static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts, double turn)
+static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts, double turn, bool *glass = nullptr)
 {
 	/* An engine of MSTS has its eye where its .eng (Open Rails' or MSTS's) has it: its glass is no glass of its own,
 	 * the solid before it a pillar between its windows; past it the eye was out of the cab, over the 742's bonnet. */
+	if (glass != nullptr) *glass = false;
 	if (m.file.ends_with(".s") || m.file.ends_with(".S")) return 0;
-	static std::map<std::tuple<const ThreeDVehicleObject *, std::array<uint64_t, 2>, double>, double> ahead;
+	static std::map<std::tuple<const ThreeDVehicleObject *, std::array<uint64_t, 2>, double>, std::pair<double, bool>> ahead;
 	const auto key = std::make_tuple(&m, parts.bits, turn);
-	if (auto it = ahead.find(key); it != ahead.end()) return it->second;
+	if (auto it = ahead.find(key); it != ahead.end()) {
+		if (glass != nullptr) *glass = it->second.second;
+		return it->second.first;
+	}
 	const ThreeDVehicleShape *shape = m.TryGetShape(0, parts);
 	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
 	if (shape == nullptr || !cab.has_value()) return 0;
@@ -6882,28 +6889,31 @@ static double CabEyeAhead(const ThreeDVehicleObject &m, const ThreeDParts &parts
 		if (d > 0) hits.push_back({d, shape->IsSeeThrough(t)});
 	}
 	std::ranges::sort(hits);
-	/* The solid first, within the cab: past it and what of the solid follows close behind it (its two sides). */
+	/* Without glass one sees through, the solid first, within the cab: past it and what of the solid follows close
+	 * behind it (its two sides). */
+	const bool through = std::ranges::any_of(hits, [](const auto &hit) { return hit.second; });
 	double move = 0;
-	if (!hits.empty() && !hits[0].second && hits[0].first < CAB_EYE_SOLID_M) {
+	if (!through && !hits.empty() && hits[0].first < CAB_EYE_SOLID_M) {
 		move = hits[0].first;
-		for (size_t i = 1; i < hits.size() && !hits[i].second && hits[i].first - move < CAB_EYE_SOLID_GAP_M; i++) move = hits[i].first;
+		for (size_t i = 1; i < hits.size() && hits[i].first - move < CAB_EYE_SOLID_GAP_M; i++) move = hits[i].first;
 		move += CAB_EYE_PAST_SOLID_M;
 	}
-	ahead[key] = move;
+	ahead[key] = {move, through};
+	if (glass != nullptr) *glass = through;
 	return move;
 }
 
 /**
  * For the rig ("test3d model rozmery"): the eye of a model's cab as the cab view takes it (CabEyeOf(), and how far
- * ahead of it CabEyeAhead() puts it), metres in its frame.
+ * ahead of it CabEyeAhead() puts it, and whether glass one sees through is before it), metres in its frame.
  * @return false: none
  */
-bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead)
+bool DescribeCabEye(const ThreeDVehicleObject &m, std::array<double, 3> &eye, double &ahead, bool &glass)
 {
 	const std::optional<std::array<double, 3>> cab = CabEyeOf(m);
 	if (!cab.has_value()) return false;
 	eye = *cab;
-	ahead = CabEyeAhead(m, m.PartsOf(0), 0);
+	ahead = CabEyeAhead(m, m.PartsOf(0), 0, &glass);
 	return true;
 }
 

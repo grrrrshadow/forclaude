@@ -7514,6 +7514,13 @@ const ThreeDVehicleObject *GetThreeDVehicleObjectNamed(std::string_view name)
 	return first;
 }
 
+/** All the vehicles' models of the indices (for the rig). */
+const std::vector<ThreeDVehicleObject> &GetThreeDVehicleObjects()
+{
+	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
+	return _vehicle_objects;
+}
+
 /** The cars of the game's own that drive about by themselves (three_d_walkers.h). */
 const std::vector<ThreeDVehicleObject> &GetThreeDDrivingCars()
 {
