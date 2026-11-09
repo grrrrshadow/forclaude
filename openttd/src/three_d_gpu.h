@@ -379,7 +379,7 @@ struct ThreeDGpuEyeStep {
 struct ThreeDGpuEyeFrame {
 	int width = 0, height = 0;
 	float near_plane = 1;            ///< the nearest drawn, world units ahead
-	std::array<float, 10> eye{};     ///< x, y, z, fx, fy, rx, ry, focal, cx, cy (CabEye of viewport.cpp)
+	std::array<float, 12> eye{};     ///< x, y, z, fx, fy, rx, ry, focal, cx, cy, sp, cp (CabEye of viewport.cpp)
 	std::vector<ThreeDGpuEyeTexture> textures;
 	std::vector<ThreeDGpuEyeCorner> corners;
 	std::vector<ThreeDGpuEyeRun> runs;

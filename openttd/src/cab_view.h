@@ -233,6 +233,10 @@ struct FirstPersonEye {
 	uint32_t light_colour = 0; ///< that light's colour (Colour::data), 0 none
 	double light_reach_m = 0;  ///< and how far it lights, metres
 	std::vector<ThreeDBlast> blasts; ///< the smoke of its rockets and their blasts
+	/** Not a walker but the camera going round a place over the map (orbit_view.cpp): eye_z the height of the eyes
+	 * itself (as EyeStandZ() gives it), over nothing; never in the water or a tunnel. */
+	bool fly = false;
+	double tip = 0;       ///< radians its look is tipped down for real (CabEye::sp, cp), 0 level; the walker's pitch shears instead
 };
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out);
 double FirstPersonGroundZ(double x, double y);

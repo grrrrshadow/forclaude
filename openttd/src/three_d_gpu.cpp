@@ -1500,6 +1500,12 @@ uniform vec2 u_grass_eye;    // the eye's x, y within such a run
 uniform vec3 u_grass_tint[5];
 uniform vec4 u_eye_dir;      // fx, fy, rx, ry
 uniform vec3 u_eye_lens;     // focal, cx, cy
+uniform vec2 u_eye_tip;      // the sine and cosine of the eye's look tipped down (CabEye::sp, cp)
+/* How far along the level the world point the pixel shows is from the eye (EyeToWorld() of viewport.cpp). */
+float LevelAhead(float f)
+{
+	return f * u_eye_tip.y + (u_eye_lens.z - gl_FragCoord.y) * f / u_eye_lens.x * u_eye_tip.x;
+}
 in vec2 v_uv;
 flat in vec4 v_rect;
 flat in float v_light;
@@ -1583,8 +1589,8 @@ void main()
 	int bank_mark = int(t.a * 255.0 + 0.5);
 	if ((how & 32) != 0 && u_grass_units > 0.0 && bank_mark > 234 && bank_mark < 250) {
 		float f = 1.0 / gl_FragCoord.w;
-		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x;
-		vec2 world = u_grass_eye + vec2(f * u_eye_dir.x + side * u_eye_dir.z, f * u_eye_dir.y + side * u_eye_dir.w);
+		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x, level = LevelAhead(f);
+		vec2 world = u_grass_eye + vec2(level * u_eye_dir.x + side * u_eye_dir.z, level * u_eye_dir.y + side * u_eye_dir.w);
 		vec2 l = world - 16.0 * floor(world / 16.0);
 		vec2 reach = 1.75 + 0.2 * sin(world * 0.7853982) + 0.15 * sin(world * 1.1780972 + 1.3);
 		int sides = bank_mark - 234;
@@ -1600,8 +1606,8 @@ void main()
 	 * 128ths) -- DrawOurGrass() and CabGrassTexel() of viewport.cpp. */
 	if ((how & 32) != 0 && u_grass_units > 0.0 && int(t.a * 255.0 + 0.5) == 252) {
 		float f = 1.0 / gl_FragCoord.w;
-		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x;
-		vec2 world = u_grass_eye + vec2(f * u_eye_dir.x + side * u_eye_dir.z, f * u_eye_dir.y + side * u_eye_dir.w);
+		float side = (gl_FragCoord.x - u_eye_lens.y) * f / u_eye_lens.x, level = LevelAhead(f);
+		vec2 world = u_grass_eye + vec2(level * u_eye_dir.x + side * u_eye_dir.z, level * u_eye_dir.y + side * u_eye_dir.w);
 		ivec2 gs = textureSize(u_grass, 0);
 		vec2 g = world * vec2(gs) / u_grass_units - 0.5;
 		ivec2 b = ivec2(floor(g));
@@ -1647,6 +1653,7 @@ uniform sampler2D u_depth;
 uniform float u_near;
 uniform vec4 u_eye_dir;   // fx, fy, rx, ry
 uniform vec3 u_eye_lens;  // focal, cx, cy
+uniform vec2 u_eye_tip;   // the sine and cosine of the eye's look tipped down (CabEye::sp, cp)
 layout(location = 0) out vec4 o_colour;
 ivec2 Pixel() { return ivec2(gl_FragCoord.xy); }
 vec3 ColourAt(ivec2 p) { return floor(texelFetch(u_colour, p, 0).rgb * 255.0 + 0.5); }
@@ -1656,7 +1663,8 @@ vec3 InWorld(vec2 s, float iw)
 {
 	float f = 1.0 / iw;
 	float r = (s.x - u_eye_lens.y) * f / u_eye_lens.x, u = (u_eye_lens.z - s.y) * f / u_eye_lens.x;
-	return vec3(f * u_eye_dir.x + r * u_eye_dir.z, f * u_eye_dir.y + r * u_eye_dir.w, u);
+	float level = f * u_eye_tip.y + u * u_eye_tip.x, up = u * u_eye_tip.y - f * u_eye_tip.x;
+	return vec3(level * u_eye_dir.x + r * u_eye_dir.z, level * u_eye_dir.y + r * u_eye_dir.w, up);
 }
 void Put(vec3 c) { o_colour = vec4(c / 255.0, 1.0); }
 )";
@@ -5825,6 +5833,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glUniform1f(gl.glGetUniformLocation(p.program, "u_near"), depth_scale);
 		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
 		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
 		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
 	};
 	auto done = [&]() {
@@ -5853,6 +5862,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_size"), static_cast<float>(w), static_cast<float>(h));
 		gl.glUniform4f(gl.glGetUniformLocation(p.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
 		gl.glUniform3f(gl.glGetUniformLocation(p.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+		gl.glUniform2f(gl.glGetUniformLocation(p.program, "u_eye_tip"), f.eye[10], f.eye[11]);
 	};
 	auto glows = [&](const std::vector<ThreeDGpuEyeGlow> &list) {
 		if (list.empty()) return;
@@ -5914,6 +5924,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				}
 				gl.glUniform4f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_dir"), f.eye[3], f.eye[4], f.eye[5], f.eye[6]);
 				gl.glUniform3f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_lens"), f.eye[7], f.eye[8], f.eye[9]);
+				gl.glUniform2f(gl.glGetUniformLocation(_frame_tri_program.program, "u_eye_tip"), f.eye[10], f.eye[11]);
 				gl.glActiveTexture(GL_TEXTURE1);
 				gl.glBindTexture(GL_TEXTURE_2D, grass ? names[f.grass_texture] : 0);
 				gl.glActiveTexture(GL_TEXTURE0);

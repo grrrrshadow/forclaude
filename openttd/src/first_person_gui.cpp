@@ -22,6 +22,7 @@
 
 #include "stdafx.h"
 #include "cab_view.h"
+#include "orbit_view.h"
 #include "landscape.h"
 #include "window_gui.h"
 #include "window_func.h"
@@ -3215,11 +3216,20 @@ TileIndex FirstPersonShopNearby()
 	return best;
 }
 
-/** Whether the view from the first person, or one from a cab (cab_view_gui.cpp), is open over the whole screen: the map under it is then not drawn (widget.cpp). */
-bool FirstPersonCoversMap()
+/** Whether the view from the first person is open over the whole screen. */
+bool FirstPersonFull()
 {
 	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
 	return w != nullptr && w->full;
+}
+
+/**
+ * Whether the map is covered: by the view from the first person over the whole screen, or by the camera going round a
+ * place (orbit_view.cpp). The map under it is then not drawn (widget.cpp), nor laid by the card.
+ */
+bool FirstPersonCoversMap()
+{
+	return FirstPersonFull() || OrbitViewOn();
 }
 
 /** The walker of the view from the first person: where it stands, world units; false when the view is not open (three_d_dragons.h). */

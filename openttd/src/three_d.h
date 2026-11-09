@@ -34,7 +34,9 @@
  * sideways (RotateViewByDrag(), 4 pixels to a degree), or with the keys Y and
  * N (15 degrees, with Ctrl 45, the next of the eight directions the vehicles
  * and our buildings have pictures for); the right button scrolls as it always
- * has. Y and N are the only two letters no window of the game binds.
+ * has. Y and N are the only two letters no window of the game binds. The
+ * middle button dragged up or down leaves the map for the camera going round
+ * the place in the middle of it (orbit_view.cpp), the second axis.
  */
 
 #ifndef THREE_D_H

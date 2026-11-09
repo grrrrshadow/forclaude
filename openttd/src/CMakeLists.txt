@@ -283,6 +283,8 @@ add_files(
     map.cpp
     map_drag.cpp
     map_drag.h
+    orbit_view.cpp
+    orbit_view.h
     map_func.h
     map_type.h
     mars_houses.cpp

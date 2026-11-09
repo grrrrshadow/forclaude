@@ -68,6 +68,7 @@
 #include "fontcache.h"
 #include "screenshot.h"
 #include "three_d.h"
+#include "orbit_view.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
 #include "progress.h"
@@ -8857,6 +8858,28 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		SetViewYaw(degrees);
 		/* The turn moved the scroll position to keep the middle in place; the view follows at the next tick, here now. */
 		UpdateViewportPosition(w, 0);
+	} else if (what == "krouzeni") {
+		/* The camera going round the place in the middle of the map (orbit_view.cpp): 'krouzeni <sklon stupne> [vzdalenost m]',
+		 * 'krouzeni vypnout', 'krouzeni tah <dx> <dy>' (the middle button dragged, dy up), 'krouzeni kolecko <n>', 'krouzeni' as it is.
+		 * Its pictures of the moment, everything read at once (as 'chodec'). */
+		extern bool _eye_synchronous;
+		_eye_synchronous = true;
+		if (argv.size() > 2 && argv[2] == "vypnout") {
+			OrbitViewSet(false, 0, 0);
+		} else if (argv.size() > 4 && argv[2] == "tah") {
+			const bool did = OrbitTipByDrag(number(3).value_or(0), number(4).value_or(0));
+			OrbitDragEnd();
+			IConsolePrint(CC_DEFAULT, "test3d: krouzeni tah {}", did ? "vzat" : "nic");
+		} else if (argv.size() > 3 && argv[2] == "kolecko") {
+			if (OrbitViewOn()) OrbitViewWheel(number(3).value_or(0));
+		} else if (argv.size() > 2) {
+			const double tip = std::strtod(std::string(argv[2]).c_str(), nullptr);
+			const double distance = argv.size() > 3 ? std::strtod(std::string(argv[3]).c_str(), nullptr) : 0.0;
+			OrbitViewSet(true, tip, distance);
+		}
+		if (OrbitViewOn()) OrbitViewTick(*w);
+		IConsolePrint(CC_DEFAULT, "test3d: krouzeni {}", DescribeOrbitView());
+		return true;
 	} else if (what == "sprite") {
 		/* The rig: a sprite as drawn, as a PPM: 'test3d sprite <id> [name]'. */
 		extern std::string WriteSpritePPM(SpriteID image, const std::string &name);

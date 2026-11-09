@@ -47,6 +47,7 @@
 #include "network/network_base.h"
 
 #include "three_d.h"
+#include "orbit_view.h"
 
 #include "table/sprites.h"
 #include "table/strings.h"
@@ -473,6 +474,11 @@ struct MainWindow : Window
 	void OnMouseWheel(int wheel, WidgetID widget) override
 	{
 		if (widget != WID_M_VIEWPORT) return;
+		/* On the camera going round a place: nearer or farther (orbit_view.cpp), the map's zoom as it was. */
+		if (OrbitViewOn()) {
+			OrbitViewWheel(wheel);
+			return;
+		}
 		if (_settings_client.gui.scrollwheel_scrolling != ScrollWheelScrolling::Off) {
 			bool in = wheel < 0;
 
@@ -483,6 +489,12 @@ struct MainWindow : Window
 				ZoomInOrOutToCursorWindow(in, this);
 			}
 		}
+	}
+
+	void OnRealtimeTick([[maybe_unused]] uint delta_ms) override
+	{
+		/* The camera going round a place over the map: its picture anew every frame (orbit_view.cpp). */
+		OrbitViewTick(*this);
 	}
 
 	void OnResize() override

@@ -125,6 +125,7 @@
 #include "three_d_ufo.h"
 #include "three_d_walkers.h"
 #include "cab_view.h"
+#include "orbit_view.h"
 #include "cab_drive.h"
 #include "thread.h"
 #include "round_track.h"
@@ -7118,6 +7119,13 @@ static void HideTurnedCardGround()
 	g.have.clear();
 }
 
+/** The turned main view's picture on the card shown no more: the camera going round a place covers the map (orbit_view.cpp). */
+void HideTurnedMapOnCard()
+{
+	AutoRestoreBackup card(_tcg, &_turned_card_ground);
+	HideTurnedCardGround();
+}
+
 /** Whether the ground of a block of the turned view is laid into the picture of the view's ground on the card (TurnedCardGround). */
 static bool TurnedCardGroundUsable(const DrawPixelInfo &frame)
 {
@@ -10992,6 +11000,8 @@ static void PlaceObject()
 
 bool HandleViewportClicked(const Viewport &vp, int x, int y)
 {
+	/* The camera going round a place covers the map: it is only to look at (orbit_view.cpp). */
+	if (OrbitViewOn() && GetMainWindow() != nullptr && &vp == GetMainWindow()->viewport.get()) return true;
 	const Vehicle *v = CheckClickOnVehicle(vp, x, y);
 
 	if (_thd.place_mode & HT_VEHICLE) {
@@ -12425,14 +12435,38 @@ struct CabVertex {
 	double sx, sy, iw, uw, vw;
 };
 
-/** The eye. */
+/**
+ * The eye. It looks along the level direction fx, fy, tipped down by its pitch (sp, cp): 0, 1 for the eyes of the
+ * walker and of a cab, which look up and down by moving the horizon (cy, the picture sheared, upright lines upright);
+ * tipped for real only by the camera going round a place over the map (T3 of test4: from over the roofs down to the
+ * side), which looks straight down at most. Tipped, "forward" of the eye's frame (CabPoint::f) is along the tipped
+ * look and "up" across it, so the near plane and the depth are the tipped eye's; EyeHorizonY() is where the level is.
+ */
 struct CabEye {
 	double x, y, z;  ///< world position (z in the game's units)
-	double fx, fy;   ///< the direction looked along
+	double fx, fy;   ///< the direction looked along, level
 	double rx, ry;   ///< the direction to the right
 	double focal;    ///< pixels: a unit across at a unit of depth
-	double cx, cy;   ///< the middle of the picture: the horizon is at cy
+	double cx, cy;   ///< the middle of the picture: the horizon is at cy when the eye is not tipped
+	double sp = 0;   ///< the sine of how far the look is tipped down, 0 level
+	double cp = 1;   ///< and its cosine
 };
+
+/** The row of the picture the level is at (the horizon): cy, tipped down higher; above the picture (-1e9) looking straight down. */
+static inline double EyeHorizonY(const CabEye &eye)
+{
+	if (eye.sp == 0) return eye.cy;
+	if (eye.cp < 1e-3) return -1e9;
+	return eye.cy - eye.focal * eye.sp / eye.cp;
+}
+
+/**
+ * Whether a tile's middle might be in the picture, for the tiles collected about the eye: level, ahead within the field
+ * of view and the reach (with a margin, as always); tipped, about the ground the tipped look sees (its middle at the
+ * tile's height, so many units round, against the field of view both ways).
+ * @param f[out] how far ahead it is (to sort and to grade by)
+ */
+static inline bool EyeTileAhead(const CabEye &eye, double x, double y, int height, double &f);
 
 /** A sprite drawn into a texture for a billboard or a box. */
 struct CabTexture {
@@ -12448,7 +12482,36 @@ static uint64_t _cab_texture_clock = 0;
 static inline CabPoint CabToEye(const CabEye &eye, double wx, double wy, double wz, double tu, double tv)
 {
 	double dx = wx - eye.x, dy = wy - eye.y;
-	return {dx * eye.fx + dy * eye.fy, dx * eye.rx + dy * eye.ry, (wz - eye.z) * CAB_Z_SCALE, tu, tv};
+	const double f = dx * eye.fx + dy * eye.fy, u = (wz - eye.z) * CAB_Z_SCALE;
+	if (eye.sp == 0) return {f, dx * eye.rx + dy * eye.ry, u, tu, tv};
+	return {f * eye.cp - u * eye.sp, dx * eye.rx + dy * eye.ry, f * eye.sp + u * eye.cp, tu, tv};
+}
+
+/** A point of the eye's frame back to the world (CabToEye() undone): x, y world units, z the game's units of height. */
+static inline void EyeToWorld(const CabEye &eye, double f, double r, double u, double &x, double &y, double &z)
+{
+	const double level = f * eye.cp + u * eye.sp, up = u * eye.cp - f * eye.sp;
+	x = eye.x + level * eye.fx + r * eye.rx;
+	y = eye.y + level * eye.fy + r * eye.ry;
+	z = eye.z + up / CAB_Z_SCALE;
+}
+
+static inline bool EyeTileAhead(const CabEye &eye, double x, double y, int height, double &f)
+{
+	if (eye.sp == 0) {
+		const CabPoint c = CabToEye(eye, x, y, eye.z, 0, 0);
+		f = c.f;
+		if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE) return false;
+		return std::abs(c.r) <= c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE;
+	}
+	const int tx = std::clamp(static_cast<int>(x / TILE_SIZE), 0, static_cast<int>(Map::MaxX()));
+	const int ty = std::clamp(static_cast<int>(y / TILE_SIZE), 0, static_cast<int>(Map::MaxY()));
+	const CabPoint c = CabToEye(eye, x, y, TilePixelHeight(TileXY(tx, ty)), 0, 0);
+	f = c.f;
+	const double margin = 3.0 * TILE_SIZE;
+	if (c.f < -margin || c.f > CAB_RANGE_TILES * TILE_SIZE) return false;
+	const double ahead = std::max(c.f, 0.0);
+	return std::abs(c.r) <= ahead * (eye.cx + 1) / eye.focal + margin && std::abs(c.u) <= ahead * (std::max(eye.cy, height - eye.cy) + 1) / eye.focal + margin;
 }
 
 /**
@@ -12461,14 +12524,17 @@ static inline CabPoint CabToEye(const CabEye &eye, double wx, double wy, double 
 static std::array<double, 16> EyeClip(const CabEye &eye, int width, int height, double ox, double oy, double oz, double near)
 {
 	const double dx = ox - eye.x, dy = oy - eye.y;
-	const double f0 = dx * eye.fx + dy * eye.fy, r0 = dx * eye.rx + dy * eye.ry, u0 = (oz - eye.z) * CAB_Z_SCALE;
 	const double ax = 2 * eye.cx / width - 1, bx = 2 * eye.focal / width;
 	const double ay = 2 * eye.cy / height - 1, by = 2 * eye.focal / height;
+	/* Ahead (f) and up (u) of the eye's frame, as CabToEye(): per unit of x, y, z from the origin, and at it. */
+	const double f0 = dx * eye.fx + dy * eye.fy, r0 = dx * eye.rx + dy * eye.ry, u0 = (oz - eye.z) * CAB_Z_SCALE;
+	const double fx = eye.fx * eye.cp, fy = eye.fy * eye.cp, fz = -CAB_Z_SCALE * eye.sp, fo = f0 * eye.cp - u0 * eye.sp;
+	const double ux = eye.fx * eye.sp, uy = eye.fy * eye.sp, uz = CAB_Z_SCALE * eye.cp, uo = f0 * eye.sp + u0 * eye.cp;
 	return {
-		ax * eye.fx + bx * eye.rx, ax * eye.fy + bx * eye.ry, 0.0, ax * f0 + bx * r0,
-		ay * eye.fx, ay * eye.fy, -by * CAB_Z_SCALE, ay * f0 - by * u0,
-		-eye.fx, -eye.fy, 0.0, 2 * near - f0,
-		eye.fx, eye.fy, 0.0, f0,
+		ax * fx + bx * eye.rx, ax * fy + bx * eye.ry, ax * fz, ax * fo + bx * r0,
+		ay * fx - by * ux, ay * fy - by * uy, ay * fz - by * uz, ay * fo - by * uo,
+		-fx, -fy, -fz, 2 * near - fo,
+		fx, fy, fz, fo,
 	};
 }
 
@@ -12871,8 +12937,8 @@ static void ClearEyeFrame(EyeFrame &f)
 	uint32_t *dst = f.pixels.data();
 	for (int y = 0; y < f.height && static_cast<size_t>(y + 1) * f.width <= f.pixels.size(); y++) {
 		Colour c;
-		if (y < f.eye.cy) {
-			const double t = y / f.eye.cy;
+		if (const double horizon = EyeHorizonY(f.eye); y < horizon) {
+			const double t = y / horizon;
 			c = Colour(static_cast<uint8_t>(60 + (haze.r - 60) * t), static_cast<uint8_t>(110 + (haze.g - 110) * t), static_cast<uint8_t>(210 + (haze.b - 210) * t));
 		} else {
 			c = Colour(84, 120, 64);
@@ -16424,7 +16490,9 @@ static void EyeSkySeen(const CabEye &eye, double t, double seen, std::vector<Thr
 	/* Where a direction of the sky is on the picture: ahead of the eye only. */
 	auto place = [&](double az, double el, double &sx, double &sy) {
 		const double h = std::cos(el), dx = std::cos(az) * h, dy = std::sin(az) * h;
-		const double f = dx * eye.fx + dy * eye.fy, r = dx * eye.rx + dy * eye.ry, u = std::sin(el);
+		const double level = dx * eye.fx + dy * eye.fy, r = dx * eye.rx + dy * eye.ry, up = std::sin(el);
+		/* The eye tipped down: ahead and up of its frame (CabToEye()). */
+		const double f = level * eye.cp - up * eye.sp, u = level * eye.sp + up * eye.cp;
 		if (f <= 0.05) return false;
 		sx = eye.cx + r * eye.focal / f;
 		sy = eye.cy - u * eye.focal / f;
@@ -16450,8 +16518,9 @@ static void DrawEyeSky(const CabEye &eye, int width, int height, uint32_t *dst, 
 	std::vector<ThreeDGpuEyeStar> stars;
 	std::array<float, 3> moon;
 	EyeSkySeen(eye, t, seen, stars, moon);
+	const double horizon = EyeHorizonY(eye);
 	auto sky = [&](int x, int y) {
-		return x >= 0 && y >= 0 && x < width && y < height && y < eye.cy && zb[static_cast<size_t>(y) * width + x] <= 0.0f;
+		return x >= 0 && y >= 0 && x < width && y < height && y < horizon && zb[static_cast<size_t>(y) * width + x] <= 0.0f;
 	};
 	auto put = [&](int x, int y, Colour c, uint a) {
 		if (!sky(x, y)) return;
@@ -16752,9 +16821,9 @@ static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, floa
 {
 	const double f = 1.0 / iw;
 	const double r = (sx - eye.cx) * f / eye.focal, u = (eye.cy - sy) * f / eye.focal;
-	x = eye.x + f * eye.fx + r * eye.rx;
-	y = eye.y + f * eye.fy + r * eye.ry;
-	zu = eye.z * CAB_Z_SCALE + u;
+	double z;
+	EyeToWorld(eye, f, r, u, x, y, z);
+	zu = z * CAB_Z_SCALE;
 }
 
 /** How far from the eye the buildings cast their shadows, tiles. */
@@ -17293,8 +17362,16 @@ static void DrawEyeFarLand(const CabEye &eye, uint32_t *dst, float *zb, int widt
 	const double ex = eye.x / TILE_SIZE, ey = eye.y / TILE_SIZE;
 	auto visible = [&](int x, int y, int size) {
 		const double half = size * TILE_SIZE / 2.0;
-		CabPoint c = CabToEye(eye, x * TILE_SIZE + half, y * TILE_SIZE + half, eye.z, 0, 0);
 		const double radius = half * std::numbers::sqrt2;
+		if (eye.sp != 0) {
+			/* The eye tipped: the block's middle at its ground's height against the field of view both ways. */
+			const int mx = std::clamp(x + size / 2, 0, static_cast<int>(Map::MaxX())), my = std::clamp(y + size / 2, 0, static_cast<int>(Map::MaxY()));
+			const CabPoint c = CabToEye(eye, x * TILE_SIZE + half, y * TILE_SIZE + half, TilePixelHeight(TileXY(mx, my)), 0, 0);
+			const double ahead = std::max(c.f, 0.0);
+			return c.f > -radius && std::abs(c.r) <= ahead * (eye.cx + 1) / eye.focal + radius + TILE_SIZE &&
+					std::abs(c.u) <= ahead * (std::max(eye.cy, height - eye.cy) + 1) / eye.focal + radius + TILE_SIZE;
+		}
+		CabPoint c = CabToEye(eye, x * TILE_SIZE + half, y * TILE_SIZE + half, eye.z, 0, 0);
 		return c.f > -radius && std::abs(c.r) <= std::max(c.f, 0.0) * CAB_FOV_TAN + radius + TILE_SIZE;
 	};
 	std::function<void(int, int, int)> split = [&](int x, int y, int size) {
@@ -17515,8 +17592,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * eyes (EyeLevelZ()): over the surface, at it, down to the bed. */
 		eye.x = walker->x;
 		eye.y = walker->y;
-		eye.z = walker->swimming ? EyeLevelZ(FirstPersonFeetZ(*walker) + walker->eye_z) : EyeStandZ(walker->x, walker->y, FirstPersonFeetZ(*walker)) + walker->eye_z;
-		if (walker->swimming) {
+		if (walker->fly) {
+			eye.z = walker->eye_z;
+		} else {
+			eye.z = walker->swimming ? EyeLevelZ(FirstPersonFeetZ(*walker) + walker->eye_z) : EyeStandZ(walker->x, walker->y, FirstPersonFeetZ(*walker)) + walker->eye_z;
+		}
+		if (walker->swimming && !walker->fly) {
 			const std::optional<double> surface = EyeWaterSurfaceZ(walker->x, walker->y);
 			under_water = surface.has_value() && FirstPersonFeetZ(*walker) + walker->eye_z < *surface;
 		}
@@ -17626,6 +17707,11 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	 * lines stay upright, as the players of the old shooters knew it). */
 	/* In a cab tipped up a slope, up with it as far as the head looks ahead (turned aside, the slope is across the view). */
 	eye.cy += std::tan(walker != nullptr ? walker->pitch : camera.pitch + (roof ? CAB_ROOF_LOOK : 0.0) + cab_pitch * std::cos(camera.head)) * eye.focal;
+	/* The camera round a place tipped down for real (CabEye::sp): from over the roofs straight down. */
+	if (walker != nullptr && walker->tip != 0) {
+		eye.sp = std::sin(walker->tip);
+		eye.cp = std::cos(walker->tip);
+	}
 	out.eye = eye;
 	out.near_plane = _cab_near;
 
@@ -17638,7 +17724,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		std::vector<TileIndex> near;
 		if (v != nullptr) near.push_back(v->tile);
 		/* The walker in a tunnel, under the land (CabTunnelAround()). */
-		if (walker != nullptr && !walker->swimming) {
+		if (walker != nullptr && !walker->swimming && !walker->fly) {
 			if (const std::optional<CabTunnel> t = CabTunnelAround(walker->x, walker->y, FirstPersonFeetZ(*walker)); t.has_value()) near.push_back(t->a);
 		}
 		if (eye.x >= 0 && eye.y >= 0 && eye.x < Map::SizeX() * TILE_SIZE && eye.y < Map::SizeY() * TILE_SIZE) near.push_back(TileVirtXY(static_cast<int>(eye.x), static_cast<int>(eye.y)));
@@ -17686,16 +17772,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	for (int ty = tcy - CAB_RANGE_TILES; ty <= tcy + CAB_RANGE_TILES; ty++) {
 		for (int tx = tcx - CAB_RANGE_TILES; tx <= tcx + CAB_RANGE_TILES; tx++) {
 			if (!IsInsideBS(tx, 0, Map::SizeX()) || !IsInsideBS(ty, 0, Map::SizeY())) continue;
-			CabPoint c = CabToEye(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, eye.z, 0, 0);
-			if (c.f < -2.0 * TILE_SIZE || c.f > CAB_RANGE_TILES * TILE_SIZE) continue;
-			if (std::abs(c.r) > c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE) continue;
+			double ahead;
+			if (!EyeTileAhead(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, height, ahead)) continue;
 			if (in_tunnel.has_value()) {
 				/* Inside a tunnel the hill over it would stick into the vault. */
 				const CabTunnel &t = *in_tunnel;
 				int along = t.axis == Axis::X ? tx : ty, across = t.axis == Axis::X ? ty : tx;
 				if (across * static_cast<int>(TILE_SIZE) + static_cast<int>(TILE_SIZE) / 2 == static_cast<int>(t.c_mid) && along * TILE_SIZE >= t.s_lo && (along + 1) * TILE_SIZE <= t.s_hi) continue;
 			}
-			tiles.push_back({tx, ty, c.f, SLOPE_FLAT, 0, 0, 0, false, false, 0, {-1, -1}});
+			tiles.push_back({tx, ty, ahead, SLOPE_FLAT, 0, 0, 0, false, false, 0, {-1, -1}});
 		}
 	}
 	camera.tiles = static_cast<int>(tiles.size());
@@ -18351,8 +18436,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		DrawEyeFarLand(eye, dst, zb, width, height, [&](int tx, int ty) {
 			/* As the tiles ahead are chosen (1. above). */
 			if (std::abs(tx - tcx) > CAB_RANGE_TILES || std::abs(ty - tcy) > CAB_RANGE_TILES) return false;
-			CabPoint c = CabToEye(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, eye.z, 0, 0);
-			return c.f >= -2.0 * TILE_SIZE && c.f <= CAB_RANGE_TILES * TILE_SIZE && std::abs(c.r) <= c.f * CAB_FOV_TAN + 3.0 * TILE_SIZE;
+			double ahead;
+			return EyeTileAhead(eye, tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, height, ahead);
 		}, [&](const ThreeDObject *obj, TileIndex origin) {
 			for (const CabObject &co : objects) {
 				if (co.origin == origin) return;
@@ -19005,7 +19090,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double fog_near = under_water ? 0.5 * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
 		const double fog_far = under_water ? EYE_UNDER_WATER_SEEN_M * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.98;
 		const Colour far_haze = under_water ? Colour(24, 72, 92) : Colour(150, 178, 205);
-		const double horizon = under_water ? -1.0 : eye.cy;
+		const double horizon = under_water ? -1.0 : EyeHorizonY(eye);
 		out.Job([width, height, fog_near, fog_far, far_haze, horizon](uint32_t *dst, float *zb) {
 			ParallelRows(height, [&](int lo, int hi) {
 			for (int y = lo; y < hi; y++) {
@@ -19186,7 +19271,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			out.Job([eye, width, height, t, seen](uint32_t *dst, float *zb) { DrawEyeSky(eye, width, height, dst, zb, t, seen); }, [eye, t, seen](EyeCard &card) {
 				ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Sky);
 				EyeSkySeen(eye, t, seen, st.stars, st.moon);
-				st.horizon = static_cast<float>(eye.cy);
+				st.horizon = static_cast<float>(EyeHorizonY(eye));
 				return true;
 			});
 		}
@@ -19346,7 +19431,8 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 	c.height = f.height;
 	c.near_plane = static_cast<float>(f.near_plane);
 	c.eye = {static_cast<float>(f.eye.x), static_cast<float>(f.eye.y), static_cast<float>(f.eye.z), static_cast<float>(f.eye.fx), static_cast<float>(f.eye.fy),
-			static_cast<float>(f.eye.rx), static_cast<float>(f.eye.ry), static_cast<float>(f.eye.focal), static_cast<float>(f.eye.cx), static_cast<float>(f.eye.cy)};
+			static_cast<float>(f.eye.rx), static_cast<float>(f.eye.ry), static_cast<float>(f.eye.focal), static_cast<float>(f.eye.cx), static_cast<float>(f.eye.cy),
+			static_cast<float>(f.eye.sp), static_cast<float>(f.eye.cp)};
 	/* Our grass of the ground (CAB_GRASS): its picture kept on the card, the eye where it is within a run of it. */
 	if (f.grass != nullptr) {
 		static const uint64_t grass_uid = ThreeDUniqueId::Next();
@@ -19362,7 +19448,7 @@ static bool DrawEyeFrameOnCard(EyeFrame &f)
 	}
 	/* Shown straight from the card where the video driver can: not read back (ThreeDGpuShows()). */
 	c.show = ThreeDGpuShows();
-	card.Step(ThreeDGpuEyeStep::Kind::Background).horizon = static_cast<float>(f.eye.cy);
+	card.Step(ThreeDGpuEyeStep::Kind::Background).horizon = static_cast<float>(EyeHorizonY(f.eye));
 	for (const EyePass &p : f.passes) {
 		if (!p.work) {
 			card.Triangles(p.triangles);
@@ -19665,4 +19751,27 @@ bool DrawCabView(const Vehicle *v, int width, int height, CabViewCamera &camera,
 bool DrawFirstPersonView(const FirstPersonEye &walker, int width, int height, CabViewCamera &camera, CabViewPicture &out)
 {
 	return EyeView(nullptr, &walker, width, height, camera, out);
+}
+
+/**
+ * The view of the camera going round a place over the map (orbit_view.cpp): from so far off, tipped so far down, looking
+ * at the place along the level direction; never lower than two metres over the ground under it.
+ * @param x,y,z the place, world units (z the game's units of height, its ground)
+ * @param heading radians, the level direction the camera looks along (atan2 of its y, x)
+ * @param tip radians it looks down, the place in the middle of the picture
+ * @param distance how far it is from the place, world units
+ */
+bool DrawOrbitView(double x, double y, double z, double heading, double tip, double distance, int width, int height, CabViewCamera &camera, CabViewPicture &out)
+{
+	FirstPersonEye eye;
+	eye.fly = true;
+	eye.tip = tip;
+	eye.heading = heading;
+	const double level = distance * std::cos(tip);
+	eye.x = x - level * std::cos(heading);
+	eye.y = y - level * std::sin(heading);
+	eye.eye_z = EyeStandZ(x, y, z) + distance * std::sin(tip) / CAB_Z_SCALE;
+	const double gx = std::clamp(eye.x, 0.0, Map::MaxX() * static_cast<double>(TILE_SIZE)), gy = std::clamp(eye.y, 0.0, Map::MaxY() * static_cast<double>(TILE_SIZE));
+	eye.eye_z = std::max(eye.eye_z, EyeStandZ(gx, gy, FirstPersonGroundZ(gx, gy)) + 2.0 * OBJECT_HEIGHT_PER_METRE);
+	return EyeView(nullptr, &eye, width, height, camera, out);
 }

@@ -2404,6 +2404,7 @@ void NWidgetViewport::SetupSmallestSize(Window *)
 
 /** Whether the view from the first person covers the map, over the whole screen (first_person_gui.cpp). */
 bool FirstPersonCoversMap();
+bool DrawOrbitViewInto(const Window &main, const Rect &r);
 
 void NWidgetViewport::Draw(const Window *w)
 {
@@ -2412,6 +2413,8 @@ void NWidgetViewport::Draw(const Window *w)
 	/* The map under the view from the first person over the whole screen is not drawn at all (the player, 16. 10.:
 	 * "the big map should stop being drawn while the first person window is open, it need not take the power"):
 	 * the bits of it beside the toolbar and the status bar black. */
+	/* The camera going round a place over the map (orbit_view.cpp): its picture instead of the map. */
+	if (w->window_class == WindowClass::MainWindow && DrawOrbitViewInto(*w, this->GetCurrentRect())) return;
 	if (w->window_class == WindowClass::MainWindow && FirstPersonCoversMap()) {
 		GfxFillRect(this->GetCurrentRect(), PC_BLACK);
 		return;

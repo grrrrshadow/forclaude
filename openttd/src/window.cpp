@@ -47,6 +47,7 @@
 #include "mouse_debug.h"
 #include "map_drag.h"
 #include "three_d.h"
+#include "orbit_view.h"
 
 #include "safeguards.h"
 
@@ -3155,18 +3156,24 @@ void HandleMouseEvents()
 		if (!middle_was) {
 			middle_dragged = false;
 			_cursor.fix_at = true;
-		} else if (_cursor.delta.x != 0) {
-			middle_dragged = true;
-			RotateViewByDrag(-_cursor.delta.x);
+		} else if (_cursor.delta.x != 0 || _cursor.delta.y != 0) {
+			/* Up or down: the second axis, the camera going round the place in the middle of the map (orbit_view.cpp). */
+			if (OrbitTipByDrag(_cursor.delta.x, -_cursor.delta.y)) middle_dragged = true;
+			if (_cursor.delta.x != 0) {
+				middle_dragged = true;
+				RotateViewByDrag(-_cursor.delta.x);
+			}
 		}
 	} else if (middle_was) {
+		OrbitDragEnd();
 		if (!_scrolling_viewport) _cursor.fix_at = false;
 		if (middle_dragged) {
 			middle_clicked = {};
 		} else {
 			auto now = std::chrono::steady_clock::now();
 			if (now - middle_clicked < std::chrono::milliseconds(THREE_D_DOUBLE_CLICK_MS)) {
-				ResetViewYaw();
+				/* On the camera going round a place: the map again, as turned; on the map: facing north. */
+				if (!OrbitDoubleClick()) ResetViewYaw();
 				middle_clicked = {};
 			} else {
 				middle_clicked = now;
