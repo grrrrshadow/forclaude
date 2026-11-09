@@ -87,6 +87,8 @@ struct ThreeDGpuPaint {
 	std::array<float, 3> rust_colour{};
 	float rust_time = 0, rust_ramp = 1;
 	bool rust_gradual = false;                            ///< the grey is when it starts (else how much)
+	const struct ThreeDVehicleRust *rust_pieces = nullptr; ///< the rust of pieces (the mask's red a piece, its green the delay), nullptr none
+	uint8_t rust_variant = 0;                             ///< and the order its pieces rust in (ThreeDVehicleState::rust_variant)
 
 	/** Whether it paints anything. */
 	bool Any() const { return this->detail != nullptr || this->body || this->addon_mask != nullptr || this->tinted || this->rust_mask != nullptr; }

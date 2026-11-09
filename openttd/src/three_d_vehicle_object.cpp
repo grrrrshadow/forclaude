@@ -357,7 +357,12 @@ static int StateStep(const ThreeDVehicleObject *obj, EngineID engine, const Vehi
 {
 	const int step = GrfStateStep(obj, engine, v, image_type);
 	const uint32_t wear = WearCode(obj, v, image_type);
-	return wear == 0 ? step : obj->WornStateOf(step, wear);
+	const int worn = wear == 0 ? step : obj->WornStateOf(step, wear);
+	/* Its pieces of rust in its own order (the player, 9. 11.: "make the chance"; the colleague: "a new vehicle a new
+	 * pattern, an old one keeps its own all its life"): one of THREE_D_RUST_VARIANTS by its number and its year. */
+	if (!obj->rust.Pieces() || v == nullptr || image_type == EngineImageType::Purchase || image_type == EngineImageType::Preview) return worn;
+	const uint32_t seed = static_cast<uint32_t>(v->index.base()) * 2654435761u ^ static_cast<uint32_t>(v->build_year.base()) * 40503u;
+	return obj->RustStateOf(worn, (seed >> 13) % THREE_D_RUST_VARIANTS);
 }
 
 /**
@@ -508,7 +513,14 @@ static float FadeAmount(const ThreeDVehicleObject *obj, int step)
 static float RustTime(const ThreeDVehicleObject *obj, int step)
 {
 	const ThreeDVehicleState *s = StateOf(obj, step);
-	return s != nullptr && !obj->rust.mask_file.empty() ? s->rust : 0.0f;
+	return s != nullptr && obj->rust.Any() ? s->rust : 0.0f;
+}
+
+/** The order of a state's pieces of rust (ThreeDVehicleState::rust_variant): 1 + the vehicle's variant, 0 none. */
+static uint8_t RustVariant(const ThreeDVehicleObject *obj, int step)
+{
+	const ThreeDVehicleState *s = StateOf(obj, step);
+	return s != nullptr ? s->rust_variant : 0;
 }
 
 /**
@@ -1175,9 +1187,15 @@ struct ObjectPaintOfState {
 	const ThreeDObjectTexture *second_mask = nullptr; ///< a tree's second part's mask (its snow, ThreeDVehicleObject::second_paint), nullptr: none painted
 	Colour second_colour;                           ///< and its colour, at the texture's lightness over the first part's
 	float second_start = 255.0f;
+	bool pieces = false;                            ///< the rust of pieces (ThreeDVehicleRust::Pieces()): the mask's red a piece, its green the delay
+	std::array<float, THREE_D_RUST_PIECES> moments{}; ///< and each piece's moment in the vehicle's order (ThreeDVehicleRust::Moments())
+	uint8_t rust_variant = 0;                       ///< that order (ThreeDVehicleState::rust_variant), for the card
 
-	/** @param second_colour a tree's second part's colour its state gives (ThreeDVehicleState::second_colour), 0 none */
-	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour, uint32_t second_colour = 0) : obj(&obj), fade(fade), rust_time(rust_time), level(level)
+	/**
+	 * @param second_colour a tree's second part's colour its state gives (ThreeDVehicleState::second_colour), 0 none
+	 * @param rust_variant the order of its pieces of rust its state gives (ThreeDVehicleState::rust_variant), 0 none
+	 */
+	ObjectPaintOfState(const ThreeDVehicleObject &obj, const ThreeDVehicleShape &shape, int level, float fade, float rust_time, uint32_t paint_colour, uint32_t second_colour = 0, uint8_t rust_variant = 0) : obj(&obj), fade(fade), rust_time(rust_time), level(level)
 	{
 		if (second_colour != 0) {
 			this->second_mask = obj.GetSecondMask(level);
@@ -1193,6 +1211,11 @@ struct ObjectPaintOfState {
 		this->start = paint.start > 0 ? static_cast<float>(paint.start) : 255.0f;
 		this->rust_mask = rust_time > 0 ? obj.GetRustMask(level) : nullptr;
 		this->rust_colour = Colour(obj.rust.target);
+		if (this->rust_mask != nullptr && obj.rust.Pieces()) {
+			this->pieces = true;
+			this->rust_variant = rust_variant;
+			obj.rust.Moments(rust_variant > 0 ? rust_variant - 1u : 0u, this->moments);
+		}
 	}
 
 	/** The paint at u, v of the body's texture over its colour: coloured at the texture's lightness, faded; a tree's second part over it. */
@@ -1240,8 +1263,18 @@ struct ObjectPaintOfState {
 	{
 		if (this->rust_mask == nullptr) return;
 		int rx = std::min(this->rust_mask->w - 1, static_cast<int>(u * this->rust_mask->w)), ry = std::min(this->rust_mask->h - 1, static_cast<int>(v * this->rust_mask->h));
-		float m = Colour(this->rust_mask->px[static_cast<size_t>(ry) * this->rust_mask->w + rx]).r;
+		const Colour at(this->rust_mask->px[static_cast<size_t>(ry) * this->rust_mask->w + rx]);
+		float m = at.r;
 		if (m <= 0) return;
+		if (this->pieces) {
+			/* A piece's: from the moment the vehicle drew for it, later by its delay, all rust in "nabeh". */
+			if (at.r >= THREE_D_RUST_PIECES) return;
+			const float f = std::clamp((this->rust_time - (this->moments[at.r] + this->obj->rust.delay_share * at.g / 255.0f)) / this->obj->rust.ramp, 0.0f, 1.0f);
+			cr += (this->rust_colour.r - cr) * f;
+			cg += (this->rust_colour.g - cg) * f;
+			cb += (this->rust_colour.b - cb) * f;
+			return;
+		}
 		/* Gradual: the value is the moment it starts, from nothing to all rust in "nabeh"; else how much. */
 		float f = this->obj->rust.gradual ? std::clamp((this->rust_time - (m - 1) / 254.0f) / this->obj->rust.ramp, 0.0f, 1.0f) : m / 255.0f * this->rust_time;
 		cr += (this->rust_colour.r - cr) * f;
@@ -1639,7 +1672,7 @@ static bool RasterObject(const ThreeDVehicleObject &obj, float scale, float cam_
 	}
 	/* The paint of the body's texture: a colour by number, faded with age (the colleague's point 6); the rust after
 	 * the paint has faded (the colleague: the paint fades, the rust grows over it). */
-	const ObjectPaintOfState painted(obj, *whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0);
+	const ObjectPaintOfState painted(obj, *whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0, st != nullptr ? st->rust_variant : 0);
 	/* The masks of details in the vehicle's colours of its set (callback 1C1). */
 	const ObjectDetailPaint details(obj, *whole, st, texs.size(), texs);
 	/* The textures an effect is coloured in: those of its material ("barvy"), the texture times the colour. */
@@ -1998,6 +2031,10 @@ static ThreeDGpuPaint GpuPaintOf(const ThreeDVehicleObject &obj, const ThreeDVeh
 		g.rust_time = painted.rust_time;
 		g.rust_ramp = obj.rust.ramp;
 		g.rust_gradual = obj.rust.gradual;
+		if (painted.pieces) {
+			g.rust_pieces = &obj.rust;
+			g.rust_variant = painted.rust_variant;
+		}
 	}
 	return g;
 }
@@ -2175,7 +2212,7 @@ static bool PrepareGpuObject(const ThreeDVehicleObject &obj, const ThreeDVehicle
 			if (i != 0) levels[i] = TextureLevelAt(obj, shape, static_cast<int>(i), p);
 			m.textures[i] = obj.GetTexture(levels[i], static_cast<int>(i));
 		}
-		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0);
+		const ObjectPaintOfState painted(obj, whole, level, fade, rust_time, paint_colour, st != nullptr ? st->second_colour : 0, st != nullptr ? st->rust_variant : 0);
 		const ObjectDetailPaint details(obj, whole, st, std::max<size_t>(1, whole.pngs.size()), m.textures);
 		m.paints.resize(m.textures.size());
 		for (size_t i = 0; i < m.textures.size(); i++) {
@@ -4417,7 +4454,7 @@ const ThreeDObjectTexture *GetThreeDEyeVehicleTexture(const ThreeDVehicleObject 
 		}
 		return keep();
 	}
-	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state));
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state), RustVariant(obj, state));
 	if (painted.mask == nullptr && !painted.whole && painted.rust_mask == nullptr && detail == nullptr) return plain();
 	t.w = raw->w;
 	t.h = raw->h;
@@ -4512,7 +4549,7 @@ bool TryGetThreeDEyeVehiclePaints(const ThreeDVehicleObject *obj, int state, dou
 	}
 	if (state == 0) return !no_wait.Missed();
 	const ThreeDVehicleState *st = obj->State(state);
-	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state));
+	const ObjectPaintOfState painted(*obj, *shape, level, FadeAmount(obj, state), RustTime(obj, state), PaletteColour(obj, state), SecondColour(obj, state), RustVariant(obj, state));
 	const ObjectDetailPaint details(*obj, *shape, st, textures.size(), textures);
 	paints.resize(textures.size());
 	for (size_t i = 0; i < textures.size(); i++) {

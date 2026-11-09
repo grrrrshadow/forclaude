@@ -6927,7 +6927,42 @@ static void ReadThreeDVehicleObjects()
 						obj.rust.gradual = true;
 						obj.rust.ramp = std::clamp(rez.at("postupne").value("nabeh", 0.25f), 0.01f, 1.0f);
 					}
-					if (obj.rust.target == 0) obj.rust.mask_file.clear();
+					/* Its pieces, each vehicle rusting in its own order (the colleague's rust of 15. 10., hra/3d/PROSBA-VOZIDLA-3D.md;
+					 * the player, 9. 11.: "make the chance"): a pixel of piece k starts at the moment the vehicle drew for k between
+					 * its "od" and "do", later by its delay times "zpozdeni_podil", all rust in "nabeh" (ThreeDVehicleRust). */
+					if (rez.contains("kusy") && rez.at("kusy").is_string()) {
+						obj.rust.pieces_file = folder + rez.at("kusy").get<std::string>();
+						if (rez.contains("zpozdeni") && rez.at("zpozdeni").is_string()) obj.rust.delay_file = folder + rez.at("zpozdeni").get<std::string>();
+						obj.rust.delay_share = std::clamp(rez.value("zpozdeni_podil", 0.35f), 0.0f, 1.0f);
+						obj.rust.gradual = true;
+						obj.rust.ramp = std::clamp(rez.value("nabeh", 0.25f), 0.01f, 1.0f);
+						/* "seznam": a file beside (its pieces' list), or the list itself; without it each piece between 0 and 1. */
+						nlohmann::json list = nlohmann::json::array();
+						if (rez.contains("seznam") && rez.at("seznam").is_string()) {
+							const std::vector<uint8_t> text = ReadWholeFile(folder + rez.at("seznam").get<std::string>());
+							try {
+								if (!text.empty()) list = nlohmann::json::parse(text.begin(), text.end());
+							} catch (const nlohmann::json::exception &ex) {
+								Debug(misc, 0, "3D objects: {} rez seznam: {}", obj.name, ex.what());
+							}
+						} else if (rez.contains("seznam") && rez.at("seznam").is_array()) {
+							list = rez.at("seznam");
+						}
+						obj.rust.spans.assign(THREE_D_RUST_PIECES, list.is_array() && !list.empty() ? std::pair<float, float>{-1.0f, -1.0f} : std::pair<float, float>{0.0f, 1.0f});
+						if (list.is_array()) {
+							for (const auto &k : list) {
+								if (!k.is_object() || !k.contains("cislo")) continue;
+								const auto n = ParseIndexNumber(k.at("cislo"));
+								if (!n.has_value() || *n < 1 || *n >= THREE_D_RUST_PIECES) continue;
+								const float from = std::clamp(k.value("od", 0.0f), 0.0f, 1.0f), to = std::clamp(k.value("do", 1.0f), 0.0f, 1.0f);
+								obj.rust.spans[*n] = {from, std::max(from, to)};
+							}
+						}
+					}
+					if (obj.rust.target == 0) {
+						obj.rust.mask_file.clear();
+						obj.rust.pieces_file.clear();
+					}
 				}
 				/* The size as a parameter of its set: each value the scale it draws at; else the game's setting. */
 				if (e.contains("velikost") && e.at("velikost").is_object()) {
@@ -9658,12 +9693,95 @@ bool ThreeDVehicleObject::TextureSize(int index, int &w, int &h) const
 	return ImageSizeOfHead(head, w, h);
 }
 
-/** The rust mask ("rez": "maska") at a level of detail, its grey in the red; nullptr without one. */
+/**
+ * The mask of the pieces of rust of an object ("rez" "kusy", ThreeDVehicleRust::Pieces()), one for all the objects
+ * that have the files: each pixel its piece's number in the red, its delay ("zpozdeni") in the green. Its levels
+ * halved by taking a pixel of each four, not their mean (a piece's number is no amount).
+ * @return nullptr when the pieces cannot be read
+ */
+static ThreeDTextureLevels RustPiecesLevels(const std::string &pieces, const std::string &delay, const ThreeDTextureBytes &of, int finest)
+{
+	static std::map<std::pair<std::string, std::string>, std::weak_ptr<std::vector<ThreeDObjectTexture>>> made_of;
+	const auto key = std::make_pair(pieces, delay);
+	{
+		std::lock_guard lock(_texture_bytes_mutex);
+		auto it = made_of.find(key);
+		if (it != made_of.end()) {
+			if (ThreeDTextureLevels known = it->second.lock(); known != nullptr && HasLevel(*known, finest)) return known;
+		}
+	}
+	const TextureCoverTriangles cover = TextureCover(of);
+	std::vector<ThreeDObjectTexture> k0, d0;
+	const std::vector<uint8_t> kp = ReadWholeFile(pieces);
+	if (!kp.empty()) DecodeTextureLevels(kp, k0, Colour(0, 0, 0).data, false, cover.get());
+	if (k0.empty() || k0[0].w < 1 || k0[0].h < 1) return nullptr;
+	if (!delay.empty()) {
+		const std::vector<uint8_t> dp = ReadWholeFile(delay);
+		if (!dp.empty()) DecodeTextureLevels(dp, d0, Colour(0, 0, 0).data, false, cover.get());
+	}
+	auto made = std::make_shared<std::vector<ThreeDObjectTexture>>();
+	ThreeDObjectTexture top;
+	top.w = k0[0].w;
+	top.h = k0[0].h;
+	top.px.resize(static_cast<size_t>(top.w) * top.h);
+	const ThreeDObjectTexture *d = !d0.empty() && d0[0].w > 0 && d0[0].h > 0 ? &d0[0] : nullptr;
+	for (int y = 0; y < top.h; y++) {
+		for (int x = 0; x < top.w; x++) {
+			const uint32_t k = k0[0].px[static_cast<size_t>(y) * top.w + x];
+			const uint8_t piece = k == 0 ? 0 : Colour(k).r;
+			uint8_t later = 0;
+			if (d != nullptr) {
+				const int dx = std::min(d->w - 1, x * d->w / top.w), dy = std::min(d->h - 1, y * d->h / top.h);
+				const uint32_t z = d->px[static_cast<size_t>(dy) * d->w + dx];
+				later = z == 0 ? 0 : Colour(z).r;
+			}
+			top.px[static_cast<size_t>(y) * top.w + x] = piece == 0 ? 0 : Colour(piece, later, 0, 255).data;
+		}
+	}
+	made->push_back(std::move(top));
+	while (made->back().w > 1 && made->back().h > 1) {
+		const ThreeDObjectTexture &fine = made->back();
+		ThreeDObjectTexture half;
+		half.w = (fine.w + 1) / 2;
+		half.h = (fine.h + 1) / 2;
+		half.px.resize(static_cast<size_t>(half.w) * half.h);
+		for (int y = 0; y < half.h; y++) {
+			for (int x = 0; x < half.w; x++) half.px[static_cast<size_t>(y) * half.w + x] = fine.px[static_cast<size_t>(std::min(fine.h - 1, 2 * y)) * fine.w + std::min(fine.w - 1, 2 * x)];
+		}
+		made->push_back(std::move(half));
+	}
+	DropFinerLevels(*made, finest);
+	std::lock_guard lock(_texture_bytes_mutex);
+	made_of[key] = made;
+	return made;
+}
+
+/**
+ * The moments the pieces of rust start at for a variant (ThreeDVehicleState::rust_variant): piece k's between its "od"
+ * and "do" by a hash of the variant and k, the same each time; a piece without a span never (2).
+ */
+void ThreeDVehicleRust::Moments(uint32_t variant, std::array<float, THREE_D_RUST_PIECES> &moments) const
+{
+	moments.fill(2.0f);
+	for (int k = 1; k < THREE_D_RUST_PIECES && static_cast<size_t>(k) < this->spans.size(); k++) {
+		const auto [from, to] = this->spans[k];
+		if (from < 0) continue;
+		uint32_t h = (variant + 1) * 0x9E3779B1u ^ static_cast<uint32_t>(k) * 0x85EBCA77u;
+		h ^= h >> 16;
+		h *= 0x7FEB352Du;
+		h ^= h >> 15;
+		h *= 0x846CA68Bu;
+		h ^= h >> 16;
+		moments[k] = from + (to - from) * static_cast<float>(h >> 8) / 16777216.0f;
+	}
+}
+
+/** The rust mask ("rez": "maska") at a level of detail, its grey in the red; of pieces ("kusy") their numbers in the red and their delays in the green; nullptr without one. */
 const ThreeDObjectTexture *ThreeDVehicleObject::GetRustMask(int level) const
 {
-	if (this->rust.mask_file.empty()) return nullptr;
+	if (!this->rust.Any()) return nullptr;
 	level = std::max(level, 0);
-	MakeOnce(this, LAZY_RUST_MASK, [this, level] { return this->rust_tried && (this->rust_levels == nullptr || HasLevel(*this->rust_levels, level)); }, [this, level] { return MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
+	MakeOnce(this, LAZY_RUST_MASK, [this, level] { return this->rust_tried && (this->rust_levels == nullptr || HasLevel(*this->rust_levels, level)); }, [this, level] { return this->rust.Pieces() ? RustPiecesLevels(this->rust.pieces_file, this->rust.delay_file, PictureUnder(this->GetShape(), -1), level) : MaskLevelsOfFile(this->rust.mask_file, PictureUnder(this->GetShape(), -1), level); }, [this](ThreeDTextureLevels made) {
 		KeepTexture(this->rust_levels, std::move(made));
 		this->rust_tried = true;
 	});
@@ -10283,6 +10401,37 @@ int ThreeDVehicleObject::WornStateOf(int step, uint32_t wear) const
 	std::lock_guard lock(_lazy_mutex);
 	auto [it, added] = this->worn_steps.emplace(std::make_pair(step, wear), step);
 	if (!added || made.wear == 0) return it->second;
+	this->composed.push_back(std::move(made));
+	it->second = static_cast<int>(this->states.size() + this->composed.size());
+	return it->second;
+}
+
+/**
+ * A state as another but rusting in the order of its pieces a vehicle drew (ThreeDVehicleRust::Pieces(); the player, 9.
+ * 11.: "make the chance"): its variant put in (ThreeDVehicleState::rust_variant), so that its pictures are its own.
+ * Made the first time, a step after its states; as it is where it has not rusted at all.
+ * @param variant the vehicle's of THREE_D_RUST_VARIANTS
+ */
+int ThreeDVehicleObject::RustStateOf(int step, uint32_t variant) const
+{
+	if (!this->rust.Pieces()) return step;
+	variant %= THREE_D_RUST_VARIANTS;
+	{
+		std::lock_guard lock(_lazy_mutex);
+		auto it = this->rust_steps.find({step, variant});
+		if (it != this->rust_steps.end()) return it->second;
+	}
+	ThreeDVehicleState made;
+	bool rusting = false;
+	if (const ThreeDVehicleState *s = this->State(step); s != nullptr && s->rust > 0) {
+		std::lock_guard lock(_lazy_mutex);
+		made = *s;
+		made.rust_variant = static_cast<uint8_t>(1 + variant);
+		rusting = true;
+	}
+	std::lock_guard lock(_lazy_mutex);
+	auto [it, added] = this->rust_steps.emplace(std::make_pair(step, variant), step);
+	if (!added || !rusting) return it->second;
 	this->composed.push_back(std::move(made));
 	it->second = static_cast<int>(this->states.size() + this->composed.size());
 	return it->second;

@@ -421,7 +421,8 @@ constexpr GLenum GL_SYNC_GPU_COMMANDS_COMPLETE = 0x9117;
 	X(void, glUniform4f, (GLint location, GLfloat x, GLfloat y, GLfloat z, GLfloat w)) \
 	X(void, glUniform1i, (GLint location, GLint v)) \
 	X(void, glUniform2i, (GLint location, GLint x, GLint y)) \
-	X(void, glUniform1f, (GLint location, GLfloat v))
+	X(void, glUniform1f, (GLint location, GLfloat v)) \
+	X(void, glUniform1fv, (GLint location, GLsizei count, const GLfloat *value))
 
 /** The functions of OpenGL, of the card's context (only its thread calls them). */
 struct GlFunctions {
@@ -609,7 +610,7 @@ struct GpuProgram {
 	/* The paint (ThreeDGpuPaint). */
 	GLint paint = -1, detail = -1, detail_colours = -1, paint_mask = -1, addon_mask = -1, rust_mask = -1;
 	GLint colour = -1, target = -1, start = -1, fade = -1, addon_colour = -1, addon_start = -1, tint = -1;
-	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1;
+	GLint rust_colour = -1, rust_time = -1, rust_ramp = -1, rust_moments = -1, rust_delay = -1;
 	GLint near_plane = -1; ///< the view from the eyes' nearest (EYE_BUILDING_FRAGMENT)
 	GLint wheels = -1, wheel_count = -1; ///< the view from the eyes' turning wheels (EyeMeshSource())
 	GLint depth_range = -1; ///< the nearness a picture's depths span (MAP_BUILDING_VERTEX)
@@ -853,13 +854,14 @@ uniform vec4 u_glow;
 uniform int u_paint;
 uniform sampler2D u_detail, u_detail_colours, u_paint_mask, u_addon_mask, u_rust_mask;
 uniform vec3 u_colour, u_target, u_addon_colour, u_tint, u_rust_colour;
-uniform float u_start, u_fade, u_addon_start, u_rust_time, u_rust_ramp;
+uniform float u_start, u_fade, u_addon_start, u_rust_time, u_rust_ramp, u_rust_delay;
+uniform float u_rust_moments[64];
 noperspective in vec2 v_uv;
 noperspective in float v_light;
 layout(location = 0) out vec4 o_colour;
 layout(location = 1) out vec4 o_lit;
 
-const int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
+const int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128, PAINT_PIECES = 256;
 
 /* A mask's red, 0-255, at the texel's middle (u, v of the texture). */
 float MaskAt(sampler2D m, vec2 uv)
@@ -935,7 +937,17 @@ vec3 Paint(vec3 c, vec2 uv)
 		}
 	}
 	if ((u_paint & PAINT_TINT) != 0) c = c * u_tint / 255.0;
-	if ((u_paint & PAINT_RUST) != 0) {
+	if ((u_paint & PAINT_PIECES) != 0) {
+		/* The rust of pieces (ThreeDVehicleRust::Pieces()): the mask's red the piece, its green the delay; the piece's
+		 * moment the vehicle's own (u_rust_moments). */
+		ivec2 rs = textureSize(u_rust_mask, 0);
+		vec4 kd = texelFetch(u_rust_mask, min(ivec2(uv * vec2(rs)), rs - 1), 0);
+		int k = int(floor(kd.r * 255.0 + 0.5));
+		if (k > 0 && k < 64) {
+			float f = clamp((u_rust_time - (u_rust_moments[k] + u_rust_delay * floor(kd.g * 255.0 + 0.5) / 255.0)) / u_rust_ramp, 0.0, 1.0);
+			c += (u_rust_colour - c) * f;
+		}
+	} else if ((u_paint & PAINT_RUST) != 0) {
 		float m = MaskAt(u_rust_mask, uv);
 		if (m > 0.0) {
 			float f = (u_paint & PAINT_GRADUAL) != 0 ? clamp((u_rust_time - (m - 1.0) / 254.0) / u_rust_ramp, 0.0, 1.0) : m / 255.0 * u_rust_time;
@@ -2601,6 +2613,8 @@ bool MakeProgram(GpuProgram &p, const char *vertex, const char *fragment, std::s
 	p.rust_colour = gl.glGetUniformLocation(p.program, "u_rust_colour");
 	p.rust_time = gl.glGetUniformLocation(p.program, "u_rust_time");
 	p.rust_ramp = gl.glGetUniformLocation(p.program, "u_rust_ramp");
+	p.rust_moments = gl.glGetUniformLocation(p.program, "u_rust_moments");
+	p.rust_delay = gl.glGetUniformLocation(p.program, "u_rust_delay");
 	p.near_plane = gl.glGetUniformLocation(p.program, "u_near");
 	p.wheels = gl.glGetUniformLocation(p.program, "u_wheels");
 	p.wheel_count = gl.glGetUniformLocation(p.program, "u_wheel_count");
@@ -3178,7 +3192,7 @@ static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, con
 		gl.glUniform1i(program.paint, 0);
 		return;
 	}
-	constexpr int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128;
+	constexpr int PAINT_DETAIL = 1, PAINT_BODY = 2, PAINT_MASK = 4, PAINT_COLOURED = 8, PAINT_ADDON = 16, PAINT_TINT = 32, PAINT_RUST = 64, PAINT_GRADUAL = 128, PAINT_PIECES = 256;
 	int bits = 0;
 	if (pc->detail != 0) bits |= PAINT_DETAIL;
 	if (paint->body) bits |= PAINT_BODY;
@@ -3188,6 +3202,7 @@ static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, con
 	if (paint->tinted) bits |= PAINT_TINT;
 	if (pc->rust_mask != 0) bits |= PAINT_RUST;
 	if (paint->rust_gradual) bits |= PAINT_GRADUAL;
+	if (pc->rust_mask != 0 && paint->rust_pieces != nullptr) bits |= PAINT_PIECES;
 	gl.glUniform1i(program.paint, bits);
 	gl.glUniform3f(program.colour, paint->colour[0], paint->colour[1], paint->colour[2]);
 	gl.glUniform3f(program.target, paint->target[0], paint->target[1], paint->target[2]);
@@ -3199,6 +3214,13 @@ static void SetPaint(const GpuProgram &program, const ThreeDGpuPaint *paint, con
 	gl.glUniform3f(program.rust_colour, paint->rust_colour[0], paint->rust_colour[1], paint->rust_colour[2]);
 	gl.glUniform1f(program.rust_time, paint->rust_time);
 	gl.glUniform1f(program.rust_ramp, paint->rust_ramp);
+	if ((bits & PAINT_PIECES) != 0) {
+		/* The moments of the vehicle's pieces of rust, in its order (ThreeDVehicleRust::Moments()). */
+		std::array<float, THREE_D_RUST_PIECES> moments;
+		paint->rust_pieces->Moments(paint->rust_variant > 0 ? paint->rust_variant - 1u : 0u, moments);
+		gl.glUniform1fv(program.rust_moments, THREE_D_RUST_PIECES, moments.data());
+		gl.glUniform1f(program.rust_delay, paint->rust_pieces->delay_share);
+	}
 	const GLuint units[5] = {pc->detail, pc->detail_colours, pc->paint_mask, pc->addon_mask, pc->rust_mask};
 	for (int k = 0; k < 5; k++) {
 		if (units[k] == 0) continue;
@@ -5114,7 +5136,8 @@ static bool SamePaint(const ThreeDGpuPaint &a, const ThreeDGpuPaint &b)
 			a.coloured == b.coloured && a.colour == b.colour && a.target == b.target && a.start == b.start && a.fade == b.fade &&
 			a.addon_mask == b.addon_mask && a.addon_colour == b.addon_colour && a.addon_start == b.addon_start &&
 			a.tinted == b.tinted && a.tint == b.tint && a.rust_mask == b.rust_mask && a.rust_colour == b.rust_colour &&
-			a.rust_time == b.rust_time && a.rust_ramp == b.rust_ramp && a.rust_gradual == b.rust_gradual;
+			a.rust_time == b.rust_time && a.rust_ramp == b.rust_ramp && a.rust_gradual == b.rust_gradual &&
+			a.rust_pieces == b.rust_pieces && a.rust_variant == b.rust_variant;
 }
 
 /** What the objects of the view from the eyes need on the card put there: false, something it cannot hold. */

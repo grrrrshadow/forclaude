@@ -616,15 +616,33 @@ struct ThreeDVehiclePaint {
 	int start = 0;              ///< "zacatek": the texture's lightness the colour is at its own (0: the brightest of the mask)
 };
 
+/** How many pieces of rust an object may have ("rez" "kusy"): the pieces 1 to 63, a pixel of another never rusts. */
+static constexpr int THREE_D_RUST_PIECES = 64;
+/** How many orders of its pieces of rust an object's vehicles rust in (ThreeDVehicleState::rust_variant): each vehicle one by its number and year. */
+static constexpr uint32_t THREE_D_RUST_VARIANTS = 64;
+
 /**
  * The rust of a vehicle object ("rez", the colleague's hra/3d/PROSBA-VOZIDLA-3D.md): a second grey mask of the body's
- * texture's layout, its pixels rusting to a colour with age, over the faded paint.
+ * texture's layout, its pixels rusting to a colour with age, over the faded paint. Or its pieces (the colleague's rust
+ * of 15. 10.; the player, 9. 11.: "make the chance"): a mask of the pieces each pixel is of, a mask of how much later
+ * within its piece a pixel starts, each piece's span of moments; every vehicle draws the moments of its pieces (its
+ * variant, ThreeDVehicleState::rust_variant), so each rusts in its own order.
  */
 struct ThreeDVehicleRust {
 	std::string mask_file;      ///< "maska"
 	uint32_t target = 0;        ///< "cil": the rust's colour (Colour::data)
 	bool gradual = false;       ///< "postupne": a pixel's value is the moment it starts rusting (1 at once, 255 at the end of "let", 0 never), else how much it rusts
 	float ramp = 0.25f;         ///< "postupne": "nabeh", the share of "let" a pixel takes from bare to all rust
+	std::string pieces_file;    ///< "kusy": a grey mask of the body's layout, each pixel the number of its piece (0 never rusts)
+	std::string delay_file;     ///< "zpozdeni": how much later within its piece a pixel starts, 0-255 for 0 to delay_share
+	float delay_share = 0.35f;  ///< "zpozdeni_podil"
+	std::vector<std::pair<float, float>> spans; ///< "seznam": by a piece's number its "od" and "do", the shares of the rust's time its moment is drawn between; empty none
+
+	/** Whether it rusts at all. */
+	bool Any() const { return !this->mask_file.empty() || !this->pieces_file.empty(); }
+	/** Whether it rusts in pieces, each vehicle in its own order. */
+	bool Pieces() const { return !this->pieces_file.empty(); }
+	void Moments(uint32_t variant, std::array<float, THREE_D_RUST_PIECES> &moments) const;
 };
 
 /**
@@ -729,6 +747,8 @@ struct ThreeDVehicleState {
 	 */
 	uint32_t wear = 0;
 	std::vector<ThreeDWearBoard> wear_boards; ///< and the boards of it, where they lie (ThreeDWear::Boards())
+	/** The order its pieces of rust rust in (ThreeDVehicleRust::Pieces()): 1 + the vehicle's variant, 0 none. Not of the index: the game puts the vehicle's own into the state it draws (ThreeDVehicleObject::RustStateOf()). */
+	uint8_t rust_variant = 0;
 	static constexpr uint8_t GIVEN_COLOUR = 1, GIVEN_FADE = 2, GIVEN_RUST = 4, GIVEN_TURN = 8;
 };
 
@@ -943,6 +963,7 @@ struct ThreeDVehicleObject {
 	int crew_record_part = 0; ///< the part of the record's own crew ("posadka" of the record), shown but where the state stands empty; 0 none (always drawn)
 	mutable std::map<int, int> empty_steps; ///< the step of each state standing empty (EmptyStateOf()), made the first time
 	mutable std::map<std::pair<int, uint32_t>, int> worn_steps; ///< the step of each state worn (WornStateOf()), by the state and its wear
+	mutable std::map<std::pair<int, uint32_t>, int> rust_steps; ///< the step of each state rusting in a vehicle's order of its pieces (RustStateOf()), by the state and the variant
 	mutable std::map<std::pair<uint64_t, uint64_t>, std::shared_ptr<const ThreeDWear>> wear_spots; ///< where it wears (Wear()), by the parts its state shows, found the first time it is drawn worn so
 	std::vector<ThreeDVehicleAddon> addons;  ///< "doplnky"
 	std::vector<std::string> part_names;     ///< the parts the states show: each add-on's nodes ("<soubor>/<uzel>"), then the crew's groups ("posadky/<jmeno>"); part n is bit n of a state's parts
@@ -1055,6 +1076,7 @@ struct ThreeDVehicleObject {
 	int StateNamed(std::string_view set) const;
 	int EmptyStateOf(int step) const;
 	int WornStateOf(int step, uint32_t wear) const;
+	int RustStateOf(int step, uint32_t variant) const;
 	const ThreeDWear *Wear(const ThreeDParts &parts) const;
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const;
