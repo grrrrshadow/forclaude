@@ -2746,6 +2746,68 @@ static Colour OurGrassAt(const ThreeDObjectTexture &level, int tiles, double wx,
 }
 
 /**
+ * How the game's grass is lit at each pixel of a picture (t, tw x th pixels) on a slope: its sprite SPR_FLAT_GRASS_TILE
+ * + slope_offset at x, y drawn there, its lightness blurred over two of its pixels each way (it is dithered), against
+ * the game's flat grass (fit_light) -- our grass lit so (DrawOurGrass(), DrawOurGrassVerges()); 1 where it has no pixel.
+ */
+static std::vector<float> OurGrassLight(const DrawPixelInfo &t, int tw, int th, int x, int y, uint slope_offset, double fit_light)
+{
+	std::vector<uint32_t> lit(static_cast<size_t>(tw) * th, 0);
+	{
+		DrawPixelInfo l = t;
+		l.dst_ptr = lit.data();
+		AutoRestoreBackup dpi_backup(_cur_dpi, &l);
+		DrawSpriteViewport(SPR_FLAT_GRASS_TILE + slope_offset, PAL_NONE, x, y, nullptr);
+	}
+	const int s = ScaleByZoom(1, t.zoom);
+	const int blur = std::max(1, 2 * static_cast<int>(ZOOM_BASE) / s);
+	/* Sums over the rect up to each pixel. */
+	std::vector<uint32_t> sum_l(static_cast<size_t>(tw + 1) * (th + 1), 0), sum_n(static_cast<size_t>(tw + 1) * (th + 1), 0);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const uint32_t p = lit[static_cast<size_t>(j) * tw + i];
+			const Colour c(p);
+			const uint32_t has = (p >> 24) != 0 ? 1 : 0;
+			const size_t at = static_cast<size_t>(j + 1) * (tw + 1) + (i + 1);
+			sum_l[at] = (has != 0 ? (c.r * 77 + c.g * 150 + c.b * 29) >> 8 : 0) + sum_l[at - 1] + sum_l[at - (tw + 1)] - sum_l[at - (tw + 1) - 1];
+			sum_n[at] = has + sum_n[at - 1] + sum_n[at - (tw + 1)] - sum_n[at - (tw + 1) - 1];
+		}
+	}
+	auto box = [&](const std::vector<uint32_t> &sum, int i0, int j0, int i1, int j1) {
+		return sum[static_cast<size_t>(j1) * (tw + 1) + i1] - sum[static_cast<size_t>(j0) * (tw + 1) + i1] - sum[static_cast<size_t>(j1) * (tw + 1) + i0] + sum[static_cast<size_t>(j0) * (tw + 1) + i0];
+	};
+	std::vector<float> light(static_cast<size_t>(tw) * th, 1.0f);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const int i0 = std::max(0, i - blur), j0 = std::max(0, j - blur), i1 = std::min(tw, i + blur + 1), j1 = std::min(th, j + blur + 1);
+			const uint32_t n = box(sum_n, i0, j0, i1, j1);
+			if (n != 0) light[static_cast<size_t>(j) * tw + i] = static_cast<float>(std::clamp(box(sum_l, i0, j0, i1, j1) / static_cast<double>(n) / fit_light, 0.35, 1.7));
+		}
+	}
+	return light;
+}
+
+/**
+ * The world point the middle of a pixel (i, j) of a picture t shows on a tile's ground: from the view's coordinates,
+ * its height found by going up and down the slope a few times (RemapCoords() backwards).
+ */
+static std::array<double, 2> GroundWorldPoint(const DrawPixelInfo &t, int i, int j, int tile_x, int tile_y, int base_z, Slope slope)
+{
+	const int s = ScaleByZoom(1, t.zoom);
+	const double vx = t.left + i * s + s / 2.0, vy = t.top + j * s + s / 2.0;
+	const double a = vx / (2.0 * ZOOM_BASE), b = vy / ZOOM_BASE;
+	double z = base_z, wx = 0, wy = 0;
+	for (int k = 0; k < 3; k++) {
+		wx = (b + z - a) / 2;
+		wy = (b + z + a) / 2;
+		const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+		const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
+		z = base_z + GetPartialPixelZ(fx, fy, slope);
+	}
+	return {wx, wy};
+}
+
+/**
  * The game's ground of a tile drawn as our grass into the picture being drawn (_cur_dpi, the ground facing north):
  * the sprite's pixels, of our picture at the world points they show -- the same at every edge, so that it runs on over
  * the tiles and their slopes --, tinted to the mean of the sprite's kind as the game draws it flat (bare land brown,
@@ -2779,7 +2841,7 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 	if (tw <= 0 || th <= 0) return;
 	/* The sprite as the game draws it, on its own (where it has pixels), and the game's grass on that slope (its light:
 	 * not the bumps of rough land nor the clods of bare land). */
-	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0), lit(static_cast<size_t>(tw) * th, 0);
+	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0);
 	DrawPixelInfo t{};
 	t.left = d->left + px0 * s;
 	t.top = d->top + py0 * s;
@@ -2791,25 +2853,8 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
 		t.dst_ptr = own.data();
 		DrawSpriteViewport(image, pal, x, y, nullptr);
-		t.dst_ptr = lit.data();
-		DrawSpriteViewport(SPR_FLAT_GRASS_TILE + ground.slope, PAL_NONE, x, y, nullptr);
 	}
-	/* Its light blurred over two of its pixels each way (it is dithered), as sums over the rect up to each pixel. */
-	const int blur = std::max(1, 2 * static_cast<int>(ZOOM_BASE) / s);
-	std::vector<uint32_t> sum_l(static_cast<size_t>(tw + 1) * (th + 1), 0), sum_n(static_cast<size_t>(tw + 1) * (th + 1), 0);
-	for (int j = 0; j < th; j++) {
-		for (int i = 0; i < tw; i++) {
-			const uint32_t p = lit[static_cast<size_t>(j) * tw + i];
-			const Colour c(p);
-			const uint32_t has = (p >> 24) != 0 ? 1 : 0;
-			const size_t at = static_cast<size_t>(j + 1) * (tw + 1) + (i + 1);
-			sum_l[at] = (has != 0 ? (c.r * 77 + c.g * 150 + c.b * 29) >> 8 : 0) + sum_l[at - 1] + sum_l[at - (tw + 1)] - sum_l[at - (tw + 1) - 1];
-			sum_n[at] = has + sum_n[at - 1] + sum_n[at - (tw + 1)] - sum_n[at - (tw + 1) - 1];
-		}
-	}
-	auto box = [&](const std::vector<uint32_t> &sum, int i0, int j0, int i1, int j1) {
-		return sum[static_cast<size_t>(j1) * (tw + 1) + i1] - sum[static_cast<size_t>(j0) * (tw + 1) + i1] - sum[static_cast<size_t>(j1) * (tw + 1) + i0] + sum[static_cast<size_t>(j0) * (tw + 1) + i0];
-	};
+	const std::vector<float> lit = OurGrassLight(t, tw, th, x, y, ground.slope, fit.light);
 	/* The level of our picture: on the map a texel or two to a pixel (a side of a tile is 36 pixels long at the normal
 	 * zoom). From the eyes none: the card colours its pixels from it (CAB_GRASS). */
 	const ThreeDObjectTexture &level = OurGrassLevel(grass, 36.0 * ZOOM_BASE / s);
@@ -2823,28 +2868,15 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 			if ((p >> 24) == 0) continue;
 			uint32_t &out = static_cast<uint32_t *>(d->dst_ptr)[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)];
 			/* Lit as the game's grass is there. */
-			const int i0 = std::max(0, i - blur), j0 = std::max(0, j - blur), i1 = std::min(tw, i + blur + 1), j1 = std::min(th, j + blur + 1);
-			const uint32_t n = box(sum_n, i0, j0, i1, j1);
-			const double light = n == 0 ? 1.0 : std::clamp(box(sum_l, i0, j0, i1, j1) / static_cast<double>(n) / fit.light, 0.35, 1.7);
+			const double light = lit[static_cast<size_t>(j) * tw + i];
 			if (eyes) {
 				/* From the eyes no colour: which tint, how lit (THREE_D_GPU_GRASS); the card (or CabGrassTexel()) colours it
 				 * from our picture at the world point each pixel of the view shows, however near. */
 				out = Colour(static_cast<uint8_t>(kind), static_cast<uint8_t>(std::clamp<long>(std::lround(light * 128), 0, 255)), 0, THREE_D_GPU_GRASS).data;
 				continue;
 			}
-			/* The world point the pixel shows, on the tile's slope: from the view's coordinates, its height found by going
-			 * up and down the slope a few times (RemapCoords() backwards). */
-			const double vx = t.left + i * s + s / 2.0, vy = t.top + j * s + s / 2.0;
-			const double a = vx / (2.0 * ZOOM_BASE), b = vy / ZOOM_BASE;
-			double z = base_z, wx = 0, wy = 0;
-			for (int k = 0; k < 3; k++) {
-				wx = (b + z - a) / 2;
-				wy = (b + z + a) / 2;
-				const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-				const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-				z = base_z + GetPartialPixelZ(fx, fy, slope);
-			}
-			out = OurGrassAt(level, grass.tiles, wx, wy, tint, light).data;
+			const std::array<double, 2> w = GroundWorldPoint(t, i, j, tile_x, tile_y, base_z, slope);
+			out = OurGrassAt(level, grass.tiles, w[0], w[1], tint, light).data;
 		}
 	}
 }
@@ -2856,6 +2888,119 @@ struct EyeRoadSprite {
 	int x, y;
 	const SubSprite *sub;
 };
+
+/** Whether a pixel is a green of a set's own colours (its 32bpp verges: not of the palette's, GrassVergeKinds()). */
+static bool GreenPixel(uint32_t p)
+{
+	const Colour c(p);
+	return c.g >= c.r + 12 && c.g >= c.b + 12;
+}
+
+/**
+ * Which pixels of a tile's ground sprites (drawn into own, the picture t) are the grass of its verges (the player,
+ * test3: "around the tracks and the roads the green will be our 3D grass ... it is the ground, there is no grass on
+ * it"; "the same missing edges as at the roads and the railway"): those the bare land's recolouring changes -- the
+ * palette's colours of the grass: drawn again with it, or without it where the road is on bare land --, and of a set's
+ * 32bpp sprites without the palette's colours its greens.
+ * @return each pixel's kind of our grass (OurGrassGround: 0 bare land, 3 grass), -1 none
+ */
+static std::vector<int8_t> GrassVergeKinds(std::span<const EyeRoadSprite> sprites, const DrawPixelInfo &t, const std::vector<uint32_t> &own)
+{
+	std::vector<uint32_t> alt(own.size(), 0);
+	bool bare = false;
+	{
+		DrawPixelInfo a = t;
+		a.dst_ptr = alt.data();
+		AutoRestoreBackup dpi_backup(_cur_dpi, &a);
+		for (const EyeRoadSprite &e : sprites) {
+			const bool on_bare = e.pal == PALETTE_TO_BARE_LAND;
+			bare |= on_bare;
+			DrawSpriteViewport(e.image, on_bare ? PAL_NONE : (e.pal == PAL_NONE ? PALETTE_TO_BARE_LAND : e.pal), e.x, e.y, e.sub);
+		}
+	}
+	std::vector<int8_t> kinds(own.size(), -1);
+	for (size_t i = 0; i < own.size(); i++) {
+		if ((own[i] >> 24) == 0) continue;
+		if (alt[i] != own[i] || GreenPixel(own[i])) kinds[i] = bare ? 0 : 3;
+	}
+	return kinds;
+}
+
+/** Whether a tile's ground has verges of grass our grass covers (DrawOurGrassVerges()): a road's, a level crossing's. */
+static bool VergeTile(int x, int y)
+{
+	if (!IsInsideBS(x, 0, Map::SizeX()) || !IsInsideBS(y, 0, Map::SizeY())) return false;
+	const TileIndex tile = TileXY(x, y);
+	return IsTileType(tile, TileType::Road) && (IsNormalRoad(tile) || IsLevelCrossing(tile));
+}
+
+/**
+ * The ground of a tile of verges (a road's, a level crossing's; VergeTile()) drawn into the picture being drawn: its
+ * sprites as the game draws them, the grass of their verges (GrassVergeKinds()) ours -- on the map of its colours at the
+ * world point a pixel shows, from the eyes marked (THREE_D_GPU_GRASS), lit as the game's grass is on its slope, as
+ * DrawOurGrass() does the land.
+ */
+static void DrawOurGrassVerges(std::span<const EyeRoadSprite> sprites, bool eyes, int tile_x, int tile_y, int base_z, Slope slope)
+{
+	const OurGrassSurface &grass = OurGrassPicture();
+	const DrawPixelInfo *d = _cur_dpi;
+	if (d == nullptr || sprites.empty()) return;
+	if (grass.picture == nullptr || grass.picture->empty() || grass.picture->front().w < 2) {
+		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+		return;
+	}
+	const int s = ScaleByZoom(1, d->zoom);
+	auto floor_div = [](int a, int b) { return a >= 0 ? a / b : -((-a + b - 1) / b); };
+	int px0 = INT_MAX, py0 = INT_MAX, px1 = INT_MIN, py1 = INT_MIN;
+	for (const EyeRoadSprite &e : sprites) {
+		const Sprite *spr = GetSprite(e.image & SPRITE_MASK, SpriteType::Normal);
+		px0 = std::min(px0, floor_div(e.x + spr->x_offs - d->left, s) - 1);
+		py0 = std::min(py0, floor_div(e.y + spr->y_offs - d->top, s) - 1);
+		px1 = std::max(px1, floor_div(e.x + spr->x_offs + spr->width - d->left + s - 1, s) + 1);
+		py1 = std::max(py1, floor_div(e.y + spr->y_offs + spr->height - d->top + s - 1, s) + 1);
+	}
+	px0 = std::max(px0, 0);
+	py0 = std::max(py0, 0);
+	px1 = std::min(px1, d->width / s);
+	py1 = std::min(py1, d->height / s);
+	const int tw = px1 - px0, th = py1 - py0;
+	if (tw <= 0 || th <= 0) return;
+	std::vector<uint32_t> own(static_cast<size_t>(tw) * th, 0);
+	DrawPixelInfo t{};
+	t.dst_ptr = own.data();
+	t.left = d->left + px0 * s;
+	t.top = d->top + py0 * s;
+	t.width = tw * s;
+	t.height = th * s;
+	t.pitch = tw;
+	t.zoom = d->zoom;
+	{
+		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
+		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
+	}
+	const std::vector<int8_t> kinds = GrassVergeKinds(sprites, t, own);
+	const OurGrassFit &fit = OurGrassFitOf(grass.picture);
+	const std::vector<float> lit = OurGrassLight(t, tw, th, sprites.front().x, sprites.front().y, SlopeToSpriteOffset(slope), fit.light);
+	const ThreeDObjectTexture &level = OurGrassLevel(grass, 36.0 * ZOOM_BASE / s);
+	for (int j = 0; j < th; j++) {
+		for (int i = 0; i < tw; i++) {
+			const size_t k = static_cast<size_t>(j) * tw + i;
+			if ((own[k] >> 24) == 0) continue;
+			uint32_t &out = static_cast<uint32_t *>(d->dst_ptr)[static_cast<size_t>(py0 + j) * d->pitch + (px0 + i)];
+			const int kind = kinds[k];
+			if (kind < 0) {
+				out = own[k];
+				continue;
+			}
+			if (eyes) {
+				out = Colour(static_cast<uint8_t>(kind), static_cast<uint8_t>(std::clamp<long>(std::lround(lit[k] * 128), 0, 255)), 0, THREE_D_GPU_GRASS).data;
+				continue;
+			}
+			const std::array<double, 2> w = GroundWorldPoint(t, i, j, tile_x, tile_y, base_z, slope);
+			out = OurGrassAt(level, grass.tiles, w[0], w[1], fit.tint[kind], lit[k]).data;
+		}
+	}
+}
 
 /**
  * Whether the ground of a tile in the view from the eyes is a road's that DrawEyeRoad() smooths: a plain road (not a
@@ -2890,8 +3035,9 @@ static bool EyeRoadTile(int x, int y)
  * @param base_z,slope the height of the lowest corner of its ground, and its slope (on a foundation its top's)
  * @param marks its straight marks added to it
  * @param smooth the surface smoothed here: the processor draws (no card)
+ * @param grass its verges our grass (OurGrassOn(); GrassVergeKinds(), marked THREE_D_GPU_GRASS as DrawOurGrassVerges())
  */
-static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int tile_y, int base_z, Slope slope, std::vector<EyeRoadMark> &marks, bool smooth)
+static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int tile_y, int base_z, Slope slope, std::vector<EyeRoadMark> &marks, bool smooth, bool grass)
 {
 	const DrawPixelInfo *d = _cur_dpi;
 	if (d == nullptr || sprites.empty()) return;
@@ -2923,6 +3069,18 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 		AutoRestoreBackup dpi_backup(_cur_dpi, &t);
 		for (const EyeRoadSprite &e : sprites) DrawSpriteViewport(e.image, e.pal, e.x, e.y, e.sub);
 	}
+	/* Its verges our grass (the player, test3: "around the tracks and the roads the green will be our 3D grass"): which tint,
+	 * how lit, marked for the card (or CabGrassTexel()) as DrawOurGrassVerges() does. */
+	std::vector<int8_t> verge;
+	std::vector<float> verge_lit;
+	if (grass) {
+		verge = GrassVergeKinds(sprites, t, own);
+		verge_lit = OurGrassLight(t, tw, th, sprites.front().x, sprites.front().y, SlopeToSpriteOffset(slope), OurGrassFitOf(OurGrassPicture().picture).light);
+	}
+	auto is_verge = [&](size_t p) { return !verge.empty() && verge[p] >= 0; };
+	auto verge_mark = [&](size_t p) {
+		return Colour(static_cast<uint8_t>(verge[p]), static_cast<uint8_t>(std::clamp<long>(std::lround(verge_lit[p] * 128), 0, 255)), 0, THREE_D_GPU_GRASS).data;
+	};
 	uint32_t *dst = static_cast<uint32_t *>(d->dst_ptr);
 	const int dw = d->width / s, dh = d->height / s;
 	auto put = [&](int i, int j, uint32_t c) {
@@ -2935,7 +3093,7 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 	std::array<uint32_t, 256> counts{};
 	uint32_t greys = 0;
 	for (size_t i = 0; i < n; i++) {
-		if ((own[i] >> 24) == 0) continue;
+		if ((own[i] >> 24) == 0 || is_verge(i)) continue;
 		const Colour c(own[i]);
 		if (std::max({c.r, c.g, c.b}) - std::min({c.r, c.g, c.b}) >= 32) continue;
 		light[i] = static_cast<int16_t>((c.r * 77 + c.g * 150 + c.b * 29) >> 8);
@@ -2945,7 +3103,8 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 	if (greys == 0) {
 		for (int j = 0; j < th; j++) {
 			for (int i = 0; i < tw; i++) {
-				if ((own[static_cast<size_t>(j) * tw + i] >> 24) != 0) put(i, j, own[static_cast<size_t>(j) * tw + i]);
+				const size_t p = static_cast<size_t>(j) * tw + i;
+				if ((own[p] >> 24) != 0) put(i, j, is_verge(p) ? verge_mark(p) : own[p]);
 			}
 		}
 		return;
@@ -3087,7 +3246,7 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 			const size_t p = at(i, j);
 			if ((own[p] >> 24) == 0) continue;
 			if (light[p] < 0) {
-				put(i, j, own[p]);
+				put(i, j, is_verge(p) ? verge_mark(p) : own[p]);
 				continue;
 			}
 			if (mark_of[p] == -2) {
@@ -3261,8 +3420,10 @@ struct EyeRiverBankTile {
  * @param coast the tile is a coast whose land is our grass (the player, test3: "the banks are bare without our 3D grass"):
  *              its tile, the height and slope of its ground; our grass where it is EYE_COAST_LAND over the water, the
  *              water under it (its sprite's sand and foam, their big pixels, not)
+ * @param colours on the map: a bank's our grass of its colours at the world point a pixel shows (not marked), its edge
+ *                sharp where the eyes have it (their wave between the texels is less than a pixel of the map)
  */
-static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bool mark = true, const EyeRiverBankTile *bank = nullptr, const EyeRiverBankTile *coast = nullptr)
+static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bool mark = true, const EyeRiverBankTile *bank = nullptr, const EyeRiverBankTile *coast = nullptr, bool colours = false)
 {
 	const DrawPixelInfo *d = _cur_dpi;
 	if (d == nullptr || sprites.empty()) return;
@@ -3318,6 +3479,10 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bo
 	};
 	/* A river's or a canal's: its sides by the land (EyeRiverLandSides()). */
 	const uint8_t sides = bank != nullptr ? EyeRiverLandSides(bank->tile_x, bank->tile_y) : 0;
+	/* On the map our grass's picture about a texel or two to a pixel, as DrawOurGrass() has it. */
+	const OurGrassSurface &grass = OurGrassPicture();
+	const bool painted = colours && grass.picture != nullptr && !grass.picture->empty() && grass.picture->front().w >= 2;
+	const ThreeDObjectTexture *grass_level = painted ? &OurGrassLevel(grass, 36.0 * ZOOM_BASE / s) : nullptr;
 	/* How far from the bank's edge a texel shows the edge's wave itself (THREE_D_GPU_BANK_EDGE): a texel is about a third of a unit across. */
 	static constexpr double EDGE_BAND = 0.75;
 	for (int j = 0; j < th; j++) {
@@ -3370,6 +3535,15 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bo
 				/* Within the tile (a pixel of its sprite may show a point a hair over its edge, on the land there). */
 				const double lx = wx - bank->tile_x * static_cast<double>(TILE_SIZE), ly = wy - bank->tile_y * static_cast<double>(TILE_SIZE);
 				const double inside = sides != 0 ? EyeRiverBankInside(lx, ly, wx, wy, sides) : -1e9;
+				if (grass_level != nullptr) {
+					/* On the map: our grass inside the edge, the water past it (the sprite's grass there the water's too). */
+					if (inside > 0 || (sides == 0 && EyeOnRiverBank(wx, wy))) {
+						dst[static_cast<size_t>(y) * d->pitch + x] = OurGrassAt(*grass_level, grass.tiles, wx, wy, OurGrassFitOf(grass.picture).tint[3], 1.0).data;
+					} else {
+						dst[static_cast<size_t>(y) * d->pitch + x] = EyeWaterPixel(p) ? p : water_about(i, j, p);
+					}
+					continue;
+				}
 				if (inside > EDGE_BAND || (sides == 0 && EyeOnRiverBank(wx, wy))) {
 					dst[static_cast<size_t>(y) * d->pitch + x] = Colour(3, 128, 0, THREE_D_GPU_GRASS).data;
 					continue;
@@ -3578,19 +3752,28 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 					std::vector<EyeRoadSprite> road;
 					for (const TurnedGroundSprite &gs : rec->sprites) road.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
 					rec->road_marks.clear();
-					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks, !card_roads);
+					DrawEyeRoad(road, rec->tile_x, rec->tile_y, rec->base_z, rec->slope, rec->road_marks, !card_roads, grass);
 					if (rec->round != INVALID_TILE) round.push_back(rec->round);
 					continue;
 				}
-				/* From the eyes a river's or a canal's bank our grass (EyeOnRiverBank()), whether the water is smoothed or not. */
-				const bool bank = eyes && grass && EyeNarrowWaterTile(rec->tile_x, rec->tile_y);
+				/* A road's or a level crossing's verges our grass (DrawOurGrassVerges()). */
+				if (grass && VergeTile(rec->tile_x, rec->tile_y)) {
+					std::vector<EyeRoadSprite> road;
+					for (const TurnedGroundSprite &gs : rec->sprites) road.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
+					DrawOurGrassVerges(road, eyes, rec->tile_x, rec->tile_y, rec->base_z, rec->slope);
+					if (rec->round != INVALID_TILE) round.push_back(rec->round);
+					continue;
+				}
+				/* A river's or a canal's bank our grass (EyeOnRiverBank()), whether the water is smoothed or not: from the eyes, and
+				 * on the map as the eyes have it (the player, test3: "our 3D grass to the canals and the rivers"). */
+				const bool bank = grass && EyeNarrowWaterTile(rec->tile_x, rec->tile_y);
 				/* And a coast's land (AddOurGrass() its tufts). */
 				const bool coast = eyes && grass && EyeCoastTile(rec->tile_x, rec->tile_y);
 				if ((roads && EyeWaterTile(rec->tile_x, rec->tile_y)) || bank || coast) {
 					std::vector<EyeRoadSprite> water;
 					for (const TurnedGroundSprite &gs : rec->sprites) water.push_back({gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr});
 					const EyeRiverBankTile at{rec->tile_x, rec->tile_y, rec->base_z, rec->slope};
-					DrawEyeWater(water, roads && !card_roads, roads, bank ? &at : nullptr, coast ? &at : nullptr);
+					DrawEyeWater(water, roads && !card_roads, roads, bank ? &at : nullptr, coast ? &at : nullptr, !eyes);
 					continue;
 				}
 				for (const TurnedGroundSprite &gs : rec->sprites) {
@@ -17899,7 +18082,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
 						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
 					}
-					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks, true);
+					DrawEyeRoad(road, t.x, t.y, t.z, t.slope, frame_marks, true, grass);
+					continue;
+				}
+				if (grass && VergeTile(t.x, t.y)) {
+					std::vector<EyeRoadSprite> road;
+					for (size_t i = t.first; i < t.end; i++) {
+						const TileSpriteToDraw &ts = _vd.tile_sprites_to_draw[i];
+						road.push_back({ts.image, ts.pal, ts.x, ts.y, ts.sub});
+					}
+					DrawOurGrassVerges(road, true, t.x, t.y, t.z, t.slope);
 					continue;
 				}
 				const bool bank = grass && EyeNarrowWaterTile(t.x, t.y);
