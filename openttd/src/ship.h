@@ -16,6 +16,8 @@
 
 void GetShipSpriteSize(EngineID engine, uint &width, uint &height, int &xoffs, int &yoffs, EngineImageType image_type);
 WaterClass GetEffectiveWaterClass(TileIndex tile);
+struct Ship;
+void GetShipImageFacing(const Ship *v, Direction direction, VehicleSpriteSeq *result);
 
 /** Element of the ShipPathCache. */
 struct ShipPathElement {

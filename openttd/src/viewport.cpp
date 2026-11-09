@@ -75,6 +75,7 @@
 #include "aircraft.h"
 #include "train.h"
 #include "roadveh.h"
+#include "ship.h"
 #include "timer/timer_game_tick.h"
 #include "vehicle_gui.h"
 #include "blitter/factory.hpp"
@@ -18351,7 +18352,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		if (u->type == VehicleType::Effect || u->direction == Direction::Invalid) {
 			seq = u->sprite_cache.sprite_seq;
 		} else {
-			u->GetImage(static_cast<Direction>((to_underlying(udir) - step) & 7), EngineImageType::OnMap, &seq);
+			if (u->type == VehicleType::Ship) {
+				/* A ship shows the way it is turned (its rotation), its GetImage() on the map nothing else. */
+				GetShipImageFacing(Ship::From(u), static_cast<Direction>((to_underlying(Ship::From(u)->rotation) - step) & 7), &seq);
+			} else {
+				u->GetImage(static_cast<Direction>((to_underlying(udir) - step) & 7), EngineImageType::OnMap, &seq);
+			}
 			if (!seq.IsValid()) seq = u->sprite_cache.sprite_seq;
 		}
 		Point pt = RemapCoords(ux, uy, uz);

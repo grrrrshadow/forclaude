@@ -170,6 +170,27 @@ void Ship::GetImage(Direction direction, EngineImageType image_type, VehicleSpri
 	result->Set(_ship_sprites[spritenum] + to_underlying(direction));
 }
 
+/**
+ * A ship's sprites on the map as if it faced a direction: GetImage() on the map shows the way it is turned (its
+ * rotation) whatever direction is asked, so its 3D likeness made from its eight sprites (three_d_vehicle.cpp) had the
+ * same picture eight times and no likeness at all (the player, 8. 11.: "why are the ships of sprites not 3D like the
+ * cars and the trains"); and the turned view showed it as it stands on the map unturned.
+ * @param v the ship
+ * @param direction the direction its picture is for
+ * @param[out] result the sprites
+ */
+void GetShipImageFacing(const Ship *v, Direction direction, VehicleSpriteSeq *result)
+{
+	uint8_t spritenum = v->spritenum;
+	if (IsCustomVehicleSpriteNum(spritenum)) {
+		GetCustomVehicleSprite(v, direction, EngineImageType::OnMap, result);
+		if (result->IsValid()) return;
+		spritenum = v->GetEngine()->original_image_index;
+	}
+	assert(IsValidImageIndex<VehicleType::Ship>(spritenum));
+	result->Set(_ship_sprites[spritenum] + to_underlying(direction));
+}
+
 static const Depot *FindClosestShipDepot(const Vehicle *v, uint max_distance)
 {
 	const int max_region_distance = (max_distance / WATER_REGION_EDGE_LENGTH) + 1;

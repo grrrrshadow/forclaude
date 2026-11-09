@@ -1416,7 +1416,12 @@ static void DoDrawVehicle(const Vehicle *v)
 		if (AddThreeDVehicleToViewport(v, pal, _cur_dpi->zoom, on_round ? &round_pose : nullptr)) return;
 	}
 	if (step != 0 && turnable) {
-		v->GetImage(static_cast<Direction>((to_underlying(v->direction) - step) & 7), EngineImageType::OnMap, &turned);
+		if (v->type == VehicleType::Ship) {
+			/* A ship shows the way it is turned (its rotation), its GetImage() on the map nothing else. */
+			GetShipImageFacing(Ship::From(v), static_cast<Direction>((to_underlying(Ship::From(v)->rotation) - step) & 7), &turned);
+		} else {
+			v->GetImage(static_cast<Direction>((to_underlying(v->direction) - step) & 7), EngineImageType::OnMap, &turned);
+		}
 		if (turned.IsValid()) seq = &turned;
 	}
 

@@ -60,6 +60,7 @@
 #include "vehicle_func.h"
 #include "train.h"
 #include "roadveh.h"
+#include "ship.h"
 #include "viewport_func.h"
 #include "direction_func.h"
 #include "fileio_type.h"
@@ -411,7 +412,12 @@ static bool PartSprites(const VehiclePart &part, VehicleType type, Direction dir
 	AutoRestoreBackup facing(_resolve_vehicle_direction, dir);
 	if (part.veh != nullptr) {
 		/* A piece on the map: its own sprites, as the map draws them (a flipped engine's, a mirror piece's, the rear head's: all inside). */
-		part.veh->GetImage(dir, EngineImageType::OnMap, &seq);
+		if (part.veh->type == VehicleType::Ship) {
+			/* A ship's GetImage() on the map is the way it is turned, whatever is asked: its picture of each direction. */
+			GetShipImageFacing(Ship::From(part.veh), dir, &seq);
+		} else {
+			part.veh->GetImage(dir, EngineImageType::OnMap, &seq);
+		}
 		return seq.IsValid();
 	}
 	Direction d = (part.mirrored || part.rear) ? ReverseDir(dir) : dir;
