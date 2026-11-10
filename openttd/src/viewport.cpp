@@ -2323,6 +2323,10 @@ struct TurnedTile {
 	int foundation[3];
 	bool building;
 	bool round; ///< its track is drawn as a strip after the ground (round_track.h)
+	/** Drawn over the tiles in front of it: a tunnel's end levelled from the eyes (CabTunnelGround()) lies lower than the
+	 * hill in front of it, whose ground covered its edge in the picture (the player, test5: "a brown strip at the
+	 * joining"). */
+	bool over = false;
 };
 
 /** Pixels of a picture facing north, from the virtual (0, 0) at its zoom; the right and the bottom edge not in it. */
@@ -3607,7 +3611,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		const bool inside = IsInsideBS(t.x, 0, Map::SizeX()) && IsInsideBS(t.y, 0, Map::SizeY());
 		GroundHash hash;
 		hash.Mix(founded);
-		hash.Mix((grass ? 1 : 0) | (roads ? 2 : 0) | (card_roads ? 4 : 0));
+		hash.Mix((grass ? 1 : 0) | (roads ? 2 : 0) | (card_roads ? 4 : 0) | (t.over ? 8 : 0));
 		if (given != nullptr) {
 			for (const TurnedGroundSprite &gs : *given) hash.Sprite(gs.image, gs.pal, gs.x, gs.y, gs.has_sub ? &gs.sub : nullptr);
 		} else if (!founded) {
@@ -3643,7 +3647,7 @@ static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tile
 		rec.area = {};
 		rec.fill = {};
 		rec.round = INVALID_TILE;
-		rec.order = static_cast<uint32_t>(t.x + t.y + 128) << 15 | static_cast<uint32_t>(t.y - t.x + 16384);
+		rec.order = static_cast<uint32_t>(t.x + t.y + 128 + (t.over ? 2 : 0)) << 15 | static_cast<uint32_t>(t.y - t.x + 16384);
 		rec.tile_x = t.x;
 		rec.tile_y = t.y;
 		rec.base_z = t.top_z;
@@ -17987,6 +17991,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		int found[2];    ///< its foundations' parent sprites (_vd.foundation), -1 none
 		bool round = false; ///< its track a round curve, drawn as a strip into the ground (round_track.h)
 		bool own_ground = false; ///< its ground a model's (ThreeDForestPart::whole_ground): the game's ground laid lower under it
+		bool levelled = false;   ///< a tunnel's end levelled (CabTunnelGround()): its ground drawn over the tiles in front of it (TurnedTile::over)
 	};
 	std::vector<CabTile> tiles;
 	int tcx = static_cast<int>(v != nullptr ? v->x_pos : eye.x) / static_cast<int>(TILE_SIZE), tcy = static_cast<int>(v != nullptr ? v->y_pos : eye.y) / static_cast<int>(TILE_SIZE);
@@ -18111,6 +18116,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			CabTunnelGround(_cur_ti.tile, _cur_ti.z);
 			t.end = _vd.tile_sprites_to_draw.size();
 			t.slope = SLOPE_FLAT;
+			t.levelled = true;
 			tunnel_ends.push_back(_cur_ti.tile);
 		}
 		if (ramp) ramps.push_back(_cur_ti.tile);
@@ -18461,6 +18467,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			tt.foundation[2] = -1;
 			tt.building = t.building;
 			tt.round = t.round;
+			tt.over = t.levelled;
 			if (t.found[0] == -1 && t.found[1] == -1) continue;
 			std::vector<TurnedGroundSprite> &on = on_foundations[n];
 			for (size_t i = t.first; i < t.end; i++) {
@@ -18511,7 +18518,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			AutoRestoreBackup dpi_backup(_cur_dpi, &bigdpi);
 			AutoRestoreBackup anim_backup(_screen_disable_anim, true);
 			const bool grass = eye_grass;
-			for (const CabTile &t : tiles) {
+			/* A tunnel's end levelled last, over the tiles in front of it (TurnedTile::over). */
+			std::vector<const CabTile *> in_order;
+			for (const CabTile &t : tiles) if (!t.levelled) in_order.push_back(&t);
+			for (const CabTile &t : tiles) if (t.levelled) in_order.push_back(&t);
+			for (const CabTile *tp : in_order) {
+				const CabTile &t = *tp;
 				if (EyeRoadTile(t.x, t.y)) {
 					std::vector<EyeRoadSprite> road;
 					for (size_t i = t.first; i < t.end; i++) {
