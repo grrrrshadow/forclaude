@@ -11946,13 +11946,31 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_ERROR, "test3d: jizda {} {}: takove vozidlo neni.", *type, *unit);
 	} else if (what == "jizda_na" && argv.size() > 5) {
-		/* 'jizda_na <unit> <x> <y> <yaw>': a road vehicle driven freely put on the middle of a tile at a heading
-		 * (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it. */
+		/* 'jizda_na <unit> <x> <y> <yaw> [lod]': a road vehicle driven freely put on the middle of a tile at a heading
+		 * (CAB_YAW_TURN a turn, 0 along +x): before the end of a bridge, to drive up it; 'lod' a ship (before the portal
+		 * of a tunnel for ships). */
 		auto unit = number(2), x = number(3), y = number(4), yaw = number(5);
+		const bool ship = argv.size() > 6 && argv[6] == "lod";
 		for (Vehicle *u : Vehicle::Iterate()) {
-			if (u->type != VehicleType::Road || !u->IsPrimaryVehicle() || !unit.has_value() || u->unitnumber != static_cast<UnitID>(*unit)) continue;
+			if (u->type != (ship ? VehicleType::Ship : VehicleType::Road) || !u->IsPrimaryVehicle() || !unit.has_value() || u->unitnumber != static_cast<UnitID>(*unit)) continue;
 			AutoRestoreBackup cur_company(_current_company, u->owner);
 			if (!u->cab_free) Command<Commands::CabDrive>::Do(DoCommandFlag::Execute, u->index, 0);
+			if (ship) {
+				Ship *s = Ship::From(u);
+				s->x_pos = static_cast<int>(*x) * TILE_SIZE + TILE_SIZE / 2;
+				s->y_pos = static_cast<int>(*y) * TILE_SIZE + TILE_SIZE / 2;
+				s->tile = TileVirtXY(s->x_pos, s->y_pos);
+				s->z_pos = GetTilePixelZ(s->tile);
+				s->cab_px = s->x_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+				s->cab_py = s->y_pos * CAB_SUBUNIT + CAB_SUBUNIT / 2;
+				s->cab_yaw = static_cast<uint8_t>(yaw.value_or(0) & (CAB_YAW_TURN - 1));
+				s->direction = s->rotation = CabYawToDirection(s->cab_yaw);
+				s->vehstatus.Reset(VehState::Hidden);
+				s->UpdatePosition();
+				s->UpdateViewport(true, true);
+				IConsolePrint(CC_DEFAULT, "test3d: jizda_na lod {}: volne {} na {},{},{} yaw {}", *unit, s->cab_free, s->x_pos, s->y_pos, s->z_pos, s->cab_yaw);
+				return true;
+			}
 			RoadVehicle *v = RoadVehicle::From(u);
 			v->x_pos = static_cast<int>(*x) * TILE_SIZE + TILE_SIZE / 2;
 			v->y_pos = static_cast<int>(*y) * TILE_SIZE + TILE_SIZE / 2;

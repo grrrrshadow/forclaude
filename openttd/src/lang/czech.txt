@@ -6234,6 +6234,8 @@ STR_ERROR_ANOTHER_TUNNEL_IN_THE_WAY                             :{WHITE}V cestě
 STR_ERROR_TUNNEL_THROUGH_MAP_BORDER                             :{WHITE}Tunel by končil mimo mapu
 STR_ERROR_UNABLE_TO_EXCAVATE_LAND                               :{WHITE}Nelze vyrovnat zem na druhém konci tunelu
 STR_ERROR_TUNNEL_TOO_LONG                                       :{WHITE}... tunel je příliš dlouhý
+STR_ERROR_SHIP_CAN_T_ENTER_TUNNEL                               :{WHITE}Loď nemůže vjet do tunelu...
+STR_ERROR_SHIP_TOO_TALL_FOR_TUNNEL                              :{WHITE}... loď je moc vysoká: tunelem projede jen loď vysoká nad vodou nejvýš {NUM} m
 
 # Object related errors
 STR_ERROR_TOO_MANY_OBJECTS                                      :{WHITE}... příliš mnoho objektů

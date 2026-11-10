@@ -24,6 +24,7 @@
 #define CAB_DRIVE_H
 
 #include "direction_type.h"
+#include "tile_type.h"
 
 /** A full turn of a heading driven freely. */
 static constexpr int CAB_YAW_TURN = 128;
@@ -50,6 +51,15 @@ enum class CabDriveOp : uint8_t {
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */
 static constexpr int CAB_SLOWEST = 5;
+
+/**
+ * How far across a tunnel's tube from its middle a vehicle driven freely in it may go, world units: the tube's half
+ * width (6 units, CAB_TUNNEL_HALF of viewport.cpp) less half a car's or a small boat's.
+ */
+static constexpr int CAB_TUBE_REACH = 4;
+
+bool CabInTunnelSpan(TileIndex end, int x, int y);
+int CabTubeAcross(TileIndex end, int x, int y);
 
 /**
  * The cosine of a heading, in 256ths: a unit along it moves this far along x.

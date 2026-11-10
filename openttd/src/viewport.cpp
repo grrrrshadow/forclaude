@@ -3323,13 +3323,13 @@ static bool EyeCoastTile(int x, int y)
 }
 
 /**
- * Whether a tile a step from a canal's (dx, dy, one of them 0) is the end of an aqueduct the canal goes on into: the
- * aqueduct going on the way of the step (the player, test5: "the canal before the aqueduct has the graphic of the
- * canal's end as if it did not go on"). As the game joins them (IsWateredTile()).
+ * Whether a tile a step from a canal's (dx, dy, one of them 0) is the end of an aqueduct or of a tunnel for ships the
+ * canal goes on into: going on the way of the step (the player, test5: "the canal before the aqueduct has the graphic of
+ * the canal's end as if it did not go on"). As the game joins them (IsWateredTile()).
  */
 static bool EyeAqueductInto(TileIndex n, int dx, int dy)
 {
-	if (!IsValidTile(n) || !IsTileType(n, TileType::TunnelBridge) || !IsBridge(n) || GetTunnelBridgeTransportType(n) != TransportType::Water) return false;
+	if (!IsValidTile(n) || !IsTileType(n, TileType::TunnelBridge) || GetTunnelBridgeTransportType(n) != TransportType::Water) return false;
 	if ((dx != 0) == (dy != 0)) return false;
 	const DiagDirection step = dx < 0 ? DiagDirection::NE : dx > 0 ? DiagDirection::SW : dy > 0 ? DiagDirection::SE : DiagDirection::NW;
 	return GetTunnelBridgeDirection(n) == step;
@@ -14057,7 +14057,8 @@ struct CabTunnel {
 	int z;            ///< the height of its floor
 	double s_lo, s_hi; ///< the planes of its portals along the axis, world units
 	double c_mid;     ///< the middle across it, world units
-	bool rail;        ///< a railway tunnel (else a road one)
+	bool rail;        ///< a railway tunnel (else a road one or one for ships)
+	bool water;       ///< a tunnel for ships: water on its floor
 };
 
 /** Half the width of a tunnel's floor, world units. */
@@ -14329,6 +14330,7 @@ static std::optional<CabTunnel> CabTunnelAt(TileIndex tile)
 	t.axis = DiagDirToAxis(GetTunnelBridgeDirection(tile));
 	t.z = GetTilePixelZ(tile);
 	t.rail = GetTunnelBridgeTransportType(tile) == TransportType::Rail;
+	t.water = GetTunnelBridgeTransportType(tile) == TransportType::Water;
 	/* A portal stands on the edge of its end tile towards the other end, where the hill starts. */
 	auto plane = [&](TileIndex end) {
 		DiagDirection d = GetTunnelBridgeDirection(end);
@@ -14477,7 +14479,7 @@ static void ForTunnelLamps(double s0, double s1, F f)
 static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, double s0, double s1)
 {
 	const double step = 4.0;
-	const Colour floor = t.rail ? Colour(92, 84, 74) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
+	const Colour floor = t.rail ? Colour(92, 84, 74) : t.water ? CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160)) : Colour(78, 78, 80), rail(176, 176, 182), lamp(255, 228, 150);
 	/* Our 3D track through it (DrawThreeDTrackTunnel() of rail_cmd.cpp; objekty/nase/koleje.py): its low embankment of
 	 * stones 3.4 m across, the sleepers on it every 0.6 m, the rails at the gauge, their heads 0.37 m over the floor as
 	 * the trains run on them; electrified, the contact wire under the vault's crown (4.4 m: the vault is 4.6 m). */
@@ -14544,7 +14546,7 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 				auto r0 = CabTunnelPoint(t, sa, c - 0.2, 0.6), r1 = CabTunnelPoint(t, sb, c - 0.2, 0.6), r2 = CabTunnelPoint(t, sb, c + 0.2, 0.6), r3 = CabTunnelPoint(t, sa, c + 0.2, 0.6);
 				CabDrawSolid(cv, eye, {r0, r1, r2, r3}, CabShade(rail, std::min(1.0, light * 1.8 + 0.15)));
 			}
-		} else if ((k & 1) == 0) {
+		} else if (!t.water && (k & 1) == 0) {
 			/* The line down the middle of the road. */
 			auto l0 = CabTunnelPoint(t, sa, -0.15, 0.3), l1 = CabTunnelPoint(t, sa + step * 0.5, -0.15, 0.3), l2 = CabTunnelPoint(t, sa + step * 0.5, 0.15, 0.3), l3 = CabTunnelPoint(t, sa, 0.15, 0.3);
 			CabDrawSolid(cv, eye, {l0, l1, l2, l3}, CabShade(Colour(220, 220, 200), std::min(1.0, light * 1.5 + 0.2)));
@@ -16120,6 +16122,9 @@ static void CabTunnelGround(TileIndex tile, int z)
 		} else {
 			add(rti->base_sprites.track_y + (axis == Axis::X ? 1 : 0));
 		}
+	} else if (GetTunnelBridgeTransportType(tile) == TransportType::Water) {
+		/* A tunnel for ships: the canal's water into its portal. */
+		add(SPR_FLAT_WATER_TILE);
 	} else {
 		/* A road type of a set (the player's CZTR, its cobbles): its own ground and overlay of the straight road, as the
 		 * road before the tunnel is drawn (DrawRoadOverlays() of road_cmd.cpp; the player, test5: "from the first person

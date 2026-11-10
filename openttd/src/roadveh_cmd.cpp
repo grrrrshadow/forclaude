@@ -2012,9 +2012,9 @@ static int RoadVehFreeHeight(RoadVehicle *u)
 
 /**
  * Whether a world point lies in the tube of a tunnel between its ends, not on them: of the tunnel one of whose ends is
- * given (a road vehicle driven freely through it, RoadVehFreeTunnelStep()).
+ * given (a road vehicle or a ship driven freely through it, RoadVehFreeTunnelStep(), ShipFreeController()).
  */
-static bool RoadVehInTunnelSpan(TileIndex end, int x, int y)
+bool CabInTunnelSpan(TileIndex end, int x, int y)
 {
 	if (!IsValidTile(end) || !IsTunnelTile(end)) return false;
 	const TileIndex other = GetOtherTunnelEnd(end);
@@ -2026,28 +2026,22 @@ static bool RoadVehInTunnelSpan(TileIndex end, int x, int y)
 	return TileX(t) == TileX(end) && TileY(t) > std::min(TileY(end), TileY(other)) && TileY(t) < std::max(TileY(end), TileY(other));
 }
 
-/**
- * How far across a tunnel's tube from its middle a road vehicle driven freely in it may go, world units: the tube's
- * half width (6 units, CAB_TUNNEL_HALF of viewport.cpp) less half a car's.
- */
-static constexpr int ROAD_VEH_TUBE_REACH = 4;
-
 /** How far across a tunnel's tube from its middle a point is, world units (of the tunnel one of whose ends is given). */
-static int RoadVehTubeAcross(TileIndex end, int x, int y)
+int CabTubeAcross(TileIndex end, int x, int y)
 {
 	const int mid = TILE_SIZE / 2;
 	return DiagDirToAxis(GetTunnelBridgeDirection(end)) == Axis::X ? y - static_cast<int>(TileY(end) * TILE_SIZE) - mid : x - static_cast<int>(TileX(end) * TILE_SIZE) - mid;
 }
 
 /**
- * A piece of a road vehicle driven freely, in the tube of a tunnel (RoadVehInTunnelSpan()) or out of it: hidden in it
+ * A piece of a road vehicle driven freely, in the tube of a tunnel (CabInTunnelSpan()) or out of it: hidden in it
  * as the game hides what goes through a tunnel, its tile the end it went in by, on the floor's height; out of it, shown
  * again. Steered in it as anywhere, between its walls (the player, test5: "I want to steer the car in the tunnel").
  * @return whether it is in the tube
  */
 static bool RoadVehFreeInTube(RoadVehicle *u, TileIndex end)
 {
-	if (!RoadVehInTunnelSpan(end, u->x_pos, u->y_pos)) {
+	if (!CabInTunnelSpan(end, u->x_pos, u->y_pos)) {
 		u->vehstatus.Reset(VehState::Hidden);
 		return false;
 	}
@@ -2130,7 +2124,7 @@ static bool RoadVehFreeTunnelStep(RoadVehicle *v)
 	const int32_t px = v->cab_px + way * CabCos(v->cab_yaw), py = v->cab_py + way * CabSin(v->cab_yaw);
 	const int x = px / CAB_SUBUNIT, y = py / CAB_SUBUNIT;
 	/* Its walls; out of an end only within them (the portal's face beside the opening). */
-	if (std::abs(RoadVehTubeAcross(end, x, y)) > ROAD_VEH_TUBE_REACH) return false;
+	if (std::abs(CabTubeAcross(end, x, y)) > CAB_TUBE_REACH) return false;
 	v->cab_px = px;
 	v->cab_py = py;
 	v->x_pos = x;
@@ -2178,8 +2172,8 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 		 * (the player, test5: "in the car I could not drive into the tunnel"). */
 		if (!along_deck && enterdir != DiagDirection::Invalid && IsTileType(tile, TileType::TunnelBridge) && IsTunnel(tile) && RoadVehRejoinRoad(v, tile, enterdir)) return true;
 		/* From a tunnel's end through its portal into its tube (RoadVehFreeTunnelStep()): through its opening, not its face. */
-		if (IsTunnelTile(v->tile) && enterdir == GetTunnelBridgeDirection(v->tile) && RoadVehInTunnelSpan(v->tile, x, y)) {
-			if (std::abs(RoadVehTubeAcross(v->tile, x, y)) > ROAD_VEH_TUBE_REACH) return false;
+		if (IsTunnelTile(v->tile) && enterdir == GetTunnelBridgeDirection(v->tile) && CabInTunnelSpan(v->tile, x, y)) {
+			if (std::abs(CabTubeAcross(v->tile, x, y)) > CAB_TUBE_REACH) return false;
 			v->cab_px = px;
 			v->cab_py = py;
 			v->x_pos = x;

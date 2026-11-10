@@ -42,6 +42,8 @@
 #include "console_func.h"
 #include "effectvehicle_func.h"
 #include "train.h"
+#include "error.h"
+#include "three_d_vehicle_object.h"
 
 #include "cab_drive.h"
 
@@ -926,11 +928,55 @@ static Track ShipTrackAlong(Direction d)
 	}
 }
 
-/** Whether a ship driven freely from its cab (cab_drive.h) may go onto a tile: open water and buoys; not a bank, a lock, a dock or a shed. */
-static bool ShipFreeCanEnter(TileIndex tile)
+/**
+ * Whether a ship driven freely from its cab (cab_drive.h) may go onto a tile: open water and buoys, and the end of a
+ * tunnel for ships from before its portal (its sides are walls); not a bank, a lock, a dock or a shed.
+ * @param enterdir the way it goes onto the tile
+ */
+static bool ShipFreeCanEnter(TileIndex tile, DiagDirection enterdir)
 {
 	if (IsTileType(tile, TileType::Water)) return IsWater(tile);
+	if (IsTunnelTile(tile)) return GetTunnelBridgeTransportType(tile) == TransportType::Water && enterdir == GetTunnelBridgeDirection(tile);
 	return IsBuoyTile(tile);
+}
+
+/** The height of the water under a ship driven freely: at the end of a tunnel its portal's, the tile's lower edge (the game's ships keep it there). */
+static int ShipFreeZ(TileIndex tile, int x, int y)
+{
+	return IsTunnelTile(tile) ? GetTilePixelZ(tile) : GetSlopePixelZ(x, y);
+}
+
+/**
+ * A ship driven freely, in the tube of a tunnel for ships or out of it (as a car, RoadVehFreeInTube() of
+ * roadveh_cmd.cpp): hidden in it as the game hides what goes through a tunnel, its tile the end it went in by, on the
+ * water of its portal; out of it shown again.
+ * @return whether it is in the tube
+ */
+static bool ShipFreeInTube(Ship *v, TileIndex end)
+{
+	if (!CabInTunnelSpan(end, v->x_pos, v->y_pos)) {
+		v->vehstatus.Reset(VehState::Hidden);
+		return false;
+	}
+	v->vehstatus.Set(VehState::Hidden);
+	v->tile = end;
+	return true;
+}
+
+/** The ship driven freely the player was last told is too tall for a tunnel, until it goes on (ShipFreeTooTall()). */
+static VehicleID _ship_told_too_tall = VehicleID::Invalid();
+
+/**
+ * A ship driven freely stands at the portal of a tunnel it is too tall for (ShipFitsTunnel()): the player who drives
+ * it is told, once each time it comes to it (the player, 10. 11.: "write an error warning when the player drives a
+ * ship too tall").
+ */
+static void ShipFreeTooTall(const Ship *v)
+{
+	if (v->owner != _local_company || _ship_told_too_tall == v->index) return;
+	_ship_told_too_tall = v->index;
+	Debug(misc, 1, "ship {} too tall for the tunnel at {},{}", v->unitnumber, TileX(v->tile), TileY(v->tile));
+	ShowErrorMessage(GetEncodedString(STR_ERROR_SHIP_CAN_T_ENTER_TUNNEL), GetEncodedString(STR_ERROR_SHIP_TOO_TALL_FOR_TUNNEL, static_cast<int>(SHIP_TUNNEL_ROOM_M)), WarningLevel::Info);
 }
 
 /**
@@ -966,7 +1012,9 @@ static bool ShipRejoinCourse(Ship *v, TileIndex tile, DiagDirection enterdir, in
 
 /**
  * A tick of a ship driven freely from its cab (cab_drive.h): as far along its heading as its speed takes it, standing
- * at a bank. Its orders wait.
+ * at a bank. Through a tunnel for ships as a car through its tunnel (the player, 10. 11.: "I want to steer through the
+ * tunnel"): through the portal into the tube if it is low enough (ShipFitsTunnel()), hidden in it and steered between
+ * its walls, out at either end. Its orders wait.
  */
 static void ShipFreeController(Ship *v)
 {
@@ -982,25 +1030,40 @@ static void ShipFreeController(Ship *v)
 		bool blocked = px < 0 || py < 0 || x < static_cast<int>(TILE_SIZE) || y < static_cast<int>(TILE_SIZE) ||
 				x >= static_cast<int>(Map::MaxX() * TILE_SIZE) || y >= static_cast<int>(Map::MaxY() * TILE_SIZE);
 		TileIndex tile = blocked ? v->tile : TileVirtXY(x, y);
-		if (!blocked && tile != v->tile) {
+		/* In a tunnel's tube, or from its end through its portal into it: between its walls. */
+		const bool in_tube = v->vehstatus.Test(VehState::Hidden) && IsTunnelTile(v->tile);
+		const bool into_tube = !blocked && !in_tube && tile != v->tile && IsTunnelTile(v->tile) &&
+				DiagdirBetweenTiles(v->tile, tile) == GetTunnelBridgeDirection(v->tile) && CabInTunnelSpan(v->tile, x, y);
+		if (!blocked && (in_tube || into_tube)) {
+			if (into_tube && !ShipFitsTunnel(v)) {
+				ShipFreeTooTall(v);
+				blocked = true;
+			} else {
+				blocked = std::abs(CabTubeAcross(v->tile, x, y)) > CAB_TUBE_REACH;
+			}
+		} else if (!blocked && tile != v->tile) {
 			DiagDirection enterdir = DiagdirBetweenTiles(v->tile, tile);
-			if (v->cab_rejoin && enterdir != DiagDirection::Invalid && ShipRejoinCourse(v, tile, enterdir, x, y)) return;
-			blocked = !ShipFreeCanEnter(tile);
+			if (v->cab_rejoin && enterdir != DiagDirection::Invalid && !IsTunnelTile(tile) && ShipRejoinCourse(v, tile, enterdir, x, y)) return;
+			blocked = !ShipFreeCanEnter(tile, enterdir);
 		}
 		if (blocked) {
-			/* At a bank: it stands, and turns there. */
+			/* At a bank or a wall: it stands, and turns there. */
 			v->cur_speed = 0;
 			v->subspeed = 0;
 			break;
 		}
-		v->tile = tile;
+		if (_ship_told_too_tall == v->index) _ship_told_too_tall = VehicleID::Invalid();
 		v->cab_px = px;
 		v->cab_py = py;
 		v->direction = v->rotation = CabYawToDirection(v->cab_yaw);
 		v->state = ShipTrackAlong(v->direction);
 		v->x_pos = x;
 		v->y_pos = y;
-		v->z_pos = GetSlopePixelZ(x, y);
+		if (!(in_tube || into_tube) || !ShipFreeInTube(v, v->tile)) {
+			/* On the water, or out of the tube on the end it came to. */
+			v->tile = tile;
+			v->z_pos = ShipFreeZ(tile, x, y);
+		}
 		v->UpdatePosition();
 		v->UpdateViewport(true, true);
 	}
