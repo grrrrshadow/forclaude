@@ -8698,25 +8698,17 @@ bool IsCoupleHeldNoseFirst(const Train *v)
  * the full design this is one piece of.
  *
  * @param flags  type of operation
- * @param veh_id the train initiating the coupling
+ * @param v the train initiating the coupling
+ * @param partner the front of the train it couples to
+ * @param partner_is_behind the partner stands off the rear of @p v rather than off its front
  * @return the cost of this operation or an error
  */
-CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
+static CommandCost CoupleTrainTo(DoCommandFlags flags, Train *v, Train *partner, bool partner_is_behind)
 {
-	Train *v = Train::GetIfValid(veh_id);
-	if (v == nullptr) return CMD_ERROR;
-
-	CommandCost ret = CheckOwnership(v->owner);
-	if (ret.Failed()) return ret;
-
-	bool partner_is_behind = false;
-	Train *partner = GetTrainCouplePartner(v, &partner_is_behind);
-	if (partner == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER);
-
 	/* Re-check ownership of the partner explicitly: GetTrainCouplePartner()
 	 * already requires matching owners, but CheckOwnership() also handles
 	 * the "spectator"/deity edge cases that a plain == comparison would not. */
-	ret = CheckOwnership(partner->owner);
+	CommandCost ret = CheckOwnership(partner->owner);
 	if (ret.Failed()) return ret;
 
 	/* The head of the merged chain has to be an engine. A chain heading with a
@@ -9226,6 +9218,107 @@ CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
 		}
 	}
 
+	return ret;
+}
+
+/**
+ * Couple a stopped train to another stopped train immediately adjacent to it
+ * (see CoupleTrainTo()), as its orders say.
+ * @param flags  type of operation
+ * @param veh_id the train initiating the coupling
+ * @return the cost of this operation or an error
+ */
+CommandCost CmdCoupleTrains(DoCommandFlags flags, VehicleID veh_id)
+{
+	Train *v = Train::GetIfValid(veh_id);
+	if (v == nullptr) return CMD_ERROR;
+
+	CommandCost ret = CheckOwnership(v->owner);
+	if (ret.Failed()) return ret;
+
+	bool partner_is_behind = false;
+	Train *partner = GetTrainCouplePartner(v, &partner_is_behind);
+	if (partner == nullptr) return CommandCost(STR_ERROR_CAN_T_COUPLE_TRAIN_NO_PARTNER);
+	return CoupleTrainTo(flags, v, partner, partner_is_behind);
+}
+
+/**
+ * The train or the wagons the player couples to by hand from a driver's stand
+ * (CabDriveOp::CoupleFront, CoupleRear): standing still off that end of @p v,
+ * within the reach a coupling closes up (AreConsistsCloseEnoughToCouple()).
+ *
+ * No order is asked, unlike IsValidCouplePartner(): the player standing at the
+ * stand and pressing the button is the order (the player, test5: "the button
+ * couples and decouples only on the side of the engine where the driver's stand
+ * is"). Only what makes a coupling possible at all still counts: ours, standing,
+ * not in a shed, not a wreck, and wagons or a train with an engine at its head.
+ *
+ * @param v the front engine the player drives, standing
+ * @param rear off its rear, towards what follows it in its list (the stand at its back)
+ * @return the front of the partner, or nullptr
+ */
+static Train *FindCouplePartnerByHand(const Train *v, bool rear)
+{
+	const Train *end = rear ? v->Last() : v;
+	/* Which way that end looks out: away from its neighbour in the list, or for
+	 * a lone engine along its own facing (backwards at its back). */
+	int out_x, out_y;
+	const Train *inner = rear ? end->Previous() : end->Next();
+	if (inner != nullptr) {
+		out_x = end->x_pos - inner->x_pos;
+		out_y = end->y_pos - inner->y_pos;
+	} else {
+		static const int8_t facing_x[] = {-1, -1, -1, 0, 1, 1, 1, 0};
+		static const int8_t facing_y[] = {-1, 0, 1, 1, 1, 0, -1, -1};
+		const uint8_t d = to_underlying(end->direction) & 7;
+		out_x = rear ? -facing_x[d] : facing_x[d];
+		out_y = rear ? -facing_y[d] : facing_y[d];
+	}
+
+	const int reach = 2 * TILE_SIZE;
+	Train *best = nullptr;
+	int best_dist = reach * reach + 1;
+	for (Vehicle *u : VehiclesNearTileXY(end->x_pos, end->y_pos, reach)) {
+		if (u->type != VehicleType::Train) continue;
+		Train *partner = Train::From(u)->First();
+		if (partner == v) continue;
+		if (std::abs(u->z_pos - end->z_pos) > 8) continue;
+		const int dx = u->x_pos - end->x_pos;
+		const int dy = u->y_pos - end->y_pos;
+		if (dx * out_x + dy * out_y <= 0) continue;
+		const int dist = dx * dx + dy * dy;
+		if (dist >= best_dist) continue;
+		if (partner->owner != v->owner || partner->vehstatus.Test(VehState::Crashed) || partner->cur_speed != 0) continue;
+		if (IsAnyPartInsideDepot(partner)) continue;
+		if (partner->breakdown_ctr == 1 || partner->IsWrecked() || partner->IsSoldForScrap()) continue;
+		if (!partner->IsFreeWagon() && !partner->IsFrontEngine()) continue;
+		best = partner;
+		best_dist = dist;
+	}
+	return best;
+}
+
+/**
+ * Couple by hand at a driver's stand (CabDriveOp::CoupleFront, CoupleRear) to
+ * what stands off that end of @p v (FindCouplePartnerByHand()), the coupling
+ * itself the same as by orders (CoupleTrainTo()).
+ * @param flags type of operation
+ * @param v the front engine the player drives
+ * @param rear at the stand at its back
+ * @return the cost of the coupling or an error; nothing there is no error, the button does nothing then
+ */
+CommandCost CoupleTrainByHand(DoCommandFlags flags, Train *v, bool rear)
+{
+	if (!v->IsFrontEngine() || v->cur_speed != 0 || v->vehstatus.Test(VehState::Crashed)) return CommandCost();
+	Train *partner = FindCouplePartnerByHand(v, rear);
+	if (partner == nullptr) {
+		if (_show_train_orientation && flags.Test(DoCommandFlag::Execute)) IConsolePrint(CC_INFO, "Vlak {}: rucni spojeni {} - nic tam nestoji", v->unitnumber, rear ? "vzadu" : "vpredu");
+		return CommandCost();
+	}
+	CommandCost ret = CoupleTrainTo(flags, v, partner, rear);
+	if (ret.Failed() && _show_train_orientation && flags.Test(DoCommandFlag::Execute)) {
+		IConsolePrint(CC_INFO, "Vlak {}: rucni spojeni {} s {} odmitnuto: {}", v->unitnumber, rear ? "vzadu" : "vpredu", partner->index.base(), GetString(ret.GetErrorMessage()));
+	}
 	return ret;
 }
 

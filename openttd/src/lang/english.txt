@@ -2302,6 +2302,8 @@ STR_FIRST_PERSON_CAPTION                                        :{WHITE}View fro
 STR_FIRST_PERSON_FULL_TOOLTIP                                   :{BLACK}The view over the whole screen, and back
 STR_FIRST_PERSON_HERE                                           :Here
 STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Put the walker where the main view looks
+STR_FIRST_PERSON_COUPLE                                         :Couple
+STR_FIRST_PERSON_DECOUPLE                                       :Decouple
 STR_FIRST_PERSON_CENTRE                                         :On the map
 STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Show the walker's place in the main view
 STR_FIRST_PERSON_STAND_FRONT                                    :Driver's stand at the front

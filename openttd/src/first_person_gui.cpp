@@ -60,6 +60,8 @@
 #include "train.h"
 #include "aircraft.h"
 #include "cab_drive.h"
+#include "vehicle_cmd.h"
+#include "vehicle_func.h"
 #include "simtrains_cab.h"
 #include "engine_base.h"
 #include "engine_func.h"
@@ -1460,6 +1462,12 @@ struct FirstPersonWindow : Window {
 			if (this->arrows.route != route) this->SetWidgetDirty(WID_FP_ROUTE);
 			DiveTowards(rv, ms / 1000.0);
 		}
+		/* The button where "Here" was: what it says as the vehicle, the stand and the coupling change (HereDecouples()). */
+		const int here = this->Riding() == nullptr ? 0 : this->HereDecouples() ? 2 : 1;
+		if (here != this->here_shown) {
+			this->here_shown = here;
+			this->SetWidgetDirty(WID_FP_HERE);
+		}
 		/* The button of the route in a vehicle, of running on foot. */
 		bool changed = this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0);
 		changed |= this->GetWidget<NWidgetStacked>(WID_FP_CONTROLS_SEL)->SetDisplayedPlane(IsSimtrainsTrain(rv) ? 0 : SZSP_NONE);
@@ -2704,12 +2712,34 @@ struct FirstPersonWindow : Window {
 		this->DrawWidgets();
 	}
 
+	int here_shown = -1; ///< what the button where "Here" was says now: 0 Here, 1 Couple, 2 Decouple
+
+	/** Whether the button where "Here" was decouples now: riding a train at its engine's back stand with wagons behind it. */
+	bool HereDecouples() const
+	{
+		const Vehicle *v = this->Riding();
+		if (v == nullptr || v->type != VehicleType::Train || !this->camera.rear) return false;
+		const Train *t = Train::From(v->First());
+		if (!t->IsFrontEngine() || t->GetNextUnit() == nullptr) return false;
+		/* A single engine leaves all behind it (TryDecoupleAtStation()). A double-headed one cannot leave its own
+		 * rear head: only a second train joined to it comes off, so with none there is nothing to decouple. */
+		if (t->other_multiheaded_part == nullptr) return true;
+		for (const Train *u = t->Next(); u != nullptr; u = u->Next()) {
+			if (u->IsArticulatedPart() || u == t->other_multiheaded_part) continue;
+			if (u->IsEngine() || u->IsRearDualheaded()) return true;
+		}
+		return false;
+	}
+
 	std::string GetWidgetString(WidgetID widget, StringID stringid) const override
 	{
 		/* Its route, or the wheel again (as the cab view's). */
 		if (widget == WID_FP_ROUTE) return GetString(this->arrows.route ? STR_CAB_VIEW_DRIVE : STR_CAB_VIEW_AUTO);
 		/* Riding, the driver's stand at the front or at the back of the vehicle (CabViewCamera::rear). */
 		if (widget == WID_FP_CENTRE && this->Riding() != nullptr) return GetString(this->camera.rear ? STR_FIRST_PERSON_STAND_BACK : STR_FIRST_PERSON_STAND_FRONT);
+		/* Riding, instead of "Here": coupling at the driver's stand (the player, test5: "in the menu of E we take the
+		 * button Here away and in its place the button Couple; coupled, it says Decouple"). */
+		if (widget == WID_FP_HERE && this->Riding() != nullptr) return GetString(this->HereDecouples() ? STR_FIRST_PERSON_DECOUPLE : STR_FIRST_PERSON_COUPLE);
 		if (widget == WID_FP_CAMERA) return CabCameraText();
 		if (widget == WID_FP_CONTROLS) return GetString(STR_CAB_VIEW_CONTROLS, _settings_client.gui.cab_msts_keys ? STR_CAB_VIEW_CONTROLS_MSTS : STR_CAB_VIEW_CONTROLS_ARROWS);
 		return this->Window::GetWidgetString(widget, stringid);
@@ -2864,6 +2894,15 @@ struct FirstPersonWindow : Window {
 				this->Attack(true);
 				break;
 			case WID_FP_HERE:
+				/* Riding a train: coupled or decoupled at the driver's stand (CmdCabDrive(), CabDriveOp::CoupleFront and
+				 * CoupleRear); another vehicle: nothing. */
+				if (const Vehicle *v = this->Riding(); v != nullptr) {
+					if (v->type == VehicleType::Train) {
+						Command<Commands::CabDrive>::Post(v->tile, v->First()->index, to_underlying(this->camera.rear ? CabDriveOp::CoupleRear : CabDriveOp::CoupleFront));
+					}
+					this->SetWidgetDirty(WID_FP_HERE);
+					break;
+				}
 				/* Out of a vehicle first. */
 				if (this->Riding() != nullptr) this->GetOut();
 				this->riding = VehicleID::Invalid();
@@ -4016,6 +4055,7 @@ std::string RigRideClick(std::string_view name)
 {
 	static const std::pair<std::string_view, WidgetID> buttons[] = {
 		{"trasa", WID_FP_ROUTE}, {"nalozit", WID_FP_LOAD}, {"vylozit", WID_FP_UNLOAD}, {"kamera", WID_FP_CAMERA}, {"cely", WID_FP_FULL}, {"zadni", WID_FP_CENTRE},
+		{"pripojit", WID_FP_HERE},
 	};
 	FirstPersonWindow *w = RigFirstPerson();
 	const Vehicle *v = w != nullptr ? w->Riding() : nullptr;
@@ -4026,8 +4066,9 @@ std::string RigRideClick(std::string_view name)
 		AutoRestoreBackup cur_company(_current_company, _local_company);
 		w->OnClick({}, id, 1);
 	}
-	return fmt::format("klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {} stanoviste {}", name, v->unitnumber, v->x_pos, v->y_pos,
-			to_underlying(v->direction), to_underlying(v->cab_heading), v->cab_free, v->cab_rejoin, v->cab_yaw, w->IsWidgetDisabled(id) ? "ano" : "ne", w->camera.rear ? "vzadu" : "vpredu");
+	return fmt::format("klik {}: vozidlo {} na {},{} smer {} smer kabiny {} volne {} zpet {} yaw {} tlacitko vypnuto {} stanoviste {}, dilu {}, tlacitko {}", name, v->unitnumber, v->x_pos, v->y_pos,
+			to_underlying(v->direction), to_underlying(v->cab_heading), v->cab_free, v->cab_rejoin, v->cab_yaw, w->IsWidgetDisabled(id) ? "ano" : "ne", w->camera.rear ? "vzadu" : "vpredu",
+			CountVehiclesInChain(v->First()), w->GetWidgetString(WID_FP_HERE, STR_FIRST_PERSON_HERE));
 }
 
 /**

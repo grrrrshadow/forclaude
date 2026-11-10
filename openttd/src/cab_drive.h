@@ -44,6 +44,8 @@ enum class CabDriveOp : uint8_t {
 	Down = 5,   ///< an aircraft flown freely: lower a step
 	Reverse = 6, ///< a road vehicle driven freely: backwards from now on (Vehicle::cab_reverse), at most Vehicle::CAB_REVERSE_SPEED
 	Forward = 7, ///< and forwards again, stopped, held to the slowest speed (CAB_SLOWEST)
+	CoupleFront = 8,  ///< a train standing: couple to what stands at its front, at the driver's stand there (CmdCabDrive())
+	CoupleRear = 9,   ///< couple to what stands at the engine's back, or decouple the wagons coupled there
 };
 
 /** The slowest speed the brake of the cab holds a vehicle to (CabSpeed()); braked further it stops. */

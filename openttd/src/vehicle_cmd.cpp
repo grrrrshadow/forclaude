@@ -1464,10 +1464,25 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 {
 	Vehicle *v = Vehicle::GetIfValid(veh_id);
 	if (v == nullptr || !v->IsPrimaryVehicle() || v->vehstatus.Test(VehState::Crashed)) return CMD_ERROR;
-	if (op > to_underlying(CabDriveOp::Forward)) return CMD_ERROR;
+	if (op > to_underlying(CabDriveOp::CoupleRear)) return CMD_ERROR;
 	CommandCost ret = CheckOwnership(v->owner);
 	if (ret.Failed()) return ret;
 	const CabDriveOp what = static_cast<CabDriveOp>(op);
+	/* From the driver's stand of a train (the player, test5: "the button couples and decouples only at the side of the
+	 * engine where the driver's stand is now; at the stand on the side where no wagons are coupled the button does
+	 * nothing"): standing only. At the front, coupled to what stands before it; at the back, the wagons behind the
+	 * engine decoupled, or, the engine alone, coupled to what stands behind it. Else nothing. */
+	if (what == CabDriveOp::CoupleFront || what == CabDriveOp::CoupleRear) {
+		if (v->type != VehicleType::Train) return CMD_ERROR;
+		Train *t = Train::From(v);
+		if (t->cur_speed != 0 || !t->IsFrontEngine()) return CommandCost();
+		const bool rear = what == CabDriveOp::CoupleRear;
+		if (rear && t->GetNextUnit() != nullptr) {
+			if (flags.Test(DoCommandFlag::Execute)) TryDecoupleAtStation(t, 0, false, OrderLoadType::LoadIfPossible, OrderUnloadType::UnloadIfPossible, 0, StationID::Invalid(), false);
+			return CommandCost();
+		}
+		return CoupleTrainByHand(flags, t, rear);
+	}
 	const bool height = what == CabDriveOp::Up || what == CabDriveOp::Down;
 	/* Backwards only a road vehicle driven freely already. */
 	const bool backwards = what == CabDriveOp::Reverse || what == CabDriveOp::Forward;

@@ -2410,6 +2410,8 @@ STR_FIRST_PERSON_CAPTION                                        :{WHITE}Pohled z
 STR_FIRST_PERSON_FULL_TOOLTIP                                   :{BLACK}Pohled přes celou obrazovku a zpět
 STR_FIRST_PERSON_HERE                                           :Sem
 STR_FIRST_PERSON_HERE_TOOLTIP                                   :{BLACK}Postav chodce tam, kam se dívá hlavní pohled
+STR_FIRST_PERSON_COUPLE                                         :Připojit
+STR_FIRST_PERSON_DECOUPLE                                       :Odpojit
 STR_FIRST_PERSON_CENTRE                                         :Na mapě
 STR_FIRST_PERSON_CENTRE_TOOLTIP                                 :{BLACK}Ukaž místo chodce v hlavním pohledu
 STR_FIRST_PERSON_STAND_FRONT                                    :Stanoviště vpředu
