@@ -1099,6 +1099,8 @@ static void DrawWaterLock(const TileInfo *ti)
 static void DrawWaterDepot(const TileInfo *ti)
 {
 	DrawWaterClassGround(ti);
+	/* In the 3D views the colleague's ship depot stands over both its tiles instead (GetThreeDDepot()). */
+	if (ThreeDDepotStandsOn(ti)) return;
 	DrawWaterTileStruct(ti, _shipdepot_display_data[GetShipDepotAxis(ti->tile)][GetShipDepotPart(ti->tile)].seq, 0, 0, GetCompanyPalette(GetTileOwner(ti->tile)), CanalFeature::End);
 }
 

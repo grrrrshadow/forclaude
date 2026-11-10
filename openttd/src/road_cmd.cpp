@@ -1911,7 +1911,8 @@ static void DrawTile_Road(TileInfo *ti)
 				}
 			}
 
-			DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, palette);
+			/* In the 3D views the colleague's garage stands there instead (GetThreeDDepot()). */
+			if (!ThreeDDepotStandsOn(ti)) DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, palette);
 			blocked_pillars = BRIDGEPILLARFLAGS_ALL;
 			break;
 		}

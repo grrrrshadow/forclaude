@@ -49,6 +49,10 @@
 #include "company_base.h"
 #include "station_base.h"
 #include "roadstop_base.h"
+#include "rail_map.h"
+#include "water_map.h"
+#include "newgrf_railtype.h"
+#include "newgrf_roadtype.h"
 #include "cargotype.h"
 #include "palette_func.h"
 #include "viewport_func.h"
@@ -260,6 +264,8 @@ struct ThreeDStationPiece {
 	std::string heap_piece;       ///< "hromada" "objekt": the shared load piece a heap is
 };
 static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStationKind::End)> _three_d_station_pieces;
+/** The depots' objects (ReadDepot()) by the transport (0 railway, 1 road, 2 water) and the way (a DiagDirection; a ship depot's axis): objects in _three_d_objects. */
+static std::map<std::pair<int, int>, size_t> _three_d_depots;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 
@@ -3877,7 +3883,7 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 	/* Without the nodes its record leaves out ("bez_uzlu": the high seat and the logs of the forest cabin on the palm
 	 * plantation), its interior's box and the wings of its doors (ThreeDObject::outside), near drawn with them. */
 	if (!obj.left_out.empty()) o.skip_nodes = &obj.left_out;
-	if (!obj.outside_of.empty()) o.skip_wings = true;
+	if (!obj.outside_of.empty() || obj.depot) o.skip_wings = true;
 	if (!ReadGlbMesh(path, mesh, o)) return false;
 	TakeMaterialPictures(mesh, obj);
 	for (const ThreeDSceneMore &more : obj.scene_more) {
@@ -3897,7 +3903,7 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 	TurnGlbMeshQuarters(mesh, quarter_turns);
 	TakeGlbFloors(mesh, obj, static_cast<uint16_t>(solid.size() + 1), false);
 	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
-		const bool passable = mesh.tri_group[t] == 0 || mesh.tri_group[t] > solid.size();
+		const bool passable = !obj.depot && (mesh.tri_group[t] == 0 || mesh.tri_group[t] > solid.size());
 		if (passable != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
 	}
 	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
@@ -5629,6 +5635,49 @@ static void MakeRockTiles()
 }
 
 /**
+ * A depot of the colleague's objekty/depa (hra/3d/DEPA-PRO-HRU.md; the player, 2. 11.: "a fine object of the depot in
+ * the style of OpenTTD, not boxy"; 10. 11.: "depots, the garage and the ship depot"): one tile (a ship depot two along
+ * x), its origin the north corner, built opening to +x (south-west); an object of its whole scene for each way it opens,
+ * turned about the middle of its (north) tile by quarter turns -- to south-east 90 degrees, north-east 180, north-west
+ * 270; a ship depot along y 90 (its "osa_y") --, solid, without the wings of its gates and doors: open, as the
+ * sprites' (the gates opening as a vehicle comes are to come). Its colours, the company's ("barva_firmy"), its night.
+ */
+static void ReadDepot(const nlohmann::json &e, const std::string &folder)
+{
+	const std::string type = e.value("typ", std::string());
+	const int transport = type == "zeleznice" ? 0 : type == "silnice" ? 1 : type == "voda" ? 2 : -1;
+	if (transport < 0) return;
+	std::vector<std::pair<int, int>> ways; // the way, its quarter turns
+	if (transport == 2) {
+		ways = {{to_underlying(Axis::X), 0}, {to_underlying(Axis::Y), 1}};
+	} else {
+		ways = {{to_underlying(DiagDirection::SW), 0}, {to_underlying(DiagDirection::SE), 1}, {to_underlying(DiagDirection::NE), 2}, {to_underlying(DiagDirection::NW), 3}};
+	}
+	int tiles_x = 1, tiles_y = 1;
+	if (e.contains("dlazdice") && e.at("dlazdice").is_array() && e.at("dlazdice").size() == 2) {
+		tiles_x = std::clamp(e.at("dlazdice").at(0).is_number_integer() ? e.at("dlazdice").at(0).get<int>() : 1, 1, 4);
+		tiles_y = std::clamp(e.at("dlazdice").at(1).is_number_integer() ? e.at("dlazdice").at(1).get<int>() : 1, 1, 4);
+	}
+	for (const auto &[way, turns] : ways) {
+		ThreeDObject obj;
+		obj.file = e.at("soubor").get<std::string>();
+		obj.name = fmt::format("{}/{}", e.value("jmeno", obj.file), turns * 90);
+		obj.glb_path = folder + obj.file;
+		obj.variants = 0; // no house's
+		obj.scene_turns = static_cast<int8_t>(turns);
+		obj.depot = true;
+		/* Along y its tiles the other way. */
+		obj.tiles_x = static_cast<uint8_t>(turns % 2 == 0 ? tiles_x : tiles_y);
+		obj.tiles_y = static_cast<uint8_t>(turns % 2 == 0 ? tiles_y : tiles_x);
+		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
+		ReadMaterialPictures(e, folder, obj);
+		ReadColourParts(e, folder, obj);
+		_three_d_depots[{transport, way}] = _three_d_objects.size();
+		_three_d_objects.push_back(std::move(obj));
+	}
+}
+
+/**
  * A piece of a station of the colleague's objekty/stanice (hra/3d/STANICE-SMEROVANI-PRO-HRU.md, -PERON-, -RAMPA-): one
  * tile, its origin the tile's north corner, the track or the road along x (a bay's entrance to +x); read as an add-on
  * (its colours, the company's), and with it the add-ons standing on it ("doplnky": the platform's benches, as a
@@ -5866,6 +5915,10 @@ static void ReadThreeDObjectsNow()
 				}
 				if (kind == "kameni") {
 					ReadRockLayouts(e, list);
+					continue;
+				}
+				if (kind == "depo" && e.contains("soubor") && e.at("soubor").is_string()) {
+					ReadDepot(e, folder);
 					continue;
 				}
 				if (kind == "les" || kind == "plantaz") {
@@ -12087,6 +12140,33 @@ static constexpr uint STATION_CARGO_PIECE_UNITS = 10;
 static constexpr uint STATION_CARGO_HEAP_UNITS = 100;
 static constexpr float STATION_CARGO_HEAP_LEAST = 0.4f;
 
+const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin)
+{
+	if (!_three_d_objects_read || _three_d_depots.empty() || !IsValidTile(tile)) return nullptr;
+	origin = tile;
+	int transport, way;
+	if (IsRailDepotTile(tile)) {
+		/* A rail type's own depot (a set of rails) its own look. */
+		if (GetCustomRailSprite(GetRailTypeInfo(GetRailType(tile)), tile, RailSpriteType::Depot) != 0) return nullptr;
+		transport = 0;
+		way = to_underlying(GetRailDepotDirection(tile));
+	} else if (IsRoadDepotTile(tile)) {
+		/* A road type's own (CZTR's) and a tram's its own look. */
+		const RoadType road = GetRoadTypeRoad(tile);
+		if (road == INVALID_ROADTYPE || GetCustomRoadSprite(GetRoadTypeInfo(road), tile, RoadSpriteType::Depot) != 0) return nullptr;
+		transport = 1;
+		way = to_underlying(GetRoadDepotDirection(tile));
+	} else if (IsShipDepotTile(tile)) {
+		transport = 2;
+		way = to_underlying(GetShipDepotAxis(tile));
+		origin = GetShipDepotNorthTile(tile);
+	} else {
+		return nullptr;
+	}
+	const auto it = _three_d_depots.find({transport, way});
+	return it == _three_d_depots.end() ? nullptr : &_three_d_objects[it->second];
+}
+
 std::vector<ThreeDObjectFigure> GetThreeDStationCargo(TileIndex tile)
 {
 	std::vector<ThreeDObjectFigure> out;
@@ -13273,6 +13353,7 @@ bool ThreeDObject::Read() const
 		read.outside_of = this->outside_of;
 		read.material_from = this->material_from;
 		read.scene_more = this->scene_more;
+		read.depot = this->depot;
 		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
 		 * (ReadInterior()) read as they are. */
 		bool ok;

@@ -331,6 +331,7 @@ struct ThreeDObject {
 	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors and windows ("dvere_NN", "okno_NN" of its file, then of its interior's): shut, open one way, the other
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
+	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
 	std::vector<ThreeDSceneMore> scene_more;  ///< and parts of other files laid into it ("scena_navic")
 	/* Its materials' pictures taken from elsewhere ("textury_materialu"; the player, 3. 11.: "many models are the same
@@ -1482,6 +1483,14 @@ const ThreeDObject *GetThreeDRocks(TileIndex tile);
  * @return nullptr: another tile, one of a set (NewGRF), or the sets have not the piece
  */
 const ThreeDObject *GetThreeDStation(TileIndex tile);
+/**
+ * The object of a depot of the game's own look (the colleague's objekty/depa): a railway's depot (the engine shed), a
+ * road's (the garage), a ship's over its two tiles, turned the way it opens; its gates open. The 3D views draw it
+ * instead of the depot's sprites (ThreeDDepotStandsOn()).
+ * @param[out] origin its north tile (a ship depot's north part)
+ * @return nullptr: another tile, one of a set's look (a rail or road type's own depot), or the sets have not the depot
+ */
+const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin);
 /**
  * The cargo waiting at a station shown on a loading bay of its (GetThreeDStation(), the colleague's
  * "cekajici_naklad"): the shared pieces of the loads by their tables, a heap in the cargo's colour of a bulk cargo

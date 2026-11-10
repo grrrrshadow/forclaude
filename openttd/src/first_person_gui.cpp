@@ -474,6 +474,12 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	if (WalkerTentBlocks(x, y)) return false;
 	/* The feet over the ground of a building whose north tile is origin. */
 	auto feet = [stand](TileIndex origin) { return std::max(0.0, stand - GetTileMaxPixelZ(origin)); };
+	/* A depot of a railway or a road by its shape, into it through its gates (GetThreeDDepot()); a ship depot is water. */
+	if (TileIndex origin; !IsTileType(tile, TileType::Water)) {
+		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr) {
+			return !depot->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE, feet(origin));
+		}
+	}
 	switch (GetTileType(tile)) {
 		case TileType::Void:
 		case TileType::Object:

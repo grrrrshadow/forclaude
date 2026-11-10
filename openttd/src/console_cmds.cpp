@@ -11404,6 +11404,35 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const ThreeDObject *o = GetThreeDStation(at(dx, dy));
 			IConsolePrint(CC_DEFAULT, "test3d: stanice3d {},{}: {}", *x + dx, *y + dy, o != nullptr ? o->name : std::string("bez objektu"));
 		}
+	} else if (what == "depa3d" && argv.size() > 3) {
+		/* 'depa3d <x> <y>': the depots of the colleague's objekty/depa side by side from the tile (GetThreeDDepot()): rail
+		 * depots opening NE, SE, SW, NW at (x + 2k, y), road depots so at (x + 2k, y + 3), a canal at (x .. x + 5, y + 6 ..
+		 * y + 10) with a ship depot along x at (x + 1, y + 7) and one along y at (x + 4, y + 7); each tile then its object. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		auto said = [](std::string_view what, const CommandCost &r) { IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: depa3d {}: {}", what, r.Succeeded() ? std::string("postaveno") : RefusalReason(r)); };
+		/* The land made level first, as high as the tile is. */
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(8, 11), at(0, 0), false, LevelMode::Level);
+		for (int k = 0; k < 4; k++) {
+			said(fmt::format("depo vlaku {}", k), Command<Commands::BuildRailDepot>::Do(DoCommandFlag::Execute, at(2 * k, 0), RAILTYPE_RAIL, static_cast<DiagDirection>(k)));
+			said(fmt::format("garaz {}", k), Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, at(2 * k, 3), ROADTYPE_ROAD, static_cast<DiagDirection>(k)));
+		}
+		said("pruplav", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(5, 10), at(0, 6), WaterClass::Canal, false));
+		said("lodni depo x", Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, at(1, 7), Axis::X));
+		said("lodni depo y", Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, at(4, 7), Axis::Y));
+		for (const auto &[dx, dy] : std::initializer_list<std::pair<int, int>>{{0, 0}, {2, 0}, {4, 0}, {6, 0}, {0, 3}, {2, 3}, {4, 3}, {6, 3}, {1, 7}, {2, 7}, {4, 7}, {4, 8}}) {
+			TileIndex origin;
+			const ThreeDObject *o = GetThreeDDepot(at(dx, dy), origin);
+			IConsolePrint(CC_DEFAULT, "test3d: depa3d {},{}: {}", *x + dx, *y + dy, o != nullptr ? fmt::format("{} od {},{}", o->name, TileX(origin), TileY(origin)) : std::string("bez objektu"));
+		}
 	} else if (what == "kameni") {
 		/* 'kameni [x y r]': the rocky land's tiles (the stones of GetThreeDRocks()), how many and the first few with the
 		 * layout of their stones; with a place, the free land within r tiles of it (1) made rocky first. */

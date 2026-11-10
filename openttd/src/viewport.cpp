@@ -14698,6 +14698,22 @@ bool ThreeDRocksStandOn(const TileInfo *ti)
  * the buildings see-through the game's sprites as they are.
  * @return whether it stands there: the tile's own buildings (platforms, roofs, booths) left out
  */
+bool ThreeDDepotStandsOn(const TileInfo *ti)
+{
+	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings) || !ObjectsIndexReadOrOwed()) return false;
+	TileIndex origin;
+	const ThreeDObject *depot = GetThreeDDepot(ti->tile, origin);
+	if (depot == nullptr) return false;
+	if (_cab_collecting) return true;
+	if (!ObjectReadyOrOwed(depot, origin, ti->tile)) return false;
+	/* A ship depot once for its two tiles. */
+	for (const TurnedObject &to : _turned_objects) {
+		if (to.origin == origin && to.obj == depot) return true;
+	}
+	_turned_objects.emplace_back(depot, origin, GetTileMaxPixelZ(origin));
+	return true;
+}
+
 bool ThreeDStationStandsOn(const TileInfo *ti)
 {
 	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings) || !ObjectsIndexReadOrOwed()) return false;
@@ -18477,6 +18493,14 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 				if (stop == nullptr) continue;
 				ps_kind[i] = 5;
 				objects.push_back({stop, _cur_ti.tile, ps.zmin});
+			}
+		}
+		/* A depot of the game's own look, its two tiles' ship depot once (ThreeDDepotStandsOn()). */
+		if (TileIndex origin; !IsTransparencySet(TransparencyOption::Buildings)) {
+			if (const ThreeDObject *depot = GetThreeDDepot(_cur_ti.tile, origin); depot != nullptr) {
+				bool known = false;
+				for (const CabObject &co : objects) known |= co.origin == origin && co.obj == depot;
+				if (!known) objects.push_back({depot, origin, GetTileMaxPixelZ(origin)});
 			}
 		}
 		/* The 3D pieces of a bridge over the tile, or of a bridge's head (EyeBridgePieces()). */

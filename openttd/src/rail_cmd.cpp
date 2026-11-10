@@ -3680,7 +3680,8 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		if (HasRailCatenaryDrawn(GetRailType(ti->tile))) DrawRailCatenary(ti);
 
-		DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, pal);
+		/* In the 3D views the colleague's engine shed stands there instead (GetThreeDDepot()). */
+		if (!ThreeDDepotStandsOn(ti)) DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, pal);
 		blocked_pillars = BRIDGEPILLARFLAGS_ALL;
 	}
 	DrawBridgeMiddle(ti, blocked_pillars);
