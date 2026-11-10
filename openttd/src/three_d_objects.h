@@ -734,6 +734,7 @@ struct ThreeDVehicleState {
 	uint8_t given = 0;          ///< the keys it gives (GIVEN_*): those of a later layer replace an earlier one's
 	std::vector<int16_t> addon_parts; ///< "doplnky": the part of each add-on it shows (its node), -1 where it names none of the add-on
 	int crew_part = -1;         ///< "posadka": the part of the group of the crew it shows, -1 none named
+	uint32_t open_doors = 0;    ///< "dvere_otevrene": bit n the wing ThreeDVehicleObject::doors[n] open, the others shut
 	std::string set_name;       ///< "sada": the GRF's set it is drawn for, by its name ("nastavba hasici"): a vehicle standing as a building's event (StateNamed())
 	bool empty = false;         ///< standing empty: none of its crew drawn, the record's nor its groups' (EmptyStateOf(): the fire Tatra on the pitch)
 	/* The pieces of the shared loads it carries (the colleague's hra/3d/TATRY-138-NAKLADY-PRO-HRU.md): the GRF's set
@@ -917,6 +918,20 @@ struct ThreeDModelWheel {
 	float max_angle = 35;       ///< "max_uhel": how far it steers at most, degrees
 };
 
+/**
+ * A wing of a door of a vehicle of its own model that opens out ("dvere" of the record, "druh": "vyklopne"; from grrrrf
+ * hra/3d/TATRA-OSOBNI-V18-PRO-HRU.md, point 3, and V20: the Karosa C734's front door): its node moved by "posun" when
+ * a state of its GRF names it open ("dvere_otevrene"). The shape has the wing twice, shut where the model has it and
+ * open where it is moved to, each a part of its own (ThreeDVehicleObject::part_names), and a state shows one of them
+ * (PartsOf()).
+ */
+struct ThreeDVehicleDoor {
+	std::string node;           ///< "uzel": the wing's node of the vehicle's own file
+	float shift[2] = {};        ///< "posun": how far the open wing lies from the shut one, x and y, metres in the vehicle's frame
+	uint8_t shut_part = 0;      ///< its part shut ("dvere/<uzel>")
+	uint8_t open_part = 0;      ///< and open ("dvere/<uzel>/otevrene")
+};
+
 /** Wheels of a vehicle object from a file of their own ("kola"): one wheel, at every place it is. */
 struct ThreeDVehicleWheels {
 	std::string file;           ///< "soubor": the wheel, its centre at the origin, its axle along y, its outer face to +y (the left)
@@ -981,6 +996,7 @@ struct ThreeDVehicleObject {
 	mutable std::map<std::pair<uint64_t, uint64_t>, std::shared_ptr<const ThreeDWear>> wear_spots; ///< where it wears (Wear()), by the parts its state shows, found the first time it is drawn worn so
 	std::vector<ThreeDVehicleAddon> addons;  ///< "doplnky"
 	std::vector<std::string> part_names;     ///< the parts the states show: each add-on's nodes ("<soubor>/<uzel>"), then the crew's groups ("posadky/<jmeno>"); part n is bit n of a state's parts
+	std::vector<ThreeDVehicleDoor> doors;       ///< "dvere": the wings of its doors that open out (ThreeDVehicleDoor)
 	std::vector<ThreeDModelWheel> model_wheels; ///< "kola_v_modelu"
 	std::string glass_node;         ///< "sklo" "uzel": the windows, drawn see-through over what is behind them
 	float glass_alpha = 0.15f;      ///< "sklo" "alfa": how much of the glass's colour a layer of it lays over

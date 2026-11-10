@@ -6779,6 +6779,21 @@ static void ReadThreeDVehicleObjects()
 						obj.companions.push_back(std::move(*c));
 					}
 				}
+				/* The wings of its doors that open out ("dvere", "druh" "vyklopne"): two parts each, shut and open
+				 * (ThreeDVehicleDoor). Other kinds ("pant" of a depot's gate) are not a vehicle's. */
+				if (e.contains("dvere") && e.at("dvere").is_array()) {
+					for (const auto &d : e.at("dvere")) {
+						if (!d.is_object() || d.value("druh", std::string()) != "vyklopne" || !d.contains("uzel") || !d.at("uzel").is_string()) continue;
+						if (!d.contains("posun") || !d.at("posun").is_array() || d.at("posun").size() != 2) continue;
+						ThreeDVehicleDoor door;
+						door.node = d.at("uzel").get<std::string>();
+						for (int a = 0; a < 2; a++) door.shift[a] = std::clamp(d.at("posun").at(a).get<float>(), -5.0f, 5.0f);
+						obj.part_names.push_back("dvere/" + door.node);
+						obj.part_names.push_back("dvere/" + door.node + "/otevrene");
+						obj.doors.push_back(std::move(door));
+						if (obj.doors.size() >= 32) break;
+					}
+				}
 				if (obj.part_names.size() > ThreeDParts::COUNT) {
 					Debug(misc, 0, "3D vehicle {}: {} parts shown by the states, only {} can be", obj.name, obj.part_names.size() - 1, ThreeDParts::COUNT - 1);
 					obj.part_names.resize(ThreeDParts::COUNT);
@@ -6787,6 +6802,12 @@ static void ReadThreeDVehicleObjects()
 					auto it = std::ranges::find(obj.part_names, name);
 					return it == obj.part_names.end() || it == obj.part_names.begin() ? 0 : static_cast<int>(it - obj.part_names.begin());
 				};
+				for (ThreeDVehicleDoor &d : obj.doors) {
+					d.shut_part = static_cast<uint8_t>(part_of("dvere/" + d.node));
+					d.open_part = static_cast<uint8_t>(part_of("dvere/" + d.node + "/otevrene"));
+				}
+				/* A wing without its two parts (past the parts a state can show) stays as the model has it. */
+				std::erase_if(obj.doors, [](const ThreeDVehicleDoor &d) { return d.shut_part == 0 || d.open_part == 0; });
 				/* The groups of the crew one of which sits at the driver's seat (the colleague's hra/3d/TATRY-V3-PRO-HRU.md:
 				 * Mat driving the fire Tatra): where a state shows one, the record's driver is not drawn (PartsOf()). */
 				for (const auto &[group, list] : obj.crew_groups) {
@@ -6934,6 +6955,15 @@ static void ReadThreeDVehicleObjects()
 						 * the states made of them after them (PictureRequest()). Once read only 255: the colleague's
 						 * two-wheeled cart has 281 (hra/3d/CHYBA-SPECIAL-255-STAVU.md), and the cute cartoon girl
 						 * pushing it, its last 26, was never found -- the bare cart drawn as if pulled. */
+						/* The wings it opens ("dvere_otevrene"; the Karosa standing loading at a stop), the others shut. */
+						if (st.contains("dvere_otevrene") && st.at("dvere_otevrene").is_array()) {
+							for (const auto &n : st.at("dvere_otevrene")) {
+								if (!n.is_string()) continue;
+								for (size_t d = 0; d < obj.doors.size(); d++) {
+									if (obj.doors[d].node == n.get<std::string>()) state.open_doors |= 1u << d;
+								}
+							}
+						}
 						obj.states.push_back(state);
 						if (obj.states.size() >= MAX_VEHICLE_STATES) break;
 					}
@@ -9076,6 +9106,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		for (const std::string &n : a.nodes) key += "/" + n;
 	}
 	for (const ThreeDModelWheel &w : this->model_wheels) key += "|o" + w.addon + "/" + w.node;
+	for (const ThreeDVehicleDoor &d : this->doors) key += fmt::format("|d{}@{},{}", d.node, d.shift[0], d.shift[1]);
 	if (!this->glass_node.empty()) key += "|s" + this->glass_node;
 	if (!this->only_node.empty()) key += "|u" + this->only_node;
 	/* Read otherwise, so a shape of its own (the player, #286: the clay town's giant mushroom at night was its day's
@@ -9264,6 +9295,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 		std::vector<std::string> marked{this->glass_node.empty() ? std::string("\x01") : this->glass_node};
 		/* (A wheel of an add-on is marked in the add-on: a name never found here keeps the numbering of the wheels.) */
 		for (const ThreeDModelWheel &w : this->model_wheels) marked.push_back(w.addon.empty() ? w.node : std::string("\x01"));
+		/* Then the wings of its doors that open out (ThreeDVehicleDoor). */
+		for (const ThreeDVehicleDoor &d : this->doors) marked.push_back(d.node);
 		if (this->frame_lights) {
 			/* A witch's frame: the glass of her lights ("noc_NN" of the frame) read below. */
 			GlbReadOptions o;
@@ -9394,6 +9427,39 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			if (lift[i]) mesh.pos[i * 3 + 2] = this->floors_over;
 		}
 	}
+	/* The wings of its doors that open out (ThreeDVehicleDoor): each wing's triangles again where it lies open, moved
+	 * by its "posun"; the wing shut its part, open its other (door_of: the door + 1 and whether open). */
+	const size_t wheel_groups = this->model_wheels.size();
+	std::vector<std::pair<uint8_t, bool>> door_of;
+	if (!this->doors.empty() && mesh.tri_group.size() == mesh.tri.size() / 3) {
+		const size_t triangles = mesh.tri.size() / 3;
+		const bool normals = mesh.nrm.size() == mesh.pos.size();
+		const bool uvs = mesh.uv.size() / 2 == mesh.pos.size() / 3;
+		const bool texs = mesh.tri_tex.size() == triangles;
+		door_of.assign(triangles, {0, false});
+		std::map<uint64_t, uint32_t> moved;
+		for (size_t t = 0; t < triangles; t++) {
+			const uint16_t g = mesh.tri_group[t];
+			if (g < 2 + wheel_groups || g - 2 - wheel_groups >= this->doors.size()) continue;
+			const size_t d = g - 2 - wheel_groups;
+			door_of[t] = {static_cast<uint8_t>(d + 1), false};
+			uint32_t copy[3];
+			for (int k = 0; k < 3; k++) {
+				const uint32_t i = mesh.tri[t * 3 + k];
+				auto [it, added] = moved.try_emplace(static_cast<uint64_t>(i) << 8 | d, static_cast<uint32_t>(mesh.pos.size() / 3));
+				if (added) {
+					mesh.pos.insert(mesh.pos.end(), {mesh.pos[i * 3] + this->doors[d].shift[0], mesh.pos[i * 3 + 1] + this->doors[d].shift[1], mesh.pos[i * 3 + 2]});
+					if (normals) mesh.nrm.insert(mesh.nrm.end(), {mesh.nrm[i * 3], mesh.nrm[i * 3 + 1], mesh.nrm[i * 3 + 2]});
+					if (uvs) mesh.uv.insert(mesh.uv.end(), {mesh.uv[i * 2], mesh.uv[i * 2 + 1]});
+				}
+				copy[k] = it->second;
+			}
+			mesh.tri.insert(mesh.tri.end(), {copy[0], copy[1], copy[2]});
+			if (texs) mesh.tri_tex.push_back(mesh.tri_tex[t]);
+			mesh.tri_group.push_back(g);
+			door_of.emplace_back(static_cast<uint8_t>(d + 1), true);
+		}
+	}
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
 	made->uv = std::move(mesh.uv);
@@ -9415,7 +9481,10 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			const uint16_t g = mesh.tri_group[t];
 			if (g == 1) {
 				made->tri_part[t] = ThreeDVehicleShape::PART_GLASS;
-			} else if (g >= 2) {
+			} else if (t < door_of.size() && door_of[t].first != 0) {
+				const ThreeDVehicleDoor &d = this->doors[door_of[t].first - 1];
+				made->tri_part[t] = door_of[t].second ? d.open_part : d.shut_part;
+			} else if (g >= 2 && g < 2 + wheel_groups) {
 				if (made->corner_wheel.empty()) made->corner_wheel.assign(made->pos.size() / 3, 0);
 				for (int k = 0; k < 3; k++) made->corner_wheel[made->tri[t * 3 + k]] = static_cast<uint8_t>(g - 1);
 			}
@@ -10116,6 +10185,9 @@ ThreeDParts ThreeDVehicleObject::PartsOf(int state) const
 {
 	const ThreeDVehicleState *s = this->State(state);
 	ThreeDParts parts = s != nullptr ? s->parts : ThreeDParts{};
+	/* Each wing of its doors shut or, the state opening it, open (ThreeDVehicleDoor); without a state shut. */
+	const uint32_t open = s != nullptr ? s->open_doors : 0;
+	for (size_t d = 0; d < this->doors.size(); d++) parts.Set(((open >> d) & 1) != 0 ? this->doors[d].open_part : this->doors[d].shut_part);
 	if (s != nullptr && s->empty) {
 		/* Standing empty: none of its crew, the record's driver neither (bit 0). */
 		if (s->crew_part > 0) parts.Clear(s->crew_part);
@@ -10681,6 +10753,8 @@ int ThreeDVehicleObject::ComposeState(const std::vector<int> &layers, uint16_t t
 			if (s.addon_colours[a] != 0) made.addon_colours[a] = s.addon_colours[a];
 		}
 		if (s.crew_part >= 0) made.crew_part = s.crew_part;
+		/* A wing open in any layer is open. */
+		made.open_doors |= s.open_doors;
 		/* The animal running behind it of any layer (the colleague's horse: its layer 1). */
 		for (const ThreeDVehicleCompanion &c : this->companions) {
 			if (s.parts.Has(c.part)) made.parts.Set(c.part);
@@ -11384,12 +11458,55 @@ bool ThreeDForestTile(TileIndex tile)
 }
 
 /**
- * The plants of a field (wheat on the farm's fields) on a sloped tile: each lifted to the ground under it, the heights
- * of the tile's corners shared between them (an object of its own a slope, made the first time).
+ * The plants of a field (wheat on the farm's fields) on its tile: as squares of the tile (LayFieldPlantsOnTileGrid()),
+ * on a sloped one each lifted to the ground under it, the heights of the tile's corners shared between them (an object
+ * of its own a slope, made the first time).
  */
+/**
+ * The plants of a field laid as squares of the tile (the player, test5: "put normal squares over the tile; why do you
+ * make the squares of the field another size than the game's tiles"): the n x n squares of its list (the wheat's 16,
+ * each about 4 m, a little apart from the grid, each of its own height and turned its own way, so that the field showed
+ * squares smaller than the tile and steps between them) on the tile's grid exactly, each as wide as its cell -- edge to
+ * edge, none over another --, all as high as they are on average and turned alike. A list not of n x n stays as it is.
+ */
+static void LayFieldPlantsOnTileGrid(std::vector<ThreeDObjectFigure> &plants)
+{
+	const size_t n = static_cast<size_t>(std::lround(std::sqrt(static_cast<double>(plants.size()))));
+	if (n < 2 || n * n != plants.size()) return;
+	const ThreeDVehicleObject *fig = GetThreeDFigure(plants[0].figure);
+	const ThreeDVehicleShape *shape = fig != nullptr ? fig->GetShape() : nullptr;
+	if (shape == nullptr || shape->x1 - shape->x0 <= 0.01f || shape->y1 - shape->y0 <= 0.01f) return;
+	if (std::ranges::any_of(plants, [&](const ThreeDObjectFigure &f) { return f.figure != plants[0].figure; })) return;
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	const double cell = side / n;
+	/* Its own width, square, as it turns by quarters. */
+	const double width = std::max(shape->x1 - shape->x0, shape->y1 - shape->y0);
+	double height = 0;
+	for (const ThreeDObjectFigure &f : plants) height += f.scale * f.stretch;
+	height /= plants.size();
+	const float scale = static_cast<float>(cell / width);
+	/* Each to the cell it is in: by its place, the rows along y, in each row along x. */
+	std::vector<size_t> order(plants.size());
+	std::iota(order.begin(), order.end(), 0);
+	std::ranges::sort(order, [&](size_t a, size_t b) { return plants[a].at[1] < plants[b].at[1]; });
+	for (size_t row = 0; row < n; row++) {
+		std::sort(order.begin() + row * n, order.begin() + (row + 1) * n, [&](size_t a, size_t b) { return plants[a].at[0] < plants[b].at[0]; });
+		for (size_t col = 0; col < n; col++) {
+			ThreeDObjectFigure &f = plants[order[row * n + col]];
+			/* All turned alike: turned by quarters each its own way, each square's stalks lay and caught the light
+			 * otherwise, a chessboard of them on the tile still. Its middle on the cell's. */
+			f.facing = 0;
+			f.at[0] = static_cast<float>((col + 0.5) * cell - (shape->x0 + shape->x1) / 2 * scale);
+			f.at[1] = static_cast<float>((row + 0.5) * cell - (shape->y0 + shape->y1) / 2 * scale);
+			f.scale = scale;
+			f.stretch = static_cast<float>(height / scale);
+		}
+	}
+}
+
 const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slope)
 {
-	if (plants == nullptr || slope == SLOPE_FLAT) return plants;
+	if (plants == nullptr) return plants;
 	static std::map<std::pair<const ThreeDObject *, Slope>, std::unique_ptr<ThreeDObject>> sloped;
 	auto &made = sloped[{plants, slope}];
 	if (made == nullptr) {
@@ -11397,6 +11514,8 @@ const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slop
 		made->name = plants->name + fmt::format("/svah{}", to_underlying(slope));
 		made->variants = 0;
 		made->plants = plants->plants;
+		LayFieldPlantsOnTileGrid(made->plants);
+		if (slope == SLOPE_FLAT) return made.get();
 		/* The corners' heights in metres: north (x 0, y 0), east (x 0, y 1), south (1, 1), west (1, 0). */
 		const double level = TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
 		const bool steep = IsSteepSlope(slope);

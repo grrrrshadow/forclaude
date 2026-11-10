@@ -10208,9 +10208,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		 * driving between them (3D cars of a GRF package); with 'zatacka' the road turns along y halfway, a bend to drive
 		 * through; a cargo's label (four letters) refits them to it, 'p2' to its subtype 2 (a lorry of the Tatras with
 		 * its trailer, the bricks with the crane); 'plny' fills them with it; 'v1:1' chooses the option 1 of the detail 1
-		 * of the configurator in the shed (the special: pushed). */
+		 * of the configurator in the shed (the special: pushed); 'zastavka' a stop of buses halfway along, where they
+		 * stop to load before the shed (the Karosa's doors at a stop, Tatra osobni v20 from grrrrf). */
 		std::string wanted(argv[2]);
-		bool bend = false, full = false;
+		bool bend = false, full = false, stop = false;
 		uint8_t subtype = 0;
 		CargoType refit_to = INVALID_CARGO;
 		std::vector<std::pair<uint8_t, uint8_t>> choices;
@@ -10219,6 +10220,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const size_t colon = argv[k].find(':');
 			if (argv[k] == "zatacka") {
 				bend = true;
+			} else if (argv[k] == "zastavka") {
+				stop = true;
 			} else if (argv[k] == "plny") {
 				full = true;
 			} else if (argv[k].size() >= 2 && argv[k].starts_with("p") && ParseInteger<uint8_t>(argv[k].substr(1)).has_value()) {
@@ -10272,6 +10275,11 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		} else {
 			road = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 15, y0), TileXY(x0 + 1, y0), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
 		}
+		/* A stop of buses halfway, drive-through ('zastavka'). */
+		if (stop && !bend && road.Succeeded()) {
+			CommandCost rs = Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, TileXY(x0 + 8, y0), 1, 1, RoadStopType::Bus, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false);
+			IConsolePrint(rs.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: auta: zastavka {},{} {}", x0 + 8, y0, rs.Succeeded() ? std::string("postavena") : RefusalReason(rs));
+		}
 		if (road.Failed() || da.Failed() || db.Failed()) {
 			IConsolePrint(CC_ERROR, "test3d: auta: silnice {} depa {} {}", RefusalReason(road), RefusalReason(da), RefusalReason(db));
 			return true;
@@ -10320,6 +10328,15 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			Order back{};
 			back.MakeGoToDepot(DestinationID(Depot::GetByTile(k % 2 == 0 ? depot_a : depot_b)->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, back);
+			/* The stop halfway first, both ways. */
+			if (stop && IsTileType(TileXY(x0 + 8, y0), TileType::Station)) {
+				Order at{};
+				at.MakeGoToStation(GetStationIndex(TileXY(x0 + 8, y0)));
+				/* Waiting there to be full: standing loading as long as the rig looks (nobody comes to the stop). */
+				at.SetLoadType(OrderLoadType::FullLoad);
+				Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, at);
+				Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 2, at);
+			}
 			/* As the purchase window's callback does (CcBuildPrimaryVehicle()): its object made ready in the depot. */
 			PrepareThreeDVehicleObjectOnMap(bought_v);
 			Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false);
