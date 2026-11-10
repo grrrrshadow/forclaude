@@ -525,8 +525,8 @@
   "jmeno": "pv_psenice_mlada",
   "druh": "rostlina",
   "vyska_m": 0.63,
-  "poznamka": "mladá zelená pšenice, čtverec 3,6 m; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 0.63 m), 1052 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
-  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "poznamka": "mladá zelená pšenice, čtverec 3,6 m; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 0.63 m), 106 trojúhelníků: plný porost pod klasy jako kvádr 4 × 4 m a nad ním svislé plochy křížem se stébly v textuře s průhledným pozadím (alphaMode MASK, oboustranné, ne BLEND; hra/3d/PROSBA-PSENICE-LEHCI.md, od 10. 11., dřív 1052 trojúhelníků)",
+  "autor": "grrrrf: vlastní model prumysl/psenice_lehka.py (numpy, bez renderu), barvy a výšky jako domy/prumysl_vanilla.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)"
  },
  {
@@ -534,8 +534,8 @@
   "jmeno": "pv_psenice_zrala",
   "druh": "rostlina",
   "vyska_m": 1.361,
-  "poznamka": "zralá pšenice, čtverec 3,6 m hustých stébel s klasy; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 1.361 m), 3852 trojúhelníků, atlas 512 px jen barva bez světla, s normálami",
-  "autor": "grrrrf: vlastní model domy/prumysl_vanilla.py (stavebnice render_dum.py), objekt domy/dum_objekt.py",
+  "poznamka": "zralá pšenice, čtverec 3,6 m hustých stébel s klasy; pata v počátku, výška 1 (meritko v seznamu rostliny dává metry, skutečná výška 1.361 m), 154 trojúhelníků: plný porost pod klasy jako kvádr 4 × 4 m a nad ním svislé plochy křížem se stébly a klasy v textuře s průhledným pozadím (alphaMode MASK, oboustranné, ne BLEND; hra/3d/PROSBA-PSENICE-LEHCI.md, od 10. 11., dřív 3852 trojúhelníků)",
+  "autor": "grrrrf: vlastní model prumysl/psenice_lehka.py (numpy, bez renderu), barvy a výšky jako domy/prumysl_vanilla.py",
   "licence": "GPL-2.0 (vlastní geometrie i textura)"
  },
  {
