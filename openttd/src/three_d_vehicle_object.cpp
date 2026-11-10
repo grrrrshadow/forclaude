@@ -3402,8 +3402,9 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	}
 	const double half = length_m * ObjectScale(obj) * UNITS_PER_METRE / 2;
 	if (half <= 0) return 0;
-	/* The slope's plane at its ends, not the game's whole steps: it tips smoothly onto a slope and holds its angle on it. */
-	auto ground = [](double px, double py) { return GroundZF(px, py, true); };
+	/* The slope's plane at its ends, not the game's whole steps: it tips smoothly onto a slope and holds its angle on it.
+	 * On a bridge's deck where it drives on it (DrivenGroundZF()), not the land under it. */
+	auto ground = [v](double px, double py) { return DrivenGroundZF(px, py, v->z_pos); };
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
 	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * stretch;
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);

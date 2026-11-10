@@ -17,6 +17,7 @@
 #include "slope_func.h"
 #include "map_func.h"
 #include "tile_map.h"
+#include "bridge_map.h"
 #include "window_func.h"
 #include "window_gui.h"
 #include "viewport_type.h"
@@ -422,6 +423,24 @@ double GroundZF(double x, double y, bool ground_vehicle)
 	const auto [slope, z] = GetFoundationPixelSlope(tile);
 	const double own = z + GetPartialZF(x - TileX(tile) * static_cast<double>(TILE_SIZE), y - TileY(tile) * static_cast<double>(TILE_SIZE), slope);
 	return std::abs(own - game) <= 1.0 ? own : game;
+}
+
+/**
+ * The surface a vehicle at a height drives on at a world point: the deck of a bridge over the point when the vehicle is
+ * up on it or on its ramp (over a level under the deck), else the ground (GroundZF()). A car's front over the bridge's
+ * first tile, its back still on the ramp, was tipped by the land under the bridge (the player, test5: "the car falls
+ * through on the first tile of the bridge, goes down the slope, on the next tile it goes on the bridge").
+ * @param at_z the vehicle's height, units (Vehicle::z_pos)
+ */
+double DrivenGroundZF(double x, double y, int at_z)
+{
+	const int max_x = static_cast<int>(Map::SizeX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
+	const TileIndex tile = TileVirtXY(std::clamp(static_cast<int>(x), 0, max_x), std::clamp(static_cast<int>(y), 0, max_y));
+	if (IsBridgeAbove(tile)) {
+		const int deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
+		if (at_z > deck - static_cast<int>(TILE_HEIGHT)) return deck;
+	}
+	return GroundZF(x, y, true);
 }
 
 /**

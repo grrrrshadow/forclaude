@@ -278,5 +278,6 @@ Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map = false);
 /* The ground's height without the game's whole steps (three_d.cpp): the planes the ground is drawn by. */
 double GetPartialZF(double x, double y, Slope corners);
 double GroundZF(double x, double y, bool ground_vehicle = true);
+double DrivenGroundZF(double x, double y, int at_z);
 
 #endif /* THREE_D_H */

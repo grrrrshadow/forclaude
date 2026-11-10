@@ -16830,7 +16830,8 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 				 * the eye rides it, each on the land under it. By the vehicle's eight directions and its steps over the tile
 				 * it jumped at each turn and shone elsewhere than the car went (the player, 4. 11.: "the lights before the car
 				 * move in jumps, so they sometimes shine elsewhere than where the car is heading"). */
-				auto ground = [](double wx, double wy) { return GroundZF(wx, wy, true); };
+				/* On a bridge's deck where it drives on it (DrivenGroundZF()), not the land under it. */
+				auto ground = [u](double wx, double wy) { return DrivenGroundZF(wx, wy, u->z_pos); };
 				/* Over a bridge or in a tunnel the vehicle is not on the land under it: its own height there. */
 				const bool on_land = std::abs(u->z_pos - ground(u->x_pos, u->y_pos)) <= static_cast<int>(TILE_HEIGHT);
 				for (int k = 1; k <= 4; k++) {
@@ -17772,7 +17773,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			 * and in a tunnel, and a ship or an aircraft. */
 			const bool on_ground = (v->type == VehicleType::Train && Train::From(v)->track != Track::Wormhole) || (v->type == VehicleType::Road && RoadVehicle::From(v)->state != RVSB_WORMHOLE);
 			if (on_ground) {
-				auto ground = [](double x, double y) { return GroundZF(x, y, true); };
+				/* On a bridge's deck where it drives on it: half a tile ahead of a car on a bridge's ramp is over the bridge, not
+				 * the valley under it (DrivenGroundZF(); the player, test5: "the car falls through on the first tile of the bridge,
+				 * goes down the slope"). */
+				auto ground = [v](double x, double y) { return DrivenGroundZF(x, y, v->z_pos); };
 				const double half = TILE_SIZE / 2.0;
 				const double rise = EyeLevelZ(ground(v->x_pos + bfx * half, v->y_pos + bfy * half) - ground(v->x_pos - bfx * half, v->y_pos - bfy * half));
 				cab_pitch = std::atan2(rise * CAB_Z_SCALE, 2 * half);

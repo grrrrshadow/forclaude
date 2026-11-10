@@ -12214,6 +12214,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 					}
 				}
 			}
+			/* 'test3d trat ... auto': a road onto the road bridge from the west and off it to the east, with a bus going over
+			 * it and back (its depot at the west end, no orders): the car up the ramp onto the deck from the eyes (the player,
+			 * test5: "the car falls through on the first tile of the bridge"). */
+			if (failed.empty() && std::find(argv.begin(), argv.end(), "auto") != argv.end()) {
+				const uint by = ry + 2;
+				const TileIndex car_depot = TileXY(x0 + 2, by);
+				Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(x0 + 5, by), TileXY(x0 + 3, by), ROADTYPE_ROAD, Axis::X, DisallowedRoadDirections{}, false, false, false);
+				/* Its end tiles whole: to the depot's door and onto the bridge's ramp. */
+				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 3, by), RoadBits{RoadBit::NE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 5, by), RoadBits{RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end + 1, by), RoadBits{RoadBit::NE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, car_depot, ROADTYPE_ROAD, DiagDirection::SW).Succeeded()) {
+					for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+						if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;
+						auto [ccost, car, ca, cb, cc] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, car_depot, e->index, true, INVALID_CARGO, ClientID::Invalid);
+						if (ccost.Succeeded() && car != VehicleID::Invalid()) {
+							Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, car, false);
+							IConsolePrint(CC_DEFAULT, "test3d: auto {} pres silnicni most z {},{} na {},{}", Vehicle::Get(car)->unitnumber, x0 + 2, by, x0 + bridge_end + 1, by);
+						}
+						break;
+					}
+				}
+			}
 			vtype = VehicleType::Train;
 		} else {
 			/* 'test3d silnice <text> <count> kopec': a plateau a level high in the middle of the grid, the rows climbing

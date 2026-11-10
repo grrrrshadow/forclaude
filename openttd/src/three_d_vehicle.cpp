@@ -2070,7 +2070,8 @@ static float LikenessPitch(const Vehicle *v, double x, double y, double facing, 
 	}
 	const double half = length_m * OBJECT_UNITS_PER_METRE / 2;
 	if (half <= 0) return 0;
-	auto ground = [](double px, double py) { return GroundZF(px, py, true); };
+	/* On a bridge's deck where it drives on it (DrivenGroundZF()), not the land under it. */
+	auto ground = [v](double px, double py) { return DrivenGroundZF(px, py, v->z_pos); };
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
 	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * EYE_LEVEL_STRETCH;
 	return static_cast<float>(std::atan2(rise_m, length_m) * 180.0 / M_PI);
