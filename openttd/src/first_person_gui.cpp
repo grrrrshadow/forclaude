@@ -537,10 +537,11 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			return true;
 		}
 		case TileType::Station:
-			return HasStationRail(tile) || IsAnyRoadStop(tile);
+			/* On a platform, round the signal box of a waypoint and the fences of a bay (FirstPersonThingsBlock()). */
+			return (HasStationRail(tile) || IsAnyRoadStop(tile)) && !FirstPersonThingsBlock(x, y, stand);
 		case TileType::Clear:
-			/* The stones of the rocky land: round a big one, up a low one (FirstPersonRocksBlock()). */
-			return !FirstPersonRocksBlock(x, y, stand);
+			/* The stones of the rocky land: round a big one, up a low one (FirstPersonThingsBlock()). */
+			return !FirstPersonThingsBlock(x, y, stand);
 		default:
 			return true;
 	}
@@ -634,7 +635,8 @@ static bool FirstPersonFreeFrom(const FirstPersonEye &w, double x, double y)
 {
 	const double feet = FirstPersonFeetZ(w);
 	const double stand = FirstPersonStandZ(x, y, feet);
-	if (stand - feet > FIRST_PERSON_WALL_UP) return false;
+	/* Up a foundation's wall no, up onto a platform or a stone as far as it steps (FirstPersonOnThing()). */
+	if (stand - feet > FIRST_PERSON_WALL_UP && !FirstPersonOnThing(x, y, stand)) return false;
 	return FirstPersonFree(x, y, stand);
 }
 

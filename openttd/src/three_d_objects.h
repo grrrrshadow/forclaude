@@ -161,6 +161,7 @@ struct ThreeDObjectColourPart {
 	int start = 255;                ///< "zacatek": the texture's lightness the colour is at its own
 	std::vector<uint32_t> palette;  ///< "paleta": the colours it may be (Colour::data), the first as it is built
 	bool per_town = false;          ///< "nahoda": "mesto": one colour a town (the colour of a lamp's foot), not one a place
+	bool per_company = false;       ///< "barva_firmy": the colour of the company the tile is of (palette unused: the game's colours, CompanyPaintColour())
 	mutable std::vector<ThreeDObjectTexture> levels; ///< the mask, halved for each level of detail (its grey in the red)
 	/** A tree's part ("barvy_casti"): the colours it may be in each use ("barvy_pouziti"), none its texture's own there; palette unused. */
 	std::array<std::vector<uint32_t>, TREE_USES> use_palettes;
@@ -1474,8 +1475,19 @@ std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope sl
  * @return nullptr: not rocky land, or the sets have not the stones (the sprite with them painted in stays)
  */
 const ThreeDObject *GetThreeDRocks(TileIndex tile);
-/** The top of the stones of a rocky tile at a point, world units from its north corner (GetThreeDRocks()): units of height over its lowest corner; none there, or not read yet. */
-std::optional<double> ThreeDRocksTopAt(TileIndex tile, double x, double y);
+/**
+ * The object of a station's tile of the game's own look (the colleague's objekty/stanice): a railway station's
+ * platforms, a waypoint, a lorries' stop or bay, turned the way the tile is; its origin the tile's north corner, on the
+ * top of its foundation. The 3D views draw it instead of the tile's buildings (ThreeDStationStandsOn()).
+ * @return nullptr: another tile, one of a set (NewGRF), or the sets have not the piece
+ */
+const ThreeDObject *GetThreeDStation(TileIndex tile);
+/**
+ * The top of what stands on a tile's land at a point, world units from its north corner: the stones of the rocky land
+ * (GetThreeDRocks()), a station's platforms, its waypoint's signal box, its lorries' bays (GetThreeDStation()).
+ * @return units of height; none there, or not read yet
+ */
+std::optional<double> ThreeDLandThingTopAt(TileIndex tile, double x, double y);
 
 /**
  * A tile of an industry of the original game drawn from the parts the industries share (the colleague's

@@ -1,0 +1,1621 @@
+[
+ {
+  "druh": "smerovani",
+  "jmeno": "smerovani",
+  "soubor": "smerovani.glb",
+  "nazev": {
+   "cs": "směrování (průjezdní bod)"
+  },
+  "typ": "zeleznice",
+  "kolej": {
+   "osa": "x",
+   "y": 7.4,
+   "poznamka": "kolej po x středem dlaždice kreslíš ty jako dosud; objekt je jen to, co stojí vedle ní"
+  },
+  "osa_y": {
+   "otoceni": -90,
+   "stred": [
+    7.4,
+    7.4
+   ],
+   "poznamka": "směrování podél y: otoč o −90° kolem středu dlaždice (kladně proti směru hodinových ručiček shora); stavědlo pak stojí u malého x jako ve spritu SPR_WAYPOINT_Y_1"
+  },
+  "dvere": [
+   {
+    "uzel": "dvere_00",
+    "druh": "dvere",
+    "pant": [
+     10.66,
+     1.42
+    ],
+    "osa": "z",
+    "poloha": [
+     10.7,
+     1.85,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 0.9,
+    "vyska": 2.1,
+    "otevira_se": "ven",
+    "otevreni_uhel": -100,
+    "poznamka": "dveře stavědla na čele k +x, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora); uvnitř jen přízemí (podlaha, strop, bílé zdi)"
+   }
+  ],
+  "interier": false,
+  "barva_firmy": {
+   "cast": "zabradli",
+   "maska": "stanice_maska_firmy.png",
+   "zacatek": 219,
+   "poznamka": "zábradlí po stranách stavědla v barvě firmy (OpenGFX má tyto čáry v barvě firmy); maska je pro texturu prvního materiálu (atlas), barvení jako u garáže (barva_firmy)"
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 13,
+   "poznamka": "v noci ukaž uzel noc: rozsvícená okna stavědla a lampa nad dveřmi; svetlo_NN jsou místa záře"
+  },
+  "vynechano": "semafor na sloupku před kolejí ze spritu OpenGFX (hráč: „směrovani , semafor mame svuj“)",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.15,
+    14.65
+   ],
+   "y": [
+    0.03,
+    11.33
+   ],
+   "z": [
+    0.0,
+    6.39
+   ]
+  },
+  "trojuhelniku": 1560,
+  "poznamka": "směrování (průjezdní bod) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 1560 trojúhelníků, 679 kB"
+ },
+ {
+  "druh": "peron",
+  "jmeno": "peron",
+  "soubor": "peron.glb",
+  "nazev": {
+   "cs": "peron (nástupiště bez přístřešku)"
+  },
+  "typ": "zeleznice",
+  "kolej": {
+   "osa": "x",
+   "y": 7.4,
+   "poznamka": "kolej po x středem dlaždice kreslíš ty jako dosud; peron je po obou stranách"
+  },
+  "osa_y": {
+   "otoceni": -90,
+   "stred": [
+    7.4,
+    7.4
+   ],
+   "poznamka": "stanice podél y: otoč o −90° kolem středu dlaždice (kladně proti směru hodinových ručiček shora)"
+  },
+  "vyska_m": 0.75,
+  "hrana": {
+   "od_osy_m": 1.8,
+   "y": [
+    5.6,
+    9.2
+   ]
+  },
+  "doplnky": [
+   {
+    "jmeno": "lavicka_parkova",
+    "poloha": [
+     3.4,
+     1.45,
+     0.75
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_parkova",
+    "poloha": [
+     11.4,
+     1.45,
+     0.75
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_parkova",
+    "poloha": [
+     3.4,
+     13.35,
+     0.75
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lavicka_parkova",
+    "poloha": [
+     11.4,
+     13.35,
+     0.75
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   }
+  ],
+  "cedule": [
+   {
+    "stred": [
+     7.4,
+     3.035,
+     3.05
+    ],
+    "normala": [
+     0,
+     1,
+     0
+    ],
+    "sirka": 2.1,
+    "vyska": 0.42
+   },
+   {
+    "stred": [
+     7.4,
+     2.965,
+     3.05
+    ],
+    "normala": [
+     0,
+     -1,
+     0
+    ],
+    "sirka": 2.1,
+    "vyska": 0.42
+   },
+   {
+    "stred": [
+     7.4,
+     11.835,
+     3.05
+    ],
+    "normala": [
+     0,
+     1,
+     0
+    ],
+    "sirka": 2.1,
+    "vyska": 0.42
+   },
+   {
+    "stred": [
+     7.4,
+     11.765,
+     3.05
+    ],
+    "normala": [
+     0,
+     -1,
+     0
+    ],
+    "sirka": 2.1,
+    "vyska": 0.42
+   }
+  ],
+  "barva_firmy": {
+   "cast": "cedule",
+   "maska": "stanice_maska_firmy.png",
+   "zacatek": 219,
+   "poznamka": "cedule stanice v barvě firmy (OpenGFX ji má modrou, v barvě firmy); maska je pro texturu prvního materiálu (atlas), barvení jako u garáže"
+  },
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.0,
+    14.8
+   ],
+   "y": [
+    0.0,
+    14.8
+   ],
+   "z": [
+    0.0,
+    3.37
+   ]
+  },
+  "trojuhelniku": 402,
+  "poznamka": "peron (nástupiště bez přístřešku) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 402 trojúhelníků, 644 kB"
+ },
+ {
+  "druh": "nakladova_rampa",
+  "jmeno": "rampa",
+  "soubor": "rampa.glb",
+  "nazev": {
+   "cs": "nákladová rampa (průjezdná)"
+  },
+  "typ": "silnice",
+  "silnice": {
+   "osa": "x",
+   "poznamka": "silnice po x středem dlaždice, zem a silnici kreslíš ty jako dosud"
+  },
+  "osa_y": {
+   "otoceni": -90,
+   "stred": [
+    7.4,
+    7.4
+   ],
+   "poznamka": "průjezdná podél y: otoč o −90° kolem středu dlaždice"
+  },
+  "cekajici_naklad": {
+   "bunky": [
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 0,
+     "poloha": [
+      1.25,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 1,
+     "poloha": [
+      2.55,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 2,
+     "poloha": [
+      3.85,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 3,
+     "poloha": [
+      5.15,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 4,
+     "poloha": [
+      6.45,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 5,
+     "poloha": [
+      7.75,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 6,
+     "poloha": [
+      9.05,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 7,
+     "poloha": [
+      10.35,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 8,
+     "poloha": [
+      11.65,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 9,
+     "poloha": [
+      12.95,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 0,
+     "poloha": [
+      1.25,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 1,
+     "poloha": [
+      2.55,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 2,
+     "poloha": [
+      3.85,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 3,
+     "poloha": [
+      5.15,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 4,
+     "poloha": [
+      6.45,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 5,
+     "poloha": [
+      7.75,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 6,
+     "poloha": [
+      9.05,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 7,
+     "poloha": [
+      10.35,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 8,
+     "poloha": [
+      11.65,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 9,
+     "poloha": [
+      12.95,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 0,
+     "poloha": [
+      1.85,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 1,
+     "poloha": [
+      3.15,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 2,
+     "poloha": [
+      4.45,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 3,
+     "poloha": [
+      5.75,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 4,
+     "poloha": [
+      7.05,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 5,
+     "poloha": [
+      8.35,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 6,
+     "poloha": [
+      9.65,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 7,
+     "poloha": [
+      10.95,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 8,
+     "poloha": [
+      12.25,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 9,
+     "poloha": [
+      13.55,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 0,
+     "poloha": [
+      1.85,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 1,
+     "poloha": [
+      3.15,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 2,
+     "poloha": [
+      4.45,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 3,
+     "poloha": [
+      5.75,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 4,
+     "poloha": [
+      7.05,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 5,
+     "poloha": [
+      8.35,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 6,
+     "poloha": [
+      9.65,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 7,
+     "poloha": [
+      10.95,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 8,
+     "poloha": [
+      12.25,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 9,
+     "poloha": [
+      13.55,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    }
+   ],
+   "bunka_m": [
+    1.3,
+    1.0
+   ],
+   "patra": 2,
+   "hromady": [
+    {
+     "strana": "zadni",
+     "sloupce": [
+      0,
+      1,
+      2
+     ],
+     "poloha": [
+      2.55,
+      1.3,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "sloupce": [
+      3,
+      4,
+      5
+     ],
+     "poloha": [
+      6.45,
+      1.3,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "sloupce": [
+      6,
+      7,
+      8
+     ],
+     "poloha": [
+      10.35,
+      1.3,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "sloupce": [
+      0,
+      1,
+      2
+     ],
+     "poloha": [
+      3.15,
+      13.5,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "sloupce": [
+      3,
+      4,
+      5
+     ],
+     "poloha": [
+      7.05,
+      13.5,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "sloupce": [
+      6,
+      7,
+      8
+     ],
+     "poloha": [
+      10.95,
+      13.5,
+      0.06
+     ],
+     "otoceni": 0
+    }
+   ],
+   "hromada": {
+    "sada": "stanice",
+    "objekt": "hromada_nakladu",
+    "rozmer_m": [
+     3.6,
+     2.0,
+     1.2
+    ]
+   },
+   "poznamka": "čekající náklad stanice na zemi (hráč: „tam bysme na zemi zobrazili čekající náklad“), místo beden ze spritu OpenGFX. Bunky jsou místa pro kusy v pořadí plnění (zadní řada první), každá 1,3 × 1,0 m, kus stojí na poloha (z = horní plocha betonu), otoceni 0 = delší strana kusu podél x; kusy jdou do 2 pater (druhé na výšce rozmer_m kusu pod ním). Kusové náklady kusem ze sady naklady podle jejich tabulky naklady (zboží paleta_bedny, cement paleta_pytle …), pošta paleta_pytle barvy 3E5F8A, kapaliny paleta_barely, dobytek dobytek_*, dlouhé kusy (klady, prkna 3,6 m) přes 3 buňky řady, ocel přes 2. Sypké náklady hromadou hromada_nakladu na místech hromady (každá přes 3 sloupce a obě řady), barva podle jejího záznamu, meritko podle množství (0,4–1). Kolik kusů na množství, rozhodni ty (návrh: kus na 10 jednotek, nejvýš všechna místa); víc druhů nákladu: místa po druzích podle množství."
+  },
+  "barva_firmy": {
+   "cast": "lampy",
+   "maska": "stanice_maska_firmy.png",
+   "zacatek": 219,
+   "poznamka": "sloupy lamp v barvě firmy (OpenGFX je má modré, v barvě firmy); maska pro texturu prvního materiálu (atlas)"
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc: svítí žluté lampy; svetlo_NN jsou místa záře"
+  },
+  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad)",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.12,
+    14.68
+   ],
+   "y": [
+    0.05,
+    14.65
+   ],
+   "z": [
+    0.0,
+    4.4
+   ]
+  },
+  "trojuhelniku": 770,
+  "poznamka": "nákladová rampa (průjezdná) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 770 trojúhelníků, 649 kB"
+ },
+ {
+  "druh": "nakladova_rampa",
+  "jmeno": "rampa_slepa",
+  "soubor": "rampa_slepa.glb",
+  "nazev": {
+   "cs": "nákladová rampa (slepá)"
+  },
+  "typ": "silnice",
+  "vjezd": {
+   "smer": [
+    1,
+    0
+   ],
+   "diagdir": "SW",
+   "konec_silnice_x": 2.9,
+   "poznamka": "postavená vjezdem k +x (DIAGDIR_SW) jako depa; ostatní směry otoč kolem středu dlaždice: SE +90° (vjezd +y), NE 180°, NW −90°"
+  },
+  "cekajici_naklad": {
+   "bunky": [
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 0,
+     "poloha": [
+      3.85,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 1,
+     "poloha": [
+      5.15,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 2,
+     "poloha": [
+      6.45,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 3,
+     "poloha": [
+      7.75,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 4,
+     "poloha": [
+      9.05,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 5,
+     "poloha": [
+      10.35,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 6,
+     "poloha": [
+      11.65,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 0,
+     "sloupec": 7,
+     "poloha": [
+      12.95,
+      0.75,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 0,
+     "poloha": [
+      3.85,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 1,
+     "poloha": [
+      5.15,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 2,
+     "poloha": [
+      6.45,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 3,
+     "poloha": [
+      7.75,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 4,
+     "poloha": [
+      9.05,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 5,
+     "poloha": [
+      10.35,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 6,
+     "poloha": [
+      11.65,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "rada": 1,
+     "sloupec": 7,
+     "poloha": [
+      12.95,
+      1.85,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 0,
+     "poloha": [
+      3.85,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 1,
+     "poloha": [
+      5.15,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 2,
+     "poloha": [
+      6.45,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 3,
+     "poloha": [
+      7.75,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 4,
+     "poloha": [
+      9.05,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 5,
+     "poloha": [
+      10.35,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 6,
+     "poloha": [
+      11.65,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 0,
+     "sloupec": 7,
+     "poloha": [
+      12.95,
+      14.05,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 0,
+     "poloha": [
+      3.85,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 1,
+     "poloha": [
+      5.15,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 2,
+     "poloha": [
+      6.45,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 3,
+     "poloha": [
+      7.75,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 4,
+     "poloha": [
+      9.05,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 5,
+     "poloha": [
+      10.35,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 6,
+     "poloha": [
+      11.65,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "rada": 1,
+     "sloupec": 7,
+     "poloha": [
+      12.95,
+      12.95,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 0,
+     "poloha": [
+      0.75,
+      1.55,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 1,
+     "poloha": [
+      0.75,
+      2.85,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 2,
+     "poloha": [
+      0.75,
+      4.15,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 3,
+     "poloha": [
+      0.75,
+      5.45,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 4,
+     "poloha": [
+      0.75,
+      6.75,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 5,
+     "poloha": [
+      0.75,
+      8.05,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 6,
+     "poloha": [
+      0.75,
+      9.35,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 7,
+     "poloha": [
+      0.75,
+      10.65,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 8,
+     "poloha": [
+      0.75,
+      11.95,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 0,
+     "sloupec": 9,
+     "poloha": [
+      0.75,
+      13.25,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 0,
+     "poloha": [
+      1.85,
+      1.55,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 1,
+     "poloha": [
+      1.85,
+      2.85,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 2,
+     "poloha": [
+      1.85,
+      4.15,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 3,
+     "poloha": [
+      1.85,
+      5.45,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 4,
+     "poloha": [
+      1.85,
+      6.75,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 5,
+     "poloha": [
+      1.85,
+      8.05,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 6,
+     "poloha": [
+      1.85,
+      9.35,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 7,
+     "poloha": [
+      1.85,
+      10.65,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 8,
+     "poloha": [
+      1.85,
+      11.95,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "rada": 1,
+     "sloupec": 9,
+     "poloha": [
+      1.85,
+      13.25,
+      0.06
+     ],
+     "otoceni": 90
+    }
+   ],
+   "bunka_m": [
+    1.3,
+    1.0
+   ],
+   "patra": 2,
+   "hromady": [
+    {
+     "strana": "zadni",
+     "sloupce": [
+      0,
+      1,
+      2
+     ],
+     "poloha": [
+      5.15,
+      1.3,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "zadni",
+     "sloupce": [
+      3,
+      4,
+      5
+     ],
+     "poloha": [
+      9.05,
+      1.3,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "sloupce": [
+      0,
+      1,
+      2
+     ],
+     "poloha": [
+      5.15,
+      13.5,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "predni",
+     "sloupce": [
+      3,
+      4,
+      5
+     ],
+     "poloha": [
+      9.05,
+      13.5,
+      0.06
+     ],
+     "otoceni": 0
+    },
+    {
+     "strana": "konec",
+     "sloupce": [
+      0,
+      1,
+      2
+     ],
+     "poloha": [
+      1.3,
+      2.85,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "sloupce": [
+      3,
+      4,
+      5
+     ],
+     "poloha": [
+      1.3,
+      6.75,
+      0.06
+     ],
+     "otoceni": 90
+    },
+    {
+     "strana": "konec",
+     "sloupce": [
+      6,
+      7,
+      8
+     ],
+     "poloha": [
+      1.3,
+      10.65,
+      0.06
+     ],
+     "otoceni": 90
+    }
+   ],
+   "hromada": {
+    "sada": "stanice",
+    "objekt": "hromada_nakladu",
+    "rozmer_m": [
+     3.6,
+     2.0,
+     1.2
+    ]
+   },
+   "poznamka": "čekající náklad stanice na zemi (hráč: „tam bysme na zemi zobrazili čekající náklad“), místo beden ze spritu OpenGFX. Bunky jsou místa pro kusy v pořadí plnění (zadní řada první), každá 1,3 × 1,0 m, kus stojí na poloha (z = horní plocha betonu), otoceni 0 = delší strana kusu podél x; kusy jdou do 2 pater (druhé na výšce rozmer_m kusu pod ním). Kusové náklady kusem ze sady naklady podle jejich tabulky naklady (zboží paleta_bedny, cement paleta_pytle …), pošta paleta_pytle barvy 3E5F8A, kapaliny paleta_barely, dobytek dobytek_*, dlouhé kusy (klady, prkna 3,6 m) přes 3 buňky řady, ocel přes 2. Sypké náklady hromadou hromada_nakladu na místech hromady (každá přes 3 sloupce a obě řady), barva podle jejího záznamu, meritko podle množství (0,4–1). Kolik kusů na množství, rozhodni ty (návrh: kus na 10 jednotek, nejvýš všechna místa); víc druhů nákladu: místa po druzích podle množství."
+  },
+  "barva_firmy": {
+   "cast": "lampy",
+   "maska": "stanice_maska_firmy.png",
+   "zacatek": 219,
+   "poznamka": "sloupy lamp v barvě firmy (OpenGFX je má modré, v barvě firmy); maska pro texturu prvního materiálu (atlas)"
+  },
+  "noc": {
+   "uzel": "noc",
+   "den": "den",
+   "svetla": 4,
+   "poznamka": "v noci ukaž uzel noc: svítí žluté lampy; svetlo_NN jsou místa záře"
+  },
+  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad)",
+  "okraje_textur": 8,
+  "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    0.05,
+    14.68
+   ],
+   "y": [
+    0.05,
+    14.75
+   ],
+   "z": [
+    0.0,
+    4.4
+   ]
+  },
+  "trojuhelniku": 1070,
+  "poznamka": "nákladová rampa (slepá) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 1070 trojúhelníků, 652 kB"
+ },
+ {
+  "druh": "naklad",
+  "jmeno": "hromada_nakladu",
+  "soubor": "hromada_nakladu.glb",
+  "nazev": {
+   "cs": "hromada sypkého nákladu"
+  },
+  "barvy": [
+   {
+    "cast": "hromada",
+    "maska": "hromada_nakladu_maska.png",
+    "zacatek": 184
+   }
+  ],
+  "barva_podle_nakladu": {
+   "COAL": "2A2928",
+   "SAND": "C4A468",
+   "GRVL": "77736E",
+   "CLAY": "895738",
+   "IORE": "8A4B32",
+   "CORE": "6F7A5E",
+   "AORE": "A5523A",
+   "GRAI": "D2B25C",
+   "WHEA": "D2B25C",
+   "MAIZ": "E0B840"
+  },
+  "poznamka": "hromada sypkého nákladu na zemi nákladové rampy (cekajici_naklad.hromady): počátek pod středem, delší strana podél x; šedé zrno celé pod maskou, barvi ji barvou nákladu z barva_podle_nakladu (barvy jako kupa v lopatě UNC, obilí naše), jiný sypký náklad šedý; meritko podle množství",
+  "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
+  "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "rozmer_m": {
+   "x": [
+    -1.8,
+    1.8
+   ],
+   "y": [
+    -1.0,
+    1.0
+   ],
+   "z": [
+    0.0,
+    1.2
+   ]
+  },
+  "trojuhelniku": 476
+ }
+]

@@ -11376,6 +11376,34 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: posekat farma {},{} poli {} prvni {},{}", fx, fy, count, first != INVALID_TILE ? TileX(first) : 0, first != INVALID_TILE ? TileY(first) : 0);
+	} else if (what == "stanice3d" && argv.size() > 3) {
+		/* 'stanice3d <x> <y>': the stations of the colleague's objekty/stanice side by side from the tile (GetThreeDStation()):
+		 * a rail station along x 3 long at (x, y), one along y 3 long at (x + 5, y), a waypoint along x at (x, y + 5) on its
+		 * rail, a lorries' drive-through stop along x at (x + 5, y + 6) on its road, a bay at (x + 8, y + 6) its entrance to
+		 * south-west and one at (x + 10, y + 6) to south-east; each tile then its object. */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		auto said = [](std::string_view what, const CommandCost &r) { IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: stanice3d {}: {}", what, r.Succeeded() ? std::string("postaveno") : RefusalReason(r)); };
+		said("nadrazi x", Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, at(0, 0), RAILTYPE_RAIL, Axis::X, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), false));
+		said("nadrazi y", Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, at(5, 0), RAILTYPE_RAIL, Axis::Y, 1, 3, STAT_CLASS_DFLT, 0, StationID::Invalid(), false));
+		said("kolej smerovani", Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, at(0, 5), RAILTYPE_RAIL, Track::X, false));
+		said("smerovani", Command<Commands::BuildRailWaypoint>::Do(DoCommandFlag::Execute, at(0, 5), Axis::X, 1, 1, STAT_CLASS_WAYP, 0, StationID::Invalid(), false, true));
+		said("silnice rampy", Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, at(5, 6), RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid()));
+		said("rampa", Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, at(5, 6), 1, 1, RoadStopType::Truck, true, DiagDirection::NE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false));
+		said("rampa slepa sw", Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, at(8, 6), 1, 1, RoadStopType::Truck, false, DiagDirection::SW, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false));
+		said("rampa slepa se", Command<Commands::BuildRoadStop>::Do(DoCommandFlag::Execute, at(10, 6), 1, 1, RoadStopType::Truck, false, DiagDirection::SE, ROADTYPE_ROAD, ROADSTOP_CLASS_DFLT, 0, StationID::Invalid(), false));
+		for (const auto &[dx, dy] : std::initializer_list<std::pair<int, int>>{{0, 0}, {5, 0}, {0, 5}, {5, 6}, {8, 6}, {10, 6}}) {
+			const ThreeDObject *o = GetThreeDStation(at(dx, dy));
+			IConsolePrint(CC_DEFAULT, "test3d: stanice3d {},{}: {}", *x + dx, *y + dy, o != nullptr ? o->name : std::string("bez objektu"));
+		}
 	} else if (what == "kameni") {
 		/* 'kameni [x y r]': the rocky land's tiles (the stones of GetThreeDRocks()), how many and the first few with the
 		 * layout of their stones; with a place, the free land within r tiles of it (1) made rocky first. */

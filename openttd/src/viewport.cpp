@@ -14690,6 +14690,24 @@ bool ThreeDRocksStandOn(const TileInfo *ti)
 	return true;
 }
 
+/**
+ * The object of a station's tile (GetThreeDStation(): the platforms, a waypoint, a lorries' stop) on a tile its draw
+ * procedure draws now, in the 3D views, as the stones (ThreeDRocksStandOn()): on the map it stands on the top of the
+ * tile's foundation once it can be drawn; from the eyes it is collected with the buildings (CollectEyeFrame()). With
+ * the buildings see-through the game's sprites as they are.
+ * @return whether it stands there: the tile's own buildings (platforms, roofs, booths) left out
+ */
+bool ThreeDStationStandsOn(const TileInfo *ti)
+{
+	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings) || !ObjectsIndexReadOrOwed()) return false;
+	const ThreeDObject *station = GetThreeDStation(ti->tile);
+	if (station == nullptr) return false;
+	if (_cab_collecting) return true;
+	if (!ObjectReadyOrOwed(station, ti->tile, ti->tile)) return false;
+	_turned_objects.emplace_back(station, ti->tile, GetTileMaxPixelZ(ti->tile));
+	return true;
+}
+
 /** A figure standing in the view from the eyes (the clay town's mushrooms, DrawThemedTrees()): a billboard of its picture. */
 struct CabFigure {
 	std::string name; ///< the figure of the indices
@@ -16096,6 +16114,8 @@ static constexpr double CAB_INTERIOR_STOREY_M = 2.5;
 
 /** How far up the walker steps at once, metres: up a stair, not onto the wall walk overhead. */
 static constexpr double CAB_STEP_UP_M = 0.45;
+/** And onto what stands on the land (ThreeDLandThingTopAt()): a platform 0.75 m over the track, as onto a boat's deck. */
+static constexpr double CAB_THING_STEP_UP_M = 0.8;
 
 /**
  * The ground at a world point (in the map) as one walks on it: the land, and on the end of a bridge its ramp as a car
@@ -16169,10 +16189,11 @@ double FirstPersonStandZ(double x, double y, double from)
 		const double deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 		if (deck <= up_to && deck > best) best = deck;
 	}
-	/* Up on a stone of the rocky land (GetThreeDRocks()) a step at a time, up its side where it is low enough. */
-	if (const std::optional<double> top = ThreeDRocksTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE); top.has_value()) {
-		const double on = GetTilePixelZ(tile) + *top;
-		if (on <= up_to && on > best) best = on;
+	/* Up on what stands on the land (ThreeDLandThingTopAt(): a stone, a platform, a bay's floor), as onto a boat's deck
+	 * (CAB_THING_STEP_UP_M: the platform's edge 0.75 m over the track, the colleague's hra/3d/STANICE-PERON-PRO-HRU.md),
+	 * up a stone's side where it is low enough. */
+	if (const std::optional<double> on = ThreeDLandThingTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE); on.has_value()) {
+		if (*on <= from + CAB_THING_STEP_UP_M * OBJECT_HEIGHT_PER_METRE && *on > best) best = *on;
 	}
 	/* Up on our track's embankment, on its sleepers (ThreeDTrackStandOver(), by the settings from the eyes). A height
 	 * within a unit of the ground is stretched with it from the eyes (EyeBaseZ()), its metres a level's 5 m: so much
@@ -16185,20 +16206,34 @@ double FirstPersonStandZ(double x, double y, double from)
 	return best;
 }
 
-/**
- * Whether a stone of the rocky land (GetThreeDRocks()) is in the walker's way at a world point: higher there than a
- * step over where it stands -- a big one walked round, a low one or a flat one climbed (FirstPersonStandZ()).
- * @param stand the height it stands at, units of height; not finite: on the ground
- */
-bool FirstPersonRocksBlock(double x, double y, double stand)
+/** The top of what stands on the land at a world point (ThreeDLandThingTopAt()), units of height; none there. */
+static std::optional<double> LandThingTopAt(double x, double y)
 {
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	const TileIndex tile = TileVirtXY(ix, iy);
-	const std::optional<double> top = ThreeDRocksTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE);
+	return ThreeDLandThingTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE);
+}
+
+/**
+ * Whether what stands on the land (ThreeDLandThingTopAt()) is in the walker's way at a world point: higher there than
+ * a step onto it over where it stands -- a big stone, the signal box, a lamp's post, the fence walked round; a low
+ * stone, a platform climbed (FirstPersonStandZ()).
+ * @param stand the height it stands at, units of height; not finite: on the ground
+ */
+bool FirstPersonThingsBlock(double x, double y, double stand)
+{
+	const std::optional<double> top = LandThingTopAt(x, y);
 	if (!top.has_value()) return false;
 	const double from = std::isfinite(stand) ? stand : CabWalkedGround(x, y);
-	return GetTilePixelZ(tile) + *top > from + CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
+	return *top > from + CAB_THING_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
+}
+
+/** Whether the walker standing at a height at a world point stands on what stands on the land there (a platform, a stone). */
+bool FirstPersonOnThing(double x, double y, double stand)
+{
+	const std::optional<double> top = LandThingTopAt(x, y);
+	return top.has_value() && std::abs(*top - stand) < 0.05 * OBJECT_HEIGHT_PER_METRE;
 }
 
 /**
@@ -18416,6 +18451,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
 		if (tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings)) {
+			/* A station's tile of the game's own look: its object, its own buildings left out (ThreeDStationStandsOn()). */
+			if (const ThreeDObject *station = GetThreeDStation(_cur_ti.tile); station != nullptr) objects.push_back({station, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile)});
 			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 				const ThreeDObject *stop = GetThreeDBusStop(_cur_ti.tile, ps.image);

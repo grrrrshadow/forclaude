@@ -3617,7 +3617,10 @@ static void DrawTile_Station(TileInfo *ti)
 		total_offset = 0;
 	}
 
-	if (HasBusStopGirls(ti->tile) && t->GetSequence().size() == 2 && !IsInvisibilitySet(TransparencyOption::Buildings)) {
+	if (ThreeDStationStandsOn(ti)) {
+		/* In the 3D views the colleague's object of a tile of the game's own look stands there (GetThreeDStation()): the
+		 * platforms without a shelter, the waypoint, the loading bay without a booth; the tile's own buildings left out. */
+	} else if (HasBusStopGirls(ti->tile) && t->GetSequence().size() == 2 && !IsInvisibilitySet(TransparencyOption::Buildings)) {
 		DrawBusStopWithGirls(ti, t, total_offset, relocation, palette);
 	} else {
 		DrawRailTileSeq(ti, t, TransparencyOption::Buildings, total_offset, relocation, palette);

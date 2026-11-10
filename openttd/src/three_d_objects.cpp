@@ -45,6 +45,9 @@
 #include "tree_map.h"
 #include "tile_map.h"
 #include "clear_map.h"
+#include "company_func.h"
+#include "company_base.h"
+#include "palette_func.h"
 #include "viewport_func.h"
 #include "slope_func.h"
 #include "language.h"
@@ -220,6 +223,23 @@ struct ThreeDRockStone {
 static std::vector<std::vector<ThreeDRockStone>> _three_d_rock_layouts;
 /** The rocky land's tiles (MakeRockTiles()) by the layout and the tile's slope: objects in _three_d_objects. */
 static std::map<std::pair<size_t, Slope>, size_t> _three_d_rock_tiles;
+/** What of a station the colleague's objekty/stanice stand for (ReadStationPiece()). */
+enum class ThreeDStationKind : uint8_t {
+	Platform, ///< "peron": a tile of a railway station, the platforms on both sides of the track
+	Waypoint, ///< "smerovani": a railway's waypoint
+	TruckStop, ///< "nakladova_rampa" "rampa": a drive-through stop of lorries
+	TruckBay, ///< "nakladova_rampa" "rampa_slepa": a bay of lorries
+	End,
+};
+/** A piece of a station as read (ReadStationPiece()): its add-on, the add-ons on it ("doplnky", the benches), where it turns. */
+struct ThreeDStationPiece {
+	std::string name;                      ///< its add-on (_three_d_addons)
+	std::vector<ThreeDObjectFigure> addons; ///< "doplnky", as a house's
+	float centre[2] = {7.4f, 7.4f};        ///< "stred" of "osa_y": what it turns about, metres
+};
+static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStationKind::End)> _three_d_station_pieces;
+/** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
+static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 
 /*
  * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
@@ -2888,6 +2908,23 @@ static constexpr size_t THREE_D_PAINT_PARTS_MAX = 10;
 /** The parts of a house painted a colour by number ("barvy"), their masks read from beside the index. */
 static void ReadColourParts(const nlohmann::json &e, const std::string &folder, ThreeDObject &obj)
 {
+	/* A part in the colour of the company the tile is of ("barva_firmy", the colleague's stations and depots: the
+	 * railings, the sign, the lamps' posts as the sprites of OpenGFX have them in the company's colour): its mask and
+	 * start as "barvy", its colours the game's (CompanyPaintColour()). */
+	if (e.contains("barva_firmy") && e.at("barva_firmy").is_object() && e.at("barva_firmy").contains("maska") && e.at("barva_firmy").at("maska").is_string()) {
+		const auto &b = e.at("barva_firmy");
+		ThreeDObjectColourPart part;
+		part.name = b.value("cast", std::string());
+		part.mask_png = ReadWholeFile(folder + b.at("maska").get<std::string>());
+		part.start = std::clamp(b.value("zacatek", 255), 1, 255);
+		part.per_company = true;
+		part.palette.assign(to_underlying(Colours::End), 0);
+		if (part.mask_png.empty()) {
+			Debug(misc, 0, "3D object {}: the company's colour part {} has no mask", obj.name, part.name);
+		} else if (obj.colours.size() < THREE_D_PAINT_PARTS_MAX) {
+			obj.colours.push_back(std::move(part));
+		}
+	}
 	if (!e.contains("barvy")) return;
 	for (const auto &b : e.at("barvy")) {
 		ThreeDObjectColourPart part;
@@ -5570,6 +5607,76 @@ static void MakeRockTiles()
 }
 
 /**
+ * A piece of a station of the colleague's objekty/stanice (hra/3d/STANICE-SMEROVANI-PRO-HRU.md, -PERON-, -RAMPA-): one
+ * tile, its origin the tile's north corner, the track or the road along x (a bay's entrance to +x); read as an add-on
+ * (its colours, the company's), and with it the add-ons standing on it ("doplnky": the platform's benches, as a
+ * house's) and the middle it turns about ("osa_y" "stred").
+ */
+static void ReadStationPiece(const nlohmann::json &e, std::string_view kind)
+{
+	ThreeDStationKind k = ThreeDStationKind::Platform;
+	if (kind == "smerovani") k = ThreeDStationKind::Waypoint;
+	if (kind == "nakladova_rampa") k = e.contains("vjezd") ? ThreeDStationKind::TruckBay : ThreeDStationKind::TruckStop;
+	ThreeDStationPiece piece;
+	piece.name = e.value("jmeno", e.at("soubor").get<std::string>());
+	if (e.contains("osa_y") && e.at("osa_y").is_object() && e.at("osa_y").contains("stred") && e.at("osa_y").at("stred").is_array() && e.at("osa_y").at("stred").size() == 2) {
+		for (int a = 0; a < 2; a++) {
+			if (e.at("osa_y").at("stred").at(a).is_number()) piece.centre[a] = e.at("osa_y").at("stred").at(a).get<float>();
+		}
+	}
+	if (e.contains("doplnky") && e.at("doplnky").is_array()) {
+		for (const auto &a : e.at("doplnky")) {
+			if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha") || !a.at("poloha").is_array() || a.at("poloha").size() != 3) continue;
+			ThreeDObjectFigure &place = piece.addons.emplace_back();
+			place.figure = a.at("jmeno").get<std::string>();
+			for (int c = 0; c < 3; c++) place.at[c] = a.at("poloha").at(c).is_number() ? a.at("poloha").at(c).get<float>() : 0.0f;
+			place.facing = a.value("otoceni", 0.0f);
+			place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+		}
+	}
+	_three_d_station_pieces[to_underlying(k)] = std::move(piece);
+}
+
+/**
+ * The stations' objects (the player: "a 3D waypoint, a platform without a shelter, a loading bay without a booth"): for
+ * each piece of a station (ReadStationPiece()) and each way it stands an object of it and its add-ons alone, drawn as
+ * the buildings are -- along x as it is made, along y turned by -90 degrees about its middle (its "osa_y"); a bay its
+ * entrance to +x (south-west) as it is made, to south-east turned by 90, north-east 180, north-west -90.
+ */
+static void MakeStationObjects()
+{
+	_three_d_station_objects.clear();
+	for (uint8_t k = 0; k < to_underlying(ThreeDStationKind::End); k++) {
+		const std::optional<ThreeDStationPiece> &piece = _three_d_station_pieces[k];
+		if (!piece.has_value() || !_three_d_addons.contains(piece->name)) continue;
+		const ThreeDStationKind kind = static_cast<ThreeDStationKind>(k);
+		/* By the way it stands: an axis (X, Y), or a bay's entrance (DiagDirection: NE, SE, SW, NW). */
+		std::vector<std::pair<int, float>> ways = {{to_underlying(Axis::X), 0.0f}, {to_underlying(Axis::Y), -90.0f}};
+		if (kind == ThreeDStationKind::TruckBay) ways = {{to_underlying(DiagDirection::NE), 180.0f}, {to_underlying(DiagDirection::SE), 90.0f}, {to_underlying(DiagDirection::SW), 0.0f}, {to_underlying(DiagDirection::NW), -90.0f}};
+		for (const auto &[way, turn] : ways) {
+			ThreeDObject obj;
+			obj.name = fmt::format("{} {}", piece->name, way);
+			obj.variants = 0;
+			/* Each place turned about the middle: where its foot goes, and its own turn. */
+			const double a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+			auto turned = [&](ThreeDObjectFigure f) {
+				const double dx = f.at[0] - piece->centre[0], dy = f.at[1] - piece->centre[1];
+				f.at[0] = static_cast<float>(piece->centre[0] + dx * c - dy * s);
+				f.at[1] = static_cast<float>(piece->centre[1] + dx * s + dy * c);
+				f.facing += turn;
+				return f;
+			};
+			ThreeDObjectFigure itself;
+			itself.figure = piece->name;
+			obj.addon_places.push_back(turned(itself));
+			for (const ThreeDObjectFigure &f : piece->addons) obj.addon_places.push_back(turned(f));
+			_three_d_station_objects.emplace(std::make_pair(kind, way), _three_d_objects.size());
+			_three_d_objects.push_back(std::move(obj));
+		}
+	}
+}
+
+/**
  * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
  * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
  * go (made after them, so let go of before them).
@@ -5687,7 +5794,9 @@ static void ReadThreeDObjectsNow()
 					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
 					continue;
 				}
-				if ((kind == "doplnek" || kind == "objekt") && e.contains("soubor") && e.at("soubor").is_string()) {
+				const bool station_piece = kind == "peron" || kind == "smerovani" || kind == "nakladova_rampa";
+				if (station_piece && e.contains("soubor") && e.at("soubor").is_string()) ReadStationPiece(e, kind);
+				if ((kind == "doplnek" || kind == "objekt" || station_piece) && e.contains("soubor") && e.at("soubor").is_string()) {
 					/* An add-on of the buildings (a parasol, a bench): one file, its foot at the origin, facing +x, read
 					 * the first time a building with it is drawn (LayAddons()); never a house of its own (variants 0).
 					 * An object of the colleague's on its own ("objekt": the sign of a bus stop) in the same frame, as
@@ -5785,6 +5894,7 @@ static void ReadThreeDObjectsNow()
 	MakeStreetLamps();
 	MakeBusStops();
 	MakeRockTiles();
+	MakeStationObjects();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
@@ -11846,6 +11956,26 @@ std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope sl
 	return it->second;
 }
 
+const ThreeDObject *GetThreeDStation(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_station_objects.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Station)) return nullptr;
+	ThreeDStationKind kind;
+	int way;
+	if (HasStationRail(tile)) {
+		/* The game's own: one of a set (NewGRF) has its own look. */
+		if (IsCustomStationSpecIndex(tile)) return nullptr;
+		kind = IsRailWaypoint(tile) ? ThreeDStationKind::Waypoint : ThreeDStationKind::Platform;
+		way = to_underlying(GetRailStationAxis(tile));
+	} else if (IsTruckStop(tile) && GetRoadStopSpec(tile) == nullptr) {
+		kind = IsDriveThroughStopTile(tile) ? ThreeDStationKind::TruckStop : ThreeDStationKind::TruckBay;
+		way = kind == ThreeDStationKind::TruckStop ? to_underlying(GetDriveThroughStopAxis(tile)) : to_underlying(GetBayRoadStopDir(tile));
+	} else {
+		return nullptr;
+	}
+	const auto it = _three_d_station_objects.find({kind, way});
+	return it == _three_d_station_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
 const ThreeDObject *GetThreeDRocks(TileIndex tile)
 {
 	if (!_three_d_objects_read || _three_d_rock_layouts.empty() || !IsValidTile(tile)) return nullptr;
@@ -11858,14 +11988,15 @@ const ThreeDObject *GetThreeDRocks(TileIndex tile)
 	return it == _three_d_rock_tiles.end() ? nullptr : &_three_d_objects[it->second];
 }
 
-std::optional<double> ThreeDRocksTopAt(TileIndex tile, double x, double y)
+/** The top of an object's triangles over a point, world units from its north corner: units of height over its foot; none there, or not read yet. */
+static std::optional<double> ShapeTopAt(const ThreeDObject *o, double x, double y)
 {
-	const ThreeDObject *rocks = GetThreeDRocks(tile);
-	if (rocks == nullptr || !rocks->TryRead() || rocks->pos.empty()) return std::nullopt;
-	if (x < rocks->extent[0] || x > rocks->extent[1] || y < rocks->extent[2] || y > rocks->extent[3]) return std::nullopt;
+	if (o == nullptr || !o->TryRead() || o->pos.empty()) return std::nullopt;
+	if (x < o->extent[0] || x > o->extent[1] || y < o->extent[2] || y > o->extent[3]) return std::nullopt;
 	std::optional<double> top;
-	for (size_t t = 0; t + 2 < rocks->tri.size(); t += 3) {
-		const float *a = &rocks->pos[rocks->tri[t] * 3], *b = &rocks->pos[rocks->tri[t + 1] * 3], *c = &rocks->pos[rocks->tri[t + 2] * 3];
+	for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
+		const float *a = &o->pos[o->tri[t] * 3], *b = &o->pos[o->tri[t + 1] * 3], *c = &o->pos[o->tri[t + 2] * 3];
+		if (std::max({a[0], b[0], c[0]}) < x || std::min({a[0], b[0], c[0]}) > x || std::max({a[1], b[1], c[1]}) < y || std::min({a[1], b[1], c[1]}) > y) continue;
 		const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
 		if (std::abs(d) < 1e-9) continue;
 		const double l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
@@ -11876,6 +12007,21 @@ std::optional<double> ThreeDRocksTopAt(TileIndex tile, double x, double y)
 		if (!top.has_value() || z > *top) top = z;
 	}
 	return top;
+}
+
+std::optional<double> ThreeDLandThingTopAt(TileIndex tile, double x, double y)
+{
+	/* The stones from the tile's lowest corner, a station from the top of its foundation. */
+	if (const ThreeDObject *rocks = GetThreeDRocks(tile); rocks != nullptr) {
+		const std::optional<double> top = ShapeTopAt(rocks, x, y);
+		if (top.has_value()) return GetTilePixelZ(tile) + *top;
+		return std::nullopt;
+	}
+	if (const ThreeDObject *station = GetThreeDStation(tile); station != nullptr) {
+		const std::optional<double> top = ShapeTopAt(station, x, y);
+		if (top.has_value()) return GetTileMaxPixelZ(tile) + *top;
+	}
+	return std::nullopt;
 }
 
 /**
@@ -12512,6 +12658,29 @@ static uint32_t PartColourNumber(uint32_t h, uint32_t town, size_t k, const Thre
  * 0 for a house without parts.
  * @return the colours' numbers, four bits a part, with the top bit set
  */
+/**
+ * The colour of the company a tile is of (ThreeDObjectColourPart::per_company): its owner's number of the game's
+ * colours, grey a tile of none (a house's, an industry's); read as the town (PaintTownAt()).
+ */
+static uint32_t PaintCompanyAt(TileIndex t)
+{
+	if (t >= Map::Size() || IsTileType(t, TileType::Void) || IsTileType(t, TileType::House) || IsTileType(t, TileType::Industry)) return to_underlying(Colours::Grey);
+	const Owner owner = GetTileOwner(t);
+	return to_underlying(Company::IsValidID(owner) ? _company_colours[owner] : Colours::Grey);
+}
+
+/**
+ * A company's colour as a part painted in it shows it (ThreeDObject::Painted()): the shade of its colour the game's
+ * sprites in the company's colour show most, read from the palette when the texture is painted (the colours are known
+ * once the base graphics are, after the indices are read).
+ */
+static uint32_t CompanyPaintColour(uint32_t colour)
+{
+	const PixelColour index = GetColourGradient(static_cast<Colours>(colour % to_underlying(Colours::End)), Shade::Lighter);
+	const Colour &c = _cur_palette.palette[index.p];
+	return Colour(c.r, c.g, c.b).data;
+}
+
 uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 {
 	/* A tree is painted by its use where it stands among a building's add-ons (AddonPaintAt()), never on its own. */
@@ -12520,7 +12689,10 @@ uint32_t ThreeDObject::PaintAt(TileIndex origin) const
 	uint32_t paint = 1u << 31;
 	const uint8_t bits = PaintBits(this->colours.size());
 	const uint32_t town = PaintTownAt(origin);
-	for (size_t k = 0; k < this->colours.size(); k++) paint |= PartColourNumber(h, town, k, this->colours[k], bits) << (bits * k);
+	for (size_t k = 0; k < this->colours.size(); k++) {
+		const uint32_t n = this->colours[k].per_company ? PaintCompanyAt(origin) : PartColourNumber(h, town, k, this->colours[k], bits);
+		paint |= n << (bits * k);
+	}
 	/* The statue of stone or of bronze (variant_paint): its first part the colour of its variant, by a bit of the
 	 * tile's hash -- of the tile only, as the rest: the frame from the eyes paints on threads of its own. */
 	if (this->variant_paint[0] >= 0 || this->variant_paint[1] >= 0) {
@@ -12565,7 +12737,10 @@ uint32_t ThreeDObject::AddonPaintAt(TileIndex origin, uint8_t texture) const
 	}
 	/* A street lamp's foot one colour a town (ThreeDObjectColourPart::per_town), whichever lamp it is. */
 	const uint32_t town = PaintTownAt(origin);
-	for (size_t k = 0; k < a.colours.size(); k++) paint |= PartColourNumber(h, town, k, a.colours[k], bits) << (bits * k);
+	for (size_t k = 0; k < a.colours.size(); k++) {
+		const uint32_t n = a.colours[k].per_company ? PaintCompanyAt(origin) : PartColourNumber(h, town, k, a.colours[k], bits);
+		paint |= n << (bits * k);
+	}
 	return paint;
 }
 
@@ -13368,7 +13543,7 @@ ThreeDObjectTexture ThreeDObject::Painted(const ThreeDObjectTexture &plain, uint
 				break;
 			}
 		}
-		const Colour colour((*palette)[number % palette->size()]);
+		const Colour colour(part.per_company ? CompanyPaintColour(number) : (*palette)[number % palette->size()]);
 		const float start = static_cast<float>(part.start);
 		for (int y = 0; y < t.h; y++) {
 			const int my = std::min(mask->h - 1, y * mask->h / t.h);
