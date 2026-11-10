@@ -5832,6 +5832,39 @@ static void ReadStationPiece(const nlohmann::json &e, std::string_view kind)
 }
 
 /**
+ * Its flat faces looking up as its floors (ThreeDObject::flat_floors; a lighthouse: the colleague described its stairs
+ * and floors in words, "podlahy", without nodes "podlaha"): each walked on (FloorAt()) and in no one's way
+ * (passable_tris).
+ */
+static void TakeFlatFloors(ThreeDObject &obj)
+{
+	const size_t n = obj.tri.size() / 3;
+	std::vector<bool> flat(n, false);
+	for (size_t t = 0; t < n; t++) {
+		const float *a = &obj.pos[obj.tri[t * 3] * 3], *b = &obj.pos[obj.tri[t * 3 + 1] * 3], *c = &obj.pos[obj.tri[t * 3 + 2] * 3];
+		const double ux = b[0] - a[0], uy = b[1] - a[1], uz = (b[2] - a[2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		const double vx = c[0] - a[0], vy = c[1] - a[1], vz = (c[2] - a[2]) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		const double nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+		const double len = std::sqrt(nx * nx + ny * ny + nz * nz);
+		/* Looking up: the triangles keep their outer side counter-clockwise from outside (TakeGlbMesh()). */
+		if (len <= 0 || nz / len < 0.95) continue;
+		flat[t] = true;
+		for (const float *p : {a, b, c}) obj.floor.insert(obj.floor.end(), {p[0], p[1], p[2]});
+	}
+	/* In no one's way: runs of them among the runs already passable (a tree's crown). */
+	std::vector<bool> passable(n, false);
+	for (size_t r = 0; r + 1 < obj.passable_tris.size(); r += 2) {
+		for (uint32_t t = obj.passable_tris[r]; t < obj.passable_tris[r + 1] && t < n; t++) passable[t] = true;
+	}
+	obj.passable_tris.clear();
+	for (size_t t = 0; t < n; t++) {
+		const bool p = passable[t] || flat[t];
+		if (p != (obj.passable_tris.size() % 2 == 1)) obj.passable_tris.push_back(static_cast<uint32_t>(t));
+	}
+	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(n));
+}
+
+/**
  * A lighthouse (the colleague's objekty/majaky, hra/3d/MAJAKY-PRO-HRU.md; the player, 10. 11.: "go do the lighthouses"):
  * its file an add-on without the node that turns ("otaceni" "uzel", the reflector with its night), its foot in the
  * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
@@ -5861,6 +5894,7 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	ThreeDObject obj;
 	obj.name = "majak/" + name;
 	obj.variants = 0;
+	obj.flat_floors = true;
 	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0);
 	ThreeDObjectFigure itself;
 	itself.figure = name;
@@ -11737,6 +11771,11 @@ const ThreeDObject *GetThreeDOutsideOfInterior(const ThreeDObject *obj)
  */
 const ThreeDObject *GetThreeDObjectToStandOnAt(TileIndex tile, TileIndex &origin)
 {
+	/* A lighthouse: up its stairs (TakeFlatFloors()). */
+	if (const ThreeDObject *lighthouse = GetThreeDLighthouse(tile); lighthouse != nullptr) {
+		origin = tile;
+		return lighthouse;
+	}
 	if (IsTileType(tile, TileType::House)) {
 		if (!IsHouseCompleted(tile)) return nullptr;
 		HouseID north = GetHouseType(tile);
@@ -11821,6 +11860,51 @@ static std::optional<std::pair<double, double>> DoorMiddle(const ThreeDObject &w
 {
 	if (!wing.Read() || wing.pos.empty()) return std::nullopt;
 	return std::make_pair((wing.extent[0] + wing.extent[1]) / 2.0, (wing.extent[2] + wing.extent[3]) / 2.0);
+}
+
+/**
+ * The rig ('test3d majakprofil'): along a line over a lighthouse's tile (metres from its north corner, every 0.1 m) its
+ * highest floor, the highest no more than a step over feet at 0, 0.2, 0.4 and 0.6 m over a height, and whether it is
+ * in the way of feet there ('#').
+ */
+std::string RigThreeDLighthouseProfile(TileIndex tile, double x0, double y0, double x1, double y1, double from)
+{
+	const ThreeDObject *o = GetThreeDLighthouse(tile);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadny majak";
+	std::string out = o->name;
+	const int steps = std::max(1, static_cast<int>(std::lround(std::hypot(x1 - x0, y1 - y0) / 0.1)));
+	for (int s = 0; s <= steps; s++) {
+		const double xm = x0 + (x1 - x0) * s / steps, ym = y0 + (y1 - y0) * s / steps;
+		const double x = xm * OBJECT_UNITS_PER_METRE, y = ym * OBJECT_UNITS_PER_METRE;
+		const auto top = o->FloorAt(x, y, 1e9);
+		out += fmt::format("\n {:.1f},{:.1f}: podlaha {}", xm, ym, top.has_value() ? fmt::format("{:.2f}", *top / OBJECT_HEIGHT_PER_METRE) : std::string("-"));
+		for (double feet : {from, from + 0.2, from + 0.4, from + 0.6}) {
+			const auto f = o->FloorAt(x, y, (feet + 0.45) * OBJECT_HEIGHT_PER_METRE);
+			const double stand = f.has_value() ? std::max(0.0, *f / OBJECT_HEIGHT_PER_METRE) : 0.0;
+			out += fmt::format(" | {:.1f}->{:.2f}{}", feet, stand, o->Blocks(x, y, stand * OBJECT_HEIGHT_PER_METRE) ? "#" : ".");
+		}
+	}
+	return out;
+}
+
+/**
+ * The rig ('test3d majakoblouk'): walked along an arc about the middle of a lighthouse's tile (its round one's stairs),
+ * from feet so high: at each 5 degrees the floor reached (a step at most over the last) and whether it is in the way.
+ */
+std::string RigThreeDLighthouseArc(TileIndex tile, double r, double a0, double a1, double from)
+{
+	const ThreeDObject *o = GetThreeDLighthouse(tile);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadny majak";
+	const double middle = TILE_SIZE / 2.0;
+	double feet = from * OBJECT_HEIGHT_PER_METRE;
+	std::string out = fmt::format("{} r {:.2f} m:", o->name, r);
+	for (double a = a0; a <= a1 + 1e-6; a += 5) {
+		const double x = middle + r * OBJECT_UNITS_PER_METRE * std::cos(a * M_PI / 180), y = middle + r * OBJECT_UNITS_PER_METRE * std::sin(a * M_PI / 180);
+		const std::optional<double> f = o->FloorAt(x, y, feet + 0.45 * OBJECT_HEIGHT_PER_METRE);
+		if (f.has_value()) feet = *f;
+		out += fmt::format(" {:.0f}:{:.2f}{}", a, feet / OBJECT_HEIGHT_PER_METRE, o->Blocks(x, y, feet) ? "#" : "");
+	}
+	return out;
 }
 
 /** The rig ('test3d vrata'): a depot's doors as they stand, each with its middle shut (metres from its north corner). */
@@ -13637,6 +13721,7 @@ bool ThreeDObject::Read() const
 			if (!snow.empty()) read.png = std::move(snow);
 		}
 		if (ok) LayAddons(*this, read);
+		if (ok && this->flat_floors) TakeFlatFloors(read);
 		Debug(misc, 2, "3D object {}: {} triangles read in {} ms", this->name, read.tri.size() / 3, std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start).count());
 		if (!ok) ReadDiary(fmt::format("budova {} ({}) se nenačetla, kreslí se krabice", this->name, this->glb_path.empty() ? std::string("jen doplňky") : this->glb_path), true);
 		return std::make_pair(ok, std::move(read));
@@ -13761,14 +13846,18 @@ bool ThreeDObject::Blocks(double x, double y, double feet) const
 			}
 			for (int side = 0; side < 2 && !poly.empty(); side++) {
 				const double limit = side == 0 ? lo : hi;
-				auto inside = [&](const std::array<double, 3> &p) { return side == 0 ? p[2] >= limit : p[2] <= limit; };
+				/* Over the knees by more than a centimetre: what only touches them from below is not in the way (the riser of
+				 * a step whose tread is as high as the knees, a lighthouse's stairs 0.2 m a step, the storeys a quarter of a
+				 * metre; its corners in floats a hair over them). */
+				const double at = side == 0 ? limit + 0.01 * OBJECT_HEIGHT_PER_METRE : limit;
+				auto inside = [&](const std::array<double, 3> &p) { return side == 0 ? p[2] > at : p[2] <= at; };
 				std::vector<std::array<double, 3>> cut;
 				for (size_t k = 0; k < poly.size(); k++) {
 					const auto &a = poly[k], &b = poly[(k + 1) % poly.size()];
 					if (inside(a)) cut.push_back(a);
 					if (inside(a) != inside(b)) {
-						const double f = (limit - a[2]) / (b[2] - a[2]);
-						cut.push_back({a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, limit});
+						const double f = (at - a[2]) / (b[2] - a[2]);
+						cut.push_back({a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f, at});
 					}
 				}
 				poly = std::move(cut);

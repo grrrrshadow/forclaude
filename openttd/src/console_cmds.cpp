@@ -9802,6 +9802,18 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			/* 'chodec smer <degrees>': the walker looking that way, from the map's x towards its y; on board a boat from its bow. */
 			extern void RigFirstPersonFace(double degrees);
 			RigFirstPersonFace(number(3).value_or(0));
+		} else if (argv.size() > 7 && argv[2] == "k") {
+			/* 'chodec k <x> <y> <x cm> <y cm> <steps>': the walker so many steps toward a point (centimetres from the
+			 * tile's north corner), turned to it before each (RigFirstPersonWalk()); it stops there. */
+			extern void RigFirstPersonWalkTo(double x, double y, int steps);
+			auto x = number(3), y = number(4);
+			if (x.has_value() && y.has_value()) {
+				RigFirstPersonWalkTo(*x * TILE_SIZE + number(5).value_or(0) / 100.0 * OBJECT_UNITS_PER_METRE, *y * TILE_SIZE + number(6).value_or(0) / 100.0 * OBJECT_UNITS_PER_METRE, number(7).value_or(1));
+			}
+		} else if (argv.size() > 3 && argv[2] == "proc") {
+			/* 'chodec proc <cm>': why the walker does not go so far ahead (RigFirstPersonWhy()). */
+			extern std::string RigFirstPersonWhy(int cm);
+			IConsolePrint(CC_DEFAULT, "test3d: chodec proc {}", RigFirstPersonWhy(number(3).value_or(20)));
 		} else if (argv.size() > 6 && argv[2] == "krok") {
 			auto n = number(3), ahead = number(4), aside = number(5), turn = number(6);
 			auto pitch = argv.size() > 7 ? number(7) : std::optional<int>(0);
@@ -11504,6 +11516,21 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const ThreeDObject *o = GetThreeDLighthouse(at(dx, 0));
 			IConsolePrint(CC_DEFAULT, "test3d: majaky {},{}: {}", *x + dx, *y, o != nullptr ? o->name : std::string("bez objektu"));
 		}
+	} else if (what == "majakoblouk" && argv.size() > 7) {
+		/* 'majakoblouk <x> <y> <r cm> <from degrees> <to degrees> <feet cm>': walked along an arc about the middle of a
+		 * lighthouse's tile (RigThreeDLighthouseArc()). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		extern std::string RigThreeDLighthouseArc(TileIndex tile, double r, double a0, double a1, double from);
+		IConsolePrint(CC_DEFAULT, "test3d: majakoblouk {}", RigThreeDLighthouseArc(TileXY(*x, *y), number(4).value_or(150) / 100.0, number(5).value_or(0), number(6).value_or(360), number(7).value_or(0) / 100.0));
+	} else if (what == "majakprofil" && argv.size() > 7) {
+		/* 'majakprofil <x> <y> <x0 cm> <y0 cm> <x1 cm> <y1 cm> [feet cm]': a lighthouse along a line (RigThreeDLighthouseProfile()). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		extern std::string RigThreeDLighthouseProfile(TileIndex tile, double x0, double y0, double x1, double y1, double from);
+		const std::string p = RigThreeDLighthouseProfile(TileXY(*x, *y), number(4).value_or(0) / 100.0, number(5).value_or(0) / 100.0, number(6).value_or(0) / 100.0, number(7).value_or(0) / 100.0,
+				argv.size() > 8 ? number(8).value_or(0) / 100.0 : 0.0);
+		for (const auto line : std::views::split(std::string_view(p), std::string_view("\n"))) IConsolePrint(CC_DEFAULT, "test3d: majakprofil {}", std::string_view(line.begin(), line.end()));
 	} else if (what == "vrata" && argv.size() > 3) {
 		/* 'vrata <x> <y>': the wings of a depot's gates and doors as they stand (GetThreeDDepotDoorWing()). */
 		auto x = number(2), y = number(3);

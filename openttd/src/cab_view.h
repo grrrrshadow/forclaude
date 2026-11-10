@@ -248,6 +248,9 @@ std::optional<double> EyeWaterSurfaceZ(double x, double y);
  * it is to grow in the water").
  */
 static constexpr double EYE_RIVER_BANK = 2.0;
+
+/** How far up the walker steps onto what stands on the land (ThreeDLandThingTopAt()), metres: a platform 0.75 m over the track, as onto a boat's deck; a lighthouse's base. */
+static constexpr double CAB_THING_STEP_UP_M = 0.8;
 bool EyeOnRiverBank(double x, double y);
 double EyeWaterDepth(double x, double y);
 std::optional<double> EyeWaterBedZ(double x, double y);

@@ -16152,8 +16152,6 @@ static constexpr double CAB_INTERIOR_STOREY_M = 2.5;
 
 /** How far up the walker steps at once, metres: up a stair, not onto the wall walk overhead. */
 static constexpr double CAB_STEP_UP_M = 0.45;
-/** And onto what stands on the land (ThreeDLandThingTopAt()): a platform 0.75 m over the track, as onto a boat's deck. */
-static constexpr double CAB_THING_STEP_UP_M = 0.8;
 
 /**
  * The ground at a world point (in the map) as one walks on it: the land, and on the end of a bridge its ramp as a car
@@ -16199,6 +16197,21 @@ double FirstPersonGroundZ(double x, double y)
  * bridge over the tile (the player: "and onto the bridge") --, or the ground. In an interior, its floor even under the
  * land of a slope.
  */
+/**
+ * The highest floor of a lighthouse (ThreeDObject::flat_floors) under the walker's body, not only under its middle: over
+ * the seam between a flight of its stairs and the landing, onto the edge of its base. World units from its north corner.
+ */
+static std::optional<double> FloorUnderBody(const ThreeDObject *o, double lx, double ly, double up_to)
+{
+	const double body = THREE_D_WALKER_BODY_M * OBJECT_UNITS_PER_METRE;
+	std::optional<double> floor;
+	for (const auto &[dx, dy] : {std::pair{0.0, 0.0}, std::pair{body, 0.0}, std::pair{-body, 0.0}, std::pair{0.0, body}, std::pair{0.0, -body}}) {
+		const std::optional<double> f = o->FloorAt(lx + dx, ly + dy, up_to);
+		if (f.has_value() && (!floor.has_value() || *f > *floor)) floor = f;
+	}
+	return floor;
+}
+
 double FirstPersonStandZ(double x, double y, double from)
 {
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
@@ -16216,9 +16229,12 @@ double FirstPersonStandZ(double x, double y, double from)
 		const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE;
 		const ThreeDObject *in = GetThreeDInterior(obj);
 		std::optional<double> floor;
+		/* A lighthouse's base, 0.6 m with no step at its door, as onto a platform (CAB_THING_STEP_UP_M); its floors under
+		 * the body (FloorUnderBody()). */
+		const double reach = obj->flat_floors ? from + CAB_THING_STEP_UP_M * OBJECT_HEIGHT_PER_METRE : up_to;
 		for (const ThreeDObject *o : {obj, in}) {
 			if (o == nullptr || !o->IsRead()) continue;
-			const std::optional<double> f = o->FloorAt(lx, ly, up_to - base);
+			const std::optional<double> f = o->flat_floors ? FloorUnderBody(o, lx, ly, reach - base) : o->FloorAt(lx, ly, reach - base);
 			if (f.has_value() && (!floor.has_value() || *f > *floor)) floor = f;
 		}
 		if (floor.has_value()) best = in != nullptr && ThreeDInsideInterior(obj, lx, ly) ? base + *floor : std::max(best, base + *floor);
@@ -16271,7 +16287,16 @@ bool FirstPersonThingsBlock(double x, double y, double stand)
 bool FirstPersonOnThing(double x, double y, double stand)
 {
 	const std::optional<double> top = LandThingTopAt(x, y);
-	return top.has_value() && std::abs(*top - stand) < 0.05 * OBJECT_HEIGHT_PER_METRE;
+	if (top.has_value() && std::abs(*top - stand) < 0.05 * OBJECT_HEIGHT_PER_METRE) return true;
+	/* On a floor of a lighthouse (its base, as a platform: FirstPersonStandZ()). */
+	if (x < 0 || y < 0 || x >= Map::SizeX() * TILE_SIZE || y >= Map::SizeY() * TILE_SIZE) return false;
+	const TileIndex tile = TileVirtXY(static_cast<int>(x), static_cast<int>(y));
+	TileIndex origin;
+	const ThreeDObject *obj = GetThreeDObjectToStandOnAt(tile, origin);
+	if (obj == nullptr || !obj->flat_floors || !obj->IsRead()) return false;
+	const double base = GetTileMaxPixelZ(origin);
+	const std::optional<double> f = FloorUnderBody(obj, x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE, stand - base + 0.05 * OBJECT_HEIGHT_PER_METRE);
+	return f.has_value() && std::abs(base + *f - stand) < 0.05 * OBJECT_HEIGHT_PER_METRE;
 }
 
 /**

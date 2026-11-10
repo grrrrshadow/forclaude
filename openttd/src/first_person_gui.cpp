@@ -488,8 +488,21 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	}
 	switch (GetTileType(tile)) {
 		case TileType::Void:
-		case TileType::Object:
 			return false;
+		case TileType::Object: {
+			/* A lighthouse: by its shape, in through its door, up its stairs (GetThreeDLighthouse()). Each point of the
+			 * walker's circle on its own floor there as far as one steps up onto a thing (CAB_THING_STEP_UP_M), as a body
+			 * stands: the edge of its base, 0.6 m, and the riser of the step after next not walls in the way of the feet
+			 * still on the ground or a step lower. */
+			const ThreeDObject *lighthouse = GetThreeDLighthouse(tile);
+			if (lighthouse == nullptr) return false;
+			const double lx = x - TileX(tile) * TILE_SIZE, ly = y - TileY(tile) * TILE_SIZE;
+			double up = feet(tile);
+			if (lighthouse->IsRead()) {
+				if (const std::optional<double> f = lighthouse->FloorAt(lx, ly, up + CAB_THING_STEP_UP_M * OBJECT_HEIGHT_PER_METRE); f.has_value()) up = std::max(up, *f);
+			}
+			return !lighthouse->Blocks(lx, ly, up);
+		}
 		case TileType::House: {
 			/* A house that is a 3D object: by its shape (ThreeDObject::Blocks()), into its park, under its roof. */
 			if (!IsHouseCompleted(tile)) return false;
@@ -3974,6 +3987,41 @@ std::string RigFirstPersonToMushroom(bool pick)
 	w->MakePicture();
 	w->SetDirty();
 	return out;
+}
+
+/**
+ * The rig ('chodec proc <cm>'): why the walker does not go so far ahead: where it stands, the height it would stand at
+ * there, and its middle and each point of its circle there walkable or not.
+ */
+std::string RigFirstPersonWhy(int cm)
+{
+	const FirstPersonWindow *w = static_cast<const FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return "zadny chodec";
+	const double d = cm / 100.0 * OBJECT_UNITS_PER_METRE;
+	const double x = w->walker.x + std::cos(w->walker.heading) * d, y = w->walker.y + std::sin(w->walker.heading) * d;
+	const double feet = FirstPersonFeetZ(w->walker), stand = FirstPersonStandZ(x, y, feet), ground = FirstPersonGroundZ(x, y);
+	std::string out = fmt::format("nohy {:.2f} m, tam stoji {:.2f} m, zem {:.2f} m, volno {}, stred {}", feet / OBJECT_HEIGHT_PER_METRE, stand / OBJECT_HEIGHT_PER_METRE,
+			ground / OBJECT_HEIGHT_PER_METRE, FirstPersonFree(x, y, stand) ? "ano" : "ne", FirstPersonWalkable(x, y, stand) ? "ano" : "ne");
+	out += fmt::format(", z mista {}, vyskok {:.2f}", FirstPersonFreeFrom(w->walker, x, y) ? "ano" : "ne", (stand - feet) / OBJECT_HEIGHT_PER_METRE);
+	for (const double r : {FIRST_PERSON_RADIUS, FIRST_PERSON_INDOOR_RADIUS}) {
+		out += fmt::format(", kruh {:.2f} m:", r / OBJECT_UNITS_PER_METRE);
+		for (int k = 0; k < 8; k++) out += FirstPersonWalkable(x + r * std::cos(k * M_PI / 4), y + r * std::sin(k * M_PI / 4), stand) ? '.' : '#';
+	}
+	return out;
+}
+
+void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch);
+
+/** The rig ('chodec k'): the walker so many steps toward a world point, turned to it before each; it stops there. */
+void RigFirstPersonWalkTo(double x, double y, int steps)
+{
+	FirstPersonWindow *w = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (w == nullptr) return;
+	for (int i = 0; i < steps; i++) {
+		if (std::hypot(x - w->walker.x, y - w->walker.y) < FIRST_PERSON_WALK_MS * OBJECT_UNITS_PER_METRE * FIRST_PERSON_TICK_MS / 1000.0) break;
+		w->walker.heading = std::atan2(y - w->walker.y, x - w->walker.x);
+		RigFirstPersonWalk(1, 1, 0, 0, w->walker.pitch);
+	}
 }
 
 void RigFirstPersonWalk(int steps, int ahead, int aside, int turn, double pitch)

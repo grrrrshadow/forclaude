@@ -335,6 +335,7 @@ struct ThreeDObject {
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
 	bool no_see_through = false;              ///< read without its see-through triangles (a material "BLEND", a lighthouse's lantern glass): the buildings are drawn opaque, the reflector in it hidden
+	bool flat_floors = false;                 ///< its flat faces looking up its floors (a lighthouse's stairs, landings, gallery and roof, TakeFlatFloors()): walked on (FloorAt()), in no one's way
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
 	std::vector<ThreeDSceneMore> scene_more;  ///< and parts of other files laid into it ("scena_navic")
 	/* Its materials' pictures taken from elsewhere ("textury_materialu"; the player, 3. 11.: "many models are the same
