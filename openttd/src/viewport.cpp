@@ -16413,10 +16413,12 @@ static constexpr double CAB_WHEAT_TILES = 10.0;
 /**
  * Our grass's tufts (objekty/nase/trava_trs) about the eye, all of them this near, metres; farther fewer and fewer to
  * CAB_GRASS_FAR_M, beyond only our grass's picture (the player, 9. 11.: "we need the blades only a few metres about the
- * walker"; they were laid three tiles, 44 m, about: 591 tufts, half of a meadow's triangles).
+ * walker"; they were laid three tiles, 44 m, about: 591 tufts, half of a meadow's triangles). Then 6 and 8 m; from a
+ * car that was a patch at the bonnet (the player, test5: "the 3D grass farther, when I drive only a bit is grown over
+ * with 3D grass").
  */
-static constexpr double CAB_GRASS_NEAR_M = 6.0;
-static constexpr double CAB_GRASS_FAR_M = 8.0;
+static constexpr double CAB_GRASS_NEAR_M = 15.0;
+static constexpr double CAB_GRASS_FAR_M = 22.0;
 /** And a tile has so many of them along each side (a tuft is 2 x 2 m, the tile 14.8 m): fewer as it is grown over. */
 static constexpr int CAB_GRASS_TUFTS = 7;
 
