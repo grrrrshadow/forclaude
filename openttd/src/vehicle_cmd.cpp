@@ -1539,6 +1539,8 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 			}
 			case CabDriveOp::Left:
 			case CabDriveOp::Right:
+				/* In a tunnel's tube driven freely: straight along it (RoadVehFreeTunnelStep()). */
+				if (v->type == VehicleType::Road && v->cab_free && v->vehstatus.Test(VehState::Hidden) && IsTunnelTile(v->tile)) break;
 				if (!v->cab_free) start();
 				v->cab_yaw = static_cast<uint8_t>((v->cab_yaw + (what == CabDriveOp::Left ? CAB_YAW_STEP : -CAB_YAW_STEP)) & (CAB_YAW_TURN - 1));
 				break;

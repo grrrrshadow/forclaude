@@ -3390,7 +3390,8 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	if (v->type == VehicleType::Train) {
 		if (Train::From(v)->track == Track::Wormhole) return 0;
 	} else if (v->type == VehicleType::Road) {
-		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return 0;
+		/* In a tunnel, driven freely through it too (hidden there, RoadVehFreeTunnelStep()). */
+		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE || v->vehstatus.Test(VehState::Hidden)) return 0;
 	} else {
 		return 0;
 	}

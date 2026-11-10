@@ -12229,7 +12229,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				 * of it. */
 				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end + 1, by), RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
 				const TileIndex road_tunnel = TileXY(x0 + bridge_end + 2, by);
-				CommandCost rt = Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, road_tunnel, TransportType::Road, INVALID_RAILTYPE, ROADTYPE_ROAD);
+				/* 'test3d trat ... auto kolejtunel': a railway's tunnel there instead, the car through it driven freely. */
+				const bool rail_tunnel = std::find(argv.begin(), argv.end(), "kolejtunel") != argv.end();
+				CommandCost rt = rail_tunnel ? Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, road_tunnel, TransportType::Rail, RAILTYPE_RAIL, INVALID_ROADTYPE) :
+						Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, road_tunnel, TransportType::Road, INVALID_RAILTYPE, ROADTYPE_ROAD);
 				if (rt.Succeeded() && IsTunnelTile(road_tunnel)) {
 					const TileIndex out_end = GetOtherTunnelEnd(road_tunnel);
 					CommandCost ro = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, out_end + TileDiffXY(1, 0), RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());

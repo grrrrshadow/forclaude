@@ -17862,7 +17862,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			/* Up a slope tipped with the vehicle, as a model's cab (above): the ground half a tile before it and behind it
 			 * from the eyes, a level 5 m; the eye ahead of its middle so much higher, looking so much up. Level on a bridge
 			 * and in a tunnel, and a ship or an aircraft. */
-			const bool on_ground = (v->type == VehicleType::Train && Train::From(v)->track != Track::Wormhole) || (v->type == VehicleType::Road && RoadVehicle::From(v)->state != RVSB_WORMHOLE);
+			const bool on_ground = ((v->type == VehicleType::Train && Train::From(v)->track != Track::Wormhole) || (v->type == VehicleType::Road && RoadVehicle::From(v)->state != RVSB_WORMHOLE)) && !v->vehstatus.Test(VehState::Hidden);
 			if (on_ground) {
 				/* On a bridge's deck where it drives on it: half a tile ahead of a car on a bridge's ramp is over the bridge, not
 				 * the valley under it (DrivenGroundZF(); the player, test5: "the car falls through on the first tile of the bridge,
