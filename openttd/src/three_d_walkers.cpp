@@ -96,6 +96,7 @@ struct Walker {
 	int frame = -1;              ///< the frame it is drawn in
 	double x = 0, y = 0;
 	int z = 0;
+	double zf = 0;     ///< the ground there on its slope's plane, not the game's whole steps (GroundZF()): where the eyes see it stand
 	float facing = 0;            ///< degrees, 0 along +x, 90 along +y
 	/* Where it was last drawn again on the map (MarkStandingDirty()), at its last frame: the map draws it there, as the
 	 * screen has it, till its next frame draws it again there and where it is then. */
@@ -348,6 +349,7 @@ void Place(Walker &w, const ThreeDVehicleObject *fig)
 	if (len > 0) w.facing = static_cast<float>(std::atan2(b.y - a.y, b.x - a.x) * 180.0 / M_PI);
 	int ix = std::clamp<int>(static_cast<int>(w.x), 0, Map::MaxX() * TILE_SIZE), iy = std::clamp<int>(static_cast<int>(w.y), 0, Map::MaxY() * TILE_SIZE);
 	w.z = GetSlopePixelZ(ix, iy);
+	w.zf = GroundZF(w.x, w.y, false);
 	w.tile = TileVirtXY(ix, iy);
 	double round = RoundLength(fig);
 	w.frame = static_cast<int>(std::floor(w.walked / round * fig->frames)) % fig->frames;
@@ -506,6 +508,7 @@ struct Driver {
 	TileIndex tile = INVALID_TILE;
 	double x = 0, y = 0;
 	int z = 0;
+	double zf = 0;     ///< the ground there on its slope's plane, not the game's whole steps (GroundZF()): where the eyes see it stand
 	float facing = 0;
 };
 
@@ -621,6 +624,7 @@ void PlaceCar(Driver &d)
 	if (len > 0) d.facing = static_cast<float>(std::atan2(b.y - a.y, b.x - a.x) * 180.0 / M_PI);
 	int ix = std::clamp<int>(static_cast<int>(d.x), 0, Map::MaxX() * TILE_SIZE), iy = std::clamp<int>(static_cast<int>(d.y), 0, Map::MaxY() * TILE_SIZE);
 	d.z = GetSlopePixelZ(ix, iy);
+	d.zf = GroundZF(d.x, d.y, false);
 	d.tile = TileVirtXY(ix, iy);
 }
 
@@ -728,7 +732,7 @@ void AddThreeDDriversToEye()
 	const float scale = WalkerScale();
 	for (const Driver &d : _drivers) {
 		if (d.path.empty() || d.tile == INVALID_TILE) continue;
-		AddCabCar(d.car, scale, d.x, d.y, d.z, d.facing, IsNightNow());
+		AddCabCar(d.car, scale, d.x, d.y, d.zf, d.facing, IsNightNow());
 	}
 }
 
@@ -797,7 +801,8 @@ void AddThreeDWalkersToEye(float scale)
 {
 	if (_walkers.empty()) return;
 	for (const Walker &w : _walkers) {
-		AddCabFigure(WALKER_FIGURE, scale, static_cast<int>(std::lround(w.x)), static_cast<int>(std::lround(w.y)), w.z, w.facing, std::max(0, w.frame));
+		/* Where it is and on the slope's plane, not at whole units (the player, test4: the stairs). */
+		AddCabFigure(WALKER_FIGURE, scale, w.x, w.y, w.zf, w.facing, std::max(0, w.frame));
 	}
 }
 

@@ -2070,11 +2070,7 @@ static float LikenessPitch(const Vehicle *v, double x, double y, double facing, 
 	}
 	const double half = length_m * OBJECT_UNITS_PER_METRE / 2;
 	if (half <= 0) return 0;
-	auto ground = [](double px, double py) {
-		const int gx = std::clamp(static_cast<int>(px), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
-		const int gy = std::clamp(static_cast<int>(py), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
-		return GetSlopePixelZ(gx, gy, true);
-	};
+	auto ground = [](double px, double py) { return GroundZF(px, py, true); };
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
 	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * EYE_LEVEL_STRETCH;
 	return static_cast<float>(std::atan2(rise_m, length_m) * 180.0 / M_PI);

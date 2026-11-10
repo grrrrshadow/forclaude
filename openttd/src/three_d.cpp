@@ -14,6 +14,7 @@
 #include "settings_type.h"
 #include "gfx_func.h"
 #include "landscape.h"
+#include "slope_func.h"
 #include "map_func.h"
 #include "tile_map.h"
 #include "window_func.h"
@@ -346,6 +347,81 @@ Point InverseRemapCoordsTurned(int x, int y, bool clamp_to_map)
 		pt.y = Clamp(pt.y, 0, max_y);
 	}
 	return pt;
+}
+
+/**
+ * How high over its lowest corner the ground of a tile of a slope is at a point of it: the game's GetPartialPixelZ()
+ * without its whole steps. The game counts heights in whole units, so a slope is stairs to it, a step each two units
+ * along (0.6 m from the eyes): what took its height walked up them -- the dog in the air and in the ground by turns, the
+ * cars rocking and half a tyre deep, our grass on a field in strips (the player, test4: "the stairs are on the slope of
+ * the field too, the field is of strips"). These are the planes the ground is drawn by (its corners, and its middle
+ * where it folds).
+ * @param x,y the point within the tile, 0 to TILE_SIZE
+ * @param corners its slope
+ */
+double GetPartialZF(double x, double y, Slope corners)
+{
+	static constexpr double T = TILE_SIZE, H = TILE_HEIGHT;
+	if (IsHalftileSlope(corners)) {
+		/* A foundation on half the tile at a corner: that half at the top (GetPartialPixelZ()). */
+		bool top = false;
+		switch (GetHalftileSlopeCorner(corners)) {
+			case CORNER_W: top = x > y; break;
+			case CORNER_S: top = x + y >= T; break;
+			case CORNER_E: top = x <= y; break;
+			case CORNER_N: top = x + y < T; break;
+			default: break;
+		}
+		if (top) return GetSlopeMaxPixelZ(corners);
+	}
+	switch (RemoveHalftileSlope(corners)) {
+		case SLOPE_FLAT: return 0;
+		/* One corner up. */
+		case SLOPE_N: return std::max(0.0, (T - x - y) / 2);
+		case SLOPE_E: return std::max(0.0, (y - x) / 2);
+		case SLOPE_S: return std::max(0.0, (x + y - T) / 2);
+		case SLOPE_W: return std::max(0.0, (x - y) / 2);
+		/* Two corners next to each other. */
+		case SLOPE_NE: return (T - x) / 2;
+		case SLOPE_SE: return y / 2;
+		case SLOPE_SW: return x / 2;
+		case SLOPE_NW: return (T - y) / 2;
+		/* Three corners. */
+		case SLOPE_ENW: return H - std::max(0.0, (x + y - T) / 2);
+		case SLOPE_SEN: return H - std::max(0.0, (x - y) / 2);
+		case SLOPE_WSE: return H - std::max(0.0, (T - x - y) / 2);
+		case SLOPE_NWS: return H - std::max(0.0, (y - x) / 2);
+		/* Two corners across. */
+		case SLOPE_NS: return std::abs(T - x - y) / 2;
+		case SLOPE_EW: return std::abs(x - y) / 2;
+		case SLOPE_ELEVATED: return H;
+		/* Steep: the top two levels up. */
+		case SLOPE_STEEP_N: return (2 * T - x - y) / 2;
+		case SLOPE_STEEP_E: return (T + y - x) / 2;
+		case SLOPE_STEEP_S: return (x + y) / 2;
+		case SLOPE_STEEP_W: return (T + x - y) / 2;
+		default: return 0;
+	}
+}
+
+/**
+ * The height of the ground at a world point, units of height, without the game's whole steps: its tile's slope on its
+ * foundation (GetFoundationPixelSlope(): a road's or a track's, a house's levelled) as its plane (GetPartialZF()).
+ * Where the game has it otherwise by more than its rounding (a bridge's ramp, a tunnel's mouth, what a tile's own
+ * rules say), the game's (GetSlopePixelZ()).
+ * @param ground_vehicle as GetSlopePixelZ()'s: the way a vehicle on the ground goes
+ */
+double GroundZF(double x, double y, bool ground_vehicle)
+{
+	const int max_x = static_cast<int>(Map::SizeX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
+	x = std::clamp(x, 0.0, max_x + 0.999);
+	y = std::clamp(y, 0.0, max_y + 0.999);
+	const int ix = std::min(static_cast<int>(x), max_x), iy = std::min(static_cast<int>(y), max_y);
+	const double game = GetSlopePixelZ(ix, iy, ground_vehicle);
+	const TileIndex tile = TileVirtXY(ix, iy);
+	const auto [slope, z] = GetFoundationPixelSlope(tile);
+	const double own = z + GetPartialZF(x - TileX(tile) * static_cast<double>(TILE_SIZE), y - TileY(tile) * static_cast<double>(TILE_SIZE), slope);
+	return std::abs(own - game) <= 1.0 ? own : game;
 }
 
 /**

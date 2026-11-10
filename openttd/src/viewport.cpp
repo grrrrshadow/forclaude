@@ -2801,9 +2801,11 @@ static std::array<double, 2> GroundWorldPoint(const DrawPixelInfo &t, int i, int
 	for (int k = 0; k < 3; k++) {
 		wx = (b + z - a) / 2;
 		wy = (b + z + a) / 2;
-		const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-		const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-		z = base_z + GetPartialPixelZ(fx, fy, slope);
+		/* On the slope's plane, not the game's whole steps of height (GetPartialZF()): by them our picture lay on a slope
+		 * in strips, each a step (the player, test4: "the field is of strips"). */
+		const double fx = std::clamp(wx - tile_x * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+		const double fy = std::clamp(wy - tile_y * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+		z = base_z + GetPartialZF(fx, fy, slope);
 	}
 	return {wx, wy};
 }
@@ -3144,9 +3146,9 @@ static void DrawEyeRoad(std::span<const EyeRoadSprite> sprites, int tile_x, int 
 		for (int k = 0; k < 3; k++) {
 			wx = (b + z - a) / 2;
 			wy = (b + z + a) / 2;
-			const int fx = std::clamp(static_cast<int>(std::floor(wx)) - tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-			const int fy = std::clamp(static_cast<int>(std::floor(wy)) - tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-			z = base_z + GetPartialPixelZ(fx, fy, slope);
+			const double fx = std::clamp(wx - tile_x * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+			const double fy = std::clamp(wy - tile_y * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+			z = base_z + GetPartialZF(fx, fy, slope);
 		}
 		return std::array<double, 2>{wx, wy};
 	};
@@ -3529,9 +3531,9 @@ static void DrawEyeWater(std::span<const EyeRoadSprite> sprites, bool smooth, bo
 				for (int k = 0; k < 3; k++) {
 					wx = (b + z - a) / 2;
 					wy = (b + z + a) / 2;
-					const int fx = std::clamp(static_cast<int>(std::floor(wx)) - bank->tile_x * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-					const int fy = std::clamp(static_cast<int>(std::floor(wy)) - bank->tile_y * static_cast<int>(TILE_SIZE), 0, static_cast<int>(TILE_SIZE) - 1);
-					z = bank->base_z + GetPartialPixelZ(fx, fy, bank->slope);
+					const double fx = std::clamp(wx - bank->tile_x * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+					const double fy = std::clamp(wy - bank->tile_y * static_cast<double>(TILE_SIZE), 0.0, static_cast<double>(TILE_SIZE));
+					z = bank->base_z + GetPartialZF(fx, fy, bank->slope);
 				}
 				/* Within the tile (a pixel of its sprite may show a point a hair over its edge, on the land there). */
 				const double lx = wx - bank->tile_x * static_cast<double>(TILE_SIZE), ly = wy - bank->tile_y * static_cast<double>(TILE_SIZE);
@@ -13681,7 +13683,7 @@ static double EyeBaseZ(double x, double y, double z)
 		const int deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 		if (z >= deck - CAB_DECK - 1 && z <= deck + 4 * TILE_HEIGHT) return deck;
 	}
-	const double ground = GetSlopePixelZ(ix, iy, true);
+	const double ground = GroundZF(x, y, true);
 	const double d = z - ground;
 	/* Under the ground (in a tunnel): itself. In doubles: TILE_HEIGHT is unsigned, and its minus was four thousand
 	 * million -- everything counted as under the ground, the height of all over it stretched as the land's (the player,
@@ -16026,13 +16028,17 @@ static constexpr double CAB_STEP_UP_M = 0.45;
  * The ground at a world point (in the map) as one walks on it: the land, and on the end of a bridge its ramp as a car
  * drives up it (the player, test 4: the walker sank through the road of a bridge's ramp).
  */
-static double CabWalkedGround(int ix, int iy)
+static double CabWalkedGround(double x, double y)
 {
+	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	const TileIndex tile = TileVirtXY(ix, iy);
-	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsBridge(tile)) return GetSlopePixelZ(ix, iy, true);
+	/* On the slope's plane, not up the game's whole steps of height (GroundZF(); the player, test4: "the dog walks up the
+	 * hill on the old big stairs, a while in the air and a while sunk in the ground"). */
+	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsBridge(tile)) return GroundZF(x, y, true);
 	/* A tunnel's end: level with the tunnel's floor into its portal, as the eyes draw it (CabTunnelGround()). */
 	if (IsValidTile(tile) && IsTileType(tile, TileType::TunnelBridge) && IsTunnel(tile)) return GetTilePixelZ(tile);
-	return GetSlopePixelZOutsideMap(ix, iy);
+	return GroundZF(x, y, false);
 }
 
 /** The height of the ground under a world point, units of height (the walker of the view from the first person stands on it). */
@@ -16040,7 +16046,7 @@ double FirstPersonGroundZ(double x, double y)
 {
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
-	const double ground = CabWalkedGround(ix, iy);
+	const double ground = CabWalkedGround(x, y);
 	/* In a house's interior (or an industry's, the dragon castle's hall): its floor there (the stage and its steps of the
 	 * cinema), of the ground storey. */
 	TileIndex origin;
@@ -16067,7 +16073,7 @@ double FirstPersonStandZ(double x, double y, double from)
 	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
 	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
 	const double up_to = from + CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
-	double best = CabWalkedGround(ix, iy);
+	double best = CabWalkedGround(x, y);
 	/* Under the land, in a tunnel (the player, 8. 11.: "I cannot walk through the tunnel on foot"): on its floor. */
 	if (from < best - CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE) {
 		if (const std::optional<double> floor = FirstPersonTunnelFloor(x, y, from); floor.has_value()) return *floor;
@@ -16096,7 +16102,7 @@ double FirstPersonStandZ(double x, double y, double from)
 	if (IsValidTile(tile)) {
 		const ThreeDEyeScope from_eyes;
 		const double on = ThreeDTrackStandOver(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE);
-		if (on > 0) best = std::max(best, CabWalkedGround(ix, iy) + on * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH);
+		if (on > 0) best = std::max(best, CabWalkedGround(x, y) + on * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH);
 	}
 	return best;
 }
@@ -16824,11 +16830,7 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 				 * the eye rides it, each on the land under it. By the vehicle's eight directions and its steps over the tile
 				 * it jumped at each turn and shone elsewhere than the car went (the player, 4. 11.: "the lights before the car
 				 * move in jumps, so they sometimes shine elsewhere than where the car is heading"). */
-				auto ground = [](double wx, double wy) {
-					const int gx = std::clamp(static_cast<int>(wx), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
-					const int gy = std::clamp(static_cast<int>(wy), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
-					return GetSlopePixelZ(gx, gy, true);
-				};
+				auto ground = [](double wx, double wy) { return GroundZF(wx, wy, true); };
 				/* Over a bridge or in a tunnel the vehicle is not on the land under it: its own height there. */
 				const bool on_land = std::abs(u->z_pos - ground(u->x_pos, u->y_pos)) <= static_cast<int>(TILE_HEIGHT);
 				for (int k = 1; k <= 4; k++) {
@@ -17770,11 +17772,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			 * and in a tunnel, and a ship or an aircraft. */
 			const bool on_ground = (v->type == VehicleType::Train && Train::From(v)->track != Track::Wormhole) || (v->type == VehicleType::Road && RoadVehicle::From(v)->state != RVSB_WORMHOLE);
 			if (on_ground) {
-				auto ground = [](double x, double y) {
-					const int gx = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
-					const int gy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
-					return static_cast<double>(GetSlopePixelZ(gx, gy, true));
-				};
+				auto ground = [](double x, double y) { return GroundZF(x, y, true); };
 				const double half = TILE_SIZE / 2.0;
 				const double rise = EyeLevelZ(ground(v->x_pos + bfx * half, v->y_pos + bfy * half) - ground(v->x_pos - bfx * half, v->y_pos - bfy * half));
 				cab_pitch = std::atan2(rise * CAB_Z_SCALE, 2 * half);

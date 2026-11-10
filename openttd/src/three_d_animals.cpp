@@ -173,6 +173,7 @@ struct Beast {
 	bool struck = false;   ///< its blow of this attack dealt
 	int frame = 0;
 	int z = 0;             ///< height units, drawn at
+	double zf = 0;         ///< and not rounded, on the slope's plane (FirstPersonGroundZ(), GroundZF()): where the eyes see it
 	std::vector<std::string> offer; ///< a seller's dogs
 	std::vector<NavPoint> way;      ///< its way round what stands between (NavFindWay())
 	size_t way_at = 0;
@@ -1116,7 +1117,8 @@ Beast &Put(const ThreeDAnimal &a, Place place, double x, double y, double up, do
 	b.until = now + InteractiveRandomRange(300);
 	SetPose(b, RestPose(b, a), now);
 	b.pose_start = now - std::min<uint64_t>(now, InteractiveRandomRange(200)); // not all in step
-	b.z = static_cast<int>(std::lround(FirstPersonGroundZ(b.x, b.y) + b.up));
+	b.zf = FirstPersonGroundZ(b.x, b.y) + b.up;
+	b.z = static_cast<int>(std::lround(b.zf));
 	Debug(misc, 2, "3D animal: {} comes at {:.1f},{:.1f}", a.name, x / TILE_SIZE, y / TILE_SIZE);
 	return b;
 }
@@ -1644,7 +1646,8 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		b.frame = FrameOf(b, now);
 		const bool moved = b.x != ox || b.y != oy || b.heading != oh || b.frame != oframe || b.pose != opose;
 		if (moved) MarkDirty(b, *a);
-		b.z = static_cast<int>(std::lround(FirstPersonGroundZ(b.x, b.y) + b.up));
+		b.zf = FirstPersonGroundZ(b.x, b.y) + b.up;
+		b.z = static_cast<int>(std::lround(b.zf));
 		if (moved) MarkDirty(b, *a);
 		++it;
 	}
@@ -1790,7 +1793,9 @@ void AddThreeDAnimalsToEye()
 		if (a == nullptr || b.inside) continue;
 		int frame;
 		const std::string figure = Figure(b, frame);
-		AddCabFigure(figure, EyeScaleOf(*a), static_cast<int>(std::lround(b.x)), static_cast<int>(std::lround(b.y)), b.z, Facing(b), frame);
+		/* Where it is and on the slope's plane, not at whole units: by them the dog went up a hill on big stairs, in the
+		 * air and in the ground by turns (the player, test4). */
+		AddCabFigure(figure, EyeScaleOf(*a), b.x, b.y, b.zf, Facing(b), frame);
 	}
 }
 

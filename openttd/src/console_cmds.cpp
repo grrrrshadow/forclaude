@@ -10952,6 +10952,40 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		if (!x1.has_value() || !y1.has_value() || !x2.has_value() || !y2.has_value()) return true;
 		CommandCost r = Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, TileXY(*x2, *y2), TileXY(*x1, *y1), WaterClass::Canal, false);
 		IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: kanal {}", r.Succeeded() ? std::string("postaven") : RefusalReason(r));
+	} else if (what == "svah") {
+		/* 'svah': a few tiles of fields and of roads on an inclined slope of the map; 'svah <x> <y>': the ground's height
+		 * across that tile, a quarter of a unit a step along x and y through its middle -- the game's whole steps
+		 * (GetSlopePixelZ()) and the slope's plane (GroundZF()), and the most they differ over the tile. */
+		auto x = number(2), y = number(3);
+		if (x.has_value() && y.has_value()) {
+			const TileIndex t = TileXY(*x, *y);
+			const double x0 = TileX(t) * TILE_SIZE, y0 = TileY(t) * TILE_SIZE;
+			std::string along_x, along_y;
+			for (int k = 0; k <= 16; k++) {
+				const double px = x0 + std::min(k, 15) + (k == 16 ? 0.99 : 0.0), py = y0 + std::min(k, 15) + (k == 16 ? 0.99 : 0.0);
+				along_x += fmt::format(" {}/{:.2f}", GetSlopePixelZ(static_cast<int>(px), static_cast<int>(y0 + 8), true), GroundZF(px, y0 + 8.0, true));
+				along_y += fmt::format(" {}/{:.2f}", GetSlopePixelZ(static_cast<int>(x0 + 8), static_cast<int>(py), true), GroundZF(x0 + 8.0, py, true));
+			}
+			double most = 0;
+			for (int j = 0; j < 64; j++) {
+				for (int i = 0; i < 64; i++) {
+					const double px = x0 + i * 0.25, py = y0 + j * 0.25;
+					most = std::max(most, std::abs(GroundZF(px, py, true) - GetSlopePixelZ(static_cast<int>(px), static_cast<int>(py), true)));
+				}
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: svah {},{} typ {} svah {}: podel x{}", *x, *y, to_underlying(GetTileType(t)), to_underlying(GetTileSlope(t)), along_x);
+			IConsolePrint(CC_DEFAULT, "test3d: svah {},{} podel y{}; nejvic se lisi o {:.2f}", *x, *y, along_y, most);
+			return true;
+		}
+		int fields = 0, roads = 0, grass = 0;
+		for (const auto t : Map::Iterate()) {
+			if (GetInclinedSlopeDirection(GetTileSlope(t)) == DiagDirection::Invalid) continue;
+			if (IsTileType(t, TileType::Clear) && IsClearGround(t, ClearGround::Fields) && fields++ < 4) IConsolePrint(CC_DEFAULT, "test3d: svah pole {},{} svah {}", TileX(t), TileY(t), to_underlying(GetTileSlope(t)));
+			if (IsTileType(t, TileType::Road) && roads++ < 4) IConsolePrint(CC_DEFAULT, "test3d: svah silnice {},{} svah {}", TileX(t), TileY(t), to_underlying(GetTileSlope(t)));
+			if (IsTileType(t, TileType::Clear) && IsClearGround(t, ClearGround::Grass) && grass++ < 2) IConsolePrint(CC_DEFAULT, "test3d: svah trava {},{} svah {}", TileX(t), TileY(t), to_underlying(GetTileSlope(t)));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: svah: poli {}, silnic {}, travy {} na naklonenem svahu", fields, roads, grass);
+		return true;
 	} else if (what == "svahy") {
 		/* 'svahy': every inclined slope by water on the map tried for a dock and for a lock (only tried, not built), what
 		 * refuses them counted with a tile of each (the player, test3: "I want to build the harbour and the lock on every

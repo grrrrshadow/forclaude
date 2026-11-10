@@ -3401,27 +3401,13 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 	}
 	const double half = length_m * ObjectScale(obj) * UNITS_PER_METRE / 2;
 	if (half <= 0) return 0;
-	auto ground = [](double px, double py) {
-		const int gx = std::clamp(static_cast<int>(px), 0, static_cast<int>(Map::MaxX() * TILE_SIZE) - 1);
-		const int gy = std::clamp(static_cast<int>(py), 0, static_cast<int>(Map::MaxY() * TILE_SIZE) - 1);
-		return GetSlopePixelZ(gx, gy, true);
-	};
+	/* The slope's plane at its ends, not the game's whole steps: it tips smoothly onto a slope and holds its angle on it. */
+	auto ground = [](double px, double py) { return GroundZF(px, py, true); };
 	const double ax = std::cos(facing) * half, ay = std::sin(facing) * half;
 	const double rise_m = (ground(x + ax, y + ay) - ground(x - ax, y - ay)) / OBJECT_HEIGHT_PER_METRE * stretch;
 	return static_cast<float>(std::atan2(rise_m, 2 * half / UNITS_PER_METRE) * 180.0 / M_PI);
 }
 
-/**
- * The height a vehicle stands at, finer than the game's whole units: on the land the plane of the slope under the point
- * itself, not the game's height of the vehicle, which goes up a slope a unit every two steps -- from the eyes, a level
- * 5 m, 0.6 m at once, and the cars went up and down a hill as up and down stairs (the player, 4. 11.: "the cars jump
- * up and down hills as on stairs"). The mean of the game's heights of the ground at a step and the next, two by two, is
- * the plane there (a slope rises a unit every two steps: the mean of two neighbours half a unit a step), between the
- * steps in between. Over a bridge or in a tunnel, a ship or an aircraft, or off the land more than a unit: its own
- * height.
- * @param v the vehicle (a piece)
- * @param x,y the point it stands at, world units (its middle from the eyes)
- */
 /**
  * How deep a submarine may dive where it is, metres: as deep as its object lets it ("ponoreni_m"), its hull ("ponor_m",
  * as big as it is drawn) half a metre over the bed under it at most (EyeWaterDepth()); 0 a vehicle that does not dive.
@@ -3447,6 +3433,16 @@ double ShipDiveM(const Vehicle *v)
 	return std::min<double>(v->cab_dive, ShipDiveRoomM(v));
 }
 
+/**
+ * The height a vehicle stands at, finer than the game's whole units: on the land the plane of the slope under the point
+ * itself (GroundZF()), not the game's height of the vehicle, which goes up a slope a unit every two steps -- from the
+ * eyes, a level 5 m, 0.6 m at once, and the cars went up and down a hill as up and down stairs (the player, 4. 11.: "the
+ * cars jump up and down hills as on stairs"). The mean of the game's whole heights two by two, taken first, was half a
+ * unit under the plane and still wavy (the player, test4: "the cars rock on small stairs, about half the tyre sunk into
+ * the slope"). Over a bridge or in a tunnel, a ship or an aircraft, or off the land more than a unit: its own height.
+ * @param v the vehicle (a piece)
+ * @param x,y the point it stands at, world units (its middle from the eyes)
+ */
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 {
 	if (v->type == VehicleType::Train) {
@@ -3465,13 +3461,8 @@ double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 		return v->z_pos - ShipDiveM(v) * OBJECT_HEIGHT_PER_METRE;
 	}
 	const int max_x = static_cast<int>(Map::SizeX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
-	auto ground = [&](int px, int py) { return GetSlopePixelZ(std::clamp(px, 0, max_x), std::clamp(py, 0, max_y), true); };
-	if (std::abs(v->z_pos - ground(v->x_pos, v->y_pos)) > 1) return v->z_pos;
-	auto block_mean = [&](int px, int py) { return (ground(px, py) + ground(px + 1, py) + ground(px, py + 1) + ground(px + 1, py + 1)) / 4.0; };
-	const double fx0 = std::floor(x), fy0 = std::floor(y), fx = x - fx0, fy = y - fy0;
-	const int ix = static_cast<int>(fx0), iy = static_cast<int>(fy0);
-	const double a = block_mean(ix, iy), b = block_mean(ix + 1, iy), c = block_mean(ix, iy + 1), d = block_mean(ix + 1, iy + 1);
-	const double on_plane = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+	if (std::abs(v->z_pos - GetSlopePixelZ(std::clamp(v->x_pos, 0, max_x), std::clamp(v->y_pos, 0, max_y), true)) > 1) return v->z_pos;
+	const double on_plane = GroundZF(x, y, true);
 	/* A train on our track in 3D on its rails (ThreeDTrackRailTop(), by the settings from the eyes); a road vehicle over
 	 * a level crossing with it on its panels and ramps (ThreeDRoadOverTrack()). A height within a unit of the ground is
 	 * stretched with it from the eyes (EyeBaseZ() of viewport.cpp), so its metres are a level's 5 m, not 3 m: so much
