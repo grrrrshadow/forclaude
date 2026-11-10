@@ -12680,6 +12680,68 @@ static uint32_t CabRoadTexel(const uint32_t *tex, int tw, int th, double u, doub
 	return Colour(channel(0), channel(1), channel(2)).data;
 }
 
+/**
+ * The edge between our grass and the ground that is not grass (a road, its marks, a pavement, bare land), as the card's
+ * EYE_TRI_FRAGMENT takes it (the player, test4: "the little blocks between the grass and the road we could round like
+ * the edges of the river"): grass where the texels about the point are grass by half or more -- each way along the row
+ * a texel far, between the four about each of five points along it. An edge straight in the world is a stair of two
+ * texels along a row to one across in the sprite's picture (2:1, either way); averaged over the stair's two texels it is
+ * a straight line again, where it was. Its corners round. A river's bank and water have their own edge (CabBankTexel()).
+ * @param u,v the point, texels
+ * @param p the texel there
+ */
+static uint32_t CabGrassEdgeTexel(const uint32_t *tex, int tw, int th, double u, double v, uint32_t p)
+{
+	auto at = [&](int iu, int iv) { return tex[static_cast<size_t>(std::clamp(iv, 0, th - 1)) * tw + std::clamp(iu, 0, tw - 1)]; };
+	const double fv = v - 0.5;
+	const int bv = static_cast<int>(std::floor(fv));
+	const double wv = fv - bv;
+	/* The four about the point first: all one kind, nothing to do. */
+	{
+		const double fu = u - 0.5;
+		const int bu = static_cast<int>(std::floor(fu));
+		int kinds = 0;
+		for (int k = 0; k < 4; k++) {
+			const uint32_t q = at(bu + (k & 1), bv + (k >> 1));
+			if (q == 0) continue;
+			if (static_cast<uint8_t>(q >> 24) < THREE_D_GPU_GRASS) return p;
+			kinds |= static_cast<uint8_t>(q >> 24) == THREE_D_GPU_GRASS ? 1 : 2;
+		}
+		if (kinds != 3) return p;
+	}
+	double grass = 0, drawn = 0, best_grass = -1, best_other = -1;
+	uint32_t a_grass = 0, an_other = 0;
+	for (int s = -2; s <= 2; s++) {
+		const double fu = u - 0.5 + s * 0.5;
+		const int bu = static_cast<int>(std::floor(fu));
+		const double wu = fu - bu;
+		for (int k = 0; k < 4; k++) {
+			const int ou = k & 1, ov = k >> 1;
+			const uint32_t q = at(bu + ou, bv + ov);
+			if (q == 0) continue;
+			const uint8_t qa = static_cast<uint8_t>(q >> 24);
+			if (qa < THREE_D_GPU_GRASS) return p;
+			const double wk = (ou == 1 ? wu : 1 - wu) * (ov == 1 ? wv : 1 - wv) * (std::abs(s) == 2 ? 0.5 : 1.0);
+			drawn += wk;
+			const double near = s == 0 ? wk : 0.0; // the replacement from the four about the point itself
+			if (qa == THREE_D_GPU_GRASS) {
+				grass += wk;
+				if (near > best_grass) {
+					best_grass = near;
+					a_grass = q;
+				}
+			} else if (near > best_other) {
+				best_other = near;
+				an_other = q;
+			}
+		}
+	}
+	if (drawn <= 0) return p;
+	const bool is_grass = static_cast<uint8_t>(p >> 24) == THREE_D_GPU_GRASS;
+	if (grass >= 0.5 * drawn) return is_grass || a_grass == 0 ? p : a_grass;
+	return !is_grass || an_other == 0 ? p : an_other;
+}
+
 static inline void CabPixelInWorld(const CabEye &eye, double sx, double sy, float iw, double &x, double &y, double &zu);
 
 /**
@@ -12797,6 +12859,7 @@ static void CabRasterRows(uint32_t *dst, float *zb, int w, int h, const uint32_t
 				}
 			}
 			if (p == 0) continue;
+			if ((fill_holes & CAB_GRASS) != 0 && grass_eye != nullptr) p = CabGrassEdgeTexel(tex, tw, th, uw * inv, vw * inv, p);
 			if ((fill_holes & CAB_ROAD) != 0) p = CabRoadTexel(tex, tw, th, uw * inv, vw * inv, p);
 			if ((fill_holes & CAB_GRASS) != 0 && grass_eye != nullptr) {
 				const uint8_t mark = static_cast<uint8_t>(p >> 24);

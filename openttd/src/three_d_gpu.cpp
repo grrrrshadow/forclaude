@@ -1538,6 +1538,59 @@ void main()
 		}
 	}
 	if (t == vec4(0.0)) discard;
+	/* The edge between our grass and the ground not grass (a road, its marks, a pavement, bare land; CabGrassEdgeTexel()
+	 * of viewport.cpp): grass where the texels about the point are grass by half or more, along the row a texel each
+	 * way (five points, the ends half) -- the sprite's 2:1 stairs of an edge straight in the world a straight line
+	 * again; not by a river's bank or water. */
+	if ((how & 32) != 0 && u_grass_units > 0.0) {
+		float fv = v_uv.y - 0.5;
+		int bv = int(floor(fv));
+		float wv = fv - float(bv);
+		int kinds = 0;
+		bool plain = true;
+		ivec2 b0 = ivec2(floor(v_uv - 0.5));
+		for (int k = 0; k < 4; k++) {
+			vec4 q = texelFetch(u_tex, origin + clamp(b0 + ivec2(k & 1, k >> 1), ivec2(0), size - 1), 0);
+			if (q == vec4(0.0)) continue;
+			int qa = int(q.a * 255.0 + 0.5);
+			if (qa < 252) plain = false;
+			kinds |= qa == 252 ? 1 : 2;
+		}
+		if (plain && kinds == 3) {
+			float grass = 0.0, drawn = 0.0, best_grass = -1.0, best_other = -1.0;
+			vec4 a_grass = vec4(0.0), an_other = vec4(0.0);
+			for (int s = -2; s <= 2; s++) {
+				float fu = v_uv.x - 0.5 + float(s) * 0.5;
+				int bu = int(floor(fu));
+				float wu = fu - float(bu);
+				for (int k = 0; k < 4; k++) {
+					ivec2 o = ivec2(k & 1, k >> 1);
+					vec4 q = texelFetch(u_tex, origin + clamp(ivec2(bu, bv) + o, ivec2(0), size - 1), 0);
+					if (q == vec4(0.0)) continue;
+					int qa = int(q.a * 255.0 + 0.5);
+					if (qa < 252) plain = false;
+					float wk = (o.x == 1 ? wu : 1.0 - wu) * (o.y == 1 ? wv : 1.0 - wv) * (abs(s) == 2 ? 0.5 : 1.0);
+					drawn += wk;
+					float near = s == 0 ? wk : 0.0;
+					if (qa == 252) {
+						grass += wk;
+						if (near > best_grass) { best_grass = near; a_grass = q; }
+					} else if (near > best_other) {
+						best_other = near;
+						an_other = q;
+					}
+				}
+			}
+			if (plain && drawn > 0.0) {
+				bool is_grass = int(t.a * 255.0 + 0.5) == 252;
+				if (grass >= 0.5 * drawn) {
+					if (!is_grass && a_grass != vec4(0.0)) t = a_grass;
+				} else if (is_grass && an_other != vec4(0.0)) {
+					t = an_other;
+				}
+			}
+		}
+	}
 	/* A road's texel of the ground (THREE_D_GPU_EYE_ROAD): between the four about the point, of the road's alone --
 	 * its surface as they blend, a white mark where the marks have two fifths of them or more (a mark of two texels
 	 * touching at a corner one, not two), so that its edge is sharp however near (DrawEyeRoad() of viewport.cpp,
