@@ -923,7 +923,11 @@ struct FirstPersonWindow : Window {
 	{
 		double room = std::numeric_limits<double>::infinity();
 		for (const auto &[ox, oy] : {std::pair{0.0, 0.0}, {0.1, 0.0}, {-0.1, 0.0}, {0.0, 0.1}, {0.0, -0.1}}) {
-			const std::optional<double> ceiling = ThreeDVehicleCeilingZ(obj, x + ox, y + oy, floor + FIRST_PERSON_ROOM_FLOOR_M);
+			/* At the body's edges what is not a step higher is a step beside it, not a ceiling: the yacht's helmsman's
+			 * step of v3 from grrrrf, 0.65 m over the cockpit's floor, was a ceiling a tenth of a metre before it, and the
+			 * walker could not get onto it (the rig's 'testlod palubadosah'). */
+			const bool edge = ox != 0 || oy != 0;
+			const std::optional<double> ceiling = ThreeDVehicleCeilingZ(obj, x + ox, y + oy, floor + (edge ? FIRST_PERSON_DECK_STEP_M : FIRST_PERSON_ROOM_FLOOR_M));
 			if (ceiling.has_value()) room = std::min(room, *ceiling - floor);
 		}
 		return room;
@@ -976,34 +980,60 @@ struct FirstPersonWindow : Window {
 		const ThreeDVehicleObject &obj = WalkedOn(*ev.obj);
 		double lx, ly;
 		WorldToBoat(ev, this->walker.x + dx, this->walker.y + dy, lx, ly);
-		std::optional<double> deck;
-		double up_to = this->deck_z + FIRST_PERSON_DECK_STEP_M;
 		/* Nothing of the boat under the step at all: over its side (OverBoard()). */
 		if (!ThreeDVehicleDeckZ(obj, lx, ly, std::numeric_limits<double>::infinity()).has_value()) {
 			this->OverBoard(this->walker.x + dx, this->walker.y + dy);
 			return;
 		}
-		for (int tries = 0;; tries++) {
-			deck = ThreeDVehicleDeckZ(obj, lx, ly, up_to);
-			if (!deck.has_value() || *deck < this->deck_z - FIRST_PERSON_DECK_DROP_M || (!rooms && *deck < this->deck_helm - FIRST_PERSON_DECK_DEPTH_M)) return;
-			if (DeckFooting(obj, lx, ly, *deck)) break;
-			if (tries == 3) return;
-			up_to = *deck - 0.02;
-		}
-		/* Room over the step: the walker as small as it is, not smaller than he can be (the table, a bunk's shelf). */
-		const double room = rooms ? RoomAt(obj, lx, ly, *deck) : std::numeric_limits<double>::infinity();
-		if (room < FIRST_PERSON_ROOM_MIN_M) return;
-		/* Walls: the way a body's half-width farther, at the chest over the higher deck of the two -- lower as he is. */
-		const double len = std::hypot(lx - this->deck_x, ly - this->deck_y);
-		const double ex = len > 0 ? lx + (lx - this->deck_x) / len * FIRST_PERSON_DECK_REACH_M : lx;
-		const double ey = len > 0 ? ly + (ly - this->deck_y) / len * FIRST_PERSON_DECK_REACH_M : ly;
-		const double chest = std::min(FIRST_PERSON_DECK_CHEST_M, FIRST_PERSON_ROOM_CHEST * room);
-		if (ThreeDVehicleBlocks(obj, this->deck_x, this->deck_y, ex, ey, std::max(this->deck_z, *deck) + chest)) return;
+		const std::optional<double> deck = StepOnBoard(obj, rooms, this->deck_helm, this->deck_x, this->deck_y, this->deck_z, lx, ly);
+		if (!deck.has_value()) return;
 		this->deck_x = lx;
 		this->deck_y = ly;
 		this->deck_z = *deck;
 		this->PlaceOnBoard(ev);
 		if (rooms) this->FitEyes();
+	}
+
+	/**
+	 * Where a step on board lands (MoveOnBoard(), the rig's RigDeckReach()): onto the highest deck the foot finds there
+	 * at most a step up or down (DeckFooting()), not deeper than a metre under its helmsman's place where it has no rooms,
+	 * room over it (RoomAt()), no wall across the way at the chest.
+	 * @param obj the boat as walked on (WalkedOn())
+	 * @param rooms whether it has rooms (ThreeDBoatRooms())
+	 * @param helm the height of its helmsman's place (deck_helm)
+	 * @param x where the walker stands, metres of the boat's frame
+	 * @param y where the walker stands
+	 * @param z the deck it stands on
+	 * @param lx where it steps
+	 * @param ly where it steps
+	 * @param why if given, why it cannot (the rig): "podlaha", "noha", "misto", "stena"
+	 * @return the deck it stands on after, none when it cannot step there
+	 */
+	static std::optional<double> StepOnBoard(const ThreeDVehicleObject &obj, bool rooms, double helm, double x, double y, double z, double lx, double ly, const char **why = nullptr)
+	{
+		auto refuse = [why](const char *reason) -> std::optional<double> {
+			if (why != nullptr) *why = reason;
+			return std::nullopt;
+		};
+		std::optional<double> deck;
+		double up_to = z + FIRST_PERSON_DECK_STEP_M;
+		for (int tries = 0;; tries++) {
+			deck = ThreeDVehicleDeckZ(obj, lx, ly, up_to);
+			if (!deck.has_value() || *deck < z - FIRST_PERSON_DECK_DROP_M || (!rooms && *deck < helm - FIRST_PERSON_DECK_DEPTH_M)) return refuse("podlaha");
+			if (DeckFooting(obj, lx, ly, *deck)) break;
+			if (tries == 3) return refuse("noha");
+			up_to = *deck - 0.02;
+		}
+		/* Room over the step: the walker as small as it is, not smaller than he can be (the table, a bunk's shelf). */
+		const double room = rooms ? RoomAt(obj, lx, ly, *deck) : std::numeric_limits<double>::infinity();
+		if (room < FIRST_PERSON_ROOM_MIN_M) return refuse("misto");
+		/* Walls: the way a body's half-width farther, at the chest over the higher deck of the two -- lower as he is. */
+		const double len = std::hypot(lx - x, ly - y);
+		const double ex = len > 0 ? lx + (lx - x) / len * FIRST_PERSON_DECK_REACH_M : lx;
+		const double ey = len > 0 ? ly + (ly - y) / len * FIRST_PERSON_DECK_REACH_M : ly;
+		const double chest = std::min(FIRST_PERSON_DECK_CHEST_M, FIRST_PERSON_ROOM_CHEST * room);
+		if (ThreeDVehicleBlocks(obj, x, y, ex, ey, std::max(z, *deck) + chest)) return refuse("stena");
+		return deck;
 	}
 
 	/** Whether the walker on board stands by its wheel (its helmsman's place, else its middle): E takes it there. */
@@ -3249,6 +3279,77 @@ std::string RigOnBoard(double x, double y, double up_to, double facing)
 	fp->FitEyes();
 	return fmt::format("{} podlaha {:.2f} m, mistnost {:.2f} m, oci {:.2f} m", ThreeDBoatRooms(*ev.obj) != nullptr ? "interier," : "obal,", *deck,
 			FirstPersonWindow::RoomAt(obj, x, y, *deck), fp->walker.eye_z / OBJECT_HEIGHT_PER_METRE);
+}
+
+/**
+ * The rig: where the walker on board gets by its steps (FirstPersonWindow::StepOnBoard()), from where it stands, a tenth
+ * of a metre at a time each way (the colleague, Lodě 3D v3: "check the walk from the cockpit onto the deck"): how many
+ * places, the highest deck, and the decks it gets onto by their height in decimetres with how many places each.
+ */
+std::string RigDeckReach()
+{
+	FirstPersonWindow *fp = static_cast<FirstPersonWindow *>(FindWindowById(WindowClass::FirstPerson, 0));
+	if (fp == nullptr) return "zadny chodec";
+	ThreeDEyeVehicle ev;
+	if (fp->aboard == VehicleID::Invalid() || fp->Aboard(ev) == nullptr) return "chodec neni na lodi";
+	const bool rooms = ThreeDBoatRooms(*ev.obj) != nullptr;
+	const ThreeDVehicleObject &obj = FirstPersonWindow::WalkedOn(*ev.obj);
+	constexpr double GRID = 0.1;
+	constexpr int MAX_PLACES = 200000;
+	/* A place: its cell and its deck in centimetres (a cell may have a deck under another, a cabin under the deck). */
+	std::set<std::tuple<int, int, int>> seen;
+	std::vector<std::tuple<int, int, double>> todo;
+	const double x0 = fp->deck_x, y0 = fp->deck_y;
+	todo.emplace_back(0, 0, fp->deck_z);
+	seen.emplace(0, 0, static_cast<int>(std::lround(fp->deck_z * 100)));
+	std::map<int, int> decks;
+	double highest = fp->deck_z;
+	while (!todo.empty() && seen.size() < MAX_PLACES) {
+		const auto [i, j, z] = todo.back();
+		todo.pop_back();
+		decks[static_cast<int>(std::lround(z * 10))]++;
+		highest = std::max(highest, z);
+		for (int di = -1; di <= 1; di++) {
+			for (int dj = -1; dj <= 1; dj++) {
+				if (di == 0 && dj == 0) continue;
+				const std::optional<double> to = FirstPersonWindow::StepOnBoard(obj, rooms, fp->deck_helm, x0 + i * GRID, y0 + j * GRID, z, x0 + (i + di) * GRID, y0 + (j + dj) * GRID);
+				if (!to.has_value()) continue;
+				if (seen.emplace(i + di, j + dj, static_cast<int>(std::lround(*to * 100))).second) todo.emplace_back(i + di, j + dj, *to);
+			}
+		}
+	}
+	std::string out = fmt::format("z {:.2f},{:.2f} paluba {:.2f} m: {} mist, nejvys {:.2f} m; paluby (dm: mist)", x0, y0, fp->deck_z, seen.size(), highest);
+	for (const auto &[dm, n] : decks) out += fmt::format(" {}:{}", dm, n);
+	/* The way to its helmsman's place straight, a tenth of a metre a step: where it stops and why. */
+	if (const ThreeDVehicleObject &boat = *ev.obj; boat.has_helm) {
+		double x = x0, y = y0, z = fp->deck_z;
+		const double len = std::hypot(boat.helm[0] - x0, boat.helm[1] - y0);
+		const int steps = std::max(1, static_cast<int>(std::ceil(len / GRID)));
+		out += fmt::format("; ke kormidlu {:.2f},{:.2f} ({:.2f} m)", boat.helm[0], boat.helm[1], boat.helm[2]);
+		for (int k = 1; k <= steps; k++) {
+			const double lx = x0 + (boat.helm[0] - x0) * k / steps, ly = y0 + (boat.helm[1] - y0) * k / steps;
+			const char *why = "";
+			const std::optional<double> to = FirstPersonWindow::StepOnBoard(obj, rooms, fp->deck_helm, x, y, z, lx, ly, &why);
+			if (!to.has_value()) {
+				const std::optional<double> there = ThreeDVehicleDeckZ(obj, lx, ly, z + FIRST_PERSON_DECK_STEP_M);
+				out += fmt::format(" stoji na {:.2f},{:.2f} ({:.2f} m), dal ne: {} (tam paluba {})", x, y, z, why, there.has_value() ? fmt::format("{:.2f} m", *there) : std::string("-"));
+				/* Low room: the ceilings the body finds over that deck (FirstPersonWindow::RoomAt()). */
+				if (std::string_view(why) == "misto" && there.has_value()) {
+					out += " stropy";
+					for (const auto &[ox, oy] : {std::pair{0.0, 0.0}, {0.1, 0.0}, {-0.1, 0.0}, {0.0, 0.1}, {0.0, -0.1}}) {
+						const std::optional<double> ceiling = ThreeDVehicleCeilingZ(obj, lx + ox, ly + oy, *there + 0.3);
+						out += ceiling.has_value() ? fmt::format(" {:.2f}", *ceiling) : std::string(" -");
+					}
+				}
+				break;
+			}
+			x = lx;
+			y = ly;
+			z = *to;
+			if (k == steps) out += fmt::format(" dojde ({:.2f} m)", z);
+		}
+	}
+	return out;
 }
 
 /**

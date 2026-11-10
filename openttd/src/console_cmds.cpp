@@ -1134,6 +1134,12 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		}
 		return true;
 	}
+	if (argv.size() == 2 && argv[1] == "palubadosah") {
+		/* 'testlod palubadosah': where the walker on board gets by its steps from where it stands (RigDeckReach()). */
+		extern std::string RigDeckReach();
+		IConsolePrint(CC_DEFAULT, "testlod: paluba dosah {}", RigDeckReach());
+		return true;
+	}
 	if (argv.size() == 2 && argv[1] == "palubakolem") {
 		/* 'testlod palubakolem': the boat's floor about the walker on board, as its steps find it (RigDeckAround()). */
 		extern std::string RigDeckAround();
