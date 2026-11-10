@@ -175,6 +175,7 @@ struct ThreeDObjectFigure {
 	float stretch = 1;    ///< its height against its width (a plant's "meritko" [x, y, z]: z / x)
 	int frame = -1;       ///< a frame of its own (the spit over the forest's fire: the animal chosen), -1 by the game's tick
 	float beyond = 0;     ///< an add-on's place: only its triangles all so far or farther from its foot along its own x (metres), 0 all
+	float rise[2] = {};   ///< a plant on a slope (GetThreeDSlopedPlants()): metres the ground rises a metre along x and y of the frame, the plant leaning with it
 };
 
 /** The animals the spit (the figure "rozen") has, by its frames: the piglet, the calf, the lamb. */

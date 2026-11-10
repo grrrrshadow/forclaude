@@ -138,8 +138,8 @@ uint64_t ThreeDStandInsGiven();
 bool ThreeDPictureStandsIn(const ThreeDModelPicture *pic);
 void OweThreeDPictureBox(double x0, double y0, double x1, double y1, int z0, int z1);
 void StopThreeDPictureThread();
-const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN);
-std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card);
+const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height = nullptr, float yaw = NAN, const float *rise = nullptr);
+std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, const float *rise = nullptr);
 struct ThreeDHeldThing;
 /** A triangle of a thing in the walker's hand on the picture of its eyes (ThreeDHeldThingTriangles()). */
 struct ThreeDHeldTriangle {

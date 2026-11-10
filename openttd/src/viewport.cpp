@@ -5908,7 +5908,7 @@ static bool BuildingFiguresSeen(ZoomLevel zoom)
  */
 static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure &f, bool plant, const ObjectLay &lay, double ox, double oy, double oz, TileIndex origin, size_t index, int &height)
 {
-	if (plant) return GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw);
+	if (plant) return GetThreeDPlantPicture(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw, f.rise);
 	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
 	return GetThreeDFigurePicture(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, f.frame, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)));
@@ -5922,7 +5922,7 @@ static const ThreeDModelPicture *StandingFigurePicture(const ThreeDObjectFigure 
  */
 static std::optional<bool> StandingFigureOnCard(const ThreeDObjectFigure &f, bool plant, const ObjectLay &lay, double ox, double oy, double oz, TileIndex origin, size_t index, int &height, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
 {
-	if (plant) return GetThreeDPlantOnCard(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw, card);
+	if (plant) return GetThreeDPlantOnCard(f.figure, f.scale, f.stretch, f.facing, lay.zoom, &height, lay.yaw, card, f.rise);
 	const double wx = ox + f.at[0] * OBJECT_UNITS_PER_METRE, wy = oy + f.at[1] * OBJECT_UNITS_PER_METRE, wz = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
 	const TileIndex on = TileXY(std::clamp<int>(static_cast<int>(wx) / TILE_SIZE, 0, Map::MaxX()), std::clamp<int>(static_cast<int>(wy) / TILE_SIZE, 0, Map::MaxY()));
 	return GetThreeDFigureOnCard(f.figure, f.scale, f.facing, lay.zoom, on, TileX(origin) * 7 + TileY(origin) * 13 + static_cast<uint32_t>(index), &height, f.frame, lay.yaw, static_cast<int>(std::floor(wz)), static_cast<int>(std::lround(wx)), static_cast<int>(std::lround(wy)), nullptr, card);
@@ -18130,8 +18130,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			}
 			const ThreeDObject *wheat = type == 0 || type >= 8 ? nullptr : GetThreeDSlopedPlants(GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala"), _cur_ti.tileh);
 			if (wheat != nullptr) {
+				/* Sheared along the slope as it rises there (ThreeDObjectFigure::rise): units of height a world unit. */
+				static constexpr float RISE = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
 				for (const ThreeDObjectFigure &f : wheat->plants) {
-					AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing);
+					AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, f.rise[0] * RISE, f.rise[1] * RISE);
 				}
 			}
 		}

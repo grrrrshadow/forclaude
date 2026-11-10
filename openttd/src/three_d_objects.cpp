@@ -11398,6 +11398,10 @@ const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slop
 		for (ThreeDObjectFigure &f : made->plants) {
 			const double u = std::clamp(f.at[0] / side, 0.0, 1.0), v = std::clamp(f.at[1] / side, 0.0, 1.0);
 			f.at[2] += static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
+			/* Leaning with the slope there, not level (the player, test4: "the stairs are on the slope of the field too, the
+			 * field is of strips" -- the young wheat's squares of 3.6 m each level at its own height, terraces). */
+			f.rise[0] = static_cast<float>((-n * (1 - v) - e * v + s * v + w * (1 - v)) / side);
+			f.rise[1] = static_cast<float>((-n * (1 - u) + e * (1 - u) + s * u - w * u) / side);
 		}
 	}
 	return made.get();

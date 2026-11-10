@@ -5309,7 +5309,7 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
  * @param yaw the angle of the view it is seen from, NaN the map's
  */
 /** What the picture of a plant is asked for by (GetThreeDPlantPicture()), and how tall it is; nothing when it is not there. */
-static std::optional<PictureToMake> PlantRequest(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, bool &later)
+static std::optional<PictureToMake> PlantRequest(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, bool &later, const float *rise)
 {
 	static constexpr float PLANT_STEP = 10.0f;
 	const ThreeDVehicleObject *plant = GetThreeDFigure(name);
@@ -5324,13 +5324,22 @@ static std::optional<PictureToMake> PlantRequest(std::string_view name, float sc
 	scale = std::max(0.05f, std::round(scale * 20.0f) / 20.0f);
 	stretch = std::max(0.05f, std::round(stretch * 20.0f) / 20.0f);
 	if (height != nullptr) *height = std::max(1, static_cast<int>(std::lround(shape->z1 * scale * stretch * 8.0 / 3.0)));
-	return PictureRequest(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch, 0, 0, 0, 0, 0.0f, 0);
+	/* On a slope leaning with it (ThreeDObjectFigure::rise): its front up as the ground rises along its facing, its left
+	 * side down as it falls across, in steps of 2 degrees as the vehicles on the map (VehicleSlopePitch()). */
+	int pitch = 0, roll = 0;
+	if (rise != nullptr && (rise[0] != 0 || rise[1] != 0)) {
+		const double a = facing * M_PI / 180.0;
+		const double along = rise[0] * std::cos(a) + rise[1] * std::sin(a), across = -rise[0] * std::sin(a) + rise[1] * std::cos(a);
+		pitch = 2 * static_cast<int>(std::lround(std::atan(along) * 180.0 / M_PI / 2.0));
+		roll = -2 * static_cast<int>(std::lround(std::atan(across) * 180.0 / M_PI / 2.0));
+	}
+	return PictureRequest(plant, scale, zoom, cam_az, world_az, false, 0, 0, -1, stretch, 0, pitch, roll, 0, 0.0f, 0);
 }
 
-const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw)
+const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, const float *rise)
 {
 	bool later = false;
-	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later);
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise);
 	return p.has_value() ? RequestedPicture(std::move(*p), later) : nullptr;
 }
 
@@ -5341,10 +5350,10 @@ const ThreeDModelPicture *GetThreeDPlantPicture(std::string_view name, float sca
  *                  (a stand-in given, ThreeDStandInsGiven(): its place to be drawn again when it comes)
  * @return nothing: the plant is not there; false: bigger than the card draws one (its picture)
  */
-std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card)
+std::optional<bool> GetThreeDPlantOnCard(std::string_view name, float scale, float stretch, float facing, ZoomLevel zoom, int *height, float yaw, std::shared_ptr<const ThreeDGpuStandingVehicle> &card, const float *rise)
 {
 	bool later = false;
-	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later);
+	std::optional<PictureToMake> p = PlantRequest(name, scale, stretch, facing, zoom, height, yaw, later, rise);
 	if (!p.has_value()) return std::nullopt;
 	std::vector<ThreeDPictureLight> lights;
 	return CardVehicle(*p, card, lights) != CardMade::TooBig;
