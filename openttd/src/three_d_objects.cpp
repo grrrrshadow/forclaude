@@ -11645,10 +11645,6 @@ const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin
 		origin = GetThreeDIndustryObjectOrigin(ind);
 		return obj;
 	}
-	/* A depot of a railway or a road with its gates and doors, opened with E as a house's (GetThreeDDepot()). */
-	if (!IsTileType(tile, TileType::Water)) {
-		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr && !depot->door_wings.empty()) return depot;
-	}
 	return nullptr;
 }
 
@@ -11740,11 +11736,6 @@ void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, 
 	if (const ThreeDObject *in = GetThreeDInterior(house); ThreeDDoorIsWindow(house, door) && in != nullptr && in->IsRead() && !in->pos.empty()) {
 		x = (in->extent[0] + in->extent[1]) / 2.0;
 		y = (in->extent[2] + in->extent[3]) / 2.0;
-	}
-	/* A depot's gate opens out, the way it does for a vehicle (ReadDepot()). */
-	if (door < house->gate_ways.size() && house->gate_ways[door] != 0) {
-		_three_d_doors_open[{origin, door}] = house->gate_ways[door];
-		return;
 	}
 	const auto a = DoorMiddle(_three_d_objects[house->door_wings[door][1]]), b = DoorMiddle(_three_d_objects[house->door_wings[door][2]]);
 	uint8_t way = 1;
@@ -12240,7 +12231,7 @@ const ThreeDObject *GetThreeDDepotDoorWing(const ThreeDObject *depot, TileIndex 
 		_three_d_depot_gates[origin] = open;
 		if (open) return &_three_d_objects[depot->door_wings[door][gate]];
 	}
-	return GetThreeDDoorWing(depot, origin, door);
+	return &_three_d_objects[depot->door_wings[door][0]];
 }
 
 void ThreeDDepotGatesTick()

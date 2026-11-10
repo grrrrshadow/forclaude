@@ -474,14 +474,14 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	if (WalkerTentBlocks(x, y)) return false;
 	/* The feet over the ground of a building whose north tile is origin. */
 	auto feet = [stand](TileIndex origin) { return std::max(0.0, stand - GetTileMaxPixelZ(origin)); };
-	/* A depot of a railway or a road by its shape, into it through its gates (GetThreeDDepot()); a ship depot is water. */
+	/* A depot of a railway or a road by its shape, its gates and doors shut to the walker even open for a vehicle
+	 * (the player, 10. 11.: one does not walk into it; GetThreeDDepot()); a ship depot is water. */
 	if (TileIndex origin; !IsTileType(tile, TileType::Water)) {
 		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr) {
 			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE, up = feet(origin);
 			if (depot->Blocks(lx, ly, up)) return false;
-			/* Its gates and doors as they stand: shut, in the way. */
-			for (size_t k = 0; k < depot->door_wings.size(); k++) {
-				if (GetThreeDDepotDoorWing(depot, origin, k)->Blocks(lx, ly, up)) return false;
+			for (const auto &wings : depot->door_wings) {
+				if (GetThreeDObjectNumbered(wings[0])->Blocks(lx, ly, up)) return false;
 			}
 			return true;
 		}
