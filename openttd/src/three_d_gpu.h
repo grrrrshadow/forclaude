@@ -355,6 +355,7 @@ struct ThreeDGpuEyeStep {
 	std::vector<uint32_t> lay_px;
 	std::vector<float> lay_z;
 	std::array<float, 3> colour{};
+	std::array<float, 3> absorb{}; ///< FarHaze under the water: how much of red, green and blue the water takes a world unit past from, 0 the haze from from to to
 	float from = 0, to = 0, depth = 0, horizon = 0;
 	std::vector<ThreeDGpuEyeGlow> glows;
 	std::vector<ThreeDGpuEyeLight> lights;

@@ -19101,27 +19101,42 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		const double fog_far = under_water ? EYE_UNDER_WATER_SEEN_M * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.98;
 		const Colour far_haze = under_water ? Colour(24, 72, 92) : Colour(150, 178, 205);
 		const double horizon = under_water ? -1.0 : EyeHorizonY(eye);
-		out.Job([width, height, fog_near, fog_far, far_haze, horizon](uint32_t *dst, float *zb) {
+		/* Under the water what is farther loses its red first, then its green, its blue last (the player, test4: "the
+		 * yellow submarine under the water turned orange, let us tune the water so that it changes the colours more
+		 * naturally"): each by its own share a metre past the near haze, as the sea takes them, all of them the water's
+		 * colour by the far end it is seen to. */
+		std::array<double, 3> absorb{};
+		if (under_water) {
+			static constexpr std::array<double, 3> PER_METRE = {0.30, 0.17, 0.14};
+			for (int k = 0; k < 3; k++) absorb[k] = PER_METRE[k] / OBJECT_UNITS_PER_METRE;
+		}
+		out.Job([width, height, fog_near, fog_far, far_haze, horizon, absorb](uint32_t *dst, float *zb) {
 			ParallelRows(height, [&](int lo, int hi) {
 			for (int y = lo; y < hi; y++) {
 				for (int x = 0; x < width; x++) {
 					const size_t i = static_cast<size_t>(y) * width + x;
-					double f;
+					std::array<double, 3> f;
 					if (zb[i] <= 0.0f) {
 						if (y < horizon) continue; // the sky
-						f = 1.0;
+						f = {1.0, 1.0, 1.0};
+					} else if (absorb[0] > 0) {
+						const double d = 1.0 / zb[i] - fog_near;
+						if (d <= 0.0) continue;
+						for (int k = 0; k < 3; k++) f[k] = 1.0 - std::exp(-absorb[k] * d);
 					} else {
-						f = std::clamp((1.0 / zb[i] - fog_near) / (fog_far - fog_near), 0.0, 1.0);
-						if (f <= 0.0) continue;
+						const double g = std::clamp((1.0 / zb[i] - fog_near) / (fog_far - fog_near), 0.0, 1.0);
+						if (g <= 0.0) continue;
+						f = {g, g, g};
 					}
 					Colour c(dst[i]);
-					dst[i] = Colour(static_cast<uint8_t>(c.r + (far_haze.r - c.r) * f), static_cast<uint8_t>(c.g + (far_haze.g - c.g) * f), static_cast<uint8_t>(c.b + (far_haze.b - c.b) * f)).data;
+					dst[i] = Colour(static_cast<uint8_t>(c.r + (far_haze.r - c.r) * f[0]), static_cast<uint8_t>(c.g + (far_haze.g - c.g) * f[1]), static_cast<uint8_t>(c.b + (far_haze.b - c.b) * f[2])).data;
 				}
 			}
 			});
-		}, [fog_near, fog_far, far_haze, horizon](EyeCard &card) {
+		}, [fog_near, fog_far, far_haze, horizon, absorb](EyeCard &card) {
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::FarHaze);
 			st.colour = {static_cast<float>(far_haze.r), static_cast<float>(far_haze.g), static_cast<float>(far_haze.b)};
+			st.absorb = {static_cast<float>(absorb[0]), static_cast<float>(absorb[1]), static_cast<float>(absorb[2])};
 			st.from = static_cast<float>(fog_near);
 			st.to = static_cast<float>(fog_far);
 			st.horizon = static_cast<float>(horizon);

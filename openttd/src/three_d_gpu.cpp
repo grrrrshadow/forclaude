@@ -1704,19 +1704,22 @@ void main()
 /* The haze far off: from u_from to u_to all of it; the ground beyond the land (nothing drawn under the horizon) all haze. */
 const char *const EYE_FAR_HAZE_FRAGMENT = R"(
 uniform vec3 u_haze;
+uniform vec3 u_absorb; // under the water: what it takes of red, green and blue a world unit past u_from; 0 the haze from u_from to u_to
 uniform float u_from, u_to, u_horizon;
 void main()
 {
 	ivec2 p = Pixel();
 	vec3 c = ColourAt(p);
 	float z = IwAt(p);
-	float f = 0.0;
+	vec3 f = vec3(0.0);
 	if (z <= 0.0) {
-		if (float(p.y) >= u_horizon) f = 1.0;
+		if (float(p.y) >= u_horizon) f = vec3(1.0);
+	} else if (u_absorb != vec3(0.0)) {
+		f = 1.0 - exp(-u_absorb * max(0.0, 1.0 / z - u_from));
 	} else {
-		f = clamp((1.0 / z - u_from) / (u_to - u_from), 0.0, 1.0);
+		f = vec3(clamp((1.0 / z - u_from) / (u_to - u_from), 0.0, 1.0));
 	}
-	if (f > 0.0) c = floor(c + (u_haze - c) * f);
+	if (f != vec3(0.0)) c = floor(c + (u_haze - c) * f);
 	Put(c);
 }
 )";
@@ -6001,6 +6004,7 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_haze"), s.colour[0], s.colour[1], s.colour[2]);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_from"), s.from);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_to"), s.to);
+				gl.glUniform3f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_absorb"), s.absorb[0], s.absorb[1], s.absorb[2]);
 				gl.glUniform1f(gl.glGetUniformLocation(_frame_far_haze_program.program, "u_horizon"), s.horizon);
 				done();
 				break;
