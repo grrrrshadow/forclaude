@@ -10962,6 +10962,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
 		Company::Get(CompanyID::Begin())->money = INT64_MAX / 4;
+		if (argv.size() > 4 && argv[2] == "zdymadlo") {
+			/* 'svahy zdymadlo <x> <y>': the lock built there for real, the ends after it. */
+			const TileIndex t = TileXY(number(3).value_or(0), number(4).value_or(0));
+			const CommandCost r = Command<Commands::BuildLock>::Do(DoCommandFlag::Execute, t);
+			IConsolePrint(CC_DEFAULT, "test3d: svahy zdymadlo {},{}: {}{}", TileX(t), TileY(t), r.Succeeded() ? "postaveno" : RefusalReason(r),
+					r.Succeeded() && IsTileType(t, TileType::Water) && IsLock(t) ? fmt::format(", konce {} {}", IsTileFlat(TileAddByDiagDir(t, ReverseDiagDir(GetLockDirection(t)))) ? "rovny" : "SIKMY", IsTileFlat(TileAddByDiagDir(t, GetLockDirection(t))) ? "rovny" : "SIKMY") : std::string());
+			return true;
+		}
 		std::map<std::string, std::pair<int, TileIndex>> dock, lock;
 		/* What lies below and above it: the tile's type, its slope, its water's class (0 sea, 1 canal, 2 river). */
 		auto about = [](TileIndex t) {

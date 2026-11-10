@@ -39,6 +39,7 @@
 #include "industry.h"
 #include "water_cmd.h"
 #include "landscape_cmd.h"
+#include "terraform_cmd.h"
 #include "pathfinder/water_regions.h"
 #include "town_type.h"
 #include "three_d_water_life.h"
@@ -340,6 +341,33 @@ static uint8_t GetLockPartMinimalBridgeHeight(LockPart lock_part)
  * @param flags Operation to perform.
  * @return The cost in case of success, or an error code if it failed.
  */
+/**
+ * An end of a lock made flat at its level, instead of refusing it as not flat (the player, test4: "it will be simpler to
+ * remove that rule; under the lock we need depth" -- the lock from the sea up the slope, its lower end on the coast):
+ * each of its corners dug down or filled up to it (CmdTerraformLand()), the coast under its lower end dug to the water.
+ * Testing (no DoCommandFlag::Execute), each corner's first step only: the map does not change between them.
+ * @param t the end's tile
+ * @param z its level, heights
+ * @return the cost, or why it cannot be made so
+ */
+static CommandCost FlattenLockEnd(TileIndex t, int z, DoCommandFlags flags)
+{
+	CommandCost cost(ExpensesType::Construction);
+	static constexpr std::array<std::tuple<Corner, int, int>, 4> CORNERS = {{{CORNER_N, 0, 0}, {CORNER_W, 1, 0}, {CORNER_S, 1, 1}, {CORNER_E, 0, 1}}};
+	for (const auto &[corner, dx, dy] : CORNERS) {
+		const uint cx = TileX(t) + dx, cy = TileY(t) + dy;
+		if (cx > Map::MaxX() || cy > Map::MaxY()) return CommandCost(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP);
+		const int diff = z - static_cast<int>(TileHeight(TileXY(cx, cy)));
+		for (int k = 0; k < std::abs(diff); k++) {
+			CommandCost ret = std::get<0>(Command<Commands::TerraformLand>::Do(flags, t, SlopeWithOneCornerRaised(corner), diff > 0));
+			if (ret.Failed()) return ret;
+			cost.AddCost(ret.GetCost());
+			if (!flags.Test(DoCommandFlag::Execute)) break;
+		}
+	}
+	return cost;
+}
+
 static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags flags)
 {
 	CommandCost cost(ExpensesType::Construction);
@@ -356,6 +384,11 @@ static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags
 	if (ret.Failed()) return ret;
 	cost.AddCost(ret.GetCost());
 
+	/* The ends' levels: the middle's foot and a level over it. Not flat (a coast, a slope): made so (FlattenLockEnd()). A
+	 * coast under the lower end was the sea's: its water stays the sea's. */
+	const int low_z = GetTileZ(tile);
+	const WaterClass coast_lower = IsTileType(tile - delta, TileType::Water) && IsCoast(tile - delta) ? WaterClass::Sea : WaterClass::Canal;
+
 	/* lower tile */
 	if (!IsWaterTile(tile - delta)) {
 		ret = Command<Commands::LandscapeClear>::Do(flags, tile - delta);
@@ -364,9 +397,11 @@ static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags
 		cost.AddCost(_price[Price::BuildCanal]);
 	}
 	if (!IsTileFlat(tile - delta)) {
-		return CommandCost(STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION);
+		ret = FlattenLockEnd(tile - delta, low_z, flags);
+		if (ret.Failed()) return ret;
+		cost.AddCost(ret.GetCost());
 	}
-	WaterClass wc_lower = IsWaterTile(tile - delta) ? GetWaterClass(tile - delta) : WaterClass::Canal;
+	WaterClass wc_lower = IsWaterTile(tile - delta) ? GetWaterClass(tile - delta) : coast_lower;
 
 	/* upper tile */
 	if (!IsWaterTile(tile + delta)) {
@@ -376,7 +411,9 @@ static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags
 		cost.AddCost(_price[Price::BuildCanal]);
 	}
 	if (!IsTileFlat(tile + delta)) {
-		return CommandCost(STR_ERROR_LAND_SLOPED_IN_WRONG_DIRECTION);
+		ret = FlattenLockEnd(tile + delta, low_z + 1, flags);
+		if (ret.Failed()) return ret;
+		cost.AddCost(ret.GetCost());
 	}
 	WaterClass wc_upper = IsWaterTile(tile + delta) ? GetWaterClass(tile + delta) : WaterClass::Canal;
 

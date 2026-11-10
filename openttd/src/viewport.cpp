@@ -16213,14 +16213,17 @@ double EyeWaterDepth(double x, double y)
 	const bool narrow = IsTileType(here, TileType::Water) && (IsRiver(here) || IsCanal(here));
 	static constexpr int REACH = 2;
 	double nearest = (REACH + 1) * TILE_SIZE;
+	double harbour = (REACH + 1) * TILE_SIZE; ///< the nearest lock, ship depot or dock
 	for (int dy = -REACH; dy <= REACH; dy++) {
 		for (int dx = -REACH; dx <= REACH; dx++) {
 			const int nx = tx + dx, ny = ty + dy;
 			/* Past the map's edge, and its edge's own tiles (void), the sea goes on. */
 			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
-			if (EyeWaterGoesOn(TileXY(nx, ny))) continue;
+			const TileIndex n = TileXY(nx, ny);
 			const double ox = std::max({0.0, nx * static_cast<double>(TILE_SIZE) - x, x - (nx + 1) * static_cast<double>(TILE_SIZE)});
 			const double oy = std::max({0.0, ny * static_cast<double>(TILE_SIZE) - y, y - (ny + 1) * static_cast<double>(TILE_SIZE)});
+			if ((IsTileType(n, TileType::Water) && (IsLock(n) || IsShipDepot(n))) || (IsTileType(n, TileType::Station) && IsDock(n))) harbour = std::min(harbour, std::hypot(ox, oy));
+			if (EyeWaterGoesOn(n)) continue;
 			nearest = std::min(nearest, std::hypot(ox, oy));
 		}
 	}
@@ -16243,6 +16246,9 @@ double EyeWaterDepth(double x, double y)
 	const double sx = x / TILE_SIZE, sy = y / TILE_SIZE;
 	const double wobble = 0.28 * std::sin(0.9 * sx + 1.7 * std::sin(0.37 * sy)) + 0.22 * std::sin(1.3 * sy - 0.6 * sx + 2.1);
 	levels += wobble * std::clamp(tiles / 2.0, 0.0, 1.0);
+	/* By a lock, a ship depot or a dock dug deep (the player, test4: "under the lock we need depth"): two levels within a
+	 * tile of it, the bed as it is two tiles off -- the shore there shallow as it gently goes down, the ships' keels in it. */
+	levels = std::max(levels, 2.0 * std::clamp(2.0 - harbour / TILE_SIZE, 0.0, 1.0));
 	return std::clamp(levels, 0.0, EYE_SEA_LEVELS) * TILE_HEIGHT;
 }
 
