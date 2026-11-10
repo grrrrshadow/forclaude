@@ -17,6 +17,11 @@
  * pavement on one side of the road: PAVEMENT from the middle of the road, crossing where the door he goes to is on
  * the other side. His frames are by the way walked (the colleague's "krok_m"), so his feet do not slide; he walks
  * as the frames walk, a round of them every snimku * tiku ticks.
+ *
+ * And he visits the depots and the lighthouses (the player, 10. 11.: "the lighthouse is in a lonely place, no other
+ * doors about; a depot may be the same: Mat appears about, walks to the door, goes in -- disappears, after a while
+ * comes out, walks off a bit and disappears there"): his way there and away the creatures' (NavFindWay()), as his way
+ * along the pavements is found by the same finder (NavFindTiles()).
  */
 
 #include "stdafx.h"
@@ -24,6 +29,11 @@
 #include "three_d.h"
 #include "three_d_objects.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_navigation.h"
+#include "object_map.h"
+#include "object_type.h"
+#include "rail_map.h"
+#include "water_map.h"
 #include "town.h"
 #include "house.h"
 #include "road.h"
@@ -70,8 +80,27 @@ constexpr int DOOR_SEARCH = 20;
 constexpr double WALK_PACE = 2.0;
 /** How far about a door (tiles, each way) the road to it may be when it does not look out onto one: over a fence. */
 constexpr int THROUGH_REACH = 3;
-/** How many road tiles the way to a door is looked for over. */
-constexpr size_t ROUTE_SEARCH = 3000;
+/** How far the way to a door is looked for (tiles each way from where he comes out). */
+constexpr int ROUTE_REACH = 64;
+/** The depots and lighthouses this far from the middle of the view (tiles, each way) get his visits. */
+constexpr int VISIT_REACH = 16;
+/** He appears, and goes off to, between so many tiles from the door he visits. */
+constexpr int VISIT_FROM_MIN = 3, VISIT_FROM_MAX = 7;
+/** He is inside so long (ticks): from the first, then up to the second more. */
+constexpr uint64_t VISIT_INSIDE = 300, VISIT_INSIDE_MORE = 600;
+/** One visit at a time among the depots and lighthouses within so many tiles (a row of depots: one Mat, not one each). */
+constexpr uint VISIT_APART = 8;
+/** At most so many visits at once about the view. */
+constexpr size_t VISITS_AT_ONCE = 3;
+/** He visits the same door again after so long (ticks): from the first, then up to the second more. */
+constexpr uint64_t VISIT_AGAIN = 900, VISIT_AGAIN_MORE = 1800;
+/** How far before a door he steps to it from (metres). */
+constexpr double DOOR_FRONT_M = 1.5;
+/**
+ * And how far out of the door the creatures' way comes to (world units): on the tile beyond, the door's front being on
+ * the depot's or lighthouse's own tile, which no way goes over (NavWalkable()).
+ */
+constexpr double DOOR_APPROACH = TILE_SIZE * 0.75;
 
 struct Point2 {
 	double x, y;
@@ -103,9 +132,17 @@ struct Walker {
 	double drawn_x = 0, drawn_y = 0;
 	int drawn_z = 0;
 	float drawn_facing = 0;
+	/* A visit to a depot or a lighthouse (SendVisit()), not a town's walk. */
+	TileIndex visit = INVALID_TILE; ///< the depot's or lighthouse's north tile, INVALID_TILE a town's walk
+	int stage = 0;                  ///< 0 to the door, 1 inside (not drawn), 2 off from it
+	uint64_t until = 0;             ///< inside till then
+	Point2 door{0, 0}, front{0, 0}; ///< the door and where he steps to it from
+	Point2 approach{0, 0};          ///< and where the way comes to it, on the walkable tile beyond the door's front
 };
 
 std::vector<Walker> _walkers;
+/** When a depot or lighthouse may get his visit again (the game's tick counter), by its north tile. */
+std::map<TileIndex, uint64_t> _next_visit;
 /** When a town's walker may come out again (the game's tick counter). */
 std::map<TownID, uint64_t> _next_walk;
 
@@ -280,30 +317,18 @@ void TownDoors(const Town *town, std::vector<Door> &doors)
  */
 std::vector<TileIndex> Route(const Town *town, TileIndex from, const std::vector<TileIndex> &ends, TileIndex &end)
 {
-	std::unordered_map<uint32_t, TileIndex> came;
-	std::vector<TileIndex> queue{from};
-	came[from.base()] = from;
+	/* The creatures' finder (NavFindTiles()) over the town's walkways, each step's road joined both ways, to the four
+	 * neighbours: no finder of his own (the player, 10. 11.: "we do not need four way finders eating the power"). */
+	const NavProfile profile{false, 1.0,
+			[town](TileIndex a, TileIndex b) { return IsWalkway(b, town) && Joined(a, b, DiagdirBetweenTiles(a, b)); },
+			[town](TileIndex t) { return IsWalkway(t, town); },
+			[](TileIndex) { return 1.0; }};
+	bool reached;
+	std::vector<TileIndex> route = NavFindTiles(from, ends, profile, ROUTE_REACH, reached);
 	end = INVALID_TILE;
-	for (size_t i = 0; i < queue.size() && i < ROUTE_SEARCH; i++) {
-		TileIndex t = queue[i];
-		if (std::ranges::find(ends, t) != ends.end()) {
-			end = t;
-			break;
-		}
-		for (DiagDirection d : {DiagDirection::NE, DiagDirection::SE, DiagDirection::SW, DiagDirection::NW}) {
-			TileIndex n = Next(t, d);
-			if (n == INVALID_TILE || came.contains(n.base()) || !IsWalkway(n, town) || !Joined(t, n, d)) continue;
-			came[n.base()] = t;
-			queue.push_back(n);
-		}
-	}
-	std::vector<TileIndex> route;
-	if (end == INVALID_TILE) return route;
-	for (TileIndex t = end;; t = came[t.base()]) {
-		route.push_back(t);
-		if (t == from) break;
-	}
-	std::reverse(route.begin(), route.end());
+	if (!reached) return {};
+	route.insert(route.begin(), from);
+	end = route.back();
 	return route;
 }
 
@@ -365,6 +390,13 @@ void Redraw(Walker &w, const ThreeDVehicleObject *fig)
 	w.drawn_facing = w.facing;
 }
 
+/** The lengths along a way, for a walker going along it (Walker::at). */
+void Measure(Walker &w)
+{
+	w.at.assign(1, 0.0);
+	for (size_t i = 1; i < w.path.size(); i++) w.at.push_back(w.at.back() + std::hypot(w.path[i].x - w.path[i - 1].x, w.path[i].y - w.path[i - 1].y));
+}
+
 /** Send a walker out in a town now, if it has two doors with a way between; whether one went. */
 bool Send(const Town *town, const ThreeDVehicleObject *fig)
 {
@@ -394,14 +426,104 @@ bool Send(const Town *town, const ThreeDVehicleObject *fig)
 	Walker w;
 	w.town = town->index;
 	w.path = MakePath(from, *to, route);
-	w.at.push_back(0);
-	for (size_t i = 1; i < w.path.size(); i++) w.at.push_back(w.at.back() + std::hypot(w.path[i].x - w.path[i - 1].x, w.path[i].y - w.path[i - 1].y));
+	Measure(w);
 	Place(w, fig);
 	Redraw(w, fig);
 	Debug(misc, 1, "3D walker: {} out of the door of the house at {},{} to the one at {},{} in {}, {} road tiles, {:.0f} units", WALKER_FIGURE,
 			TileX(from.house), TileY(from.house), TileX(to->house), TileY(to->house), town->index.base(), route.size(), w.at.back());
 	_walkers.push_back(std::move(w));
 	return true;
+}
+
+/**
+ * A walkable place some tiles off a point, from where the creatures' way (NavFindWay()) leads to it: where he appears
+ * before a visit, or goes off to after it.
+ * @param[out] way the way from there to the point, or back from the point to there
+ * @param back the way from the point to the place, not to the point
+ */
+bool PlaceOff(Point2 at, bool back, Point2 &place, std::vector<Point2> &way)
+{
+	for (int tries = 0; tries < 8; tries++) {
+		const double a = InteractiveRandomRange(360) * M_PI / 180.0;
+		const double r = (VISIT_FROM_MIN + InteractiveRandomRange(VISIT_FROM_MAX - VISIT_FROM_MIN + 1)) * static_cast<double>(TILE_SIZE);
+		double x = at.x + std::cos(a) * r, y = at.y + std::sin(a) * r;
+		if (x < TILE_SIZE || y < TILE_SIZE || x >= (Map::MaxX() - 1) * TILE_SIZE || y >= (Map::MaxY() - 1) * TILE_SIZE) continue;
+		if (!NavNearestWalkable(x, y, 1)) continue;
+		const std::vector<NavPoint> found = back ? NavFindWay(at.x, at.y, x, y, 24) : NavFindWay(x, y, at.x, at.y, 24);
+		if (found.empty()) continue;
+		/* It must get there (DOOR_APPROACH: a walkable tile). */
+		const NavPoint end = found.back();
+		const Point2 goal = back ? Point2{x, y} : at;
+		if (std::hypot(end.first - goal.x, end.second - goal.y) > TILE_SIZE / 2.0) continue;
+		place = {x, y};
+		way.clear();
+		for (const auto &[px, py] : found) way.push_back({px, py});
+		return true;
+	}
+	return false;
+}
+
+/**
+ * Send him to visit a depot or a lighthouse now, by one of its doors (ThreeDPeopleDoorsAt()): from a place some tiles
+ * off by the creatures' way to the front of the door, in at it; whether he went.
+ */
+bool SendVisit(TileIndex tile, const ThreeDVehicleObject *fig)
+{
+	const std::vector<ThreeDPeopleDoor> doors = ThreeDPeopleDoorsAt(tile);
+	if (doors.empty()) return false;
+	const ThreeDPeopleDoor &d = doors[InteractiveRandomRange(static_cast<uint32_t>(doors.size()))];
+	Walker w;
+	w.town = TownID::Invalid();
+	w.visit = tile;
+	w.door = {d.x, d.y};
+	w.front = {d.x + d.out_x * DOOR_FRONT_M * OBJECT_UNITS_PER_METRE, d.y + d.out_y * DOOR_FRONT_M * OBJECT_UNITS_PER_METRE};
+	w.approach = {d.x + d.out_x * DOOR_APPROACH, d.y + d.out_y * DOOR_APPROACH};
+	Point2 from;
+	std::vector<Point2> way;
+	if (!PlaceOff(w.approach, false, from, way)) return false;
+	w.path.push_back(from);
+	w.path.insert(w.path.end(), way.begin(), way.end());
+	w.path.push_back(w.approach);
+	w.path.push_back(w.front);
+	w.path.push_back(w.door);
+	Measure(w);
+	Place(w, fig);
+	Redraw(w, fig);
+	Debug(misc, 1, "3D walker: {} visits {},{} from {:.0f},{:.0f}, {} points, {:.0f} units", WALKER_FIGURE, TileX(tile), TileY(tile), from.x, from.y, w.path.size(), w.at.back());
+	_walkers.push_back(std::move(w));
+	return true;
+}
+
+/** Out of the door after a visit: off by the creatures' way to a place some tiles away; whether there is one. */
+bool LeaveVisit(Walker &w, const ThreeDVehicleObject *fig)
+{
+	Point2 to;
+	std::vector<Point2> way;
+	if (!PlaceOff(w.approach, true, to, way)) return false;
+	w.path = {w.door, w.front, w.approach};
+	w.path.insert(w.path.end(), way.begin(), way.end());
+	Measure(w);
+	w.walked = 0;
+	w.stage = 2;
+	Place(w, fig);
+	Redraw(w, fig);
+	return true;
+}
+
+/** The depots and lighthouses with doors for people about the middle of the view (ThreeDPeopleDoorsAt()), their north tiles. */
+std::vector<TileIndex> VisitPlaces(TileIndex middle)
+{
+	std::vector<TileIndex> places;
+	const int cx = TileX(middle), cy = TileY(middle);
+	for (int y = std::max(1, cy - VISIT_REACH); y <= std::min<int>(Map::MaxY() - 1, cy + VISIT_REACH); y++) {
+		for (int x = std::max(1, cx - VISIT_REACH); x <= std::min<int>(Map::MaxX() - 1, cx + VISIT_REACH); x++) {
+			const TileIndex t = TileXY(x, y);
+			const bool lighthouse = IsTileType(t, TileType::Object) && GetObjectType(t) == OBJECT_LIGHTHOUSE;
+			const bool depot = IsRailDepotTile(t) || IsRoadDepotTile(t) || IsShipDepotTile(t);
+			if ((lighthouse || depot) && !ThreeDPeopleDoorsAt(t).empty()) places.push_back(t);
+		}
+	}
+	return places;
 }
 
 /** The middle of the main view when it is turned, else INVALID_TILE. */
@@ -444,6 +566,47 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 	const uint64_t now = TimerGameTick::counter;
 	for (auto it = _walkers.begin(); it != _walkers.end();) {
 		Walker &w = *it;
+		if (w.visit != INVALID_TILE) {
+			/* A visit: to the door and in, a while inside, out and off (SendVisit()). */
+			if (DistanceManhattan(w.visit, middle) > TOWN_GONE || ThreeDPeopleDoorsAt(w.visit).empty()) {
+				if (w.stage != 1) MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+				it = _walkers.erase(it);
+				continue;
+			}
+			if (w.stage == 1) {
+				if (now >= w.until && !LeaveVisit(w, fig)) {
+					/* Nowhere to go off to: he stays in. */
+					_next_visit[w.visit] = now + VISIT_AGAIN + InteractiveRandomRange(VISIT_AGAIN_MORE);
+					it = _walkers.erase(it);
+					continue;
+				}
+				++it;
+				continue;
+			}
+			w.walked += speed;
+			if (w.walked >= w.at.back()) {
+				MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+				if (w.stage == 0) {
+					/* In at the door. */
+					w.stage = 1;
+					w.until = now + VISIT_INSIDE + InteractiveRandomRange(VISIT_INSIDE_MORE);
+					++it;
+				} else {
+					/* Off where he went: gone. */
+					_next_visit[w.visit] = now + VISIT_AGAIN + InteractiveRandomRange(VISIT_AGAIN_MORE);
+					it = _walkers.erase(it);
+				}
+				continue;
+			}
+			const int frame = w.frame;
+			Place(w, fig);
+			if (w.frame != frame) {
+				MarkStandingDirty(fig, w.drawn_x, w.drawn_y, w.drawn_z, false);
+				Redraw(w, fig);
+			}
+			++it;
+			continue;
+		}
 		const Town *town = Town::GetIfValid(w.town);
 		w.walked += speed;
 		if (town == nullptr || w.walked >= w.at.back() || DistanceManhattan(town->xy, middle) > TOWN_GONE) {
@@ -463,6 +626,21 @@ const IntervalTimer<TimerGameTick> _walkers_timer({TimerGameTick::Priority::None
 		++it;
 	}
 	if (now % 16 != 0) return;
+	/* The depots and lighthouses about get his visit now and then, each its own (the first time after a while). */
+	if (now % 64 == 0) {
+		for (const TileIndex place : VisitPlaces(middle)) {
+			const size_t visits = std::ranges::count_if(_walkers, [](const Walker &w) { return w.visit != INVALID_TILE; });
+			if (visits >= VISITS_AT_ONCE) break;
+			if (std::ranges::any_of(_walkers, [&](const Walker &w) { return w.visit != INVALID_TILE && DistanceManhattan(w.visit, place) <= VISIT_APART; })) continue;
+			auto next = _next_visit.find(place);
+			if (next == _next_visit.end()) {
+				_next_visit[place] = now + InteractiveRandomRange(VISIT_AGAIN);
+				continue;
+			}
+			if (now < next->second) continue;
+			if (!SendVisit(place, fig)) _next_visit[place] = now + VISIT_AGAIN;
+		}
+	}
 	for (const Town *town : Town::Iterate()) {
 		if (DistanceManhattan(town->xy, middle) > TOWN_REACH) continue;
 		if (std::ranges::any_of(_walkers, [&](const Walker &w) { return w.town == town->index; })) continue;
@@ -789,6 +967,7 @@ void AddThreeDWalkersToViewport(ZoomLevel zoom)
 	if (_walkers.empty() || IsTransparencySet(TransparencyOption::Houses)) return;
 	const float scale = WalkerScale();
 	for (const Walker &w : _walkers) {
+		if (w.stage == 1) continue; // inside a depot or a lighthouse
 		/* Where it was drawn again last (Walker::drawn_x): as the screen has it. */
 		const int x = static_cast<int>(std::lround(w.drawn_x)), y = static_cast<int>(std::lround(w.drawn_y));
 		const TileIndex tile = TileVirtXY(std::clamp<int>(x, 0, Map::MaxX() * TILE_SIZE), std::clamp<int>(y, 0, Map::MaxY() * TILE_SIZE));
@@ -801,6 +980,7 @@ void AddThreeDWalkersToEye(float scale)
 {
 	if (_walkers.empty()) return;
 	for (const Walker &w : _walkers) {
+		if (w.stage == 1) continue; // inside a depot or a lighthouse
 		/* Where it is and on the slope's plane, not at whole units (the player, test4: the stairs). */
 		AddCabFigure(WALKER_FIGURE, scale, w.x, w.y, w.zf, w.facing, std::max(0, w.frame));
 	}
@@ -821,6 +1001,19 @@ bool SendThreeDWalker()
 	return Send(best, fig);
 }
 
+/** Send him now to visit the depot or lighthouse nearest the middle of the life about (the rig, SendVisit()); whether he went. */
+bool SendThreeDVisit()
+{
+	const TileIndex middle = LifeMiddle();
+	const ThreeDVehicleObject *fig = WalkerFigure();
+	if (middle == INVALID_TILE || fig == nullptr) return false;
+	std::vector<TileIndex> places = VisitPlaces(middle);
+	if (places.empty()) return false;
+	std::ranges::sort(places, [&](TileIndex a, TileIndex b) { return DistanceManhattan(a, middle) < DistanceManhattan(b, middle); });
+	std::erase_if(_walkers, [&](const Walker &w) { return w.visit == places.front(); });
+	return SendVisit(places.front(), fig);
+}
+
 /** Where the first walker is, world units (the rig); false when none walks. */
 bool ThreeDWalkerAt(int &x, int &y, int &z)
 {
@@ -835,7 +1028,7 @@ bool ThreeDWalkerAt(int &x, int &y, int &z)
 bool ThreeDMatNear(double x, double y, double reach_m)
 {
 	for (const Walker &w : _walkers) {
-		if (std::hypot(w.x - x, w.y - y) <= reach_m * OBJECT_UNITS_PER_METRE) return true;
+		if (w.stage != 1 && std::hypot(w.x - x, w.y - y) <= reach_m * OBJECT_UNITS_PER_METRE) return true;
 	}
 	return false;
 }
@@ -851,6 +1044,11 @@ std::string DescribeThreeDWalkers()
 {
 	std::string out = fmt::format("{} walkers", _walkers.size());
 	for (const Walker &w : _walkers) {
+		if (w.visit != INVALID_TILE) {
+			out += fmt::format("\n  visit {},{} {} at {:.1f},{:.1f},{} facing {:.0f} frame {}, {:.0f} of {:.0f} walked, {} points", TileX(w.visit), TileY(w.visit),
+					w.stage == 0 ? "to the door" : w.stage == 1 ? "inside" : "off", w.x / TILE_SIZE, w.y / TILE_SIZE, w.z, w.facing, w.frame, w.walked, w.at.back(), w.path.size());
+			continue;
+		}
 		out += fmt::format("\n  town {} at {:.1f},{:.1f},{} facing {:.0f} frame {}, {:.0f} of {:.0f} walked, {} points", w.town.base(), w.x, w.y, w.z, w.facing, w.frame, w.walked, w.at.back(), w.path.size());
 	}
 	TileIndex middle = TurnedViewMiddle();

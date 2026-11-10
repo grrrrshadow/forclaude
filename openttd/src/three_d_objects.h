@@ -1509,6 +1509,12 @@ const ThreeDObject *GetThreeDLighthouse(TileIndex tile);
  * it only marks the way in).
  */
 const ThreeDObject *GetThreeDDepotDoorWing(const ThreeDObject *depot, TileIndex origin, size_t door);
+/** A door people walk in and out of at a depot or a lighthouse (ThreeDPeopleDoorsAt()): where it is and the way out of it, world units. */
+struct ThreeDPeopleDoor {
+	double x, y;         ///< the middle of its opening
+	double out_x, out_y; ///< the way out of it, a unit long
+};
+std::vector<ThreeDPeopleDoor> ThreeDPeopleDoorsAt(TileIndex tile);
 /** Each tick: the depots whose gates have opened or shut since they were drawn (GetThreeDDepotDoorWing()) drawn again. */
 void ThreeDDepotGatesTick();
 /**

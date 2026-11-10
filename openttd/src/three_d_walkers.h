@@ -33,6 +33,7 @@ void AddThreeDWalkersToViewport(ZoomLevel zoom);
 void AddThreeDWalkersToEye(float scale);
 std::string DescribeThreeDWalkers();
 bool SendThreeDWalker();
+bool SendThreeDVisit();
 struct Town;
 bool IsThreeDWalkway(TileIndex t, const Town *town);
 bool ThreeDWalkerAt(int &x, int &y, int &z);

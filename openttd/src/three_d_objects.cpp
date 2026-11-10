@@ -5900,6 +5900,21 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	itself.figure = name;
 	itself.at[0] = itself.at[1] = middle;
 	obj.addon_places.push_back(itself);
+	/* Its doors ("dvere": where in the lighthouse's frame, the way out): Mat goes in and out there (ThreeDPeopleDoorsAt()). */
+	if (e.contains("dvere") && e.at("dvere").is_array()) {
+		for (const auto &d : e.at("dvere")) {
+			if (!d.is_object() || !d.contains("poloha") || !d.contains("smer")) continue;
+			const auto &at = d.at("poloha"), &out = d.at("smer");
+			if (!at.is_array() || at.size() < 2 || !out.is_array() || out.size() < 2) continue;
+			ThreeDObjectDoor door;
+			for (int k = 0; k < 2; k++) {
+				door.at[k] = middle + at.at(k).get<float>();
+				door.out[k] = out.at(k).get<float>();
+			}
+			door.width = d.value("sirka", 1.0f);
+			obj.doors.push_back(door);
+		}
+	}
 	if (!spin_node.empty()) {
 		GlbMesh mesh;
 		GlbReadOptions o;
@@ -11930,6 +11945,39 @@ std::string RigThreeDDepotDoors(TileIndex tile)
 		if (mid.has_value()) out += fmt::format(" (stred {:.2f},{:.2f} m)", mid->first / OBJECT_UNITS_PER_METRE, mid->second / OBJECT_UNITS_PER_METRE);
 	}
 	return out;
+}
+
+/**
+ * The doors people walk in and out of at a depot or a lighthouse whose north tile a tile is (Mat's visits,
+ * three_d_walkers.h; the player, 10. 11.: "Mat appears about, walks to the door, goes in"): a depot's doors for people
+ * (ThreeDObject::gate_ways 0, the way out away from the depot's middle), a lighthouse's ("dvere" of its index).
+ */
+std::vector<ThreeDPeopleDoor> ThreeDPeopleDoorsAt(TileIndex tile)
+{
+	std::vector<ThreeDPeopleDoor> doors;
+	const double cx = TileX(tile) * TILE_SIZE, cy = TileY(tile) * TILE_SIZE;
+	if (const ThreeDObject *l = GetThreeDLighthouse(tile); l != nullptr) {
+		for (const ThreeDObjectDoor &d : l->doors) {
+			const double len = std::hypot(d.out[0], d.out[1]);
+			if (len <= 0) continue;
+			doors.push_back({cx + d.at[0] * OBJECT_UNITS_PER_METRE, cy + d.at[1] * OBJECT_UNITS_PER_METRE, d.out[0] / len, d.out[1] / len});
+		}
+		return doors;
+	}
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr || origin != tile || !o->Read() || o->pos.empty()) return doors;
+	const double mx = (o->extent[0] + o->extent[1]) / 2.0, my = (o->extent[2] + o->extent[3]) / 2.0;
+	for (size_t k = 0; k < o->door_wings.size() && k < o->gate_ways.size(); k++) {
+		if (o->gate_ways[k] != 0) continue;
+		const auto mid = DoorMiddle(_three_d_objects[o->door_wings[k][0]]);
+		if (!mid.has_value()) continue;
+		/* Out away from the depot's middle, along the nearer axis: its door is in a wall. */
+		const double dx = mid->first - mx, dy = mid->second - my;
+		const bool along_x = std::abs(dx) >= std::abs(dy);
+		doors.push_back({cx + mid->first, cy + mid->second, along_x ? (dx >= 0 ? 1.0 : -1.0) : 0.0, along_x ? 0.0 : (dy >= 0 ? 1.0 : -1.0)});
+	}
+	return doors;
 }
 
 /** The door of a house nearest a point (world units from its north corner) within reach of it (world units), if any. */

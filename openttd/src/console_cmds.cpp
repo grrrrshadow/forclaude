@@ -12704,6 +12704,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* The rig: the people walking about the towns (three_d_walkers.h); 'chodci posli' sends one out now in the
 		 * town nearest the middle of the turned view. */
 		if (argv.size() > 2 && argv[2] == "posli") IConsolePrint(CC_DEFAULT, "test3d: chodec {}", SendThreeDWalker() ? "vysel" : "NEVYSEL");
+		/* 'chodci navsteva': Mat to the depot or lighthouse nearest, by its door (SendThreeDVisit()). */
+		if (argv.size() > 2 && argv[2] == "navsteva") IConsolePrint(CC_DEFAULT, "test3d: navsteva {}", SendThreeDVisit() ? "vysel" : "NEVYSEL");
 		int wx, wy, wz;
 		if (argv.size() > 2 && argv[2] == "stred" && ThreeDWalkerAt(wx, wy, wz)) {
 			/* The view's middle on the first walker. */
