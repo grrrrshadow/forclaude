@@ -92,8 +92,8 @@ constexpr uint32_t CATTAIL_BANKS = 45;  ///< cattails along so many banks in a h
 constexpr double CATTAIL_APART_M = 0.55; ///< the cattails of a cluster so far apart along the bank
 constexpr double CATTAIL_OUT_M = 0.2;   ///< and in the water past the bank drawn on the tile (EYE_RIVER_BANK) so far ...
 constexpr double CATTAIL_OUT_MORE_M = 0.7; ///< ... and up to so much farther: there it is 0.3 to 1 m deep
-constexpr float CATTAIL_SIZE = 1.3f;     ///< as big against its 1.6 m (the player, test3: "the cattail is too small") ...
-constexpr float CATTAIL_SIZE_MORE = 0.3f; ///< ... and up to so much bigger: 2.1 to 2.6 m, 1 to 2 m of it over the water
+constexpr float CATTAIL_SIZE = 2.6f;     ///< as big against its 1.6 m (the player, test3: "the cattail is too small"; test5: "if it has a metre, make it 2 metres") ...
+constexpr float CATTAIL_SIZE_MORE = 0.6f; ///< ... and up to so much bigger: 4.2 to 5.2 m, 3 to 5 m of it over the water
 
 /** Of the tile, a number of its own for the things by chance on it (each its key). */
 uint32_t TileRandom(TileIndex t, uint32_t key)
