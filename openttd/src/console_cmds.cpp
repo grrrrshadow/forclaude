@@ -15,6 +15,9 @@
 #include "train.h"
 #include "ship.h"
 #include "depot_base.h"
+#include "object.h"
+#include "object_base.h"
+#include "object_type.h"
 #include "water_map.h"
 #include "water_cmd.h"
 #include "road_cmd.h"
@@ -11488,6 +11491,19 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string RigThreeDDepotMap(TileIndex tile, double feet_m);
 		const std::string m = RigThreeDDepotMap(TileXY(*x, *y), (argv.size() > 4 ? number(4).value_or(0) : 0) / 100.0);
 		for (const auto line : std::views::split(std::string_view(m), std::string_view("\n"))) IConsolePrint(CC_DEFAULT, "test3d: depomapa {}", std::string_view(line.begin(), line.end()));
+	} else if (what == "majaky" && argv.size() > 3) {
+		/* 'majaky <x> <y>': lighthouses of the game's own at (x, y) and (x + 3, y) on level land, each tile then its
+		 * object (GetThreeDLighthouse(): one of the colleague's by the tile). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(5, 3), at(-2, -3), false, LevelMode::Level);
+		for (int dx : {0, 3}) {
+			Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, at(dx, 0));
+			if (Object::CanAllocateItem()) BuildObject(OBJECT_LIGHTHOUSE, at(dx, 0), OWNER_NONE, nullptr, 0);
+			const ThreeDObject *o = GetThreeDLighthouse(at(dx, 0));
+			IConsolePrint(CC_DEFAULT, "test3d: majaky {},{}: {}", *x + dx, *y, o != nullptr ? o->name : std::string("bez objektu"));
+		}
 	} else if (what == "vrata" && argv.size() > 3) {
 		/* 'vrata <x> <y>': the wings of a depot's gates and doors as they stand (GetThreeDDepotDoorWing()). */
 		auto x = number(2), y = number(3);

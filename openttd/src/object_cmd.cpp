@@ -484,7 +484,8 @@ static void DrawTile_Object(TileInfo *ti)
 			DrawGroundSprite(dts->ground.sprite, palette);
 		}
 
-		if (!IsInvisibilitySet(TransparencyOption::Structures)) {
+		/* A lighthouse in the 3D views: the colleague's, not its sprites (ThreeDLighthouseStandsOn()). */
+		if (!IsInvisibilitySet(TransparencyOption::Structures) && !(type == OBJECT_LIGHTHOUSE && ThreeDLighthouseStandsOn(ti))) {
 			for (const DrawTileSeqStruct &dtss : dts->GetSequence()) {
 				AddSortableSpriteToDraw(dtss.image.sprite, palette, *ti, dtss, IsTransparencySet(TransparencyOption::Structures));
 			}

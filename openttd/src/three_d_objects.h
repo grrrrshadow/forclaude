@@ -334,6 +334,7 @@ struct ThreeDObject {
 	std::vector<std::array<float, 5>> walkways; ///< a ship depot's ("lavky", ReadDepot()): each its x and y from, x and y to and its height, world units from the depot's north corner, turned with it
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
+	bool no_see_through = false;              ///< read without its see-through triangles (a material "BLEND", a lighthouse's lantern glass): the buildings are drawn opaque, the reflector in it hidden
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
 	std::vector<ThreeDSceneMore> scene_more;  ///< and parts of other files laid into it ("scena_navic")
 	/* Its materials' pictures taken from elsewhere ("textury_materialu"; the player, 3. 11.: "many models are the same
@@ -1493,6 +1494,12 @@ const ThreeDObject *GetThreeDStation(TileIndex tile);
  * @return nullptr: another tile, one of a set's look (a rail or road type's own depot), or the sets have not the depot
  */
 const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin);
+/**
+ * The object of a lighthouse of the game's own (the colleague's objekty/majaky, ReadLighthouse()) on a tile: one of
+ * them by the tile, its reflector a figure that turns.
+ * @return nullptr: another tile, or the sets have no lighthouse
+ */
+const ThreeDObject *GetThreeDLighthouse(TileIndex tile);
 /**
  * The wing of a door of a depot as it stands now (GetThreeDDepot()): a gate open out while a vehicle is on the depot's
  * tile and not hidden in it (coming in, going out), else shut; a door for people always shut (the player, 10. 11.:

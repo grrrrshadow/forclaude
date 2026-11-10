@@ -52,6 +52,7 @@
 #include "roadstop_base.h"
 #include "rail_map.h"
 #include "water_map.h"
+#include "object_map.h"
 #include "newgrf_railtype.h"
 #include "newgrf_roadtype.h"
 #include "cargotype.h"
@@ -267,6 +268,8 @@ struct ThreeDStationPiece {
 static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStationKind::End)> _three_d_station_pieces;
 /** The depots' objects (ReadDepot()) by the transport (0 railway, 1 road, 2 water) and the way (a DiagDirection; a ship depot's axis): objects in _three_d_objects. */
 static std::map<std::pair<int, int>, size_t> _three_d_depots;
+/** The lighthouses' objects (ReadLighthouse()), objects in _three_d_objects: one of them on each lighthouse's tile (GetThreeDLighthouse()). */
+static std::vector<size_t> _three_d_lighthouses;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 
@@ -2757,6 +2760,31 @@ static std::vector<std::string> GlbDoorNodes(const std::string &path)
 	return out;
 }
 
+/**
+ * A mesh without its see-through triangles (a material "BLEND": a lighthouse's lantern glass, 0.3 of its colour): the
+ * buildings are drawn opaque, the glass a box in its colour hid the reflector turning in it.
+ */
+static void DropSeeThroughTriangles(GlbMesh &mesh)
+{
+	const size_t n = mesh.tri.size() / 3;
+	size_t kept = 0;
+	for (size_t t = 0; t < n; t++) {
+		const uint8_t tex = t < mesh.tri_tex.size() ? mesh.tri_tex[t] : 0;
+		if (tex < mesh.textures.size() && mesh.textures[tex].alpha < 255) continue;
+		for (int k = 0; k < 3; k++) mesh.tri[kept * 3 + k] = mesh.tri[t * 3 + k];
+		if (t < mesh.tri_tex.size()) mesh.tri_tex[kept] = mesh.tri_tex[t];
+		if (t < mesh.tri_group.size()) mesh.tri_group[kept] = mesh.tri_group[t];
+		if (t < mesh.tri_mark.size()) mesh.tri_mark[kept] = mesh.tri_mark[t];
+		if (t < mesh.tri_glass.size()) mesh.tri_glass[kept] = mesh.tri_glass[t];
+		kept++;
+	}
+	mesh.tri.resize(kept * 3);
+	if (mesh.tri_tex.size() > kept) mesh.tri_tex.resize(kept);
+	if (mesh.tri_group.size() > kept) mesh.tri_group.resize(kept);
+	if (mesh.tri_mark.size() > kept) mesh.tri_mark.resize(kept);
+	if (mesh.tri_glass.size() > kept) mesh.tri_glass.resize(kept);
+}
+
 static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 {
 	GlbMesh mesh;
@@ -2769,9 +2797,13 @@ static bool ReadGlb(const std::string &path, ThreeDObject &obj)
 		/* Its floors walked on as an interior's (the dragon castle's stairs, wall walks and the hall's roof, "podlaha"). */
 		o.groups = &GLB_FLOORS;
 		if (!ReadGlbMesh(path, mesh, o)) return false;
-	} else if (!ReadGlbMesh(path, mesh)) {
-		return false;
+	} else {
+		/* Without the nodes it leaves out (a lighthouse's reflector, a figure that turns of its own). */
+		GlbReadOptions o;
+		if (!obj.left_out.empty()) o.skip_nodes = &obj.left_out;
+		if (!ReadGlbMesh(path, mesh, o)) return false;
 	}
+	if (obj.no_see_through) DropSeeThroughTriangles(mesh);
 	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
 	TakeGlbFloors(mesh, obj);
 	TakeGlbMesh(mesh, obj);
@@ -5799,6 +5831,64 @@ static void ReadStationPiece(const nlohmann::json &e, std::string_view kind)
 	_three_d_station_pieces[to_underlying(k)] = std::move(piece);
 }
 
+/**
+ * A lighthouse (the colleague's objekty/majaky, hra/3d/MAJAKY-PRO-HRU.md; the player, 10. 11.: "go do the lighthouses"):
+ * its file an add-on without the node that turns ("otaceni" "uzel", the reflector with its night), its foot in the
+ * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
+ * (the figures' index), stood where its bottom is.
+ */
+static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
+{
+	ThreeDObject addon;
+	addon.file = e.at("soubor").get<std::string>();
+	addon.name = e.value("jmeno", addon.file);
+	addon.glb_path = folder + addon.file;
+	NoteMarginsFilled(e, addon.glb_path, MarginsOf::Buildings);
+	ReadMaterialPictures(e, folder, addon);
+	addon.addon = true;
+	addon.variants = 0;
+	std::string spin_node, spin_night;
+	if (e.contains("otaceni") && e.at("otaceni").is_object()) {
+		spin_node = e.at("otaceni").value("uzel", std::string());
+		spin_night = e.at("otaceni").value("noc_uzel", std::string());
+	}
+	if (!spin_node.empty()) addon.left_out.push_back(spin_node);
+	addon.no_see_through = true;
+	if (!_three_d_addons.emplace(addon.name, _three_d_objects.size()).second) return;
+	const std::string name = addon.name, path = addon.glb_path;
+	_three_d_objects.push_back(std::move(addon));
+
+	ThreeDObject obj;
+	obj.name = "majak/" + name;
+	obj.variants = 0;
+	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0);
+	ThreeDObjectFigure itself;
+	itself.figure = name;
+	itself.at[0] = itself.at[1] = middle;
+	obj.addon_places.push_back(itself);
+	if (!spin_node.empty()) {
+		GlbMesh mesh;
+		GlbReadOptions o;
+		o.all_nodes = true;
+		o.only_node = spin_node;
+		std::vector<std::string> skip;
+		if (!spin_night.empty()) skip.push_back(spin_night);
+		o.skip_nodes = &skip;
+		float bottom = 0;
+		if (ReadGlbMesh(path, mesh, o) && mesh.pos.size() >= 3) {
+			bottom = mesh.pos[2];
+			for (size_t i = 2; i < mesh.pos.size(); i += 3) bottom = std::min(bottom, mesh.pos[i]);
+		}
+		ThreeDObjectFigure reflector;
+		reflector.figure = name + "/reflektor";
+		reflector.at[0] = reflector.at[1] = middle;
+		reflector.at[2] = bottom;
+		obj.figures.push_back(reflector);
+	}
+	_three_d_lighthouses.push_back(_three_d_objects.size());
+	_three_d_objects.push_back(std::move(obj));
+}
+
 /** How far a station's piece is turned standing a way (MakeStationObjects()): along y -90 degrees, a bay by its entrance. */
 static float StationWayTurn(ThreeDStationKind kind, int way)
 {
@@ -5973,6 +6063,10 @@ static void ReadThreeDObjectsNow()
 					/* A picture of a surface of the land (the grass of the temperate climate, GetThreeDSurface()). */
 					const int tiles = e.contains("dlazdic") && e.at("dlazdic").is_number_integer() ? std::clamp(e.at("dlazdic").get<int>(), 1, 64) : 1;
 					_three_d_surfaces.emplace(e.at("povrch").get<std::string>(), ThreeDSurfaceFile{folder + e.at("soubor").get<std::string>(), tiles});
+					continue;
+				}
+				if (kind == "majak") {
+					if (e.contains("soubor") && e.at("soubor").is_string()) ReadLighthouse(e, folder);
 					continue;
 				}
 				const bool station_piece = kind == "peron" || kind == "smerovani" || kind == "nakladova_rampa";
@@ -6482,6 +6576,30 @@ static void ReadThreeDVehicleObjects()
 					continue;
 				}
 				const std::string figure_kind = e.value("druh", std::string("dum"));
+				if (figure_kind == "majak" && e.contains("soubor") && e.at("soubor").is_string() && e.contains("otaceni") && e.at("otaceni").is_object()) {
+					/* A lighthouse's reflector (ReadLighthouse()): the node that turns ("otaceni" "uzel") without its night
+					 * ("noc_uzel"), stood on the ground, a turn in "otacka_s" seconds about the axis ("osa") through "stred". */
+					const auto &o = e.at("otaceni");
+					ThreeDVehicleObject fig;
+					fig.package = package;
+					fig.file = folder + e.at("soubor").get<std::string>();
+					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
+					fig.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor";
+					fig.thing = true;
+					fig.only_node = o.value("uzel", std::string("reflektor"));
+					if (o.contains("noc_uzel") && o.at("noc_uzel").is_string()) fig.skip_nodes.push_back(o.at("noc_uzel").get<std::string>());
+					fig.to_ground = true;
+					fig.spin_ticks = std::clamp(static_cast<int>(std::lround(o.value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+					const std::string axis = o.value("osa", std::string("z"));
+					fig.spin_axis[0] = axis == "x" ? 1.0f : 0.0f;
+					fig.spin_axis[1] = axis == "y" ? 1.0f : 0.0f;
+					fig.spin_axis[2] = axis == "z" ? 1.0f : 0.0f;
+					if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+						for (int k = 0; k < 2; k++) fig.spin_centre[k] = o.at("stred").at(k).is_number() ? o.at("stred").at(k).get<float>() : 0.0f;
+					}
+					_figure_objects.push_back(std::move(fig));
+					continue;
+				}
 				if (figure_kind == "pohyby") {
 					ReadMotionSet(e, folder, package);
 					continue;
@@ -12199,6 +12317,12 @@ static constexpr uint STATION_CARGO_PIECE_UNITS = 10;
 static constexpr uint STATION_CARGO_HEAP_UNITS = 100;
 static constexpr float STATION_CARGO_HEAP_LEAST = 0.4f;
 
+const ThreeDObject *GetThreeDLighthouse(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_lighthouses.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Object) || GetObjectType(tile) != OBJECT_LIGHTHOUSE) return nullptr;
+	return &_three_d_objects[_three_d_lighthouses[(TileX(tile) * 7 + TileY(tile) * 13) % _three_d_lighthouses.size()]];
+}
+
 const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin)
 {
 	if (!_three_d_objects_read || _three_d_depots.empty() || !IsValidTile(tile)) return nullptr;
@@ -13495,6 +13619,7 @@ bool ThreeDObject::Read() const
 		read.material_from = this->material_from;
 		read.scene_more = this->scene_more;
 		read.depot = this->depot;
+		read.no_see_through = this->no_see_through;
 		/* Without a file of its own, its add-ons alone (a street lamp, MakeStreetLamps()); a door's wing, an interior
 		 * (ReadInterior()) read as they are. */
 		bool ok;

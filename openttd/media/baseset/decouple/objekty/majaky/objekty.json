@@ -1,0 +1,134 @@
+[
+ {
+  "druh": "majak",
+  "jmeno": "majak_kulaty",
+  "soubor": "majak_kulaty.glb",
+  "nazev": {
+   "cs": "kulatý maják",
+   "en": "round lighthouse"
+  },
+  "rozmer_m": {
+   "x": [
+    -3.92,
+    3.92
+   ],
+   "y": [
+    -3.92,
+    3.92
+   ],
+   "z": [
+    0.0,
+    20.98
+   ]
+  },
+  "trojuhelniku": 2214,
+  "dvere": [
+   {
+    "poloha": [
+     3.2,
+     0.0,
+     0.6
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.15,
+    "vyska": 2.3,
+    "otevrene": true,
+    "poznamka": "otevřený vchod do věže, uvnitř točité schody"
+   }
+  ],
+  "podlahy": {
+   "prizemi": 0.6,
+   "lucerna": 16.6,
+   "ochoz": 16.6,
+   "poznamka": "uvnitř 64 schodů po 0.25 m a 22,5° kolem sloupu (0,35 m), od 22,5° (vlevo za dveřmi) proti směru hodinových ručiček, 4 m na otáčku, z přízemí na podlahu lucerny; nad poslední půlotáčkou je v podlaze lucerny otvor (hlava se nepraští); z lucerny dveře na ochoz (bez skla mezi 90° a 135°), ochoz 1,3 m široký s červeným zábradlím 1 m"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "otaceni": {
+   "uzel": "reflektor",
+   "osa": "z",
+   "stred": [
+    0.0,
+    0.0,
+    17.9
+   ],
+   "otacka_s": 10,
+   "noc_uzel": "reflektor_noc",
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček a dva slabé paprsky po 30 m, jen v noci jako uzel noc"
+  },
+  "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice, inspirace rozhledna Petra Š.)",
+  "licence": "GPL-2.0 (vlastní geometrie i barvy)",
+  "poznamka": "kulatý maják (hráč 9. 11.: „tak skus kulaty majak se schdama uvnitř, mužou byt dva majaky“): bílá zužující se věž s dvěma červenými pruhy na kamenném soklu, dole otevřený vchod k +x, uvnitř točité schody nahoru do prosklené lucerny, z ní ven na ochoz; v lucerně lampa a reflektor, který se točí (otaceni), v noci lampa svítí (noc) a reflektor dává dva paprsky; počátek uprostřed na zemi; levný, jen barvy"
+ },
+ {
+  "druh": "majak",
+  "jmeno": "majak_hranaty",
+  "soubor": "majak_hranaty.glb",
+  "nazev": {
+   "cs": "hranatý maják",
+   "en": "square lighthouse"
+  },
+  "rozmer_m": {
+   "x": [
+    -3.7,
+    3.7
+   ],
+   "y": [
+    -3.7,
+    3.7
+   ],
+   "z": [
+    0.0,
+    16.29
+   ]
+  },
+  "trojuhelniku": 1680,
+  "dvere": [
+   {
+    "poloha": [
+     2.78,
+     0.0,
+     0.0
+    ],
+    "smer": [
+     1,
+     0
+    ],
+    "sirka": 1.1,
+    "vyska": 2.1,
+    "otevrene": false,
+    "napis": "VCHOD",
+    "poznamka": "zavřené dveře s cedulí VCHOD, bez interiéru (hráč: „bude tam chodit mat“)"
+   }
+  ],
+  "podlahy": {
+   "strecha": 12.0,
+   "skleník": 12.0,
+   "poznamka": "schody venku jednou kolem dokola: 4 ramena po 15 schodech (0.2 m, hloubka 0.35 m, šířka 1.0 m) a odpočívadla v rozích; začínají u rohu +x −y na zemi, jdou podél −y, −x, +y a +x, horní odpočívadlo ve 12 m pokračuje podél −y na střechu mezerou v zábradlí (x 1,2 až 2,7); skleník na střeše 2,6 × 2,6 m s otevřenými dveřmi na −y"
+  },
+  "noc": {
+   "uzel": "noc",
+   "svetla": 1
+  },
+  "otaceni": {
+   "uzel": "reflektor",
+   "osa": "z",
+   "stred": [
+    0.0,
+    0.0,
+    13.3
+   ],
+   "otacka_s": 10,
+   "noc_uzel": "reflektor_noc",
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček a dva slabé paprsky po 30 m, jen v noci jako uzel noc"
+  },
+  "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice)",
+  "licence": "GPL-2.0 (vlastní geometrie, barvy a cedule)",
+  "poznamka": "hranatý maják (hráč 9. 11.: „široka krabice pul kachličky, vnějškem schodiště nahoru, schody jednou okolo budovy, vyšsí nebude budova. na střeše dveře do skleníku, uvnitř skleníku světlo, reflektor se bude točit. budova bude mit dole dveře označené vchod bez interieru. bude tam chodit mat“): bílá krabice 5,4 m (se schody 7,4 m, půl dlaždice) s červeným pásem a zábradlím, střecha ve 12 m, skleník s lampou a reflektorem, který se točí (otaceni); dole zavřené dveře s cedulí VCHOD k +x; počátek uprostřed na zemi"
+ }
+]

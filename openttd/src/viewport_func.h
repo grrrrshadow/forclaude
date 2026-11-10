@@ -76,6 +76,7 @@ struct TileInfo;
 bool ThreeDRocksStandOn(const TileInfo *ti);
 bool ThreeDStationStandsOn(const TileInfo *ti);
 bool ThreeDDepotStandsOn(const TileInfo *ti);
+bool ThreeDLighthouseStandsOn(const TileInfo *ti);
 void AddCabFigure(std::string_view name, float size, double x, double y, double z, float facing, int frame = 0, int state = 0);
 void AddCabGroundFigure(std::string_view name, double x, double y, double z, float facing);
 struct ThreeDObject;

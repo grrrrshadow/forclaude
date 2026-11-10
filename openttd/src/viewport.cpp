@@ -14716,6 +14716,22 @@ bool ThreeDDepotStandsOn(const TileInfo *ti)
 	return true;
 }
 
+/**
+ * A lighthouse of the game's own in the 3D views (GetThreeDLighthouse(): the colleague's, its reflector turning) on a
+ * tile its draw proc draws: its object stands there, its sprites are not drawn.
+ * @return whether it stands there
+ */
+bool ThreeDLighthouseStandsOn(const TileInfo *ti)
+{
+	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Structures) || !ObjectsIndexReadOrOwed()) return false;
+	const ThreeDObject *lighthouse = GetThreeDLighthouse(ti->tile);
+	if (lighthouse == nullptr) return false;
+	if (_cab_collecting) return true;
+	if (!ObjectReadyOrOwed(lighthouse, ti->tile, ti->tile)) return false;
+	_turned_objects.emplace_back(lighthouse, ti->tile, GetTileMaxPixelZ(ti->tile));
+	return true;
+}
+
 bool ThreeDStationStandsOn(const TileInfo *ti)
 {
 	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || IsTransparencySet(TransparencyOption::Buildings) || !ObjectsIndexReadOrOwed()) return false;
@@ -18470,6 +18486,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (const ThreeDObject *lamp = GetThreeDEdgeLamp(_cur_ti.tile, dx, dy); lamp != nullptr) {
 				objects.push_back({lamp, _cur_ti.tile, GetSlopePixelZ(TileX(_cur_ti.tile) * TILE_SIZE + dx, TileY(_cur_ti.tile) * TILE_SIZE + dy)});
 			}
+		}
+		/* A lighthouse of the game's own: its object, its reflector turning among its figures (ThreeDLighthouseStandsOn()). */
+		if (tile_type == TileType::Object && !IsTransparencySet(TransparencyOption::Structures)) {
+			if (const ThreeDObject *lighthouse = GetThreeDLighthouse(_cur_ti.tile); lighthouse != nullptr) objects.push_back({lighthouse, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile)});
 		}
 		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
 		if (tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings)) {
