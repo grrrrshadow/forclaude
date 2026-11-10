@@ -3314,6 +3314,19 @@ static bool EyeCoastTile(int x, int y)
 	return IsTileType(tile, TileType::Water) && IsCoast(tile);
 }
 
+/**
+ * Whether a tile a step from a canal's (dx, dy, one of them 0) is the end of an aqueduct the canal goes on into: the
+ * aqueduct going on the way of the step (the player, test5: "the canal before the aqueduct has the graphic of the
+ * canal's end as if it did not go on"). As the game joins them (IsWateredTile()).
+ */
+static bool EyeAqueductInto(TileIndex n, int dx, int dy)
+{
+	if (!IsValidTile(n) || !IsTileType(n, TileType::TunnelBridge) || !IsBridge(n) || GetTunnelBridgeTransportType(n) != TransportType::Water) return false;
+	if ((dx != 0) == (dy != 0)) return false;
+	const DiagDirection step = dx < 0 ? DiagDirection::NE : dx > 0 ? DiagDirection::SW : dy > 0 ? DiagDirection::SE : DiagDirection::NW;
+	return GetTunnelBridgeDirection(n) == step;
+}
+
 /** The sides of a river's or a canal's tile by the land (THREE_D_GPU_BANK_EDGE): 1 north-east (x - 1), 2 south-east (y + 1), 4 south-west (x + 1), 8 north-west (y - 1). */
 static uint8_t EyeRiverLandSides(int x, int y)
 {
@@ -3326,6 +3339,8 @@ static uint8_t EyeRiverLandSides(int x, int y)
 		const TileIndex n = TileXY(nx, ny);
 		/* The water goes on into a lock and a ship depot too (EyeWaterGoesOn()). */
 		if ((IsTileType(n, TileType::Water) && (IsWater(n) || IsLock(n) || IsShipDepot(n))) || (IsTileType(n, TileType::Station) && IsBuoy(n))) continue;
+		/* And on into an aqueduct. */
+		if (EyeAqueductInto(n, DX[k], DY[k])) continue;
 		sides |= 1 << k;
 	}
 	return sides;
@@ -16180,7 +16195,7 @@ bool EyeOnRiverBank(double x, double y)
 			const int nx = tx + dx, ny = ty + dy;
 			/* Past the map's edge, and its edge's own tiles (void), the water goes on. */
 			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
-			if (EyeWaterGoesOn(TileXY(nx, ny))) continue;
+			if (EyeWaterGoesOn(TileXY(nx, ny)) || EyeAqueductInto(TileXY(nx, ny), dx, dy)) continue;
 			const double ox = dx < 0 ? lx : dx > 0 ? TILE_SIZE - lx : 0.0;
 			const double oy = dy < 0 ? ly : dy > 0 ? TILE_SIZE - ly : 0.0;
 			if (std::hypot(ox, oy) < EYE_RIVER_BANK) return true;
