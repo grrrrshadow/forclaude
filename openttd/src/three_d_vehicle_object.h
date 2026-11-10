@@ -87,6 +87,12 @@ struct ThreeDBoatFigure;
 void ForThreeDBoatFigures(const Vehicle *v, const struct ThreeDVehicleObject &obj, bool inside, const std::function<void(const ThreeDBoatFigure &)> &f);
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
 double ShipDiveRoomM(const Vehicle *v);
+/**
+ * How high a boat may stand over the water to go through a ship tunnel, metres: its vault 4.6 m over the water (the 3D
+ * tunnel's), a little spare (the player, 10. 11.: only the low boats through, "co výška plachet?").
+ */
+static constexpr double SHIP_TUNNEL_ROOM_M = 4.0;
+bool ShipFitsTunnel(const Vehicle *v);
 double ShipDiveM(const Vehicle *v);
 double ThreeDEyeLikenessFacing(const Vehicle *v, double by_direction);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);

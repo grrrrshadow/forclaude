@@ -24,6 +24,9 @@ extern bool _show_train_orientation;
 #include "../depot_map.h"
 #include "pathfinder_func.h"
 
+/* Whether a ship goes through a ship tunnel (three_d_vehicle_object.h). */
+bool ShipFitsTunnel(const Vehicle *v);
+
 /**
  * Track follower helper template class (can serve pathfinders and vehicle
  *  controllers). See 6 different typedefs below for 3 different transport
@@ -476,6 +479,11 @@ protected:
 				if (!this->is_tunnel) {
 					DiagDirection tunnel_enterdir = GetTunnelBridgeDirection(this->new_tile);
 					if (tunnel_enterdir != this->exitdir) {
+						this->err = ErrorCode::NoWay;
+						return false;
+					}
+					/* A ship tunnel, only for a boat low enough (ShipFitsTunnel()); the regions of the water know of it. */
+					if (IsWaterTT() && this->veh != nullptr && !ShipFitsTunnel(this->veh)) {
 						this->err = ErrorCode::NoWay;
 						return false;
 					}

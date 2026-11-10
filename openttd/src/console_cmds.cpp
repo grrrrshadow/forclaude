@@ -11522,6 +11522,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		said("kopec", std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(8, 3), at(4, -3), false, LevelMode::Raise)));
 		said("tunel", Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, at(3, 0), TransportType::Water, INVALID_RAILTYPE, INVALID_ROADTYPE));
 		said("pruplav pred", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(2, 0), at(-2, 0), WaterClass::Canal, false));
+		/* 'lodnitunel <x> <y> lode': the canal before it longer and two wide, for two ship depots side by side (testlod). */
+		if (argv.size() > 4 && argv[4] == "lode") said("pruplav pro depa", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(1, -1), at(-7, 0), WaterClass::Canal, false));
 		said("pruplav za", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(12, 0), at(9, 0), WaterClass::Canal, false));
 		/* For comparison a road tunnel through the same hill two tiles beside it. */
 		said("silnicni tunel", Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, at(3, 2), TransportType::Road, INVALID_RAILTYPE, ROADTYPE_ROAD));

@@ -14,6 +14,7 @@
 #include "yapf.hpp"
 #include "yapf_ship_regions.h"
 #include "../water_regions.h"
+#include "../../three_d_vehicle_object.h"
 
 #include "../../safeguards.h"
 
@@ -99,6 +100,7 @@ private:
 
 	std::vector<WaterRegionPatchKey> origin_keys;
 	WaterRegionPatchKey dest;
+	bool tunnels = true; ///< through the ship tunnels too: the ship low enough for them (ShipFitsTunnel())
 
 	inline YapfShipRegions &Yapf()
 	{
@@ -140,7 +142,7 @@ public:
 			node.Set(&old_node, water_region_patch);
 			Yapf().AddNewNode(node, TrackFollower{});
 		};
-		VisitWaterRegionPatchNeighbours(old_node.key.water_region_patch, visit_func);
+		VisitWaterRegionPatchNeighbours(old_node.key.water_region_patch, visit_func, this->tunnels);
 	}
 
 	/** @copydoc CYapfBaseT::PfDetectDestinationFunc */
@@ -190,6 +192,7 @@ public:
 		const int node_limit = std::min(static_cast<int>(Map::Size() * NODES_PER_REGION) / WATER_REGION_NUMBER_OF_TILES, MAX_NUMBER_OF_NODES);
 		YapfShipRegions pf(node_limit);
 		pf.SetDestination(start_water_region_patch);
+		pf.tunnels = ShipFitsTunnel(v);
 
 		/* A ship on a raid steers by the tile its errand set, not by the
 		 * station in its orders -- the same rule as in the tile-level search

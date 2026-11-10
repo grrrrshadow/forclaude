@@ -38,6 +38,7 @@
 #include "object_base.h"
 #include "water.h"
 #include "pathfinder/water_regions.h"
+#include "three_d_vehicle_object.h"
 #include "company_gui.h"
 #include "tunnelbridge_cmd.h"
 #include "landscape_cmd.h"
@@ -2132,6 +2133,27 @@ static VehicleEnterTileStates VehicleEnterTile_TunnelBridge(Vehicle *v, TileInde
 				rv->state = to_underlying(DiagDirToDiagTrackdir(vdir));
 				rv->frame = frame;
 				rv->vehstatus.Reset(VehState::Hidden);
+				return VehicleEnterTileState::EnteredWormhole;
+			}
+		} else if (v->type == VehicleType::Ship) {
+			Ship *ship = Ship::From(v);
+
+			/* Into a ship tunnel, hidden in it as a road vehicle; one too high for it (ShipFitsTunnel()) turns round
+			 * before it. */
+			if (ship->state != Track::Wormhole && dir == vdir) {
+				if (!ShipFitsTunnel(ship)) return VehicleEnterTileState::CannotEnter;
+				if (frame != _tunnel_visibility_frame[dir]) return {};
+				ship->tile = tile;
+				ship->state = Track::Wormhole;
+				ship->vehstatus.Set(VehState::Hidden);
+				return VehicleEnterTileState::EnteredWormhole;
+			}
+
+			/* Out at its other end. */
+			if (ship->state == Track::Wormhole && dir == ReverseDiagDir(vdir) && frame == TILE_SIZE - _tunnel_visibility_frame[dir] && z == 0) {
+				ship->tile = tile;
+				ship->state = DiagDirToDiagTrack(vdir);
+				ship->vehstatus.Reset(VehState::Hidden);
 				return VehicleEnterTileState::EnteredWormhole;
 			}
 		}

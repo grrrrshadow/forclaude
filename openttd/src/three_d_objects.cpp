@@ -7378,6 +7378,10 @@ static void ReadThreeDVehicleObjects()
 				/* A boat's hull under its waterline, and a submarine's dive (the player, test4: "we have no buttons up and
 				 * down to steer the submarine"; the colleague's hra/3d/PROSBA-LODE-TEST4.md): ShipDiveM(). */
 				if (e.contains("ponor_m") && e.at("ponor_m").is_number()) obj.draught_m = std::clamp(e.at("ponor_m").get<float>(), 0.0f, 50.0f);
+				/* Its height, a boat's over its waterline the room it needs in a ship tunnel (ShipFitsTunnel()). */
+				if (e.contains("rozmer_m") && e.at("rozmer_m").is_array() && e.at("rozmer_m").size() == 3 && e.at("rozmer_m")[2].is_number()) {
+					obj.height_m = std::clamp(e.at("rozmer_m")[2].get<float>(), 0.0f, 200.0f);
+				}
 				if (e.contains("ponoreni_m") && e.at("ponoreni_m").is_number()) obj.dive_m = std::clamp(e.at("ponoreni_m").get<float>(), 0.0f, 100.0f);
 				/* A vehicle with no lights (the colleague's hra/3d/SVETLA-SPECIAL-PRO-HRU.md: the horses, their cart, the
 				 * barrow and the two-wheeled cart, "svetla" "vychozi": "off"): never lit, as if switched off from its cab. */

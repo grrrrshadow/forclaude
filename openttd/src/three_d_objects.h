@@ -967,6 +967,7 @@ struct ThreeDVehicleObject {
 	bool has_helm = false;          ///< "ridic" "poloha": where its helmsman stands or sits (the colleague's boats): the walker stands there when he lets go of the wheel
 	float helm[3] = {};             ///< x, y, z, metres
 	float draught_m = 0;            ///< "ponor_m": how deep its hull goes under its waterline (its origin), metres
+	float height_m = 0;             ///< "rozmer_m" z: how high it is from its keel to its top (a boat's mast), metres; 0 not said
 	float dive_m = 0;               ///< "ponoreni_m": a submarine's, how deep its waterline may go under the surface (ShipDiveM()), metres; 0 it does not dive
 	float floors_over = NAN;        ///< a boat's rooms (ReadBoatRooms()): their floors under its waterline lifted to so many metres over it, NAN as they are
 	std::string interior_figure;    ///< a boat with rooms ("interier", the colleague's sailing yacht): the figure of its whole hull with its cabins, walked on and drawn while the walker is aboard; empty none

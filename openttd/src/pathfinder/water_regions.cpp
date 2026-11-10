@@ -29,7 +29,8 @@ static_assert(sizeof(WaterRegionTraversabilityBits) * 8 == WATER_REGION_EDGE_LEN
 static_assert(sizeof(WaterRegionPatchLabel) == sizeof(uint8_t)); // Important for the hash calculation.
 
 static inline TrackBits GetWaterTracks(TileIndex tile) { return TrackdirBitsToTrackBits(GetTileTrackStatus(tile, TransportType::Water, RoadTramType::Invalid).trackdirs); }
-static inline bool IsAqueductTile(TileIndex tile) { return IsBridgeTile(tile) && GetTunnelBridgeTransportType(tile) == TransportType::Water; }
+/** An aqueduct's end, or a ship tunnel's (the player, 10. 11.): the water goes on at its other end. */
+static inline bool IsAqueductTile(TileIndex tile) { return IsTileType(tile, TileType::TunnelBridge) && GetTunnelBridgeTransportType(tile) == TransportType::Water; }
 
 static inline int GetWaterRegionX(TileIndex tile) { return TileX(tile) / WATER_REGION_EDGE_LENGTH; }
 static inline int GetWaterRegionY(TileIndex tile) { return TileY(tile) / WATER_REGION_EDGE_LENGTH; }
@@ -168,7 +169,7 @@ public:
 					if (ft.Follow(tile, dir)) {
 						if (this->tile_area.Contains(ft.new_tile)) {
 							tiles_to_check.push_back(ft.new_tile);
-						} else if (!ft.is_bridge) {
+						} else if (!ft.is_bridge && !ft.is_tunnel) {
 							assert(DistanceManhattan(ft.new_tile, tile) == 1);
 							const auto side = DiagdirBetweenTiles(tile, ft.new_tile);
 							const int local_x_or_y = DiagDirToAxis(side) == Axis::X ? TileY(tile) - TileY(this->tile_area.tile) : TileX(tile) - TileX(this->tile_area.tile);
@@ -388,11 +389,12 @@ static inline void VisitAdjacentWaterRegionPatchNeighbours(const WaterRegionPatc
 
 /**
  * Calls the provided callback function on all accessible water region patches in
- * each cardinal direction, plus any others that are reachable via aqueducts.
+ * each cardinal direction, plus any others that are reachable via aqueducts (and ship tunnels).
  * @param water_region_patch Water patch within the water region to start searching from
  * @param callback The function that will be called for each accessible water patch that is found
+ * @param tunnels whether through the ship tunnels too (the ship low enough, ShipFitsTunnel())
  */
-void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &water_region_patch, VisitWaterRegionPatchCallback &callback)
+void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &water_region_patch, VisitWaterRegionPatchCallback &callback, bool tunnels)
 {
 	if (water_region_patch.label == INVALID_WATER_REGION_PATCH) return;
 
@@ -405,7 +407,9 @@ void VisitWaterRegionPatchNeighbours(const WaterRegionPatchDesc &water_region_pa
 	if (current_region.HasCrossRegionAqueducts()) {
 		for (const TileIndex tile : current_region) {
 			if (GetWaterRegionPatchInfo(tile) == water_region_patch && IsAqueductTile(tile)) {
-				const TileIndex other_end_tile = GetOtherBridgeEnd(tile);
+				/* Not through a ship tunnel for a ship too high for it (ShipFitsTunnel()). */
+				if (IsTunnel(tile) && !tunnels) continue;
+				const TileIndex other_end_tile = GetOtherTunnelBridgeEnd(tile);
 				if (GetWaterRegionIndex(tile) != GetWaterRegionIndex(other_end_tile)) callback(GetWaterRegionPatchInfo(other_end_tile));
 			}
 		}

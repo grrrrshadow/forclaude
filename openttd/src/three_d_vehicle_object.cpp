@@ -3412,6 +3412,19 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
 }
 
 /**
+ * Whether a ship goes through a ship tunnel (SHIP_TUNNEL_ROOM_M): its object as high over its waterline as that at most
+ * (its "rozmer_m" z less its "ponor_m", at its size). One without an object of its own -- the game's ships from their
+ * sprites, the tankers, ferries and freighters, and a set's without one -- is a big ship, it does not.
+ */
+bool ShipFitsTunnel(const Vehicle *v)
+{
+	if (v == nullptr || v->type != VehicleType::Ship) return false;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v);
+	if (obj == nullptr || obj->height_m <= 0) return false;
+	return (obj->height_m - obj->draught_m) * ObjectScale(obj) <= SHIP_TUNNEL_ROOM_M;
+}
+
+/**
  * How deep a submarine may dive where it is, metres: as deep as its object lets it ("ponoreni_m"), its hull ("ponor_m",
  * as big as it is drawn) half a metre over the bed under it at most (EyeWaterDepth()); 0 a vehicle that does not dive.
  */
