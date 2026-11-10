@@ -1095,6 +1095,8 @@ struct ThreeDVehicleObject {
 	const std::vector<ThreeDWalkingCrew> &WalkingCrew() const;
 	void AddCrewFigure(ThreeDVehicleShape &made, const ThreeDVehicleCrew &c, uint8_t part) const;
 	void Forget() const;
+	bool HoldsMade() const;
+	void MarkDrawn() const;
 	size_t TrimTextures(std::set<const void *> &seen) const;
 
 	mutable uint32_t used = 0;      ///< when it was last drawn (ForgetUnusedThreeDObjects()), seconds of the clock of the objects

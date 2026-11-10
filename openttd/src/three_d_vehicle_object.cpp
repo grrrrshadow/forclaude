@@ -3141,6 +3141,7 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 	auto it = _object_pictures.find(key);
 	if (it != _object_pictures.end()) {
 		it->second.used = ++_object_pictures_clock;
+		if (obj != nullptr) obj->MarkDrawn();
 		return it->second.picture.width > 0 ? &it->second.picture : nullptr;
 	}
 	/* Drawing the map (_three_d_pictures_stand_in): the drawing waits for no card -- the nearest made of the object stands

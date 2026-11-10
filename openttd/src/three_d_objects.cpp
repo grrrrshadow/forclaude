@@ -13195,6 +13195,25 @@ void ThreeDVehicleObject::Forget() const
 	this->shape_parts = {};
 }
 
+/**
+ * Whether it holds anything made to draw it (Forget()). The vehicles were never forgotten before, only the figures:
+ * this asked only for the frames of a figure, and a lorry or a train has one shape and its textures (the player's test5,
+ * 10. 11.: the vehicles' shapes grew to 1.3 GB, the game to 5.5 GB, and Android killed it when the turned view went far
+ * out over the map).
+ */
+bool ThreeDVehicleObject::HoldsMade() const
+{
+	return this->shape != nullptr || !this->frame_shapes.empty() || !this->frame_bones.empty() || !this->levels.empty() ||
+			this->mask_levels != nullptr || this->rust_levels != nullptr || this->second_levels != nullptr ||
+			!this->addon_mask_levels.empty() || !this->detail_masks.empty();
+}
+
+/** Mark it drawn now without asking for its shape: its picture on the map was kept (ObjectPictureOf()), so it is not forgotten while seen. */
+void ThreeDVehicleObject::MarkDrawn() const
+{
+	MarkThreeDUsed(this->used);
+}
+
 /** How long a thing not drawn keeps what was made of it, seconds. */
 static constexpr uint32_t THREE_D_FORGET_AFTER = 120;
 
@@ -13238,7 +13257,7 @@ static void ForgetUnusedThreeDObjectsNow()
 	}
 	for (std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
 		for (const ThreeDVehicleObject &v : *list) {
-			if (v.used >= before || (v.frame_shapes.empty() && v.frame_bones.empty())) continue;
+			if (v.used >= before || !v.HoldsMade()) continue;
 			v.Forget();
 			forgotten++;
 		}
