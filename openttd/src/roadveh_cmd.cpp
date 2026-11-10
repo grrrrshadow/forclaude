@@ -943,16 +943,30 @@ static void RoadVehArrivesAt(const RoadVehicle *v, Station *st)
  * the distance to drive before moving a step on the map.
  * @return distance to drive.
  */
+/**
+ * The most a road vehicle the player drives from its cab speeds up, 256ths of a unit of its speed (half a km/h) a tick:
+ * some 10 km/h a second, a hundred in ten seconds (the player, test5: "the car should accelerate more naturally, it is
+ * too abrupt, speed up a little slower"). A light car of a set took the realistic model's power to weight at once.
+ */
+static constexpr int CAB_MAX_ACCELERATION = 160;
+
 int RoadVehicle::UpdateSpeed()
 {
+	int accel, min_speed;
 	switch (_settings_game.vehicle.roadveh_acceleration_model) {
 		default: NOT_REACHED();
 		case AccelerationModel::Original:
-			return this->DoUpdateSpeed(this->overtaking != 0 ? 512 : 256, 0, this->GetCurrentMaxSpeed());
+			accel = this->overtaking != 0 ? 512 : 256;
+			min_speed = 0;
+			break;
 
 		case AccelerationModel::Realistic:
-			return this->DoUpdateSpeed(this->GetAcceleration() + (this->overtaking != 0 ? 256 : 0), this->GetAccelerationStatus() == AS_BRAKE ? 0 : 4, this->GetCurrentMaxSpeed());
+			accel = this->GetAcceleration() + (this->overtaking != 0 ? 256 : 0);
+			min_speed = this->GetAccelerationStatus() == AS_BRAKE ? 0 : 4;
+			break;
 	}
+	if (this->IsCabSteered() && accel > CAB_MAX_ACCELERATION) accel = CAB_MAX_ACCELERATION;
+	return this->DoUpdateSpeed(accel, min_speed, this->GetCurrentMaxSpeed());
 }
 
 static Direction RoadVehGetNewDirection(const RoadVehicle *v, int x, int y)

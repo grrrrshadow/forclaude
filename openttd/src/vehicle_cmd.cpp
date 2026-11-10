@@ -1540,6 +1540,9 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 			case CabDriveOp::Left:
 			case CabDriveOp::Right:
 				if (!v->cab_free) start();
+				/* A road vehicle turns only as it goes, forwards or backwards: standing, its wheels turn it nowhere (the
+				 * player, test5: "the car will not turn if it does not go, if it does not move"). */
+				if (v->type == VehicleType::Road && v->cur_speed == 0) break;
 				v->cab_yaw = static_cast<uint8_t>((v->cab_yaw + (what == CabDriveOp::Left ? CAB_YAW_STEP : -CAB_YAW_STEP)) & (CAB_YAW_TURN - 1));
 				break;
 			case CabDriveOp::Rejoin:
