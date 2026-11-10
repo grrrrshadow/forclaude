@@ -9893,6 +9893,44 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			std::string text;
 			for (const auto &[x, y] : way) text += fmt::format(" {:.1f},{:.1f}", x / TILE_SIZE, y / TILE_SIZE);
 			IConsolePrint(CC_DEFAULT, "test3d: cesta {} bodu{}{}", way.size(), text, NavStraight((*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE, (*x2 + 0.5) * TILE_SIZE, (*y2 + 0.5) * TILE_SIZE) ? " (rovne)" : "");
+			/* 'draci cesta ... mapa': the tiles about it, a letter each (R road, H house, . grass, f field, t trees, r rail,
+			 * w water, # else), and the way over them, every half tile of it a '*', the start 'S', the end 'E'. */
+			if (argv.size() > 7 && argv[7] == "mapa") {
+				const int bx0 = std::max(0, static_cast<int>(std::min(*x1, *x2)) - 3), by0 = std::max(0, static_cast<int>(std::min(*y1, *y2)) - 3);
+				const int bx1 = std::min(static_cast<int>(Map::MaxX()), static_cast<int>(std::max(*x1, *x2)) + 3), by1 = std::min(static_cast<int>(Map::MaxY()), static_cast<int>(std::max(*y1, *y2)) + 3);
+				std::vector<std::string> rows;
+				for (int y = by0; y <= by1; y++) {
+					std::string row;
+					for (int x = bx0; x <= bx1; x++) {
+						const TileIndex t = TileXY(x, y);
+						char c = '#';
+						switch (GetTileType(t)) {
+							case TileType::Road: c = 'R'; break;
+							case TileType::House: c = 'H'; break;
+							case TileType::Trees: c = 't'; break;
+							case TileType::Railway: c = 'r'; break;
+							case TileType::Water: c = 'w'; break;
+							case TileType::Clear: c = IsClearGround(t, ClearGround::Fields) ? 'f' : '.'; break;
+							default: break;
+						}
+						row += c;
+					}
+					rows.push_back(std::move(row));
+				}
+				auto mark = [&](double wx, double wy, char c) {
+					const int tx = static_cast<int>(wx / TILE_SIZE) - bx0, ty = static_cast<int>(wy / TILE_SIZE) - by0;
+					if (ty >= 0 && ty < static_cast<int>(rows.size()) && tx >= 0 && tx < static_cast<int>(rows[ty].size())) rows[ty][tx] = c;
+				};
+				NavPoint at{(*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE};
+				for (const auto &p : way) {
+					const double len = std::hypot(p.first - at.first, p.second - at.second);
+					for (double d = 0; d < len; d += TILE_SIZE / 2.0) mark(at.first + (p.first - at.first) * d / len, at.second + (p.second - at.second) * d / len, '*');
+					at = p;
+				}
+				mark((*x1 + 0.5) * TILE_SIZE, (*y1 + 0.5) * TILE_SIZE, 'S');
+				mark((*x2 + 0.5) * TILE_SIZE, (*y2 + 0.5) * TILE_SIZE, 'E');
+				for (size_t i = 0; i < rows.size(); i++) IConsolePrint(CC_DEFAULT, "test3d: mapa {:3} {}", by0 + static_cast<int>(i), rows[i]);
+			}
 			return true;
 		}
 		if (argv.size() > 4 && argv[2] == "oko") {

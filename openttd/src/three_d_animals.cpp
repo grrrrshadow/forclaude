@@ -422,7 +422,17 @@ bool StepTo(Beast &b, double tx, double ty, double speed_m)
 bool WalkTo(Beast &b, double tx, double ty, double speed_m, uint64_t now, bool flies)
 {
 	if (flies) return StepTo(b, tx, ty, speed_m);
-	if (b.way.empty() || std::hypot(tx - b.way_tx, ty - b.way_ty) > TILE_SIZE || now - b.way_made > 74) {
+	/* Found again when the goal has moved a tile, or when the way is no longer good to go on along (the land changed):
+	 * not every few seconds anyway (NavWayStillGood(), the player: "not four way finders eating the power"). */
+	bool find = b.way.empty() || std::hypot(tx - b.way_tx, ty - b.way_ty) > TILE_SIZE;
+	if (!find && now - b.way_made > 74) {
+		if (NavWayStillGood(b.x, b.y, b.way, b.way_at)) {
+			b.way_made = now;
+		} else {
+			find = true;
+		}
+	}
+	if (find) {
 		b.way = NavFindWay(b.x, b.y, tx, ty, 24);
 		b.way_at = 0;
 		b.way_tx = tx;

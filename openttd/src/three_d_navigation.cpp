@@ -16,6 +16,7 @@
 #include "tile_map.h"
 #include "water_map.h"
 #include "slope_func.h"
+#include "clear_map.h"
 
 #include <cmath>
 #include <numbers>
@@ -62,10 +63,41 @@ static bool NavStep(TileIndex from, TileIndex to)
 }
 
 /**
- * Whether the straight line between two points goes over walkable tiles only, every tile it touches (the line walked
- * through the grid, a tile after the next, as a ray through the tiles).
+ * How dear a tile is to walk over, its length on plain grass 1 (the player, 10. 11.: "take what is good of Godot's way
+ * finding": the travel cost of its regions): the roads and their pavements cheaper, so one keeps to them; the rough
+ * land, the trees, the forest, across the rails and the fields dearer.
  */
-bool NavStraight(double fx, double fy, double tx, double ty)
+double NavTileCost(TileIndex tile)
+{
+	switch (GetTileType(tile)) {
+		case TileType::Road: return NAV_ROAD_COST;
+		case TileType::Railway: return 1.5;
+		case TileType::Trees: return 1.2;
+		case TileType::Industry: return 1.3;
+		case TileType::Clear:
+			switch (GetClearGround(tile)) {
+				case ClearGround::Fields: return 1.6;
+				case ClearGround::Rocks: return 1.4;
+				case ClearGround::Rough: return 1.2;
+				default: return 1.0;
+			}
+		default: return 1.0;
+	}
+}
+
+/** The creatures' way: the walkable tiles (NavWalkable()), a level's climb at most, eight neighbours, the costs of the land. */
+const NavProfile &NavCreatureProfile()
+{
+	static const NavProfile profile{true, NAV_ROAD_COST, NavStep, NavWalkable, NavTileCost};
+	return profile;
+}
+
+/**
+ * Whether a straight line goes over tiles one may walk along (the line walked through the grid, a tile after the next,
+ * as a ray through the tiles): each walkable from the one before (NavStep()), none dearer than so much.
+ * @param max_cost the dearest tile it may cross; 0 any
+ */
+static bool NavRay(double fx, double fy, double tx, double ty, double max_cost)
 {
 	const double ux = fx / TILE_SIZE, uy = fy / TILE_SIZE, vx = tx / TILE_SIZE, vy = ty / TILE_SIZE;
 	int cx = static_cast<int>(std::floor(ux)), cy = static_cast<int>(std::floor(uy));
@@ -77,7 +109,7 @@ bool NavStraight(double fx, double fy, double tx, double ty)
 	double tmy = dy != 0 ? ((sy > 0 ? cy + 1 - uy : uy - cy) * tdy) : 1e18;
 	if (cx < 0 || cy < 0 || cx > static_cast<int>(Map::MaxX()) || cy > static_cast<int>(Map::MaxY())) return false;
 	TileIndex prev = TileXY(cx, cy);
-	if (!NavWalkable(prev)) return false;
+	if (!NavWalkable(prev) || (max_cost > 0 && NavTileCost(prev) > max_cost)) return false;
 	for (int guard = 0; (cx != ex || cy != ey) && guard < 4096; guard++) {
 		if (tmx < tmy) {
 			tmx += tdx;
@@ -88,10 +120,30 @@ bool NavStraight(double fx, double fy, double tx, double ty)
 		}
 		if (cx < 0 || cy < 0 || cx > static_cast<int>(Map::MaxX()) || cy > static_cast<int>(Map::MaxY())) return false;
 		const TileIndex t = TileXY(cx, cy);
-		if (!NavStep(prev, t)) return false;
+		if (!NavStep(prev, t) || (max_cost > 0 && NavTileCost(t) > max_cost)) return false;
 		prev = t;
 	}
 	return true;
+}
+
+/**
+ * Whether one can walk straight between two points keeping off what is not walkable by NAV_MARGIN (the agent's radius
+ * of Godot's way finding: the way not along a house's wall, round its corner with room): the line and the two beside it
+ * so far to either side over walkable tiles (NavRay()).
+ * @param max_cost the dearest tile it may cross; 0 any
+ */
+static bool NavStraightUpTo(double fx, double fy, double tx, double ty, double max_cost)
+{
+	if (!NavRay(fx, fy, tx, ty, max_cost)) return false;
+	const double len = std::hypot(tx - fx, ty - fy);
+	if (len < 1e-6) return true;
+	const double m = NAV_MARGIN_M * OBJECT_UNITS_PER_METRE, nx = -(ty - fy) / len * m, ny = (tx - fx) / len * m;
+	return NavRay(fx + nx, fy + ny, tx + nx, ty + ny, max_cost) && NavRay(fx - nx, fy - ny, tx - nx, ty - ny, max_cost);
+}
+
+bool NavStraight(double fx, double fy, double tx, double ty)
+{
+	return NavStraightUpTo(fx, fy, tx, ty, 0);
 }
 
 /** Move a point to the middle of the nearest walkable tile within so many tiles; whether there is one. */
@@ -125,23 +177,20 @@ bool NavNearestWalkable(double &x, double &y, int reach_tiles)
 }
 
 /**
- * The shortest way from one point to another over the walkable tiles (A*, a tile to each of its eight neighbours, a
- * corner cut only between two walkable tiles, a climb of a level costing half a tile more), within so many tiles of
- * the start; then straightened: a point of the way is left out where one can go straight past it (NavStraight()).
- * @return the points to walk through, world units, the last the goal (when the goal cannot be reached, the tile of
- *         the way nearest to it); empty when the start is not walkable or there is no way at all
+ * The cheapest way from one tile to one of others over the tiles a profile walks (A*, to the four neighbours and with
+ * NavProfile::diagonal to the eight, a corner cut only between two walkable tiles; a step costing its length times the
+ * mean of the two tiles' costs, a climb half a tile more), within so many tiles of the start.
+ * @param ends the tiles it may end on
+ * @param[out] reached whether it got to one; else the way goes to the tile nearest the first end
+ * @return the tiles of the way after the start, the last the end
  */
-std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int reach_tiles)
+std::vector<TileIndex> NavFindTiles(TileIndex start, std::span<const TileIndex> ends, const NavProfile &profile, int reach_tiles, bool &reached)
 {
-	std::vector<NavPoint> way;
-	if (NavStraight(fx, fy, tx, ty)) {
-		way.emplace_back(tx, ty);
-		return way;
-	}
-	const int sx = static_cast<int>(fx / TILE_SIZE), sy = static_cast<int>(fy / TILE_SIZE);
-	const int gx = static_cast<int>(tx / TILE_SIZE), gy = static_cast<int>(ty / TILE_SIZE);
-	if (sx < 0 || sy < 0 || sx > static_cast<int>(Map::MaxX()) || sy > static_cast<int>(Map::MaxY())) return way;
-	const TileIndex start = TileXY(sx, sy);
+	reached = false;
+	std::vector<TileIndex> tiles;
+	if (ends.empty() || !IsValidTile(start)) return tiles;
+	const int sx = TileX(start), sy = TileY(start);
+	const int gx = TileX(ends[0]), gy = TileY(ends[0]);
 	struct Node {
 		double g;
 		TileIndex from;
@@ -149,17 +198,21 @@ std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int
 	std::unordered_map<uint32_t, Node> seen;
 	using Open = std::pair<double, uint32_t>;
 	std::priority_queue<Open, std::vector<Open>, std::greater<>> open;
+	/* The cheapest a tile can be, so it never guesses too much: the nearest end. */
 	auto h = [&](int x, int y) {
-		const int ddx = std::abs(x - gx), ddy = std::abs(y - gy);
-		return std::max(ddx, ddy) + (std::numbers::sqrt2 - 1) * std::min(ddx, ddy);
+		double best = 1e18;
+		for (const TileIndex e : ends) {
+			const int ddx = std::abs(x - static_cast<int>(TileX(e))), ddy = std::abs(y - static_cast<int>(TileY(e)));
+			best = std::min(best, profile.diagonal ? std::max(ddx, ddy) + (std::numbers::sqrt2 - 1) * std::min(ddx, ddy) : static_cast<double>(ddx + ddy));
+		}
+		return best * profile.min_cost;
 	};
 	seen[start.base()] = {0, start};
 	open.emplace(h(sx, sy), start.base());
 	TileIndex best = start;
-	double best_h = h(sx, sy);
+	double best_h = 1e18;
 	static const int8_t DX[8] = {1, -1, 0, 0, 1, 1, -1, -1};
 	static const int8_t DY[8] = {0, 0, 1, -1, 1, -1, 1, -1};
-	bool reached = false;
 	for (int expanded = 0; !open.empty() && expanded < 8192; expanded++) {
 		const auto [f, index] = open.top();
 		open.pop();
@@ -167,24 +220,26 @@ std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int
 		const int x = TileX(t), y = TileY(t);
 		const Node node = seen[index];
 		if (f - h(x, y) > node.g + 1e-9) continue; // a better way to it was found meanwhile
-		if (x == gx && y == gy) {
+		if (std::ranges::find(ends, t) != ends.end()) {
 			best = t;
 			reached = true;
 			break;
 		}
-		if (h(x, y) < best_h) {
-			best_h = h(x, y);
+		const double dist = std::max(std::abs(x - gx), std::abs(y - gy));
+		if (dist < best_h) {
+			best_h = dist;
 			best = t;
 		}
-		for (int k = 0; k < 8; k++) {
+		for (int k = 0; k < (profile.diagonal ? 8 : 4); k++) {
 			const int nx = x + DX[k], ny = y + DY[k];
 			if (nx < 0 || ny < 0 || nx > static_cast<int>(Map::MaxX()) || ny > static_cast<int>(Map::MaxY())) continue;
 			if (std::max(std::abs(nx - sx), std::abs(ny - sy)) > reach_tiles) continue;
 			const TileIndex n = TileXY(nx, ny);
-			if (!NavStep(t, n)) continue;
+			if (k < 4 && !profile.step(t, n)) continue;
 			/* Diagonally only past two walkable tiles: not through the corner of a house. */
-			if (k >= 4 && (!NavWalkable(TileXY(x + DX[k], y)) || !NavWalkable(TileXY(x, y + DY[k])))) continue;
-			const double cost = (k >= 4 ? std::numbers::sqrt2 : 1.0) + (NavHeight(t) != NavHeight(n) ? 0.5 : 0.0);
+			if (k >= 4 && (!profile.walkable(n) || !profile.step(t, TileXY(x + DX[k], y)) || !profile.step(t, TileXY(x, y + DY[k])) ||
+					std::abs(NavHeight(t) - NavHeight(n)) > 1)) continue;
+			const double cost = (k >= 4 ? std::numbers::sqrt2 : 1.0) * (profile.cost(t) + profile.cost(n)) / 2 + (NavHeight(t) != NavHeight(n) ? 0.5 : 0.0);
 			const double g = node.g + cost;
 			auto it = seen.find(n.base());
 			if (it != seen.end() && it->second.g <= g) continue;
@@ -192,28 +247,74 @@ std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int
 			open.emplace(g + h(nx, ny), n.base());
 		}
 	}
-	/* Back from the end to the start: the middles of the tiles. */
-	std::vector<NavPoint> tiles;
-	for (TileIndex t = best; t != start; t = seen[t.base()].from) tiles.emplace_back((TileX(t) + 0.5) * TILE_SIZE, (TileY(t) + 0.5) * TILE_SIZE);
+	for (TileIndex t = best; t != start; t = seen[t.base()].from) tiles.push_back(t);
 	std::reverse(tiles.begin(), tiles.end());
-	if (reached) {
-		if (tiles.empty()) tiles.emplace_back(tx, ty);
-		else tiles.back() = {tx, ty};
+	return tiles;
+}
+
+/**
+ * The cheapest way from one point to another over the walkable tiles (NavFindTiles() with the creatures' profile), within
+ * so many tiles of the start; then straightened (the string pulled, as Godot's): a point of the way is left out where
+ * one can go straight past it keeping off what stands beside (NavStraightUpTo()) over tiles no dearer than those of the
+ * way it leaves out -- the pavement kept to, not a field cut across.
+ * @return the points to walk through, world units, the last the goal (when the goal cannot be reached, the tile of
+ *         the way nearest to it); empty when the start is not walkable or there is no way at all
+ */
+std::vector<NavPoint> NavFindWay(double fx, double fy, double tx, double ty, int reach_tiles)
+{
+	std::vector<NavPoint> way;
+	const int sx = static_cast<int>(fx / TILE_SIZE), sy = static_cast<int>(fy / TILE_SIZE);
+	const int gx = static_cast<int>(tx / TILE_SIZE), gy = static_cast<int>(ty / TILE_SIZE);
+	if (sx < 0 || sy < 0 || sx > static_cast<int>(Map::MaxX()) || sy > static_cast<int>(Map::MaxY())) return way;
+	if (gx < 0 || gy < 0 || gx > static_cast<int>(Map::MaxX()) || gy > static_cast<int>(Map::MaxY())) return way;
+	const TileIndex start = TileXY(sx, sy), goal = TileXY(gx, gy);
+	/* Straight there over land no dearer than where it is and where it goes. */
+	if (NavWalkable(start) && NavStraightUpTo(fx, fy, tx, ty, std::max(NavTileCost(start), NavWalkable(goal) ? NavTileCost(goal) : 0.0))) {
+		way.emplace_back(tx, ty);
+		return way;
 	}
-	if (tiles.empty()) return way;
+	bool reached;
+	const std::vector<TileIndex> tiles = NavFindTiles(start, {&goal, 1}, NavCreatureProfile(), reach_tiles, reached);
+	if (tiles.empty()) {
+		if (reached) way.emplace_back(tx, ty);
+		return way;
+	}
+	/* The middles of the tiles, the last the goal itself when it got there; each with its cost. */
+	std::vector<NavPoint> points;
+	std::vector<double> costs;
+	for (const TileIndex t : tiles) {
+		points.emplace_back((TileX(t) + 0.5) * TILE_SIZE, (TileY(t) + 0.5) * TILE_SIZE);
+		costs.push_back(NavTileCost(t));
+	}
+	if (reached) points.back() = {tx, ty};
 	/* Straightened: from where it is, on to the farthest point it can go to straight. */
 	NavPoint at{fx, fy};
-	for (size_t i = 0; i < tiles.size();) {
+	double at_cost = NavTileCost(start);
+	for (size_t i = 0; i < points.size();) {
 		size_t far = i;
-		for (size_t k = tiles.size(); k-- > i + 1;) {
-			if (NavStraight(at.first, at.second, tiles[k].first, tiles[k].second)) {
+		for (size_t k = points.size(); k-- > i + 1;) {
+			/* The dearest tile of the way it would leave out, it may cross no dearer. */
+			double upto = at_cost;
+			for (size_t j = i; j <= k; j++) upto = std::max(upto, costs[j]);
+			if (NavStraightUpTo(at.first, at.second, points[k].first, points[k].second, upto)) {
 				far = k;
 				break;
 			}
 		}
-		way.push_back(tiles[far]);
-		at = tiles[far];
+		way.push_back(points[far]);
+		at = points[far];
+		at_cost = costs[far];
 		i = far + 1;
 	}
 	return way;
+}
+
+/**
+ * Whether a way found is still good to go on along (instead of finding it again now and then): the next point of it
+ * can still be walked to straight from where one is; else the land has changed, or one was pushed off it.
+ */
+bool NavWayStillGood(double x, double y, std::span<const NavPoint> way, size_t at)
+{
+	if (at >= way.size()) return false;
+	return NavRay(x, y, way[at].first, way[at].second, 0);
 }

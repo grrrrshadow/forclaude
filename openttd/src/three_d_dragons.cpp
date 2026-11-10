@@ -205,7 +205,17 @@ bool StepTo(Dragon &d, double tx, double ty, double speed_m)
  */
 bool WalkTo(Dragon &d, double tx, double ty, double speed_m, uint64_t now)
 {
-	if (d.way.empty() || std::hypot(tx - d.way_tx, ty - d.way_ty) > TILE_SIZE || now - d.way_made > 74) {
+	/* Found again when the goal has moved a tile, or when the way is no longer good to go on along (the land changed):
+	 * not every few seconds anyway (NavWayStillGood(), the player: "not four way finders eating the power"). */
+	bool find = d.way.empty() || std::hypot(tx - d.way_tx, ty - d.way_ty) > TILE_SIZE;
+	if (!find && now - d.way_made > 74) {
+		if (NavWayStillGood(d.x, d.y, d.way, d.way_at)) {
+			d.way_made = now;
+		} else {
+			find = true;
+		}
+	}
+	if (find) {
 		d.way = NavFindWay(d.x, d.y, tx, ty);
 		d.way_at = 0;
 		d.way_tx = tx;
