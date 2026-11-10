@@ -1483,6 +1483,13 @@ const ThreeDObject *GetThreeDRocks(TileIndex tile);
  */
 const ThreeDObject *GetThreeDStation(TileIndex tile);
 /**
+ * The cargo waiting at a station shown on a loading bay of its (GetThreeDStation(), the colleague's
+ * "cekajici_naklad"): the shared pieces of the loads by their tables, a heap in the cargo's colour of a bulk cargo
+ * without one; a piece for each STATION_CARGO_PIECE_UNITS units, the station's cargo shared by its bays. Each a figure
+ * "naklad:<piece>|#<label>" (GetThreeDStandingVehicle()) in the bay's frame, turned as it stands.
+ */
+std::vector<ThreeDObjectFigure> GetThreeDStationCargo(TileIndex tile);
+/**
  * The top of what stands on a tile's land at a point, world units from its north corner: the stones of the rocky land
  * (GetThreeDRocks()), a station's platforms, its waypoint's signal box, its lorries' bays (GetThreeDStation()).
  * @return units of height; none there, or not read yet

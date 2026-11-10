@@ -5865,6 +5865,7 @@ struct TurnedObject {
 	std::span<const ThreeDObjectFigure> more; ///< figures on it besides its own (the girl at work, the girls by the road)
 	int sort_z = 0;                           ///< added to the bottom of its box (the field road flat and first, under the cars)
 	std::vector<const ThreeDObject *> with;   ///< drawn with it, among its own triangles (the dragon farm's hay, the wings of a house's doors)
+	std::vector<ThreeDObjectFigure> own_more; ///< figures of its own more points into (the cargo waiting on a loading bay); its storage moves with it
 
 	TurnedObject(const ThreeDObject *obj, TileIndex origin, int z, const ThreeDObject *ground = nullptr, std::span<const ThreeDObjectFigure> more = {}, int sort_z = 0) :
 			obj(obj), origin(origin), z(z), ground(ground), more(more), sort_z(sort_z) {}
@@ -14704,7 +14705,10 @@ bool ThreeDStationStandsOn(const TileInfo *ti)
 	if (station == nullptr) return false;
 	if (_cab_collecting) return true;
 	if (!ObjectReadyOrOwed(station, ti->tile, ti->tile)) return false;
-	_turned_objects.emplace_back(station, ti->tile, GetTileMaxPixelZ(ti->tile));
+	TurnedObject &to = _turned_objects.emplace_back(station, ti->tile, GetTileMaxPixelZ(ti->tile));
+	/* The cargo waiting on a loading bay (GetThreeDStationCargo()). */
+	to.own_more = GetThreeDStationCargo(ti->tile);
+	to.more = to.own_more;
 	return true;
 }
 
@@ -18452,7 +18456,21 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* The bench and the BUS sign of a bus stop for its shelters (AddBusStopObjects()). */
 		if (tile_type == TileType::Station && !IsTransparencySet(TransparencyOption::Buildings)) {
 			/* A station's tile of the game's own look: its object, its own buildings left out (ThreeDStationStandsOn()). */
-			if (const ThreeDObject *station = GetThreeDStation(_cur_ti.tile); station != nullptr) objects.push_back({station, _cur_ti.tile, GetTileMaxPixelZ(_cur_ti.tile)});
+			if (const ThreeDObject *station = GetThreeDStation(_cur_ti.tile); station != nullptr) {
+				const int oz = GetTileMaxPixelZ(_cur_ti.tile);
+				objects.push_back({station, _cur_ti.tile, oz});
+				/* The cargo waiting on a loading bay (GetThreeDStationCargo()), as the vehicles standing about. */
+				for (const ThreeDObjectFigure &f : GetThreeDStationCargo(_cur_ti.tile)) {
+					if (ThreeDEyeVehicle ev; GetThreeDStandingVehicle(f.figure, ev)) {
+						ev.scale = f.scale;
+						ev.x = _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE;
+						ev.y = _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE;
+						ev.z = oz + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+						ev.facing = f.facing;
+						AddCabVehicle(ev, false);
+					}
+				}
+			}
 			for (size_t i = first_parent; i < _vd.parent_sprites_to_draw.size(); i++) {
 				const ParentSpriteToDraw &ps = _vd.parent_sprites_to_draw[i];
 				const ThreeDObject *stop = GetThreeDBusStop(_cur_ti.tile, ps.image);

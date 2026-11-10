@@ -47,6 +47,9 @@
 #include "clear_map.h"
 #include "company_func.h"
 #include "company_base.h"
+#include "station_base.h"
+#include "roadstop_base.h"
+#include "cargotype.h"
 #include "palette_func.h"
 #include "viewport_func.h"
 #include "slope_func.h"
@@ -236,6 +239,25 @@ struct ThreeDStationPiece {
 	std::string name;                      ///< its add-on (_three_d_addons)
 	std::vector<ThreeDObjectFigure> addons; ///< "doplnky", as a house's
 	float centre[2] = {7.4f, 7.4f};        ///< "stred" of "osa_y": what it turns about, metres
+	/** A place for a piece of the cargo waiting ("cekajici_naklad" "bunky"): its side, row and column, its middle on the floor, its turn. */
+	struct Cell {
+		uint8_t side;
+		int row, column;
+		float at[3];
+		float turn;
+	};
+	/** A place for a heap of a bulk cargo ("hromady"): over the columns of a side, both rows. */
+	struct Heap {
+		uint8_t side;
+		std::vector<int> columns;
+		float at[3];
+		float turn;
+	};
+	std::vector<Cell> cells;      ///< in the order they are filled, the back row first
+	std::vector<Heap> heaps;
+	float cell_m[2] = {1.3f, 1.0f}; ///< "bunka_m": a cell along a piece and across it
+	int floors = 1;               ///< "patra": a piece on another so many high at most
+	std::string heap_piece;       ///< "hromada" "objekt": the shared load piece a heap is
 };
 static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStationKind::End)> _three_d_station_pieces;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
@@ -5634,7 +5656,68 @@ static void ReadStationPiece(const nlohmann::json &e, std::string_view kind)
 			place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
 		}
 	}
+	/* The places of the cargo waiting on its floor (the colleague's hra/3d/STANICE-RAMPA-PRO-HRU.md). */
+	if (e.contains("cekajici_naklad") && e.at("cekajici_naklad").is_object()) {
+		const auto &c = e.at("cekajici_naklad");
+		std::vector<std::string> sides;
+		auto side_of = [&sides](const nlohmann::json &s) {
+			const std::string name = s.value("strana", std::string());
+			auto it = std::ranges::find(sides, name);
+			if (it != sides.end()) return static_cast<uint8_t>(it - sides.begin());
+			sides.push_back(name);
+			return static_cast<uint8_t>(sides.size() - 1);
+		};
+		auto place = [](const nlohmann::json &s, float *at) {
+			if (!s.contains("poloha") || !s.at("poloha").is_array() || s.at("poloha").size() != 3) return false;
+			for (int a = 0; a < 3; a++) at[a] = s.at("poloha").at(a).is_number() ? s.at("poloha").at(a).get<float>() : 0.0f;
+			return true;
+		};
+		if (c.contains("bunky") && c.at("bunky").is_array()) {
+			for (const auto &s : c.at("bunky")) {
+				ThreeDStationPiece::Cell cell{};
+				if (!s.is_object() || !place(s, cell.at)) continue;
+				cell.side = side_of(s);
+				cell.row = s.value("rada", 0);
+				cell.column = s.value("sloupec", 0);
+				cell.turn = s.value("otoceni", 0.0f);
+				piece.cells.push_back(cell);
+			}
+		}
+		if (c.contains("hromady") && c.at("hromady").is_array()) {
+			for (const auto &s : c.at("hromady")) {
+				ThreeDStationPiece::Heap heap{};
+				if (!s.is_object() || !place(s, heap.at) || !s.contains("sloupce") || !s.at("sloupce").is_array()) continue;
+				heap.side = side_of(s);
+				for (const auto &n : s.at("sloupce")) {
+					if (n.is_number_integer()) heap.columns.push_back(n.get<int>());
+				}
+				heap.turn = s.value("otoceni", 0.0f);
+				piece.heaps.push_back(std::move(heap));
+			}
+		}
+		if (c.contains("bunka_m") && c.at("bunka_m").is_array() && c.at("bunka_m").size() == 2) {
+			for (int a = 0; a < 2; a++) {
+				if (c.at("bunka_m").at(a).is_number()) piece.cell_m[a] = std::max(0.1f, c.at("bunka_m").at(a).get<float>());
+			}
+		}
+		piece.floors = std::clamp(c.value("patra", 1), 1, 4);
+		if (c.contains("hromada") && c.at("hromada").is_object()) piece.heap_piece = c.at("hromada").value("objekt", std::string());
+	}
 	_three_d_station_pieces[to_underlying(k)] = std::move(piece);
+}
+
+/** How far a station's piece is turned standing a way (MakeStationObjects()): along y -90 degrees, a bay by its entrance. */
+static float StationWayTurn(ThreeDStationKind kind, int way)
+{
+	if (kind == ThreeDStationKind::TruckBay) {
+		switch (static_cast<DiagDirection>(way)) {
+			case DiagDirection::NE: return 180.0f;
+			case DiagDirection::SE: return 90.0f;
+			case DiagDirection::NW: return -90.0f;
+			default: return 0.0f;
+		}
+	}
+	return way == to_underlying(Axis::Y) ? -90.0f : 0.0f;
 }
 
 /**
@@ -5651,9 +5734,10 @@ static void MakeStationObjects()
 		if (!piece.has_value() || !_three_d_addons.contains(piece->name)) continue;
 		const ThreeDStationKind kind = static_cast<ThreeDStationKind>(k);
 		/* By the way it stands: an axis (X, Y), or a bay's entrance (DiagDirection: NE, SE, SW, NW). */
-		std::vector<std::pair<int, float>> ways = {{to_underlying(Axis::X), 0.0f}, {to_underlying(Axis::Y), -90.0f}};
-		if (kind == ThreeDStationKind::TruckBay) ways = {{to_underlying(DiagDirection::NE), 180.0f}, {to_underlying(DiagDirection::SE), 90.0f}, {to_underlying(DiagDirection::SW), 0.0f}, {to_underlying(DiagDirection::NW), -90.0f}};
-		for (const auto &[way, turn] : ways) {
+		std::vector<int> ways = {to_underlying(Axis::X), to_underlying(Axis::Y)};
+		if (kind == ThreeDStationKind::TruckBay) ways = {to_underlying(DiagDirection::NE), to_underlying(DiagDirection::SE), to_underlying(DiagDirection::SW), to_underlying(DiagDirection::NW)};
+		for (const int way : ways) {
+			const float turn = StationWayTurn(kind, way);
 			ThreeDObject obj;
 			obj.name = fmt::format("{} {}", piece->name, way);
 			obj.variants = 0;
@@ -6093,6 +6177,27 @@ static void ReadLoadPiece(const nlohmann::json &e, const std::string &folder, co
 			if (label == 0 || !rgb.has_value()) continue;
 			ThreeDVehicleState st;
 			st.colour = Colour(static_cast<uint8_t>(*rgb >> 16), static_cast<uint8_t>(*rgb >> 8), static_cast<uint8_t>(*rgb)).data;
+			st.given = ThreeDVehicleState::GIVEN_COLOUR;
+			int step = 0;
+			for (size_t k = 0; k < fig.states.size(); k++) {
+				if (fig.states[k].colour == st.colour) step = static_cast<int>(k) + 1;
+			}
+			if (step == 0) {
+				fig.states.push_back(st);
+				step = static_cast<int>(fig.states.size());
+			}
+			piece.colours.emplace_back(label, step);
+		}
+	}
+	/* A heap of a bulk cargo on a loading bay (the colleague's hromada_nakladu): its colour by the cargo
+	 * ("barva_podle_nakladu"), each a state as those of the table, for no vehicle's load. */
+	if (e.contains("barva_podle_nakladu") && e.at("barva_podle_nakladu").is_object() && !fig.file.empty()) {
+		for (const auto &[label_text, colour] : e.at("barva_podle_nakladu").items()) {
+			const uint32_t label = ParseLoadLabel(nlohmann::json(label_text));
+			const std::optional<uint32_t> c = colour.is_string() ? ParseIndexColour(colour.get<std::string>()) : std::nullopt;
+			if (label == 0 || !c.has_value()) continue;
+			ThreeDVehicleState st;
+			st.colour = *c;
 			st.given = ThreeDVehicleState::GIVEN_COLOUR;
 			int step = 0;
 			for (size_t k = 0; k < fig.states.size(); k++) {
@@ -11974,6 +12079,161 @@ const ThreeDObject *GetThreeDStation(TileIndex tile)
 	}
 	const auto it = _three_d_station_objects.find({kind, way});
 	return it == _three_d_station_objects.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** Units of a cargo waiting a piece of it stands for on a loading bay (GetThreeDStationCargo(), the colleague's proposal). */
+static constexpr uint STATION_CARGO_PIECE_UNITS = 10;
+/** And a heap of a bulk cargo at its biggest; less, smaller, down to STATION_CARGO_HEAP_LEAST of its size. */
+static constexpr uint STATION_CARGO_HEAP_UNITS = 100;
+static constexpr float STATION_CARGO_HEAP_LEAST = 0.4f;
+
+std::vector<ThreeDObjectFigure> GetThreeDStationCargo(TileIndex tile)
+{
+	std::vector<ThreeDObjectFigure> out;
+	if (GetThreeDStation(tile) == nullptr || !IsTruckStop(tile)) return out;
+	const ThreeDStationKind kind = IsDriveThroughStopTile(tile) ? ThreeDStationKind::TruckStop : ThreeDStationKind::TruckBay;
+	const int way = kind == ThreeDStationKind::TruckStop ? to_underlying(GetDriveThroughStopAxis(tile)) : to_underlying(GetBayRoadStopDir(tile));
+	const std::optional<ThreeDStationPiece> &piece = _three_d_station_pieces[to_underlying(kind)];
+	if (!piece.has_value() || piece->cells.empty()) return out;
+	const Station *st = Station::GetByTile(tile);
+	/* The station's cargo shared by its bays drawn so. */
+	uint bays = 0;
+	for (const RoadStop *rs = st->truck_stops; rs != nullptr; rs = rs->next) {
+		if (GetThreeDStation(rs->xy) != nullptr) bays++;
+	}
+	bays = std::max(1u, bays);
+	/* What waits: a piece of the shared loads by its table ("naklady"), a bulk cargo without one a heap. */
+	struct Want {
+		uint32_t label;
+		const ThreeDLoadPiece *piece;
+		bool heap;
+		uint amount;
+		uint placed = 0;
+	};
+	const ThreeDLoadPiece *heap = piece->heap_piece.empty() ? nullptr : GetThreeDLoadPiece(piece->heap_piece);
+	std::vector<Want> wants;
+	for (const CargoSpec *cs : CargoSpec::Iterate()) {
+		const GoodsEntry &ge = st->goods[cs->Index()];
+		if (!ge.HasData()) continue;
+		const uint amount = (ge.GetData().cargo.TotalCount() + bays - 1) / bays;
+		if (amount == 0) continue;
+		const uint32_t label = cs->label.base();
+		const ThreeDLoadPiece *p = nullptr;
+		for (const ThreeDLoadPiece &lp : _load_pieces) {
+			if (std::ranges::find(lp.cargoes, label) != lp.cargoes.end() && !lp.figure.empty()) {
+				p = &lp;
+				break;
+			}
+		}
+		if (p != nullptr) {
+			wants.push_back({label, p, false, amount});
+		} else if (heap != nullptr && cs->classes.Test(CargoClass::Bulk)) {
+			wants.push_back({label, heap, true, amount});
+		}
+	}
+	if (wants.empty()) return out;
+	std::ranges::stable_sort(wants, std::greater{}, &Want::amount);
+	/* Its places turned as the bay stands (MakeStationObjects()). */
+	const double turn = StationWayTurn(kind, way), a = turn * M_PI / 180.0, c = std::cos(a), s = std::sin(a);
+	auto stand = [&](const Want &w, double x, double y, double z, float facing, float scale) {
+		ThreeDObjectFigure &f = out.emplace_back();
+		f.figure = fmt::format("naklad:{}|#{:08X}", w.piece->name, w.label);
+		const double dx = x - piece->centre[0], dy = y - piece->centre[1];
+		f.at[0] = static_cast<float>(piece->centre[0] + dx * c - dy * s);
+		f.at[1] = static_cast<float>(piece->centre[1] + dx * s + dy * c);
+		f.at[2] = static_cast<float>(z);
+		f.facing = facing + static_cast<float>(turn);
+		f.scale = scale;
+	};
+	std::vector<bool> used(piece->cells.size(), false);
+	auto cell_at = [&](uint8_t side, int row, int column) -> int {
+		for (size_t k = 0; k < piece->cells.size(); k++) {
+			const ThreeDStationPiece::Cell &cell = piece->cells[k];
+			if (cell.side == side && cell.row == row && cell.column == column) return static_cast<int>(k);
+		}
+		return -1;
+	};
+	/* The heaps first, their places (both rows of their columns) given to the bulk cargoes the most waits of. */
+	for (const ThreeDStationPiece::Heap &h : piece->heaps) {
+		Want *w = nullptr;
+		for (Want &cand : wants) {
+			if (cand.heap && cand.placed < cand.amount && (w == nullptr || cand.amount - cand.placed > w->amount - w->placed)) w = &cand;
+		}
+		if (w == nullptr) break;
+		const uint units = std::min(STATION_CARGO_HEAP_UNITS, w->amount - w->placed);
+		w->placed += units;
+		stand(*w, h.at[0], h.at[1], h.at[2], h.turn, STATION_CARGO_HEAP_LEAST + (1.0f - STATION_CARGO_HEAP_LEAST) * units / STATION_CARGO_HEAP_UNITS);
+		for (const int column : h.columns) {
+			for (int row = 0; row < 2; row++) {
+				if (const int k = cell_at(h.side, row, column); k >= 0) used[k] = true;
+			}
+		}
+	}
+	/* The pieces: a piece a block of cells as long and wide as it is (a log over three, the steel over two), the cells
+	 * shared by the cargoes as much as each waits; then on each other as high as the floors and the piece allow. */
+	struct Block {
+		size_t want;
+		double x, y, z;
+		float turn;
+	};
+	std::vector<Block> blocks;
+	uint pieces_wanted = 0;
+	for (const Want &w : wants) {
+		if (!w.heap) pieces_wanted += (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+	}
+	const size_t free_cells = static_cast<size_t>(std::ranges::count(used, false));
+	for (int pass = 0; pass < 2; pass++) {
+		for (size_t i = 0; i < wants.size(); i++) {
+			Want &w = wants[i];
+			if (w.heap) continue;
+			const ThreeDLoadPiece &p = *w.piece;
+			const int columns = std::max(1, static_cast<int>(std::ceil(p.size[0] / piece->cell_m[0] - 0.05f)));
+			const int rows = std::max(1, static_cast<int>(std::ceil(p.size[1] / piece->cell_m[1] - 0.05f)));
+			const uint wanted = (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+			/* Its share of the floor the first time round, the rest of it the second. */
+			const size_t share = pass == 0 ? std::max<size_t>(1, free_cells * wanted / std::max(1u, pieces_wanted) / (columns * rows)) : SIZE_MAX;
+			size_t laid = 0;
+			for (size_t k = 0; k < piece->cells.size() && w.placed < wanted && laid < share; k++) {
+				const ThreeDStationPiece::Cell &first = piece->cells[k];
+				if (used[k]) continue;
+				std::vector<int> block;
+				for (int r = 0; r < rows; r++) {
+					for (int col = 0; col < columns; col++) {
+						const int at = cell_at(first.side, first.row + r, first.column + col);
+						if (at < 0 || used[at]) {
+							block.clear();
+							r = rows;
+							break;
+						}
+						block.push_back(at);
+					}
+				}
+				if (block.empty()) continue;
+				double x = 0, y = 0;
+				for (const int at : block) {
+					used[at] = true;
+					x += piece->cells[at].at[0];
+					y += piece->cells[at].at[1];
+				}
+				blocks.push_back({i, x / block.size(), y / block.size(), first.at[2], first.turn});
+				w.placed++;
+				laid++;
+			}
+		}
+	}
+	/* On each other, a floor at a time, as many as the piece lies in layers and the bay has floors. */
+	const std::vector<Block> ground = blocks;
+	for (int floor = 1; floor < piece->floors; floor++) {
+		for (const Block &b : ground) {
+			Want &w = wants[b.want];
+			const uint wanted = (w.amount + STATION_CARGO_PIECE_UNITS - 1) / STATION_CARGO_PIECE_UNITS;
+			if (w.placed >= wanted || floor >= w.piece->layers) continue;
+			blocks.push_back({b.want, b.x, b.y, b.z + floor * w.piece->size[2], b.turn});
+			w.placed++;
+		}
+	}
+	for (const Block &b : blocks) stand(wants[b.want], b.x, b.y, b.z, b.turn, 1.0f);
+	return out;
 }
 
 const ThreeDObject *GetThreeDRocks(TileIndex tile)

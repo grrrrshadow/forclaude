@@ -4976,6 +4976,16 @@ bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev)
 		for (size_t at = bar; at != std::string_view::npos;) {
 			const size_t next = name.find('|', at + 1);
 			const std::string_view token = name.substr(at + 1, next == std::string_view::npos ? std::string_view::npos : next - at - 1);
+			/* "#<label>" (eight hex digits): its colour as its table gives that cargo (the cargo waiting on a loading bay,
+			 * GetThreeDStationCargo()). */
+			if (token.starts_with('#')) {
+				const std::optional<uint32_t> label = ParseInteger<uint32_t>(token.substr(1), 16);
+				for (const auto &[l, step] : piece->colours) {
+					if (label.has_value() && l == *label) ev.state = step;
+				}
+				at = next;
+				continue;
+			}
 			const size_t eq = token.find('=');
 			if (eq != std::string_view::npos && token.substr(0, eq) == piece->paint_part) {
 				const std::optional<uint32_t> colour = ParseIndexColour(token.substr(eq + 1));

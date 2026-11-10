@@ -15,6 +15,7 @@
 #include "bridge_map.h"
 #include "vehiclelist_func.h"
 #include "viewport_func.h"
+#include "three_d_objects.h"
 #include "viewport_kdtree.h"
 #include "command_func.h"
 #include "town.h"
@@ -4058,6 +4059,12 @@ static bool StationHandleBigTick(BaseStation *st)
 			for (const RoadStop *rs = Station::From(st)->bus_stops; rs != nullptr; rs = rs->next) {
 				if (IsDriveThroughStopTile(rs->xy)) MarkTileDirtyByTile(rs->xy);
 			}
+		}
+
+		/* The cargo waiting stands on the loading bays in the 3D views (GetThreeDStationCargo()): drawn again as it
+		 * comes and goes. */
+		for (const RoadStop *rs = Station::From(st)->truck_stops; rs != nullptr; rs = rs->next) {
+			if (GetThreeDStation(rs->xy) != nullptr) MarkTileDirtyByTile(rs->xy);
 		}
 
 		for (GoodsEntry &ge : Station::From(st)->goods) {
