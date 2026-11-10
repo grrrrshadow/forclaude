@@ -86,6 +86,8 @@ const struct ThreeDVehicleObject *ThreeDBoatRooms(const struct ThreeDVehicleObje
 struct ThreeDBoatFigure;
 void ForThreeDBoatFigures(const Vehicle *v, const struct ThreeDVehicleObject &obj, bool inside, const std::function<void(const ThreeDBoatFigure &)> &f);
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y);
+double ShipDiveRoomM(const Vehicle *v);
+double ShipDiveM(const Vehicle *v);
 double ThreeDEyeLikenessFacing(const Vehicle *v, double by_direction);
 bool GetThreeDStandingVehicle(std::string_view name, ThreeDEyeVehicle &ev);
 

@@ -1115,6 +1115,25 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testlod: holky na lodich {}", argv[2]);
 		return true;
 	}
+	if (argv.size() == 2 && argv[1] == "hloubka") {
+		/* 'testlod hloubka': the tile of the sea deepest from the eyes (EyeWaterDepth() at its middle), levels. */
+		TileIndex best = INVALID_TILE;
+		double deepest = 0;
+		for (TileIndex t : Map::Iterate()) {
+			if (!IsWaterTile(t)) continue;
+			const double d = EyeWaterDepth(TileX(t) * TILE_SIZE + TILE_SIZE / 2.0, TileY(t) * TILE_SIZE + TILE_SIZE / 2.0);
+			if (d > deepest) {
+				deepest = d;
+				best = t;
+			}
+		}
+		if (best == INVALID_TILE) {
+			IConsolePrint(CC_ERROR, "testlod: hloubka: zadna voda");
+		} else {
+			IConsolePrint(CC_DEFAULT, "testlod: nejhlubsi ({},{}) {:.2f} urovne", TileX(best), TileY(best), deepest / TILE_HEIGHT);
+		}
+		return true;
+	}
 	if (argv.size() == 2 && argv[1] == "palubakolem") {
 		/* 'testlod palubakolem': the boat's floor about the walker on board, as its steps find it (RigDeckAround()). */
 		extern std::string RigDeckAround();
@@ -11848,12 +11867,26 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				IConsolePrint(CC_ERROR, "test3d kabina klavesa: no first person view open.");
 				return true;
 			}
+			/* 'klavesa ctrl+f', 'ctrl+i' (a submarine down, up), 'pgup', 'pgdn': as keycodes. */
+			uint16_t keycode = 0;
+			char32_t key = static_cast<char32_t>(argv[3][0]);
+			if (argv[3].size() == 6 && argv[3].substr(0, 5) == "ctrl+") {
+				keycode = WKC_CTRL | static_cast<uint16_t>(std::toupper(argv[3][5]));
+				key = 0;
+			} else if (argv[3] == "pgup" || argv[3] == "pgdn") {
+				keycode = argv[3] == "pgup" ? WKC_PAGEUP : WKC_PAGEDOWN;
+				key = 0;
+			}
 			EventState state;
 			{
 				AutoRestoreBackup cur_company(_current_company, _local_company);
-				state = kw->OnKeyPress(static_cast<char32_t>(argv[3][0]), 0);
+				state = kw->OnKeyPress(key, keycode);
 			}
 			IConsolePrint(CC_DEFAULT, "test3d: kabina klavesa {}: {}", argv[3], state == EventState::Handled ? "vzata" : "nevzata");
+			extern const Vehicle *FirstPersonRiding();
+			if (const Vehicle *rv = FirstPersonRiding(); rv != nullptr && rv->type == VehicleType::Ship) {
+				IConsolePrint(CC_DEFAULT, "test3d: kabina ponor {:.1f} m, k {:.1f} m, misto {:.1f} m", ShipDiveM(rv), rv->cab_dive_to, ShipDiveRoomM(rv));
+			}
 			if (argv[3] == "i" || argv[3] == "I") IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeCarHorn());
 			IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeRiding());
 			return true;

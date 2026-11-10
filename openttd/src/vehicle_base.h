@@ -326,6 +326,10 @@ public:
 	int32_t cab_py = 0;
 	/** The height an aircraft flown freely from its cab climbs or sinks to (cab_drive.h), units of z. */
 	uint16_t cab_altitude = 0;
+	/** A submarine steered from its cab (ShipDiveM()): how deep its waterline is under the surface now, and how deep it
+	 * goes, metres. Only how it looks: not saved, not sent to the other players. */
+	float cab_dive = 0;
+	float cab_dive_to = 0;
 	/** A road vehicle driven freely from its cab goes backwards, facing as it did (cab_drive.h, CabDriveOp::Reverse). */
 	bool cab_reverse = false;
 	/** And so fast at most, in the units the vehicle shows (the player, 27. 10.: "30 km when I hold it long"). */

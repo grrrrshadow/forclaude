@@ -3422,6 +3422,31 @@ static float VehicleSlopePitch(const ThreeDVehicleObject *obj, const Vehicle *v,
  * @param v the vehicle (a piece)
  * @param x,y the point it stands at, world units (its middle from the eyes)
  */
+/**
+ * How deep a submarine may dive where it is, metres: as deep as its object lets it ("ponoreni_m"), its hull ("ponor_m",
+ * as big as it is drawn) half a metre over the bed under it at most (EyeWaterDepth()); 0 a vehicle that does not dive.
+ */
+double ShipDiveRoomM(const Vehicle *v)
+{
+	if (v->type != VehicleType::Ship) return 0;
+	int piece = 0;
+	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
+	if (obj == nullptr || obj->dive_m <= 0) return 0;
+	const double bed = EyeWaterDepth(v->x_pos, v->y_pos) / OBJECT_HEIGHT_PER_METRE;
+	return std::clamp(std::min<double>(obj->dive_m, bed - obj->draught_m * ObjectScale(obj) - 0.5), 0.0, static_cast<double>(obj->dive_m));
+}
+
+/**
+ * How deep a submarine has dived, its waterline under the surface, metres (the player, test4: "we have no buttons up and
+ * down to steer the submarine"): as far as it was steered (Vehicle::cab_dive), no deeper than there is room for it there
+ * (ShipDiveRoomM(): over a shallower bed it rises). 0 at the surface, and every other vehicle.
+ */
+double ShipDiveM(const Vehicle *v)
+{
+	if (v->type != VehicleType::Ship || v->cab_dive <= 0) return 0;
+	return std::min<double>(v->cab_dive, ShipDiveRoomM(v));
+}
+
 double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 {
 	if (v->type == VehicleType::Train) {
@@ -3436,7 +3461,8 @@ double ThreeDVehicleEyeZ(const Vehicle *v, double x, double y)
 	} else if (v->type == VehicleType::Road) {
 		if (RoadVehicle::From(v)->state == RVSB_WORMHOLE) return v->z_pos;
 	} else {
-		return v->z_pos;
+		/* A submarine dived: so much under the surface (ShipDiveM()). */
+		return v->z_pos - ShipDiveM(v) * OBJECT_HEIGHT_PER_METRE;
 	}
 	const int max_x = static_cast<int>(Map::SizeX() * TILE_SIZE) - 1, max_y = static_cast<int>(Map::SizeY() * TILE_SIZE) - 1;
 	auto ground = [&](int px, int py) { return GetSlopePixelZ(std::clamp(px, 0, max_x), std::clamp(py, 0, max_y), true); };

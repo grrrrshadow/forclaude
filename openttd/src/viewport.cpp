@@ -13607,6 +13607,8 @@ static constexpr double EyeLevelZ(double z)
  * finer than the game's whole units of the ground (a tuft of grass on a slope), fading into the ground's within two
  * units over it -- so that what rises from it (a jump) rises smoothly.
  */
+static bool EyeSwimTile(TileIndex tile);
+
 static double EyeBaseZ(double x, double y, double z)
 {
 	const int ix = std::clamp(static_cast<int>(std::floor(x)), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
@@ -13622,6 +13624,9 @@ static double EyeBaseZ(double x, double y, double z)
 	 * million -- everything counted as under the ground, the height of all over it stretched as the land's (the player,
 	 * 4. 11.: the glows of the cars' own lamps by their windscreens, 5/3 of the lamps' height). */
 	if (d < -static_cast<double>(TILE_HEIGHT) / 2.0) return z;
+	/* Under the surface of open water: itself too, as everything under it is lifted (EyeLevelZ(): the bed, the fish, the
+	 * diving walker) -- a submarine dived (ShipDiveM()) goes down from the surface evenly, not by its first few units. */
+	if (d < 0 && EyeSwimTile(tile)) return z;
 	const double a = std::abs(d);
 	return ground + (a <= 1.0 ? d : a >= 2.0 ? 0.0 : std::copysign(2.0 - a, d));
 }
@@ -16092,12 +16097,49 @@ std::optional<double> EyeWaterSurfaceZ(double x, double y)
 	return static_cast<double>(GetSlopePixelZ(ix, iy, true));
 }
 
+/** How far from the land the sea is deepest, tiles (EyeWaterDepth()); how deep it is there, levels. */
+static constexpr int EYE_SEA_REACH = 6;
+static constexpr double EYE_SEA_LEVELS = 4.0;
+
 /**
- * How deep under the surface of the water the bed lies at a world point, units of height (the player, 7. 11.: "the sea's
- * first two tiles from the shore down under today's land, deeper we do not need; rivers and aqueducts a steep slope under
- * the water, they are a tile wide, at the bottom less"): from the nearest land (a tile not swum on, EyeSwimTile()) the
- * sea a level deeper a tile, two at most; a river or a canal shallow over its bank drawn by the land (EYE_RIVER_BANK),
- * past it a level within a quarter of a tile. 0 on land.
+ * How far the nearest land is from the middle of a tile, tiles (the sea's bed, EyeWaterDepth()): from the middle to the
+ * nearest point of a tile not of water (EyeWaterGoesOn()) within EYE_SEA_REACH, past the map's edge the sea going on;
+ * EYE_SEA_REACH + 1 none. Kept by the tile till the ground changes (_turned_ground_version): the bed under the diving
+ * walker's eyes asks it for every corner of its pieces.
+ */
+static double EyeSeaLandDistance(int tx, int ty)
+{
+	static std::mutex lock;
+	static std::unordered_map<uint32_t, float> kept;
+	static uint64_t kept_version = UINT64_MAX;
+	std::lock_guard guard(lock);
+	if (kept_version != _turned_ground_version) {
+		kept.clear();
+		kept_version = _turned_ground_version;
+	}
+	const uint32_t key = static_cast<uint32_t>(tx) | static_cast<uint32_t>(ty) << 16;
+	if (auto it = kept.find(key); it != kept.end()) return it->second;
+	double nearest = EYE_SEA_REACH + 1;
+	for (int dy = -EYE_SEA_REACH; dy <= EYE_SEA_REACH; dy++) {
+		for (int dx = -EYE_SEA_REACH; dx <= EYE_SEA_REACH; dx++) {
+			const int nx = tx + dx, ny = ty + dy;
+			if (nx < 1 || ny < 1 || nx >= static_cast<int>(Map::SizeX()) - 1 || ny >= static_cast<int>(Map::SizeY()) - 1) continue;
+			if (EyeWaterGoesOn(TileXY(nx, ny))) continue;
+			nearest = std::min(nearest, std::hypot(std::max(0.0, std::abs(dx) - 0.5), std::max(0.0, std::abs(dy) - 0.5)));
+		}
+	}
+	kept.emplace(key, static_cast<float>(nearest));
+	return nearest;
+}
+
+/**
+ * How deep under the surface of the water the bed lies at a world point, units of height. A river or a canal shallow
+ * over its bank drawn by the land (EYE_RIVER_BANK), past it a level within a quarter of a tile. The sea (the player,
+ * 10. 11.: "add two levels, four will do", "by the shore half a level a tile", "a beach some day, so the bed may go
+ * down unevenly"): half a level a tile from the nearest land (a tile not swum on, EyeSwimTile()) to two levels four
+ * tiles out, then a level a tile to four, the bed rising and falling a little about that away from the shore. Near the
+ * shore the distance from the land itself (its shape), farther the tiles' kept distances between their middles
+ * (EyeSeaLandDistance()). 0 on land.
  */
 double EyeWaterDepth(double x, double y)
 {
@@ -16119,7 +16161,26 @@ double EyeWaterDepth(double x, double y)
 			nearest = std::min(nearest, std::hypot(ox, oy));
 		}
 	}
-	return narrow ? std::clamp((nearest - EYE_RIVER_BANK) / (TILE_SIZE / 4.0), 0.0, 1.0) * TILE_HEIGHT : std::min(2.0, nearest / TILE_SIZE) * TILE_HEIGHT;
+	if (narrow) return std::clamp((nearest - EYE_RIVER_BANK) / (TILE_SIZE / 4.0), 0.0, 1.0) * TILE_HEIGHT;
+	/* Tiles from the land: from 1.5 tiles on more and more the kept distances between the tiles' middles. */
+	double tiles = nearest / TILE_SIZE;
+	if (tiles > 1.5) {
+		const double fx = x / TILE_SIZE - 0.5, fy = y / TILE_SIZE - 0.5;
+		const int ix = static_cast<int>(std::floor(fx)), iy = static_cast<int>(std::floor(fy));
+		const double u = fx - ix, v = fy - iy;
+		auto at = [](int i, int j) {
+			return EyeSeaLandDistance(std::clamp(i, 0, static_cast<int>(Map::MaxX())), std::clamp(j, 0, static_cast<int>(Map::MaxY())));
+		};
+		const double kept = (at(ix, iy) * (1 - u) + at(ix + 1, iy) * u) * (1 - v) + (at(ix, iy + 1) * (1 - u) + at(ix + 1, iy + 1) * u) * v;
+		const double t = std::clamp((tiles - 1.5) / 0.5, 0.0, 1.0);
+		tiles = std::min(tiles, 2.0) * (1 - t) + kept * t;
+	}
+	double levels = tiles <= 4.0 ? 0.5 * tiles : 2.0 + (tiles - 4.0);
+	/* Unevenly: up and down by half a level at most, gently, none at the shore. */
+	const double sx = x / TILE_SIZE, sy = y / TILE_SIZE;
+	const double wobble = 0.28 * std::sin(0.9 * sx + 1.7 * std::sin(0.37 * sy)) + 0.22 * std::sin(1.3 * sy - 0.6 * sx + 2.1);
+	levels += wobble * std::clamp(tiles / 2.0, 0.0, 1.0);
+	return std::clamp(levels, 0.0, EYE_SEA_LEVELS) * TILE_HEIGHT;
 }
 
 /** How far the eyes see under the water, metres: farther all is the water's colour. */

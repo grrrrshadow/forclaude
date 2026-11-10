@@ -114,6 +114,7 @@ static constexpr double FIRST_PERSON_SIDESTEP = 0.3 * OBJECT_UNITS_PER_METRE;
 static constexpr int FIRST_PERSON_SIDESTEPS = 6;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
+static constexpr double FIRST_PERSON_DIVE_M_S = 1.0; ///< a submarine goes up or down so fast, metres a second (DiveTowards())
 /** An arrow pressed twice within this many seconds: the walker walks on by itself (the player, 21. 10.). */
 static constexpr double FIRST_PERSON_DOUBLE_TAP_S = 0.4;
 /** How long taking a weapon out or putting it away takes, and a swing of it, seconds. */
@@ -709,6 +710,24 @@ TileIndex FirstPersonShopNearby();
 void RedrawFirstPersonPicture();
 
 /** The window of the view from the first person; there is one, number 0. */
+/** A submarine steered a metre up (-1) or down (1) from where it is going (ShipDiveM()): as deep as there is room. */
+static void SteerDive(const Vehicle *rv, int way)
+{
+	Vehicle *v = Vehicle::Get(rv->index);
+	v->cab_dive_to = static_cast<float>(std::clamp(static_cast<double>(v->cab_dive_to) + way, 0.0, ShipDiveRoomM(v)));
+}
+
+/** A submarine going up or down to where it was steered, FIRST_PERSON_DIVE_M_S at most; up over a shallower bed. */
+static void DiveTowards(const Vehicle *rv, double seconds)
+{
+	if (rv->type != VehicleType::Ship || (rv->cab_dive == 0 && rv->cab_dive_to == 0)) return;
+	Vehicle *v = Vehicle::Get(rv->index);
+	const double room = ShipDiveRoomM(v);
+	v->cab_dive_to = static_cast<float>(std::min<double>(v->cab_dive_to, room));
+	const double step = FIRST_PERSON_DIVE_M_S * seconds;
+	v->cab_dive = static_cast<float>(std::min(room, v->cab_dive < v->cab_dive_to ? std::min<double>(v->cab_dive_to, v->cab_dive + step) : std::max<double>(v->cab_dive_to, v->cab_dive - step)));
+}
+
 struct FirstPersonWindow : Window {
 	FirstPersonEye walker{};             ///< where the walker is and looks
 	mutable CabViewCamera camera{};      ///< the eye between frames
@@ -1439,6 +1458,7 @@ struct FirstPersonWindow : Window {
 			const int ms = static_cast<int>(steps) * FIRST_PERSON_TICK_MS;
 			if (!this->seat.Drive(rv, keys, ms)) this->arrows.Drive(rv, keys, ms);
 			if (this->arrows.route != route) this->SetWidgetDirty(WID_FP_ROUTE);
+			DiveTowards(rv, ms / 1000.0);
 		}
 		/* The button of the route in a vehicle, of running on foot. */
 		bool changed = this->GetWidget<NWidgetStacked>(WID_FP_RUN_SEL)->SetDisplayedPlane(rv != nullptr ? 1 : 0);
@@ -2554,6 +2574,18 @@ struct FirstPersonWindow : Window {
 		if (key == 'e' || key == 'E') {
 			this->BoardOrLeave();
 			return EventState::Handled;
+		}
+		/* A submarine (its object's "ponoreni_m", ShipDiveM()): up with Ctrl+I or Page Up, down with Ctrl+F or Page Down
+		 * (the player, test4: "I have Ctrl+F and Ctrl+I free, and set the players something usual for the height"), a
+		 * metre a press, before the horn and the lights of I and F. */
+		if (const Vehicle *rv = this->Riding(); rv != nullptr && ShipDiveRoomM(rv) > 0) {
+			const uint16_t k = keycode & ~WKC_SPECIAL_KEYS;
+			const bool ctrl = (keycode & WKC_CTRL) != 0;
+			const int way = (ctrl && k == 'I') || keycode == WKC_PAGEUP ? -1 : (ctrl && k == 'F') || keycode == WKC_PAGEDOWN ? 1 : 0;
+			if (way != 0) {
+				SteerDive(rv, way);
+				return EventState::Handled;
+			}
 		}
 		/* In a vehicle, as in its cab: I the horn, F the lights, C the next camera, T its route or the wheel again. */
 		if (const Vehicle *rv = this->Riding(); rv != nullptr) {
