@@ -11428,11 +11428,48 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		said("pruplav", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(5, 10), at(0, 6), WaterClass::Canal, false));
 		said("lodni depo x", Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, at(1, 7), Axis::X));
 		said("lodni depo y", Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, at(4, 7), Axis::Y));
+		UpdateSignalsInBuffer(); // built outside the command queue: the depots' signal blocks as a command's would be
 		for (const auto &[dx, dy] : std::initializer_list<std::pair<int, int>>{{0, 0}, {2, 0}, {4, 0}, {6, 0}, {0, 3}, {2, 3}, {4, 3}, {6, 3}, {1, 7}, {2, 7}, {4, 7}, {4, 8}}) {
 			TileIndex origin;
 			const ThreeDObject *o = GetThreeDDepot(at(dx, dy), origin);
 			IConsolePrint(CC_DEFAULT, "test3d: depa3d {},{}: {}", *x + dx, *y + dy, o != nullptr ? fmt::format("{} od {},{}", o->name, TileX(origin), TileY(origin)) : std::string("bez objektu"));
 		}
+		if (argv.size() > 4 && argv[4] == "jede") {
+			/* 'depa3d <x> <y> jede': out of the depots opening SE a train onto two tiles of rails and a lorry onto two
+			 * of road, to a second shed and back (the gates, GetThreeDDepotDoorWing()). */
+			said("koleje", Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, at(2, 2), at(2, 1), RAILTYPE_RAIL, Track::Y, false, true));
+			said("silnice", Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, at(2, 5), at(2, 4), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false));
+			said("druha garaz", Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, at(3, 5), ROADTYPE_ROAD, DiagDirection::NE));
+			UpdateSignalsInBuffer(); // the rails built outside the command queue: their signal blocks as a command's would be
+			for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+				auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, at(2, 0), e->index, true, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Failed()) continue;
+				said("vlak vyjel", Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false));
+				break;
+			}
+			for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
+				auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, at(2, 3), e->index, true, INVALID_CARGO, ClientID::Invalid);
+				if (cost.Failed()) continue;
+				Depot *near_depot = Depot::GetByTile(at(2, 3));
+				Depot *far_depot = Depot::GetByTile(at(3, 5));
+				if (near_depot != nullptr && far_depot != nullptr) {
+					Order there{};
+					there.MakeGoToDepot(DestinationID(far_depot->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+					Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, there);
+					Order back{};
+					back.MakeGoToDepot(DestinationID(near_depot->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
+					Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 1, back);
+				}
+				said("auto vyjelo", Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false));
+				break;
+			}
+		}
+	} else if (what == "vrata" && argv.size() > 3) {
+		/* 'vrata <x> <y>': the wings of a depot's gates and doors as they stand (GetThreeDDepotDoorWing()). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		extern std::string RigThreeDDepotDoors(TileIndex tile);
+		IConsolePrint(CC_DEFAULT, "test3d: vrata {},{}: {}", *x, *y, RigThreeDDepotDoors(TileXY(*x, *y)));
 	} else if (what == "kameni") {
 		/* 'kameni [x y r]': the rocky land's tiles (the stones of GetThreeDRocks()), how many and the first few with the
 		 * layout of their stones; with a place, the free land within r tiles of it (1) made rocky first. */

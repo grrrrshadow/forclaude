@@ -330,6 +330,7 @@ struct ThreeDObject {
 	 * house's frame, the wings of the doors objects of their own, each in its three states. */
 	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors and windows ("dvere_NN", "okno_NN" of its file, then of its interior's): shut, open one way, the other
+	std::vector<uint8_t> gate_ways;           ///< a depot's (ReadDepot()): of each of door_wings, the way its gate opens out as a vehicle passes (1, 2: door_wings' open states), 0 a door for people
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
@@ -1491,6 +1492,13 @@ const ThreeDObject *GetThreeDStation(TileIndex tile);
  * @return nullptr: another tile, one of a set's look (a rail or road type's own depot), or the sets have not the depot
  */
 const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin);
+/**
+ * The wing of a door of a depot as it stands now (GetThreeDDepot()): a gate open out while a vehicle is on the depot's
+ * tile and not hidden in it (coming in, going out), else as the walker left it (GetThreeDDoorWing()).
+ */
+const ThreeDObject *GetThreeDDepotDoorWing(const ThreeDObject *depot, TileIndex origin, size_t door);
+/** Each tick: the depots whose gates have opened or shut since they were drawn (GetThreeDDepotDoorWing()) drawn again. */
+void ThreeDDepotGatesTick();
 /**
  * The cargo waiting at a station shown on a loading bay of its (GetThreeDStation(), the colleague's
  * "cekajici_naklad"): the shared pieces of the loads by their tables, a heap in the cargo's colour of a bulk cargo

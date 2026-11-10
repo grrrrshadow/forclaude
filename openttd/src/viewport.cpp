@@ -14710,7 +14710,9 @@ bool ThreeDDepotStandsOn(const TileInfo *ti)
 	for (const TurnedObject &to : _turned_objects) {
 		if (to.origin == origin && to.obj == depot) return true;
 	}
-	_turned_objects.emplace_back(depot, origin, GetTileMaxPixelZ(origin));
+	TurnedObject &to = _turned_objects.emplace_back(depot, origin, GetTileMaxPixelZ(origin));
+	/* The wings of its gates and doors as they stand (GetThreeDDepotDoorWing()). */
+	for (size_t k = 0; k < depot->door_wings.size(); k++) to.with.push_back(GetThreeDDepotDoorWing(depot, origin, k));
 	return true;
 }
 
@@ -18500,7 +18502,10 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			if (const ThreeDObject *depot = GetThreeDDepot(_cur_ti.tile, origin); depot != nullptr) {
 				bool known = false;
 				for (const CabObject &co : objects) known |= co.origin == origin && co.obj == depot;
-				if (!known) objects.push_back({depot, origin, GetTileMaxPixelZ(origin)});
+				if (!known) {
+					objects.push_back({depot, origin, GetTileMaxPixelZ(origin)});
+					for (size_t k = 0; k < depot->door_wings.size(); k++) objects.push_back({GetThreeDDepotDoorWing(depot, origin, k), origin, GetTileMaxPixelZ(origin)});
+				}
 			}
 		}
 		/* The 3D pieces of a bridge over the tile, or of a bridge's head (EyeBridgePieces()). */

@@ -31,6 +31,7 @@
 #include "core/bitmath_func.hpp"
 #include "engine_base.h"
 #include "vehicle_base.h"
+#include "vehicle_func.h"
 #include "effectvehicle_func.h"
 #include "core/string_consumer.hpp"
 #include "three_d.h"
@@ -5672,6 +5673,34 @@ static void ReadDepot(const nlohmann::json &e, const std::string &folder)
 		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 		ReadMaterialPictures(e, folder, obj);
 		ReadColourParts(e, folder, obj);
+		/* The wings of its gates and doors ("dvere_NN"), each shut and open either way about its hinge, turned with it
+		 * (as a house's, ReadInterior()); a gate ("druh" "vrata") opens out ("otevreni_uhel", its sign the way). */
+		for (const std::string &node : GlbDoorNodes(obj.glb_path)) {
+			std::array<size_t, 3> wings;
+			for (int k = 0; k < 3; k++) {
+				ThreeDObject wing;
+				wing.name = fmt::format("{}/{}{}", obj.name, node, k == 0 ? "" : (k == 1 ? "/+" : "/-"));
+				wing.variants = 0;
+				wing.tiles_x = obj.tiles_x;
+				wing.tiles_y = obj.tiles_y;
+				wing.glb_path = obj.glb_path;
+				wing.door_node = node;
+				wing.door_turn = static_cast<int8_t>(k == 2 ? -1 : k);
+				wing.scene_turns = static_cast<int8_t>(turns);
+				wing.material_from = obj.material_from;
+				wings[k] = _three_d_objects.size();
+				_three_d_objects.push_back(std::move(wing));
+			}
+			uint8_t gate = 0;
+			if (e.contains("dvere") && e.at("dvere").is_array()) {
+				for (const auto &d : e.at("dvere")) {
+					if (!d.is_object() || d.value("uzel", std::string()) != node || d.value("druh", std::string()) != "vrata") continue;
+					gate = d.value("otevreni_uhel", 0.0f) < 0 ? 2 : 1;
+				}
+			}
+			obj.door_wings.push_back(wings);
+			obj.gate_ways.push_back(gate);
+		}
 		_three_d_depots[{transport, way}] = _three_d_objects.size();
 		_three_d_objects.push_back(std::move(obj));
 	}
@@ -11616,6 +11645,10 @@ const ThreeDObject *GetThreeDObjectWithRoomsAt(TileIndex tile, TileIndex &origin
 		origin = GetThreeDIndustryObjectOrigin(ind);
 		return obj;
 	}
+	/* A depot of a railway or a road with its gates and doors, opened with E as a house's (GetThreeDDepot()). */
+	if (!IsTileType(tile, TileType::Water)) {
+		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr && !depot->door_wings.empty()) return depot;
+	}
 	return nullptr;
 }
 
@@ -11661,6 +11694,21 @@ static std::optional<std::pair<double, double>> DoorMiddle(const ThreeDObject &w
 	return std::make_pair((wing.extent[0] + wing.extent[1]) / 2.0, (wing.extent[2] + wing.extent[3]) / 2.0);
 }
 
+/** The rig ('test3d vrata'): a depot's doors as they stand, each with its middle shut (metres from its north corner). */
+std::string RigThreeDDepotDoors(TileIndex tile)
+{
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr) return "zadne depo";
+	std::string out = fmt::format("{} ({} kridel):", o->name, o->door_wings.size());
+	for (size_t k = 0; k < o->door_wings.size(); k++) {
+		const auto mid = DoorMiddle(_three_d_objects[o->door_wings[k][0]]);
+		out += fmt::format(" {}", GetThreeDDepotDoorWing(o, origin, k)->name);
+		if (mid.has_value()) out += fmt::format(" (stred {:.2f},{:.2f} m)", mid->first / OBJECT_UNITS_PER_METRE, mid->second / OBJECT_UNITS_PER_METRE);
+	}
+	return out;
+}
+
 /** The door of a house nearest a point (world units from its north corner) within reach of it (world units), if any. */
 std::optional<size_t> ThreeDDoorNear(const ThreeDObject *house, TileIndex, double x, double y, double reach)
 {
@@ -11692,6 +11740,11 @@ void ToggleThreeDDoor(const ThreeDObject *house, TileIndex origin, size_t door, 
 	if (const ThreeDObject *in = GetThreeDInterior(house); ThreeDDoorIsWindow(house, door) && in != nullptr && in->IsRead() && !in->pos.empty()) {
 		x = (in->extent[0] + in->extent[1]) / 2.0;
 		y = (in->extent[2] + in->extent[3]) / 2.0;
+	}
+	/* A depot's gate opens out, the way it does for a vehicle (ReadDepot()). */
+	if (door < house->gate_ways.size() && house->gate_ways[door] != 0) {
+		_three_d_doors_open[{origin, door}] = house->gate_ways[door];
+		return;
 	}
 	const auto a = DoorMiddle(_three_d_objects[house->door_wings[door][1]]), b = DoorMiddle(_three_d_objects[house->door_wings[door][2]]);
 	uint8_t way = 1;
@@ -12165,6 +12218,45 @@ const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin)
 	}
 	const auto it = _three_d_depots.find({transport, way});
 	return it == _three_d_depots.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+/** The depots whose gates have been drawn, open or not (GetThreeDDepotDoorWing()): drawn again as that changes (ThreeDDepotGatesTick()). */
+static std::map<TileIndex, bool> _three_d_depot_gates;
+
+/** Whether a depot's gates stand open: a train or a road vehicle on its tile and not hidden in it, coming in or going out. */
+static bool ThreeDDepotGatesOpen(TileIndex origin)
+{
+	return HasVehicleOnTile(origin, [](const Vehicle *v) {
+		return (v->type == VehicleType::Train || v->type == VehicleType::Road) && !v->vehstatus.Test(VehState::Hidden);
+	});
+}
+
+const ThreeDObject *GetThreeDDepotDoorWing(const ThreeDObject *depot, TileIndex origin, size_t door)
+{
+	if (depot == nullptr || door >= depot->door_wings.size()) return nullptr;
+	const uint8_t gate = door < depot->gate_ways.size() ? depot->gate_ways[door] : 0;
+	if (gate != 0) {
+		const bool open = ThreeDDepotGatesOpen(origin);
+		_three_d_depot_gates[origin] = open;
+		if (open) return &_three_d_objects[depot->door_wings[door][gate]];
+	}
+	return GetThreeDDoorWing(depot, origin, door);
+}
+
+void ThreeDDepotGatesTick()
+{
+	for (auto it = _three_d_depot_gates.begin(); it != _three_d_depot_gates.end();) {
+		TileIndex origin;
+		if (it->first >= Map::Size() || GetThreeDDepot(it->first, origin) == nullptr || origin != it->first) {
+			it = _three_d_depot_gates.erase(it);
+			continue;
+		}
+		if (const bool open = ThreeDDepotGatesOpen(it->first); open != it->second) {
+			it->second = open;
+			MarkTileDirtyByTile(it->first);
+		}
+		++it;
+	}
 }
 
 std::vector<ThreeDObjectFigure> GetThreeDStationCargo(TileIndex tile)

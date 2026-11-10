@@ -477,7 +477,13 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 	/* A depot of a railway or a road by its shape, into it through its gates (GetThreeDDepot()); a ship depot is water. */
 	if (TileIndex origin; !IsTileType(tile, TileType::Water)) {
 		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr) {
-			return !depot->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE, feet(origin));
+			const double lx = x - TileX(origin) * TILE_SIZE, ly = y - TileY(origin) * TILE_SIZE, up = feet(origin);
+			if (depot->Blocks(lx, ly, up)) return false;
+			/* Its gates and doors as they stand: shut, in the way. */
+			for (size_t k = 0; k < depot->door_wings.size(); k++) {
+				if (GetThreeDDepotDoorWing(depot, origin, k)->Blocks(lx, ly, up)) return false;
+			}
+			return true;
 		}
 	}
 	switch (GetTileType(tile)) {

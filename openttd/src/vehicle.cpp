@@ -1150,6 +1150,9 @@ void CallVehicleTicks()
 		}
 	}
 
+	/* The gates of the 3D depots open as a vehicle comes in or goes out: drawn again as they do. */
+	ThreeDDepotGatesTick();
+
 	for (auto &it : _vehicles_to_autoreplace) {
 		Vehicle *v = Vehicle::Get(it.first);
 		/* Autoreplace needs the current company set as the vehicle owner */
