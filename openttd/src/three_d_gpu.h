@@ -377,6 +377,9 @@ struct ThreeDGpuEyeStep {
 	} shadow_map;
 };
 
+/** The kinds of our grass (viewport.cpp OurGrassGround): the grass's 5 and the 8 stages of a farm's field it is tinted to. */
+static constexpr int THREE_D_GPU_GRASS_KINDS = 13;
+
 /**
  * The whole view from the eyes drawn on the card (the player, 20. 10.: "draw as it is to be drawn, so that it does not
  * jerk"): its steps in their order, the triangles' corners and textures they point to, and what comes of it.
@@ -394,7 +397,7 @@ struct ThreeDGpuEyeFrame {
 	int grass_texture = -1;
 	float grass_units = 0;
 	std::array<float, 2> grass_eye{};
-	std::array<float, 15> grass_tint{};
+	std::array<float, 3 * THREE_D_GPU_GRASS_KINDS> grass_tint{};
 	bool show = false;               ///< to be shown straight from the card (ThreeDGpuShows()): no pixels read back
 	std::vector<uint32_t> pixels;    ///< what comes: the colours (Colour::data), top row first; or
 	uint32_t shown = 0;              ///< the texture of the video driver's OpenGL it is in, top row first (shown)

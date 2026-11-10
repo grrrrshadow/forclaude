@@ -2649,10 +2649,11 @@ static Colour CabSpriteColour(SpriteID image, PaletteID pal, Colour fallback);
  * or all of it grown over, rough land (under trees too) --, not the land of a themed town in its colours.
  */
 struct OurGrassGround {
-	int kind = -1;      ///< 0 bare land, 1-3 its thirds grown over, 4 rough land; -1 none of ours
+	int kind = -1;      ///< 0 bare land, 1-3 its thirds grown over, 4 rough land, 5-12 a farm's field at its stage; -1 none of ours
 	uint slope = 0;     ///< which of the sprites of its kind by the slope (SlopeToSpriteOffset())
 };
-static constexpr int OUR_GRASS_KINDS = 5;
+static constexpr int OUR_GRASS_KINDS = THREE_D_GPU_GRASS_KINDS;
+static_assert(OUR_GRASS_KINDS == 5 + 8);
 
 static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
 {
@@ -2664,6 +2665,11 @@ static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
 	}
 	if (s >= SPR_FLAT_ROUGH_LAND && s < SPR_FLAT_ROUGH_LAND + 19) return {4, s - SPR_FLAT_ROUGH_LAND};
 	if (s >= SPR_FLAT_ROUGH_LAND_1 && s <= SPR_FLAT_ROUGH_LAND_4) return {4, 0}; // the flat rough land's others
+	/* A farm's field growing, ripe or harvested (the player, test5: "just tint the big tile of grass yellow, we can do
+	 * that, and put the wheat on it; there are several tiles by the slope, that's why your small squares did not fit"):
+	 * our grass tinted as its sprite of that stage is, every slope of it as the grass's (19 sprites a stage). The
+	 * ploughed field stays the game's. */
+	if (s >= SPR_FARMLAND_STATE_1 && s < SPR_FARMLAND_HAYPACKS + 19) return {5 + static_cast<int>((s - SPR_FARMLAND_STATE_1) / 19), (s - SPR_FARMLAND_STATE_1) % 19};
 	return {};
 }
 
@@ -2699,8 +2705,10 @@ static const OurGrassFit &OurGrassFitOf(const ThreeDTextureLevels &picture)
 		}
 		const double n = std::max<size_t>(1, picture->front().px.size());
 		const double mr = std::max(1.0, r / n), mg = std::max(1.0, g / n), mb = std::max(1.0, b / n);
-		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND};
-		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45)};
+		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND,
+				SPR_FARMLAND_STATE_1, SPR_FARMLAND_STATE_2, SPR_FARMLAND_STATE_3, SPR_FARMLAND_STATE_4, SPR_FARMLAND_STATE_5, SPR_FARMLAND_STATE_6, SPR_FARMLAND_STATE_7, SPR_FARMLAND_HAYPACKS};
+		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45),
+				Colour(110, 120, 55), Colour(120, 125, 55), Colour(135, 130, 55), Colour(170, 145, 60), Colour(185, 155, 65), Colour(195, 160, 70), Colour(200, 165, 75), Colour(185, 160, 95)};
 		OurGrassFit f{};
 		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
 			const Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
