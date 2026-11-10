@@ -17790,7 +17790,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* In a tunnel (hidden in it): along it at once, as the vehicle goes. A car turned round at its end, the eye turning
 	 * after it over a few frames went sideways out of the tube (the rig of test5). */
 	if (walker == nullptr && v != nullptr && v->vehstatus.Test(VehState::Hidden) && IsTunnelTile(v->tile) && v->direction != Direction::Invalid) {
-		target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)])) + (rear ? M_PI : 0.0);
+		/* Driven freely through it, steered there: its own heading (RoadVehFreeTunnelStep()). */
+		target = v->cab_free ? v->cab_yaw * (2 * M_PI / CAB_YAW_TURN) : std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)])) + (rear ? M_PI : 0.0);
 		camera.valid = false;
 	}
 	if (!camera.valid) {
@@ -17951,6 +17952,17 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	/* The sky down to the horizon, the far ground under it: drawn with the frame (ClearEyeFrame()). */
 	const Colour haze = EyeHaze();
 
+	/* The eye of a vehicle hidden in a tunnel within its tube: a car steered there and turned towards a wall had its eye
+	 * ahead of it through the wall (the player, test5: "I want to steer the car in the tunnel"). */
+	if (v != nullptr && v->vehstatus.Test(VehState::Hidden) && IsTunnelTile(v->tile)) {
+		if (const std::optional<CabTunnel> t = CabTunnelAt(v->tile); t.has_value()) {
+			/* A little from its walls (the near plane in a tunnel is a walker's, below). */
+			const double room = CAB_TUNNEL_HALF - 1.0;
+			double &across = t->axis == Axis::X ? eye.y : eye.x;
+			across = std::clamp(across, t->c_mid - room, t->c_mid + room);
+		}
+	}
+
 	/* A tunnel the eye is in: its tube is drawn round the eye, and the hill over it is left out. */
 	std::optional<CabTunnel> in_tunnel;
 	{
@@ -17978,6 +17990,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * test5). */
 		if (!in_tunnel.has_value() && v != nullptr && v->vehstatus.Test(VehState::Hidden)) in_tunnel = CabTunnelAt(v->tile);
 	}
+	/* In a tunnel the near plane as the walker's: its walls are near, and a car steered there turned towards one cut it
+	 * off at the picture's side, the hill's dark and the sky past it (the player, test5: steering in the tunnel). */
+	if (in_tunnel.has_value()) _cab_near = std::min(_cab_near, 0.25);
 
 	/* Hidden elsewhere than in a tunnel (a depot): the dark, with the light of the door. */
 	if (v != nullptr && v->vehstatus.Test(VehState::Hidden) && !in_tunnel.has_value() && !CabTunnelAt(v->tile).has_value()) {

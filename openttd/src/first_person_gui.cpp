@@ -4058,7 +4058,7 @@ std::string DescribeRiding()
 	s += fmt::format(", volne {} yaw {} limit {} rychlost {} stoji {} svetla {} (prani {})", v->cab_free, v->cab_yaw, v->cab_speed_limit, v->GetDisplaySpeed(), v->vehstatus.Test(VehState::Stopped) ? "ano" : "ne",
 			VehicleLightsOn(v) ? "sviti" : "nesviti", v->First()->cab_lights);
 	if (v->type == VehicleType::Aircraft) s += fmt::format(" vyska {} cil {} stav {} na {},{}", v->z_pos, v->cab_altitude, Aircraft::From(v)->state, v->x_pos, v->y_pos);
-	if (v->type == VehicleType::Road) s += fmt::format(" na {},{},{} smer {} stav {:#x} skryte {}", v->x_pos, v->y_pos, v->z_pos, to_underlying(v->direction), RoadVehicle::From(v)->state, v->vehstatus.Test(VehState::Hidden) ? "ano" : "ne");
+	if (v->type == VehicleType::Road) s += fmt::format(" na {},{},{} smer {} stav {:#x} skryte {} zniceno {}", v->x_pos, v->y_pos, v->z_pos, to_underlying(v->direction), RoadVehicle::From(v)->state, v->vehstatus.Test(VehState::Hidden) ? "ano" : "ne", v->vehstatus.Test(VehState::Crashed) ? "ANO" : "ne");
 	if (v->type == VehicleType::Train) {
 		const Train *t = Train::From(v->First());
 		s += fmt::format(" cur {} pult MSTS {} rizen {} vykon {} edb {} brzda {} primocinna {} rychlobrzda {} smer {} tfp {} na {},{} rozkaz {} ({})", t->cur_speed, IsSimtrainsTrain(v) ? "ano" : "ne",
