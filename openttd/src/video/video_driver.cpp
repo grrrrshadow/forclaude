@@ -184,15 +184,12 @@ void VideoDriver::Tick()
 			::InputLoop();
 			lap(parts.input);
 
-			/* The sets being read (GfxLoadSprites()): how far, and no window -- nor the pointer's picture -- while their
-			 * pictures are being read. */
-			const bool sets_loading = DrawSetsLoading();
 			/* Prevent drawing when switching mode, as windows can be removed when they should still appear. */
-			if (!sets_loading && (_game_mode == GameMode::Bootstrap || _switch_mode == SwitchMode::None || HasModalProgress())) {
+			if (_game_mode == GameMode::Bootstrap || _switch_mode == SwitchMode::None || HasModalProgress()) {
 				::UpdateWindows();
 			}
 
-			if (!sets_loading) this->PopulateSystemSprites();
+			this->PopulateSystemSprites();
 			lap(parts.windows);
 		}
 

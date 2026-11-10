@@ -2744,10 +2744,6 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
 
 	_cur_gps.spriteid = load_index;
 
-	/* How far the reading is, shown while it lasts (SetsLoadingStep()): a file in a stage a step. */
-	const uint loading_steps = static_cast<uint>(_grfconfig.size()) * (to_underlying(GrfLoadingStage::End) - to_underlying(GrfLoadingStage::LabelScan));
-	uint loading_step = 0;
-
 	/* Load newgrf sprites
 	 * in each loading stage, (try to) open each file specified in the config
 	 * and load information from it. */
@@ -2774,7 +2770,6 @@ bool LoadNewGRF(SpriteID load_index, uint num_baseset, NewGRFLoadRounds &rounds)
 
 		_cur_gps.stage = stage;
 		for (const auto &c : _grfconfig) {
-			SetsLoadingStep(loading_step++, loading_steps);
 			if (c->status == GRFStatus::Disabled || c->status == GRFStatus::NotFound) continue;
 			if (stage > GrfLoadingStage::Init && c->flags.Test(GRFConfigFlag::InitOnly)) continue;
 
