@@ -1468,6 +1468,16 @@ static constexpr std::string_view FIELD_BALE_STRAW = "E2C46A";
 std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope slope);
 
 /**
+ * The stones of a tile of the rocky land (the colleague's objekty/kameni, hra/3d/KAMENI-PRO-HRU.md): one of the layouts
+ * of "skalnata_zem" by the tile, its slope's object of them alone (each stone in addon_places, its height in metres over
+ * the tile's lowest corner). The 3D views draw the land under them without the rocks painted in (DrawTile_Clear()).
+ * @return nullptr: not rocky land, or the sets have not the stones (the sprite with them painted in stays)
+ */
+const ThreeDObject *GetThreeDRocks(TileIndex tile);
+/** The top of the stones of a rocky tile at a point, world units from its north corner (GetThreeDRocks()): units of height over its lowest corner; none there, or not read yet. */
+std::optional<double> ThreeDRocksTopAt(TileIndex tile, double x, double y);
+
+/**
  * A tile of an industry of the original game drawn from the parts the industries share (the colleague's
  * hra/3d/PROSBA-PRUMYSL-VANILLA-3D.md, set prumysl_vanilla): the ground of the tile, the parts standing on it (of the
  * whole building when the tile is the anchor of a block of tiles), and the plants (the forest, the plantations).

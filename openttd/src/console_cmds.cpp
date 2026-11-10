@@ -11376,6 +11376,29 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: posekat farma {},{} poli {} prvni {},{}", fx, fy, count, first != INVALID_TILE ? TileX(first) : 0, first != INVALID_TILE ? TileY(first) : 0);
+	} else if (what == "kameni") {
+		/* 'kameni [x y r]': the rocky land's tiles (the stones of GetThreeDRocks()), how many and the first few with the
+		 * layout of their stones; with a place, the free land within r tiles of it (1) made rocky first. */
+		if (argv.size() > 4) {
+			const int cx = number(2).value_or(0), cy = number(3).value_or(0), r = std::clamp(number(4).value_or(1), 0, 16);
+			for (int y = std::max(1, cy - r); y <= std::min<int>(Map::MaxY() - 1, cy + r); y++) {
+				for (int x = std::max(1, cx - r); x <= std::min<int>(Map::MaxX() - 1, cx + r); x++) {
+					const TileIndex t = TileXY(x, y);
+					if (!IsTileType(t, TileType::Clear) || IsClearGround(t, ClearGround::Fields)) continue;
+					MakeClear(t, ClearGround::Rocks, 3);
+					MarkTileDirtyByTile(t);
+				}
+			}
+		}
+		std::string first;
+		uint count = 0;
+		for (const auto t : Map::Iterate()) {
+			if (!IsTileType(t, TileType::Clear) || !IsClearGround(t, ClearGround::Rocks)) continue;
+			if (count++ >= 6) continue;
+			const ThreeDObject *rocks = GetThreeDRocks(t);
+			first += fmt::format(" {},{} {}", TileX(t), TileY(t), rocks != nullptr ? rocks->name : std::string("bez kamenu"));
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: kameni dlazdic {}:{}", count, first);
 	} else if (what == "lampy") {
 		/* 'lampy <0|1>': at night the lamps and lit windows of the houses light what is about them (1) or not. */
 		extern bool _cab_lamp_light;

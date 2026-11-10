@@ -44,6 +44,7 @@
 #include "table/sprites.h"
 #include "tree_map.h"
 #include "tile_map.h"
+#include "clear_map.h"
 #include "viewport_func.h"
 #include "slope_func.h"
 #include "language.h"
@@ -207,6 +208,18 @@ static std::map<std::string, size_t, std::less<>> _three_d_addons;
 static std::map<int, size_t> _three_d_street_lamps;
 /** The pavements of a drive-through bus stop with their bench and sign (MakeBusStops()), by the shelter's sprite they stand for: objects in _three_d_objects. */
 static std::map<SpriteID, size_t> _three_d_bus_stops;
+/** A stone of a layout of the rocky land (the colleague's objekty/kameni, "skalnata_zem", ReadRockLayouts()). */
+struct ThreeDRockStone {
+	std::string name;              ///< its add-on ("kamen")
+	float x = 0, y = 0;            ///< its middle, metres from the tile's north corner ("poloha")
+	float turn = 0;                ///< degrees, 90 its +x to +y ("otoceni")
+	float scale = 1;               ///< "meritko"
+	std::array<float, 4> extent{}; ///< its add-on's x0, x1, y0, y1 as made ("rozmer_m"), metres
+};
+/** The layouts of the stones of the rocky land, one of them a tile (GetThreeDRocks()). */
+static std::vector<std::vector<ThreeDRockStone>> _three_d_rock_layouts;
+/** The rocky land's tiles (MakeRockTiles()) by the layout and the tile's slope: objects in _three_d_objects. */
+static std::map<std::pair<size_t, Slope>, size_t> _three_d_rock_tiles;
 
 /*
  * The diary of the 3D houses, 3d_domy.log in the player's folder (the player, 19. 10.: in a new game the temperate
@@ -2294,8 +2307,144 @@ static void ReadGlbNight(const std::string &path, ThreeDObject &obj)
 }
 
 /** A mesh read (ReadGlbMesh()) into a building: metres into units, the side of each triangle facing out, the light from its normals. */
+/**
+ * A mesh whose texture repeats (glTF's sampler repeats it unless it says otherwise; the colleague's stones of
+ * objekty/kameni, from -0.8 to 0.8 of their picture): a building's texture is not repeated where it is drawn -- on the
+ * map off it nothing (DrawTexturedTriangle() of viewport.cpp), on the card clamped to its edge --, and of the stones only
+ * pieces were left on the map (the player, test5: "he has normal stones, so what is going on?"). Its triangles that
+ * reach past the picture cut where it begins again, each piece's u and v within it, a hair from its edges, as the
+ * masonry of the bridges (MasonryMesh()); those within it as they are.
+ */
+static void CutRepeatedTexture(GlbMesh &mesh)
+{
+	const size_t corners = mesh.pos.size() / 3;
+	if (corners == 0 || mesh.uv.size() != corners * 2) return;
+	/* Past it by more than its quantising's slack. */
+	static constexpr double SLACK = 1e-3;
+	auto past = [&mesh](uint32_t i) {
+		const double u = mesh.uv[i * 2], v = mesh.uv[i * 2 + 1];
+		return u < -SLACK || u > 1 + SLACK || v < -SLACK || v > 1 + SLACK;
+	};
+	auto reaches_past = [&](size_t t) { return past(mesh.tri[t]) || past(mesh.tri[t + 1]) || past(mesh.tri[t + 2]); };
+	bool any = false;
+	for (size_t t = 0; t + 2 < mesh.tri.size() && !any; t += 3) any = reaches_past(t);
+	if (!any) return;
+	const bool normals = mesh.nrm.size() == mesh.pos.size();
+	struct Corner {
+		float p[3];
+		float n[3];
+		double u, v;
+	};
+	auto mix = [](const Corner &a, const Corner &b, double f) {
+		Corner c;
+		for (int k = 0; k < 3; k++) {
+			c.p[k] = static_cast<float>(a.p[k] + (b.p[k] - a.p[k]) * f);
+			c.n[k] = static_cast<float>(a.n[k] + (b.n[k] - a.n[k]) * f);
+		}
+		c.u = a.u + (b.u - a.u) * f;
+		c.v = a.v + (b.v - a.v) * f;
+		return c;
+	};
+	/* A polygon's part on one side of the line u (or v) = at, the side above it or below. */
+	auto cut = [&mix](const std::vector<Corner> &poly, bool v, double at, bool above) {
+		std::vector<Corner> out;
+		for (size_t k = 0; k < poly.size(); k++) {
+			const Corner &a = poly[k], &b = poly[(k + 1) % poly.size()];
+			const double da = ((v ? a.v : a.u) - at) * (above ? 1 : -1), db = ((v ? b.v : b.u) - at) * (above ? 1 : -1);
+			if (da >= 0) out.push_back(a);
+			if ((da >= 0) != (db >= 0)) out.push_back(mix(a, b, da / (da - db)));
+		}
+		return out;
+	};
+	/* Within the picture a hair from its edges: a texel past them is none. */
+	static constexpr double EDGE = 1.0 / 1024;
+	auto inside = [](double t) { return static_cast<float>(EDGE + std::clamp(t, 0.0, 1.0) * (1 - 2 * EDGE)); };
+	static constexpr double EPS = 1e-6;
+	std::vector<float> pos, nrm, uv;
+	std::vector<uint32_t> tri;
+	std::vector<uint8_t> tri_tex, tri_glass;
+	std::vector<uint16_t> tri_group, tri_mark;
+	/* Each triangle's own marks for each piece of it. */
+	auto marked = [&](size_t t) {
+		const size_t k = t / 3;
+		if (k < mesh.tri_tex.size()) tri_tex.push_back(mesh.tri_tex[k]);
+		if (k < mesh.tri_group.size()) tri_group.push_back(mesh.tri_group[k]);
+		if (k < mesh.tri_mark.size()) tri_mark.push_back(mesh.tri_mark[k]);
+		if (k < mesh.tri_glass.size()) tri_glass.push_back(mesh.tri_glass[k]);
+	};
+	/* The corners of the triangles within it kept, once each. */
+	std::vector<uint32_t> kept(corners, UINT32_MAX);
+	auto keep = [&](uint32_t i) {
+		if (kept[i] == UINT32_MAX) {
+			kept[i] = static_cast<uint32_t>(pos.size() / 3);
+			pos.insert(pos.end(), &mesh.pos[i * 3], &mesh.pos[i * 3] + 3);
+			if (normals) nrm.insert(nrm.end(), &mesh.nrm[i * 3], &mesh.nrm[i * 3] + 3);
+			uv.insert(uv.end(), &mesh.uv[i * 2], &mesh.uv[i * 2] + 2);
+		}
+		return kept[i];
+	};
+	for (size_t t = 0; t + 2 < mesh.tri.size(); t += 3) {
+		if (std::max({mesh.tri[t], mesh.tri[t + 1], mesh.tri[t + 2]}) >= corners) continue;
+		if (!reaches_past(t)) {
+			tri.insert(tri.end(), {keep(mesh.tri[t]), keep(mesh.tri[t + 1]), keep(mesh.tri[t + 2])});
+			marked(t);
+			continue;
+		}
+		std::vector<Corner> poly(3);
+		double u0 = std::numeric_limits<double>::max(), u1 = -u0, v0 = u0, v1 = -u0;
+		for (int k = 0; k < 3; k++) {
+			const uint32_t i = mesh.tri[t + k];
+			for (int a = 0; a < 3; a++) {
+				poly[k].p[a] = mesh.pos[i * 3 + a];
+				poly[k].n[a] = normals ? mesh.nrm[i * 3 + a] : 0.0f;
+			}
+			poly[k].u = mesh.uv[i * 2];
+			poly[k].v = mesh.uv[i * 2 + 1];
+			u0 = std::min(u0, poly[k].u);
+			u1 = std::max(u1, poly[k].u);
+			v0 = std::min(v0, poly[k].v);
+			v1 = std::max(v1, poly[k].v);
+		}
+		const double i0 = std::floor(u0 + EPS), i1 = std::max(i0 + 1, std::ceil(u1 - EPS));
+		const double j0 = std::floor(v0 + EPS), j1 = std::max(j0 + 1, std::ceil(v1 - EPS));
+		for (double i = i0; i < i1; i++) {
+			const std::vector<Corner> strip = cut(cut(poly, false, i, true), false, i + 1, false);
+			if (strip.size() < 3) continue;
+			for (double j = j0; j < j1; j++) {
+				const std::vector<Corner> piece = cut(cut(strip, true, j, true), true, j + 1, false);
+				if (piece.size() < 3) continue;
+				const uint32_t first = static_cast<uint32_t>(pos.size() / 3);
+				for (const Corner &k : piece) {
+					pos.insert(pos.end(), k.p, k.p + 3);
+					if (normals) {
+						const float len = std::sqrt(k.n[0] * k.n[0] + k.n[1] * k.n[1] + k.n[2] * k.n[2]);
+						for (int m = 0; m < 3; m++) nrm.push_back(len > 0 ? k.n[m] / len : 0.0f);
+					}
+					uv.push_back(inside(k.u - i));
+					uv.push_back(inside(k.v - j));
+				}
+				/* (Cut by lines, it goes round as the triangle did: its outer side kept.) */
+				for (uint32_t k = 1; k + 1 < piece.size(); k++) {
+					tri.insert(tri.end(), {first, first + k, first + k + 1});
+					marked(t);
+				}
+			}
+		}
+	}
+	mesh.pos = std::move(pos);
+	mesh.nrm = std::move(nrm);
+	mesh.uv = std::move(uv);
+	mesh.tri = std::move(tri);
+	mesh.tri_tex = std::move(tri_tex);
+	mesh.tri_group = std::move(tri_group);
+	mesh.tri_mark = std::move(tri_mark);
+	mesh.tri_glass = std::move(tri_glass);
+}
+
 static void TakeGlbMesh(GlbMesh &mesh, ThreeDObject &obj)
 {
+	/* A building's texture is not repeated where it is drawn: what repeats it, cut. */
+	CutRepeatedTexture(mesh);
 	TakeMaterialPictures(mesh, obj);
 	obj.pos.reserve(mesh.pos.size());
 	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
@@ -5327,6 +5476,100 @@ static void MakeBusStops()
 }
 
 /**
+ * The layouts of the stones of the rocky land (the colleague's hra/3d/KAMENI-PRO-HRU.md, "druh" "kameni"): its
+ * "varianty", each a list of stones -- the add-on ("kamen"), its middle ("poloha", metres from the tile's north
+ * corner), its turn ("otoceni") and size ("meritko") --, and each stone's footprint from its add-on's record in the same
+ * index ("rozmer_m").
+ * @param e the record
+ * @param list its index
+ */
+static void ReadRockLayouts(const nlohmann::json &e, const nlohmann::json &list)
+{
+	if (!e.contains("varianty") || !e.at("varianty").is_array()) return;
+	auto number = [](const nlohmann::json &j, float fallback) { return j.is_number() ? j.get<float>() : fallback; };
+	auto extent_of = [&](const std::string &name) {
+		std::array<float, 4> extent{-0.5f, 0.5f, -0.5f, 0.5f};
+		for (const auto &s : list) {
+			if (!s.is_object() || s.value("jmeno", std::string()) != name || !s.contains("rozmer_m") || !s.at("rozmer_m").is_object()) continue;
+			const auto &size = s.at("rozmer_m");
+			for (int k = 0; k < 2; k++) {
+				const char *axis = k == 0 ? "x" : "y";
+				if (!size.contains(axis) || !size.at(axis).is_array() || size.at(axis).size() != 2) continue;
+				extent[k * 2] = number(size.at(axis).at(0), extent[k * 2]);
+				extent[k * 2 + 1] = number(size.at(axis).at(1), extent[k * 2 + 1]);
+			}
+		}
+		return extent;
+	};
+	_three_d_rock_layouts.clear();
+	for (const auto &layout : e.at("varianty")) {
+		if (!layout.is_array()) continue;
+		std::vector<ThreeDRockStone> stones;
+		for (const auto &s : layout) {
+			if (!s.is_object() || !s.contains("kamen") || !s.at("kamen").is_string() || !s.contains("poloha") || !s.at("poloha").is_array() || s.at("poloha").size() < 2) continue;
+			ThreeDRockStone &stone = stones.emplace_back();
+			stone.name = s.at("kamen").get<std::string>();
+			stone.x = number(s.at("poloha").at(0), 0.0f);
+			stone.y = number(s.at("poloha").at(1), 0.0f);
+			stone.turn = s.contains("otoceni") ? number(s.at("otoceni"), 0.0f) : 0.0f;
+			stone.scale = std::clamp(s.contains("meritko") ? number(s.at("meritko"), 1.0f) : 1.0f, 0.1f, 5.0f);
+			stone.extent = extent_of(stone.name);
+		}
+		if (!stones.empty()) _three_d_rock_layouts.push_back(std::move(stones));
+	}
+}
+
+/**
+ * The tiles of the rocky land (the player: "groups of stones lying about the map ... more variants we get by laying the
+ * pieces otherwise"): for each layout of the stones (ReadRockLayouts()) and each slope of a tile an object of the stones
+ * alone (no file of its own: Read() lays the add-ons into it), drawn as the buildings are. Each stone level, not tipped
+ * with the slope, as low as the land is lowest under it -- its 0.12 m dug in kept it from hanging over a slope on its
+ * lower side (3.3 m long on a slope rising 3 m a tile, a third of a metre) --, sunk into the land on its upper side.
+ */
+static void MakeRockTiles()
+{
+	_three_d_rock_tiles.clear();
+	if (_three_d_rock_layouts.empty()) return;
+	std::vector<Slope> slopes;
+	for (uint8_t s = SLOPE_FLAT; s < SLOPE_ELEVATED; s++) slopes.push_back(static_cast<Slope>(s));
+	slopes.insert(slopes.end(), {SLOPE_STEEP_W, SLOPE_STEEP_S, SLOPE_STEEP_E, SLOPE_STEEP_N});
+	const double side = TILE_SIZE / OBJECT_UNITS_PER_METRE;
+	for (size_t layout = 0; layout < _three_d_rock_layouts.size(); layout++) {
+		for (const Slope slope : slopes) {
+			/* The land's height over the tile's lowest corner at a point, metres. */
+			auto land = [&](double x, double y) {
+				return GetPartialZF(std::clamp(x, 0.0, side) * OBJECT_UNITS_PER_METRE, std::clamp(y, 0.0, side) * OBJECT_UNITS_PER_METRE, slope) / OBJECT_HEIGHT_PER_METRE;
+			};
+			ThreeDObject rocks;
+			rocks.name = fmt::format("skalnata_zem {} svah{}", layout, to_underlying(slope));
+			rocks.variants = 0;
+			for (const ThreeDRockStone &stone : _three_d_rock_layouts[layout]) {
+				if (!_three_d_addons.contains(stone.name)) continue;
+				/* The lowest of the land under it: its middle and the edge of the round inside its footprint. */
+				const double turn = stone.turn * M_PI / 180.0, c = std::cos(turn), s = std::sin(turn);
+				const double mx = (stone.extent[0] + stone.extent[1]) / 2, my = (stone.extent[2] + stone.extent[3]) / 2;
+				const double rx = (stone.extent[1] - stone.extent[0]) / 2, ry = (stone.extent[3] - stone.extent[2]) / 2;
+				double low = land(stone.x, stone.y);
+				for (int k = 0; k < 16; k++) {
+					const double px = (mx + rx * std::cos(k * M_PI / 8)) * stone.scale, py = (my + ry * std::sin(k * M_PI / 8)) * stone.scale;
+					low = std::min(low, land(stone.x + px * c - py * s, stone.y + px * s + py * c));
+				}
+				ThreeDObjectFigure &place = rocks.addon_places.emplace_back();
+				place.figure = stone.name;
+				place.at[0] = stone.x;
+				place.at[1] = stone.y;
+				place.at[2] = static_cast<float>(low);
+				place.facing = stone.turn;
+				place.scale = stone.scale;
+			}
+			if (rocks.addon_places.empty()) continue;
+			_three_d_rock_tiles.emplace(std::make_pair(layout, slope), _three_d_objects.size());
+			_three_d_objects.push_back(std::move(rocks));
+		}
+	}
+}
+
+/**
  * The thread reading the indices from the start of the game (StartReadingThreeDObjects()), joined by the first that
  * needs them before they are read (ReadThreeDObjects()), at the latest when the game ends -- before the lists it fills
  * go (made after them, so let go of before them).
@@ -5428,6 +5671,10 @@ static void ReadThreeDObjectsNow()
 				}
 				if (kind == "most") {
 					ReadBridge(e, folder);
+					continue;
+				}
+				if (kind == "kameni") {
+					ReadRockLayouts(e, list);
 					continue;
 				}
 				if (kind == "les" || kind == "plantaz") {
@@ -5537,6 +5784,7 @@ static void ReadThreeDObjectsNow()
 	}
 	MakeStreetLamps();
 	MakeBusStops();
+	MakeRockTiles();
 	for (size_t i = 0; i < _three_d_objects.size(); i++) {
 		const ThreeDObject &o = _three_d_objects[i];
 		if (o.industry != 0xFF && (o.variant_paint[0] >= 0 || o.variant_paint[1] >= 0)) {
@@ -11596,6 +11844,38 @@ std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope sl
 		it->second.push_back(std::move(f));
 	}
 	return it->second;
+}
+
+const ThreeDObject *GetThreeDRocks(TileIndex tile)
+{
+	if (!_three_d_objects_read || _three_d_rock_layouts.empty() || !IsValidTile(tile)) return nullptr;
+	if (!IsTileType(tile, TileType::Clear) || !IsClearGround(tile, ClearGround::Rocks)) return nullptr;
+	/* A walker's tent pitched there: on the rocks as the game paints them, no stone through its cloth. */
+	if (WalkerTentAt(tile) != nullptr) return nullptr;
+	/* The layout by the tile as the game picks its second set of rocky sprites (DrawTile_Clear()): a tile has one always. */
+	const size_t layout = TileHash(TileX(tile) * TILE_SIZE, TileY(tile) * TILE_SIZE) % _three_d_rock_layouts.size();
+	const auto it = _three_d_rock_tiles.find({layout, GetTileSlope(tile)});
+	return it == _three_d_rock_tiles.end() ? nullptr : &_three_d_objects[it->second];
+}
+
+std::optional<double> ThreeDRocksTopAt(TileIndex tile, double x, double y)
+{
+	const ThreeDObject *rocks = GetThreeDRocks(tile);
+	if (rocks == nullptr || !rocks->TryRead() || rocks->pos.empty()) return std::nullopt;
+	if (x < rocks->extent[0] || x > rocks->extent[1] || y < rocks->extent[2] || y > rocks->extent[3]) return std::nullopt;
+	std::optional<double> top;
+	for (size_t t = 0; t + 2 < rocks->tri.size(); t += 3) {
+		const float *a = &rocks->pos[rocks->tri[t] * 3], *b = &rocks->pos[rocks->tri[t + 1] * 3], *c = &rocks->pos[rocks->tri[t + 2] * 3];
+		const double d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+		if (std::abs(d) < 1e-9) continue;
+		const double l1 = ((b[1] - c[1]) * (x - c[0]) + (c[0] - b[0]) * (y - c[1])) / d;
+		const double l2 = ((c[1] - a[1]) * (x - c[0]) + (a[0] - c[0]) * (y - c[1])) / d;
+		const double l3 = 1 - l1 - l2;
+		if (l1 < 0 || l2 < 0 || l3 < 0) continue;
+		const double z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+		if (!top.has_value() || z > *top) top = z;
+	}
+	return top;
 }
 
 /**

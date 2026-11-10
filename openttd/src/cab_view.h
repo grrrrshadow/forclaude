@@ -252,6 +252,7 @@ bool EyeOnRiverBank(double x, double y);
 double EyeWaterDepth(double x, double y);
 std::optional<double> EyeWaterBedZ(double x, double y);
 double FirstPersonStandZ(double x, double y, double from);
+bool FirstPersonRocksBlock(double x, double y, double stand);
 std::optional<double> FirstPersonTunnelFloor(double x, double y, double z);
 double FirstPersonFeetZ(const FirstPersonEye &walker);
 void ShowFirstPersonWindow();

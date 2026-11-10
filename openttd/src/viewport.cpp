@@ -14672,6 +14672,24 @@ bool ViewportDrawing3D()
 	return _drawing_turned || _north_house_objects_now || _cab_collecting;
 }
 
+/**
+ * The stones of the rocky land (GetThreeDRocks(), the colleague's objekty/kameni) on a tile its draw procedure draws
+ * now, in the 3D views: on the map, turned or facing north with the houses as objects, the object of its layout stands
+ * on the tile once it can be drawn (till then the rocks painted in the land's sprite, ObjectReadyOrOwed()); from the
+ * eyes each stone stands on the land under it by itself (CollectEyeFrame()).
+ * @return whether they stand there: the land drawn under them without the rocks painted in
+ */
+bool ThreeDRocksStandOn(const TileInfo *ti)
+{
+	if (!ViewportDrawing3D() || ti->tile == INVALID_TILE || !ObjectsIndexReadOrOwed()) return false;
+	const ThreeDObject *rocks = GetThreeDRocks(ti->tile);
+	if (rocks == nullptr) return false;
+	if (_cab_collecting) return true;
+	if (!ObjectReadyOrOwed(rocks, ti->tile, ti->tile)) return false;
+	_turned_objects.emplace_back(rocks, ti->tile, ti->z);
+	return true;
+}
+
 /** A figure standing in the view from the eyes (the clay town's mushrooms, DrawThemedTrees()): a billboard of its picture. */
 struct CabFigure {
 	std::string name; ///< the figure of the indices
@@ -16151,6 +16169,11 @@ double FirstPersonStandZ(double x, double y, double from)
 		const double deck = GetBridgePixelHeight(GetSouthernBridgeEnd(tile));
 		if (deck <= up_to && deck > best) best = deck;
 	}
+	/* Up on a stone of the rocky land (GetThreeDRocks()) a step at a time, up its side where it is low enough. */
+	if (const std::optional<double> top = ThreeDRocksTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE); top.has_value()) {
+		const double on = GetTilePixelZ(tile) + *top;
+		if (on <= up_to && on > best) best = on;
+	}
 	/* Up on our track's embankment, on its sleepers (ThreeDTrackStandOver(), by the settings from the eyes). A height
 	 * within a unit of the ground is stretched with it from the eyes (EyeBaseZ()), its metres a level's 5 m: so much
 	 * less here. */
@@ -16160,6 +16183,22 @@ double FirstPersonStandZ(double x, double y, double from)
 		if (on > 0) best = std::max(best, CabWalkedGround(x, y) + on * OBJECT_HEIGHT_PER_METRE / EYE_LEVEL_STRETCH);
 	}
 	return best;
+}
+
+/**
+ * Whether a stone of the rocky land (GetThreeDRocks()) is in the walker's way at a world point: higher there than a
+ * step over where it stands -- a big one walked round, a low one or a flat one climbed (FirstPersonStandZ()).
+ * @param stand the height it stands at, units of height; not finite: on the ground
+ */
+bool FirstPersonRocksBlock(double x, double y, double stand)
+{
+	const int ix = std::clamp(static_cast<int>(x), 0, static_cast<int>(Map::SizeX() * TILE_SIZE) - 1);
+	const int iy = std::clamp(static_cast<int>(y), 0, static_cast<int>(Map::SizeY() * TILE_SIZE) - 1);
+	const TileIndex tile = TileVirtXY(ix, iy);
+	const std::optional<double> top = ThreeDRocksTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE);
+	if (!top.has_value()) return false;
+	const double from = std::isfinite(stand) ? stand : CabWalkedGround(x, y);
+	return GetTilePixelZ(tile) + *top > from + CAB_STEP_UP_M * OBJECT_HEIGHT_PER_METRE;
 }
 
 /**
@@ -18232,6 +18271,15 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Our grass about the walker (AddOurGrass()): a tile with a point that near. */
 		if ((tile_type == TileType::Clear || tile_type == TileType::Trees || tile_type == TileType::Water || tile_type == TileType::Railway || tile_type == TileType::Road) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_GRASS_FAR_M * OBJECT_UNITS_PER_METRE + TILE_SIZE * 0.7072) {
 			AddOurGrass(_cur_ti.tile, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh, eye.x, eye.y);
+		}
+		if (const ThreeDObject *rocks = tile_type == TileType::Clear ? GetThreeDRocks(_cur_ti.tile) : nullptr; rocks != nullptr) {
+			/* The stones of the rocky land (ThreeDRocksStandOn()): each a thing of its own on the land, as low as the land
+			 * under it is lowest, lifted with it -- the land from the eyes steeper than the map's its object is laid on. */
+			for (const ThreeDObjectFigure &f : rocks->addon_places) {
+				const double z = _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE;
+				AddCabFigure(f.figure, f.scale, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, z, f.facing, 0);
+				_cab_figures.back().base = z;
+			}
 		}
 		if (tile_type == TileType::Clear && IsPasture(_cur_ti.tile) && std::hypot(_cur_ti.x + TILE_SIZE / 2.0 - eye.x, _cur_ti.y + TILE_SIZE / 2.0 - eye.y) < CAB_WHEAT_TILES * TILE_SIZE) {
 			/* A pasture (AddPastureTile()): its fences, its shelter or trough, its animals grazing, on the game's grass. */

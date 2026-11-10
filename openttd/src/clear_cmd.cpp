@@ -307,7 +307,8 @@ static void DrawTile_Clear(TileInfo *ti)
 	if (IsSnowTile(ti->tile)) {
 		uint8_t density = GetClearDensity(ti->tile);
 		DrawGroundSprite(_clear_land_sprites_snow_desert[density] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
-		if (GetClearGround(ti->tile) == ClearGround::Rocks) {
+		/* In the 3D views the stones stand on the snow (ThreeDRocksStandOn()), none painted on it. */
+		if (GetClearGround(ti->tile) == ClearGround::Rocks && !ThreeDRocksStandOn(ti)) {
 			/* There 4 levels of snowy overlay rocks, each with 19 sprites. */
 			++density;
 			DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + (density * 19) + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
@@ -330,6 +331,16 @@ static void DrawTile_Clear(TileInfo *ti)
 			break;
 
 		case ClearGround::Rocks:
+			/* In the 3D views the stones stand on the land (ThreeDRocksStandOn(), the colleague's objekty/kameni): grass under
+			 * them, the sand of the desert, none of the rocks painted in. */
+			if (ThreeDRocksStandOn(ti)) {
+				if (GetTropicZone(ti->tile) == TropicZone::Desert) {
+					DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
+				} else {
+					DrawClearLandTile(ti, 3);
+				}
+				break;
+			}
 			if (GetTropicZone(ti->tile) == TropicZone::Desert) {
 				DrawGroundSprite(_clear_land_sprites_snow_desert[GetClearDensity(ti->tile)] + SlopeToSpriteOffset(ti->tileh), PAL_NONE);
 				DrawGroundSprite(SPR_OVERLAY_ROCKS_BASE + SlopeToSpriteOffset(ti->tileh), PAL_NONE);

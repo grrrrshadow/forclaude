@@ -538,6 +538,9 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 		}
 		case TileType::Station:
 			return HasStationRail(tile) || IsAnyRoadStop(tile);
+		case TileType::Clear:
+			/* The stones of the rocky land: round a big one, up a low one (FirstPersonRocksBlock()). */
+			return !FirstPersonRocksBlock(x, y, stand);
 		default:
 			return true;
 	}
