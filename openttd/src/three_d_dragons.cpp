@@ -91,6 +91,7 @@ struct Dragon {
 	size_t way_at = 0;     ///< the point of it it walks to
 	double way_tx = 0, way_ty = 0; ///< where the way goes
 	uint64_t way_made = 0; ///< when it was found
+	uint64_t way_checked = 0; ///< when it was last checked still good (NavWayStillGood())
 };
 
 std::vector<Dragon> _dragons;
@@ -205,12 +206,13 @@ bool StepTo(Dragon &d, double tx, double ty, double speed_m)
  */
 bool WalkTo(Dragon &d, double tx, double ty, double speed_m, uint64_t now)
 {
-	/* Found again when the goal has moved a tile, or when the way is no longer good to go on along (the land changed):
-	 * not every few seconds anyway (NavWayStillGood(), the player: "not four way finders eating the power"). */
-	bool find = d.way.empty() || std::hypot(tx - d.way_tx, ty - d.way_ty) > TILE_SIZE;
-	if (!find && now - d.way_made > 74) {
+	/* Found again when the goal has moved a tile, when the way is no longer good to go on along (the land changed;
+	 * checked every 74 ticks, NavWayStillGood()), and anyway every NAV_WAY_RENEW_TICKS (the player, 10. 11.: "a
+	 * preventive reset now and then is needed; it was every 3 seconds, it may well be every 30"). */
+	bool find = d.way.empty() || std::hypot(tx - d.way_tx, ty - d.way_ty) > TILE_SIZE || now - d.way_made > NAV_WAY_RENEW_TICKS;
+	if (!find && now - d.way_checked > 74) {
 		if (NavWayStillGood(d.x, d.y, d.way, d.way_at)) {
-			d.way_made = now;
+			d.way_checked = now;
 		} else {
 			find = true;
 		}
@@ -221,6 +223,7 @@ bool WalkTo(Dragon &d, double tx, double ty, double speed_m, uint64_t now)
 		d.way_tx = tx;
 		d.way_ty = ty;
 		d.way_made = now;
+		d.way_checked = now;
 		if (d.way.empty()) return true;
 	}
 	if (d.way_at >= d.way.size()) return true;

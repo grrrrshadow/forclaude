@@ -178,7 +178,8 @@ struct Beast {
 	std::vector<NavPoint> way;      ///< its way round what stands between (NavFindWay())
 	size_t way_at = 0;
 	double way_tx = 0, way_ty = 0;
-	uint64_t way_made = 0;
+	uint64_t way_made = 0;    ///< when it was found
+	uint64_t way_checked = 0; ///< when it was last checked still good (NavWayStillGood())
 	std::string next_pose; ///< the pose it goes into when the one it is in (sitting down, getting up) is done
 	TileIndex rail_tile = INVALID_TILE;       ///< riding the rails (Place::Rail): the tile it rides through ...
 	Trackdir rail_td = Trackdir::Invalid;     ///< ... along this track of it, to its far edge
@@ -422,12 +423,13 @@ bool StepTo(Beast &b, double tx, double ty, double speed_m)
 bool WalkTo(Beast &b, double tx, double ty, double speed_m, uint64_t now, bool flies)
 {
 	if (flies) return StepTo(b, tx, ty, speed_m);
-	/* Found again when the goal has moved a tile, or when the way is no longer good to go on along (the land changed):
-	 * not every few seconds anyway (NavWayStillGood(), the player: "not four way finders eating the power"). */
-	bool find = b.way.empty() || std::hypot(tx - b.way_tx, ty - b.way_ty) > TILE_SIZE;
-	if (!find && now - b.way_made > 74) {
+	/* Found again when the goal has moved a tile, when the way is no longer good to go on along (the land changed;
+	 * checked every 74 ticks, NavWayStillGood()), and anyway every NAV_WAY_RENEW_TICKS (the player, 10. 11.: "a
+	 * preventive reset now and then is needed; it was every 3 seconds, it may well be every 30"). */
+	bool find = b.way.empty() || std::hypot(tx - b.way_tx, ty - b.way_ty) > TILE_SIZE || now - b.way_made > NAV_WAY_RENEW_TICKS;
+	if (!find && now - b.way_checked > 74) {
 		if (NavWayStillGood(b.x, b.y, b.way, b.way_at)) {
-			b.way_made = now;
+			b.way_checked = now;
 		} else {
 			find = true;
 		}
@@ -438,6 +440,7 @@ bool WalkTo(Beast &b, double tx, double ty, double speed_m, uint64_t now, bool f
 		b.way_tx = tx;
 		b.way_ty = ty;
 		b.way_made = now;
+		b.way_checked = now;
 		if (b.way.empty()) return true;
 	}
 	if (b.way_at >= b.way.size()) return true;

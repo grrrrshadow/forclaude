@@ -22,6 +22,7 @@
 
 #include "tile_type.h"
 
+#include <cstdint>
 #include <functional>
 #include <span>
 #include <utility>
@@ -32,6 +33,8 @@ using NavPoint = std::pair<double, double>;
 
 /** The cost of a road's tile to walk over (NavTileCost()): the cheapest, so one keeps to the roads and their pavements. */
 static constexpr double NAV_ROAD_COST = 0.6;
+/** A way found again anyway after so many ticks, about 30 seconds (the player: "a preventive reset now and then"). */
+static constexpr uint64_t NAV_WAY_RENEW_TICKS = 1000;
 /** How far a way keeps off what is not walkable, metres (the agent's radius of Godot's way finding: NavStraight()). */
 static constexpr double NAV_MARGIN_M = 0.6;
 
