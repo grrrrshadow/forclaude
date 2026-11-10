@@ -3549,6 +3549,7 @@ STR_WATERWAYS_TOOLBAR_BUILD_DEPOT_TOOLTIP                       :{BLACK}Postavit
 STR_WATERWAYS_TOOLBAR_BUILD_DOCK_TOOLTIP                        :{BLACK}Postavit přístavní molo. Pomocí Ctrl ho připojíš k jinému. Podrž Shift pro zobrazení odhadu ceny
 STR_WATERWAYS_TOOLBAR_BUOY_TOOLTIP                              :{BLACK}Umístit bójku použitelnou pro navádění. Podrž Shift pro zobrazení odhadu ceny
 STR_WATERWAYS_TOOLBAR_BUILD_AQUEDUCT_TOOLTIP                    :{BLACK}Postavit akvadukt. Podrž Shift pro zobrazení odhadu ceny
+STR_WATERWAYS_TOOLBAR_BUILD_TUNNEL_TOOLTIP                      :{BLACK}Postavit tunel pro lodě, projedou lodě nejvýš 4 m nad vodou. Podrž Shift pro zobrazení odhadu ceny
 STR_WATERWAYS_TOOLBAR_CREATE_LAKE_TOOLTIP                       :{BLACK}Vytvořit kanál. Při stisknutí Ctrl+Klik na úroveň moře dojde k zaplavení mořskou vodou.
 STR_WATERWAYS_TOOLBAR_CREATE_RIVER_TOOLTIP                      :{BLACK}Vytvořit řeky. Ctrl vybere oblast diagonálně
 
@@ -3876,6 +3877,7 @@ STR_LAI_WATER_DESCRIPTION_SHIP_DEPOT                            :Lodní depo
 
 STR_LAI_TUNNEL_DESCRIPTION_RAILROAD                             :Železniční tunel
 STR_LAI_TUNNEL_DESCRIPTION_ROAD                                 :Silniční tunel
+STR_LAI_TUNNEL_DESCRIPTION_WATER                                :Tunel pro lodě
 
 STR_LAI_BRIDGE_DESCRIPTION_RAIL_SUSPENSION_STEEL                :Ocelový zavěšený železniční most
 STR_LAI_BRIDGE_DESCRIPTION_RAIL_GIRDER_STEEL                    :Ocelový trámový železniční most

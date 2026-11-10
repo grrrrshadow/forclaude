@@ -11503,6 +11503,38 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string RigThreeDDepotMap(TileIndex tile, double feet_m);
 		const std::string m = RigThreeDDepotMap(TileXY(*x, *y), (argv.size() > 4 ? number(4).value_or(0) : 0) / 100.0);
 		for (const auto line : std::views::split(std::string_view(m), std::string_view("\n"))) IConsolePrint(CC_DEFAULT, "test3d: depomapa {}", std::string_view(line.begin(), line.end()));
+	} else if (what == "lodnitunel" && argv.size() > 3) {
+		/* 'lodnitunel <x> <y>': a hill a level high, a ship tunnel through it from (x + 3, y), a canal before it from
+		 * (x - 2) and after it from (x + 9) to (x + 12) (CmdBuildTunnel() for TransportType::Water); a road tunnel beside
+		 * it at (x + 3, y + 2). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		auto said = [](std::string_view what, const CommandCost &r) { IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: lodnitunel {}: {}", what, r.Succeeded() ? std::string("postaveno") : RefusalReason(r)); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(13, 3), at(-3, -3), false, LevelMode::Level);
+		said("kopec", std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(8, 3), at(4, -3), false, LevelMode::Raise)));
+		said("tunel", Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, at(3, 0), TransportType::Water, INVALID_RAILTYPE, INVALID_ROADTYPE));
+		said("pruplav pred", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(2, 0), at(-2, 0), WaterClass::Canal, false));
+		said("pruplav za", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(12, 0), at(9, 0), WaterClass::Canal, false));
+		/* For comparison a road tunnel through the same hill two tiles beside it. */
+		said("silnicni tunel", Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, at(3, 2), TransportType::Road, INVALID_RAILTYPE, ROADTYPE_ROAD));
+		if (const TileIndex t = at(3, 0); IsTileType(t, TileType::TunnelBridge) && IsTunnel(t)) {
+			const TileIndex end = GetOtherTunnelEnd(t);
+			IConsolePrint(CC_DEFAULT, "test3d: lodnitunel {},{} az {},{}: doprava {}, smer {}", *x + 3, *y, TileX(end), TileY(end), to_underlying(GetTunnelBridgeTransportType(t)), to_underlying(GetTunnelBridgeDirection(t)));
+		}
+		/* 'lodnitunel <x> <y> zbourat': and the ship tunnel demolished again (DoClearTunnel()). */
+		if (argv.size() > 4 && argv[4] == "zbourat") {
+			const Money water = Company::Get(_local_company)->infrastructure.water;
+			said("zbourani", Command<Commands::LandscapeClear>::Do(DoCommandFlag::Execute, at(3, 0)));
+			IConsolePrint(CC_DEFAULT, "test3d: lodnitunel po zbourani {}, vodnich kusu {} -> {}", IsTileType(at(3, 0), TileType::TunnelBridge) ? "tunel stoji" : "tunel neni", water, Company::Get(_local_company)->infrastructure.water);
+		}
 	} else if (what == "majaky" && argv.size() > 3) {
 		/* 'majaky <x> <y>': lighthouses of the game's own at (x, y) and (x + 3, y) on level land, each tile then its
 		 * object (GetThreeDLighthouse(): one of the colleague's by the tile). */

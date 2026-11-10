@@ -37,6 +37,7 @@
 #include "newgrf_roadtype.h"
 #include "object_base.h"
 #include "water.h"
+#include "pathfinder/water_regions.h"
 #include "company_gui.h"
 #include "tunnelbridge_cmd.h"
 #include "landscape_cmd.h"
@@ -657,6 +658,9 @@ CommandCost CmdBuildTunnel(DoCommandFlags flags, TileIndex start_tile, Transport
 			if (!ValParamRoadType(roadtype)) return CMD_ERROR;
 			break;
 
+		case TransportType::Water: // a canal through the hill, for the boats low enough (ShipFitsTunnel())
+			break;
+
 		default: return CMD_ERROR;
 	}
 
@@ -778,10 +782,11 @@ CommandCost CmdBuildTunnel(DoCommandFlags flags, TileIndex start_tile, Transport
 	}
 	cost.AddCost(_price[Price::BuildTunnel]);
 
-	/* Pay for the rail/road in the tunnel including entrances */
+	/* Pay for the rail/road/canal in the tunnel including entrances */
 	switch (transport_type) {
 		case TransportType::Road: cost.AddCost((tiles + 2) * RoadBuildCost(roadtype) * 2); break;
 		case TransportType::Rail: cost.AddCost((tiles + 2) * RailBuildCost(railtype)); break;
+		case TransportType::Water: cost.AddCost((tiles + 2) * _price[Price::BuildCanal]); break;
 		default: NOT_REACHED();
 	}
 
@@ -794,6 +799,14 @@ CommandCost CmdBuildTunnel(DoCommandFlags flags, TileIndex start_tile, Transport
 			MakeRailTunnel(end_tile,   company, ReverseDiagDir(direction), railtype);
 			AddSideToSignalBuffer(start_tile, DiagDirection::Invalid, company);
 			YapfNotifyTrackLayoutChange(start_tile, DiagDirToDiagTrack(direction));
+		} else if (transport_type == TransportType::Water) {
+			if (c != nullptr) c->infrastructure.water += num_pieces;
+			MakeWaterTunnel(start_tile, company, direction);
+			MakeWaterTunnel(end_tile,   company, ReverseDiagDir(direction));
+			CheckForDockingTile(start_tile);
+			CheckForDockingTile(end_tile);
+			InvalidateWaterRegion(start_tile);
+			InvalidateWaterRegion(end_tile);
 		} else {
 			if (c != nullptr) c->infrastructure.road[roadtype] += num_pieces * 2; // A full diagonal road has two road bits.
 			RoadType road_rt = RoadTypeIsRoad(roadtype) ? roadtype : INVALID_ROADTYPE;
@@ -921,6 +934,16 @@ static CommandCost DoClearTunnel(TileIndex tile, DoCommandFlags flags)
 			YapfNotifyTrackLayoutChange(endtile, track);
 
 			if (v != nullptr) TryPathReserve(v);
+		} else if (GetTunnelBridgeTransportType(tile) == TransportType::Water) {
+			Owner owner = GetTileOwner(tile);
+			if (Company::IsValidID(owner)) {
+				Company::Get(owner)->infrastructure.water -= len * TUNNELBRIDGE_TRACKBIT_FACTOR;
+				DirtyCompanyInfrastructureWindows(owner);
+			}
+			DoClearSquare(tile);
+			DoClearSquare(endtile);
+			InvalidateWaterRegion(tile);
+			InvalidateWaterRegion(endtile);
 		} else {
 			/* A full diagonal road tile has two road bits. */
 			UpdateCompanyRoadInfrastructure(GetRoadTypeRoad(tile), GetRoadOwner(tile, RoadTramType::Road), -(int)(len * 2 * TUNNELBRIDGE_TRACKBIT_FACTOR));
@@ -1348,6 +1371,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 				if (railtype_overlay != 0) image = SPR_RAILTYPE_TUNNEL_BASE; // Draw blank grass tunnel base.
 			}
 		} else {
+			/* A road's portal; a ship tunnel's too, the canal's water in it below. */
 			image = SPR_TUNNEL_ENTRY_REAR_ROAD;
 		}
 
@@ -1362,7 +1386,10 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 			DrawGroundSprite(image, PAL_NONE);
 		}
 
-		if (transport_type == TransportType::Road) {
+		if (transport_type == TransportType::Water) {
+			/* The canal's water in its mouth, flat at the foot of the slope (where the boats float, GetSlopePixelZ()). */
+			DrawGroundSpriteAt(SPR_FLAT_WATER_TILE, PAL_NONE, 0, 0, 0);
+		} else if (transport_type == TransportType::Road) {
 			RoadType road_rt = GetRoadTypeRoad(ti->tile);
 			RoadType tram_rt = GetRoadTypeTram(ti->tile);
 			const RoadTypeInfo *road_rti = road_rt == INVALID_ROADTYPE ? nullptr : GetRoadTypeInfo(road_rt);
@@ -1414,7 +1441,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 				StartSpriteCombine();
 				AddSortableSpriteToDraw(catenary_sprite_base + to_underlying(tunnelbridge_direction), PAL_NONE, *ti, catenary_bounds[tunnelbridge_direction], IsTransparencySet(TransparencyOption::Catenary));
 			}
-		} else {
+		} else if (transport_type == TransportType::Rail) {
 			const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
 			if (rti->UsesOverlay() && !three_d) {
 				SpriteID surface = GetCustomRailSprite(rti, ti->tile, RailSpriteType::Tunnel);
@@ -1801,7 +1828,7 @@ static void GetTileDesc_TunnelBridge(TileIndex tile, TileDesc &td)
 	TransportType tt = GetTunnelBridgeTransportType(tile);
 
 	if (IsTunnel(tile)) {
-		td.str = (tt == TransportType::Rail) ? STR_LAI_TUNNEL_DESCRIPTION_RAILROAD : STR_LAI_TUNNEL_DESCRIPTION_ROAD;
+		td.str = (tt == TransportType::Rail) ? STR_LAI_TUNNEL_DESCRIPTION_RAILROAD : (tt == TransportType::Water) ? STR_LAI_TUNNEL_DESCRIPTION_WATER : STR_LAI_TUNNEL_DESCRIPTION_ROAD;
 	} else { // IsBridge(tile)
 		td.str = (tt == TransportType::Water) ? STR_LAI_BRIDGE_DESCRIPTION_AQUEDUCT : GetBridgeSpec(GetBridgeType(tile))->transport_name[to_underlying(tt)];
 	}

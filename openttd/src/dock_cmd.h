@@ -14,5 +14,6 @@
 
 CommandCallback CcBuildDocks;
 CommandCallback CcPlaySound_CONSTRUCTION_WATER;
+CommandCallback CcBuildWaterTunnel;
 
 #endif /* DOCK_CMD_H */

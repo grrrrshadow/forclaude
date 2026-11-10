@@ -85,4 +85,24 @@ inline void MakeRailTunnel(Tile t, Owner o, DiagDirection d, RailType r)
 	SetRailType(t, r);
 }
 
+/**
+ * Makes a ship tunnel entrance (the player, 10. 11.: "a tunnel for the ship"): a canal through the hill, of the
+ * company as an aqueduct is (TunnelBridge tiles are canals to the ships, GetEffectiveWaterClass()).
+ * @param t the entrance of the tunnel
+ * @param o the owner of the entrance
+ * @param d the direction facing out of the tunnel
+ */
+inline void MakeWaterTunnel(Tile t, Owner o, DiagDirection d)
+{
+	SetTileType(t, TileType::TunnelBridge);
+	SetTileOwner(t, o);
+	t.m2() = 0;
+	t.m3() = 0;
+	t.m4() = 0;
+	t.m5() = to_underlying(TransportType::Water) << 2 | to_underlying(d);
+	SB(t.m6(), 2, 6, 0);
+	t.m7() = 0;
+	t.m8() = 0;
+}
+
 #endif /* TUNNEL_MAP_H */

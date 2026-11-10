@@ -3441,6 +3441,7 @@ STR_WATERWAYS_TOOLBAR_BUILD_DEPOT_TOOLTIP                       :{BLACK}Build sh
 STR_WATERWAYS_TOOLBAR_BUILD_DOCK_TOOLTIP                        :{BLACK}Build ship dock. Ctrl+Click to select another station to join. Also press Shift to show cost estimate only
 STR_WATERWAYS_TOOLBAR_BUOY_TOOLTIP                              :{BLACK}Place a buoy which can be used as a waypoint. Also press Shift to show cost estimate only
 STR_WATERWAYS_TOOLBAR_BUILD_AQUEDUCT_TOOLTIP                    :{BLACK}Build aqueduct. Also press Shift to show cost estimate only
+STR_WATERWAYS_TOOLBAR_BUILD_TUNNEL_TOOLTIP                      :{BLACK}Build ship tunnel, for boats no more than 4 m above the water. Also press Shift to show cost estimate only
 STR_WATERWAYS_TOOLBAR_CREATE_LAKE_TOOLTIP                       :{BLACK}Build canal. Ctrl+Click at sea level to flood with sea water instead
 STR_WATERWAYS_TOOLBAR_CREATE_RIVER_TOOLTIP                      :{BLACK}Place rivers. Ctrl+Click to select diagonally
 
@@ -3762,6 +3763,7 @@ STR_LAI_WATER_DESCRIPTION_SHIP_DEPOT                            :Ship depot
 
 STR_LAI_TUNNEL_DESCRIPTION_RAILROAD                             :Railway tunnel
 STR_LAI_TUNNEL_DESCRIPTION_ROAD                                 :Road tunnel
+STR_LAI_TUNNEL_DESCRIPTION_WATER                                :Ship tunnel
 
 STR_LAI_BRIDGE_DESCRIPTION_RAIL_SUSPENSION_STEEL                :Steel suspension rail bridge
 STR_LAI_BRIDGE_DESCRIPTION_RAIL_GIRDER_STEEL                    :Steel girder rail bridge

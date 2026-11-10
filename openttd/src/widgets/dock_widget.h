@@ -36,6 +36,7 @@ enum DockToolbarWidgets : WidgetID {
 	WID_DT_BUOY,           ///< Build buoy button.
 	WID_DT_RIVER,          ///< Build river button (in scenario editor).
 	WID_DT_BUILD_AQUEDUCT, ///< Build aqueduct button.
+	WID_DT_BUILD_TUNNEL,   ///< Build ship tunnel button.
 };
 
 #endif /* WIDGETS_DOCK_WIDGET_H */

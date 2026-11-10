@@ -27,6 +27,7 @@
 #include "gui.h"
 #include "zoom_func.h"
 #include "tunnelbridge_cmd.h"
+#include "tunnelbridge.h"
 #include "dock_cmd.h"
 #include "station_cmd.h"
 #include "water_cmd.h"
@@ -59,6 +60,17 @@ void CcBuildDocks(Commands, const CommandCost &result, TileIndex tile)
 void CcPlaySound_CONSTRUCTION_WATER(Commands, const CommandCost &result, TileIndex tile)
 {
 	if (result.Succeeded() && _settings_client.sound.confirm) SndPlayTileFx(SND_02_CONSTRUCTION_WATER, tile);
+}
+
+/** A ship tunnel built (the player, 10. 11.): as a road's, its other end red where it could not be. */
+void CcBuildWaterTunnel(Commands, const CommandCost &result, TileIndex start_tile)
+{
+	if (result.Succeeded()) {
+		if (_settings_client.sound.confirm) SndPlayTileFx(SND_02_CONSTRUCTION_WATER, start_tile);
+		if (!_settings_client.gui.persistent_buildingtools) ResetObjectToPlace();
+	} else {
+		SetRedErrorSquare(_build_tunnel_endtile);
+	}
 }
 
 
@@ -190,6 +202,10 @@ struct BuildDocksToolbarWindow : Window {
 				HandlePlacePushButton(this, WID_DT_BUILD_AQUEDUCT, SPR_CURSOR_AQUEDUCT, HT_SPECIAL);
 				break;
 
+			case WID_DT_BUILD_TUNNEL: // Build ship tunnel button
+				HandlePlacePushButton(this, WID_DT_BUILD_TUNNEL, SPR_CURSOR_ROAD_TUNNEL, HT_SPECIAL);
+				break;
+
 			default: return;
 		}
 		this->last_clicked_widget = widget;
@@ -242,6 +258,10 @@ struct BuildDocksToolbarWindow : Window {
 
 			case WID_DT_BUILD_AQUEDUCT: // Build aqueduct button
 				Command<Commands::BuildBridge>::Post(STR_ERROR_CAN_T_BUILD_AQUEDUCT_HERE, CcBuildBridge, tile, GetOtherAqueductEnd(tile), TransportType::Water, 0, INVALID_RAILTYPE, INVALID_ROADTYPE);
+				break;
+
+			case WID_DT_BUILD_TUNNEL: // Build ship tunnel button
+				Command<Commands::BuildTunnel>::Post(STR_ERROR_CAN_T_BUILD_TUNNEL_HERE, CcBuildWaterTunnel, tile, TransportType::Water, INVALID_RAILTYPE, INVALID_ROADTYPE);
 				break;
 
 			default: NOT_REACHED();
@@ -299,6 +319,10 @@ struct BuildDocksToolbarWindow : Window {
 
 		if (this->last_clicked_widget == WID_DT_BUILD_AQUEDUCT) {
 			GetOtherAqueductEnd(tile_from, &tile_to);
+		} else if (this->last_clicked_widget == WID_DT_BUILD_TUNNEL) {
+			/* A ship tunnel's other end, as a road's (OnPlacePresize() of road_gui.cpp). */
+			Command<Commands::BuildTunnel>::Do(DoCommandFlag::Auto, tile_from, TransportType::Water, INVALID_RAILTYPE, INVALID_ROADTYPE);
+			tile_to = _build_tunnel_endtile == INVALID_TILE ? tile_from : _build_tunnel_endtile;
 		} else {
 			DiagDirection dir = GetInclinedSlopeDirection(GetTileSlope(tile_from));
 			if (IsValidDiagDirection(dir)) {
@@ -334,6 +358,7 @@ struct BuildDocksToolbarWindow : Window {
 		Hotkey('6', "buoy", WID_DT_BUOY),
 		Hotkey('7', "river", WID_DT_RIVER),
 		Hotkey({'B', '8'}, "aqueduct", WID_DT_BUILD_AQUEDUCT),
+		Hotkey({'T', '9'}, "tunnel", WID_DT_BUILD_TUNNEL),
 	}, DockToolbarGlobalHotkeys};
 };
 
@@ -356,6 +381,7 @@ static constexpr std::initializer_list<NWidgetPart> _nested_build_docks_toolbar_
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_DT_STATION), SetToolbarMinimalSize(1), SetFill(0, 1), SetSpriteTip(SPR_IMG_SHIP_DOCK, STR_WATERWAYS_TOOLBAR_BUILD_DOCK_TOOLTIP),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_DT_BUOY), SetToolbarMinimalSize(1), SetFill(0, 1), SetSpriteTip(SPR_IMG_BUOY, STR_WATERWAYS_TOOLBAR_BUOY_TOOLTIP),
 		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_DT_BUILD_AQUEDUCT), SetToolbarMinimalSize(1), SetFill(0, 1), SetSpriteTip(SPR_IMG_AQUEDUCT, STR_WATERWAYS_TOOLBAR_BUILD_AQUEDUCT_TOOLTIP),
+		NWidget(WWT_IMGBTN, Colours::DarkGreen, WID_DT_BUILD_TUNNEL), SetToolbarMinimalSize(1), SetFill(0, 1), SetSpriteTip(SPR_IMG_ROAD_TUNNEL, STR_WATERWAYS_TOOLBAR_BUILD_TUNNEL_TOOLTIP),
 	EndContainer(),
 };
 
