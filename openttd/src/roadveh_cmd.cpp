@@ -1936,7 +1936,10 @@ std::string DescribeRoadVehFreeAhead(const Vehicle *v)
  */
 static bool RoadVehRejoinRoad(RoadVehicle *v, TileIndex tile, DiagDirection enterdir)
 {
-	if (!IsTileType(tile, TileType::Road) || !(IsNormalRoad(tile) || IsLevelCrossing(tile))) return false;
+	/* Or straight into a road tunnel (RoadVehFreeIntoTunnel()): the game drives it through. */
+	const bool tunnel = IsTileType(tile, TileType::TunnelBridge) && IsTunnel(tile) && GetTunnelBridgeTransportType(tile) == TransportType::Road &&
+			GetTunnelBridgeDirection(tile) == enterdir && HasTileRoadType(tile, RoadTramType::Road);
+	if (!tunnel && (!IsTileType(tile, TileType::Road) || !(IsNormalRoad(tile) || IsLevelCrossing(tile)))) return false;
 	if (!GetAnyRoadBits(tile, RoadTramType::Road).Any(DiagDirToRoadBits(ReverseDiagDir(enterdir)))) return false;
 	TrackdirBits reachable = GetTileTrackStatus(tile, TransportType::Road, RoadTramType::Road).trackdirs & DiagdirReachesTrackdirs(enterdir);
 	if (reachable.None()) return false;
@@ -2068,6 +2071,10 @@ static bool RoadVehFreeStep(RoadVehicle *v)
 		const bool along_deck = RoadVehFreeBridgeDeck(v, tile) >= 0 && enterdir != DiagDirection::Invalid && DiagDirToAxis(enterdir) == GetBridgeAxis(tile);
 		if (on_deck && !along_deck && !(IsBridgeTile(tile) && RoadVehFreeCanEnter(tile, enterdir))) return false;
 		if (!along_deck && v->cab_rejoin && enterdir != DiagDirection::Invalid && RoadVehRejoinRoad(v, tile, enterdir)) return true;
+		/* Straight into a road tunnel: on its road, the game drives it through, and out of it the arrows take the wheel
+		 * again (CabArrows::Drive(): not on a tunnel's tile, CabCanDriveFreely()). Driven freely it stood at the portal
+		 * (the player, test5: "in the car I could not drive into the tunnel"). */
+		if (!along_deck && enterdir != DiagDirection::Invalid && IsTileType(tile, TileType::TunnelBridge) && IsTunnel(tile) && RoadVehRejoinRoad(v, tile, enterdir)) return true;
 		if (!along_deck && !RoadVehFreeCanEnter(tile, enterdir) && !RoadVehFreeInYard(v->tile, tile)) return false;
 		v->tile = tile;
 	}

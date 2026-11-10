@@ -32,6 +32,7 @@
 #include "roadveh.h"
 #include "road.h"
 #include "station_map.h"
+#include "tunnel_map.h"
 #include "tile_map.h"
 #include "order_base.h"
 #include "direction_func.h"
@@ -69,15 +70,16 @@
 
 /**
  * Whether the player can take a vehicle's wheel from its cab now and drive it freely (CmdCabDrive()): a road vehicle on
- * the road (not a tram, not in its depot, a tunnel or a bay), a ship on the water (not in its shed or a tunnel), an
- * aircraft in the air (not taking off or landing). A train follows its rails: only its speed is the player's.
+ * the road (not a tram, not in its depot, a tunnel or a bay -- nor at a tunnel's mouth, which the game drives it into
+ * and through, RoadVehFreeStep()), a ship on the water (not in its shed or a tunnel), an aircraft in the air (not taking
+ * off or landing). A train follows its rails: only its speed is the player's.
  */
 static bool CabCanDriveFreely(const Vehicle *v)
 {
 	switch (v->type) {
 		case VehicleType::Road: {
 			const RoadVehicle *rv = RoadVehicle::From(v);
-			return !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried();
+			return !RoadTypeIsTram(rv->roadtype) && !rv->IsInDepot() && rv->state != RVSB_WORMHOLE && !IsBayRoadStopTile(rv->tile) && !rv->IsCarried() && !IsTunnelTile(rv->tile);
 		}
 		case VehicleType::Ship: {
 			const Ship *sh = Ship::From(v);

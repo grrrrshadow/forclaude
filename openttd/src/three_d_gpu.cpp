@@ -1825,12 +1825,16 @@ void main()
 
 /* The lights lighting what is about them (DrawEyeLights()), all at once: each pixel within reach its own colour out of
  * the dark (u_night, taken from the dark pixel once) in the light of all of them together, a day's at most. The lights
- * four texels each of u_lights. */
+ * four texels each of u_lights. In a tunnel (u_tube_axis 0 or 1) the dark of its tube too, by the nearer portal as it is
+ * drawn (EyeTubeDark()), and what is bright already less; by day nothing out of the tube (u_tube_day). */
 const char *const EYE_LAMPS_FRAGMENT = R"(
 uniform sampler2D u_lights;
 uniform int u_count;
 uniform vec3 u_night;
 uniform float u_zu_per_unit;
+uniform vec4 u_tube;
+uniform int u_tube_axis;
+uniform int u_tube_day;
 void main()
 {
 	ivec2 p = Pixel();
@@ -1838,6 +1842,19 @@ void main()
 	float iw = IwAt(p);
 	if (iw > 0.0) {
 		vec3 w = InWorld(vec2(p) + 0.5, iw);
+		float dark = 1.0;
+		bool tube = false;
+		if (u_tube_axis >= 0) {
+			float s = u_tube_axis == 0 ? w.x : w.y, across = (u_tube_axis == 0 ? w.y : w.x) - u_tube.z;
+			if (s >= u_tube.x && s <= u_tube.y && abs(across) <= u_tube.w) {
+				tube = true;
+				dark = 0.10 + 0.90 * exp(-min(s - u_tube.x, u_tube.y - s) / 10.0);
+			}
+		}
+		if (u_tube_day != 0 && !tube) {
+			Put(c);
+			return;
+		}
 		vec3 light = vec3(0.0);
 		for (int i = 0; i < u_count; i++) {
 			vec4 l0 = texelFetch(u_lights, ivec2(i * 4, 0), 0), l1 = texelFetch(u_lights, ivec2(i * 4 + 1, 0), 0);
@@ -1868,8 +1885,10 @@ void main()
 			}
 			light += l1.rgb / 255.0 * k;
 		}
-		vec3 own = min(vec3(255.0), c * 256.0 / u_night);
-		c = floor(min(vec3(255.0), c + own * min(light, vec3(1.0))));
+		vec3 own = min(vec3(255.0), c * 256.0 / (u_night * dark));
+		vec3 add = own * min(light, vec3(1.0));
+		if (tube) add *= vec3(1.0) - c / 255.0;
+		c = floor(min(vec3(255.0), c + add));
 	}
 	Put(c);
 }
@@ -6120,6 +6139,9 @@ bool DrawEyeFrameOnCard(ThreeDGpuEyeFrame &f)
 				gl.glUniform1i(gl.glGetUniformLocation(p, "u_count"), static_cast<GLint>(s.lights.size()));
 				gl.glUniform3f(gl.glGetUniformLocation(p, "u_night"), s.colour[0], s.colour[1], s.colour[2]);
 				gl.glUniform1f(gl.glGetUniformLocation(p, "u_zu_per_unit"), s.depth);
+				gl.glUniform4f(gl.glGetUniformLocation(p, "u_tube"), s.tube[0], s.tube[1], s.tube[2], s.tube[3]);
+				gl.glUniform1i(gl.glGetUniformLocation(p, "u_tube_axis"), s.tube_axis);
+				gl.glUniform1i(gl.glGetUniformLocation(p, "u_tube_day"), s.tube_day ? 1 : 0);
 				done();
 				gl.glActiveTexture(GL_TEXTURE2);
 				gl.glBindTexture(GL_TEXTURE_2D, 0);

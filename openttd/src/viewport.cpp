@@ -101,6 +101,7 @@
 #include "elrail_func.h"
 #include "rail_map.h"
 #include "road_map.h"
+#include "newgrf_roadtype.h"
 #include "water_map.h"
 #include "clear_map.h"
 #include "tree_map.h"
@@ -16019,7 +16020,19 @@ static void CabTunnelGround(TileIndex tile, int z)
 			add(rti->base_sprites.track_y + (axis == Axis::X ? 1 : 0));
 		}
 	} else {
-		add(axis == Axis::X ? SPR_ROAD_X : SPR_ROAD_Y);
+		/* A road type of a set (the player's CZTR, its cobbles): its own ground and overlay of the straight road, as the
+		 * road before the tunnel is drawn (DrawRoadOverlays() of road_cmd.cpp; the player, test5: "from the first person
+		 * the road unfinished to the tunnel", the tunnel's tile of the original asphalt). X 1, Y 0 among its sprites. */
+		const RoadType rt = GetRoadTypeRoad(tile);
+		const RoadTypeInfo *rti = rt != INVALID_ROADTYPE ? GetRoadTypeInfo(rt) : nullptr;
+		const uint offset = axis == Axis::X ? 1 : 0;
+		if (rti != nullptr && rti->UsesOverlay()) {
+			add(SPR_FLAT_GRASS_TILE);
+			if (SpriteID ground = GetCustomRoadSprite(rti, tile, RoadSpriteType::Ground); ground != 0) add(ground + offset);
+			if (SpriteID overlay = GetCustomRoadSprite(rti, tile, RoadSpriteType::Overlay); overlay != 0) add(overlay + offset);
+		} else {
+			add(SPR_ROAD_Y + offset);
+		}
 	}
 }
 
@@ -17239,7 +17252,24 @@ static std::vector<ThreeDGpuEyeLight> EyeLampsLit(const CabEye &eye, int width, 
  * had lit for its colour in the dark and lit that again: under the sixteen bulbs of the cinema's entrance the light
  * grew on itself to white (the player, 23. 10.: "the cinema shines too much at night"; the doors not to be seen).
  */
-static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDGpuEyeLight> &lit, NightLight moon)
+/**
+ * The tunnel the eye is in, for the lights lighting what is in it (DrawEyeLights()): its tube along its axis between its
+ * portals' planes, its middle across, half its width, world units; axis -1 none. By day (day) nothing out of the tube is
+ * lit -- the daylight there.
+ */
+struct EyeTube {
+	int axis = -1;
+	double s_lo = 0, s_hi = 0, c_mid = 0, half = 0;
+	bool day = false;
+};
+
+/** How dark the tube of a tunnel is drawn at a place along it (CabDrawTube()): the daylight from the nearer portal fading into the dark. */
+static inline double EyeTubeDark(double s, double s_lo, double s_hi)
+{
+	return 0.10 + 0.90 * std::exp(-std::min(s - s_lo, s_hi - s) / 10.0);
+}
+
+static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDGpuEyeLight> &lit, NightLight moon, const EyeTube &tube = {})
 {
 	if (lit.empty()) return;
 	/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground. */
@@ -17259,6 +17289,18 @@ static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int
 				if (zb[i] <= 0.0f) continue;
 				double x, y, zu;
 				CabPixelInWorld(eye, px + 0.5, py + 0.5, zb[i], x, y, zu);
+				/* In the tube of the tunnel: its own dark too, and what is bright already lit less (the vehicles in it); by
+				 * day nothing out of it. */
+				double dark = 1.0;
+				bool in_tube = false;
+				if (tube.axis >= 0) {
+					const double s = tube.axis == 0 ? x : y, across = (tube.axis == 0 ? y : x) - tube.c_mid;
+					if (s >= tube.s_lo && s <= tube.s_hi && std::abs(across) <= tube.half) {
+						in_tube = true;
+						dark = EyeTubeDark(s, tube.s_lo, tube.s_hi);
+					}
+				}
+				if (tube.day && !in_tube) continue;
 				double lr = 0, lg = 0, lb = 0;
 				for (const ThreeDGpuEyeLight &g : lit) {
 					if (px < g.x0 || py < g.y0 || px > g.x1 || py > g.y1) continue;
@@ -17291,9 +17333,10 @@ static void DrawEyeLights(const CabEye &eye, uint32_t *dst, const float *zb, int
 				}
 				if (lr <= 0 && lg <= 0 && lb <= 0) continue;
 				const Colour o(dst[i]);
-				auto add = [](uint8_t now, uint night, double light) {
-					const double own = std::min(255.0, now * 256.0 / night);
-					return static_cast<uint8_t>(std::min(255.0, now + own * std::min(light, 1.0)));
+				auto add = [dark, in_tube](uint8_t now, uint night, double light) {
+					const double own = std::min(255.0, now * 256.0 / (night * dark));
+					const double headroom = in_tube ? 1.0 - now / 255.0 : 1.0;
+					return static_cast<uint8_t>(std::min(255.0, now + own * std::min(light, 1.0) * headroom));
 				};
 				dst[i] = Colour(add(o.r, moon.r, lr), add(o.g, moon.g, lg), add(o.b, moon.b, lb)).data;
 			}
@@ -17401,9 +17444,9 @@ static std::vector<ThreeDGpuEyeLight> EyeWitchLightsLit(const CabEye &eye, int w
 	return lit;
 }
 
-static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights, NightLight moon)
+static void DrawEyeWitchLight(const CabEye &eye, uint32_t *dst, const float *zb, int width, int height, const std::vector<ThreeDWitchLight> &lights, NightLight moon, const EyeTube &tube)
 {
-	DrawEyeLights(eye, dst, zb, width, height, EyeWitchLightsLit(eye, width, height, lights), moon);
+	DrawEyeLights(eye, dst, zb, width, height, EyeWitchLightsLit(eye, width, height, lights), moon, tube);
 }
 
 /** How far the far land reaches (DrawEyeFarLand()), tiles. */
@@ -17725,6 +17768,12 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* On a round curve along the arc (round_track.h). */
 		if (RoundTrackPose pose; GetRoundTrackPose(v, pose)) target = (pose.azimuth + 135.0) * M_PI / 180.0;
 	}
+	/* In a tunnel (hidden in it): along it at once, as the vehicle goes. A car turned round at its end, the eye turning
+	 * after it over a few frames went sideways out of the tube (the rig of test5). */
+	if (walker == nullptr && v != nullptr && v->vehstatus.Test(VehState::Hidden) && IsTunnelTile(v->tile) && v->direction != Direction::Invalid) {
+		target = std::atan2(static_cast<double>(dir_dy[to_underlying(v->direction)]), static_cast<double>(dir_dx[to_underlying(v->direction)])) + (rear ? M_PI : 0.0);
+		camera.valid = false;
+	}
 	if (!camera.valid) {
 		camera.heading = target;
 		camera.valid = true;
@@ -17897,13 +17946,18 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			std::optional<CabTunnel> t = CabTunnelAt(tile);
 			if (!t.has_value()) continue;
 			double s_e = t->axis == Axis::X ? eye.x : eye.y, c_e = (t->axis == Axis::X ? eye.y : eye.x) - t->c_mid;
-			/* On a portal's plane too: the eye of a train going in stood on it for a frame, neither in the tunnel nor out of
-			 * it, and the picture was of the hill from under it (the rig of test5). */
-			if (s_e >= t->s_lo && s_e <= t->s_hi && std::abs(c_e) < TILE_SIZE / 2.0 && eye.z < EyeLevelZ(t->z) + CAB_PORTAL_TOP) {
+			/* Nearer a portal's plane than the eye sees (CAB_NEAR) too: the eye of a train going in stood so close before it
+			 * for a frame that its face was not drawn, and the picture was of the hill from under it (the rig of test5). */
+			const double close = CAB_NEAR;
+			if (s_e > t->s_lo - close && s_e < t->s_hi + close && std::abs(c_e) < TILE_SIZE / 2.0 && eye.z < EyeLevelZ(t->z) + CAB_PORTAL_TOP) {
 				in_tunnel = t;
 				break;
 			}
 		}
+		/* The vehicle the eye rides hidden in a tunnel: the eye is in it too, wherever the head is turned (a car turning
+		 * round at a tunnel's end, its eye ahead of it turned sideways out of the tube: the hill from under it, the rig of
+		 * test5). */
+		if (!in_tunnel.has_value() && v != nullptr && v->vehstatus.Test(VehState::Hidden)) in_tunnel = CabTunnelAt(v->tile);
 	}
 
 	/* Hidden elsewhere than in a tunnel (a depot): the dark, with the light of the door. */
@@ -19362,11 +19416,23 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		 * over the picture. */
 		const NightLight moon = night ? GetNightLight() : NightLight{256, 256, 256};
 		/* What a light shows of a thing in the dark, its own colour with the dark taken away (DrawEyeLights()): the night's,
-		 * and in a tunnel the tube's dark deep in it too (CabDrawTube(): a tenth of the day's light, an eighth here) -- at
-		 * night in a tunnel both, or the torch lit nothing there. */
-		auto in_tube = [&](uint c) { return in_tunnel.has_value() ? std::max(1u, c / 8) : c; };
-		const NightLight lit_from{in_tube(moon.r), in_tube(moon.g), in_tube(moon.b)};
+		 * and in a tunnel the tube's own dark by the nearer portal (EyeTubeDark()) -- at night in a tunnel both, or the
+		 * torch lit nothing there; by day in a tunnel nothing out of it, the daylight there (the car's lights out of the
+		 * portal lit the road white). */
+		const NightLight lit_from = moon;
+		EyeTube tube;
+		if (in_tunnel.has_value()) {
+			const CabTunnel &t = *in_tunnel;
+			tube = {t.axis == Axis::X ? 0 : 1, t.s_lo, t.s_hi, t.c_mid, CAB_TUNNEL_HALF + 0.5, !night};
+		}
 		auto glows = std::make_shared<std::vector<EyeGlow>>(CollectEyeNightGlows(eye, own, bfx, bfy, in_tunnel.has_value() ? &*in_tunnel : nullptr));
+		/* By day in a tunnel only the glows in its tube: a car's pools out of its portal shone on the road in the sun. */
+		if (tube.day) {
+			std::erase_if(*glows, [&tube](const EyeGlow &g) {
+				const double s = tube.axis == 0 ? g.x : g.y, across = (tube.axis == 0 ? g.y : g.x) - tube.c_mid;
+				return s < tube.s_lo || s > tube.s_hi || std::abs(across) > tube.half;
+			});
+		}
 		/* The lamps on the walls of the tunnel the eye is in (CabDrawTube()): glowing, and lighting the tube about them
 		 * (the player, test5: "on the walls of the road tunnel are yellow rectangles, lights, aren't they; they did not
 		 * light either"). */
@@ -19430,19 +19496,26 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		/* Metres up as the eye's units count them (CAB_Z_SCALE), against the units along the ground (DrawEyeWitchLight()). */
 		const float zu_per_unit = static_cast<float>(CAB_Z_SCALE * OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE);
-		auto lights_step = [zu_per_unit](EyeCard &card, std::vector<ThreeDGpuEyeLight> lights, NightLight from) {
+		auto lights_step = [zu_per_unit, eye](EyeCard &card, std::vector<ThreeDGpuEyeLight> lights, NightLight from, const EyeTube &tube) {
 			if (lights.empty()) return;
 			ThreeDGpuEyeStep &st = card.Step(ThreeDGpuEyeStep::Kind::Lamps);
 			st.colour = {static_cast<float>(from.r), static_cast<float>(from.g), static_cast<float>(from.b)};
+			/* The tube from the eye, as the card's pixels are (InWorld()). */
+			if (tube.axis >= 0) {
+				const double es = tube.axis == 0 ? eye.x : eye.y, ec = tube.axis == 0 ? eye.y : eye.x;
+				st.tube = {static_cast<float>(tube.s_lo - es), static_cast<float>(tube.s_hi - es), static_cast<float>(tube.c_mid - ec), static_cast<float>(tube.half)};
+				st.tube_axis = tube.axis;
+				st.tube_day = tube.day;
+			}
 			st.depth = zu_per_unit;
 			st.lights = std::move(lights);
 		};
 		if (night && _cab_lamp_light) out.Job([eye, width, height, lamps](uint32_t *dst, float *zb) { DrawEyeLampLight(eye, dst, zb, width, height, lamps); }, [eye, width, height, lamps, lights_step](EyeCard &card) {
-			lights_step(card, EyeLampsLit(eye, width, height, lamps), GetNightLight());
+			lights_step(card, EyeLampsLit(eye, width, height, lamps), GetNightLight(), EyeTube{});
 			return true;
 		});
-		if (!tube_lamps.empty()) out.Job([eye, width, height, tube_lamps, lit_from](uint32_t *dst, float *zb) { DrawEyeLights(eye, dst, zb, width, height, EyeLampsLit(eye, width, height, tube_lamps), lit_from); }, [eye, width, height, tube_lamps, lights_step, lit_from](EyeCard &card) {
-			lights_step(card, EyeLampsLit(eye, width, height, tube_lamps), lit_from);
+		if (!tube_lamps.empty()) out.Job([eye, width, height, tube_lamps, lit_from, tube](uint32_t *dst, float *zb) { DrawEyeLights(eye, dst, zb, width, height, EyeLampsLit(eye, width, height, tube_lamps), lit_from, tube); }, [eye, width, height, tube_lamps, lights_step, lit_from, tube](EyeCard &card) {
+			lights_step(card, EyeLampsLit(eye, width, height, tube_lamps), lit_from, tube);
 			return true;
 		});
 		/* The witches' lanterns and torches lighting what is about them and where the beam falls (DrawEyeWitchLight()),
@@ -19455,6 +19528,27 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			l.z = FirstPersonFeetZ(*walker) + walker->eye_z - 0.5 * OBJECT_HEIGHT_PER_METRE;
 			l.reach = walker->light_reach_m * OBJECT_UNITS_PER_METRE;
 			l.colour = Colour(static_cast<uint8_t>(walker->light_colour >> 16), static_cast<uint8_t>(walker->light_colour >> 8), static_cast<uint8_t>(walker->light_colour));
+		}
+		/* The own vehicle's headlights as a beam ahead (the player, test5: "the engine's light shines only on the ground
+		 * and the vault of the tunnel is not seen in the dark; light the vault a little"): what is before it lit, the
+		 * walls and at the beam's edge the vault too -- not only the pools on the way (CollectEyeNightGlows()). */
+		if (own != nullptr && (own->type == VehicleType::Train || own->type == VehicleType::Road) && VehicleLightsOn(own)) {
+			const double len = std::hypot(bfx, bfy);
+			if (len > 1e-6) {
+				ThreeDWitchLight &l = witch_lights.emplace_back();
+				l.torch = true;
+				const double down = -0.05, n = std::sqrt(1.0 + down * down);
+				l.dx = bfx / len / n;
+				l.dy = bfy / len / n;
+				l.dz = down / n;
+				l.x = eye.x + l.dx * 1.0 * OBJECT_UNITS_PER_METRE;
+				l.y = eye.y + l.dy * 1.0 * OBJECT_UNITS_PER_METRE;
+				l.z = own->z_pos + 1.2 * OBJECT_HEIGHT_PER_METRE;
+				l.reach = 35.0 * OBJECT_UNITS_PER_METRE;
+				l.half_angle = 0.6;
+				/* Softer than a torch: the way is lit by the pools of the headlights already. */
+				l.colour = Colour(140, 130, 105);
+			}
 		}
 		/* A rocket's blast lighting what is about it, as it swells and fades. */
 		if (walker != nullptr) {
@@ -19471,8 +19565,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* Their heights from the eyes, over the land as it is from there (EyeStandZ()). */
 		for (ThreeDWitchLight &l : witch_lights) l.z = EyeStandZ(l.x, l.y, l.z);
 		if (!witch_lights.empty()) {
-			out.Job([eye, width, height, witch_lights, lit_from](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights, lit_from); }, [eye, width, height, witch_lights, lights_step, lit_from](EyeCard &card) {
-				lights_step(card, EyeWitchLightsLit(eye, width, height, witch_lights), lit_from);
+			out.Job([eye, width, height, witch_lights, lit_from, tube](uint32_t *dst, float *zb) { DrawEyeWitchLight(eye, dst, zb, width, height, witch_lights, lit_from, tube); }, [eye, width, height, witch_lights, lights_step, lit_from, tube](EyeCard &card) {
+				lights_step(card, EyeWitchLightsLit(eye, width, height, witch_lights), lit_from, tube);
 				return true;
 			});
 		}

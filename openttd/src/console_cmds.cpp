@@ -12224,7 +12224,20 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				/* Its end tiles whole: to the depot's door and onto the bridge's ramp. */
 				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 3, by), RoadBits{RoadBit::NE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
 				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + 5, by), RoadBits{RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
-				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end + 1, by), RoadBits{RoadBit::NE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				/* Off the bridge into a road tunnel through the hill beside the railway's (the player, test5: "the road into the
+				 * tunnel unfinished from the eyes"; "in the car I could not drive into the tunnel"), and a tile of road out
+				 * of it. */
+				Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, TileXY(x0 + bridge_end + 1, by), RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+				const TileIndex road_tunnel = TileXY(x0 + bridge_end + 2, by);
+				CommandCost rt = Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, road_tunnel, TransportType::Road, INVALID_RAILTYPE, ROADTYPE_ROAD);
+				if (rt.Succeeded() && IsTunnelTile(road_tunnel)) {
+					const TileIndex out_end = GetOtherTunnelEnd(road_tunnel);
+					CommandCost ro = Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, out_end + TileDiffXY(1, 0), RoadBits{RoadBit::NE, RoadBit::SW}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+					if (ro.Succeeded()) Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, out_end + TileDiffXY(2, 0), RoadBits{RoadBit::NE}, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+					IConsolePrint(CC_DEFAULT, "test3d: silnicni tunel {},{} az {},{}, silnice za nim: {}", TileX(road_tunnel), TileY(road_tunnel), TileX(out_end), TileY(out_end), ro.Succeeded() ? "ano" : err(ro));
+				} else {
+					IConsolePrint(CC_ERROR, "test3d: silnicni tunel na {},{}: {}", TileX(road_tunnel), TileY(road_tunnel), err(rt));
+				}
 				if (Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, car_depot, ROADTYPE_ROAD, DiagDirection::SW).Succeeded()) {
 					for (const Engine *e : Engine::IterateType(VehicleType::Road)) {
 						if (!e->company_avail.Test(_local_company) || RoadVehInfo(e->index)->roadtype != ROADTYPE_ROAD) continue;

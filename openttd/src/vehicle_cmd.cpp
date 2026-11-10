@@ -20,6 +20,7 @@
 #include "aircraft.h"
 #include "newgrf_text.h"
 #include "vehicle_func.h"
+#include "tunnel_map.h"
 #include "string_func.h"
 #include "depot_map.h"
 #include "vehiclelist.h"
@@ -1476,9 +1477,10 @@ CommandCost CmdCabDrive(DoCommandFlags flags, VehicleID veh_id, uint8_t op)
 		const RoadVehicle *rv = RoadVehicle::From(v);
 		if (height) return CMD_ERROR;
 		if (what == CabDriveOp::Free) {
-			/* On the road: not a tram, not in its depot, a tunnel or a bay; its trailers come after it (RoadVehPullChain()). */
+			/* On the road: not a tram, not in its depot, a tunnel (nor at its mouth, the game drives it through) or a bay; its
+			 * trailers come after it (RoadVehPullChain()). */
 			if (RoadTypeIsTram(rv->roadtype)) return CMD_ERROR;
-			if (!v->cab_free && (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried())) return CMD_ERROR;
+			if (!v->cab_free && (rv->IsInDepot() || rv->state == RVSB_WORMHOLE || IsBayRoadStopTile(rv->tile) || rv->IsCarried() || IsTunnelTile(rv->tile))) return CMD_ERROR;
 		} else if (!v->cab_free) {
 			return CMD_ERROR; // on the road, driven freely first
 		}

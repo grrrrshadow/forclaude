@@ -362,6 +362,10 @@ struct ThreeDGpuEyeStep {
 	std::vector<ThreeDGpuEyeBlast> blasts;
 	std::vector<ThreeDGpuEyeStar> stars;
 	std::array<float, 3> moon{};     ///< the moon on the sky: x, y, radius, pixels; radius 0 not seen
+	/** Lamps in a tunnel (EyeTube of viewport.cpp): its tube from the eye along it (its portals' planes), its middle across and half its width; axis -1 none, 0 x, 1 y; by day no light out of it. */
+	std::array<float, 4> tube{};
+	int tube_axis = -1;
+	bool tube_day = false;
 	/** The map of the shadows (CabShadowMap of viewport.cpp): kept on the card by key. */
 	struct ShadowMap {
 		uint64_t key = 0;
