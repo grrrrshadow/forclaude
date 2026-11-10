@@ -17696,6 +17696,16 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		}
 		eye.z = vz + camera.eye_dz;
 	}
+	/* The eye of a cab under the water's surface (a submarine's, its driver under the waterline or dived; the player,
+	 * test4: "I look and the sky is below, the sea above, the view is upside down"): the bed, the fish and the haze of the
+	 * water as the diving walker has them -- else the surface was drawn over the eye and the sky under it. The haze from
+	 * a few metres on: the cab about the eye stays as it is. */
+	bool cab_under_water = false;
+	if (walker == nullptr) {
+		const std::optional<double> surface = EyeWaterSurfaceZ(eye.x, eye.y);
+		cab_under_water = surface.has_value() && eye.z < EyeLevelZ(*surface);
+		under_water = cab_under_water;
+	}
 	eye.focal = walker != nullptr ? (width / 2.0) / CAB_FOV_TAN : CabFocal(camera, width, height);
 	eye.cx = width / 2.0;
 	eye.cy = height * 0.5;
@@ -19087,7 +19097,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 	{
 		/* Under the water instead: its own haze near the eyes, the sky all of it (the surface seen from under it, the
 		 * bed and what is in the water fade into the water's colour within twenty metres). */
-		const double fog_near = under_water ? 0.5 * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
+		const double fog_near = under_water ? (cab_under_water ? 3.0 : 0.5) * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.6;
 		const double fog_far = under_water ? EYE_UNDER_WATER_SEEN_M * OBJECT_UNITS_PER_METRE : CAB_FAR_TILES * TILE_SIZE * 0.98;
 		const Colour far_haze = under_water ? Colour(24, 72, 92) : Colour(150, 178, 205);
 		const double horizon = under_water ? -1.0 : EyeHorizonY(eye);

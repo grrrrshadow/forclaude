@@ -1170,6 +1170,34 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		}
 		return true;
 	}
+	if (argv.size() > 3 && argv[1] == "bojka") {
+		/* 'testlod bojka <x> <y>': a buoy on the water nearest there, every ship's only order to go to it -- a ship
+		 * without a destination stays in its depot (CheckShipLeaveDepot()); out on the water it can be boarded. */
+		if (!Company::IsValidID(CompanyID::Begin())) return true;
+		AutoRestoreBackup cur_company(_current_company, CompanyID::Begin());
+		const TileIndex want = TileXY(ParseInteger<uint>(argv[2]).value_or(0), ParseInteger<uint>(argv[3]).value_or(0));
+		TileIndex buoy = INVALID_TILE;
+		uint best = UINT_MAX;
+		for (TileIndex t : Map::Iterate()) {
+			if (!IsWaterTile(t) || DistanceManhattan(t, want) >= best) continue;
+			if (Command<Commands::BuildBuoy>::Do(DoCommandFlags{}, t).Failed()) continue;
+			best = DistanceManhattan(t, want);
+			buoy = t;
+		}
+		if (buoy == INVALID_TILE || Command<Commands::BuildBuoy>::Do(DoCommandFlag::Execute, buoy).Failed()) {
+			IConsolePrint(CC_ERROR, "testlod: bojka nejde postavit");
+			return true;
+		}
+		int given = 0;
+		for (Ship *sh : Ship::Iterate()) {
+			if (!sh->IsPrimaryVehicle()) continue;
+			Order go{};
+			go.MakeGoToWaypoint(GetStationIndex(buoy));
+			if (Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, sh->index, sh->GetNumOrders(), go).Succeeded()) given++;
+		}
+		IConsolePrint(CC_DEFAULT, "testlod: bojka na ({},{}), lodi s rozkazem {}", TileX(buoy), TileY(buoy), given);
+		return true;
+	}
 	uint sx = argv.size() > 2 ? 0 : Map::MaxX() / 2;
 	uint sy = argv.size() > 2 ? 0 : Map::MaxY() / 2;
 	if (argv.size() > 2) {
@@ -1228,7 +1256,9 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		/* An order to its own shed, so the ship has something to go back to
 		 * after the errand: without one there is nothing to prove it was put
 		 * back where it was. */
-		if (const Depot *d = Depot::GetByTile(depot); d != nullptr) {
+		/* 'testlod <x> <y> <text> volna': none, it sails out and about (to board it from the water). */
+		const bool loose = argv.size() > 4 && argv[4] == "volna";
+		if (const Depot *d = Depot::GetByTile(depot); d != nullptr && !loose) {
 			Order home{};
 			home.MakeGoToDepot(DestinationID(d->index), OrderDepotTypeFlag::PartOfOrders, OrderNonStopFlags{}, OrderDepotActionFlags{});
 			Command<Commands::InsertOrder>::Do(DoCommandFlag::Execute, veh, 0, home);
