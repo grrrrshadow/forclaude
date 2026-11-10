@@ -14427,9 +14427,71 @@ static void CabDrawStone(const CabCanvas &cv, const CabEye &eye, std::initialize
 	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, stone.px.data(), stone.w, stone.h, std::move(poly), eye, false);
 }
 
+/** How high a level of the land is from the eyes, metres (5 m, EYE_LEVEL_STRETCH). */
+static constexpr double EYE_LEVEL_M = EYE_LEVEL_STRETCH * TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
+
+/**
+ * A quad of world points dressed in the concrete of our walls (zed_lic_beton, beton_5m.py; its texture 5 x 5 m,
+ * repeated): (x, y, z, u, v) at each corner, u and v metres on it (v down from the top), at the level of detail of its
+ * nearest corner, about a texel to a pixel, as the retaining walls (DrawEyeRetainingWalls()); while its texture is not
+ * made yet (in the background) in its colour.
+ */
+static void CabDrawConcrete(const CabCanvas &cv, const CabEye &eye, std::initializer_list<std::array<double, 5>> pts)
+{
+	static constexpr double SIZE_M = 5.0;
+	const ThreeDVehicleObject *board = GetThreeDFigure("zed_lic_beton");
+	int tw0 = 1, th0 = 1;
+	int level = 0;
+	if (board != nullptr && board->TextureSize(0, tw0, th0)) {
+		double fmin = std::numeric_limits<double>::max();
+		for (const auto &p : pts) fmin = std::min(fmin, CabToEye(eye, p[0], p[1], p[2], 0, 0).f);
+		const double texels_per_unit = tw0 / (SIZE_M * OBJECT_UNITS_PER_METRE);
+		const double pixels_per_unit = eye.focal / std::max(fmin, CAB_NEAR * 4);
+		level = std::max(0, static_cast<int>(std::floor(std::log2(std::max(1.0, texels_per_unit / std::max(pixels_per_unit, 1e-6))))));
+	}
+	const ThreeDObjectTexture *tex = board != nullptr ? board->TryGetTexture(level) : nullptr;
+	const bool textured = tex != nullptr && !tex->px.empty();
+	uint32_t flat = Colour(128, 128, 124).data;
+	const uint32_t *px = textured ? tex->px.data() : EyeColour(flat);
+	const int tw = textured ? tex->w : 1, th = textured ? tex->h : 1;
+	if (textured && _eye_frame != nullptr) _eye_frame->kept[px] = tex->uid.value;
+	std::vector<CabPoint> poly;
+	for (const auto &p : pts) poly.push_back(CabToEye(eye, p[0], p[1], p[2], p[3] / SIZE_M * tw, p[4] / SIZE_M * th));
+	CabDrawPolygon(cv.dst, cv.zb, cv.w, cv.h, px, tw, th, std::move(poly), eye, CAB_REPEAT);
+}
+
+/**
+ * The mouth of a tunnel for ships from the eyes (the player, 10. 11.: "make the tunnel's entrance, the concrete. the
+ * aqueduct is wider than the road"): as from above (DrawThreeDShipTunnelEntrance() of tunnelbridge_cmd.cpp), its face
+ * of concrete the tile's width round the opening, and walls of concrete beside the way in up to the hill.
+ * @param s,s_out the planes of the portal and of the end tile's outer edge along the tunnel
+ */
+static void CabDrawConcretePortal(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, double s, double s_out)
+{
+	const double half = TILE_SIZE / 2.0, upm = OBJECT_UNITS_PER_METRE;
+	/* Its face: along it from its left edge (metres), down from its top (a level, EYE_LEVEL_M). */
+	auto at = [&](double c, double dz) {
+		const std::array<double, 3> p = CabTunnelPoint(t, s, c, dz);
+		return std::array<double, 5>{p[0], p[1], p[2], (c + half) / upm, (CAB_PORTAL_TOP - dz) / CAB_PORTAL_TOP * EYE_LEVEL_M};
+	};
+	CabDrawConcrete(cv, eye, {at(-half, 0), at(-CAB_TUNNEL_HALF, 0), at(-CAB_TUNNEL_HALF, CAB_PORTAL_TOP), at(-half, CAB_PORTAL_TOP)});
+	CabDrawConcrete(cv, eye, {at(CAB_TUNNEL_HALF, 0), at(half, 0), at(half, CAB_PORTAL_TOP), at(CAB_TUNNEL_HALF, CAB_PORTAL_TOP)});
+	for (size_t i = 1; i + 2 < _cab_tunnel_profile.size(); i++) {
+		const auto &p = _cab_tunnel_profile[i], &q = _cab_tunnel_profile[i + 1];
+		CabDrawConcrete(cv, eye, {at(p[0], p[1]), at(q[0], q[1]), at(q[0], CAB_PORTAL_TOP), at(p[0], CAB_PORTAL_TOP)});
+	}
+	/* The walls beside the way in: from the water up to where the slope of the end tile was, on both sides. */
+	const double level = EyeLevelZ(TILE_HEIGHT), len_m = TILE_SIZE / upm;
+	for (double c : {-half, half}) {
+		const std::array<double, 3> p0 = CabTunnelPoint(t, s_out, c, 0), p1 = CabTunnelPoint(t, s, c, 0), p2 = CabTunnelPoint(t, s, c, level);
+		CabDrawConcrete(cv, eye, {{p0[0], p0[1], p0[2], 0, EYE_LEVEL_M}, {p1[0], p1[1], p1[2], len_m, EYE_LEVEL_M}, {p2[0], p2[1], p2[2], len_m, 0}});
+	}
+}
+
 /**
  * A portal of a tunnel: a face of stones on the edge of its end tile, around an opening as tall as the tunnel, and
- * walls of stones beside the way into it, up to the hill on either side.
+ * walls of stones beside the way into it, up to the hill on either side; a tunnel for ships's of concrete
+ * (CabDrawConcretePortal()).
  * @param end the tunnel's end the portal is on
  */
 static void CabDrawPortal(const CabCanvas &cv, const CabEye &eye, const CabTunnel &t, TileIndex end)
@@ -14439,6 +14501,7 @@ static void CabDrawPortal(const CabCanvas &cv, const CabEye &eye, const CabTunne
 	bool into_low = d == DiagDirection::NE || d == DiagDirection::NW;
 	double s = into_low ? base : base + TILE_SIZE;
 	double s_out = into_low ? base + TILE_SIZE : base;
+	if (t.water) return CabDrawConcretePortal(cv, eye, t, s, s_out);
 	const double k = 4.0; // texture pixels to a world unit
 	auto face = [&](double c, double dz) {
 		std::array<double, 3> p = CabTunnelPoint(t, s, c, dz);
@@ -15047,8 +15110,6 @@ static void DrawEyeWallPiece(const CabCanvas &cv, const CabEye &eye, const Three
 	}
 }
 
-/** How high a level of the land is from the eyes, metres (5 m, EYE_LEVEL_STRETCH). */
-static constexpr double EYE_LEVEL_M = EYE_LEVEL_STRETCH * TILE_HEIGHT / OBJECT_HEIGHT_PER_METRE;
 /** How near a retaining wall has its coping, railing and ivies, world units: farther the face alone. */
 static constexpr double EYE_WALL_DETAIL_UNITS = 12.0 * TILE_SIZE;
 /** How many of the retaining walls have ivies on them, of a hundred. */

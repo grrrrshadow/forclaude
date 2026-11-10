@@ -6959,6 +6959,9 @@ static void ReadThreeDVehicleObjects()
 					 * middle at the origin ("na_stred"); only the ends of a thing ("jen_konce_m": the grill's trestles
 					 * without its bricks, as over the forest's fire). */
 					fig.to_middle = e.value("na_stred", false);
+					/* Seen only from the outer side of its faces ("jednostranne"), as glTF has them: the concrete of a ship
+					 * tunnel's mouth, whose faces under the hill behind it are not drawn over the hill (tunel_lodni.py). */
+					fig.one_sided = e.value("jednostranne", false);
 					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
 					/* Only its frames' nodes ("jen_snimky"): the torch's flame without its stick, the fire of the fireplaces. */
 					fig.frames_only = e.value("jen_snimky", false);
@@ -9832,6 +9835,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	for (const std::string &n : this->skip_nodes) key += "|x" + n;
 	if (this->to_ground) key += "|g";
 	if (this->to_middle) key += "|m";
+	if (this->one_sided) key += "|o";
 	if (this->frames_only) key += "|j";
 	for (const std::string &n : this->skip_materials) key += "|-" + n;
 	for (const auto &p : this->bend_from) key += fmt::format("|<{},{}", p[0], p[1]);
@@ -10176,6 +10180,8 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			door_of.emplace_back(static_cast<uint8_t>(d + 1), true);
 		}
 	}
+	/* One-sided ("jednostranne"): the side of each triangle facing away left out where it is drawn (TriangleFacing()). */
+	if (this->one_sided) made->facing = TriangleFacing(mesh);
 	made->pos = std::move(mesh.pos);
 	made->nrm = std::move(mesh.nrm);
 	made->uv = std::move(mesh.uv);

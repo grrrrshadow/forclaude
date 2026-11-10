@@ -1038,6 +1038,7 @@ struct ThreeDVehicleObject {
 	std::vector<std::string> skip_nodes; ///< nodes of it left out (the rocket launcher shot, "<jmeno>/prazdny": its "raketa_v_hlavni"; a saucer's frames: its beam and its sheep)
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
 	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
+	bool one_sided = false;         ///< "jednostranne": its triangles seen only from their outer side, as glTF has them (a material not "doubleSided"), the side facing away left out where it is drawn (the concrete of a ship tunnel's mouth, whose back is under the hill)
 	bool frames_only = false;       ///< "jen_snimky": of its file only its frames' nodes, not the rest drawn in each (the torch's flame without its stick: the fireplaces' fire)
 	std::vector<std::string> skip_materials; ///< "bez_materialu": the triangles of its file's materials so named left out (the short rod's own float and line)
 	/**

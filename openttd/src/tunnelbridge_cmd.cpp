@@ -39,6 +39,8 @@
 #include "water.h"
 #include "pathfinder/water_regions.h"
 #include "three_d_vehicle_object.h"
+#include "three_d_objects.h"
+#include "three_d.h"
 #include "company_gui.h"
 #include "tunnelbridge_cmd.h"
 #include "landscape_cmd.h"
@@ -1309,6 +1311,73 @@ static void DrawBridgeRoadBits(TileIndex head_tile, int x, int y, int z, int off
  * </ul>
  * Please note that in this code, "roads" are treated as railtype 1, whilst the real railtypes are 0, 2 and 3
  */
+/**
+ * The mouth of a tunnel for ships in 3D (the player, 10. 11.: "make the tunnel's entrance, the concrete. the aqueduct is
+ * wider than the road"): the canal's water up to the portal and our concrete the canal's whole width
+ * (objekty/nase/tunel_lodni.py) -- a wing wall along each side of the end tile in thirds, its outer face from the land
+ * beside rising with the slope, and the portal's face across the tile at the hill with the dark of the opening on it --
+ * instead of the road tunnel's sprites, narrower than the canal with grass beside them over its water. In the turned
+ * view and facing north among the objects, as the lock (DrawThreeDLock() of water_cmd.cpp); from the eyes the eyes draw
+ * the portal (CabDrawPortal() of viewport.cpp).
+ * @return whether it was drawn so: the road portal's sprites left out
+ */
+static bool DrawThreeDShipTunnelEntrance(const TileInfo *ti)
+{
+	if (ViewportDrawingEye() || (!ViewportDrawingTurned() && !ViewportDrawingNorthObjects())) return false;
+	if (IsInvisibilitySet(TransparencyOption::Buildings)) return false;
+	/* The thirds of the wall on the right looking into the tunnel (its inner face to the left), and mirrored on the left; the face. */
+	static constexpr std::string_view RIGHT[3] = {"tunel_lodni_zed_0", "tunel_lodni_zed_1", "tunel_lodni_zed_2"};
+	static constexpr std::string_view LEFT[3] = {"tunel_lodni_zed_0_z", "tunel_lodni_zed_1_z", "tunel_lodni_zed_2_z"};
+	static constexpr std::string_view TOPS[3] = {"tunel_lodni_vrch_0", "tunel_lodni_vrch_1", "tunel_lodni_vrch_2"};
+	static constexpr std::string_view FACE = "tunel_lodni_celo";
+	for (int k = 0; k < 3; k++) {
+		if (GetThreeDFigure(LEFT[k]) == nullptr || GetThreeDFigure(RIGHT[k]) == nullptr || GetThreeDFigure(TOPS[k]) == nullptr) return false;
+	}
+	if (GetThreeDFigure(FACE) == nullptr) return false;
+
+	/* The canal's water, flat at the foot of the slope where the boats float. */
+	DrawGroundSpriteAt(SPR_FLAT_WATER_TILE, PAL_NONE, 0, 0, 0);
+
+	/* Into the tunnel and to its left (a model's +y, glTF's -Z), world units; the angles of each. */
+	const TileIndexDiffC d = TileIndexDiffCByDiagDir(GetTunnelBridgeDirection(ti->tile));
+	const double ax = d.x, ay = d.y, px = -ay, py = ax;
+	const float in_deg = static_cast<float>(std::atan2(ay, ax) * 180.0 / M_PI);
+	const float left_deg = static_cast<float>(std::atan2(py, px) * 180.0 / M_PI);
+	const double cx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	const double m = OBJECT_UNITS_PER_METRE, half = TILE_SIZE / 2.0;
+	/* Whether the face's front is seen, the nearer the greater a turned point's x + y (TurnWorldPoint()). Seen from
+	 * behind, over the hill, only the walls' tops: their faces to the water are behind the portal and under the hill
+	 * there, and drawn after the ground they came over it (the player, 10. 11.: "again it draws in front what should be
+	 * at the back"). */
+	double nx0, ny0, nx1, ny1;
+	TurnWorldPoint(cx, cy, nx0, ny0);
+	TurnWorldPoint(cx - ax, cy - ay, nx1, ny1);
+	const bool front_seen = nx1 + ny1 > nx0 + ny0;
+	static constexpr double WALL_T_M = 1.0, LEVEL_M = 3.0; // tunel_lodni.py
+	/* Each in the box it fills (AddThreeDFigureToViewportInBox()), as the lock's walls. */
+	auto put = [&](std::string_view name, double x, double y, float facing, double hx, double hy, double tall_m) {
+		const std::array<int, 6> box{static_cast<int>(std::lround(x - hx)), static_cast<int>(std::lround(y - hy)), ti->z,
+				std::max(static_cast<int>(std::lround(x - hx)), static_cast<int>(std::lround(x + hx)) - 1), std::max(static_cast<int>(std::lround(y - hy)), static_cast<int>(std::lround(y + hy)) - 1),
+				ti->z + std::max(1, static_cast<int>(std::lround(tall_m * OBJECT_HEIGHT_PER_METRE))) - 1};
+		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
+	};
+	/* The wing walls at the sides of the tile, a third at a time from the canal to the portal; on the left (+p) the mirrored one. */
+	for (int side : {1, -1}) {
+		const double off = half - WALL_T_M / 2 * m;
+		for (int k = 0; k < 3; k++) {
+			const double along = (k - 1) * (TILE_SIZE / 3.0);
+			const double mx = cx + side * px * off + ax * along, my = cy + side * py * off + ay * along;
+			const double ha = TILE_SIZE / 6.0, hc = WALL_T_M / 2 * m;
+			put(!front_seen ? TOPS[k] : side > 0 ? LEFT[k] : RIGHT[k], mx, my, in_deg, std::abs(ax) * ha + std::abs(px) * hc, std::abs(ay) * ha + std::abs(py) * hc, (k + 1) * LEVEL_M / 3);
+		}
+	}
+	/* The face at the hill, its front to the canal. */
+	const double along = half - WALL_T_M / 2 * m;
+	const double hc = WALL_T_M / 2 * m;
+	put(FACE, cx + ax * along, cy + ay * along, left_deg, std::abs(px) * half + std::abs(ax) * hc, std::abs(py) * half + std::abs(ay) * hc, LEVEL_M);
+	return true;
+}
+
 static void DrawTile_TunnelBridge(TileInfo *ti)
 {
 	TransportType transport_type = GetTunnelBridgeTransportType(ti->tile);
@@ -1381,7 +1450,11 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 		image += to_underlying(tunnelbridge_direction) * 2;
 		/* Our 3D track into the portal (DrawThreeDTrackTunnel()): under it the tunnel's base without the game's rails. */
 		const bool three_d = transport_type == TransportType::Rail && DrawThreeDTrackTunnel(ti);
-		if (three_d && railtype_overlay == 0) {
+		/* A tunnel for ships: its concrete mouth in 3D, the road portal's sprites left out (DrawThreeDShipTunnelEntrance()). */
+		const bool ship_mouth = transport_type == TransportType::Water && DrawThreeDShipTunnelEntrance(ti);
+		if (ship_mouth) {
+			/* Drawn: the wall's helper boxes still sort what is beside the tunnel. */
+		} else if (three_d && railtype_overlay == 0) {
 			DrawGroundSprite(SPR_RAILTYPE_TUNNEL_BASE + (HasTunnelBridgeSnowOrDesert(ti->tile) ? 8 : 0) + to_underlying(tunnelbridge_direction) * 2, PAL_NONE);
 		} else {
 			DrawGroundSprite(image, PAL_NONE);
@@ -1469,7 +1542,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 
 		if (railtype_overlay != 0 && !catenary) StartSpriteCombine();
 
-		AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
+		if (!ship_mouth) AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 		/* Draw railtype tunnel portal overlay if defined. */
 		if (railtype_overlay != 0) AddSortableSpriteToDraw(railtype_overlay + to_underlying(tunnelbridge_direction), PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 
