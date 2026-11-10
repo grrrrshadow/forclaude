@@ -1115,6 +1115,12 @@ static bool ConTestBuildShip(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "testlod: holky na lodich {}", argv[2]);
 		return true;
 	}
+	if (argv.size() == 2 && argv[1] == "palubakolem") {
+		/* 'testlod palubakolem': the boat's floor about the walker on board, as its steps find it (RigDeckAround()). */
+		extern std::string RigDeckAround();
+		IConsolePrint(CC_DEFAULT, "testlod: paluba kolem {}", RigDeckAround());
+		return true;
+	}
 	if (argv.size() > 5 && argv[1] == "chodec") {
 		/* 'testlod chodec <x> <y> <do_m> <smer>': the walker on board its boat at a point of its frame (RigOnBoard()). */
 		extern std::string RigOnBoard(double x, double y, double up_to, double facing);
