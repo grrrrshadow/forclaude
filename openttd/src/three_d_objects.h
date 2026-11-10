@@ -331,6 +331,7 @@ struct ThreeDObject {
 	size_t interior = SIZE_MAX;               ///< "interier": its interior's object, SIZE_MAX none
 	std::vector<std::array<size_t, 3>> door_wings; ///< the wings of its doors and windows ("dvere_NN", "okno_NN" of its file, then of its interior's): shut, open one way, the other
 	std::vector<uint8_t> gate_ways;           ///< a depot's (ReadDepot()): of each of door_wings, the way its gate opens out as a vehicle passes (1, 2: door_wings' open states), 0 a door for people, always shut
+	std::vector<std::array<float, 5>> walkways; ///< a ship depot's ("lavky", ReadDepot()): each its x and y from, x and y to and its height, world units from the depot's north corner, turned with it
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())

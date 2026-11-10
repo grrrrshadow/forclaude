@@ -508,6 +508,13 @@ static bool FirstPersonWalkable(double x, double y, double stand = -std::numeric
 			return true;
 		}
 		case TileType::Water:
+			/* A ship depot: along its walkways (ThreeDLandThingTopAt()), round its walls and posts. */
+			if (IsShipDepot(tile)) {
+				TileIndex origin;
+				const ThreeDObject *depot = GetThreeDDepot(tile, origin);
+				if (depot == nullptr || !ThreeDLandThingTopAt(tile, x - TileX(tile) * TILE_SIZE, y - TileY(tile) * TILE_SIZE).has_value()) return false;
+				return !depot->Blocks(x - TileX(origin) * TILE_SIZE, y - TileY(origin) * TILE_SIZE, feet(origin));
+			}
 			/* A coast, and the bank a river or a canal has along the land (EyeOnRiverBank()). */
 			return IsCoast(tile) || EyeOnRiverBank(x, y);
 		case TileType::Industry: {

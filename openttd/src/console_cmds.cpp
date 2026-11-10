@@ -11464,6 +11464,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				break;
 			}
 		}
+	} else if (what == "lodnidepo" && argv.size() > 3) {
+		/* 'lodnidepo <x> <y>': a canal a tile wide along x through a ship depot at the tile, three tiles of it each
+		 * side, land along it (the walkways inside, "lavky", reached from its ends). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		auto said = [](std::string_view what, const CommandCost &r) { IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: lodnidepo {}: {}", what, r.Succeeded() ? std::string("postaveno") : RefusalReason(r)); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(6, 3), at(-5, -3), false, LevelMode::Level);
+		said("pruplav", Command<Commands::BuildCanal>::Do(DoCommandFlag::Execute, at(4, 0), at(-3, 0), WaterClass::Canal, false));
+		said("depo", Command<Commands::BuildShipDepot>::Do(DoCommandFlag::Execute, at(0, 0), Axis::X));
+	} else if (what == "depomapa" && argv.size() > 3) {
+		/* 'depomapa <x> <y> [feet cm]': a depot's object from above over its north tile (RigThreeDDepotMap()). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		extern std::string RigThreeDDepotMap(TileIndex tile, double feet_m);
+		const std::string m = RigThreeDDepotMap(TileXY(*x, *y), (argv.size() > 4 ? number(4).value_or(0) : 0) / 100.0);
+		for (const auto line : std::views::split(std::string_view(m), std::string_view("\n"))) IConsolePrint(CC_DEFAULT, "test3d: depomapa {}", std::string_view(line.begin(), line.end()));
 	} else if (what == "vrata" && argv.size() > 3) {
 		/* 'vrata <x> <y>': the wings of a depot's gates and doors as they stand (GetThreeDDepotDoorWing()). */
 		auto x = number(2), y = number(3);

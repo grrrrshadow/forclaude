@@ -5673,6 +5673,21 @@ static void ReadDepot(const nlohmann::json &e, const std::string &folder)
 		NoteMarginsFilled(e, obj.glb_path, MarginsOf::Buildings);
 		ReadMaterialPictures(e, folder, obj);
 		ReadColourParts(e, folder, obj);
+		/* A ship depot's walkways along its long walls ("lavky": their height and their sides across it, as made along
+		 * x), its whole length; along y turned as its mesh (TurnGlbMeshQuarters(): x' = 2 middle - y, y' = x). */
+		if (e.contains("lavky") && e.at("lavky").is_object() && e.at("lavky").contains("y") && e.at("lavky").at("y").is_array()) {
+			const float z = static_cast<float>(e.at("lavky").value("z", 0.0f) * OBJECT_HEIGHT_PER_METRE);
+			const float length = static_cast<float>(tiles_x * TILE_SIZE);
+			for (const auto &side : e.at("lavky").at("y")) {
+				if (!side.is_array() || side.size() != 2 || !side.at(0).is_number() || !side.at(1).is_number()) continue;
+				const float a = static_cast<float>(side.at(0).get<float>() * OBJECT_UNITS_PER_METRE), b = static_cast<float>(side.at(1).get<float>() * OBJECT_UNITS_PER_METRE);
+				if (turns % 2 == 0) {
+					obj.walkways.push_back({0.0f, a, length, b, z});
+				} else {
+					obj.walkways.push_back({static_cast<float>(TILE_SIZE) - b, 0.0f, static_cast<float>(TILE_SIZE) - a, length, z});
+				}
+			}
+		}
 		/* The wings of its gates and doors ("dvere_NN"), each shut and open either way about its hinge, turned with it
 		 * (as a house's, ReadInterior()); a gate ("druh" "vrata") opens out ("otevreni_uhel", its sign the way). */
 		for (const std::string &node : GlbDoorNodes(obj.glb_path)) {
@@ -12444,7 +12459,50 @@ std::optional<double> ThreeDLandThingTopAt(TileIndex tile, double x, double y)
 		const std::optional<double> top = ShapeTopAt(station, x, y);
 		if (top.has_value()) return GetTileMaxPixelZ(tile) + *top;
 	}
+	/* The planks of a ship depot's walkways (the colleague's "lavky"), from its north tile. */
+	if (IsValidTile(tile) && IsShipDepotTile(tile)) {
+		TileIndex origin;
+		if (const ThreeDObject *depot = GetThreeDDepot(tile, origin); depot != nullptr) {
+			const double lx = x + (static_cast<double>(TileX(tile)) - TileX(origin)) * TILE_SIZE, ly = y + (static_cast<double>(TileY(tile)) - TileY(origin)) * TILE_SIZE;
+			for (const auto &w : depot->walkways) {
+				if (lx >= w[0] && lx <= w[2] && ly >= w[1] && ly <= w[3]) return GetTileMaxPixelZ(origin) + w[4];
+			}
+		}
+	}
 	return std::nullopt;
+}
+
+/**
+ * The rig ('test3d depomapa'): a depot's object seen from above over its north tile, a character every quarter of a
+ * metre: '#' in the way of feet so high (ThreeDObject::Blocks()), '=' a floor between 0.4 and 0.8 m under no more than
+ * 1 m, '.' neither.
+ */
+std::string RigThreeDDepotMap(TileIndex tile, double feet_m)
+{
+	TileIndex origin;
+	const ThreeDObject *o = GetThreeDDepot(tile, origin);
+	if (o == nullptr || !o->Read() || o->pos.empty()) return "zadne depo";
+	std::string out = fmt::format("{} nohy {:.2f} m (x doprava, y dolu, po 0.25 m)", o->name, feet_m);
+	for (double ym = 0.125; ym < 14.8; ym += 0.25) {
+		out += fmt::format("\n{:5.2f} ", ym);
+		for (double xm = 0.125; xm < 14.8; xm += 0.25) {
+			const double x = xm * OBJECT_UNITS_PER_METRE, y = ym * OBJECT_UNITS_PER_METRE;
+			const auto floor = ShapeTopAt(o, x, y);
+			char c = '.';
+			std::optional<double> low;
+			for (size_t t = 0; t + 2 < o->tri.size(); t += 3) {
+				const float *a = &o->pos[o->tri[t] * 3], *b = &o->pos[o->tri[t + 1] * 3], *d = &o->pos[o->tri[t + 2] * 3];
+				if (std::max({a[0], b[0], d[0]}) < x || std::min({a[0], b[0], d[0]}) > x || std::max({a[1], b[1], d[1]}) < y || std::min({a[1], b[1], d[1]}) > y) continue;
+				const double z = std::max({a[2], b[2], d[2]}) / OBJECT_HEIGHT_PER_METRE;
+				if (std::min({a[2], b[2], d[2]}) / OBJECT_HEIGHT_PER_METRE > 0.4 && z < 0.8) low = z;
+			}
+			if (low.has_value()) c = '=';
+			if (o->Blocks(x, y, feet_m * OBJECT_HEIGHT_PER_METRE)) c = '#';
+			(void)floor;
+			out += c;
+		}
+	}
+	return out;
 }
 
 /**
