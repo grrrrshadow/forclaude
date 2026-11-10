@@ -1387,10 +1387,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 			DrawGroundSprite(image, PAL_NONE);
 		}
 
-		if (transport_type == TransportType::Water) {
-			/* The canal's water in its mouth, flat at the foot of the slope (where the boats float, GetSlopePixelZ()). */
-			DrawGroundSpriteAt(SPR_FLAT_WATER_TILE, PAL_NONE, 0, 0, 0);
-		} else if (transport_type == TransportType::Road) {
+		if (transport_type == TransportType::Road) {
 			RoadType road_rt = GetRoadTypeRoad(ti->tile);
 			RoadType tram_rt = GetRoadTypeTram(ti->tile);
 			const RoadTypeInfo *road_rti = road_rt == INVALID_ROADTYPE ? nullptr : GetRoadTypeInfo(road_rt);
