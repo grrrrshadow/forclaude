@@ -48,7 +48,7 @@
   "interier": false,
   "barva_firmy": {
    "cast": "zabradli",
-   "maska": "stanice_maska_firmy.png",
+   "maska": "smerovani_maska.png",
    "zacatek": 219,
    "poznamka": "zábradlí po stranách stavědla v barvě firmy (OpenGFX má tyto čáry v barvě firmy); maska je pro texturu prvního materiálu (atlas), barvení jako u garáže (barva_firmy)"
   },
@@ -62,6 +62,10 @@
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   768
+  ],
   "rozmer_m": {
    "x": [
     0.15,
@@ -77,7 +81,7 @@
    ]
   },
   "trojuhelniku": 1560,
-  "poznamka": "směrování (průjezdní bod) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 1560 trojúhelníků, 679 kB"
+  "poznamka": "směrování (průjezdní bod) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 1560 trojúhelníků, 511 kB"
  },
  {
   "druh": "peron",
@@ -163,7 +167,8 @@
      0
     ],
     "sirka": 2.1,
-    "vyska": 0.42
+    "vyska": 0.42,
+    "lic": true
    },
    {
     "stred": [
@@ -177,7 +182,8 @@
      0
     ],
     "sirka": 2.1,
-    "vyska": 0.42
+    "vyska": 0.42,
+    "lic": false
    },
    {
     "stred": [
@@ -191,7 +197,8 @@
      0
     ],
     "sirka": 2.1,
-    "vyska": 0.42
+    "vyska": 0.42,
+    "lic": false
    },
    {
     "stred": [
@@ -205,14 +212,16 @@
      0
     ],
     "sirka": 2.1,
-    "vyska": 0.42
+    "vyska": 0.42,
+    "lic": true
    }
   ],
+  "poznamka_cedule": "lic: true je líc cedule (barva firmy, ke své koleji; kdyby se psalo jméno stanice, sem), false rub (šedý kov, za ním sloupky)",
   "barva_firmy": {
    "cast": "cedule",
-   "maska": "stanice_maska_firmy.png",
+   "maska": "peron_maska.png",
    "zacatek": 219,
-   "poznamka": "cedule stanice v barvě firmy (OpenGFX ji má modrou, v barvě firmy); maska je pro texturu prvního materiálu (atlas), barvení jako u garáže"
+   "poznamka": "líc cedule stanice v barvě firmy (OpenGFX ji má modrou, v barvě firmy); maska je pro texturu prvního materiálu (malý atlas peronu), barvení jako u garáže"
   },
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
@@ -231,8 +240,8 @@
     3.37
    ]
   },
-  "trojuhelniku": 402,
-  "poznamka": "peron (nástupiště bez přístřešku) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 402 trojúhelníků, 644 kB"
+  "trojuhelniku": 378,
+  "poznamka": "peron (nástupiště bez přístřešku) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 378 trojúhelníků, 125 kB"
  },
  {
   "druh": "nakladova_rampa",
@@ -799,38 +808,49 @@
    },
    "poznamka": "čekající náklad stanice na zemi (hráč: „tam bysme na zemi zobrazili čekající náklad“), místo beden ze spritu OpenGFX. Bunky jsou místa pro kusy v pořadí plnění (zadní řada první), každá 1,3 × 1,0 m, kus stojí na poloha (z = horní plocha betonu), otoceni 0 = delší strana kusu podél x; kusy jdou do 2 pater (druhé na výšce rozmer_m kusu pod ním). Kusové náklady kusem ze sady naklady podle jejich tabulky naklady (zboží paleta_bedny, cement paleta_pytle …), pošta paleta_pytle barvy 3E5F8A, kapaliny paleta_barely, dobytek dobytek_*, dlouhé kusy (klady, prkna 3,6 m) přes 3 buňky řady, ocel přes 2. Sypké náklady hromadou hromada_nakladu na místech hromady (každá přes 3 sloupce a obě řady), barva podle jejího záznamu, meritko podle množství (0,4–1). Kolik kusů na množství, rozhodni ty (návrh: kus na 10 jednotek, nejvýš všechna místa); víc druhů nákladu: místa po druzích podle množství."
   },
-  "barva_firmy": {
-   "cast": "lampy",
-   "maska": "stanice_maska_firmy.png",
-   "zacatek": 219,
-   "poznamka": "sloupy lamp v barvě firmy (OpenGFX je má modré, v barvě firmy); maska pro texturu prvního materiálu (atlas)"
-  },
-  "noc": {
-   "uzel": "noc",
-   "den": "den",
-   "svetla": 4,
-   "poznamka": "v noci ukaž uzel noc: svítí žluté lampy; svetlo_NN jsou místa záře"
-  },
-  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad)",
+  "doplnky": [
+   {
+    "jmeno": "lampa_david_h",
+    "poloha": [
+     14.2,
+     2.3,
+     0.06
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lampa_david_h",
+    "poloha": [
+     0.6,
+     12.5,
+     0.06
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka_doplnky": "lampy hry (lampa_david_h ze sady lampy, hráč: „my mame ingame lampy aby se šetřilo“) tam, kde stály lampy OpenGFX, na betonu; rameno nad silnicí (otoceni kladně proti směru hodinových ručiček shora)",
+  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad); od 10. 11. i vlastní lampy (místo nich lampy hry v doplnky) a plot (hráč: „plot kolem nakladovych ramp dej pryč“), tím i barva firmy a noc",
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "rozmer_m": {
    "x": [
-    0.12,
-    14.68
+    0.15,
+    14.65
    ],
    "y": [
-    0.05,
+    0.15,
     14.65
    ],
    "z": [
     0.0,
-    4.4
+    0.14
    ]
   },
-  "trojuhelniku": 770,
-  "poznamka": "nákladová rampa (průjezdná) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 770 trojúhelníků, 649 kB"
+  "trojuhelniku": 256,
+  "poznamka": "nákladová rampa (průjezdná) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 256 trojúhelníků, 84 kB"
  },
  {
   "druh": "nakladova_rampa",
@@ -1540,38 +1560,49 @@
    },
    "poznamka": "čekající náklad stanice na zemi (hráč: „tam bysme na zemi zobrazili čekající náklad“), místo beden ze spritu OpenGFX. Bunky jsou místa pro kusy v pořadí plnění (zadní řada první), každá 1,3 × 1,0 m, kus stojí na poloha (z = horní plocha betonu), otoceni 0 = delší strana kusu podél x; kusy jdou do 2 pater (druhé na výšce rozmer_m kusu pod ním). Kusové náklady kusem ze sady naklady podle jejich tabulky naklady (zboží paleta_bedny, cement paleta_pytle …), pošta paleta_pytle barvy 3E5F8A, kapaliny paleta_barely, dobytek dobytek_*, dlouhé kusy (klady, prkna 3,6 m) přes 3 buňky řady, ocel přes 2. Sypké náklady hromadou hromada_nakladu na místech hromady (každá přes 3 sloupce a obě řady), barva podle jejího záznamu, meritko podle množství (0,4–1). Kolik kusů na množství, rozhodni ty (návrh: kus na 10 jednotek, nejvýš všechna místa); víc druhů nákladu: místa po druzích podle množství."
   },
-  "barva_firmy": {
-   "cast": "lampy",
-   "maska": "stanice_maska_firmy.png",
-   "zacatek": 219,
-   "poznamka": "sloupy lamp v barvě firmy (OpenGFX je má modré, v barvě firmy); maska pro texturu prvního materiálu (atlas)"
-  },
-  "noc": {
-   "uzel": "noc",
-   "den": "den",
-   "svetla": 4,
-   "poznamka": "v noci ukaž uzel noc: svítí žluté lampy; svetlo_NN jsou místa záře"
-  },
-  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad)",
+  "doplnky": [
+   {
+    "jmeno": "lampa_david_h",
+    "poloha": [
+     14.2,
+     2.3,
+     0.06
+    ],
+    "otoceni": 90.0,
+    "meritko": 1.0
+   },
+   {
+    "jmeno": "lampa_david_h",
+    "poloha": [
+     14.2,
+     12.5,
+     0.06
+    ],
+    "otoceni": 270.0,
+    "meritko": 1.0
+   }
+  ],
+  "poznamka_doplnky": "lampy hry (lampa_david_h ze sady lampy, hráč: „my mame ingame lampy aby se šetřilo“) tam, kde stály lampy OpenGFX, na betonu; rameno nad silnicí (otoceni kladně proti směru hodinových ručiček shora)",
+  "vynechano": "budka a cihlový domek ze spritu OpenGFX (hráč: „nákladovou rampu bez budky“), bedny ze spritu (místo nich čekající náklad); od 10. 11. i vlastní lampy (místo nich lampy hry v doplnky) a plot (hráč: „plot kolem nakladovych ramp dej pryč“), tím i barva firmy a noc",
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
   "rozmer_m": {
    "x": [
-    0.05,
-    14.68
+    0.15,
+    14.65
    ],
    "y": [
-    0.05,
-    14.75
+    0.15,
+    14.65
    ],
    "z": [
     0.0,
-    4.4
+    0.14
    ]
   },
-  "trojuhelniku": 1070,
-  "poznamka": "nákladová rampa (slepá) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 1070 trojúhelníků, 652 kB"
+  "trojuhelniku": 336,
+  "poznamka": "nákladová rampa (slepá) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; silnici a zem kreslí hra; 336 trojúhelníků, 85 kB"
  },
  {
   "druh": "naklad",

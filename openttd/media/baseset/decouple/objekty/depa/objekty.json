@@ -103,6 +103,10 @@
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   512
+  ],
   "rozmer_m": {
    "x": [
     0.55,
@@ -118,7 +122,7 @@
    ]
   },
   "trojuhelniku": 6698,
-  "poznamka": "depo vlaků ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 6698 trojúhelníků, 893 kB"
+  "poznamka": "depo vlaků ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 6698 trojúhelníků, 502 kB"
  },
  {
   "druh": "depo",
@@ -229,6 +233,10 @@
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   768
+  ],
   "rozmer_m": {
    "x": [
     0.09,
@@ -244,7 +252,7 @@
    ]
   },
   "trojuhelniku": 3554,
-  "poznamka": "garáž (depo silničních vozidel) ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 3554 trojúhelníků, 861 kB"
+  "poznamka": "garáž (depo silničních vozidel) ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 3554 trojúhelníků, 529 kB"
  },
  {
   "druh": "depo",
@@ -327,7 +335,7 @@
   "interier": false,
   "barva_firmy": {
    "cast": "pas_nad_vjezdy_a_vlajky",
-   "maska": "depo_auta_maska_firmy.png",
+   "maska": "depo_lode_maska_firmy.png",
    "zacatek": 222,
    "poznamka": "pás nad oběma vjezdy a vlajky na hřebeni v barvě firmy (OpenGFX je má modré); stejný atlas i maska jako garáž"
   },
@@ -340,6 +348,10 @@
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model depa/depa.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
+  "atlas_px": [
+   1024,
+   512
+  ],
   "rozmer_m": {
    "x": [
     0.08,
@@ -355,6 +367,6 @@
    ]
   },
   "trojuhelniku": 4964,
-  "poznamka": "lodní depo ve stylu OpenGFX (hráč 10. 11.: „udělame 3D depo pro lodě“): dvě dlaždice podél x nad vodou, počátek v severním rohu severní dlaždice, osy hry, metry; otevřené na obou čelech (vjezd obou částí), vodu kreslí hra; uvnitř lávky podél zdí; 4964 trojúhelníků, 859 kB"
+  "poznamka": "lodní depo ve stylu OpenGFX (hráč 10. 11.: „udělame 3D depo pro lodě“): dvě dlaždice podél x nad vodou, počátek v severním rohu severní dlaždice, osy hry, metry; otevřené na obou čelech (vjezd obou částí), vodu kreslí hra; uvnitř lávky podél zdí; 4964 trojúhelníků, 354 kB"
  }
 ]
