@@ -27,6 +27,12 @@
 #include "table/sprites.h"
 
 #include "green_load.h"
+#include "strings_func.h"
+#include "debug.h"
+#include "zoom_func.h"
+#include "core/backup_type.hpp"
+
+#include "table/strings.h"
 
 #include "safeguards.h"
 
@@ -405,6 +411,69 @@ void CheckBlitter()
 /** How many rounds the last loading of the sprites read the NewGRFs (GfxLoadSprites()): more than one when one gave up. */
 int _sprite_load_rounds = 0;
 
+/**
+ * The sets being read (GfxLoadSprites()), shown while it lasts (the player, test5: "the search for graphics ends with
+ * the old grf 100 % checked and then ... the indicator shows 100 % and looks stuck" -- on the phone the sets took 12 to
+ * 29 s after it, the screen as the scan had left it). The windows' pictures are being read again meanwhile, so the
+ * drawing thread draws no window then but the screen black with how far the reading is (DrawSetsLoading()); the
+ * game's thread, which reads them, lets it draw between the sets' files, not more often than SETS_LOADING_EVERY and
+ * only once the reading has lasted SETS_LOADING_FIRST (SetsLoadingStep()).
+ */
+static struct SetsLoading {
+	std::atomic<bool> active{false}; ///< the sets are being read now, and have been read before (the font is there)
+	std::atomic<uint> done{0};       ///< the steps of reading done in this round: a set's file in one of the stages
+	std::atomic<uint> total{0};      ///< the steps of this round
+	std::atomic<int> round{1};       ///< the round of reading (_sprite_load_rounds): one set gave up, all read again
+	std::atomic<bool> drawn{false};  ///< the drawing thread has drawn it: the windows to be drawn anew after it
+	std::chrono::steady_clock::time_point started{}; ///< the game's thread's only: when the reading began
+	std::chrono::steady_clock::time_point let{};     ///< and when it last let the drawing thread draw
+} _sets_loading;
+
+static constexpr auto SETS_LOADING_FIRST = std::chrono::milliseconds(300); ///< a reading shorter than this is not shown
+static constexpr auto SETS_LOADING_EVERY = std::chrono::milliseconds(250); ///< the drawing thread let draw at most this often
+
+/**
+ * A step of reading the sets done (LoadNewGRF()): on the game's thread, the drawing thread let draw how far it is
+ * (DrawSetsLoading()), if it is time.
+ * @param done the steps done
+ * @param total all the steps of this round
+ */
+void SetsLoadingStep(uint done, uint total)
+{
+	if (!_sets_loading.active) return;
+	_sets_loading.done = done;
+	_sets_loading.total = total;
+	const auto now = std::chrono::steady_clock::now();
+	if (now - _sets_loading.started < SETS_LOADING_FIRST || now - _sets_loading.let < SETS_LOADING_EVERY) return;
+	_sets_loading.let = now;
+	VideoDriver::GetInstance()->GameLoopPause();
+}
+
+/**
+ * The drawing thread's frame while the sets are read (VideoDriver::Tick()): the screen black, the words and a bar of
+ * how far; no window, their pictures being read. Only plain fills and the font's letters, read with the base graphics
+ * before any set.
+ * @return whether the sets are being read, so the frame is this
+ */
+bool DrawSetsLoading()
+{
+	if (!_sets_loading.active) return false;
+	AutoRestoreBackup dpi_backup(_cur_dpi, &_screen);
+	GfxFillRect(0, 0, _screen.width - 1, _screen.height - 1, PC_BLACK);
+	const uint total = std::max(1U, _sets_loading.total.load());
+	const uint percent = std::min(100U, _sets_loading.done * 100 / total);
+	const int line = GetCharacterHeight(FontSize::Normal);
+	const int w = std::max(16, std::min(_screen.width - 32, ScaleGUITrad(400)));
+	const int x = (_screen.width - w) / 2;
+	const int y = _screen.height / 2;
+	DrawString(x, x + w - 1, y - 2 * line, GetString(_sets_loading.round > 1 ? STR_SETS_LOADING_AGAIN : STR_SETS_LOADING, percent), TextColour::White, AlignmentH::Centre);
+	GfxFillRect(x, y, x + w - 1, y + line, PC_DARK_GREY);
+	if (percent > 0) GfxFillRect(x + 1, y + 1, x + 1 + (w - 3) * static_cast<int>(percent) / 100, y + line - 1, PC_GREEN);
+	VideoDriver::GetInstance()->MakeDirty(0, 0, _screen.width, _screen.height);
+	_sets_loading.drawn = true;
+	return true;
+}
+
 /** Initialise and load all the sprites. */
 void GfxLoadSprites()
 {
@@ -425,12 +494,27 @@ void GfxLoadSprites()
 	 * ever. */
 	NewGRFLoadRounds rounds;
 	_sprite_load_rounds = 0;
+	/* Shown while it lasts (DrawSetsLoading()); not the first reading of all, before there is a font. */
+	static bool read_before = false;
+	_sets_loading.started = std::chrono::steady_clock::now();
+	_sets_loading.let = {};
+	_sets_loading.done = 0;
+	_sets_loading.total = 0;
+	_sets_loading.drawn = false;
+	_sets_loading.active = read_before;
 	do {
 		_sprite_load_rounds++;
+		_sets_loading.round = _sprite_load_rounds;
 		VideoDriver::GetInstance()->ClearSystemSprites();
 		FontCache::ClearFontCaches(FONTSIZES_ALL);
 		GfxInitSpriteMem();
 	} while (LoadSpriteTables(rounds));
+	_sets_loading.active = false;
+	read_before = true;
+	/* The windows drawn anew over the black of the reading. */
+	if (_sets_loading.drawn) MarkWholeScreenDirty();
+	Debug(sprite, 1, "Sets read in {} ms, {} round(s){}", std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - _sets_loading.started).count(),
+			_sprite_load_rounds, _sets_loading.drawn ? ", shown" : "");
 	GfxInitPalettes();
 
 	UpdateCursorSize();

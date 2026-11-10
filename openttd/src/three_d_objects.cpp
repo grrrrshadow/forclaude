@@ -5347,7 +5347,19 @@ static void ReadThreeDObjects()
 {
 	if (_three_d_objects_reading) return;
 	std::lock_guard lock(_three_d_objects_reader.mutex);
-	if (_three_d_objects_reader.thread.joinable()) _three_d_objects_reader.thread.join();
+	if (_three_d_objects_reader.thread.joinable()) {
+		/* Waited for, the thread still reading: for how long, in the crash's trace and the debug (the player, test5:
+		 * after the sets the start "looks stuck" -- the sets or this?). */
+		const bool waits = !_three_d_objects_read;
+		const auto from = std::chrono::steady_clock::now();
+		if (waits) CrashTrace("3d index: waiting for its thread");
+		_three_d_objects_reader.thread.join();
+		if (waits) {
+			const auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - from).count();
+			CrashTrace(fmt::format("3d index: waited {} ms", ms));
+			Debug(misc, 1, "3D objects: waited {} ms for the thread reading the indices", ms);
+		}
+	}
 	if (!_three_d_objects_read) ReadThreeDObjectsNow();
 }
 

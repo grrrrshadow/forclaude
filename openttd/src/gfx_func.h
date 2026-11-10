@@ -109,6 +109,8 @@ bool DrawStringMultiLineWithClipping(int left, int right, int top, int bottom, s
 void DrawCharCentered(char32_t c, const Rect &r, TextColour colour);
 
 void GfxFillRect(int left, int top, int right, int bottom, const std::variant<PixelColour, PaletteID> &colour, FillRectMode mode = FillRectMode::Opaque);
+void SetsLoadingStep(uint done, uint total);
+bool DrawSetsLoading();
 void GfxFillPolygon(std::span<const Point> shape, const std::variant<PixelColour, PaletteID> &colour, FillRectMode mode = FillRectMode::Opaque);
 void GfxDrawLine(int left, int top, int right, int bottom, PixelColour colour, int width = 1, int dash = 0);
 void DrawBox(int x, int y, int dx1, int dy1, int dx2, int dy2, int dx3, int dy3);
