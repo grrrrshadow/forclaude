@@ -480,7 +480,7 @@
    5
   ],
   "barva_mostu": {
-   "3": "A6A59D",
+   "3": "35619E",
    "4": "985A4A",
    "5": "D0B458"
   },
@@ -490,9 +490,17 @@
     "maska": "most_zaveseny_maska_barva.png",
     "zacatek": 204,
     "paleta": [
-     "A6A59D",
+     "35619E",
      "985A4A",
      "D0B458"
+    ]
+   },
+   {
+    "cast": "chodnik",
+    "maska": "most_zaveseny_maska_chodnik.png",
+    "zacatek": 96,
+    "paleta": [
+     "3E3F41"
     ]
    }
   ],
