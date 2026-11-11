@@ -2838,8 +2838,11 @@ struct FirstPersonWindow : Window {
 				/* Made by the step; anew here only when the window changed its size since. */
 				if (this->picture.width != w || this->picture.height != h) this->MakePicture();
 				if (!this->picture_ok) {
+					/* No picture yet (the first frame is drawn on its thread, a frame behind), or none can be made: the
+					 * blitter is said only when it is the reason (test6: a 40bpp blitter was told it needs 32bpp while the
+					 * frames did not come). */
 					GfxFillRect(r, GetColourGradient(Colours::Grey, Shade::Darkest));
-					DrawString(r.left, r.right, r.top + h / 2, STR_FIRST_PERSON_NEEDS_32BPP, TextColour::White, AlignmentH::Centre);
+					if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) DrawString(r.left, r.right, r.top + h / 2, STR_FIRST_PERSON_NEEDS_32BPP, TextColour::White, AlignmentH::Centre);
 					return;
 				}
 				/* Hurt: red over the picture, fading. */
