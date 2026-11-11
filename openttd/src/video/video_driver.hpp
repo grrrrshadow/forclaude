@@ -125,9 +125,11 @@ public:
 	 *             picture of the turned map reaches past the view, TurnedCardGround)
 	 * @param z its window's place among the windows, from the back: of those not under, the ones further front are
 	 *          shown after (over) the others where both have holes (one window over another)
+	 * @param over_order how near each pixel of over is, its order in red, green and blue (ThreeDGpuStandingItem::order),
+	 *                   0 none: a glow (SetThreeDGlows()) not over a pixel nearer than its lamp
 	 * @return whether it is shown
 	 */
-	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false, [[maybe_unused]] uint32_t light = 0, [[maybe_unused]] uint32_t over = 0, [[maybe_unused]] uint32_t over_lit = 0, [[maybe_unused]] const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, [[maybe_unused]] int z = 0) { return false; }
+	virtual bool ShowThreeDPicture([[maybe_unused]] const void *owner, [[maybe_unused]] const Rect &r, [[maybe_unused]] uint32_t texture, [[maybe_unused]] uint32_t tint, [[maybe_unused]] bool under = false, [[maybe_unused]] uint32_t light = 0, [[maybe_unused]] uint32_t over = 0, [[maybe_unused]] uint32_t over_lit = 0, [[maybe_unused]] const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, [[maybe_unused]] int z = 0, [[maybe_unused]] uint32_t over_order = 0) { return false; }
 
 	/**
 	 * A window's picture shown straight from the graphics card no more (the window gone).
@@ -144,6 +146,8 @@ public:
 		float rx, ry;    ///< half its width and its height, pixels
 		float r, g, b;   ///< its colour, 0-255
 		float strength;  ///< how much of it is added in its middle
+		float order = 0; ///< how near its lamp is, as the order of over's pixels (over_order of ShowThreeDPicture()): not over a pixel nearer; 0 over all
+		float order_down = 0; ///< how much less near a pixel lower of it is: the glow a disc standing upright at its lamp
 	};
 
 	/**

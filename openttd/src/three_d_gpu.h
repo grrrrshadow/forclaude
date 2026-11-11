@@ -562,7 +562,7 @@ uint32_t ThreeDGpuViewGround(int view, uint64_t *made = nullptr);
 bool ThreeDGpuDrawGroundStart(ThreeDGpuGround &ground);
 bool ThreeDGpuDrawGroundTake();
 bool ThreeDGpuDrawStanding(ThreeDGpuStanding &standing);
-uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr);
+uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit = nullptr, uint32_t *order = nullptr);
 void ThreeDGpuMovingLayer(int view, bool on);
 std::string ThreeDGpuMovingTimes();
 void ThreeDGpuForgetView(int view, uint64_t ground_key);

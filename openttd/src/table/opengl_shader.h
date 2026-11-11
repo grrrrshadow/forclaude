@@ -263,7 +263,11 @@ static const char *_frag_shader_three_d_150[] = {
 /**
  * Fragment shader of a glow of the night over a picture of the graphics card (OpenGLBackend::SetThreeDGlows()): added
  * where the screen leaves the picture seen, a soft spot as the processor's (AddNightLight()), only when the picture over
- * it has a lit pixel near its middle (two pixels about it, as the processor's night looked).
+ * it has a lit pixel near its middle (two pixels about it, as the processor's night looked) -- and not over a pixel of
+ * it nearer than the glow there, a disc standing upright at its lamp (order_at: the lamp's order, its half size, how
+ * much less near a pixel lower of the disc is; over_order_tex the order of each pixel of what stands,
+ * STANDING_ORDER_GLSL of three_d_gpu.cpp): the railing before a lighthouse's lamp covers its glow, the roof over it
+ * not. A pixel a little nearer (48, a unit and a half of the world) still under it: its lamp and the glass about it.
  */
 static const char *_frag_shader_three_d_glow[] = {
 	"#version 110\n",
@@ -272,6 +276,8 @@ static const char *_frag_shader_three_d_glow[] = {
 	"uniform vec2 screen_size;",
 	"uniform vec4 glow;",
 	"uniform vec4 lit_at;",
+	"uniform sampler2D over_order_tex;",
+	"uniform vec4 order_at;",
 	"varying vec2 colour_tex_uv;",
 	"void main() {",
 	"  vec4 s = texture2D(screen_tex, vec2(gl_FragCoord.x / screen_size.x, 1.0 - gl_FragCoord.y / screen_size.y));",
@@ -279,6 +285,12 @@ static const char *_frag_shader_three_d_glow[] = {
 	"  vec2 d = colour_tex_uv * 2.0 - 1.0;",
 	"  float d2 = dot(d, d);",
 	"  if (d2 >= 1.0) discard;",
+	"  if (order_at.x > 0.5) {",
+	"    vec2 off = d * order_at.yz;",
+	"    vec4 o = texture2D(over_order_tex, lit_at.xy + off * lit_at.zw);",
+	"    float there = floor(o.r * 255.0 + 0.5) * 65536.0 + floor(o.g * 255.0 + 0.5) * 256.0 + floor(o.b * 255.0 + 0.5);",
+	"    if (o.a > 0.5 && there > order_at.x - off.y * order_at.w + 48.0) discard;",
+	"  }",
 	"  float lit = 0.0;",
 	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture2D(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
 	"  if (lit < 0.002) discard;",
@@ -295,6 +307,8 @@ static const char *_frag_shader_three_d_glow_150[] = {
 	"uniform vec2 screen_size;",
 	"uniform vec4 glow;",
 	"uniform vec4 lit_at;",
+	"uniform sampler2D over_order_tex;",
+	"uniform vec4 order_at;",
 	"in vec2 colour_tex_uv;",
 	"out vec4 colour;",
 	"void main() {",
@@ -303,6 +317,12 @@ static const char *_frag_shader_three_d_glow_150[] = {
 	"  vec2 d = colour_tex_uv * 2.0 - 1.0;",
 	"  float d2 = dot(d, d);",
 	"  if (d2 >= 1.0) discard;",
+	"  if (order_at.x > 0.5) {",
+	"    vec2 off = d * order_at.yz;",
+	"    vec4 o = texture(over_order_tex, lit_at.xy + off * lit_at.zw);",
+	"    float there = floor(o.r * 255.0 + 0.5) * 65536.0 + floor(o.g * 255.0 + 0.5) * 256.0 + floor(o.b * 255.0 + 0.5);",
+	"    if (o.a > 0.5 && there > order_at.x - off.y * order_at.w + 48.0) discard;",
+	"  }",
 	"  float lit = 0.0;",
 	"  for (int y = -2; y <= 2; y++) for (int x = -2; x <= 2; x++) lit = max(lit, texture(over_lit_tex, lit_at.xy + vec2(float(x), float(y)) * lit_at.zw).r);",
 	"  if (lit < 0.002) discard;",

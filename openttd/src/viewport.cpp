@@ -2095,6 +2095,8 @@ struct TurnedCardGlow {
 	Colour colour;
 	float strength;
 	bool house = false; ///< a light of a building or of a thing standing (its "svetlo_NN", _night_glows), told with what the card laid there; else a vehicle's, told by its block
+	float order = 0;    ///< how near its lamp is (TurnedOrder()): not over what stands nearer (VideoDriver::ThreeDGlow::order); 0 over all
+	float order_down = 0; ///< how much less near a pixel lower of it is (VideoDriver::ThreeDGlow::order_down, TurnedGlowOrderDown())
 };
 
 static void ParallelRows(int rows, const std::function<void(int, int)> &work, bool worth = true);
@@ -7421,8 +7423,8 @@ static void ShowTurnedCardGround()
 	const Viewport &vp = *g.vp;
 	const bool was = g.shown;
 	/* What stands on it, laid by the card over it (ThreeDGpuStanding). */
-	uint32_t over_lit = 0;
-	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(g.view, &over_lit) : 0;
+	uint32_t over_lit = 0, over_order = 0;
+	const uint32_t over = _turned_card_standing_on ? ThreeDGpuViewStanding(g.view, &over_lit, &over_order) : 0;
 	/* The view in its middle: it reaches past it every way (band). */
 	const std::array<float, 4> part = g.w > 0 && g.h > 0 ? std::array<float, 4>{static_cast<float>(g.band) / g.w, static_cast<float>(g.band) / g.h, static_cast<float>(vp.width) / g.w, static_cast<float>(vp.height) / g.h} : std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f};
 	/* The main view under all the other pictures; a small view's in its window's place among the windows. */
@@ -7434,7 +7436,7 @@ static void ShowTurnedCardGround()
 			z++;
 		}
 	}
-	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&g, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, main, NightLightOfCard(), over, over != 0 ? over_lit : 0, part, z);
+	g.shown = name != 0 && VideoDriver::GetInstance()->ShowThreeDPicture(&g, {vp.left, vp.top, vp.left + vp.width - 1, vp.top + vp.height - 1}, name, 0, main, NightLightOfCard(), over, over != 0 ? over_lit : 0, part, z, over != 0 ? over_order : 0);
 	/* Shown first now: the blocks drawn before it are drawn again as holes. */
 	if (g.shown && !was) {
 		Debug(misc, 1, "3D: the turned map's ground shown straight from the graphics card ({}x{}, view {})", vp.width, vp.height, g.view);
@@ -9336,7 +9338,7 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 	for (const TurnedCardGlow &g : card.glows) {
 		const float x = g.x + ox, y = g.y + oy;
 		if (x + g.rx < vp.left || y + g.ry < vp.top || x - g.rx > vp.left + vp.width || y - g.ry > vp.top + vp.height) continue;
-		glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength});
+		glows.push_back({x, y, g.rx, g.ry, static_cast<float>(g.colour.r), static_cast<float>(g.colour.g), static_cast<float>(g.colour.b), g.strength, g.order, g.order_down});
 	}
 	card.glows_told = !glows.empty();
 	VideoDriver::GetInstance()->SetThreeDGlows(&card, std::move(glows));
@@ -9346,6 +9348,27 @@ static void TurnedCardGlowsShow(const Viewport &vp)
 static const Colour TURNED_HOUSE_GLOW_COLOUR(255, 200, 110);
 static constexpr double TURNED_HOUSE_GLOW_SIZE = 1.4;
 static constexpr double TURNED_HOUSE_GLOW_STRENGTH = 0.35;
+
+/**
+ * How near the lamp of a light of a building or of a thing standing is (_night_glows: its x, y, z), as what stands is
+ * ordered (TurnedOrder()): its glow not over what stands nearer than it (the railing of a lighthouse's gallery before
+ * its lamp; the player, test6: "the light is lower than the wall about the lantern, it shines through the wall").
+ */
+static float TurnedGlowOrder(const std::array<double, 4> &g)
+{
+	double xr, yr;
+	TurnWorldPoint(g[0], g[1], xr, yr);
+	return static_cast<float>(TurnedOrder(xr + yr + 2.0 * g[2]));
+}
+
+/**
+ * How much less near a glow is a pixel lower on the screen at a zoom, in the order's 32nds (TurnedOrder()): a disc
+ * standing upright at its lamp, a pixel lower of it a pixel's units of height lower (its xr + yr as the lamp's).
+ */
+static float TurnedGlowOrderDown(ZoomLevel zoom)
+{
+	return static_cast<float>(2.0 * 32.0 * ScaleByZoom(1, zoom) / ZOOM_BASE);
+}
 
 /**
  * The glow of a light of a building or of a thing standing on the turned view (_night_glows), as the card's picture of the
@@ -9359,7 +9382,7 @@ static TurnedCardGlow TurnedHouseGlow(const std::array<double, 4> &g, ZoomLevel 
 	ProjectTurnedF(g[0], g[1], g[2], vx, vy);
 	const double scale = 1.0 / (1 << to_underlying(zoom));
 	const float r = static_cast<float>(TURNED_HOUSE_GLOW_SIZE * 2 * ZOOM_BASE * scale * g[3]);
-	return {static_cast<float>(vx * scale), static_cast<float>(vy * scale), r, r, TURNED_HOUSE_GLOW_COLOUR, static_cast<float>(TURNED_HOUSE_GLOW_STRENGTH), true};
+	return {static_cast<float>(vx * scale), static_cast<float>(vy * scale), r, r, TURNED_HOUSE_GLOW_COLOUR, static_cast<float>(TURNED_HOUSE_GLOW_STRENGTH), true, TurnedGlowOrder(g), TurnedGlowOrderDown(zoom)};
 }
 
 /**
@@ -9430,9 +9453,9 @@ static void DrawNight(bool turned)
 		std::erase_if(_tcg->glows, [&](const TurnedCardGlow &g) { return (!_night_block_hole || !g.house) && g.x >= bl && g.x < bl + w && g.y >= bt && g.y < bt + h; });
 	}
 	/* A glow seen only by a lit pixel near it: by the card's where it laid the block (_night_card_lit), else here. */
-	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool house = false) {
+	auto lit_glow = [&](double px, double py, double rx, double ry, Colour colour, double strength, bool house = false, float order = 0) {
 		if (turned && _night_card_lit) {
-			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), house});
+			if (px >= 0 && py >= 0 && px < w && py < h) _tcg->glows.push_back({static_cast<float>(bl + px), static_cast<float>(bt + py), static_cast<float>(rx), static_cast<float>(ry), colour, static_cast<float>(strength), house, order, order != 0 ? TurnedGlowOrderDown(dpi.zoom) : 0.0f});
 			return;
 		}
 		if (lit_near(static_cast<int>(px), static_cast<int>(py))) AddNightLight(dst, dpi.pitch, w, h, px, py, rx, ry, colour, strength);
@@ -9444,7 +9467,7 @@ static void DrawNight(bool turned)
 		double px, py;
 		project(g[0], g[1], g[2], px, py);
 		if (px < 0 || py < 0 || px >= w || py >= h) continue;
-		lit_glow(px, py, TURNED_HOUSE_GLOW_SIZE * unit * g[3], TURNED_HOUSE_GLOW_SIZE * unit * g[3], window, TURNED_HOUSE_GLOW_STRENGTH, true);
+		lit_glow(px, py, TURNED_HOUSE_GLOW_SIZE * unit * g[3], TURNED_HOUSE_GLOW_SIZE * unit * g[3], window, TURNED_HOUSE_GLOW_STRENGTH, true, turned ? TurnedGlowOrder(g) : 0.0f);
 	}
 	/* A light of a vehicle's model (ThreeDPictureLight), its picture hung from the point hx, hy of the block; braking,
 	 * its red lights glow more (VehicleBrakeLightsOn()). */

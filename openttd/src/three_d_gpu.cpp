@@ -684,7 +684,7 @@ struct ViewPictures {
 	std::atomic<uint64_t> made = 0;        ///< counts the times it was made anew or let go: what it held is gone
 	GLuint standing = 0, standing_lit = 0, standing_fbo = 0;
 	GLuint standing_depth = 0;             ///< the depth of the building being drawn among them (ThreeDGpuStandingBuilding)
-	std::atomic<uint32_t> standing_name = 0, standing_lit_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
+	std::atomic<uint32_t> standing_name = 0, standing_lit_name = 0, standing_order_name = 0; ///< for the other threads, 0 none (ThreeDGpuViewStanding())
 	GLuint standing_order = 0;             ///< the order of what stands there by each pixel (ThreeDGpuStandingItem::order), its third picture
 	/* What stands with the moving things laid over it (ThreeDGpuStanding::moving): its colours and which are lit,
 	 * shown instead while the moving layer is on (ThreeDGpuMovingLayer()). */
@@ -734,7 +734,7 @@ static void ForgetViewPictures(ViewPictures &v)
 		gl.glDeleteTextures(1, &v.standing_lit);
 	}
 	v.standing = v.standing_lit = 0;
-	v.standing_name = v.standing_lit_name = 0;
+	v.standing_name = v.standing_lit_name = v.standing_order_name = 0;
 	if (v.standing_depth != 0) gl.glDeleteRenderbuffers(1, &v.standing_depth);
 	v.standing_depth = 0;
 	if (v.standing_order != 0) gl.glDeleteTextures(1, &v.standing_order);
@@ -4096,6 +4096,7 @@ bool ViewGroundOfSize(ViewPictures &v, int w, int h)
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	v.standing_name = standing_complete ? v.standing : 0;
 	v.standing_lit_name = standing_complete ? v.standing_lit : 0;
+	v.standing_order_name = standing_complete ? v.standing_order : 0;
 	v.made++;
 	if (!complete) {
 		gl.glDeleteTextures(1, &v.ground);
@@ -6765,9 +6766,11 @@ uint32_t ThreeDGpuViewGround(int view, uint64_t *made)
 }
 
 /** The picture of what stands on a view on the card (ThreeDGpuStanding), the card's texture, 0 none; and which of its pixels are lit. */
-uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit)
+uint32_t ThreeDGpuViewStanding(int view, uint32_t *lit, uint32_t *order)
 {
 	const ViewPictures &v = ViewPicturesOf(view);
+	/* How near each pixel of what stands is (its order), the moving things' none. */
+	if (order != nullptr) *order = v.standing_order_name;
 	/* With the moving things over it, once they were laid (ThreeDGpuMovingLayer()). */
 	if (v.moving_on && v.moving_name != 0 && v.moving_lit_name != 0) {
 		if (lit != nullptr) *lit = v.moving_lit_name;
@@ -6909,7 +6912,7 @@ void ThreeDGpuVideoContextGone() {}
 void *ThreeDGpuOwnContext() { return nullptr; }
 bool ThreeDGpuShows() { return false; }
 uint32_t ThreeDGpuViewGround(int, uint64_t *made) { if (made != nullptr) *made = 0; return 0; }
-uint32_t ThreeDGpuViewStanding(int, uint32_t *lit) { if (lit != nullptr) *lit = 0; return 0; }
+uint32_t ThreeDGpuViewStanding(int, uint32_t *lit, uint32_t *order) { if (lit != nullptr) *lit = 0; if (order != nullptr) *order = 0; return 0; }
 void ThreeDGpuMovingLayer(int, bool) {}
 std::string ThreeDGpuMovingTimes() { return "-"; }
 void ThreeDGpuForgetView(int, uint64_t) {}

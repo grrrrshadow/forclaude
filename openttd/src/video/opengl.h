@@ -88,6 +88,7 @@ private:
 		GLuint over_lit = 0; ///< which of over's pixels the light leaves as they are (its red), 0 none
 		std::array<float, 4> part = {0.0f, 0.0f, 1.0f, 1.0f}; ///< the part of the textures shown: left, top, width, height as parts of theirs
 		int z = 0;        ///< its window's place among the windows, from the back (ShowThreeDPicture())
+		GLuint over_order = 0; ///< how near each of over's pixels is, its order in red, green and blue (ThreeDGpuStandingItem::order), 0 none
 	};
 	std::map<const void *, ThreeDPicture> three_d_pictures; ///< by their owners
 	std::map<const void *, std::vector<VideoDriver::ThreeDGlow>> three_d_glows; ///< the glows over them (SetThreeDGlows()), by their owners
@@ -106,6 +107,7 @@ private:
 	GLint  three_d_glow_size_loc = -1;   ///< Uniform location for the screen size in the fragment shader.
 	GLint  three_d_glow_colour_loc = -1; ///< Uniform location for its colour and strength.
 	GLint  three_d_glow_lit_loc = -1;    ///< Uniform location for its middle in the lit pixels and a pixel of them.
+	GLint  three_d_glow_order_loc = -1;  ///< Uniform location for how near its lamp is and its half size (VideoDriver::ThreeDGlow::order).
 
 	OpenGLBackend();
 	~OpenGLBackend() override;
@@ -146,7 +148,7 @@ public:
 	void ClearCursorCache();
 
 	bool CanShowThreeDPictures() const { return this->three_d_program != 0; }
-	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, int z = 0);
+	void ShowThreeDPicture(const void *owner, const Rect &r, uint32_t texture, uint32_t tint, bool under = false, uint32_t light = 0, uint32_t over = 0, uint32_t over_lit = 0, const std::array<float, 4> &part = {0.0f, 0.0f, 1.0f, 1.0f}, int z = 0, uint32_t over_order = 0);
 	void HideThreeDPicture(const void *owner);
 	void SetThreeDGlows(const void *owner, std::vector<VideoDriver::ThreeDGlow> &&glows);
 	std::vector<std::pair<Rect, uint32_t>> GetThreeDPictures();
