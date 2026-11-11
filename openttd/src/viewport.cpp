@@ -5040,6 +5040,12 @@ static constexpr int TURNED_OVER_PIECES = 1;
 static constexpr double TURNED_WAY_HALF = 3.0;
 /** Half the width of an aqueduct's water between the walls of its 3D trough, metres (the colleague's hra/3d/PROSBA-AKVADUKTY.md: "y ±5.5 m"). */
 static constexpr double AQUEDUCT_WATER_HALF_M = 5.5;
+/**
+ * How far an aqueduct's water on its head reaches over the canal it comes from, world units: the canal's sprite ends
+ * in the teeth of a tile's edge, the trough's water straight at the tile's edge, and between them the head's ground
+ * showed, green teeth from above and a dark line from the eyes (the player's test6, 2 and 3).
+ */
+static constexpr double AQUEDUCT_WATER_OVER_CANAL = 1.0;
 
 /** Across a bridge's tile, where its floor lies: the whole deck, or an aqueduct's water between its 3D walls (TURNED_DECK_WATER). */
 static void TurnedDeckAcross(int16_t bits, double &c0, double &c1)
@@ -5192,7 +5198,14 @@ static void DrawTurnedBridgeRamp(const DrawPixelInfo &frame, const ParentSpriteT
 	/* An aqueduct's water dressed from the middle of its trough's sprite alone (DrawTurnedAqueductWater()). */
 	const bool water = (ps.box_dy & TURNED_DECK_WATER) != 0;
 	const double t_far = water ? TURNED_WATER_TEXTURE_C0 : c_far, t_near = water ? TURNED_WATER_TEXTURE_C1 : c_near;
-	add({pt(a_out, c_far, deck_out + lift, t_far, deck_out), pt(a_in, c_far, deck_in + lift, t_far, deck_in), pt(a_in, c_near, deck_in + lift, t_near, deck_in), pt(a_out, c_near, deck_out + lift, t_near, deck_out)});
+	/* The water a little over the canal at the outer end (AQUEDUCT_WATER_OVER_CANAL), dressed as at the end. */
+	const double a_edge = water ? a_out + (a_out > a_in ? AQUEDUCT_WATER_OVER_CANAL : -AQUEDUCT_WATER_OVER_CANAL) : a_out;
+	auto edge = [&](double c, double tc) {
+		BoxVertex v = pt(a_out, c, deck_out + lift, tc, deck_out);
+		world(a_edge, c, v.x, v.y);
+		return v;
+	};
+	add({edge(c_far, t_far), pt(a_in, c_far, deck_in + lift, t_far, deck_in), pt(a_in, c_near, deck_in + lift, t_near, deck_in), edge(c_near, t_near)});
 	/* Its sides down to the ground: the near one as the sprite shows it, the far one in the near one's pixels. */
 	for (double c : {c_near, c_far}) {
 		if (on_pieces) break;
@@ -13850,16 +13863,27 @@ static bool EyeBridgePieces(TileIndex tile, F add, bool map)
  * in it), the colour of the game's water.
  * @param ez the trough's bottom, the eyes' height (EyeLevelZ())
  */
-static void CabDrawAqueductWater(const CabCanvas &cv, const CabEye &eye, Axis axis, int x0, int y0, double ez)
+static void CabDrawAqueductWater(const CabCanvas &cv, const CabEye &eye, Axis axis, int x0, int y0, double ez, std::optional<double> canal_edge = std::nullopt)
 {
 	const double half = AQUEDUCT_WATER_HALF_M * OBJECT_UNITS_PER_METRE, c0 = TILE_SIZE / 2.0 - half, c1 = TILE_SIZE / 2.0 + half;
 	const double z = ez + CAB_DECK_OVER_PIECES;
+	const Colour water = CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160));
+	/* At a head a little over the canal it comes from (AQUEDUCT_WATER_OVER_CANAL), and its front there down under the
+	 * canal's water: the trough's water lies a little higher than the canal's. */
+	const double a0 = canal_edge == 0.0 ? -AQUEDUCT_WATER_OVER_CANAL : 0.0, a1 = canal_edge == static_cast<double>(TILE_SIZE) ? TILE_SIZE + AQUEDUCT_WATER_OVER_CANAL : TILE_SIZE;
 	double p[4][2];
-	CabAlongAcross(axis, x0, y0, 0, c0, p[0][0], p[0][1]);
-	CabAlongAcross(axis, x0, y0, TILE_SIZE, c0, p[1][0], p[1][1]);
-	CabAlongAcross(axis, x0, y0, TILE_SIZE, c1, p[2][0], p[2][1]);
-	CabAlongAcross(axis, x0, y0, 0, c1, p[3][0], p[3][1]);
-	CabDrawSolid(cv, eye, {{p[0][0], p[0][1], z}, {p[1][0], p[1][1], z}, {p[2][0], p[2][1], z}, {p[3][0], p[3][1], z}}, CabSpriteColour(SPR_FLAT_WATER_TILE, PAL_NONE, Colour(60, 90, 160)));
+	CabAlongAcross(axis, x0, y0, a0, c0, p[0][0], p[0][1]);
+	CabAlongAcross(axis, x0, y0, a1, c0, p[1][0], p[1][1]);
+	CabAlongAcross(axis, x0, y0, a1, c1, p[2][0], p[2][1]);
+	CabAlongAcross(axis, x0, y0, a0, c1, p[3][0], p[3][1]);
+	CabDrawSolid(cv, eye, {{p[0][0], p[0][1], z}, {p[1][0], p[1][1], z}, {p[2][0], p[2][1], z}, {p[3][0], p[3][1], z}}, water);
+	if (canal_edge.has_value()) {
+		const double a = *canal_edge == 0.0 ? a0 : a1;
+		double e[2][2];
+		CabAlongAcross(axis, x0, y0, a, c0, e[0][0], e[0][1]);
+		CabAlongAcross(axis, x0, y0, a, c1, e[1][0], e[1][1]);
+		CabDrawSolid(cv, eye, {{e[0][0], e[0][1], z}, {e[1][0], e[1][1], z}, {e[1][0], e[1][1], ez - 1.0}, {e[0][0], e[0][1], ez - 1.0}}, water);
+	}
 }
 
 /**
@@ -14016,7 +14040,8 @@ static void CabDrawBridgeRamp(const CabCanvas &cv, const CabEye &eye, TileIndex 
 	if (EyeBridgePieces(head, [](const ThreeDObject *, int) {})) {
 		/* An aqueduct's head (its trough on the slope): its water. */
 		if (GetTunnelBridgeTransportType(head) == TransportType::Water) {
-			CabDrawAqueductWater(cv, eye, axis, x0, y0, EyeLevelZ(bz));
+			const DiagDirection into = GetTunnelBridgeDirection(head);
+			CabDrawAqueductWater(cv, eye, axis, x0, y0, EyeLevelZ(bz), into == DiagDirection::NE || into == DiagDirection::NW ? TILE_SIZE : 0.0);
 			return;
 		}
 		/* Our 3D track up them (DrawThreeDTrackBridgeHead()): not the game's rails besides. */

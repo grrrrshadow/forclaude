@@ -2760,17 +2760,14 @@ static std::vector<std::string> GlbDoorNodes(const std::string &path)
 	return out;
 }
 
-/**
- * A mesh without its see-through triangles (a material "BLEND": a lighthouse's lantern glass, 0.3 of its colour): the
- * buildings are drawn opaque, the glass a box in its colour hid the reflector turning in it.
- */
-static void DropSeeThroughTriangles(GlbMesh &mesh)
+/** A mesh without the triangles \a drop says (given each triangle's index), their lists of each triangle with them. */
+template <typename Drop>
+static void DropTrianglesIf(GlbMesh &mesh, Drop drop)
 {
 	const size_t n = mesh.tri.size() / 3;
 	size_t kept = 0;
 	for (size_t t = 0; t < n; t++) {
-		const uint8_t tex = t < mesh.tri_tex.size() ? mesh.tri_tex[t] : 0;
-		if (tex < mesh.textures.size() && mesh.textures[tex].alpha < 255) continue;
+		if (drop(t)) continue;
 		for (int k = 0; k < 3; k++) mesh.tri[kept * 3 + k] = mesh.tri[t * 3 + k];
 		if (t < mesh.tri_tex.size()) mesh.tri_tex[kept] = mesh.tri_tex[t];
 		if (t < mesh.tri_group.size()) mesh.tri_group[kept] = mesh.tri_group[t];
@@ -2783,6 +2780,18 @@ static void DropSeeThroughTriangles(GlbMesh &mesh)
 	if (mesh.tri_group.size() > kept) mesh.tri_group.resize(kept);
 	if (mesh.tri_mark.size() > kept) mesh.tri_mark.resize(kept);
 	if (mesh.tri_glass.size() > kept) mesh.tri_glass.resize(kept);
+}
+
+/**
+ * A mesh without its see-through triangles (a material "BLEND": a lighthouse's lantern glass, 0.3 of its colour): the
+ * buildings are drawn opaque, the glass a box in its colour hid the reflector turning in it.
+ */
+static void DropSeeThroughTriangles(GlbMesh &mesh)
+{
+	DropTrianglesIf(mesh, [&mesh](size_t t) {
+		const uint8_t tex = t < mesh.tri_tex.size() ? mesh.tri_tex[t] : 0;
+		return tex < mesh.textures.size() && mesh.textures[tex].alpha < 255;
+	});
 }
 
 static bool ReadGlb(const std::string &path, ThreeDObject &obj)
@@ -4777,15 +4786,22 @@ static std::vector<ThreeDObject::DecalFace> ConcreteDecalFaces(const GlbMesh &me
 
 /** The concrete of the bridges' models: the warm grey cell of their shared atlas (the others its paint, the deck, the steel). */
 static const Colour BRIDGE_CONCRETE_CELL(0xA8, 0xA6, 0xA0);
+/**
+ * The aqueduct's trough laid in the same concrete (the player's test6: its walls plain beige planes, "jo" to the concrete
+ * of the ship tunnel's mouth): the cells of its stone and of its cornice ("kamen", "rimsa"; its dark bottom "dno" as it
+ * is). Its pillars are of the walls' masonry as the other bridges'.
+ */
+static const std::array<Colour, 2> AQUEDUCT_CONCRETE_CELLS = {Colour(0xB8, 0xAC, 0x96), Colour(0x92, 0x88, 0x76)};
 
 /**
  * A bridge's piece with its concrete laid in the concrete of the walls (zed_lic_beton, beton_5m.py; the player, test2:
  * "the grey concrete I don't like", the plain grey deck of the girder bridge, the grey of the suspension bridge): its
  * triangles that draw from the atlas's concrete cell (BRIDGE_CONCRETE_CELL) laid by the world as the pillars of masonry
  * are (MasonryMesh()), after the others as they are; tri_tex 1 the concrete's, 0 the model's own (DressInConcrete()).
+ * @param cells the atlas's cells laid so (BRIDGE_CONCRETE_CELL; the aqueduct's AQUEDUCT_CONCRETE_CELLS)
  * @return whether it has concrete
  */
-static bool LayBridgeConcrete(GlbMesh &mesh, double w_m, double h_m)
+static bool LayBridgeConcrete(GlbMesh &mesh, double w_m, double h_m, std::span<const Colour> cells)
 {
 	const size_t t = mesh.png_texture >= 0 ? static_cast<size_t>(mesh.png_texture) : (mesh.tri_tex.empty() ? 0 : mesh.tri_tex[0]);
 	if (t >= mesh.textures.size() || mesh.textures[t].png == nullptr || mesh.uv.size() / 2 != mesh.pos.size() / 3) return false;
@@ -4802,7 +4818,7 @@ static bool LayBridgeConcrete(GlbMesh &mesh, double w_m, double h_m)
 		const int x = std::clamp(static_cast<int>(std::floor((u - std::floor(u)) * atlas.w)), 0, atlas.w - 1);
 		const int y = std::clamp(static_cast<int>(std::floor((v - std::floor(v)) * atlas.h)), 0, atlas.h - 1);
 		const Colour c(atlas.px[static_cast<size_t>(y) * atlas.w + x]);
-		return std::abs(c.r - BRIDGE_CONCRETE_CELL.r) <= 8 && std::abs(c.g - BRIDGE_CONCRETE_CELL.g) <= 8 && std::abs(c.b - BRIDGE_CONCRETE_CELL.b) <= 8;
+		return std::ranges::any_of(cells, [&c](const Colour &cell) { return std::abs(c.r - cell.r) <= 8 && std::abs(c.g - cell.g) <= 8 && std::abs(c.b - cell.b) <= 8; });
 	};
 	/* Its triangles in two meshes, each with its own corners. */
 	GlbMesh rest, concrete;
@@ -4891,6 +4907,21 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 	for (size_t p = 0; p < meshes.size(); p++) {
 		IndustryPartMesh pm;
 		if (!ReadGlbMesh(path, pm.mesh, true, {}, 0, BRIDGE_PIECE_NODES[p]) || pm.mesh.tri.empty()) continue;
+		if (p == to_underlying(ThreeDBridgePiece::HeadSlope)) {
+			/* An aqueduct's head on its slope: at its outer edge (x 0, the canal's side) the ends of its slab and of its dark
+			 * bottom under the level of the trough's top (z 0) are in the land there, the canal's bank. From the eyes the
+			 * depth hid them but the bottom's dark edge (a dark line across the water); on the map nothing hides what is
+			 * under the land and they stood over the canal's water as a wall across the trough's end (the player's test6, 2
+			 * and 3: "the canal joined to the aqueduct, nothing changed"). Left out, the canal's water runs on into the trough. */
+			const std::vector<float> &pos = pm.mesh.pos;
+			DropTrianglesIf(pm.mesh, [&](size_t t) {
+				for (int k = 0; k < 3; k++) {
+					const size_t c = pm.mesh.tri[t * 3 + k] * 3;
+					if (pos[c] > 0.01f || pos[c + 2] > 0.001f) return false;
+				}
+				return true;
+			});
+		}
 		pm.facing = TriangleFacing(pm.mesh);
 		pm.holder = holder_at;
 		meshes[p] = std::move(pm);
@@ -4927,7 +4958,8 @@ static void ReadBridge(const nlohmann::json &e, const std::string &folder)
 	std::array<bool, to_underlying(ThreeDBridgePiece::Count)> has_concrete{};
 	if (concrete.has_value()) {
 		for (size_t p = 0; p < meshes.size(); p++) {
-			if (!meshes[p].has_value() || !LayBridgeConcrete(meshes[p]->mesh, concrete->w_m, concrete->h_m)) continue;
+			const std::span<const Colour> cells = aqueduct ? std::span<const Colour>(AQUEDUCT_CONCRETE_CELLS) : std::span<const Colour>(&BRIDGE_CONCRETE_CELL, 1);
+			if (!meshes[p].has_value() || !LayBridgeConcrete(meshes[p]->mesh, concrete->w_m, concrete->h_m, cells)) continue;
 			meshes[p]->facing = TriangleFacing(meshes[p]->mesh);
 			has_concrete[p] = true;
 			Debug(misc, 1, "3D bridge {}: {} in concrete, {} of its {} triangles", holder.name, BRIDGE_PIECE_NODES[p], std::ranges::count(meshes[p]->mesh.tri_tex, 1), meshes[p]->mesh.tri_tex.size());
