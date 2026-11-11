@@ -204,7 +204,9 @@ static const char *_frag_shader_sprite_blend_150[] = {
 /**
  * Fragment shader that draws a picture of the graphics card where the screen's pixels are of alpha below 255
  * (OpenGLBackend::ShowThreeDPicture()): the screen's pixel laid over it, its colour with its alpha in it (what the
- * blitter drew over the hole: a shadow, an edge, a letter).
+ * blitter drew over the hole: a shadow, an edge, a letter). Over it what stands (over_tex, its colour with its alpha in
+ * it), in the light but as much of it as is lit (over_lit_tex: how much of the pixel is lit, its alpha in it too -- a
+ * lighthouse's beam lit, what is behind it not).
  */
 static const char *_frag_shader_three_d[] = {
 	"#version 110\n",
@@ -225,7 +227,7 @@ static const char *_frag_shader_three_d[] = {
 	"  vec3 c = texture2D(colour_tex, uv).rgb * light.rgb;",
 	"  if (has_over > 0.5) {",
 	"    vec4 o = texture2D(over_tex, uv);",
-	"    float l = texture2D(over_lit_tex, uv).r;",
+	"    float l = min(1.0, texture2D(over_lit_tex, uv).r / max(o.a, 1.0 / 255.0));",
 	"    c = o.rgb * mix(light.rgb, vec3(1.0), l) + (1.0 - o.a) * c;",
 	"  }",
 	"  gl_FragData[0] = vec4(s.rgb + (1.0 - s.a) * mix(c, tint.rgb, tint.a), 1.0);",
@@ -253,7 +255,7 @@ static const char *_frag_shader_three_d_150[] = {
 	"  vec3 c = texture(colour_tex, uv).rgb * light.rgb;",
 	"  if (has_over > 0.5) {",
 	"    vec4 o = texture(over_tex, uv);",
-	"    float l = texture(over_lit_tex, uv).r;",
+	"    float l = min(1.0, texture(over_lit_tex, uv).r / max(o.a, 1.0 / 255.0));",
 	"    c = o.rgb * mix(light.rgb, vec3(1.0), l) + (1.0 - o.a) * c;",
 	"  }",
 	"  colour = vec4(s.rgb + (1.0 - s.a) * mix(c, tint.rgb, tint.a), 1.0);",

@@ -1239,10 +1239,13 @@ void main()
 		float under = floor(o.r * 255.0 + 0.5) * 65536.0 + floor(o.g * 255.0 + 0.5) * 256.0 + floor(o.b * 255.0 + 0.5);
 		if (order < under) discard;
 	}
-	float lit = abs(t.a * 255.0 - 254.0) < 0.5 ? 1.0 : 0.0;
-	float a = lit > 0.5 ? 1.0 : t.a;
+	/* Lit at night (ThreeDGpuStandingAlpha()): of alpha 254 whole; of an odd one below it see-through (a lighthouse's
+	 * beam) -- how much of the pixel is lit with its alpha in it, as its colour. */
+	float ta = floor(t.a * 255.0 + 0.5);
+	float lit = ta == 254.0 || (ta < 254.0 && mod(ta, 2.0) > 0.5) ? 1.0 : 0.0;
+	float a = ta == 254.0 ? 1.0 : t.a;
 	o_colour = vec4(t.rgb, a);
-	o_lit = vec4(lit, 0.0, 0.0, a);
+	o_lit = vec4(lit * a, 0.0, 0.0, a);
 	o_order = a >= 0.5 ? OrderColour(order) : vec4(0.0);
 	gl_FragDepth = depth;
 }
@@ -1289,14 +1292,27 @@ void main()
 		o_colour = vec4(0.0);
 		return;
 	}
+	/* Its alpha as ThreeDGpuStandingAlpha() gives it: lit nearly whole whole, its colour as it is; see-through odd lit
+	 * (a lighthouse's beam), even not; nearly whole as whole. */
+	vec4 c = sum / float(u_ss * u_ss);
+	float a = floor(c.a * 255.0 + 0.5);
 	if (lit > 0.0) {
-		o_colour = vec4(sum.rgb / sum.a, 254.0 / 255.0);
+		if (a >= 252.0) {
+			o_colour = vec4(sum.rgb / sum.a, 254.0 / 255.0);
+			return;
+		}
+		a = a - mod(a, 2.0) + 1.0;
+	} else if (a >= 253.0) {
+		o_colour = vec4(sum.rgb / sum.a, 1.0);
+		return;
+	} else {
+		a -= mod(a, 2.0);
+	}
+	if (a <= 0.0) {
+		o_colour = vec4(0.0);
 		return;
 	}
-	vec4 c = sum / float(u_ss * u_ss);
-	/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
-	if (abs(c.a * 255.0 - 254.0) < 0.5) c = vec4(c.rgb / c.a, 1.0);
-	o_colour = c;
+	o_colour = vec4(min(c.rgb / c.a, vec3(1.0)) * (a / 255.0), a / 255.0);
 }
 )";
 

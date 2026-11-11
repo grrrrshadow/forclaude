@@ -406,13 +406,27 @@ struct ThreeDGpuEyeFrame {
 /**
  * A picture of a thing standing on the turned map as the card lays it (ThreeDGpuStanding): its colours with their alpha
  * multiplied in (Colour::data, what it gives over black), top row first; a pixel lit at night (a window, a lamp's
- * glass: the night does not darken it) whole, of alpha THREE_D_GPU_LIT_ALPHA.
+ * glass: the night does not darken it) whole, of alpha THREE_D_GPU_LIT_ALPHA; one lit and see-through (a lighthouse's
+ * beam, the colleague's material "paprsek" of alpha 0.16: the night darkens what is behind it, not it) of an odd
+ * alpha below it, one not lit of an even one (ThreeDGpuStandingAlpha()).
  */
 struct ThreeDGpuStandingPicture {
 	int width = 0, height = 0;
 	std::vector<uint32_t> pixels;
 };
 static constexpr uint8_t THREE_D_GPU_LIT_ALPHA = 254;
+
+/**
+ * The alpha a pixel of a picture for the card has (ThreeDGpuStandingPicture): 255 whole; THREE_D_GPU_LIT_ALPHA whole and
+ * lit (its colour then without its alpha in it); below, see-through -- odd lit, even not. Nearly whole as whole.
+ * @param a how much of what is behind it hides, 0-255
+ * @param lit whether the night leaves it lit
+ */
+inline uint8_t ThreeDGpuStandingAlpha(int a, bool lit)
+{
+	if (lit) return a >= 252 ? THREE_D_GPU_LIT_ALPHA : static_cast<uint8_t>(std::max(0, a) | 1);
+	return a >= 253 ? 255 : static_cast<uint8_t>(std::max(0, a & ~1));
+}
 
 /**
  * A building of the turned map drawn by the card among what stands on a block (ThreeDGpuStandingItem::building), as

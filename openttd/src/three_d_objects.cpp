@@ -5959,9 +5959,12 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	addon.addon = true;
 	addon.variants = 0;
 	std::string spin_node, spin_night;
+	float spin_z = 0;
 	if (e.contains("otaceni") && e.at("otaceni").is_object()) {
 		spin_node = e.at("otaceni").value("uzel", std::string());
 		spin_night = e.at("otaceni").value("noc_uzel", std::string());
+		const auto &o = e.at("otaceni");
+		if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3 && o.at("stred").at(2).is_number()) spin_z = o.at("stred").at(2).get<float>();
 	}
 	if (!spin_node.empty()) addon.left_out.push_back(spin_node);
 	addon.no_see_through = true;
@@ -6011,6 +6014,29 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 		reflector.at[0] = reflector.at[1] = middle;
 		reflector.at[2] = bottom;
 		obj.figures.push_back(reflector);
+		/* At night its reflectors lit (the player, test6: "the bulb shines and the two reflectors turning about it do
+		 * not"): the node of their night ("noc_uzel": the glow of the lenses and two beams) turning with it, a figure of
+		 * its own drawn only at night, its middle at the height of the lamp ("stred") -- as its file has it under the
+		 * reflector, not as high again (its node moved by the reflector's height twice). */
+		if (!spin_night.empty()) {
+			GlbMesh lit;
+			GlbReadOptions lo;
+			lo.all_nodes = true;
+			lo.only_node = spin_night;
+			if (ReadGlbMesh(path, lit, lo) && lit.pos.size() >= 3) {
+				float low = lit.pos[2], high = lit.pos[2];
+				for (size_t i = 2; i < lit.pos.size(); i += 3) {
+					low = std::min(low, lit.pos[i]);
+					high = std::max(high, lit.pos[i]);
+				}
+				ThreeDObjectFigure lenses;
+				lenses.figure = name + "/reflektor_noc";
+				lenses.at[0] = lenses.at[1] = middle;
+				lenses.at[2] = spin_z - (high - low) / 2;
+				lenses.night = true;
+				obj.figures.push_back(lenses);
+			}
+		}
 	}
 	_three_d_lighthouses.push_back(_three_d_objects.size());
 	_three_d_objects.push_back(std::move(obj));
@@ -6711,6 +6737,23 @@ static void ReadThreeDVehicleObjects()
 					fig.spin_axis[2] = axis == "z" ? 1.0f : 0.0f;
 					if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
 						for (int k = 0; k < 2; k++) fig.spin_centre[k] = o.at("stred").at(k).is_number() ? o.at("stred").at(k).get<float>() : 0.0f;
+					}
+					/* Its night (the lenses' glow and the beams) a figure of its own turning alike, drawn only at night
+					 * (ReadLighthouse()). */
+					if (o.contains("noc_uzel") && o.at("noc_uzel").is_string()) {
+						ThreeDVehicleObject lit;
+						lit.package = fig.package;
+						lit.file = fig.file;
+						lit.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor_noc";
+						lit.thing = true;
+						lit.only_node = o.at("noc_uzel").get<std::string>();
+						lit.to_ground = true;
+						lit.spin_ticks = fig.spin_ticks;
+						std::copy(std::begin(fig.spin_axis), std::end(fig.spin_axis), std::begin(lit.spin_axis));
+						std::copy(std::begin(fig.spin_centre), std::end(fig.spin_centre), std::begin(lit.spin_centre));
+						_figure_objects.push_back(std::move(fig));
+						_figure_objects.push_back(std::move(lit));
+						continue;
 					}
 					_figure_objects.push_back(std::move(fig));
 					continue;

@@ -2076,6 +2076,23 @@ static bool _night_windows_now = false;
 static std::vector<std::pair<uint32_t *, uint32_t>> _night_lit;
 static std::vector<std::array<double, 4>> _night_glows;
 /**
+ * The night's lit pixels that are see-through (a lighthouse's beam, the colleague's "paprsek" of alpha 0.16): where each
+ * is, the colour it was drawn in, and its own light (its colour with its alpha in it) -- the night darkens what is
+ * behind it, not it (DrawNight()); unless something drawn later covered it.
+ */
+struct NightLitThrough {
+	uint32_t *at;
+	uint32_t drawn;
+	Colour own;
+};
+static std::vector<NightLitThrough> _night_lit_through;
+
+/** Whether a figure of a building is drawn now: one drawn only at night (ThreeDObjectFigure::night, a lighthouse's reflectors lit) at night. */
+static bool FigureShownNow(const ThreeDObjectFigure &f)
+{
+	return !f.night || IsNightNow();
+}
+/**
  * What stands on the block being drawn was laid by the card at night: the glows that are seen only by a lit pixel near
  * them go to the video driver (TurnedCardGlow), which tells that from the card's lit pixels where they are -- not read
  * back from the card (the player's 3d_karta.log of 31. 10.: 1943 reads of them, the processor waiting for the card at
@@ -5860,12 +5877,22 @@ static void BlitTurnedPicture(const DrawPixelInfo &frame, const ThreeDModelPictu
 	}
 	if (_night_windows_now) {
 		for (uint32_t i : pic->lit) {
+			if (i >= pic->pixels.size()) continue;
+			/* See-through (a lighthouse's beam): its own light kept, what is behind it darkened. */
+			const Colour s(pic->pixels[i]);
+			if (s.a == 0) continue;
+			const bool through = ThreeDGpuStandingAlpha(s.a, true) != THREE_D_GPU_LIT_ALPHA;
+			const Colour own(static_cast<uint8_t>(s.r * s.a / 255), static_cast<uint8_t>(s.g * s.a / 255), static_cast<uint8_t>(s.b * s.a / 255), s.a);
 			const int px = static_cast<int>(i % pic->width) << up, py = static_cast<int>(i / pic->width) << up;
 			for (int y = py; y < py + (1 << up); y++) {
 				for (int x = px; x < px + (1 << up); x++) {
 					if (x < x0 || x >= x1 || y < y0 || y >= y1) continue;
 					uint32_t *at = dst + static_cast<size_t>(oy + y) * frame.pitch + ox + x;
-					_night_lit.emplace_back(at, *at);
+					if (through) {
+						_night_lit_through.push_back({at, *at, own});
+					} else {
+						_night_lit.emplace_back(at, *at);
+					}
 				}
 			}
 		}
@@ -6084,7 +6111,9 @@ static void DrawObjectInto(uint32_t *dst, int pitch, int fw, int fh, const Objec
 	};
 	if (o != nullptr) {
 		if (BuildingFiguresSeen(lay.zoom)) {
-			for (const ThreeDObjectFigure &f : o->figures) stand(f, false);
+			for (const ThreeDObjectFigure &f : o->figures) {
+				if (FigureShownNow(f)) stand(f, false);
+			}
 		}
 		for (const ThreeDObjectFigure &f : o->plants) stand(f, true);
 	}
@@ -6347,7 +6376,10 @@ static void AddTurnedObjectsToDraw()
 				if (o != nullptr) {
 					o->Read();
 					if (BuildingFiguresSeen(lay.zoom)) {
-						for (const ThreeDObjectFigure &f : o->figures) StandingFigurePicture(f, false, lay, ox, oy, to.z, to.origin, index++, height);
+						for (const ThreeDObjectFigure &f : o->figures) {
+							if (FigureShownNow(f)) StandingFigurePicture(f, false, lay, ox, oy, to.z, to.origin, index, height);
+							index++;
+						}
 					}
 					for (const ThreeDObjectFigure &f : o->plants) StandingFigurePicture(f, true, lay, ox, oy, to.z, to.origin, index++, height);
 				}
@@ -7766,8 +7798,8 @@ static void DrawTurnedStandingByProcessor(const DrawPixelInfo &frame, const Pare
 
 /**
  * The pixels of a picture for the card (ThreeDGpuStandingPicture) of what was drawn over black and over white: its
- * alpha what tells them apart, its colour (with its alpha in it) what it gave over black; a pixel lit at night whole and
- * marked lit.
+ * alpha what tells them apart, its colour (with its alpha in it) what it gave over black; a pixel lit at night marked
+ * lit (ThreeDGpuStandingAlpha(): nearly whole whole, see-through as it is).
  */
 static void TurnedStandingPixels(const std::vector<uint32_t> &black, const std::vector<uint32_t> &white, const std::vector<uint8_t> *lit, std::vector<uint32_t> &out)
 {
@@ -7775,14 +7807,13 @@ static void TurnedStandingPixels(const std::vector<uint32_t> &black, const std::
 	for (size_t i = 0; i < black.size(); i++) {
 		const Colour b(black[i]), w(white[i]);
 		const int through = std::max({static_cast<int>(w.r) - b.r, static_cast<int>(w.g) - b.g, static_cast<int>(w.b) - b.b, 0});
-		int a = 255 - std::min(255, through);
+		const uint8_t a = ThreeDGpuStandingAlpha(255 - std::min(255, through), lit != nullptr && (*lit)[i] != 0);
 		if (a == 0) {
 			out[i] = 0;
-		} else if (lit != nullptr && (*lit)[i] != 0) {
+		} else if (a == THREE_D_GPU_LIT_ALPHA) {
 			out[i] = Colour(b.r, b.g, b.b, THREE_D_GPU_LIT_ALPHA).data;
 		} else {
-			if (a == THREE_D_GPU_LIT_ALPHA) a--;
-			out[i] = Colour(static_cast<uint8_t>(std::min<int>(b.r, a)), static_cast<uint8_t>(std::min<int>(b.g, a)), static_cast<uint8_t>(std::min<int>(b.b, a)), static_cast<uint8_t>(a)).data;
+			out[i] = Colour(std::min(b.r, a), std::min(b.g, a), std::min(b.b, a), a).data;
 		}
 	}
 }
@@ -7938,7 +7969,7 @@ static std::shared_ptr<ThreeDGpuStandingPicture> DrawTurnedStandingApart(const D
 		d.width = ScaleByZoom(w, frame.zoom);
 		d.height = ScaleByZoom(h, frame.zoom);
 		d.pitch = w;
-		const size_t lit_before = _night_lit.size();
+		const size_t lit_before = _night_lit.size(), through_before = _night_lit_through.size();
 		{
 			AutoRestoreBackup dpi_backup(_cur_dpi, &d);
 			AutoRestoreBackup vd_backup(_vd.dpi, d);
@@ -7949,7 +7980,12 @@ static std::shared_ptr<ThreeDGpuStandingPicture> DrawTurnedStandingApart(const D
 			const ptrdiff_t at = _night_lit[i].first - buf->data();
 			if (at >= 0 && static_cast<size_t>(at) < n && *_night_lit[i].first == _night_lit[i].second) lit[at] = 1;
 		}
+		for (size_t i = through_before; i < _night_lit_through.size(); i++) {
+			const ptrdiff_t at = _night_lit_through[i].at - buf->data();
+			if (at >= 0 && static_cast<size_t>(at) < n && *_night_lit_through[i].at == _night_lit_through[i].drawn) lit[at] = 1;
+		}
 		_night_lit.resize(lit_before);
+		_night_lit_through.resize(through_before);
 		if (glows == SIZE_MAX) {
 			glows = _night_glows.size();
 		} else {
@@ -8012,15 +8048,18 @@ static std::shared_ptr<const ThreeDGpuStandingPicture> TurnedFigurePicture(const
 			own[i] = 0;
 			continue;
 		}
-		/* Not lit: never the lit pixels' alpha (nearly whole, as whole). */
-		const uint a = c.a == THREE_D_GPU_LIT_ALPHA ? 255 : c.a;
-		own[i] = Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
+		/* Not lit: never a lit pixel's alpha (ThreeDGpuStandingAlpha()). */
+		const uint a = ThreeDGpuStandingAlpha(c.a, false);
+		own[i] = a == 0 ? 0 : Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
 	}
 	if (lit) {
+		/* Lit: nearly whole whole, its colour as it is; see-through as it is (a lighthouse's beam). */
 		for (uint32_t i : pic.lit) {
 			if (i >= own.size()) continue;
 			const Colour c(pic.pixels[i]);
-			own[i] = Colour(c.r, c.g, c.b, THREE_D_GPU_LIT_ALPHA).data;
+			if (c.a == 0) continue;
+			const uint a = ThreeDGpuStandingAlpha(c.a, true);
+			own[i] = a == THREE_D_GPU_LIT_ALPHA ? Colour(c.r, c.g, c.b, THREE_D_GPU_LIT_ALPHA).data : Colour(static_cast<uint8_t>((c.r * a + 127) / 255), static_cast<uint8_t>((c.g * a + 127) / 255), static_cast<uint8_t>((c.b * a + 127) / 255), static_cast<uint8_t>(a)).data;
 		}
 	}
 	auto made = std::make_shared<ThreeDGpuStandingPicture>();
@@ -8169,7 +8208,9 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			};
 			if (p.o != nullptr) {
 				if (BuildingFiguresSeen(lay.zoom)) {
-					for (const ThreeDObjectFigure &f : p.o->figures) stand(f, false);
+					for (const ThreeDObjectFigure &f : p.o->figures) {
+						if (FigureShownNow(f)) stand(f, false);
+					}
 				}
 				for (const ThreeDObjectFigure &f : p.o->plants) stand(f, true);
 			}
@@ -9401,9 +9442,16 @@ static void DrawNight(bool turned)
 	if (w <= 0 || h <= 0) return;
 	/* The lit windows that are still as they were drawn: nothing came over them since. */
 	std::erase_if(_night_lit, [](const auto &p) { return *p.first != p.second; });
+	std::erase_if(_night_lit_through, [](const NightLitThrough &p) { return *p.at != p.drawn; });
 	const NightLight moon = GetNightLight();
 	BlitterFactory::GetCurrentBlitter()->DarkenRect(dpi.dst_ptr, w, h, moon.r, moon.g, moon.b);
 	for (const auto &[at, colour] : _night_lit) *at = colour;
+	/* The see-through lit ones: their own light given back as the darkening took it (DarkenRect()). */
+	for (const NightLitThrough &p : _night_lit_through) {
+		const Colour d(*p.at);
+		auto back = [](uint8_t now, uint8_t own, uint m) { return static_cast<uint8_t>(std::min<uint>(255, now + own - (own * m >> 8))); };
+		*p.at = Colour(back(d.r, p.own.r, moon.r), back(d.g, p.own.g, moon.g), back(d.b, p.own.b, moon.b), d.a).data;
+	}
 
 	uint32_t *dst = static_cast<uint32_t *>(dpi.dst_ptr);
 	const double scale = 1.0 / (1 << to_underlying(dpi.zoom));
@@ -9652,6 +9700,7 @@ static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, i
 	_vd.combine_sprites = SpriteCombineMode::None;
 	_vd.last_child = LAST_CHILD_NONE;
 	_night_lit.clear();
+	_night_lit_through.clear();
 	_night_glows.clear();
 	const int laid = _turned_times.standing_card;
 	ViewportDoDrawTurned();
@@ -9674,6 +9723,7 @@ static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, i
 		}
 	}
 	_night_lit.clear();
+	_night_lit_through.clear();
 	_night_glows.clear();
 	_vd.string_sprites_to_draw.clear();
 	_vd.tile_sprites_to_draw.clear();
@@ -9956,6 +10006,7 @@ void TurnedCardLayMovers()
 	for (const TurnedSprite &s : standing) AddTurnedStandingThingInOrder(movers, frame, s);
 	const bool laid = ThreeDGpuDrawStanding(movers);
 	_night_lit.clear();
+	_night_lit_through.clear();
 	_night_glows.clear();
 	_turned_vehicle_pictures.clear();
 	_vd.string_sprites_to_draw.clear();
@@ -10250,6 +10301,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_vd.dpi.top = top & mask;
 	/* The lit windows of the houses, when the night is drawn on 32 bpp (DrawNight()). */
 	_night_lit.clear();
+	_night_lit_through.clear();
 	_night_glows.clear();
 	_night_card_lit = false;
 	_night_block_hole = false;
@@ -10330,6 +10382,7 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	_turned_vehicles_on_card = false;
 	_night_block_hole = false;
 	_night_lit.clear();
+	_night_lit_through.clear();
 	_night_glows.clear();
 	_night_windows_now = false;
 
@@ -18746,7 +18799,9 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 			AddCabFigure(f.figure, fig != nullptr && fig->thing ? f.scale : CAB_FIGURE_SCALE, ox + f.at[0] * OBJECT_UNITS_PER_METRE, oy + f.at[1] * OBJECT_UNITS_PER_METRE,
 					oz + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, frame);
 		};
-		for (const ThreeDObjectFigure &f : co.obj->figures) add(f);
+		for (const ThreeDObjectFigure &f : co.obj->figures) {
+			if (FigureShownNow(f)) add(f);
+		}
 		index += static_cast<uint32_t>(co.obj->plants.size());
 		for (const ThreeDObjectFigure &f : co.more) add(f);
 		/* And its plants (the marijuana about the hut and the statue, Matylda's pots by the pub), as on the map. */
