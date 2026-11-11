@@ -3062,16 +3062,29 @@ static bool _object_picture_waited = false;
 static std::vector<PictureToMake> *_pictures_collected = nullptr;
 static std::set<ObjectPictureKey> _pictures_collected_keys;
 
+/**
+ * How often at most the windows, and the vehicles of the map drawn as objects, are drawn again for the sprites made in
+ * the background (_owed_pictures_timer): at every one that came, every 30 ms, the purchase window, the depot's and the
+ * vehicles' windows were drawn whole about 30 times a second for as long as the thread made them -- the player's test7
+ * diary, buying trains of big objects: a minute and a half of it on the phone, the purchase window 6 ms a time, the
+ * mouse pointer slow ("whenever I open the purchase menu, the mouse pointer slows down").
+ */
+static constexpr auto SPRITES_CAME_REDRAW = std::chrono::milliseconds(250);
+static std::chrono::steady_clock::time_point _gui_sprites_redrawn, _map_sprites_redrawn;
+
 /** The pictures made come in, and the vehicles that waited for them are drawn again. */
 static const IntervalTimer<TimerWindow> _owed_pictures_timer(std::chrono::milliseconds(30), [](auto) {
 	/* The pictures asked for while the frames were drawn: the thread makes them now, together. */
 	if (_pictures_asked_since.exchange(false)) _pictures_wake.notify_one();
+	const auto now = std::chrono::steady_clock::now();
 	/* The sprites for the windows made in the background (ThreeDVehicleObjectSpriteStandIn()): the windows that draw them. */
-	if (_gui_sprites_came.exchange(false)) {
+	if (now - _gui_sprites_redrawn >= SPRITES_CAME_REDRAW && _gui_sprites_came.exchange(false)) {
+		_gui_sprites_redrawn = now;
 		for (WindowClass wc : {WindowClass::BuildVehicle, WindowClass::ReplaceVehicle, WindowClass::EnginePreview}) SetWindowClassesDirty(wc);
 	}
 	/* Those of the map: the vehicles drawn as objects, and the windows of the vehicles. */
-	if (_map_sprites_came.exchange(false)) {
+	if (now - _map_sprites_redrawn >= SPRITES_CAME_REDRAW && _map_sprites_came.exchange(false)) {
+		_map_sprites_redrawn = now;
 		for (const Vehicle *v : Vehicle::Iterate()) {
 			if (ThreeDVehicleObjectOf(v) != nullptr) v->MarkAllViewportsDirty();
 		}
