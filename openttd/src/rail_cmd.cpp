@@ -3585,8 +3585,13 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		/* Our 3D track from its door to its middle (DrawThreeDTrackOn()): its ground plain, no track of the game's. */
 		const bool three_d = DrawThreeDTrackOn(ti, DiagDirToAxis(dir), dir, false);
+		/* In the 3D views the colleague's engine shed stands there instead of its sprites (GetThreeDDepot()). A depot
+		 * opening north-east or north-west has its track in its building's sprite, not in its ground: without them, its
+		 * ground's track as when the buildings are invisible -- under the shed's gates and through it (the player,
+		 * test6: "there are no rails under the doors; at the back we cover the rails, at the front there are none"). */
+		const bool shed = ThreeDDepotStandsOn(ti);
 
-		if (IsInvisibilitySet(TransparencyOption::Buildings)) {
+		if (shed || IsInvisibilitySet(TransparencyOption::Buildings)) {
 			/* Draw rail instead of depot */
 			dts = &_depot_invisible_gfx_table[dir];
 		} else {
@@ -3619,13 +3624,13 @@ static void DrawTile_Rail(TileInfo *ti)
 
 			switch (GetRailDepotDirection(ti->tile)) {
 				case DiagDirection::NE:
-					if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+					if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 					[[fallthrough]];
 				case DiagDirection::SW:
 					DrawGroundSprite(ground + RTO_X, PAL_NONE);
 					break;
 				case DiagDirection::NW:
-					if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+					if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 					[[fallthrough]];
 				case DiagDirection::SE:
 					DrawGroundSprite(ground + RTO_Y, PAL_NONE);
@@ -3639,13 +3644,13 @@ static void DrawTile_Rail(TileInfo *ti)
 
 				switch (GetRailDepotDirection(ti->tile)) {
 					case DiagDirection::NE:
-						if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+						if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 						[[fallthrough]];
 					case DiagDirection::SW:
 						DrawGroundSprite(overlay + RTO_X, PALETTE_CRASH);
 						break;
 					case DiagDirection::NW:
-						if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+						if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 						[[fallthrough]];
 					case DiagDirection::SE:
 						DrawGroundSprite(overlay + RTO_Y, PALETTE_CRASH);
@@ -3659,13 +3664,13 @@ static void DrawTile_Rail(TileInfo *ti)
 			if (_game_mode != GameMode::Menu && _settings_client.gui.show_track_reservation && HasDepotReservation(ti->tile)) {
 				switch (GetRailDepotDirection(ti->tile)) {
 					case DiagDirection::NE:
-						if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+						if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 						[[fallthrough]];
 					case DiagDirection::SW:
 						DrawGroundSprite(rti->base_sprites.single_x, PALETTE_CRASH);
 						break;
 					case DiagDirection::NW:
-						if (!IsInvisibilitySet(TransparencyOption::Buildings)) break;
+						if (!shed && !IsInvisibilitySet(TransparencyOption::Buildings)) break;
 						[[fallthrough]];
 					case DiagDirection::SE:
 						DrawGroundSprite(rti->base_sprites.single_y, PALETTE_CRASH);
@@ -3680,8 +3685,7 @@ static void DrawTile_Rail(TileInfo *ti)
 
 		if (HasRailCatenaryDrawn(GetRailType(ti->tile))) DrawRailCatenary(ti);
 
-		/* In the 3D views the colleague's engine shed stands there instead (GetThreeDDepot()). */
-		if (!ThreeDDepotStandsOn(ti)) DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, pal);
+		if (!shed) DrawRailTileSeq(ti, dts, TransparencyOption::Buildings, relocation, 0, pal);
 		blocked_pillars = BRIDGEPILLARFLAGS_ALL;
 	}
 	DrawBridgeMiddle(ti, blocked_pillars);
