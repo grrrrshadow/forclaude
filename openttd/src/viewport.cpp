@@ -14066,9 +14066,14 @@ static constexpr double CAB_TUNNEL_HALF = 6.0;
 /** The height of a tunnel's walls (2.25 m) and of its vault (4.6 m), units of height above its floor: under the hill of a level (5 m) over it. */
 static constexpr double CAB_TUNNEL_WALL = 6.0;
 static constexpr double CAB_TUNNEL_TOP = 12.3;
-/** The height of a portal's face above the floor -- the hill's over it, a level of the land (the player, 4. 11.: "the top of the tunnel and the top of the land are different"); and how far it reaches beside the opening, world units. */
+/**
+ * The height of a portal's face above the floor -- the hill's over it, a level of the land (the player, 4. 11.: "the top
+ * of the tunnel and the top of the land are different"); and how far it reaches beside the opening, world units: to the
+ * tile's edge, where the walls beside the way in stand (the player, 11. 11.: "that corner of the tunnel away, it reaches
+ * into the next tile" -- it reached 2 units over).
+ */
 static constexpr double CAB_PORTAL_TOP = EyeLevelZ(TILE_HEIGHT);
-static constexpr double CAB_PORTAL_HALF = 10.0;
+static constexpr double CAB_PORTAL_HALF = TILE_SIZE / 2.0;
 /** The cross-section of a tunnel: across from its middle (world units), up from its floor (units of height). */
 static const std::array<std::array<double, 2>, 9> _cab_tunnel_profile = {{
 	{-CAB_TUNNEL_HALF, 0}, {-CAB_TUNNEL_HALF, CAB_TUNNEL_WALL}, {-5.2, 9.0}, {-3.0, 11.4}, {0.0, CAB_TUNNEL_TOP},
