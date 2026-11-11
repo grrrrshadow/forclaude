@@ -26,6 +26,13 @@ across (Z), its inner face at Z -0.5 (the water), its outer at +0.5. The face: a
 centred on the origin, 1 m thick (Z), its front at Z -0.5 (the canal), its foot at Y 0 (the water). Each hung from its
 middle: the game sorts each by its own point, as the lock's walls.
 
+The same for a road tunnel's mouth (the player, 11. 11.: "turning a little left or right changed the entrance's
+picture by turns on both ends of the tunnel. here the road tunnel does it"): tunel_silnicni_zed_N(_z), _vrch_N and _celo
+of the same shapes -- the portal from the eyes is the same, the tile's width round the tube's opening, walls at the
+tile's sides up to the hill (CabDrawPortal() of viewport.cpp) -- in the stones the eyes dress it in (CabStoneTexture():
+the same picture, made here by the same rule), the road's ground under them the game's (DrawThreeDTunnelEntrance() of
+tunnelbridge_cmd.cpp).
+
     python3 tunel_lodni.py
 """
 import io
@@ -42,12 +49,37 @@ LEVEL_M = 3.0                      # a level of the game's height (OBJECT_HEIGHT
 WALL_T = 1.0                       # a wall's and the face's thickness
 OVER_M = 0.0                       # their top over the land beside, over the hill: level with it (the player: "higher than the terrain")
 TEX_M = 5.0                        # the concrete's texture: 5 x 5 m, seamless
+# The set being written: its material and how many metres its picture covers across (U) and up (V).
+MAT, TEX_U, TEX_V = 'beton', TEX_M, TEX_M
 # The opening on the face: as wide as the tube (12 of the tile's 16 units, CAB_TUNNEL_HALF of viewport.cpp), its walls
 # and vault the tube's profile at the land's height of a level (_cab_tunnel_profile: walls 6, vault 12.3 of a 13.3 high
 # portal from the eyes), so the opening is the same part of the face as from the eyes.
 OPEN_HALF = 6.0 / 16.0 * TILE_M
 OPEN_WALL = 6.0 / 13.3 * LEVEL_M
 OPEN_TOP = 12.3 / 13.3 * LEVEL_M
+
+
+# The stones' picture: 96 x 48 pixels, 4 to a world unit (16 to the tile) across, as from the eyes.
+STONE_W_M = 96 / 4 * TILE_M / 16
+STONE_H_M = 48 / 4 * TILE_M / 16
+
+
+def stone_png():
+    """The stones of the portals from the eyes (CabStoneTexture() of viewport.cpp), pixel for pixel by its rule."""
+    w, h = 96, 48
+    im = Image.new('RGB', (w, h))
+    seed = 12345
+    for y in range(h):
+        course = y // 6
+        for x in range(w):
+            seed = (seed * 1103515245 + 12345) & 0xFFFFFFFF
+            noise = ((seed >> 16) % 21) - 10
+            joint = (y % 6) == 5 or ((x + (course & 1) * 6) % 12) == 11
+            base = 82 if joint else 128 + ((course * 7 + (x + (course & 1) * 6) // 12 * 13) % 17) - 8
+            im.putpixel((x, y), (max(0, min(255, base + noise + 6)), max(0, min(255, base + noise)), max(0, min(255, base + noise - 10))))
+    out = io.BytesIO()
+    im.save(out, format='PNG', optimize=True)
+    return out.getvalue()
 
 
 def concrete_png():
@@ -100,18 +132,18 @@ def wall(k):
     zi, zo = -WALL_T / 2, WALL_T / 2
     land0, land1 = k * LEVEL_M / 3, (k + 1) * LEVEL_M / 3
     top0, top1 = land0 + OVER_M, land1 + OVER_M
-    u0, u1 = (k * TILE_M / 3) / TEX_M, ((k + 1) * TILE_M / 3) / TEX_M
+    u0, u1 = (k * TILE_M / 3) / TEX_U, ((k + 1) * TILE_M / 3) / TEX_U
 
     def v(y):
-        return (LEVEL_M + OVER_M - y) / TEX_M
+        return (LEVEL_M + OVER_M - y) / TEX_V
     # The inner face, to the water: from the water (Y 0) up; seen from -Z.
-    m.poly('beton', [(x1, 0.0, zi), (x0, 0.0, zi), (x0, top0, zi), (x1, top1, zi)], [(u1, v(0)), (u0, v(0)), (u0, v(top0)), (u1, v(top1))])
+    m.poly(MAT, [(x1, 0.0, zi), (x0, 0.0, zi), (x0, top0, zi), (x1, top1, zi)], [(u1, v(0)), (u0, v(0)), (u0, v(top0)), (u1, v(top1))])
     # The outer face, to the land beside: from the land up; seen from +Z (none when the top is the land's).
     if OVER_M > 0:
-        m.poly('beton', [(x0, land0, zo), (x1, land1, zo), (x1, top1, zo), (x0, top0, zo)], [(u0, v(land0)), (u1, v(land1)), (u1, v(top1)), (u0, v(top0))])
+        m.poly(MAT, [(x0, land0, zo), (x1, land1, zo), (x1, top1, zo), (x0, top0, zo)], [(u0, v(land0)), (u1, v(land1)), (u1, v(top1)), (u0, v(top0))])
     # The top, a strip along it.
-    w = WALL_T / TEX_M
-    m.poly('beton', [(x0, top0, zo), (x1, top1, zo), (x1, top1, zi), (x0, top0, zi)], [(u0, 0.0), (u1, 0.0), (u1, w), (u0, w)])
+    w = WALL_T / TEX_V
+    m.poly(MAT, [(x0, top0, zo), (x1, top1, zo), (x1, top1, zi), (x0, top0, zi)], [(u0, 0.0), (u1, 0.0), (u1, w), (u0, w)])
     # No ends: the thirds meet each other, the canal's end is the water's height and the portal's under the face; one
     # between two thirds hung below the land beside it (the player: "again it draws in front what should be at the back").
     return m
@@ -123,9 +155,9 @@ def wall_top(k):
     x0, x1 = -TILE_M / 6, TILE_M / 6
     zi, zo = -WALL_T / 2, WALL_T / 2
     top0, top1 = k * LEVEL_M / 3 + OVER_M, (k + 1) * LEVEL_M / 3 + OVER_M
-    u0, u1 = (k * TILE_M / 3) / TEX_M, ((k + 1) * TILE_M / 3) / TEX_M
-    w = WALL_T / TEX_M
-    m.poly('beton', [(x0, top0, zo), (x1, top1, zo), (x1, top1, zi), (x0, top0, zi)], [(u0, 0.0), (u1, 0.0), (u1, w), (u0, w)])
+    u0, u1 = (k * TILE_M / 3) / TEX_U, ((k + 1) * TILE_M / 3) / TEX_U
+    w = WALL_T / TEX_V
+    m.poly(MAT, [(x0, top0, zo), (x1, top1, zo), (x1, top1, zi), (x0, top0, zi)], [(u0, 0.0), (u1, 0.0), (u1, w), (u0, w)])
     return m
 
 
@@ -147,10 +179,10 @@ def face():
     top = LEVEL_M + OVER_M
 
     def u(x):
-        return (x - x0) / TEX_M
+        return (x - x0) / TEX_U
 
     def v(y):
-        return (top - y) / TEX_M
+        return (top - y) / TEX_V
     # The front, round the opening: its outline and the face's edge joined in strips from the left foot over to the right.
     hole = opening()
     # The face's edge as seen from the front (-Z): its left foot, its left top, ... its right foot, matched to the hole's
@@ -158,22 +190,22 @@ def face():
     for i in range(len(hole) - 1):
         (ax, ay), (bx, by) = hole[i], hole[i + 1]
         # Each piece of the outline out to the face's edge: straight up to the top, and the first and last also sideways.
-        m.poly('beton', [(bx, by, zf), (ax, ay, zf), (ax, top, zf), (bx, top, zf)], [(u(bx), v(by)), (u(ax), v(ay)), (u(ax), v(top)), (u(bx), v(top))])
+        m.poly(MAT, [(bx, by, zf), (ax, ay, zf), (ax, top, zf), (bx, top, zf)], [(u(bx), v(by)), (u(ax), v(ay)), (u(ax), v(top)), (u(bx), v(top))])
     for side, (hx, hy0, hy1) in ((-1, (-OPEN_HALF, 0.0, top)), (1, (OPEN_HALF, 0.0, top))):
         ex = x0 if side < 0 else x1
         if side < 0:
-            m.poly('beton', [(hx, 0.0, zf), (ex, 0.0, zf), (ex, top, zf), (hx, top, zf)], [(u(hx), v(0)), (u(ex), v(0)), (u(ex), v(top)), (u(hx), v(top))])
+            m.poly(MAT, [(hx, 0.0, zf), (ex, 0.0, zf), (ex, top, zf), (hx, top, zf)], [(u(hx), v(0)), (u(ex), v(0)), (u(ex), v(top)), (u(hx), v(top))])
         else:
-            m.poly('beton', [(ex, 0.0, zf), (hx, 0.0, zf), (hx, top, zf), (ex, top, zf)], [(u(ex), v(0)), (u(hx), v(0)), (u(hx), v(top)), (u(ex), v(top))])
+            m.poly(MAT, [(ex, 0.0, zf), (hx, 0.0, zf), (hx, top, zf), (ex, top, zf)], [(u(ex), v(0)), (u(hx), v(0)), (u(hx), v(top)), (u(ex), v(top))])
     # The dark of the opening, a hair before the front so it is drawn on it.
     dark = [(x, y, zf - 0.02) for x, y in hole]
     m.poly('tma', dark, [(0, 0)] * len(dark))
     # The back, only over the hill.
     if OVER_M > 0:
-        m.poly('beton', [(x0, LEVEL_M, zb), (x1, LEVEL_M, zb), (x1, top, zb), (x0, top, zb)], [(u(x1), v(LEVEL_M)), (u(x0), v(LEVEL_M)), (u(x0), v(top)), (u(x1), v(top))])
+        m.poly(MAT, [(x0, LEVEL_M, zb), (x1, LEVEL_M, zb), (x1, top, zb), (x0, top, zb)], [(u(x1), v(LEVEL_M)), (u(x0), v(LEVEL_M)), (u(x0), v(top)), (u(x1), v(top))])
     # The top.
-    w = WALL_T / TEX_M
-    m.poly('beton', [(x0, top, zb), (x1, top, zb), (x1, top, zf), (x0, top, zf)], [(u(x0), 0.0), (u(x1), 0.0), (u(x1), w), (u(x0), w)])
+    w = WALL_T / TEX_V
+    m.poly(MAT, [(x0, top, zb), (x1, top, zb), (x1, top, zf), (x0, top, zf)], [(u(x0), 0.0), (u(x1), 0.0), (u(x1), w), (u(x0), w)])
     # No ends: beside the face the wing walls and the hill.
     return m
 
@@ -194,7 +226,7 @@ def write(path, mesh, name):
         return len(views) - 1
 
     accessors, primitives, materials, textures, images = [], [], [], [], []
-    tex_of = {'beton': concrete_png()}
+    tex_of = {MAT: concrete_png() if MAT == 'beton' else stone_png()}
     triangles = 0
     for mat, (pos, nrm, uv, idx) in mesh.prims.items():
         fp = [c for p in pos for c in p]
@@ -249,11 +281,13 @@ def write(path, mesh, name):
 
 
 def main():
-    for k in range(3):
-        write(os.path.join(HERE, f'tunel_lodni_zed_{k}.glb'), wall(k), f'tunel_lodni_zed_{k}')
-        write(os.path.join(HERE, f'tunel_lodni_zed_{k}_z.glb'), mirrored(wall(k)), f'tunel_lodni_zed_{k}_z')
-        write(os.path.join(HERE, f'tunel_lodni_vrch_{k}.glb'), wall_top(k), f'tunel_lodni_vrch_{k}')
-    write(os.path.join(HERE, 'tunel_lodni_celo.glb'), face(), 'tunel_lodni_celo')
+    global MAT, TEX_U, TEX_V
+    for prefix, MAT, TEX_U, TEX_V in (('tunel_lodni', 'beton', TEX_M, TEX_M), ('tunel_silnicni', 'kamen', STONE_W_M, STONE_H_M)):
+        for k in range(3):
+            write(os.path.join(HERE, f'{prefix}_zed_{k}.glb'), wall(k), f'{prefix}_zed_{k}')
+            write(os.path.join(HERE, f'{prefix}_zed_{k}_z.glb'), mirrored(wall(k)), f'{prefix}_zed_{k}_z')
+            write(os.path.join(HERE, f'{prefix}_vrch_{k}.glb'), wall_top(k), f'{prefix}_vrch_{k}')
+        write(os.path.join(HERE, f'{prefix}_celo.glb'), face(), f'{prefix}_celo')
     print(f'otvor {2 * OPEN_HALF:.2f} m siroky, {OPEN_TOP:.2f} m vysoky')
 
 

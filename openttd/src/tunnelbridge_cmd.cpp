@@ -1319,24 +1319,33 @@ static void DrawBridgeRoadBits(TileIndex head_tile, int x, int y, int z, int off
  * instead of the road tunnel's sprites, narrower than the canal with grass beside them over its water. In the turned
  * view and facing north among the objects, as the lock (DrawThreeDLock() of water_cmd.cpp); from the eyes the eyes draw
  * the portal (CabDrawPortal() of viewport.cpp).
+ * A road tunnel's mouth the same in stones (the player, 11. 11.: "turning a little left or right changed the entrance's
+ * picture by turns on both ends of the tunnel. here the road tunnel does it": the portal's sprite is of the four views
+ * of the original game alone, the far end's the back of the portal, turned with the map one end's or the other's): the
+ * same shapes as from the eyes (CabDrawPortal()), turned with the map, the road's ground under them the game's.
+ * @param water a ship tunnel's: the canal's water under it, the concrete; else a road tunnel's, the stones
  * @return whether it was drawn so: the road portal's sprites left out
  */
-static bool DrawThreeDShipTunnelEntrance(const TileInfo *ti)
+static bool DrawThreeDTunnelEntrance(const TileInfo *ti, bool water)
 {
 	if (ViewportDrawingEye() || (!ViewportDrawingTurned() && !ViewportDrawingNorthObjects())) return false;
 	if (IsInvisibilitySet(TransparencyOption::Buildings)) return false;
 	/* The thirds of the wall on the right looking into the tunnel (its inner face to the left), and mirrored on the left; the face. */
-	static constexpr std::string_view RIGHT[3] = {"tunel_lodni_zed_0", "tunel_lodni_zed_1", "tunel_lodni_zed_2"};
-	static constexpr std::string_view LEFT[3] = {"tunel_lodni_zed_0_z", "tunel_lodni_zed_1_z", "tunel_lodni_zed_2_z"};
-	static constexpr std::string_view TOPS[3] = {"tunel_lodni_vrch_0", "tunel_lodni_vrch_1", "tunel_lodni_vrch_2"};
-	static constexpr std::string_view FACE = "tunel_lodni_celo";
+	static constexpr std::string_view SHIP_RIGHT[3] = {"tunel_lodni_zed_0", "tunel_lodni_zed_1", "tunel_lodni_zed_2"};
+	static constexpr std::string_view SHIP_LEFT[3] = {"tunel_lodni_zed_0_z", "tunel_lodni_zed_1_z", "tunel_lodni_zed_2_z"};
+	static constexpr std::string_view SHIP_TOPS[3] = {"tunel_lodni_vrch_0", "tunel_lodni_vrch_1", "tunel_lodni_vrch_2"};
+	static constexpr std::string_view ROAD_RIGHT[3] = {"tunel_silnicni_zed_0", "tunel_silnicni_zed_1", "tunel_silnicni_zed_2"};
+	static constexpr std::string_view ROAD_LEFT[3] = {"tunel_silnicni_zed_0_z", "tunel_silnicni_zed_1_z", "tunel_silnicni_zed_2_z"};
+	static constexpr std::string_view ROAD_TOPS[3] = {"tunel_silnicni_vrch_0", "tunel_silnicni_vrch_1", "tunel_silnicni_vrch_2"};
+	const std::string_view *RIGHT = water ? SHIP_RIGHT : ROAD_RIGHT, *LEFT = water ? SHIP_LEFT : ROAD_LEFT, *TOPS = water ? SHIP_TOPS : ROAD_TOPS;
+	const std::string_view FACE = water ? "tunel_lodni_celo" : "tunel_silnicni_celo";
 	for (int k = 0; k < 3; k++) {
 		if (GetThreeDFigure(LEFT[k]) == nullptr || GetThreeDFigure(RIGHT[k]) == nullptr || GetThreeDFigure(TOPS[k]) == nullptr) return false;
 	}
 	if (GetThreeDFigure(FACE) == nullptr) return false;
 
 	/* The canal's water, flat at the foot of the slope where the boats float. */
-	DrawGroundSpriteAt(SPR_FLAT_WATER_TILE, PAL_NONE, 0, 0, 0);
+	if (water) DrawGroundSpriteAt(SPR_FLAT_WATER_TILE, PAL_NONE, 0, 0, 0);
 
 	/* Into the tunnel and to its left (a model's +y, glTF's -Z), world units; the angles of each. */
 	const TileIndexDiffC d = TileIndexDiffCByDiagDir(GetTunnelBridgeDirection(ti->tile));
@@ -1449,10 +1458,24 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 		image += to_underlying(tunnelbridge_direction) * 2;
 		/* Our 3D track into the portal (DrawThreeDTrackTunnel()): under it the tunnel's base without the game's rails. */
 		const bool three_d = transport_type == TransportType::Rail && DrawThreeDTrackTunnel(ti);
-		/* A tunnel for ships: its concrete mouth in 3D, the road portal's sprites left out (DrawThreeDShipTunnelEntrance()). */
-		const bool ship_mouth = transport_type == TransportType::Water && DrawThreeDShipTunnelEntrance(ti);
+		/* A tunnel for ships: its concrete mouth in 3D, the road portal's sprites left out (DrawThreeDTunnelEntrance()). */
+		const bool ship_mouth = transport_type == TransportType::Water && DrawThreeDTunnelEntrance(ti, true);
+		/* A road tunnel's in stones (DrawThreeDTunnelEntrance()), its road a plain straight road at the foot of the slope
+		 * as from the eyes: the tunnel's ground sprites -- the hill and the portal's foot drawn into them for the original
+		 * view -- laid flat in the turned view were a grey smear where the road goes in. A tunnel of trams alone as it was. */
+		const bool road_mouth = transport_type == TransportType::Road && GetRoadTypeRoad(ti->tile) != INVALID_ROADTYPE && DrawThreeDTunnelEntrance(ti, false);
 		if (ship_mouth) {
 			/* Drawn: the wall's helper boxes still sort what is beside the tunnel. */
+		} else if (road_mouth) {
+			/* The road's own ground (DrawRoadOverlays() below lays a road set's surface over it), as a straight road's. */
+			const RoadTypeInfo *rti = GetRoadTypeInfo(GetRoadTypeRoad(ti->tile));
+			const bool snow = HasTunnelBridgeSnowOrDesert(ti->tile);
+			const uint axis_offset = DiagDirToAxis(tunnelbridge_direction) == Axis::X ? 1 : 0;
+			if (rti->UsesOverlay()) {
+				DrawGroundSprite(snow ? SPR_FLAT_SNOW_DESERT_TILE : SPR_FLAT_GRASS_TILE, PAL_NONE);
+			} else {
+				DrawGroundSprite(SPR_ROAD_Y + axis_offset + (snow ? 19 : 0), PAL_NONE);
+			}
 		} else if (three_d && railtype_overlay == 0) {
 			DrawGroundSprite(SPR_RAILTYPE_TUNNEL_BASE + (HasTunnelBridgeSnowOrDesert(ti->tile) ? 8 : 0) + to_underlying(tunnelbridge_direction) * 2, PAL_NONE);
 		} else {
@@ -1467,9 +1490,9 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 			uint sprite_offset = DiagDirToAxis(tunnelbridge_direction) == Axis::X ? 1 : 0;
 			bool draw_underlay = true;
 
-			/* Road underlay takes precedence over tram */
+			/* Road underlay takes precedence over tram; with the mouth in 3D a straight road's (above), not the tunnel's. */
 			if (road_rti != nullptr) {
-				if (road_rti->UsesOverlay()) {
+				if (road_rti->UsesOverlay() && !road_mouth) {
 					SpriteID ground = GetCustomRoadSprite(road_rti, ti->tile, RoadSpriteType::Tunnel);
 					if (ground != 0) {
 						DrawGroundSprite(ground + to_underlying(tunnelbridge_direction), PAL_NONE);
@@ -1541,7 +1564,8 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 
 		if (railtype_overlay != 0 && !catenary) StartSpriteCombine();
 
-		if (!ship_mouth) AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
+		/* A road tunnel's mouth in 3D in the turned view (above): its portal's sprite left out. */
+		if (!ship_mouth && !road_mouth) AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 		/* Draw railtype tunnel portal overlay if defined. */
 		if (railtype_overlay != 0) AddSortableSpriteToDraw(railtype_overlay + to_underlying(tunnelbridge_direction), PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 

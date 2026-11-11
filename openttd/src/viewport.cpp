@@ -14599,7 +14599,7 @@ static void CabDrawConcrete(const CabCanvas &cv, const CabEye &eye, std::initial
 
 /**
  * The mouth of a tunnel for ships from the eyes (the player, 10. 11.: "make the tunnel's entrance, the concrete. the
- * aqueduct is wider than the road"): as from above (DrawThreeDShipTunnelEntrance() of tunnelbridge_cmd.cpp), its face
+ * aqueduct is wider than the road"): as from above (DrawThreeDTunnelEntrance() of tunnelbridge_cmd.cpp), its face
  * of concrete the tile's width round the opening, and walls of concrete beside the way in up to the hill.
  * @param s,s_out the planes of the portal and of the end tile's outer edge along the tunnel
  */
