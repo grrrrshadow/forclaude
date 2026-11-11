@@ -103,6 +103,7 @@
 #include "frame_diary.h"
 #include "station_map.h"
 #include "tilehighlight_func.h"
+#include "widgets/rail_widget.h"
 #include "newgrf_station.h"
 #include "train_cmd.h"
 #include "gamelog.h"
@@ -5659,6 +5660,24 @@ static std::vector<std::pair<int, std::string>> _testza_queue;
 /* The rig's picture of the screen as the video driver shows it (test3d obrazovka, OpenGLBackend::Paint()). */
 std::string _rig_screen_picture; ///< into this .ppm, empty none
 int _rig_screen_paints = 0;      ///< after so many paints
+int _rig_mouse_walk = 0;         ///< the rig: so many more frames the mouse moves over the main view ('okno vystavba mys')
+
+/** The rig's mouse moving over the main view, a frame's step (UpdateWindows()): the selection under it as the game moves it. */
+void RigMouseWalkStep()
+{
+	if (_rig_mouse_walk <= 0) return;
+	const Window *w = FindWindowById(WindowClass::MainWindow, 0);
+	if (w == nullptr || w->viewport == nullptr) return;
+	_rig_mouse_walk--;
+	/* Across the middle of the view and back, 7 pixels a frame: a new tile every few frames. */
+	static int step = 0;
+	step++;
+	const int span = w->viewport->width / 2, at = (step * 7) % (2 * span);
+	_cursor.pos.x = w->viewport->left + w->viewport->width / 4 + (at < span ? at : 2 * span - at);
+	_cursor.pos.y = w->viewport->top + w->viewport->height / 2 + ((step / 9) % 5 - 2) * 9;
+	_cursor.dirty = true;
+	UpdateTileSelection();
+}
 bool _rig_screen_quit = false;   ///< and the game ended after it
 /** A command run once the picture is taken ('obrazovka ... potom <command>'): by the clock of the windows, the game paused too. */
 static std::string _rig_screen_then;
@@ -9388,6 +9407,14 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			float before = GetViewYaw();
 			Window *tb = ShowBuildRailToolbar(RAILTYPE_RAIL);
 			IConsolePrint(CC_DEFAULT, "test3d: vystavba {}, uhel {} -> {}", tb != nullptr ? "otevrena" : "NEOTEVRENA", before, GetViewYaw());
+			/* 'okno vystavba mys <snimku>': with its autorail tool picked, the mouse moved over the main view a few pixels
+			 * each frame for so many frames, as the player's hand looking where to build (the player's test7: "the cursor
+			 * slows down ... I chase the cursor over the screen"): the selection under it as the game moves it. */
+			if (tb != nullptr && argv.size() > 4 && argv[3] == "mys") {
+				tb->OnClick({}, WID_RAT_AUTORAIL, 1);
+				_rig_mouse_walk = static_cast<int>(ParseInteger(argv[4]).value_or(0));
+				IConsolePrint(CC_DEFAULT, "test3d: vystavba, autorail, mys pojede {} snimku", _rig_mouse_walk);
+			}
 			return true;
 		}
 		if (argv[2] == "kup" && argv.size() > 3) {

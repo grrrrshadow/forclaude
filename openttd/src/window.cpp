@@ -3331,6 +3331,9 @@ void UpdateWindows()
 	 * pieces drawn below: counted apart in the diary of the frames, so a slow frame says which of the two it was
 	 * (frame_diary.h, the player's #299 log: "okna" long, nothing saying where). */
 	const auto timers_started = std::chrono::steady_clock::now();
+	/* The rig's mouse moving over the main view ('test3d okno vystavba mys', console_cmds.cpp). */
+	extern void RigMouseWalkStep();
+	RigMouseWalkStep();
 	TimerManager<TimerWindow>::Elapsed(delta_ms);
 	CallWindowRealtimeTickEvent(delta_ms.count());
 	FrameDiaryWindowsTimers(std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - timers_started).count());

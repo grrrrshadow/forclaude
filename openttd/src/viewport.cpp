@@ -259,6 +259,22 @@ static void TurnedCardLaySmallViewsDirty(int left, int top, int right, int botto
 static int TurnedCardLayChanged(const Viewport &vp, int left, int top, int right, int bottom);
 /** The blocks being drawn are what a move of the view uncovered (SetViewportPosition()): what the card has about the view there stays (TurnedCardGround). */
 static bool _turned_scroll_uncovering = false;
+/** The selection of tiles being marked dirty (SetSelectionTilesDirty()): on a view it is drawn over (SelectionOverTurned()) only the screen drawn again. */
+static bool _marking_selection = false;
+
+/**
+ * Whether the selection of tiles on a view the second renderer draws is drawn by the processor over each finished block
+ * (DrawTileSelectionOverTurned()), as the signs are, not into the ground the card lays: facing north, where the player
+ * builds (ThreeDViewForBuilding()) -- the main view at angle 0, a small view on the card. In the ground, each move of the
+ * mouse while building laid the ground and what stands about the old and the new selection anew (TurnedCardLayChanged(),
+ * 16 ms a lay on the computer, 58 lays in 5 s; the player: "whatever I start to build, I chase the cursor about the
+ * screen"). Turned away it lies on the turned ground as before.
+ * @param vp the view
+ */
+static bool SelectionOverTurned(const Viewport &vp)
+{
+	return !IsViewportTurnedAway(vp);
+}
 
 static ViewportDrawer _vd;
 
@@ -1397,7 +1413,12 @@ static void AddBusStopObjects(size_t first_parent);
 static void AddFieldWheat();
 static void AddOriginalIndustryTile(TileIndex tile, const ThreeDIndustryTileParts &parts, bool built);
 
-static void ViewportAddLandscape()
+/**
+ * Collect what the tiles in the block being drawn (_vd.dpi) show, as the game drew them facing north.
+ * @param selection_only only the selection of tiles over them, on their ground as their foundations leave it
+ *                       (DrawTileSelectionOverTurned())
+ */
+static void ViewportAddLandscape(bool selection_only = false)
 {
 	assert(_vd.dpi.top <= _vd.dpi.top + _vd.dpi.height);
 	assert(_vd.dpi.left <= _vd.dpi.left + _vd.dpi.width);
@@ -1501,6 +1522,14 @@ static void ViewportAddLandscape()
 				_vd.foundation[FoundationPart::Halftile] = -1;
 				_vd.last_foundation_child[FoundationPart::Normal] = LAST_CHILD_NONE;
 				_vd.last_foundation_child[FoundationPart::Halftile] = LAST_CHILD_NONE;
+
+				if (selection_only) {
+					/* No foundation drawn: the selection on the ground over it, where it lies on the foundation. */
+					if (_cur_ti.tile == INVALID_TILE) continue;
+					if (tile_type != TileType::Void) std::tie(_cur_ti.tileh, _cur_ti.z) = GetFoundationPixelSlope(_cur_ti.tile);
+					DrawTileSelection(&_cur_ti);
+					continue;
+				}
 
 				size_t first_parent = _vd.parent_sprites_to_draw.size();
 				_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
@@ -1791,6 +1820,21 @@ static void ViewportDrawTileSprites(const TileSpriteToDrawVector *tstdv)
 	for (const TileSpriteToDraw &ts : *tstdv) {
 		DrawSpriteViewport(ts.image, ts.pal, ts.x, ts.y, ts.sub);
 	}
+}
+
+/**
+ * The selection of tiles drawn by the processor over the finished block of a view the second renderer draws facing north
+ * (SelectionOverTurned()): over what stands too, as a cursor. A move of it draws the blocks under it again, each only a
+ * hole for the card's picture (TurnedCardBandHas()) and it over that; nothing laid again (MarkViewportDirty()).
+ */
+static void DrawTileSelectionOverTurned()
+{
+	static TileSpriteToDrawVector selection;
+	selection.clear();
+	std::swap(selection, _vd.tile_sprites_to_draw);
+	ViewportAddLandscape(true);
+	std::swap(selection, _vd.tile_sprites_to_draw);
+	ViewportDrawTileSprites(&selection);
 }
 
 /**
@@ -8729,7 +8773,8 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 		const size_t round_before = RoundTrackTileCount();
 		_tile_type_procs[tile_type]->draw_tile_proc(&_cur_ti);
 		t.round = RoundTrackTileCount() != round_before;
-		if (_cur_ti.tile != INVALID_TILE) DrawTileSelection(&_cur_ti);
+		/* Facing north the selection is drawn over the finished block (DrawTileSelectionOverTurned()), not into the ground. */
+		if (_cur_ti.tile != INVALID_TILE && (_turned_vp == nullptr || !SelectionOverTurned(*_turned_vp))) DrawTileSelection(&_cur_ti);
 		/* The ground lies on top of the foundation, if the tile has one. */
 		t.top_slope = t.raw_slope;
 		t.top_z = t.raw_z;
@@ -10379,6 +10424,8 @@ void ViewportDoDraw(const Viewport &vp, int left, int top, int right, int bottom
 	/* The night over it all but the signs (gui.night). */
 	if (IsNightNow()) DrawNight(turned);
 	if (turned) TurnedCardGlowsShow(vp);
+	/* The selection of tiles over it all but the signs, facing north (SelectionOverTurned()). */
+	if (turned && SelectionOverTurned(vp)) DrawTileSelectionOverTurned();
 	_turned_vehicles_on_card = false;
 	_night_block_hole = false;
 	_night_lit.clear();
@@ -10625,8 +10672,9 @@ static bool MarkViewportDirty(const Viewport &vp, int left, int top, int right, 
 	 * lights (DrawNight()). */
 	const bool mover = _turned_moving_layer && &vp == _turned_card_ground.vp && DirtyPlaceIsMover();
 
-	/* Past the turned main view, on the card about it: laid again when the view comes to it; a sign only drawn again. */
-	if (!mover && !DirtyPlaceIsScreenOnly()) TurnedCardBandDirty(vp, left, top, right, bottom);
+	/* Past the turned main view, on the card about it: laid again when the view comes to it; a sign, the selection of
+	 * tiles facing north (SelectionOverTurned()) only drawn again. */
+	if (!mover && !DirtyPlaceIsScreenOnly() && !(_marking_selection && SelectionOverTurned(vp))) TurnedCardBandDirty(vp, left, top, right, bottom);
 
 	right -= vp.virtual_left;
 	if (right <= 0) return false;
@@ -10782,6 +10830,8 @@ void MarkWorldBoxDirty(double x0, double y0, double x1, double y1, int z0, int z
  */
 static void SetSelectionTilesDirty()
 {
+	/* Over a view the card draws facing north only the screen drawn again (SelectionOverTurned()). */
+	AutoRestoreBackup marking(_marking_selection, true);
 	int x_size = _thd.size.x;
 	int y_size = _thd.size.y;
 
