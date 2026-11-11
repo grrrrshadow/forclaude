@@ -305,7 +305,9 @@ constexpr GLenum GL_CLAMP_TO_EDGE = 0x812F;
 constexpr GLenum GL_TEXTURE_BASE_LEVEL = 0x813C;
 constexpr GLenum GL_TEXTURE_MAX_LEVEL = 0x813D;
 constexpr GLenum GL_DEPTH_COMPONENT24 = 0x81A6;
+constexpr GLenum GL_RG = 0x8227;
 constexpr GLenum GL_R8 = 0x8229;
+constexpr GLenum GL_RG8 = 0x822B;
 constexpr GLenum GL_R32F = 0x822E;
 constexpr GLenum GL_UNSIGNED_INT_8_8_8_8_REV = 0x8367;
 constexpr GLenum GL_TEXTURE0 = 0x84C0;
@@ -739,8 +741,11 @@ static void ForgetViewPictures(ViewPictures &v)
 	v.standing_order = 0;
 	ForgetMovingPictures(v);
 }
-/* The pictures laid: a sprite's kept by its key in the atlas, the block's others in the stream; started over when full. */
-GLuint _standing_atlas = 0, _standing_stream = 0;
+/* The pictures laid: a sprite's kept by its key in the atlas, the block's others in the stream; started over when full.
+ * Beside the atlas how near each pixel of a vehicle kept in it is (ThreeDGpuStandingVehicle::near_span), 16 bits in
+ * red and green, as it was shrunk into it (STANDING_SHRINK_FRAGMENT). */
+GLuint _standing_atlas = 0, _standing_stream = 0, _standing_near = 0;
+bool _standing_near_checked = false; ///< whether the atlas's frame was found complete with it
 int _standing_atlas_size = 0;
 struct StandingShelf {
 	int x = 0, y = 0, h = 0;
@@ -1174,7 +1179,7 @@ void main()
 
 /* The pictures laid on the turned map (DrawStandingOnCard()), as STANDING_VERTEX with each one's box after its order
  * (ThreeDGpuStandingItem::box): its lowest corner and middle, its highest corner and how its depth comes -- 0 by its
- * box, 1 as given (a_pos.z: a figure in a building's depth), 2 as given, its order alone. */
+ * box, 1 as given (a_pos.z: a figure in a building's depth), 2 as given, its order alone, 3 a vehicle's own (STANDING_FRAGMENT). */
 const char *const STANDING_BOX_VERTEX = R"(#version 330 core
 layout(location = 0) in vec3 a_pos;
 layout(location = 1) in vec2 a_uv;
@@ -1202,6 +1207,7 @@ const char *const STANDING_FRAGMENT = "#version 330 core\n" STANDING_ORDER_GLSL 
 uniform sampler2D u_texture;
 uniform int u_moving;
 uniform sampler2D u_orders;
+uniform sampler2D u_near_tex;
 noperspective in vec2 v_uv;
 flat in float v_order;
 flat in vec4 v_lo;
@@ -1214,9 +1220,15 @@ void main()
 {
 	vec4 t = texelFetch(u_texture, ivec2(floor(v_uv)), 0);
 	if (t.a == 0.0) discard;
-	/* How near this pixel of it is: by its box, or as given. */
+	/* How near this pixel of it is: by its box, as given, or a vehicle's by its own depth kept beside the atlas
+	 * (how 3: v_lo its nearness's least and span, how near the point it hangs from is). */
 	float order = v_order, depth = v_depth;
-	if (v_hi.w < 0.5) {
+	if (v_hi.w > 2.5) {
+		vec4 n = texelFetch(u_near_tex, ivec2(floor(v_uv)), 0);
+		float near = v_lo.w + v_lo.x + (floor(n.r * 255.0 + 0.5) * 256.0 + floor(n.g * 255.0 + 0.5)) / 65535.0 * v_lo.y;
+		order = NearOrder(near);
+		depth = NearDepth(near);
+	} else if (v_hi.w < 0.5) {
 		float near = PixelNear(v_lo.xyz, v_hi.xyz, v_lo.w);
 		order = NearOrder(near);
 		depth = NearDepth(near);
@@ -1243,20 +1255,36 @@ void main()
 const char *const STANDING_SHRINK_FRAGMENT = R"(#version 330 core
 uniform sampler2D u_colour;
 uniform sampler2D u_lit;
+uniform sampler2D u_depth;
 uniform int u_ss;
+uniform vec4 u_near;
+uniform vec4 u_near_range;
 noperspective in vec2 v_uv;
 layout(location = 0) out vec4 o_colour;
+layout(location = 1) out vec4 o_near;
 void main()
 {
 	ivec2 at = ivec2(floor(v_uv)) * u_ss;
 	vec4 sum = vec4(0.0);
 	float lit = 0.0;
+	/* How near the nearest of its subpixels is (ThreeDGpuStandingVehicle::near_osy): its row and its depth in the
+	 * picture, u_near its weights and the row of the picture's first, u_near_range the picture's depths and how near
+	 * its box is, nearest to furthest -- 0-1 between them in 16 bits. */
+	float best = -1e30;
 	for (int dy = 0; dy < u_ss; dy++) {
 		for (int dx = 0; dx < u_ss; dx++) {
-			sum += texelFetch(u_colour, at + ivec2(dx, dy), 0);
+			vec4 c = texelFetch(u_colour, at + ivec2(dx, dy), 0);
+			sum += c;
 			lit = max(lit, texelFetch(u_lit, at + ivec2(dx, dy), 0).r);
+			if (c.a > 0.0) {
+				float od = mix(u_near_range.x, u_near_range.y, texelFetch(u_depth, at + ivec2(dx, dy), 0).r);
+				best = max(best, u_near.x * (u_near.z + float(at.y + dy) + 0.5) + u_near.y * od);
+			}
 		}
 	}
+	float k = best > -1e29 ? floor(clamp((best - u_near_range.z) / u_near_range.w, 0.0, 1.0) * 65535.0 + 0.5) : 0.0;
+	float hi = floor(k / 256.0);
+	o_near = vec4(hi / 255.0, (k - hi * 256.0) / 255.0, 0.0, 1.0);
 	if (sum.a <= 0.0) {
 		o_colour = vec4(0.0);
 		return;
@@ -2922,7 +2950,8 @@ void ForgetCard()
 		gl.glDeleteTextures(1, &_standing_atlas);
 		gl.glDeleteTextures(1, &_standing_stream);
 	}
-	_standing_atlas = _standing_stream = 0;
+	if (_standing_near != 0) gl.glDeleteTextures(1, &_standing_near);
+	_standing_atlas = _standing_stream = _standing_near = 0;
 	_standing_atlas_size = 0;
 	_standing_places.clear();
 	if (_sv_colour != 0) {
@@ -2930,7 +2959,7 @@ void ForgetCard()
 		gl.glDeleteTextures(1, &_sv_lit);
 	}
 	_sv_colour = _sv_lit = 0;
-	if (_sv_depth != 0) gl.glDeleteRenderbuffers(1, &_sv_depth);
+	if (_sv_depth != 0) gl.glDeleteTextures(1, &_sv_depth);
 	_sv_depth = 0;
 	_sv_w = _sv_h = 0;
 }
@@ -4324,21 +4353,27 @@ bool StandingVehiclesTargetOfSize(int w, int h)
 	const int nw = std::min(_max_target, (std::max(_sv_w, w) + 255) / 256 * 256), nh = std::min(_max_target, (std::max(_sv_h, h) + 255) / 256 * 256);
 	Step(fmt::format("ramec vozidel plochy {}x{}", nw, nh));
 	if (_sv_fbo == 0) gl.glGenFramebuffers(1, &_sv_fbo);
-	if (_sv_depth == 0) gl.glGenRenderbuffers(1, &_sv_depth);
 	if (_sv_colour != 0) {
 		gl.glDeleteTextures(1, &_sv_colour);
 		gl.glDeleteTextures(1, &_sv_lit);
 	}
 	_sv_colour = NewGroundTexture(nw, nh);
 	_sv_lit = NewGroundTexture(nw, nh);
+	/* Its depth a texture: how near each pixel of a vehicle is read from it as it is shrunk (STANDING_SHRINK_FRAGMENT). */
+	if (_sv_depth == 0) gl.glGenTextures(1, &_sv_depth);
+	gl.glBindTexture(GL_TEXTURE_2D, _sv_depth);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+	gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+	gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, nw, nh, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
 	gl.glBindTexture(GL_TEXTURE_2D, 0);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, _sv_depth);
-	gl.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, nw, nh);
-	gl.glBindRenderbuffer(GL_RENDERBUFFER, 0);
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, _sv_fbo);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _sv_colour, 0);
 	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _sv_lit, 0);
-	gl.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, _sv_depth);
+	gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, _sv_depth, 0);
 	const bool complete = gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
 	gl.glBindFramebuffer(GL_FRAMEBUFFER, 0);
 	if (!complete) {
@@ -4465,6 +4500,16 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		Step(fmt::format("atlas toho, co stoji na plose, {}x{}", _standing_atlas_size, _standing_atlas_size));
 		_standing_atlas = NewGroundTexture(_standing_atlas_size, _standing_atlas_size);
 		_standing_stream = NewGroundTexture(_standing_atlas_size, _standing_atlas_size);
+		gl.glGenTextures(1, &_standing_near);
+		gl.glBindTexture(GL_TEXTURE_2D, _standing_near);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+		gl.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+		gl.glTexImage2D(GL_TEXTURE_2D, 0, GL_RG8, _standing_atlas_size, _standing_atlas_size, 0, GL_RG, GL_UNSIGNED_BYTE, nullptr);
+		_standing_near_checked = false;
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		_standing_atlas_shelf = {};
 		_standing_places.clear();
@@ -4610,6 +4655,10 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform1i(gl.glGetUniformLocation(p, "u_orders"), 1);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, s.moving ? pics.standing_order : 0);
+		/* How near each pixel of a vehicle is, kept beside the atlas (how 3). */
+		gl.glUniform1i(gl.glGetUniformLocation(p, "u_near_tex"), 2);
+		gl.glActiveTexture(GL_TEXTURE2);
+		gl.glBindTexture(GL_TEXTURE_2D, _standing_near);
 		gl.glActiveTexture(GL_TEXTURE0);
 		gl.glBindVertexArray(_standing_order_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _standing_vbo);
@@ -4648,11 +4697,14 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (!s.moving && item.depth >= 0) {
 			how = 1.0f;
 			z = std::min(1.0f, item.depth);
+		} else if (item.vehicle != nullptr && item.own_near && item.vehicle->near_span > 0 && _standing_near != 0) {
+			how = 3.0f;
 		} else if (!item.boxed) {
 			how = 2.0f;
 			z = std::clamp((static_cast<float>(item.order) / 32.0f - 262144.0f - s.depth[0]) / std::max(1e-3f, s.depth[1]), 0.0f, 1.0f);
 		}
-		const std::array<float, 8> box = {item.box[0], item.box[1], item.box[2], item.mid, item.box[3], item.box[4], item.box[5], how};
+		std::array<float, 8> box = {item.box[0], item.box[1], item.box[2], item.mid, item.box[3], item.box[4], item.box[5], how};
+		if (how == 3.0f) box = {item.vehicle->near_min, item.vehicle->near_span, 0.0f, item.hang_near, 0.0f, 0.0f, 0.0f, how};
 		auto corner = [&](float x, float y, float u, float v) {
 			corners.insert(corners.end(), {x, y, z, u, v, o});
 			corners.insert(corners.end(), box.begin(), box.end());
@@ -4881,8 +4933,19 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		if (_standing_atlas_fbo == 0) gl.glGenFramebuffers(1, &_standing_atlas_fbo);
 		gl.glBindFramebuffer(GL_FRAMEBUFFER, _standing_atlas_fbo);
 		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, _standing_atlas, 0);
-		static const GLenum colour_only[1] = {GL_COLOR_ATTACHMENT0};
-		gl.glDrawBuffers(1, colour_only);
+		/* And how near each of its pixels is beside it (ThreeDGpuStandingVehicle::near_span); a card that cannot draw
+		 * into both at once lays them by their boxes. */
+		gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, _standing_near, 0);
+		if (_standing_near != 0 && !_standing_near_checked) {
+			_standing_near_checked = true;
+			if (gl.glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+				Diary("hloubka vozidel plochy: ramec atlasu s ni neuplny, vozidla po krabicich", true);
+				gl.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, 0, 0);
+				gl.glDeleteTextures(1, &_standing_near);
+				_standing_near = 0;
+			}
+		}
+		gl.glDrawBuffers(_standing_near != 0 ? 2 : 1, colour_and_lit);
 		gl.glViewport(0, 0, _standing_atlas_size, _standing_atlas_size);
 		gl.glDisable(GL_SCISSOR_TEST);
 		gl.glDisable(GL_BLEND);
@@ -4893,6 +4956,12 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_colour"), 0);
 		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_lit"), 1);
 		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_ss"), ss);
+		gl.glUniform1i(gl.glGetUniformLocation(sp, "u_depth"), 2);
+		/* Its row in the picture drawn: subpixels from where it is drawn, its first row's from the point it hangs from. */
+		gl.glUniform4f(gl.glGetUniformLocation(sp, "u_near"), v.near_osy, v.near_od, v.near_top - static_cast<float>(at[1]), 0.0f);
+		gl.glUniform4f(gl.glGetUniformLocation(sp, "u_near_range"), v.pic.depth_near, v.pic.depth_far, v.near_min, std::max(1e-3f, v.near_span));
+		gl.glActiveTexture(GL_TEXTURE2);
+		gl.glBindTexture(GL_TEXTURE_2D, _sv_depth);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, _sv_lit);
 		gl.glActiveTexture(GL_TEXTURE0);
@@ -4906,6 +4975,8 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 		gl.glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STREAM_DRAW);
 		gl.glDrawArrays(GL_TRIANGLES, 0, 6);
 		/* Not bound while the next are drawn into them. */
+		gl.glActiveTexture(GL_TEXTURE2);
+		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
 		gl.glActiveTexture(GL_TEXTURE0);

@@ -11265,6 +11265,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		_standing_faces_on_card = number(3).value_or(1) != 0;
 		MarkWholeScreenDirty();
 		IConsolePrint(CC_DEFAULT, "test3d: stojici krabice {}", _standing_faces_on_card ? "kartou" : "procesorem");
+	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "hloubka") {
+		/* 'stojici hloubka 0|1': the vehicles the card draws laid each pixel by its own depth (1;
+		 * ThreeDGpuStandingVehicle::near_span), or by their boxes (0). */
+		extern bool _standing_vehicles_own_near;
+		_standing_vehicles_own_near = number(3).value_or(1) != 0;
+		MarkWholeScreenDirty();
+		IConsolePrint(CC_DEFAULT, "test3d: stojici hloubka {}", _standing_vehicles_own_near ? "vlastni" : "krabici");
 	} else if (what == "stojici" && argv.size() > 3 && argv[2] == "auta") {
 		/* 'stojici auta 0|1': the vehicles among what the card lays drawn by it, no pictures of them (1;
 		 * ThreeDGpuStandingVehicle), or laid as their pictures (0). */
@@ -11513,13 +11520,21 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: depa3d {},{}: {}", *x + dx, *y + dy, o != nullptr ? fmt::format("{} od {},{}", o->name, TileX(origin), TileY(origin)) : std::string("bez objektu"));
 		}
 		if (argv.size() > 4 && argv[4] == "jede") {
-			/* 'depa3d <x> <y> jede': out of the depots opening SE a train onto two tiles of rails and a lorry onto two
-			 * of road, to a second shed and back (the gates, GetThreeDDepotDoorWing()). */
+			/* 'depa3d <x> <y> jede [engine]': out of the depots opening SE a train onto two tiles of rails and a lorry onto
+			 * two of road, to a second shed and back (the gates, GetThreeDDepotDoorWing()); the train the first engine there
+			 * is, or the first whose name has the text (one with an object of its own, drawn by the card). */
+			std::string want = argv.size() > 5 ? std::string(argv[5]) : "";
+			std::transform(want.begin(), want.end(), want.begin(), [](unsigned char c) { return std::tolower(c); });
 			said("koleje", Command<Commands::BuildRailLong>::Do(DoCommandFlag::Execute, at(2, 2), at(2, 1), RAILTYPE_RAIL, Track::Y, false, true));
 			said("silnice", Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, at(2, 5), at(2, 4), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false));
 			said("druha garaz", Command<Commands::BuildRoadDepot>::Do(DoCommandFlag::Execute, at(3, 5), ROADTYPE_ROAD, DiagDirection::NE));
 			UpdateSignalsInBuffer(); // the rails built outside the command queue: their signal blocks as a command's would be
 			for (const Engine *e : Engine::IterateType(VehicleType::Train)) {
+				if (!want.empty()) {
+					std::string name = GetString(STR_ENGINE_NAME, e->index);
+					std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return std::tolower(c); });
+					if (name.find(want) == std::string::npos) continue;
+				}
 				auto [cost, veh, un_a, un_b, un_c] = Command<Commands::BuildVehicle>::Do(DoCommandFlag::Execute, at(2, 0), e->index, true, INVALID_CARGO, ClientID::Invalid);
 				if (cost.Failed()) continue;
 				said("vlak vyjel", Command<Commands::StartStopVehicle>::Do(DoCommandFlag::Execute, veh, false));

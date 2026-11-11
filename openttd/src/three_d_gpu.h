@@ -448,6 +448,17 @@ struct ThreeDGpuStandingVehicle {
 	int left = 0, top = 0;     ///< its top left from the world point it hangs from, pixels of the block
 	int width = 0, height = 0; ///< pixels of the block
 	std::vector<std::shared_ptr<const ThreeDObjectTexture>> held; ///< what its paints need, kept till it is drawn
+	/**
+	 * How near each of its pixels is, from its own depth (the player's test6: the gates and the iron of a depot drawn
+	 * over the engine, its nearness of its box only): a subpixel of its picture at row osy (subpixels down from the world
+	 * point it hangs from) and depth od of its picture (ThreeDGpuPicture::depth_near, depth_far) as near_osy * osy +
+	 * near_od * od nearer than that point -- xr + yr + 2 z of the turned world, as the buildings' (ThreeDGpuStanding::depth).
+	 * Shrunk, the nearest of each pixel's subpixels kept by the card between near_min and near_min + near_span; span 0:
+	 * none, laid by its box (ThreeDGpuStandingItem::box).
+	 */
+	float near_osy = 0, near_od = 0;
+	float near_top = 0;        ///< osy of its picture's first row
+	float near_min = 0, near_span = 0;
 };
 
 /**
@@ -490,6 +501,9 @@ struct ThreeDGpuStandingItem {
 	std::array<float, 6> box{};
 	float mid = 0;
 	bool boxed = false;
+	/** A vehicle laid by its own depth (ThreeDGpuStandingVehicle::near_span): how near the world point it hangs from is. */
+	float hang_near = 0;
+	bool own_near = false;
 };
 /** The bits of ThreeDGpuStandingItem::order: kept in three channels of 8 bits on the card. */
 static constexpr int THREE_D_GPU_ORDER_BITS = 24;

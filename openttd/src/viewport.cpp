@@ -8259,6 +8259,9 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	return true;
 }
 
+/** The rig: the vehicles the card draws laid by their own depth (ThreeDGpuStandingVehicle::near_span; test3d stojici hloubka); else by their boxes. */
+bool _standing_vehicles_own_near = true;
+
 /**
  * A vehicle's or a figure's likeness among what stands on a block for the card (box_kind 5): its picture, and those
  * drawn with it after it, laid where DrawTurnedVehicle() blits them, kept on the card by their numbers -- not drawn
@@ -8285,6 +8288,12 @@ static void AddTurnedStandingLikeness(ThreeDGpuStanding &out, const DrawPixelInf
 			item.y = y;
 			item.up = up;
 			item.vehicle = p.card;
+			/* Each pixel of it laid by its own depth (ThreeDGpuStandingVehicle::near_span), from how near the point it
+			 * hangs from is -- not by its box: a depot's gates and iron over the engine in it, the box nearer (test6). */
+			double xr, yr;
+			TurnWorldPoint(p.ax, p.ay, xr, yr);
+			item.hang_near = static_cast<float>(xr + yr + 2.0 * p.az);
+			item.own_near = _standing_vehicles_own_near && p.card->near_span > 0;
 			_turned_times.standing_vehicles++;
 			continue;
 		}

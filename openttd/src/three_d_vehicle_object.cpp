@@ -3338,6 +3338,27 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	v->top = gp.top / SUPERSAMPLE;
 	v->width = gp.pic.width / SUPERSAMPLE;
 	v->height = gp.pic.height / SUPERSAMPLE;
+	/* How near each of its subpixels is (ThreeDGpuStandingVehicle::near_osy): one osy subpixels down from the point it
+	 * hangs from, at depth od, is yr = C od - S osy / p metres further and z = -C osy / p - S od metres higher than it
+	 * (ObjectCamera::Place(), p its subpixels a metre); further on the turned map xr + yr less by sqrt 2 units a metre,
+	 * higher 2 z more by its units of height a metre (as it stands stretched). Between its box's corners in the picture. */
+	{
+		const float pc = p.pxm * SUPERSAMPLE, stretch = p.stretch > 0 ? p.stretch : 1.0f;
+		const float further = static_cast<float>(OBJECT_UNITS_PER_METRE * std::sqrt(2.0)), higher = static_cast<float>(2.0 * OBJECT_HEIGHT_PER_METRE) / stretch;
+		v->near_osy = (further * CAM_SIN - higher * CAM_COS) / pc;
+		v->near_od = -further * CAM_COS - higher * CAM_SIN;
+		v->near_top = static_cast<float>(gp.top);
+		float lo = std::numeric_limits<float>::max(), hi = std::numeric_limits<float>::lowest();
+		for (const float osy : {v->near_top, v->near_top + gp.pic.height}) {
+			for (const float od : {gp.pic.depth_near, gp.pic.depth_far}) {
+				const float n = v->near_osy * osy + v->near_od * od;
+				lo = std::min(lo, n);
+				hi = std::max(hi, n);
+			}
+		}
+		v->near_min = lo;
+		v->near_span = std::max(1e-3f, hi - lo);
+	}
 	v->pic = std::move(gp.pic);
 	v->held = std::move(gp.held);
 	lights = std::move(gp.lights);
@@ -3504,6 +3525,11 @@ static void KeepCardDrawn(const Vehicle *v, const ThreeDVehicleObject *obj, cons
 	drawn->top = card->top;
 	drawn->width = card->width;
 	drawn->height = card->height;
+	drawn->near_osy = card->near_osy;
+	drawn->near_od = card->near_od;
+	drawn->near_top = card->near_top;
+	drawn->near_min = card->near_min;
+	drawn->near_span = card->near_span;
 	kept = {obj, std::move(drawn)};
 }
 
