@@ -18,8 +18,8 @@
     7.4,
     0.0
    ],
-   "sirka": 4.8,
-   "vyska": 6.8,
+   "sirka": 8.4,
+   "vyska": 7.2,
    "kolej_y": 7.4
   },
   "dvere": [
@@ -28,20 +28,20 @@
     "druh": "vrata",
     "pant": [
      14.15,
-     5.0
+     3.2
     ],
     "osa": "z",
     "poloha": [
      14.2,
-     6.2,
+     5.3,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 2.4,
-    "vyska": 6.48,
+    "sirka": 4.2,
+    "vyska": 6.64,
     "otevira_se": "ven",
     "otevreni_uhel": -100,
     "poznamka": "křídlo vjezdu, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
@@ -51,20 +51,20 @@
     "druh": "vrata",
     "pant": [
      14.15,
-     9.8
+     11.6
     ],
     "osa": "z",
     "poloha": [
      14.2,
-     8.6,
+     9.5,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 2.4,
-    "vyska": 6.48,
+    "sirka": 4.2,
+    "vyska": 6.64,
     "otevira_se": "ven",
     "otevreni_uhel": 100,
     "poznamka": "křídlo vjezdu, zavřené; otevřené = otočené o otevreni_uhel stupňů kolem svislé osy pantu (kladně proti směru hodinových ručiček shora)"
@@ -97,7 +97,7 @@
   "noc": {
    "uzel": "noc",
    "den": "den",
-   "svetla": 12,
+   "svetla": 11,
    "poznamka": "v noci ukaž uzel noc: rozsvícená okna (kopie skel 1,5 cm před nimi) a lampy u vjezdu a u dveří; svetlo_NN jsou místa záře"
   },
   "okraje_textur": 8,
@@ -121,8 +121,8 @@
     10.1
    ]
   },
-  "trojuhelniku": 6698,
-  "poznamka": "depo vlaků ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 6698 trojúhelníků, 502 kB"
+  "trojuhelniku": 6350,
+  "poznamka": "depo vlaků ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 6350 trojúhelníků, 498 kB"
  },
  {
   "druh": "depo",

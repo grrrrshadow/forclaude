@@ -21,7 +21,7 @@
     20.98
    ]
   },
-  "trojuhelniku": 2214,
+  "trojuhelniku": 2212,
   "dvere": [
    {
     "poloha": [
@@ -43,7 +43,7 @@
    "prizemi": 0.6,
    "lucerna": 16.6,
    "ochoz": 16.6,
-   "poznamka": "uvnitř 64 schodů po 0.25 m a 22,5° kolem sloupu (0,35 m), od 22,5° (vlevo za dveřmi) proti směru hodinových ručiček, 4 m na otáčku, z přízemí na podlahu lucerny; nad poslední půlotáčkou je v podlaze lucerny otvor (hlava se nepraští); z lucerny dveře na ochoz (bez skla mezi 90° a 135°), ochoz 1,3 m široký s červeným zábradlím 1 m"
+   "poznamka": "uvnitř 64 schodů po 0.25 m a 22,5° kolem sloupu (0,35 m), od 22,5° (vlevo za dveřmi) proti směru hodinových ručiček, 4 m na otáčku, z přízemí na podlahu lucerny; v podlaze lucerny (spodek 16,35 m) je otvor nad schody od 14,35 m (od 157,5°) a 0,45 m před nimi, nad každým schodem je aspoň 2,1 m volna (hra 10. 11.); podlaha lucerny je mezi 22,5° a 112,5° celá, mezi 112,5° a 135° od 1,25 m ke sklu; z lucerny dveře na ochoz (bez skla mezi 90° a 135°), ochoz 1,3 m široký s červeným zábradlím 1 m"
   },
   "noc": {
    "uzel": "noc",
