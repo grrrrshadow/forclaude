@@ -10947,8 +10947,9 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		/* 'pamet': how much memory the 3D objects (glb) and the pictures made of them take. */
 		extern std::string DescribeThreeDObjectMemory();
 		extern std::string DescribeThreeDPictureMemory();
+		extern std::string DescribeThreeDSharedMaterials();
 		/* In the debug log too: the rig of the graphics card shows no console (scena_gl3.sh). */
-		for (const std::string &line : {DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory()}) {
+		for (const std::string &line : {DescribeThreeDObjectMemory(), DescribeThreeDPictureMemory(), DescribeThreeDSharedMaterials()}) {
 			IConsolePrint(CC_DEFAULT, "test3d: pamet {}", line);
 			Debug(misc, 1, "test3d pamet {}", line);
 		}
@@ -11078,6 +11079,30 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			const CommandCost r = Command<Commands::BuildLock>::Do(DoCommandFlag::Execute, t);
 			IConsolePrint(CC_DEFAULT, "test3d: svahy zdymadlo {},{}: {}{}", TileX(t), TileY(t), r.Succeeded() ? "postaveno" : RefusalReason(r),
 					r.Succeeded() && IsTileType(t, TileType::Water) && IsLock(t) ? fmt::format(", konce {} {}", IsTileFlat(TileAddByDiagDir(t, ReverseDiagDir(GetLockDirection(t)))) ? "rovny" : "SIKMY", IsTileFlat(TileAddByDiagDir(t, GetLockDirection(t))) ? "rovny" : "SIKMY") : std::string());
+			return true;
+		}
+		if (argv.size() > 2 && argv[2] == "postav") {
+			/* 'svahy postav': a lock built as the player builds it (Post(), the test and then the making) on every inclined
+			 * slope by water, its estimate against what it cost (the player's crash of 10. 11.: "I drive along the bank and
+			 * click", the test and the making cost differently). */
+			int built = 0, refused = 0, differ = 0;
+			for (const auto t : Map::Iterate()) {
+				const DiagDirection up = GetInclinedSlopeDirection(GetTileSlope(t));
+				if (up == DiagDirection::Invalid) continue;
+				const TileIndex low = TileAddByDiagDir(t, ReverseDiagDir(up)), high = TileAddByDiagDir(t, up);
+				if (!IsValidTile(low) || !IsValidTile(high) || !(IsTileType(low, TileType::Water) || IsTileType(t, TileType::Water))) continue;
+				const CommandCost estimate = Command<Commands::BuildLock>::Do(DoCommandFlags{}, t);
+				if (estimate.Failed()) continue;
+				const Money before = Company::Get(CompanyID::Begin())->money;
+				if (!Command<Commands::BuildLock>::Post(t) || !IsTileType(t, TileType::Water) || !IsLock(t)) {
+					if (refused++ < 6) IConsolePrint(CC_DEFAULT, "test3d: svahy postav {},{} odmitnuto: {}", TileX(t), TileY(t), RefusalReason(Command<Commands::BuildLock>::Do(DoCommandFlag::Auto, t)));
+					continue;
+				}
+				built++;
+				const Money cost = before - Company::Get(CompanyID::Begin())->money;
+				if (cost != estimate.GetCost() && differ++ < 6) IConsolePrint(CC_DEFAULT, "test3d: svahy postav {},{}: odhad {} stalo {}", TileX(t), TileY(t), estimate.GetCost(), cost);
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: svahy postav: postaveno {}, odmitnuto {}, odhad jiny nez cena {}", built, refused, differ);
 			return true;
 		}
 		std::map<std::string, std::pair<int, TileIndex>> dock, lock;

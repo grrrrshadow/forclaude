@@ -5118,6 +5118,8 @@ struct TrackArcMade {
 };
 static std::unordered_map<uint64_t, TrackArcMade> _track_arcs;
 
+static bool LazyPending(const void *of);
+
 /**
  * Our track along an arc of a round curve (round_track.h; the player, 8. 11.: "the curves in 3D, yes", "make the track
  * like the fishing rod's line, a thick square rope"): drawn along the arc's centre line in one, not in pieces -- the
@@ -5165,7 +5167,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	/* Many kept: those not drawn for a minute let go of, their textures made (none being made in the background). */
 	if (_track_arcs.size() > 256) {
 		for (auto it = _track_arcs.begin(); it != _track_arcs.end();) {
-			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; });
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; }) && !LazyPending(it->second.obj.get());
 			if (made && now - it->second.used > std::chrono::seconds(60)) {
 				it = _track_arcs.erase(it);
 			} else {
@@ -5327,7 +5329,7 @@ const ThreeDObject *GetThreeDWires(TileIndex tile, std::span<const ThreeDWire> w
 	}
 	if (_three_d_wires.size() > 1024) {
 		for (auto it = _three_d_wires.begin(); it != _three_d_wires.end();) {
-			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; });
+			const bool made = std::ranges::all_of(it->second.obj->material_levels, [](const ThreeDTextureLevels &l) { return l != nullptr; }) && !LazyPending(it->second.obj.get());
 			if (made && now - it->second.used > std::chrono::seconds(60)) {
 				it = _three_d_wires.erase(it);
 			} else {
@@ -8493,6 +8495,20 @@ uint64_t ThreeDUniqueId::Next()
 static std::set<std::pair<const void *, int>> _lazy_making;
 /** The things asked of the thread in the background and not made yet (MadeOrAsked()). */
 static std::set<std::pair<const void *, int>> _lazy_asked;
+
+/**
+ * Whether a thing of an object is being made or asked of the thread in the background: the object must stay till it is
+ * made (a finer level of a material's texture, ThreeDObject::MaterialTexture(); the pieces of track and wires kept).
+ */
+static bool LazyPending(const void *of)
+{
+	std::lock_guard lock(_lazy_mutex);
+	for (const auto *things : {&_lazy_making, &_lazy_asked}) {
+		auto it = things->lower_bound({of, std::numeric_limits<int>::min()});
+		if (it != things->end() && it->first == of) return true;
+	}
+	return false;
+}
 /** Which thing of an object is made (MakeOnce()): of a vehicle object, of a shape its simpler ones, of a building its textures and shapes. */
 enum LazyThing : int {
 	LAZY_SHAPE = 0,
@@ -14187,29 +14203,32 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTextureOf(uint8_t texture, int le
 /**
  * The texture of another material of its file (material_pngs) at a level of detail, as it is (the building's colours
  * paint only its own): made once for all the objects with the same picture (ThreeDTextureLevelsOf()) -- the forest's
- * four parts share their grass.
- * @param now made here if it is not yet (on whichever thread); else made in the background and nullptr meanwhile
+ * four parts share their grass. As the textures of the figures, by need (ThreeDVehicleObject::GetTexture()): those
+ * levels shared with a figure of the same picture lose their pixels when the figure's are trimmed (TrimTextures()),
+ * and a level without them drawn read nothing (the player's crash of 11. 11. from the eyes, a texture's pixels at 0):
+ * a level with its pixels given, a finer one made again when it is wanted.
+ * @param now made here if it is not yet (on whichever thread); else made in the background and meanwhile its finest
+ *            level there is (a coarser one), nullptr none
  */
 const ThreeDObjectTexture *ThreeDObject::MaterialTexture(size_t material, int level, bool now) const
 {
 	MarkThreeDUsed(this->used);
+	level = std::max(level, 0);
 	const int thing = LAZY_HOUSE_MATERIAL + static_cast<int>(material);
-	auto made = [this, material] { return material < this->material_levels.size() && this->material_levels[material] != nullptr; };
-	auto make = [this, material, thing, made] {
-		MakeOnce(this, thing, made, [this, material] { return ThreeDTextureLevelsOf(this->material_pngs[material], this->material_flats[material]); },
+	auto made = [this, material, level] { return material < this->material_levels.size() && this->material_levels[material] != nullptr && HasLevel(*this->material_levels[material], level); };
+	auto make = [this, material, thing, made, level] {
+		MakeOnce(this, thing, made, [this, material, level] { return ThreeDTextureLevelsOf(this->material_pngs[material], this->material_flats[material], level); },
 				[this, material](ThreeDTextureLevels levels) {
-					if (material < this->material_levels.size()) this->material_levels[material] = std::move(levels);
+					if (material < this->material_levels.size()) KeepTexture(this->material_levels[material], std::move(levels));
 				});
 	};
 	if (now) {
 		make();
-	} else if (!MadeOrAsked(this, thing, made, make)) {
-		return nullptr;
+	} else {
+		MadeOrAsked(this, thing, made, make);
 	}
 	std::lock_guard lock(_lazy_mutex);
-	if (!made() || this->material_levels[material]->empty()) return nullptr;
-	const std::vector<ThreeDObjectTexture> &levels = *this->material_levels[material];
-	return &levels[std::clamp<int>(level, 0, static_cast<int>(levels.size()) - 1)];
+	return material < this->material_levels.size() ? LevelOfKept(this->material_levels[material], level) : nullptr;
 }
 
 /**
@@ -14811,6 +14830,33 @@ std::string DescribeThreeDObjectMemory()
 	for (size_t i = 0; i < std::min<size_t>(biggest.size(), 3); i++) most += fmt::format("{}{} {:.1f} MB", i == 0 ? "" : ", ", biggest[i].second, mb(biggest[i].first));
 	return fmt::format("glb: tvary vozidel {:.1f} MB ({}; z toho snimky postav na kostre procesorem {:.1f} MB ({}), postavy v klidu pro kartu {:.1f} MB ({})), kosti snimku pro kartu {:.2f} MB ({}), textury po urovnich {:.1f} MB ({}), masky podrobnosti {:.1f} MB, obrazky textur ze souboru {:.1f} MB ({}), drzene soubory .glb {:.1f} MB, domy (textury, lakovane, tvary) {:.1f} MB ({}), domy prectene z glb {:.1f} MB ({}), nejvic drzi (tvar a podil textur) {}; nejvetsi textury {}",
 			mb(shapes), shape_count, mb(posed), posed_count, mb(rest), rest_count, mb(bones), bones_count, mb(textures), texture_count, mb(masks), mb(pngs), png_count, mb(glb_files), mb(houses), house_count, mb(house_glb), houses_read, most.empty() ? std::string("-") : most, textures_most.empty() ? std::string("-") : textures_most);
+}
+
+/**
+ * The rig ('test3d pamet'): the textures of the buildings' other materials (ThreeDObject::MaterialTexture()) made,
+ * those of them a vehicle or a figure holds too (the same picture: trimmed with its, TrimTextures()), and those with
+ * levels finer than their finest without pixels.
+ */
+std::string DescribeThreeDSharedMaterials()
+{
+	std::lock_guard lock(_lazy_mutex);
+	std::set<const void *> of_figures;
+	for (const std::vector<ThreeDVehicleObject> *list : {&_vehicle_objects, &_figure_objects}) {
+		for (const ThreeDVehicleObject &v : *list) v.ForHeldTextures([&](const ThreeDTextureLevels &lv, const char *) { of_figures.insert(lv.get()); });
+	}
+	int made = 0, shared = 0, without = 0;
+	auto count = [&](const ThreeDObject &o) {
+		for (const ThreeDTextureLevels &lv : o.material_levels) {
+			if (lv == nullptr || lv->empty()) continue;
+			made++;
+			if (of_figures.contains(lv.get())) shared++;
+			if (lv->front().px.empty()) without++;
+		}
+	};
+	for (const ThreeDObject &o : _three_d_objects) count(o);
+	for (const auto &[key, arc] : _track_arcs) count(*arc.obj);
+	for (const auto &[key, wire] : _three_d_wires) count(*wire.obj);
+	return fmt::format("materialy domu: udelano {}, sdileno s vozidly a postavami {}, bez pixelu nejjemnejsi urovne {}", made, shared, without);
 }
 
 /** The rig: every house read now (ThreeDObject::Read()), as the start of the game read them all before. */

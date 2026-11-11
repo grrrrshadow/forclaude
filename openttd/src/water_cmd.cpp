@@ -345,12 +345,15 @@ static uint8_t GetLockPartMinimalBridgeHeight(LockPart lock_part)
  * An end of a lock made flat at its level, instead of refusing it as not flat (the player, test4: "it will be simpler to
  * remove that rule; under the lock we need depth" -- the lock from the sea up the slope, its lower end on the coast):
  * each of its corners dug down or filled up to it (CmdTerraformLand()), the coast under its lower end dug to the water.
- * Testing (no DoCommandFlag::Execute), each corner's first step only: the map does not change between them.
+ * Testing (no DoCommandFlag::Execute), each corner's first step only: the map does not change between them, so the
+ * test only estimates it (the lock is CommandFlag::NoTest, water_cmd.h). Made, each step paid for as it is made, as
+ * levelling the land (CmdLevelLand()): not made when the money is not there.
  * @param t the end's tile
  * @param z its level, heights
+ * @param spent what the lock cost before (cleared, the other end)
  * @return the cost, or why it cannot be made so
  */
-static CommandCost FlattenLockEnd(TileIndex t, int z, DoCommandFlags flags)
+static CommandCost FlattenLockEnd(TileIndex t, int z, DoCommandFlags flags, Money spent)
 {
 	CommandCost cost(ExpensesType::Construction);
 	static constexpr std::array<std::tuple<Corner, int, int>, 4> CORNERS = {{{CORNER_N, 0, 0}, {CORNER_W, 1, 0}, {CORNER_S, 1, 1}, {CORNER_E, 0, 1}}};
@@ -359,10 +362,17 @@ static CommandCost FlattenLockEnd(TileIndex t, int z, DoCommandFlags flags)
 		if (cx > Map::MaxX() || cy > Map::MaxY()) return CommandCost(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP);
 		const int diff = z - static_cast<int>(TileHeight(TileXY(cx, cy)));
 		for (int k = 0; k < std::abs(diff); k++) {
-			CommandCost ret = std::get<0>(Command<Commands::TerraformLand>::Do(flags, t, SlopeWithOneCornerRaised(corner), diff > 0));
+			CommandCost ret = std::get<0>(Command<Commands::TerraformLand>::Do(DoCommandFlags{flags}.Reset(DoCommandFlag::Execute), t, SlopeWithOneCornerRaised(corner), diff > 0));
+			if (ret.Failed()) return ret;
+			if (!flags.Test(DoCommandFlag::Execute)) {
+				cost.AddCost(ret.GetCost());
+				break;
+			}
+			CommandCost need(ExpensesType::Construction, spent + cost.GetCost() + ret.GetCost());
+			if (!CheckCompanyHasMoney(need)) return need;
+			ret = std::get<0>(Command<Commands::TerraformLand>::Do(flags, t, SlopeWithOneCornerRaised(corner), diff > 0));
 			if (ret.Failed()) return ret;
 			cost.AddCost(ret.GetCost());
-			if (!flags.Test(DoCommandFlag::Execute)) break;
 		}
 	}
 	return cost;
@@ -397,7 +407,7 @@ static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags
 		cost.AddCost(_price[Price::BuildCanal]);
 	}
 	if (!IsTileFlat(tile - delta)) {
-		ret = FlattenLockEnd(tile - delta, low_z, flags);
+		ret = FlattenLockEnd(tile - delta, low_z, flags, cost.GetCost());
 		if (ret.Failed()) return ret;
 		cost.AddCost(ret.GetCost());
 	}
@@ -411,7 +421,7 @@ static CommandCost DoBuildLock(TileIndex tile, DiagDirection dir, DoCommandFlags
 		cost.AddCost(_price[Price::BuildCanal]);
 	}
 	if (!IsTileFlat(tile + delta)) {
-		ret = FlattenLockEnd(tile + delta, low_z + 1, flags);
+		ret = FlattenLockEnd(tile + delta, low_z + 1, flags, cost.GetCost());
 		if (ret.Failed()) return ret;
 		cost.AddCost(ret.GetCost());
 	}
@@ -516,6 +526,12 @@ CommandCost CmdBuildLock(DoCommandFlags flags, TileIndex tile)
 		return CommandCost(STR_ERROR_TOO_CLOSE_TO_EDGE_OF_MAP);
 	}
 
+	/* Its cost is known only as its ends are made level (FlattenLockEnd(), CommandFlag::NoTest): the money for what the
+	 * test estimated is there first, as before any other command (CheckCompanyHasMoney()). */
+	if (flags.Test(DoCommandFlag::Execute)) {
+		CommandCost estimate = DoBuildLock(tile, dir, DoCommandFlags{flags}.Reset(DoCommandFlag::Execute));
+		if (estimate.Failed() || !CheckCompanyHasMoney(estimate)) return estimate;
+	}
 	return DoBuildLock(tile, dir, flags);
 }
 

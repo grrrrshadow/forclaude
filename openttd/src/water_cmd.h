@@ -19,6 +19,6 @@ CommandCost CmdBuildLock(DoCommandFlags flags, TileIndex tile);
 
 DEF_CMD_TRAIT(Commands::BuildShipDepot, CmdBuildShipDepot, CommandFlag::Auto, CommandType::LandscapeConstruction)
 DEF_CMD_TRAIT(Commands::BuildCanal, CmdBuildCanal, CommandFlag::Auto, CommandType::LandscapeConstruction)
-DEF_CMD_TRAIT(Commands::BuildLock, CmdBuildLock, CommandFlag::Auto, CommandType::LandscapeConstruction)
+DEF_CMD_TRAIT(Commands::BuildLock, CmdBuildLock, CommandFlags({CommandFlag::Auto, CommandFlag::NoTest}), CommandType::LandscapeConstruction) // its ends made level: the test cannot know the steps after the first (FlattenLockEnd())
 
 #endif /* WATER_CMD_H */
