@@ -10770,6 +10770,27 @@ static bool ConTest3D(std::span<std::string_view> argv)
 						obj->name, piece, piece == obj->anchor ? " kotva" : "", v->type == VehicleType::Train ? Train::From(v)->gcache.cached_veh_length : RoadVehicle::From(v)->gcache.cached_veh_length, v->x_pos, v->y_pos, list, obj->states.size());
 			}
 		}
+	} else if (what == "tunely") {
+		/* 'tunely': each end of a road tunnel -- its tile, way in, height and slope -- and the tile before its mouth: its
+		 * kind, height, slope, road bits and road type (the player's test7: a strip of grass between the road and the
+		 * tunnel from the eyes). */
+		for (TileIndex t : Map::Iterate()) {
+			if (!IsTileType(t, TileType::TunnelBridge) || !IsTunnel(t) || GetTunnelBridgeTransportType(t) != TransportType::Road) continue;
+			const DiagDirection d = GetTunnelBridgeDirection(t);
+			const TileIndex before = TileAddByDiagDir(t, ReverseDiagDir(d));
+			std::string what_before = "mimo mapu";
+			if (IsValidTile(before)) {
+				const auto [slope, z] = GetTileSlopeZ(before);
+				std::string road;
+				if (IsTileType(before, TileType::Road) && IsNormalRoad(before)) {
+					const RoadType rt = GetRoadTypeRoad(before);
+					road = fmt::format(" silnice bity {:x} typ {}{}", GetAllRoadBits(before).base(), rt == INVALID_ROADTYPE ? -1 : static_cast<int>(rt), rt != INVALID_ROADTYPE && GetRoadTypeInfo(rt)->UsesOverlay() ? " (sada)" : "");
+				}
+				what_before = fmt::format("{},{} typ {} vyska {} svah {:x}{}", TileX(before), TileY(before), to_underlying(GetTileType(before)), z, static_cast<int>(slope), road);
+			}
+			const auto [tslope, tz] = GetTileSlopeZ(t);
+			IConsolePrint(CC_DEFAULT, "test3d: tunel {},{} smer {} vyska {} svah {:x}; pred nim {}", TileX(t), TileY(t), to_underlying(d), tz, static_cast<int>(tslope), what_before);
+		}
 	} else if (what == "auta3d") {
 		/* 'auta3d [stred]': the cars of the game's own driving about (three_d_walkers.h) and the stops near the view;
 		 * with "stred" the view on the first of them. */
@@ -10986,6 +11007,10 @@ static bool ConTest3D(std::span<std::string_view> argv)
 				_rig_screen_paints = static_cast<int>(*n);
 			}
 		}
+		/* No message over it (a save of the player's without its sets: "missing NewGRF files have been disabled"). */
+		extern void ClearErrorMessages();
+		ClearErrorMessages();
+		CloseWindowByClass(WindowClass::ErrorMessage);
 		IConsolePrint(CC_DEFAULT, "test3d: obrazovka {} po {} kresleni{}", _rig_screen_picture, _rig_screen_paints, _rig_screen_quit ? ", pak konec" : "");
 	} else if (what == "gpu" && argv.size() > 3 && argv[2] == "mazani") {
 		/* 'gpu mazani 0|1': the rects of the card's pictures cleared by drawing over them (1), as where the card's
