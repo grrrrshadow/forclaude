@@ -7602,6 +7602,10 @@ static void LayTurnedGround(TurnedGroundLaying &lay)
 			g.view_w = _tcg->w;
 			g.view_h = _tcg->h;
 			g.out = nullptr;
+			/* Only the parts of it that changed, when so laid (TurnedCardLayChanged()): only their tiles were collected. */
+			if (_turned_card_parts != nullptr) {
+				for (const std::array<int, 4> &p : *_turned_card_parts) g.parts.push_back({p[0] - lay.view_x, p[1] - lay.view_y, p[2], p[3]});
+			}
 		} else if (_turned_ground_check) {
 			lay.card_pixels.assign(static_cast<size_t>(fw) * fh, g.clear);
 			g.out = lay.card_pixels.data();
@@ -8695,7 +8699,17 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 	/* 3. Clear the block: black, and the animation buffer told these pixels do not animate. */
 	BlitterFactory::GetCurrentBlitter()->DrawRect(frame.dst_ptr, fw, fh, PixelColour{0});
 
-	/* 4. The tiles that can reach into the block, far first. */
+	/* 4. The tiles that can reach into the block, far first. Laid at once only in the parts that changed
+	 * (TurnedCardLayChanged()), only those reaching into them: the piece about scattered changes is most of the view,
+	 * the parts a fifth of it (the player's test7 diary: 18 % of the pieces, every tile of them collected, 96 ms a frame
+	 * on the phone with a vehicle's window open). Virtual coordinates, left, top, right, bottom. */
+	std::vector<std::array<int, 4>> only_parts;
+	if (_turned_card_parts != nullptr) {
+		const int part_vs = ScaleByZoom(1, zoom);
+		for (const std::array<int, 4> &p : *_turned_card_parts) {
+			only_parts.push_back({(_tcg->l + p[0]) * part_vs, (_tcg->t + p[1]) * part_vs, (_tcg->l + p[0] + p[2]) * part_vs, (_tcg->t + p[1] + p[3]) * part_vs});
+		}
+	}
 	std::vector<TurnedTile> tiles;
 	for (int ty = ty0; ty <= ty1; ty++) {
 		for (int tx = tx0; tx <= tx1; tx++) {
@@ -8714,6 +8728,11 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 				reach += 2 * TILE_HEIGHT;
 			}
 			if (vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE < frame.top || vy - (reach + TILE_PIXELS) * ZOOM_BASE > frame.top + frame.height) continue;
+			if (!only_parts.empty()) {
+				const double l = vx - 2 * TILE_PIXELS * ZOOM_BASE, r = vx + 2 * TILE_PIXELS * ZOOM_BASE;
+				const double top = vy - (reach + TILE_PIXELS) * ZOOM_BASE, bottom = vy + MAX_TILE_EXTENT_BOTTOM + TILE_PIXELS * ZOOM_BASE;
+				if (std::ranges::none_of(only_parts, [&](const std::array<int, 4> &o) { return r >= o[0] && l <= o[2] && bottom >= o[1] && top <= o[3]; })) continue;
+			}
 			double xr, yr;
 			TurnWorldPoint(tx * TILE_SIZE + TILE_SIZE / 2.0, ty * TILE_SIZE + TILE_SIZE / 2.0, xr, yr);
 			tiles.push_back({tx, ty, xr + yr, TileType::Void, SLOPE_FLAT, SLOPE_FLAT, 0, 0, 0, 0, {-1, -1, -1}, false, false});
@@ -9760,7 +9779,16 @@ static bool TurnedPassOnCard(const Viewport &vp, int left, int top, int width, i
 		}
 		const int vs = ScaleByZoom(1, vp.zoom);
 		const float x0 = static_cast<float>(left / vs), y0 = static_cast<float>(top / vs), x1 = x0 + fw, y1 = y0 + fh;
-		auto inside = [&](const TurnedCardGlow &c) { return c.x >= x0 && c.x < x1 && c.y >= y0 && c.y < y1; };
+		/* Laid only in the parts that changed (TurnedCardLayChanged()), only their buildings collected: the glows
+		 * elsewhere in the piece stay. */
+		auto inside = [&](const TurnedCardGlow &c) {
+			if (c.x < x0 || c.x >= x1 || c.y < y0 || c.y >= y1) return false;
+			if (_turned_card_parts == nullptr) return true;
+			return std::ranges::any_of(*_turned_card_parts, [&](const std::array<int, 4> &p) {
+				const float px = static_cast<float>(g.l + p[0]), py = static_cast<float>(g.t + p[1]);
+				return c.x >= px && c.x < px + p[2] && c.y >= py && c.y < py + p[3];
+			});
+		};
 		std::erase_if(g.glows, [&](const TurnedCardGlow &c) { return c.house && inside(c); });
 		for (const auto &light : _night_glows) {
 			const TurnedCardGlow c = TurnedHouseGlow(light, vp.zoom);

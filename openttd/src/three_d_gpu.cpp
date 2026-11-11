@@ -4245,19 +4245,33 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 	gl.glDisable(GL_BLEND);
 	gl.glDisable(GL_DEPTH_TEST);
 	gl.glDisable(GL_CULL_FACE);
+	/* Where it is laid: the block's place in the view's picture, nothing outside it touched -- only the parts asked
+	 * (ThreeDGpuGround::parts), the rest of it as it was; else all the block. */
+	std::vector<std::array<int, 4>> clips;
 	if (g.into_view) {
-		/* The block's place in the view's picture, nothing outside it touched. */
 		gl.glViewport(g.view_x, g.view_y, g.width, g.height);
-		gl.glScissor(g.view_x, g.view_y, g.width, g.height);
 		gl.glEnable(GL_SCISSOR_TEST);
+		if (g.parts.empty()) {
+			clips.push_back({g.view_x, g.view_y, g.width, g.height});
+		} else {
+			for (const std::array<int, 4> &p : g.parts) {
+				const int x0 = std::max(0, p[0]), y0 = std::max(0, p[1]), x1 = std::min(g.width, p[0] + p[2]), y1 = std::min(g.height, p[1] + p[3]);
+				if (x1 > x0 && y1 > y0) clips.push_back({g.view_x + x0, g.view_y + y0, x1 - x0, y1 - y0});
+			}
+		}
 	} else {
 		gl.glViewport(0, 0, g.width, g.height);
 		gl.glDisable(GL_SCISSOR_TEST);
+		clips.push_back({0, 0, g.width, g.height});
 	}
 	const float clear[4] = {static_cast<float>((g.clear >> 16) & 0xFF) / 255.0f, static_cast<float>((g.clear >> 8) & 0xFF) / 255.0f, static_cast<float>(g.clear & 0xFF) / 255.0f, static_cast<float>(g.clear >> 24) / 255.0f};
 	gl.glClearColor(clear[0], clear[1], clear[2], clear[3]);
-	gl.glClear(GL_COLOR_BUFFER_BIT);
-	if (!corners.empty()) {
+	if (corners.empty()) {
+		for (const std::array<int, 4> &c : clips) {
+			if (g.into_view) gl.glScissor(c[0], c[1], c[2], c[3]);
+			gl.glClear(GL_COLOR_BUFFER_BIT);
+		}
+	} else {
 		const GLuint p = _ground_program.program;
 		gl.glUseProgram(p);
 		gl.glUniform2f(gl.glGetUniformLocation(p, "u_size"), static_cast<float>(g.width), static_cast<float>(g.height));
@@ -4271,7 +4285,11 @@ bool DrawGroundOnCard(ThreeDGpuGround &g)
 		gl.glBindVertexArray(_ground_vao);
 		gl.glBindBuffer(GL_ARRAY_BUFFER, _ground_vbo);
 		gl.glBufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(corners.size() * sizeof(float)), corners.data(), GL_STREAM_DRAW);
-		gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 9));
+		for (const std::array<int, 4> &c : clips) {
+			if (g.into_view) gl.glScissor(c[0], c[1], c[2], c[3]);
+			gl.glClear(GL_COLOR_BUFFER_BIT);
+			gl.glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(corners.size() / 9));
+		}
 		gl.glBindVertexArray(0);
 		gl.glActiveTexture(GL_TEXTURE1);
 		gl.glBindTexture(GL_TEXTURE_2D, 0);
