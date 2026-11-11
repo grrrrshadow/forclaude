@@ -3907,41 +3907,6 @@ static void AddGlbMeshNodes(GlbMesh &into, const GlbMesh &from, const std::vecto
  * Only the cabin, the high seat, the logs and the fireplace keep the walker off, not the ferns, the grass and the
  * stones (passable_tris).
  */
-/**
- * A depot over its tiles to their back (the player's test6: "make the depot over the whole tile so that the rails do
- * not stick out of it at the back"): the colleague's train depot ends 0.55 m before its tile's back edge, our track ran
- * on past it. Its last metre (DEPOT_BACK_REACH_M) from its back stretched back to the edge (x 0, built opening to +x),
- * the rest -- the gate, the doors, the windows -- where it is.
- */
-static constexpr float DEPOT_BACK_REACH_M = 1.0f;
-
-/** A point's x along a depot (metres) with its back stretched to the edge (StretchDepotBack()), \a back where it was. */
-static float DepotBackStretched(float x, float back)
-{
-	if (back <= 0.0f || x >= back + DEPOT_BACK_REACH_M) return x;
-	return (x - back) * (back + DEPOT_BACK_REACH_M) / DEPOT_BACK_REACH_M;
-}
-
-/** @return the back the depot's mesh had, metres (0: at the edge already) */
-static float StretchDepotBack(GlbMesh &mesh)
-{
-	float back = std::numeric_limits<float>::max();
-	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) back = std::min(back, mesh.pos[i]);
-	if (back == std::numeric_limits<float>::max() || back < 0.01f || back > 2.0f) return 0.0f;
-	const float k = (back + DEPOT_BACK_REACH_M) / DEPOT_BACK_REACH_M;
-	for (size_t i = 0; i + 2 < mesh.pos.size(); i += 3) {
-		if (mesh.pos[i] >= back + DEPOT_BACK_REACH_M) continue;
-		mesh.pos[i] = DepotBackStretched(mesh.pos[i], back);
-		if (i + 2 < mesh.nrm.size()) {
-			float *n = &mesh.nrm[i];
-			n[0] /= k;
-			const float len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
-			if (len > 0) for (int c = 0; c < 3; c++) n[c] /= len;
-		}
-	}
-	return back;
-}
-
 static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter_turns)
 {
 	/* What one bumps into -- of the palm plantation its reed hut, benches and baskets -- and then its floors to walk on
@@ -3977,7 +3942,6 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 		AddGlbMeshNodes(mesh, other, groups, more);
 	}
 	if (!obj.outside_of.empty()) CutOutInteriorBox(mesh, obj.outside_of);
-	const float depot_back = obj.depot ? StretchDepotBack(mesh) : 0.0f;
 	TurnGlbMeshQuarters(mesh, quarter_turns);
 	TakeGlbFloors(mesh, obj, static_cast<uint16_t>(solid.size() + 1), false);
 	for (size_t t = 0; t < mesh.tri_group.size(); t++) {
@@ -3987,13 +3951,6 @@ static bool ReadGlbScene(const std::string &path, ThreeDObject &obj, int quarter
 	if (obj.passable_tris.size() % 2 == 1) obj.passable_tris.push_back(static_cast<uint32_t>(mesh.tri.size() / 3));
 	TakeGlbMesh(mesh, obj);
 	ReadGlbNight(path, obj);
-	if (depot_back > 0.0f) {
-		/* Its lamps on the back wall with it (world units). */
-		const float upm = static_cast<float>(OBJECT_UNITS_PER_METRE);
-		for (std::vector<float> *list : {&obj.night_pos, &obj.lights}) {
-			for (size_t i = 0; i + 2 < list->size(); i += 3) (*list)[i] = DepotBackStretched((*list)[i] / upm, depot_back) * upm;
-		}
-	}
 	TurnNightQuarters(obj, quarter_turns);
 	return true;
 }
