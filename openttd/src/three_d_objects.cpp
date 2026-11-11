@@ -5701,6 +5701,49 @@ static void MakeRockTiles()
 	}
 }
 
+/** Our planter behind a rail depot (objekty/nase kvetinac_hranaty), and the plants in it. */
+static constexpr std::string_view DEPOT_PLANTER = "kvetinac_hranaty";
+static constexpr std::string_view DEPOT_PLANTER_PLANT = "kytka_mari_kosata";
+static constexpr float DEPOT_PLANTER_X = 0.27f;    ///< its middle from the tile's back edge, metres: the depot's back wall begins at 0.55
+static constexpr float DEPOT_PLANTER_SOIL = 0.82f; ///< the top of its soil, metres
+static constexpr float DEPOT_PLANTER_PLANT_M = 2.4f; ///< how tall each plant is, metres
+
+/**
+ * The planter behind a rail depot (the player, test6: "the depot has a roof, so it cannot be stretched to the edge of
+ * the tile; let us cover those rails with a tall prism -- a big square planter with grass in it ... tufts of grass and
+ * three nice big marijuana plants"): our long planter with its grass (an add-on, laid into the depot's shape) on the
+ * strip between the depot's back wall and the tile's back edge, where the rails of the tile showed, and three big
+ * marijuana plants in it (the depot's plants). Made opening to +x as the depot's file, turned with its scene.
+ * @param turns the depot's quarter turns about the middle of its tile (ReadDepot())
+ */
+static void AddDepotPlanter(ThreeDObject &obj, int turns)
+{
+	const float mid = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2);
+	/* A point of the frame opening to +x where the scene turned puts it (TurnGlbMeshQuarters(): x' = 2 middle - y, y' = x). */
+	auto place = [&](ThreeDObjectFigure &f, float x, float y, float z, float facing) {
+		for (int k = 0; k < turns; k++) {
+			const float nx = 2 * mid - y;
+			y = x;
+			x = nx;
+		}
+		f.at[0] = x;
+		f.at[1] = y;
+		f.at[2] = z;
+		f.facing = facing + 90.0f * turns;
+	};
+	ThreeDObjectFigure &pot = obj.addon_places.emplace_back();
+	pot.figure = DEPOT_PLANTER;
+	place(pot, DEPOT_PLANTER_X, mid, 0.0f, 0.0f);
+	/* Two metres apart along it, each turned otherwise. */
+	static constexpr std::array<std::pair<float, float>, 3> PLANTS = {{{-2.0f, 30.0f}, {0.0f, 150.0f}, {2.0f, 260.0f}}};
+	for (const auto &[along, facing] : PLANTS) {
+		ThreeDObjectFigure &plant = obj.plants.emplace_back();
+		plant.figure = DEPOT_PLANTER_PLANT;
+		plant.scale = DEPOT_PLANTER_PLANT_M;
+		place(plant, DEPOT_PLANTER_X, mid + along, DEPOT_PLANTER_SOIL, facing);
+	}
+}
+
 /**
  * A depot of the colleague's objekty/depa (hra/3d/DEPA-PRO-HRU.md; the player, 2. 11.: "a fine object of the depot in
  * the style of OpenTTD, not boxy"; 10. 11.: "depots, the garage and the ship depot"): one tile (a ship depot two along
@@ -5754,6 +5797,7 @@ static void ReadDepot(const nlohmann::json &e, const std::string &folder)
 				}
 			}
 		}
+		if (transport == 0) AddDepotPlanter(obj, turns);
 		/* The wings of its gates and doors ("dvere_NN"), each shut and open either way about its hinge, turned with it
 		 * (as a house's, ReadInterior()); a gate ("druh" "vrata") opens out ("otevreni_uhel", its sign the way). */
 		for (const std::string &node : GlbDoorNodes(obj.glb_path)) {

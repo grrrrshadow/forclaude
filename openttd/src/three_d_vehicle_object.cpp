@@ -3341,10 +3341,11 @@ static CardMade CardVehicle(const PictureToMake &p, std::shared_ptr<const ThreeD
 	/* How near each of its subpixels is (ThreeDGpuStandingVehicle::near_osy): one osy subpixels down from the point it
 	 * hangs from, at depth od, is yr = C od - S osy / p metres further and z = -C osy / p - S od metres higher than it
 	 * (ObjectCamera::Place(), p its subpixels a metre); further on the turned map xr + yr less by sqrt 2 units a metre,
-	 * higher 2 z more by its units of height a metre (as it stands stretched). Between its box's corners in the picture. */
+	 * higher 2 z more by its units of height a metre -- as high as it is drawn (a plant's stretch its own height).
+	 * Between its box's corners in the picture. */
 	{
-		const float pc = p.pxm * SUPERSAMPLE, stretch = p.stretch > 0 ? p.stretch : 1.0f;
-		const float further = static_cast<float>(OBJECT_UNITS_PER_METRE * std::sqrt(2.0)), higher = static_cast<float>(2.0 * OBJECT_HEIGHT_PER_METRE) / stretch;
+		const float pc = p.pxm * SUPERSAMPLE;
+		const float further = static_cast<float>(OBJECT_UNITS_PER_METRE * std::sqrt(2.0)), higher = static_cast<float>(2.0 * OBJECT_HEIGHT_PER_METRE);
 		v->near_osy = (further * CAM_SIN - higher * CAM_COS) / pc;
 		v->near_od = -further * CAM_COS - higher * CAM_SIN;
 		v->near_top = static_cast<float>(gp.top);

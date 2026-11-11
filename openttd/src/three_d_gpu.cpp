@@ -4694,11 +4694,11 @@ bool DrawStandingOnCard(ThreeDGpuStanding &s)
 	auto lay_rect = [&](const ThreeDGpuStandingItem &item, float x0, float y0, float x1, float y1, float u0, float v0, float u1, float v1) {
 		const float o = static_cast<float>(item.order);
 		float how = 0.0f, z = 0.0f;
-		if (!s.moving && item.depth >= 0) {
+		if (item.vehicle != nullptr && item.own_near && item.vehicle->near_span > 0 && _standing_near != 0) {
+			how = 3.0f;
+		} else if (!s.moving && item.depth >= 0) {
 			how = 1.0f;
 			z = std::min(1.0f, item.depth);
-		} else if (item.vehicle != nullptr && item.own_near && item.vehicle->near_span > 0 && _standing_near != 0) {
-			how = 3.0f;
 		} else if (!item.boxed) {
 			how = 2.0f;
 			z = std::clamp((static_cast<float>(item.order) / 32.0f - 262144.0f - s.depth[0]) / std::max(1e-3f, s.depth[1]), 0.0f, 1.0f);

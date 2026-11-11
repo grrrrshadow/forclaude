@@ -8049,6 +8049,9 @@ static const std::array<float, 6> &TurnedShapeBox(const ThreeDObjectShapeView &s
 	return it->second;
 }
 
+/** The rig: the vehicles and figures the card draws laid by their own depth (ThreeDGpuStandingVehicle::near_span; test3d stojici hloubka); else by their boxes, a figure on a building by its middle. */
+bool _standing_vehicles_own_near = true;
+
 /**
  * A building that is a 3D object among what stands on a block for the card (box_kind 7), as DrawTurnedObject() draws
  * it: each part's triangles drawn by the card through a depth of its own -- the field's soil alone, the building and
@@ -8082,6 +8085,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 			int x, y;
 			double near;
 			std::shared_ptr<const ThreeDGpuStandingVehicle> card = nullptr;
+			double hang_near = 0; ///< how near its feet are on the turned map (xr + yr + 2 z): drawn by the card, each pixel from it
 			int Width() const { return this->pic != nullptr ? this->pic->width : this->card->width; }
 			int Height() const { return this->pic != nullptr ? this->pic->height : this->card->height; }
 		};
@@ -8141,7 +8145,7 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 				lay.Project(wx, wy, wz, sx, sy);
 				const double near = xr + yr + 2 * (wz - oz + height / 2.0);
 				const int px = static_cast<int>(std::lround(sx)) + (pic != nullptr ? pic->left : card->left), py = static_cast<int>(std::lround(sy)) + (pic != nullptr ? pic->top : card->top);
-				const Part::Figure &fig = p.figures.emplace_back(Part::Figure{pic, px, py, near, std::move(card)});
+				const Part::Figure &fig = p.figures.emplace_back(Part::Figure{pic, px, py, near, std::move(card), xr + yr + 2 * wz});
 				cover(px, py, px + fig.Width(), py + fig.Height());
 			};
 			if (p.o != nullptr) {
@@ -8230,6 +8234,10 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 					item.y = f.y;
 					item.vehicle = f.card;
 					item.depth = cleared ? depth_of(f.near + 0.05) : -1.0f;
+					/* Each pixel of it by its own depth, as a vehicle's (ThreeDGpuStandingVehicle::near_span): a plant in a
+					 * planter behind its rim, a figure behind a column. */
+					item.hang_near = static_cast<float>(f.hang_near);
+					item.own_near = _standing_vehicles_own_near && f.card->near_span > 0;
 					_turned_times.standing_vehicles++;
 					continue;
 				}
@@ -8258,9 +8266,6 @@ static bool AddTurnedStandingObject(ThreeDGpuStanding &out, const DrawPixelInfo 
 	_turned_times.standing_objects++;
 	return true;
 }
-
-/** The rig: the vehicles the card draws laid by their own depth (ThreeDGpuStandingVehicle::near_span; test3d stojici hloubka); else by their boxes. */
-bool _standing_vehicles_own_near = true;
 
 /**
  * A vehicle's or a figure's likeness among what stands on a block for the card (box_kind 5): its picture, and those
