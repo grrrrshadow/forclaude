@@ -46,19 +46,13 @@
    }
   ],
   "interier": false,
-  "barva_firmy": {
-   "cast": "zabradli",
-   "maska": "smerovani_maska.png",
-   "zacatek": 219,
-   "poznamka": "zábradlí po stranách stavědla v barvě firmy (OpenGFX má tyto čáry v barvě firmy); maska je pro texturu prvního materiálu (atlas), barvení jako u garáže (barva_firmy)"
-  },
   "noc": {
    "uzel": "noc",
    "den": "den",
    "svetla": 13,
    "poznamka": "v noci ukaž uzel noc: rozsvícená okna stavědla a lampa nad dveřmi; svetlo_NN jsou místa záře"
   },
-  "vynechano": "semafor na sloupku před kolejí ze spritu OpenGFX (hráč: „směrovani , semafor mame svuj“)",
+  "vynechano": "semafor na sloupku před kolejí ze spritu OpenGFX (hráč: „směrovani , semafor mame svuj“); zábradlí v barvě firmy po stranách stavědla (hráč 11. 11.: „směrování - plot pryč“), směrování proto nemá barvu firmy",
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
@@ -68,8 +62,8 @@
   ],
   "rozmer_m": {
    "x": [
-    0.15,
-    14.65
+    3.27,
+    11.24
    ],
    "y": [
     0.03,
@@ -80,8 +74,8 @@
     6.39
    ]
   },
-  "trojuhelniku": 1560,
-  "poznamka": "směrování (průjezdní bod) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 1560 trojúhelníků, 511 kB"
+  "trojuhelniku": 1342,
+  "poznamka": "směrování (průjezdní bod) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 1342 trojúhelníků, 471 kB"
  },
  {
   "druh": "peron",
@@ -106,10 +100,10 @@
   },
   "vyska_m": 0.75,
   "hrana": {
-   "od_osy_m": 1.8,
+   "od_osy_m": 2.775,
    "y": [
-    5.6,
-    9.2
+    4.625,
+    10.175
    ]
   },
   "doplnky": [
@@ -158,7 +152,7 @@
    {
     "stred": [
      7.4,
-     3.035,
+     2.548,
      3.05
     ],
     "normala": [
@@ -173,7 +167,7 @@
    {
     "stred": [
      7.4,
-     2.965,
+     2.478,
      3.05
     ],
     "normala": [
@@ -188,7 +182,7 @@
    {
     "stred": [
      7.4,
-     11.835,
+     12.323,
      3.05
     ],
     "normala": [
@@ -203,7 +197,7 @@
    {
     "stred": [
      7.4,
-     11.765,
+     12.253,
      3.05
     ],
     "normala": [
@@ -216,13 +210,7 @@
     "lic": true
    }
   ],
-  "poznamka_cedule": "lic: true je líc cedule (barva firmy, ke své koleji; kdyby se psalo jméno stanice, sem), false rub (šedý kov, za ním sloupky)",
-  "barva_firmy": {
-   "cast": "cedule",
-   "maska": "peron_maska.png",
-   "zacatek": 219,
-   "poznamka": "líc cedule stanice v barvě firmy (OpenGFX ji má modrou, v barvě firmy); maska je pro texturu prvního materiálu (malý atlas peronu), barvení jako u garáže"
-  },
+  "poznamka_cedule": "cedule je modrá z obou stran, bez barvy firmy (hráč 11. 11.: „cedule nastupiště bude modra z obou stran, jina barva ne“); lic: true je strana ke své koleji (kdyby se psalo jméno stanice, sem), false strana od koleje, za ní sloupky",
   "okraje_textur": 8,
   "autor": "grrrrf: vlastní model stanice/stanice.py (bez renderu, textury z numpy)",
   "licence": "GPL-2.0 (vlastní geometrie i textura)",
@@ -240,8 +228,8 @@
     3.37
    ]
   },
-  "trojuhelniku": 378,
-  "poznamka": "peron (nástupiště bez přístřešku) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 378 trojúhelníků, 125 kB"
+  "trojuhelniku": 274,
+  "poznamka": "peron (nástupiště bez přístřešku) ve stylu OpenGFX: jedna dlaždice, počátek v severním rohu, osy hry, metry; kolej po x (y 7.4) kreslí hra; 274 trojúhelníků, 127 kB"
  },
  {
   "druh": "nakladova_rampa",
