@@ -1525,7 +1525,7 @@ uniform float u_near;
 uniform sampler2D u_grass;
 uniform float u_grass_units; // world units its picture runs over each way; 0 none
 uniform vec2 u_grass_eye;    // the eye's x, y within such a run
-uniform vec3 u_grass_tint[13];
+uniform vec3 u_grass_tint[14];
 uniform vec4 u_eye_dir;      // fx, fy, rx, ry
 uniform vec3 u_eye_lens;     // focal, cx, cy
 uniform vec2 u_eye_tip;      // the sine and cosine of the eye's look tipped down (CabEye::sp, cp)
@@ -1701,7 +1701,7 @@ void main()
 			float wk = (o.x == 1 ? w.x : 1.0 - w.x) * (o.y == 1 ? w.y : 1.0 - w.y);
 			sum += wk * floor(texelFetch(u_grass, clamp(q, ivec2(0), gs - 1), 0).rgb * 255.0 + 0.5);
 		}
-		int kind = clamp(int(t.r * 255.0 + 0.5), 0, 12);
+		int kind = clamp(int(t.r * 255.0 + 0.5), 0, 13);
 		float lit = floor(t.g * 255.0 + 0.5) / 128.0;
 		t = vec4(clamp(floor(sum * u_grass_tint[kind] * lit), 0.0, 255.0) / 255.0, 1.0);
 	}

@@ -378,7 +378,7 @@ struct ThreeDGpuEyeStep {
 };
 
 /** The kinds of our grass (viewport.cpp OurGrassGround): the grass's 5 and the 8 stages of a farm's field it is tinted to. */
-static constexpr int THREE_D_GPU_GRASS_KINDS = 13;
+static constexpr int THREE_D_GPU_GRASS_KINDS = 14;
 
 /**
  * The whole view from the eyes drawn on the card (the player, 20. 10.: "draw as it is to be drawn, so that it does not

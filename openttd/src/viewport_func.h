@@ -71,6 +71,7 @@ bool ViewportVehiclesOnCard();
 bool ViewportDrawingTurned();
 bool ViewportDrawingNorthObjects();
 bool ViewportDrawingEye();
+bool OurGrassDrawsGround(bool eyes);
 bool ViewportDrawing3D();
 struct TileInfo;
 bool ThreeDRocksStandOn(const TileInfo *ti);

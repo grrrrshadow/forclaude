@@ -2653,7 +2653,7 @@ struct OurGrassGround {
 	uint slope = 0;     ///< which of the sprites of its kind by the slope (SlopeToSpriteOffset())
 };
 static constexpr int OUR_GRASS_KINDS = THREE_D_GPU_GRASS_KINDS;
-static_assert(OUR_GRASS_KINDS == 5 + 8);
+static_assert(OUR_GRASS_KINDS == 5 + 9);
 
 static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
 {
@@ -2668,8 +2668,10 @@ static OurGrassGround OurGrassGroundOf(SpriteID image, PaletteID pal)
 	/* A farm's field growing, ripe or harvested (the player, test5: "just tint the big tile of grass yellow, we can do
 	 * that, and put the wheat on it; there are several tiles by the slope, that's why your small squares did not fit"):
 	 * our grass tinted as its sprite of that stage is, every slope of it as the grass's (19 sprites a stage). The
-	 * ploughed field stays the game's. */
+	 * ploughed field so too, brown (the player, test6: "the farm -- get rid of those small squares and make it of the
+	 * game's big tiles"; the game's sprite of it was squares of clods, from the eyes big ones). */
 	if (s >= SPR_FARMLAND_STATE_1 && s < SPR_FARMLAND_HAYPACKS + 19) return {5 + static_cast<int>((s - SPR_FARMLAND_STATE_1) / 19), (s - SPR_FARMLAND_STATE_1) % 19};
+	if (s >= SPR_FARMLAND_BARE && s < SPR_FARMLAND_BARE + 19) return {13, s - SPR_FARMLAND_BARE};
 	return {};
 }
 
@@ -2685,6 +2687,9 @@ static const OurGrassSurface &OurGrassPicture()
 	if (grass.picture == nullptr && ObjectsIndexReadOrOwed()) grass.picture = GetThreeDSurface("trava", grass.tiles);
 	return grass;
 }
+
+/** The colour of a harvested field's stubble (SPR_FARMLAND_HAYPACKS, OurGrassFitOf()): straw, a little of the soil in it. */
+static const Colour FIELD_STUBBLE_COLOUR(184, 158, 96);
 
 /** Each kind's tint of our grass: the mean of its flat sprite against our picture's; and the light of the game's flat grass. */
 struct OurGrassFit {
@@ -2706,12 +2711,17 @@ static const OurGrassFit &OurGrassFitOf(const ThreeDTextureLevels &picture)
 		const double n = std::max<size_t>(1, picture->front().px.size());
 		const double mr = std::max(1.0, r / n), mg = std::max(1.0, g / n), mb = std::max(1.0, b / n);
 		static const SpriteID flat[OUR_GRASS_KINDS] = {SPR_FLAT_BARE_LAND, SPR_FLAT_1_THIRD_GRASS_TILE, SPR_FLAT_2_THIRD_GRASS_TILE, SPR_FLAT_GRASS_TILE, SPR_FLAT_ROUGH_LAND,
-				SPR_FARMLAND_STATE_1, SPR_FARMLAND_STATE_2, SPR_FARMLAND_STATE_3, SPR_FARMLAND_STATE_4, SPR_FARMLAND_STATE_5, SPR_FARMLAND_STATE_6, SPR_FARMLAND_STATE_7, SPR_FARMLAND_HAYPACKS};
+				SPR_FARMLAND_STATE_1, SPR_FARMLAND_STATE_2, SPR_FARMLAND_STATE_3, SPR_FARMLAND_STATE_4, SPR_FARMLAND_STATE_5, SPR_FARMLAND_STATE_6, SPR_FARMLAND_STATE_7, SPR_FARMLAND_HAYPACKS,
+				SPR_FARMLAND_BARE};
 		static const Colour fallback[OUR_GRASS_KINDS] = {Colour(130, 105, 70), Colour(110, 115, 60), Colour(100, 125, 55), Colour(90, 130, 50), Colour(75, 105, 45),
-				Colour(110, 120, 55), Colour(120, 125, 55), Colour(135, 130, 55), Colour(170, 145, 60), Colour(185, 155, 65), Colour(195, 160, 70), Colour(200, 165, 75), Colour(185, 160, 95)};
+				Colour(110, 120, 55), Colour(120, 125, 55), Colour(135, 130, 55), Colour(170, 145, 60), Colour(185, 155, 65), Colour(195, 160, 70), Colour(200, 165, 75), Colour(185, 160, 95),
+				Colour(115, 85, 60)};
 		OurGrassFit f{};
 		for (int k = 0; k < OUR_GRASS_KINDS; k++) {
-			const Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
+			Colour c = CabSpriteColour(flat[k], PAL_NONE, fallback[k]);
+			/* The harvested field the straw of its stubble: its sprite's mean has its bales and green in it (the player,
+			 * test6: "the bales lie on a green meadow"). */
+			if (flat[k] == SPR_FARMLAND_HAYPACKS) c = FIELD_STUBBLE_COLOUR;
 			f.tint[k] = {static_cast<float>(c.r / mr), static_cast<float>(c.g / mg), static_cast<float>(c.b / mb)};
 		}
 		const Colour game = CabSpriteColour(SPR_FLAT_GRASS_TILE, PAL_NONE, fallback[3]);
@@ -2875,8 +2885,9 @@ static void DrawOurGrass(SpriteID image, PaletteID pal, int x, int y, OurGrassGr
 	 * zoom). From the eyes none: the card colours its pixels from it (CAB_GRASS). */
 	const ThreeDObjectTexture &level = OurGrassLevel(grass, 36.0 * ZOOM_BASE / s);
 	/* From the eyes the grass of every thickness and the rough land alike (how thick it is, its tufts show,
-	 * AddOurGrass()): no edges of the tiles between them; bare land as it is. */
-	const int kind = eyes && ground.kind > 0 ? 3 : ground.kind;
+	 * AddOurGrass()): no edges of the tiles between them; bare land as it is, a field as its stage (all of them were the
+	 * meadow's green from the eyes: the player, test6, "the bales lie on a green meadow", the ground under the wheat). */
+	const int kind = eyes && ground.kind > 0 && ground.kind <= 4 ? 3 : ground.kind;
 	const std::array<float, 3> &tint = fit.tint[kind];
 	for (int j = 0; j < th; j++) {
 		for (int i = 0; i < tw; i++) {
@@ -3613,6 +3624,12 @@ static bool EyeRoadsOnCard()
 static bool OurGrassOn(bool eyes)
 {
 	return (eyes || _settings_client.gui.map_grass) && _settings_game.game_creation.landscape == LandscapeType::Temperate && OurGrassPicture().picture != nullptr;
+}
+
+/** Whether the grass and the fields are drawn as our grass in the view being drawn (OurGrassOn()): from the eyes, or on the turned map. */
+bool OurGrassDrawsGround(bool eyes)
+{
+	return (eyes || ViewportDrawingTurned()) && OurGrassOn(eyes);
 }
 
 static void UpdateTurnedGround(TurnedGround &g, std::span<const TurnedTile> tiles, std::span<const std::vector<TurnedGroundSprite>> on_foundations = {})

@@ -11432,10 +11432,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			if (count++ < 5) first += fmt::format(" {},{}", TileX(t), TileY(t));
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: snehulaku {}:{}", count, first);
-	} else if (what == "posekat") {
+	} else if (what == "posekat" || (what == "polestav" && argv.size() > 2)) {
 		/* 'posekat [r]': the fields about the first farm, within r tiles (8), harvested: their type 8, the bales of straw
-		 * standing on them in the 3D views (GetThreeDFieldBales()); the farm's tile and a field's said. */
-		const int r = std::clamp(number(2).value_or(8), 1, 32);
+		 * standing on them in the 3D views (GetThreeDFieldBales()); the farm's tile and a field's said. 'polestav <type>
+		 * [r]': so, of that type (0 ploughed, 1-7 growing, 8 harvested). */
+		const bool any = what == "polestav";
+		const uint type = any ? static_cast<uint>(std::clamp(number(2).value_or(8), 0, 8)) : 8;
+		const int r = std::clamp(number(any ? 3 : 2).value_or(8), 1, 32);
 		const Industry *farm = nullptr;
 		for (const Industry *ind : Industry::Iterate()) {
 			if (GetIndustrySpec(ind->type)->behaviour.Test(IndustryBehaviour::PlantFields)) {
@@ -11444,7 +11447,7 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			}
 		}
 		if (farm == nullptr) {
-			IConsolePrint(CC_ERROR, "test3d posekat: no farm on the map.");
+			IConsolePrint(CC_ERROR, "test3d {}: no farm on the map.", what);
 			return true;
 		}
 		const int fx = TileX(farm->location.tile), fy = TileY(farm->location.tile);
@@ -11454,13 +11457,13 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			for (int x = std::max(1, fx - r); x <= std::min<int>(Map::MaxX() - 1, fx + r); x++) {
 				const TileIndex t = TileXY(x, y);
 				if (!IsTileType(t, TileType::Clear) || !IsClearGround(t, ClearGround::Fields) || IsPasture(t)) continue;
-				SetFieldType(t, 8);
+				SetFieldType(t, type);
 				MarkTileDirtyByTile(t);
 				if (first == INVALID_TILE) first = t;
 				count++;
 			}
 		}
-		IConsolePrint(CC_DEFAULT, "test3d: posekat farma {},{} poli {} prvni {},{}", fx, fy, count, first != INVALID_TILE ? TileX(first) : 0, first != INVALID_TILE ? TileY(first) : 0);
+		IConsolePrint(CC_DEFAULT, "test3d: {} {} farma {},{} poli {} prvni {},{}", what, type, fx, fy, count, first != INVALID_TILE ? TileX(first) : 0, first != INVALID_TILE ? TileY(first) : 0);
 	} else if (what == "stanice3d" && argv.size() > 3) {
 		/* 'stanice3d <x> <y>': the stations of the colleague's objekty/stanice side by side from the tile (GetThreeDStation()):
 		 * a rail station along x 3 long at (x, y), one along y 3 long at (x + 5, y), a waypoint along x at (x, y + 5) on its

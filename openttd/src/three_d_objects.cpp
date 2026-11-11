@@ -7023,6 +7023,10 @@ static void ReadThreeDVehicleObjects()
 					NoteMarginsFilled(e, fig.file, MarginsOf::Vehicles);
 					fig.name = e.value("jmeno", e.at("soubor").get<std::string>());
 					fig.thing = figure_kind == "predmet";
+					/* The wheat of the fields without its solid stand under the ears (its "<name>_koberec", a block 4 x 4 m):
+					 * the player, test6, "under the plants there is still some rubbish ... away with it"; the blocks stood as
+					 * small squares, in steps on a slope. Its stalks on the field's ground, our grass tinted to its stage. */
+					if (figure_kind == "rostlina" && fig.name.starts_with("pv_psenice_")) fig.skip_materials.push_back(fig.name + "_koberec");
 					/* One pose of a file of several, each a node (the colleague's girls of the lorries, point 11): that node only. */
 					if (e.contains("uzel") && e.at("uzel").is_string()) fig.only_node = e.at("uzel").get<std::string>();
 					/* Without some nodes of its file ("bez_uzlu", as a building's): the jumping fox's block of snow it
@@ -12461,15 +12465,22 @@ const ThreeDObject *GetThreeDSlopedPlants(const ThreeDObject *plants, Slope slop
  * stack -- in the straw's colour, each on the ground under it. One of a few layouts a tile, by the tile.
  * @return none when the sets have not the bales: the field's sprite with them painted in stays
  */
+/**
+ * How big the bales of a harvested field are drawn against their true size (the player, test6: "the bales are not seen
+ * from above, they are too small, they are there but tiny"): twice.
+ */
+static constexpr float FIELD_BALE_SCALE = 2.0f;
+
 std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope slope)
 {
 	struct Bale {
 		bool square;
 		float x, y, z, turn; ///< its foot, metres from the tile's north corner; degrees
 	};
-	/* A little stack of square ones: two side by side, one across them on top. */
+	/* A little stack of square ones: two side by side, one across them on top (as big as they are drawn). */
 	auto stack = [](float x, float y) {
-		return std::array<Bale, 3>{{{true, x, y - 0.24f, 0, 0}, {true, x, y + 0.24f, 0, 0}, {true, x, y, 0.36f, 90}}};
+		const float k = FIELD_BALE_SCALE;
+		return std::array<Bale, 3>{{{true, x, y - 0.24f * k, 0, 0}, {true, x, y + 0.24f * k, 0, 0}, {true, x, y, 0.36f * k, 90}}};
 	};
 	static const std::array<std::vector<Bale>, 6> layouts = [&] {
 		std::array<std::vector<Bale>, 6> l;
@@ -12508,6 +12519,7 @@ std::span<const ThreeDObjectFigure> GetThreeDFieldBales(TileIndex tile, Slope sl
 		f.at[1] = b.y;
 		f.at[2] = b.z + static_cast<float>(n * (1 - u) * (1 - v) + e * (1 - u) * v + s * u * v + w * u * (1 - v));
 		f.facing = b.turn;
+		f.scale = FIELD_BALE_SCALE;
 		it->second.push_back(std::move(f));
 	}
 	return it->second;
