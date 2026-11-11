@@ -3156,16 +3156,12 @@ void HandleMouseEvents()
 		if (!middle_was) {
 			middle_dragged = false;
 			_cursor.fix_at = true;
-		} else if (_cursor.delta.x != 0 || _cursor.delta.y != 0) {
-			/* Up or down: the second axis, the camera going round the place in the middle of the map (orbit_view.cpp). */
-			if (OrbitTipByDrag(_cursor.delta.x, -_cursor.delta.y)) middle_dragged = true;
-			if (_cursor.delta.x != 0) {
-				middle_dragged = true;
-				RotateViewByDrag(-_cursor.delta.x);
-			}
+		} else if (_cursor.delta.x != 0) {
+			/* Sideways only: up or down turns nothing (the player, 11. 11.: away with tipping the map up and down). */
+			middle_dragged = true;
+			RotateViewByDrag(-_cursor.delta.x);
 		}
 	} else if (middle_was) {
-		OrbitDragEnd();
 		if (!_scrolling_viewport) _cursor.fix_at = false;
 		if (middle_dragged) {
 			middle_clicked = {};
