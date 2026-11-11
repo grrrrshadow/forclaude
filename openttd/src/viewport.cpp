@@ -16986,6 +16986,52 @@ static void AddOurGrass(TileIndex tile, int x0, int y0, int base_z, Slope slope,
 }
 
 /**
+ * The wheat of a farm's field in the view from the eyes (the player, 11. 11.: "throw out the squares under the wheat and
+ * leave the wheat in squares, that will not help"): our tufts (objekty/nase/psenice_trs_*, three planes 1.6 m wide
+ * crossing, the stalks from the ground) strewn over it as our grass is (AddOurGrass()) -- each anywhere in its cell of
+ * the tile, turned anyhow, sheared to the ground under it -- young while it grows (the field's type 1 to 3), ripe
+ * before the harvest (4 to 7). Near the eye small and many; farther (CAB_WHEAT_NEAR_M) fewer and wider, as high.
+ */
+static constexpr double CAB_WHEAT_NEAR_M = 35.0;
+static constexpr int CAB_WHEAT_TUFTS_NEAR = 9; ///< a tile's tufts along each side near the eye (a tuft 1.6 m, the tile 14.8 m)
+static constexpr int CAB_WHEAT_TUFTS_FAR = 4;  ///< and farther, each CAB_WHEAT_FAR_SCALE times as wide
+static constexpr float CAB_WHEAT_FAR_SCALE = 2.2f;
+static void AddFieldWheatTufts(TileIndex tile, uint type, int x0, int y0, int base_z, Slope slope, double eye_x, double eye_y)
+{
+	if (type == 0 || type >= 8) return;
+	const std::string_view name = type < 4 ? "psenice_trs_mlada" : "psenice_trs_zrala";
+	uint32_t seed = TileX(tile) * 2246822519u ^ (TileY(tile) + 0x7F4A7C15u) * 2654435761u;
+	auto next = [&seed]() {
+		seed ^= seed << 13;
+		seed ^= seed >> 17;
+		seed ^= seed << 5;
+		return (seed & 0xFFFFFF) / static_cast<double>(0x1000000);
+	};
+	/* Its height in a few steps, its turn in eighths: without the card its picture is shared by all alike
+	 * (GetThreeDPlantPicture()). */
+	static constexpr float HEIGHTS[3] = {0.92f, 1.0f, 1.08f};
+	for (const bool near : {true, false}) {
+		const int n = near ? CAB_WHEAT_TUFTS_NEAR : CAB_WHEAT_TUFTS_FAR;
+		const float scale = near ? 1.0f : CAB_WHEAT_FAR_SCALE;
+		const double cell = static_cast<double>(TILE_SIZE) / n;
+		for (int i = 0; i < n; i++) {
+			for (int j = 0; j < n; j++) {
+				/* Anywhere in its cell: no rows. */
+				const double x = std::clamp((i + next()) * cell, 0.0, TILE_SIZE - 0.01);
+				const double y = std::clamp((j + next()) * cell, 0.0, TILE_SIZE - 0.01);
+				const float facing = static_cast<float>(45 * static_cast<int>(next() * 8));
+				const float stretch = HEIGHTS[std::min(2, static_cast<int>(next() * 3))] / scale;
+				const double metres = std::hypot(x0 + x - eye_x, y0 + y - eye_y) / OBJECT_UNITS_PER_METRE;
+				if ((metres <= CAB_WHEAT_NEAR_M) != near) continue;
+				double z, rise_x, rise_y;
+				CabGroundPlane(slope, base_z, x, y, z, rise_x, rise_y);
+				AddCabPlant(name, scale, stretch, x0 + x, y0 + y, z, facing, static_cast<float>(rise_x), static_cast<float>(rise_y));
+			}
+		}
+	}
+}
+
+/**
  * The night sky in the view from an eye (the player, 15. 10.: "only the night sky", as OpenMW has it): the stars, fixed
  * in the sky so that they go round as the eye turns, a little twinkling, and the moon with its glow -- made by the
  * game, nothing to license. Only where the sky is, nothing drawn there.
@@ -18606,14 +18652,8 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 					AddCabVehicle(ev, false);
 				}
 			}
-			const ThreeDObject *wheat = type == 0 || type >= 8 ? nullptr : GetThreeDSlopedPlants(GetThreeDFieldPart(type < 4 ? "psenice_mlada" : "psenice_zrala"), _cur_ti.tileh);
-			if (wheat != nullptr) {
-				/* Sheared along the slope as it rises there (ThreeDObjectFigure::rise): units of height a world unit. */
-				static constexpr float RISE = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
-				for (const ThreeDObjectFigure &f : wheat->plants) {
-					AddCabPlant(f.figure, f.scale, f.stretch, _cur_ti.x + f.at[0] * OBJECT_UNITS_PER_METRE, _cur_ti.y + f.at[1] * OBJECT_UNITS_PER_METRE, _cur_ti.z + f.at[2] * OBJECT_HEIGHT_PER_METRE, f.facing, f.rise[0] * RISE, f.rise[1] * RISE);
-				}
-			}
+			/* The wheat our tufts strewn over it, no squares (AddFieldWheatTufts()). */
+			AddFieldWheatTufts(_cur_ti.tile, type, _cur_ti.x, _cur_ti.y, _cur_ti.z, _cur_ti.tileh, eye.x, eye.y);
 		}
 		if (const ThreeDForestPart *forest = tile_type == TileType::Industry ? ThreeDGameForestPartAt(_cur_ti.tile) : nullptr; forest != nullptr) {
 			/* The forest with a clearing as in the turned view (AddIndustryObjects()): its ground and trees at once, its
