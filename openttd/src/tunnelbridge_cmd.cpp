@@ -1345,14 +1345,6 @@ static bool DrawThreeDShipTunnelEntrance(const TileInfo *ti)
 	const float left_deg = static_cast<float>(std::atan2(py, px) * 180.0 / M_PI);
 	const double cx = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
 	const double m = OBJECT_UNITS_PER_METRE, half = TILE_SIZE / 2.0;
-	/* Whether the face's front is seen, the nearer the greater a turned point's x + y (TurnWorldPoint()). Seen from
-	 * behind, over the hill, only the walls' tops: their faces to the water are behind the portal and under the hill
-	 * there, and drawn after the ground they came over it (the player, 10. 11.: "again it draws in front what should be
-	 * at the back"). */
-	double nx0, ny0, nx1, ny1;
-	TurnWorldPoint(cx, cy, nx0, ny0);
-	TurnWorldPoint(cx - ax, cy - ay, nx1, ny1);
-	const bool front_seen = nx1 + ny1 > nx0 + ny0;
 	static constexpr double WALL_T_M = 1.0, LEVEL_M = 3.0; // tunel_lodni.py
 	/* Each in the box it fills (AddThreeDFigureToViewportInBox()), as the lock's walls. */
 	auto put = [&](std::string_view name, double x, double y, float facing, double hx, double hy, double tall_m) {
@@ -1361,14 +1353,21 @@ static bool DrawThreeDShipTunnelEntrance(const TileInfo *ti)
 				ti->z + std::max(1, static_cast<int>(std::lround(tall_m * OBJECT_HEIGHT_PER_METRE))) - 1};
 		AddThreeDFigureToViewportInBox(name, 1.0f, static_cast<int>(std::lround(x)), static_cast<int>(std::lround(y)), ti->z, facing, _cur_dpi->zoom, ti->tile, 0, -1, 0, &box);
 	};
-	/* The wing walls at the sides of the tile, a third at a time from the canal to the portal; on the left (+p) the mirrored one. */
+	/* The wing walls at the sides of the tile, a third at a time from the canal to the portal; on the left (+p) the mirrored one.
+	 * Each whole where its face to the water is seen, else its top only (its outer face is in the land beside): by the face
+	 * of each, not by the portal's -- by the portal's, turning the map took the far wall of one mouth or the other away and
+	 * left its top (the player's test6, 5 and 6: "turning one way the entrance to the canal goes to hell on one side"). */
 	for (int side : {1, -1}) {
 		const double off = half - WALL_T_M / 2 * m;
+		double wx0, wy0, wx1, wy1;
+		TurnWorldPoint(cx + side * px * off, cy + side * py * off, wx0, wy0);
+		TurnWorldPoint(cx + side * px * (off - 1), cy + side * py * (off - 1), wx1, wy1);
+		const bool water_face_seen = wx1 + wy1 > wx0 + wy0;
 		for (int k = 0; k < 3; k++) {
 			const double along = (k - 1) * (TILE_SIZE / 3.0);
 			const double mx = cx + side * px * off + ax * along, my = cy + side * py * off + ay * along;
 			const double ha = TILE_SIZE / 6.0, hc = WALL_T_M / 2 * m;
-			put(!front_seen ? TOPS[k] : side > 0 ? LEFT[k] : RIGHT[k], mx, my, in_deg, std::abs(ax) * ha + std::abs(px) * hc, std::abs(ay) * ha + std::abs(py) * hc, (k + 1) * LEVEL_M / 3);
+			put(!water_face_seen ? TOPS[k] : side > 0 ? LEFT[k] : RIGHT[k], mx, my, in_deg, std::abs(ax) * ha + std::abs(px) * hc, std::abs(ay) * ha + std::abs(py) * hc, (k + 1) * LEVEL_M / 3);
 		}
 	}
 	/* The face at the hill, its front to the canal. */
