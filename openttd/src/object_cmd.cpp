@@ -28,6 +28,7 @@
 #include "core/pool_func.hpp"
 #include "object_map.h"
 #include "object_base.h"
+#include "three_d_objects.h"
 #include "newgrf_config.h"
 #include "newgrf_object.h"
 #include "timer/timer_game_calendar.h"
@@ -669,6 +670,14 @@ static void GetTileDesc_Object(TileIndex tile, TileDesc &td)
 {
 	const ObjectSpec *spec = ObjectSpec::GetByTile(tile);
 	td.str = spec->name;
+	/* The lighthouses are named after the two colleagues (the player, 12. 11.: "pojmenujem majáky kolega a kolega
+	 * z grrrrf"): the round one after the one who wrote the game, the square one after the one of grrrrf. By the
+	 * object standing there (GetThreeDLighthouse()); before the objects are read, by the same choice of the tile. */
+	if (IsObjectType(tile, OBJECT_LIGHTHOUSE)) {
+		bool square = (TileX(tile) * 7 + TileY(tile) * 13) % 2 == 1;
+		if (const ThreeDObject *lighthouse = GetThreeDLighthouse(tile); lighthouse != nullptr) square = lighthouse->name.ends_with("hranaty");
+		td.str = square ? STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_GRRRRF : STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_KOLEGA;
+	}
 	td.owner[0] = GetTileOwner(tile);
 	td.build_date = Object::GetByTile(tile)->build_date;
 

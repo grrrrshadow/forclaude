@@ -3899,6 +3899,8 @@ STR_LAI_BRIDGE_DESCRIPTION_AQUEDUCT                             :Akvadukt
 
 STR_LAI_OBJECT_DESCRIPTION_TRANSMITTER                          :Vysílač
 STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE                           :Maják
+STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_KOLEGA                    :Maják Kolega
+STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_GRRRRF                    :Maják Kolega z grrrrf
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_HEADQUARTERS                 :Ředitelství společnosti
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_OWNED_LAND                   :Půda vlastněna společností
 

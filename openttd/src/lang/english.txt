@@ -3785,6 +3785,8 @@ STR_LAI_BRIDGE_DESCRIPTION_AQUEDUCT                             :Aqueduct
 
 STR_LAI_OBJECT_DESCRIPTION_TRANSMITTER                          :Transmitter
 STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE                           :Lighthouse
+STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_KOLEGA                    :Lighthouse Kolega
+STR_LAI_OBJECT_DESCRIPTION_LIGHTHOUSE_GRRRRF                    :Lighthouse Kolega z grrrrf
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_HEADQUARTERS                 :Company headquarters
 STR_LAI_OBJECT_DESCRIPTION_COMPANY_OWNED_LAND                   :Company-owned land
 
