@@ -388,16 +388,36 @@ struct Curve {
 	}
 };
 
-/** At a corner between two pieces walked forward: the tile past it goes straight on the way of the piece coming to it -- that way is the straight way of a switch. */
+/**
+ * Whether more pieces than one of a tile begin at an edge of it: a way coming to that edge forks there. With no piece
+ * going straight on it is a fork of two curves (a Y): the way coming to it is its straight way as a switch's is -- it
+ * stays straight to the edge and each branch is drawn on over it as far as its arc goes. (The player, 14. 11., build
+ * #362: "the 3D track, the track is not drawn up to the others; if the middle one went on, they would join well": the
+ * walk along the stem ends at the fork (NextStep()), so the stem stayed straight to the edge, while each branch had
+ * its arc from its own side, beginning in the stem's tile but drawn only from the edge -- already aside of the stem's
+ * end there, a wedge of grass between the three.)
+ */
+bool ForksAt(TileIndex tile, DiagDirection edge)
+{
+	int pieces = 0;
+	for (Track tr : GetTrackBits(tile)) {
+		auto [a, b] = PieceEdges(tr);
+		if (a == edge || b == edge) pieces++;
+	}
+	return pieces > 1;
+}
+
+/** At a corner between two pieces walked forward: the tile past it goes straight on the way of the piece coming to it -- that way is the straight way of a switch --, or forks there (ForksAt()). */
 bool SwitchBehind(const Step &to, const Step &from)
 {
-	return GoesStraightOn(from.tile, from.from, to.Vector());
+	return GoesStraightOn(from.tile, from.from, to.Vector()) || ForksAt(from.tile, from.from);
 }
 
 /** At a corner between two pieces walked forward: the tile before it goes straight on the way of the piece leaving it, walked back. */
 bool SwitchAhead(const Step &to, const Step &from)
 {
-	return GoesStraightOn(to.tile, OtherEdge(to.track, to.from), from.Vector() * -1.0);
+	const DiagDirection edge = OtherEdge(to.track, to.from);
+	return GoesStraightOn(to.tile, edge, from.Vector() * -1.0) || ForksAt(to.tile, edge);
 }
 
 /** A side of a corner along the straight way of a switch: only its piece at the switch, and no corner past it. */
