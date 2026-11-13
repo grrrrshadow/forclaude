@@ -2369,8 +2369,7 @@ bool StartContext(std::string &why)
 	HGLRC first = wglCreateContext(_gpu_dc);
 	if (first == nullptr || !wglMakeCurrent(_gpu_dc, first)) {
 		/* Why, as Windows tells it (the player's #361: "no context of OpenGL" and no word more, the whole game drawn
-		 * by the processor: the game's hardware acceleration had been switched off, the game's own way after a start
-		 * that did not finish, hwaccel.dat of driver.cpp). */
+		 * by the processor). */
 		why = fmt::format("no context of OpenGL ({} failed, Windows error {})", first == nullptr ? "wglCreateContext" : "wglMakeCurrent", static_cast<uint32_t>(GetLastError()));
 		if (first != nullptr) wglDeleteContext(first);
 		return false;
@@ -6522,8 +6521,7 @@ void GpuThreadMain()
 /**
  * The player told once, in a window, that the card could not be started and why: the 3D pictures are the processor's
  * then, slow, the vehicles their stand-in pictures (the player's #361: "the cars are not drawn in time, they use the
- * stand-in 2D picture" -- the card had not started, the hardware acceleration being off, and nothing in the game
- * said so).
+ * stand-in 2D picture" -- the card had not started, and nothing in the game said so).
  */
 static const IntervalTimer<TimerWindow> _gpu_failed_timer(std::chrono::seconds(2), [](auto) {
 	std::string why;

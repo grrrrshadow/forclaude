@@ -6315,7 +6315,7 @@ STR_ERROR_CAN_T_CHANGE_SIGN_NAME                                :Can't change si
 STR_ERROR_CAN_T_DELETE_SIGN                                     :Can't delete sign...
 STR_ERROR_THREE_D_BOXES                                         :{WHITE}3D: {RAW_STRING}. All of it is in 3d_domy.log in the OpenTTD folder
 STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}The graphics card brought the game down the last time, at: {RAW_STRING}. The 3D pictures are drawn by the processor; the diary is 3d_karta_minule.log in the OpenTTD folder. Settings, Graphics switch the card on again
-STR_ERROR_THREE_D_GPU_NOT_STARTED                               :{WHITE}The graphics card did not start: {RAW_STRING}. The 3D pictures are drawn by the processor, slowly, and the vehicles stay their stand-in pictures. Switch the hardware acceleration on (Game options, Graphics) and start the game again; the diary is 3d_karta.log in the OpenTTD folder
+STR_ERROR_THREE_D_GPU_NOT_STARTED                               :{WHITE}The graphics card did not start: {RAW_STRING}. The 3D pictures are drawn by the processor, slowly, and the vehicles stay their stand-in pictures. Start the game again; the diary is 3d_karta.log in the OpenTTD folder
 
 # Translatable comment for OpenTTD's desktop shortcut
 ###external 1
