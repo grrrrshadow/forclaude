@@ -144,21 +144,11 @@
    {
     "postava": "lucerna",
     "poloha": [
-     -5.11,
+     -6.15,
      -0.41,
      0.09
     ],
     "otoceni": 270
-   },
-   {
-    "postava": "strasidlo_hrobecku",
-    "poloha": [
-     -5.6,
-     0.0,
-     0.0
-    ],
-    "otoceni": 270,
-    "kdy": "noc"
    }
   ],
   "rostliny": [
@@ -393,21 +383,11 @@
    {
     "postava": "lucerna",
     "poloha": [
-     -5.11,
+     -6.15,
      -0.41,
      0.09
     ],
     "otoceni": 270
-   },
-   {
-    "postava": "strasidlo_hrobecku",
-    "poloha": [
-     -5.6,
-     0.0,
-     0.0
-    ],
-    "otoceni": 270,
-    "kdy": "noc"
    }
   ],
   "rostliny": [

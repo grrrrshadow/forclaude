@@ -85,6 +85,14 @@ constexpr std::string_view CHURCH_GHOST = "strasidlo_ulice";
 constexpr uint CHURCHES_KEPT = 4;          ///< at most so many churches about the middle have theirs
 constexpr double CHURCH_ROUND_TILES = 0.7; ///< it goes about its church so far out from its walls, tiles
 constexpr uint64_t CHURCH_INSIDE_TICKS = 600; ///< and is in it, or gone, at least so long (and as long again at most)
+/**
+ * The same ghost at night by the graves of the two colleagues by the lighthouses (the player, 14. 11.: "a ghost at night
+ * by the graves, the ghost's sheet; let it fly only by the grave", "we have the ghost built in, we must save, teach
+ * that one to haunt here by the graves"): about a grave so far from its middle, metres, never further.
+ */
+constexpr uint GRAVES_KEPT = 4;
+constexpr double GRAVE_ROUND_NEAR_M = 0.9, GRAVE_ROUND_FAR_M = 1.6;
+constexpr std::string_view GRAVE_ADDON = "hrob_kolega"; ///< the graves' add-ons of a lighthouse's record begin so
 constexpr uint SELLERS_KEPT = 1;           ///< sellers of dogs
 /** The dogs of the farms (the player, 27. 10.: "put the little dogs on the farm"): the true dogs of the streets, not the
  * cats, the foxes, the wolves the index has as dogs too. */
@@ -135,6 +143,7 @@ enum class Place : uint8_t {
 	Forest, ///< in a forest, always (the player, 24. 10.: "trees, mushrooms and the little animals are to be in the forest all the time")
 	ForestNight, ///< a ghost of the forest with a clearing at night, at its places ("noc_postavy")
 	Church, ///< the ghost in its sheet of a church, about it and in it (CHURCH_GHOST)
+	Grave,  ///< the same ghost at night about a grave by a lighthouse (GRAVE_ADDON), its lighthouse's tile Beast::church
 	Farm,   ///< a dog of a farm, about its yard (FARM_DOGS)
 	Pasture, ///< a dog of a farm by the fence of a pasture, guarding its animals (FARM_DOGS)
 	Nurse,  ///< a nurse standing before a church's door, selling the walker's health insurance (ThreeDAnimal::Kind::Nurse)
@@ -686,6 +695,43 @@ void ChurchFront(TileIndex church, double &x, double &y, double &out)
 	}
 }
 
+/** The middle of the grave by a lighthouse (GRAVE_ADDON of its record), world units. @return whether the tile has a lighthouse with one */
+bool GraveOf(TileIndex tile, double &x, double &y)
+{
+	const ThreeDObject *o = GetThreeDLighthouse(tile);
+	if (o == nullptr) return false;
+	for (const ThreeDObjectFigure &f : o->addon_places) {
+		if (!f.figure.starts_with(GRAVE_ADDON)) continue;
+		x = TileX(tile) * TILE_SIZE + f.at[0] * OBJECT_UNITS_PER_METRE;
+		y = TileY(tile) * TILE_SIZE + f.at[1] * OBJECT_UNITS_PER_METRE;
+		return true;
+	}
+	return false;
+}
+
+/** A place about a grave, between GRAVE_ROUND_NEAR_M and GRAVE_ROUND_FAR_M from its middle. */
+void PickAboutGrave(double gx, double gy, double &x, double &y)
+{
+	const double a = InteractiveRandomRange(360) * M_PI / 180.0;
+	const double r = (GRAVE_ROUND_NEAR_M + InteractiveRandomRange(100) / 100.0 * (GRAVE_ROUND_FAR_M - GRAVE_ROUND_NEAR_M)) * OBJECT_UNITS_PER_METRE;
+	x = gx + std::cos(a) * r;
+	y = gy + std::sin(a) * r;
+}
+
+/** How many graves by lighthouses about the middle, so many as have their ghosts at most (GRAVES_KEPT). */
+uint GravesNear(TileIndex middle)
+{
+	uint n = 0;
+	const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+	for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r) && n < GRAVES_KEPT; ty++) {
+		for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r) && n < GRAVES_KEPT; tx++) {
+			double x, y;
+			if (GraveOf(TileXY(tx, ty), x, y)) n++;
+		}
+	}
+	return n;
+}
+
 /** A place about the church, a little out from its walls, where it can stand. @return whether there is one */
 bool PickAboutChurch(TileIndex church, double &x, double &y)
 {
@@ -957,8 +1003,33 @@ void ChurchGhost(Beast &b, const ThreeDAnimal &a, uint64_t now)
 	b.state = State::Wander;
 }
 
+/**
+ * The ghost of a grave, not fighting: about its grave from a place to a place (Beast::home_x, home_y its middle), a
+ * while still between them; never away from it.
+ */
+void GraveGhost(Beast &b, const ThreeDAnimal &a, uint64_t now)
+{
+	const std::string_view walk = PoseOf(a, {"chuze", "beh"});
+	if (b.state == State::Wander) {
+		SetPose(b, walk, now);
+		if (!WalkTo(b, b.tx, b.ty, Speed(b, walk, 0.015), now, true)) return;
+		b.state = State::Idle;
+		b.until = now + 30 + InteractiveRandomRange(120);
+		return;
+	}
+	SetPose(b, RestPose(b, a), now);
+	if (now < b.until) return;
+	PickAboutGrave(b.home_x, b.home_y, b.tx, b.ty);
+	b.way.clear();
+	b.state = State::Wander;
+}
+
 void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double wx, double wy)
 {
+	if (b.place == Place::Grave && (b.state == State::Idle || b.state == State::Wander) && !b.angry) {
+		GraveGhost(b, a, now);
+		return;
+	}
 	/* The ghost of a church about it and in it; struck, it runs as the others (Strike()). */
 	if (b.place == Place::Church && (b.inside || b.state == State::Idle || b.state == State::Wander) && !b.angry) {
 		ChurchGhost(b, a, now);
@@ -1445,6 +1516,27 @@ bool Spawn(Place place, TileIndex middle, const Town *t, bool night, uint64_t no
 			}
 			return false;
 		}
+		case Place::Grave: {
+			/* The ghost in its sheet at a grave by a lighthouse about the middle that has none yet. */
+			const ThreeDAnimal *a = GetThreeDAnimal(CHURCH_GHOST);
+			if (a == nullptr || !a->OutNow(night)) return false;
+			const int cx = TileX(middle), cy = TileY(middle), r = static_cast<int>(REACH);
+			for (int ty = std::max(1, cy - r); ty <= std::min<int>(Map::MaxY() - 1, cy + r); ty++) {
+				for (int tx = std::max(1, cx - r); tx <= std::min<int>(Map::MaxX() - 1, cx + r); tx++) {
+					const TileIndex lighthouse = TileXY(tx, ty);
+					double gx, gy;
+					if (!GraveOf(lighthouse, gx, gy)) continue;
+					if (std::ranges::any_of(_beasts, [lighthouse](const Beast &o) { return o.place == Place::Grave && o.church == lighthouse; })) continue;
+					PickAboutGrave(gx, gy, x, y);
+					Beast &b = Put(*a, place, x, y, 0, std::atan2(gy - y, gx - x), now);
+					b.church = lighthouse;
+					b.home_x = gx;
+					b.home_y = gy;
+					return true;
+				}
+			}
+			return false;
+		}
 		case Place::Farm: {
 			/* A dog to a farm about the middle with fewer than its own, on its yard where one can stand. */
 			for (const Industry *farm : FarmsNear(middle)) {
@@ -1644,8 +1736,8 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		const ThreeDAnimal *a = KindOf(b);
 		const TileIndex at = TileVirtXY(static_cast<int>(std::clamp(b.x, 0.0, (Map::SizeX() - 1.0) * TILE_SIZE)), static_cast<int>(std::clamp(b.y, 0.0, (Map::SizeY() - 1.0) * TILE_SIZE)));
 		const bool gone = a == nullptr || (b.place != Place::Pet && b.place != Place::Carer && DistanceManhattan(at, middle) > GONE) || (b.state == State::Dead && now >= b.until) ||
-				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight || b.place == Place::Church) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle) ||
-				(b.place == Place::Church && !IsChurchNorthTile(b.church)) || (b.place == Place::Nurse && b.church != INVALID_TILE && !IsChurchNorthTile(b.church));
+				((b.place == Place::Ghost || b.place == Place::Rail || b.place == Place::ForestNight || b.place == Place::Church || b.place == Place::Grave) && !a->OutNow(night)) || (b.place == Place::Seller && now >= b.until && b.state == State::Idle) ||
+				(b.place == Place::Church && !IsChurchNorthTile(b.church)) || (b.place == Place::Grave && GetThreeDLighthouse(b.church) == nullptr) || (b.place == Place::Nurse && b.church != INVALID_TILE && !IsChurchNorthTile(b.church));
 		if (gone) {
 			if (a != nullptr) MarkDirty(b, *a);
 			if (b.place == Place::Seller) _next_seller = now + SELLER_AWAY_TICKS / 2 + InteractiveRandomRange(SELLER_AWAY_TICKS);
@@ -1679,13 +1771,14 @@ const IntervalTimer<TimerGameTick> _animals_timer({TimerGameTick::Priority::None
 		{Place::Street, STREET_KEPT}, {Place::Door, DOOR_KEPT}, {Place::Roof, ROOF_KEPT}, {Place::Round, ROUND_KEPT},
 		{Place::Ghost, GHOSTS_KEPT}, {Place::Seller, now >= _next_seller ? SELLERS_KEPT : 0u}, {Place::Rail, RAIL_KEPT},
 		{Place::Forest, FOREST_KEPT}, {Place::ForestNight, night ? FOREST_GHOSTS_KEPT : 0u}, {Place::Church, CHURCHES_KEPT},
+		{Place::Grave, GRAVES_KEPT},
 		{Place::Farm, FARM_DOGS_KEPT}, {Place::Pasture, 1}, {Place::Nurse, 1},
 	};
 	/* One a time, the place picked in turn. The forests' game and ghosts are there without a town near too. */
 	const Wanted &w = wanted[(now / 29) % std::size(wanted)];
-	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight && w.place != Place::Farm && w.place != Place::Pasture) return;
+	if (t == nullptr && w.place != Place::Rail && w.place != Place::Forest && w.place != Place::ForestNight && w.place != Place::Farm && w.place != Place::Pasture && w.place != Place::Grave) return;
 	/* A church's ghost to each church about the middle; the dogs to each farm. */
-	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.place == Place::Farm ? static_cast<uint>(FarmsNear(middle).size()) * w.kept :
+	const uint kept = w.place == Place::Church ? (night ? ChurchesNear(middle) : 0u) : w.place == Place::Grave ? (night ? GravesNear(middle) : 0u) : w.place == Place::Farm ? static_cast<uint>(FarmsNear(middle).size()) * w.kept :
 			w.place == Place::Pasture ? static_cast<uint>(PasturesNear(middle).size()) * w.kept : w.place == Place::Nurse ? NursesNear(middle) : w.kept;
 	if (Count(w.place) < kept) Spawn(w.place, middle, t != nullptr ? t : any, night, now);
 });
