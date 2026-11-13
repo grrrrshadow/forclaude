@@ -14728,6 +14728,7 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 {
 	/* What is not made yet, by object. */
 	std::vector<std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>> jobs;
+	const bool stand_in = _three_d_pictures_stand_in && !_three_d_load_at_once;
 	{
 		std::lock_guard lock(_lazy_mutex);
 		for (const ThreeDTextureWanted &w : wanted) {
@@ -14738,6 +14739,10 @@ void PrepareThreeDObjectTextures(std::span<const ThreeDTextureWanted> wanted)
 			if (!o->levels.empty()) {
 				const int level = std::clamp<int>(w.level, 0, static_cast<int>(o->levels.size()) - 1);
 				if (w.paint == 0 || o->colours.empty() || o->painted.contains({level, w.paint})) continue;
+				/* Drawing the map, painted at another level already: that one stands in and this one is painted in the
+				 * background (DrawnTexture()) -- not painted here, the main thread waiting for it (the player's test10,
+				 * snimky.log of the map: "dum textura 99x 1109 ms", a drag of the map held up by each). */
+				if (stand_in && std::ranges::any_of(o->painted, [&w](const auto &p) { return p.first.second == w.paint; })) continue;
 			}
 			auto it = std::ranges::find(jobs, o, &std::pair<const ThreeDObject *, std::vector<std::pair<int, uint32_t>>>::first);
 			if (it == jobs.end()) it = jobs.insert(jobs.end(), {o, {}});
