@@ -6023,6 +6023,29 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	itself.figure = name;
 	itself.at[0] = itself.at[1] = middle;
 	obj.addon_places.push_back(itself);
+	/* What stands by it, as by a house ("doplnky" add-ons, "postavy" figures and things, "rostliny" plants; the player,
+	 * 13. 11.: the graves of the two colleagues by their lighthouses, a lantern on each, young marijuana and the flowers
+	 * of our grass on them): where in the lighthouse's frame (its middle, as its doors), turned and sized as a house's. */
+	{
+		const size_t addons = obj.addon_places.size(), figures = obj.figures.size(), plants = obj.plants.size();
+		if (e.contains("doplnky") && e.at("doplnky").is_array()) for (const auto &a : e.at("doplnky")) {
+			if (!a.is_object() || !a.contains("jmeno") || !a.at("jmeno").is_string() || !a.contains("poloha") || !a.at("poloha").is_array() || a.at("poloha").size() != 3) continue;
+			ThreeDObjectFigure place;
+			place.figure = a.at("jmeno").get<std::string>();
+			for (int k = 0; k < 3; k++) place.at[k] = a.at("poloha").at(k).get<float>();
+			place.facing = a.value("otoceni", 0.0f);
+			place.scale = std::clamp(a.value("meritko", 1.0f), 0.05f, 20.0f);
+			obj.addon_places.push_back(std::move(place));
+		}
+		if (e.contains("postavy") && e.at("postavy").is_array()) for (const auto &f : e.at("postavy")) {
+			ThreeDObjectFigure fig;
+			if (ReadFigure(f, fig)) obj.figures.push_back(std::move(fig));
+		}
+		ReadPlants(e, obj);
+		for (size_t i = addons; i < obj.addon_places.size(); i++) obj.addon_places[i].at[0] += middle, obj.addon_places[i].at[1] += middle;
+		for (size_t i = figures; i < obj.figures.size(); i++) obj.figures[i].at[0] += middle, obj.figures[i].at[1] += middle;
+		for (size_t i = plants; i < obj.plants.size(); i++) obj.plants[i].at[0] += middle, obj.plants[i].at[1] += middle;
+	}
 	/* Its doors ("dvere": where in the lighthouse's frame, the way out): Mat goes in and out there (ThreeDPeopleDoorsAt()). */
 	if (e.contains("dvere") && e.at("dvere").is_array()) {
 		for (const auto &d : e.at("dvere")) {

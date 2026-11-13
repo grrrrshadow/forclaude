@@ -69,6 +69,111 @@
     "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (6° dolů, nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
    }
   },
+  "doplnky": [
+   {
+    "jmeno": "hrob_kolega_forclaude",
+    "poloha": [
+     -5.6,
+     0.0,
+     0
+    ],
+    "otoceni": 270
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "lucerna",
+    "poloha": [
+     -5.11,
+     -0.41,
+     0.09
+    ],
+    "otoceni": 270
+   }
+  ],
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -6.1,
+     0.15,
+     0.09
+    ],
+    "otoceni": 295,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.78,
+     -0.14,
+     0.09
+    ],
+    "otoceni": 50,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.43,
+     0.08,
+     0.09
+    ],
+    "otoceni": 170,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -6.22,
+     -0.13,
+     0.09
+    ],
+    "otoceni": 270,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.8,
+     0.17,
+     0.09
+    ],
+    "otoceni": 340,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.48,
+     -0.16,
+     0.09
+    ],
+    "otoceni": 60,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.96,
+     0.0,
+     0.09
+    ],
+    "otoceni": 130,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.3,
+     0.14,
+     0.09
+    ],
+    "otoceni": 210,
+    "meritko": 0.8
+   }
+  ],
+  "hrob_poznamka": "hrobeček kolegy za majákem, na straně dál od dveří (hráč 13. 11.: „ať mají klid ode mně“): hrob_kolega_forclaude (predmety/hroby_kolegu.py), náhrobek k věži, nápis a záhon ven; na něm lucerna od grrrrf (predmety lucerna), v záhonu mladá marihuana (kytka_mari_mlada, 0,35 m) a kvítky naší trávy (trava_kvitky); polohy v rámu majáku (počátek uprostřed), jako u domů doplnky, postavy, rostliny",
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice, inspirace rozhledna Petra Š.)",
   "licence": "GPL-2.0 (vlastní geometrie i barvy)",
   "poznamka": "kulatý maják (hráč 9. 11.: „tak skus kulaty majak se schdama uvnitř, mužou byt dva majaky“): bílá zužující se věž s dvěma červenými pruhy na kamenném soklu, dole otevřený vchod k +x, uvnitř točité schody nahoru do prosklené lucerny, z ní ven na ochoz; v lucerně lampa a reflektor, který se točí (otaceni), v noci lampa svítí (noc) a reflektor dává dva paprsky; počátek uprostřed na zemi; levný, jen barvy"
@@ -143,6 +248,111 @@
     "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (6° dolů, nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
    }
   },
+  "doplnky": [
+   {
+    "jmeno": "hrob_kolega_grrrrf",
+    "poloha": [
+     -5.6,
+     0.0,
+     0
+    ],
+    "otoceni": 270
+   }
+  ],
+  "postavy": [
+   {
+    "postava": "lucerna",
+    "poloha": [
+     -5.11,
+     -0.41,
+     0.09
+    ],
+    "otoceni": 270
+   }
+  ],
+  "rostliny": [
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -6.1,
+     0.15,
+     0.09
+    ],
+    "otoceni": 295,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.78,
+     -0.14,
+     0.09
+    ],
+    "otoceni": 50,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "kytka_mari_mlada",
+    "poloha": [
+     -5.43,
+     0.08,
+     0.09
+    ],
+    "otoceni": 170,
+    "meritko": 0.35
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -6.22,
+     -0.13,
+     0.09
+    ],
+    "otoceni": 270,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.8,
+     0.17,
+     0.09
+    ],
+    "otoceni": 340,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.48,
+     -0.16,
+     0.09
+    ],
+    "otoceni": 60,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.96,
+     0.0,
+     0.09
+    ],
+    "otoceni": 130,
+    "meritko": 0.8
+   },
+   {
+    "soubor": "trava_kvitky",
+    "poloha": [
+     -5.3,
+     0.14,
+     0.09
+    ],
+    "otoceni": 210,
+    "meritko": 0.8
+   }
+  ],
+  "hrob_poznamka": "hrobeček kolegy za majákem, na straně dál od dveří (hráč 13. 11.: „ať mají klid ode mně“): hrob_kolega_grrrrf (predmety/hroby_kolegu.py), náhrobek k věži, nápis a záhon ven; na něm lucerna od grrrrf (predmety lucerna), v záhonu mladá marihuana (kytka_mari_mlada, 0,35 m) a kvítky naší trávy (trava_kvitky); polohy v rámu majáku (počátek uprostřed), jako u domů doplnky, postavy, rostliny",
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice)",
   "licence": "GPL-2.0 (vlastní geometrie, barvy a cedule)",
   "poznamka": "hranatý maják (hráč 9. 11.: „široka krabice pul kachličky, vnějškem schodiště nahoru, schody jednou okolo budovy, vyšsí nebude budova. na střeše dveře do skleníku, uvnitř skleníku světlo, reflektor se bude točit. budova bude mit dole dveře označené vchod bez interieru. bude tam chodit mat“): bílá krabice 5,4 m (se schody 7,4 m, půl dlaždice) s červeným pásem a zábradlím, střecha ve 12 m, skleník s lampou a reflektorem, který se točí (otaceni); dole zavřené dveře s cedulí VCHOD k +x; počátek uprostřed na zemi"
