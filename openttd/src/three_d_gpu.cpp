@@ -5347,10 +5347,37 @@ static bool SamePaint(const ThreeDGpuPaint &a, const ThreeDGpuPaint &b)
 }
 
 /** What the objects of the view from the eyes need on the card put there: false, something it cannot hold. */
+/**
+ * How much new a picture from the eyes may put on the card (shapes, triangles, textures of its buildings and figures)
+ * before what else is new waits for the next picture: the player's test10, two games of three down as he went to the
+ * first person view among many lorries leaving a depot ("it fell because it was a great load when they leave the depot,
+ * there are many of them and they are drawn"; the phone's driver down in its shader compiler, the device lost, at the
+ * first draw of the vehicles with wheels -- right after that one picture had put every lorry of the scene on the card,
+ * a 70 thousand corners and 16 MB of textures each). A picture a second apart the view is whole; the first draws of
+ * the programs (FirstDraw()) come with little put on the card.
+ */
+static constexpr size_t EYE_PICTURE_NEW_BYTES = 32u << 20;
+std::atomic<uint64_t> _gpu_eye_later{0}; ///< the diary: the buildings and figures of the pictures from the eyes left for a later picture so
+
 bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 {
 	out.glass_alpha = pic.glass_alpha;
+	const size_t sent_before = _card_sent.load();
+	/* Whether the picture has put its fill of new things on the card (EYE_PICTURE_NEW_BYTES). */
+	auto full = [sent_before]() {
+		const size_t sent = _card_sent.load();
+		return sent > sent_before && sent - sent_before > EYE_PICTURE_NEW_BYTES;
+	};
 	for (const ThreeDGpuEyeBuilding &e : pic.buildings) {
+		if (full()) {
+			/* A building not on the card yet, or a texture of its: the next picture. */
+			bool is_new = !_card_buildings.contains(e.building.uid);
+			for (const ThreeDObjectTexture *t : e.building.textures) is_new = is_new || (t != nullptr && !_card_textures.contains(t->uid.value));
+			if (is_new) {
+				_gpu_eye_later++;
+				continue;
+			}
+		}
 		const GpuBuilding *on = BuildingOnCard(e.building);
 		if (on == nullptr) continue;
 		EyeObjectDraws::Draw d{&e, on, std::vector<GLuint>(e.building.textures.size(), 0)};
@@ -5365,6 +5392,18 @@ bool PrepareEyeObjects(const ThreeDGpuEyePicture &pic, EyeObjectDraws &out)
 	/* The figures' shapes, triangles, textures and the masks the card paints them by as it draws them (ThreeDGpuMesh::paints). */
 	for (const ThreeDGpuMesh &m : pic.meshes) {
 		if (m.shape == nullptr || m.triangles == nullptr || m.triangles->indices.empty()) continue;
+		if (full()) {
+			/* A figure whose shape or a texture is not on the card yet: the next picture. */
+			bool is_new = !_card_shapes.contains(m.shape->uid.value);
+			for (size_t i = 0; i < m.textures.size() && !is_new; i++) {
+				if (m.textures[i] == nullptr || i >= m.triangles->used.size() || !m.triangles->used[i]) continue;
+				is_new = !_card_textures.contains(m.textures[i]->uid.value);
+			}
+			if (is_new) {
+				_gpu_eye_later++;
+				continue;
+			}
+		}
 		EyeObjectDraws::MeshDraw d{&m, ShapeOnCard(*m.shape), IndicesOnCard(*m.triangles), std::vector<GLuint>(m.textures.size(), 0), std::vector<PaintOnCard>(m.textures.size())};
 		if (d.shape == nullptr || d.indices == nullptr) return false;
 		if (m.bones != nullptr && !d.shape->has_bones) return false;
@@ -6922,6 +6961,7 @@ std::string ThreeDGpuTimes()
 	if (_gpu_grounds > 0) s += fmt::format("; the ground of {} blocks in {:.1f} ms{}", _gpu_grounds, _gpu_ground_ms, _gpu_grounds_failed > 0 ? fmt::format(", {} left to the processor", _gpu_grounds_failed) : std::string());
 	if (_gpu_standing_vehicles + _gpu_standing_vehicles_kept > 0) s += fmt::format("; vehicles of the turned map {} drawn, {} as kept", _gpu_standing_vehicles, _gpu_standing_vehicles_kept);
 	if (_gpu_eye_batches + _gpu_eye_single > 0) s += fmt::format("; from the eyes {} meshes in {} batches, {} each on its own", _gpu_eye_instances, _gpu_eye_batches, _gpu_eye_single);
+	if (const uint64_t later = _gpu_eye_later.exchange(0); later > 0) s += fmt::format(", {} new left for a later picture", later);
 	{
 		/* A picture from the eyes as the card drew it: its triangles and draw calls, the batches' objects, the most drawn. */
 		std::lock_guard most_lock(_gpu_eye_most_mutex);
