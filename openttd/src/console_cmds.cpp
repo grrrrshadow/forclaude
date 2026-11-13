@@ -10053,15 +10053,8 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDAnimals());
 	} else if (what == "majak") {
-		/* 'majak paprsek <znamenko> <stupnu>': which way the lighthouses' beams turn (1 or -1) and from where (degrees),
-		 * against the reflector's (AddThreeDLighthouseLights()); the beams now. */
-		extern int _lighthouse_beam_sign;
-		extern double _lighthouse_beam_phase;
-		if (argv.size() > 4 && argv[2] == "paprsek") {
-			_lighthouse_beam_sign = number(3).value_or(1) < 0 ? -1 : 1;
-			_lighthouse_beam_phase = number(4).value_or(0) * M_PI / 180.0;
-		}
-		IConsolePrint(CC_DEFAULT, "test3d: majak paprsek {} {:.0f}; {}", _lighthouse_beam_sign, _lighthouse_beam_phase * 180.0 / M_PI, DescribeThreeDWitches());
+		/* 'majak': the lighthouses' beams now, with the witches' lights (AddThreeDLighthouseLights()). */
+		IConsolePrint(CC_DEFAULT, "test3d: majak; {}", DescribeThreeDWitches());
 	} else if (what == "carodejnice") {
 		/* 'carodejnice [<x> <y> <stupnu> [jmeno]]': the witches flying (three_d_witches.h, only at night); with a tile one
 		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu> [jmeno]': one sent from

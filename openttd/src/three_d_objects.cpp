@@ -274,9 +274,6 @@ static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStation
 static std::map<std::pair<int, int>, size_t> _three_d_depots;
 /** The lighthouses' objects (ReadLighthouse()), objects in _three_d_objects: one of them on each lighthouse's tile (GetThreeDLighthouse()). */
 static std::vector<size_t> _three_d_lighthouses;
-/** The rig ('test3d majak paprsek <sign> <phase>'): which way the beams turn and from where, against the reflector's. */
-int _lighthouse_beam_sign = 1;
-double _lighthouse_beam_phase = 0;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 
@@ -5955,13 +5952,6 @@ static void TakeFlatFloors(ThreeDObject &obj)
 }
 
 /**
- * The material of the two beams of a lighthouse's file under its reflector's night ("paprsek": cylinders 30 m long,
- * see-through), left out: the player's test9, "it is a cylinder like a laser, a normal light widens and fades; the
- * witches have a nice light they shine on the ground with" -- our cones of light instead (AddThreeDLighthouseLights()).
- */
-static const std::vector<std::string> LIGHTHOUSE_MODEL_BEAMS{"paprsek"};
-
-/**
  * A lighthouse (the colleague's objekty/majaky, hra/3d/MAJAKY-PRO-HRU.md; the player, 10. 11.: "go do the lighthouses"):
  * its file an add-on without the node that turns ("otaceni" "uzel", the reflector with its night), its foot in the
  * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
@@ -5994,10 +5984,38 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	ThreeDObject obj;
 	obj.name = "majak/" + name;
 	obj.variants = 0;
-	/* Its beams of light from the lamp, turning with the reflector (AddThreeDLighthouseLights()). */
-	if (!spin_node.empty() && spin_z > 0) {
-		obj.beam_z_m = spin_z;
-		obj.beam_spin_ticks = std::clamp(static_cast<int>(std::lround(e.at("otaceni").value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+	/* Its beams as a witch's torch (AddThreeDLighthouseLights(); the player, 13. 11.: "make it as the witch has it"):
+	 * where each starts and where it aims, empty nodes of its file under the node that turns ("svitilna_NN",
+	 * "paprsek_NN"), their light in the record ("svetla" "svitilna": "barva", "dosah_m", "uhel"); turning with the
+	 * reflector about the axis through "stred", a turn in "otacka_s" seconds. Nothing of it the game's own. */
+	if (!spin_node.empty() && e.contains("svetla") && e.at("svetla").is_object() && e.at("svetla").contains("svitilna") && e.at("svetla").at("svitilna").is_object()) {
+		const auto &torch = e.at("svetla").at("svitilna");
+		auto colour = torch.contains("barva") && torch.at("barva").is_string() ? ParseInteger<uint32_t>(torch.at("barva").get<std::string>(), 16) : std::nullopt;
+		GlbMesh none;
+		GlbReadOptions po;
+		po.all_nodes = true;
+		po.only_node = "\x01";
+		po.points_only = true;
+		po.point_prefix = "svitilna_";
+		po.points = &obj.beam_from;
+		ReadGlbMesh(path, none, po);
+		po.point_prefix = "paprsek_";
+		po.points = &obj.beam_aim;
+		ReadGlbMesh(path, none, po);
+		if (obj.beam_from.size() != obj.beam_aim.size() || !colour.has_value()) {
+			Debug(misc, 0, "3D lighthouse {}: {} beams and {} aims of them, colour {}: no beams", name, obj.beam_from.size() / 3, obj.beam_aim.size() / 3, colour.has_value() ? "given" : "none");
+			obj.beam_from.clear();
+			obj.beam_aim.clear();
+		} else {
+			obj.beam_colour = Colour(static_cast<uint8_t>(*colour >> 16), static_cast<uint8_t>(*colour >> 8), static_cast<uint8_t>(*colour)).data;
+			obj.beam_reach_m = std::clamp(torch.value("dosah_m", 0.0f), 0.0f, 500.0f);
+			obj.beam_angle = std::clamp(torch.value("uhel", 0.0f), 1.0f, 120.0f);
+			obj.beam_spin_ticks = std::clamp(static_cast<int>(std::lround(e.at("otaceni").value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+			const auto &o = e.at("otaceni");
+			if (o.contains("stred") && o.at("stred").is_array() && o.at("stred").size() == 3) {
+				for (int k = 0; k < 2; k++) obj.beam_centre[k] = o.at("stred").at(k).is_number() ? o.at("stred").at(k).get<float>() : 0.0f;
+			}
+		}
 	}
 	obj.flat_floors = true;
 	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0);
@@ -6039,7 +6057,7 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 		reflector.at[2] = bottom;
 		obj.figures.push_back(reflector);
 		/* At night its reflectors lit (the player, test6: "the bulb shines and the two reflectors turning about it do
-		 * not"): the node of their night ("noc_uzel": the glow of the lenses and two beams) turning with it, a figure of
+		 * not"): the node of their night ("noc_uzel": the glow of the lenses) turning with it, a figure of
 		 * its own drawn only at night, its middle at the height of the lamp ("stred") -- as its file has it under the
 		 * reflector, not as high again (its node moved by the reflector's height twice). */
 		if (!spin_night.empty()) {
@@ -6047,8 +6065,6 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 			GlbReadOptions lo;
 			lo.all_nodes = true;
 			lo.only_node = spin_night;
-			/* Without its beams (LIGHTHOUSE_MODEL_BEAMS: our cones instead), its middle the lenses' glow's. */
-			lo.skip_materials = &LIGHTHOUSE_MODEL_BEAMS;
 			if (ReadGlbMesh(path, lit, lo) && lit.pos.size() >= 3) {
 				float low = lit.pos[2], high = lit.pos[2];
 				for (size_t i = 2; i < lit.pos.size(); i += 3) {
@@ -6773,7 +6789,6 @@ static void ReadThreeDVehicleObjects()
 						lit.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor_noc";
 						lit.thing = true;
 						lit.only_node = o.at("noc_uzel").get<std::string>();
-						lit.skip_materials = LIGHTHOUSE_MODEL_BEAMS;
 						lit.to_ground = true;
 						lit.spin_ticks = fig.spin_ticks;
 						std::copy(std::begin(fig.spin_axis), std::end(fig.spin_axis), std::begin(lit.spin_axis));
@@ -12692,32 +12707,41 @@ static int LighthouseBeamStep(const ThreeDObject &lh)
  */
 static void LighthouseBeams(TileIndex tile, const ThreeDObject &lh, double turn, std::vector<ThreeDWitchLight> &out)
 {
-	static constexpr double REACH_M = 160.0;      ///< how far each beam shines
-	static constexpr double HALF_ANGLE_DEG = 6.0; ///< half the angle of its cone
-	static constexpr double DOWN_DEG = 9.0;       ///< how far down from the level it points: it falls on the land a hundred metres off
-	static constexpr double OUT_M = 4.2;          ///< where it starts, out from the lamp: past the gallery's railing
-	static constexpr double OVER_M = 0.4;         ///< and over the lamp
-	const Colour colour(255, 237, 178);
-	const double down = std::tan(DOWN_DEG * M_PI / 180.0), len = std::sqrt(1.0 + down * down);
+	const double c = std::cos(turn), sn = std::sin(turn);
 	const double cx = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
 	const double foot = GetTileMaxPixelZ(tile);
-	for (const double side : {0.0, M_PI}) {
-		const double a = _lighthouse_beam_sign * turn + side + _lighthouse_beam_phase;
+	/* A point of the file (metres from the middle of its foot) turned with the reflector about its axis. */
+	auto turned = [&](const float *p, double &x, double &y, double &z) {
+		const double px = p[0] - lh.beam_centre[0], py = p[1] - lh.beam_centre[1];
+		x = lh.beam_centre[0] + px * c - py * sn;
+		y = lh.beam_centre[1] + px * sn + py * c;
+		z = p[2];
+	};
+	for (size_t i = 0; i + 2 < lh.beam_from.size() && i + 2 < lh.beam_aim.size(); i += 3) {
+		double fx, fy, fz, ax, ay, az;
+		turned(&lh.beam_from[i], fx, fy, fz);
+		turned(&lh.beam_aim[i], ax, ay, az);
+		/* Its way in metres' terms, as a witch's torch's (LightsOf()). */
+		double dx = ax - fx, dy = ay - fy, dz = az - fz;
+		const double len = std::sqrt(dx * dx + dy * dy + dz * dz);
+		if (len < 1e-6) continue;
 		ThreeDWitchLight &l = out.emplace_back();
 		l.torch = true;
-		l.dx = std::cos(a) / len;
-		l.dy = std::sin(a) / len;
-		l.dz = -down / len;
-		l.x = cx + std::cos(a) * OUT_M * OBJECT_UNITS_PER_METRE;
-		l.y = cy + std::sin(a) * OUT_M * OBJECT_UNITS_PER_METRE;
-		l.z = foot + (lh.beam_z_m + OVER_M) * OBJECT_HEIGHT_PER_METRE;
-		l.reach = REACH_M * OBJECT_UNITS_PER_METRE;
-		l.half_angle = HALF_ANGLE_DEG * M_PI / 180.0;
-		l.colour = colour;
+		l.dx = dx / len;
+		l.dy = dy / len;
+		l.dz = dz / len;
+		l.x = cx + fx * OBJECT_UNITS_PER_METRE;
+		l.y = cy + fy * OBJECT_UNITS_PER_METRE;
+		l.z = foot + fz * OBJECT_HEIGHT_PER_METRE;
+		l.reach = lh.beam_reach_m * OBJECT_UNITS_PER_METRE;
+		l.half_angle = lh.beam_angle * M_PI / 360.0;
+		l.colour = Colour(lh.beam_colour);
 		/* Where it falls on the land, within its reach (as a witch's torch, LightsOf()). */
-		const double over = (l.z - FirstPersonGroundZ(l.x, l.y)) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
-		const double ground = over / down * len;
-		l.ground = over > 0 && ground < l.reach ? ground : 0;
+		if (l.dz < -0.01) {
+			const double over = (l.z - FirstPersonGroundZ(l.x, l.y)) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+			const double ground = over / -l.dz;
+			if (over > 0 && ground < l.reach) l.ground = ground;
+		}
 	}
 }
 
@@ -12740,7 +12764,7 @@ void AddThreeDLighthouseLights(bool eye, std::vector<ThreeDWitchLight> &out)
 		if (o->type != OBJECT_LIGHTHOUSE) continue;
 		const TileIndex tile = o->location.tile;
 		const ThreeDObject *lh = GetThreeDLighthouse(tile);
-		if (lh == nullptr || lh->beam_z_m < 0 || lh->beam_spin_ticks <= 0) continue;
+		if (lh == nullptr || lh->beam_from.empty() || lh->beam_spin_ticks <= 0) continue;
 		/* Its reflector's turn now (the figure's, viewport.cpp and three_d_vehicle_object.cpp: the same tick), the
 		 * model's beams along its x. */
 		const double turn = eye ? (TimerGameTick::counter % lh->beam_spin_ticks) * 2 * M_PI / lh->beam_spin_ticks : LighthouseBeamStep(*lh) * 2 * M_PI / LIGHTHOUSE_BEAM_STEPS;
@@ -12797,7 +12821,7 @@ static const IntervalTimer<TimerGameTick> _lighthouse_beams_timer({TimerGameTick
 		if (o->type != OBJECT_LIGHTHOUSE) continue;
 		const TileIndex tile = o->location.tile;
 		const ThreeDObject *lh = GetThreeDLighthouse(tile);
-		if (lh == nullptr || lh->beam_z_m < 0 || lh->beam_spin_ticks <= 0) continue;
+		if (lh == nullptr || lh->beam_from.empty() || lh->beam_spin_ticks <= 0) continue;
 		const int step = LighthouseBeamStep(*lh);
 		auto [it, added] = _lighthouse_beam_steps.try_emplace(tile, step);
 		if (!added && it->second == step) continue;

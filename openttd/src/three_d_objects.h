@@ -335,7 +335,12 @@ struct ThreeDObject {
 	std::vector<std::array<float, 5>> walkways; ///< a ship depot's ("lavky", ReadDepot()): each its x and y from, x and y to and its height, world units from the depot's north corner, turned with it
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
-	double beam_z_m = -1;                     ///< a lighthouse's: how high its lamp is over its foot, metres (its beams, AddThreeDLighthouseLights()); -1 none
+	std::vector<float> beam_from;             ///< a lighthouse's beams (AddThreeDLighthouseLights()): where each starts ("svitilna_NN" of its file), metres x, y, z
+	std::vector<float> beam_aim;              ///< and where each aims ("paprsek_NN")
+	uint32_t beam_colour = 0;                 ///< their light ("svetla" "svitilna" "barva"), Colour::data
+	float beam_reach_m = 0;                   ///< how far ("dosah_m")
+	float beam_angle = 0;                     ///< their cone's angle, degrees ("uhel")
+	float beam_centre[2] = {};                ///< the axis they turn about ("otaceni" "stred"), metres
 	int beam_spin_ticks = 0;                  ///< a lighthouse's: ticks of a turn of its reflector, its beams with it
 	bool no_see_through = false;              ///< read without its see-through triangles (a material "BLEND", a lighthouse's lantern glass): the buildings are drawn opaque, the reflector in it hidden
 	bool flat_floors = false;                 ///< its flat faces looking up its floors (a lighthouse's stairs, landings, gallery and roof, TakeFlatFloors()): walked on (FloorAt()), in no one's way

@@ -21,7 +21,7 @@
     20.98
    ]
   },
-  "trojuhelniku": 2882,
+  "trojuhelniku": 2802,
   "dvere": [
    {
     "poloha": [
@@ -59,7 +59,15 @@
    ],
    "otacka_s": 10,
    "noc_uzel": "reflektor_noc",
-   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček a dva slabé paprsky po 30 m, jen v noci jako uzel noc"
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček, jen v noci jako uzel noc; paprsky jsou světla (svetla.svitilna, body svitilna_NN a paprsek_NN pod reflektorem)"
+  },
+  "svetla": {
+   "svitilna": {
+    "barva": "FFEDB2",
+    "dosah_m": 160,
+    "uhel": 12,
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku za zábradlím ochozu kousek nad lampou, paprsek_NN kam míří (9° dolů); barva, dosah v metrech a úhel kužele ve stupních"
+   }
   },
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice, inspirace rozhledna Petra Š.)",
   "licence": "GPL-2.0 (vlastní geometrie i barvy)",
@@ -87,7 +95,7 @@
     16.29
    ]
   },
-  "trojuhelniku": 1936,
+  "trojuhelniku": 1856,
   "dvere": [
    {
     "poloha": [
@@ -125,7 +133,15 @@
    ],
    "otacka_s": 10,
    "noc_uzel": "reflektor_noc",
-   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček a dva slabé paprsky po 30 m, jen v noci jako uzel noc"
+   "poznamka": "reflektor se točí kolem svislé osy přes střed lampy (počátek uzlu reflektor je na ní), jedna otáčka za 10 s; uzel reflektor_noc (pod reflektorem, točí se s ním) je záře čoček, jen v noci jako uzel noc; paprsky jsou světla (svetla.svitilna, body svitilna_NN a paprsek_NN pod reflektorem)"
+  },
+  "svetla": {
+   "svitilna": {
+    "barva": "FFEDB2",
+    "dosah_m": 160,
+    "uhel": 12,
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku za zábradlím ochozu kousek nad lampou, paprsek_NN kam míří (9° dolů); barva, dosah v metrech a úhel kužele ve stupních"
+   }
   },
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice)",
   "licence": "GPL-2.0 (vlastní geometrie, barvy a cedule)",
