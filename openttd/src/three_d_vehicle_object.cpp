@@ -3261,7 +3261,9 @@ static int VehicleObjectLightsOn(const ThreeDVehicleObject *obj, const Vehicle *
 	const bool on = VehicleLightsOn(front);
 	if (!on && !VehicleBrakeLightsOn(front)) return 0;
 	const int red = LIGHTS_BACK | LIGHTS_BACK_AT_FRONT;
-	const ThreeDVehicleShape *shape = obj->GetShape();
+	/* Its shape not waited for (read in the background): no lights till it is read, the vehicle is drawn again as it
+	 * goes. The main thread read the shape of each vehicle braking or lit the first time it was seen. */
+	const ThreeDVehicleShape *shape = obj->TryGetShape();
 	if (shape == nullptr || !shape->HasLights()) return 0;
 	const bool leads = front->Previous() == nullptr;
 	/* Its red lights when nothing follows it, or nothing seen: a lorry of the colleague's without its trailer has the
@@ -3957,7 +3959,9 @@ bool GetThreeDVehicleObjectLights(const Vehicle *v, ZoomLevel zoom, const RoundT
 	if (obj == nullptr) return false;
 	/* An object that draws nothing now has no lights either (not those about its box: a lorry's trailer it has not). */
 	if (ObjectDrawsNothing(obj, v, piece, zoom)) return true;
-	const ThreeDVehicleShape *shape = obj->GetShape();
+	/* Not read yet (read in the background, not waited for): no lights of it now, not those about its box either. */
+	const ThreeDVehicleShape *shape = obj->TryGetShape();
+	if (shape == nullptr && !obj->ShapeTried()) return true;
 	if (shape == nullptr || !shape->HasLights()) return false;
 	VehicleObjectPlace place;
 	PlaceVehicleObject(v, zoom, pose, place, ViewportVehiclesOnCard());
@@ -5193,7 +5197,7 @@ void NoteThreeDBlinking(TileIndex tile, int ticks, double x0, double y0, double 
  * @param[out] later its picture not waited for: asked of the thread, the nearest made meanwhile (_object_picture_may_wait)
  * @return nothing when the figure is not there (or its frame is not read yet)
  */
-static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr)
+static std::optional<PictureToMake> FigureRequest(std::string_view name, float scale, float facing, ZoomLevel zoom, TileIndex tile, uint32_t phase, int *height, int frame, float yaw, int z, int x, int y, int *up, bool &later, float side = FIGURE_PICTURE_SIDE, int state = 0, bool for_card = false, bool *not_yet = nullptr, bool no_wait = false)
 {
 	if (up != nullptr) *up = 0;
 	later = false;
@@ -5203,7 +5207,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 	 * when they come (not_yet). The main thread read a horse's skeleton for the map, 0.3 s in the rig, 0.8 s on the
 	 * phone (the player's test2: the frames stood as the purchase window was opened by the farm). */
 	auto missing = [&]() -> std::optional<PictureToMake> {
-		if (not_yet != nullptr && for_card) *not_yet = true;
+		if (not_yet != nullptr && (for_card || no_wait)) *not_yet = true;
 		return std::nullopt;
 	};
 	if (name.starts_with("vozidlo:") || name.starts_with("naklad:")) {
@@ -5212,7 +5216,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 		if (!GetThreeDStandingVehicle(name, ev)) return std::nullopt;
 		const bool for_eye = ViewportDrawingEye();
 		const ThreeDParts parts = ev.obj->PartsOf(ev.state);
-		const ThreeDVehicleShape *shape = for_eye || for_card ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
+		const ThreeDVehicleShape *shape = for_eye || for_card || no_wait ? ev.obj->TryGetShape(0, parts) : ev.obj->GetShape(0, parts);
 		if (shape == nullptr) return missing();
 		if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
 		const float world_az = facing - 135.0f;
@@ -5245,7 +5249,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 	if (for_card && fig->OnBones() && ThreeDGpuPosesBones()) {
 		if (ThreeDCardFrame(*fig, frame, true, bones, shape) == nullptr) return missing();
 	} else {
-		shape = later || for_card ? fig->TryGetShape(frame) : fig->GetShape(frame);
+		shape = later || for_card || no_wait ? fig->TryGetShape(frame) : fig->GetShape(frame);
 	}
 	if (shape == nullptr) return missing();
 	if (up != nullptr) zoom = FigurePictureZoom(*shape, scale, zoom, *up, side);
@@ -5369,7 +5373,17 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 				break;
 		}
 	}
-	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state);
+	/* Its picture (bigger than the card draws one, or a pass without the card's vehicles): drawing the map its shape is
+	 * not waited for either -- read in the background, its place drawn again when it comes. The main thread read the
+	 * shapes of the trees and the figures itself (the player's test10, snimky.log: "tvar 70x 13381 ms", a frame of
+	 * 14 s; the rig at night: FigureRequest() of DrawTile_Trees()). */
+	bool shape_not_yet = false;
+	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state, false, &shape_not_yet, _three_d_pictures_stand_in && !_three_d_load_at_once);
+	if (shape_not_yet) {
+		_stand_ins_given++;
+		OweUnknownFigurePlace(x, y, z);
+		return true;
+	}
 	if (!p.has_value()) return false;
 	const ThreeDModelPicture *pic = nullptr;
 	{

@@ -1085,6 +1085,7 @@ struct ThreeDVehicleObject {
 	const ThreeDVehicleShape *GetShape(int frame) const;
 	const ThreeDVehicleShape *GetShape(int frame, const ThreeDParts &parts) const;
 	const ThreeDVehicleShape *TryGetShape(int frame = 0) const;
+	bool ShapeTried() const;
 	const ThreeDVehicleShape *TryGetShape(int frame, const ThreeDParts &parts) const;
 	bool OnBones() const;
 	std::shared_ptr<const ThreeDBonesFrame> GetBones(int frame) const;

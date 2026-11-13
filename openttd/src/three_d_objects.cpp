@@ -9081,6 +9081,13 @@ const ThreeDVehicleShape *ThreeDVehicleObject::TryGetShape(int frame) const
 	return this->TryGetShape(frame, 1);
 }
 
+/** Whether its shape was read, or tried and could not be (TryGetShape() gives nullptr for both that and not read yet). */
+bool ThreeDVehicleObject::ShapeTried() const
+{
+	std::lock_guard lock(_lazy_mutex);
+	return this->shape_tried;
+}
+
 /**
  * The object's shape (a frame of it) if it is read already, with the parts asked for if they are added already: the
  * parts it has not yet are added in the background (MadeOrAsked()), the shape as it is till then; nullptr when there
