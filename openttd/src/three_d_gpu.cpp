@@ -606,7 +606,20 @@ constexpr size_t GPU_BYTES_KEPT = 1024u * 1024 * 1024; ///< (the player, 20. 10.
  * memory over its limit and Winlator gone.
  */
 constexpr size_t GPU_BYTES_KEPT_SHARED = 384u * 1024 * 1024;
-size_t _card_budget = GPU_BYTES_KEPT; ///< what the card keeps at most (GPU_BYTES_KEPT, GPU_BYTES_KEPT_SHARED), set at its start
+size_t _card_budget = GPU_BYTES_KEPT; ///< over this much the card lets go of what was not drawn for CARD_KEPT_SECONDS (GPU_BYTES_KEPT, GPU_BYTES_KEPT_SHARED), set at its start
+/**
+ * What the card holds at most whatever was drawn when (TrimCard()): over it, all not drawn in this picture goes. The
+ * player's test10 on the phone (snimky.log): what a scene draws was more than the 384 MB kept, so every picture let go
+ * of what the next one drew -- 1 to 2 GB put on the card in 5 s turning the map, 2 to 3 frames a second; the player,
+ * 14. 11.: "there should be no limit on the memory". Let go of by age now, this only so that it cannot grow for ever.
+ */
+constexpr size_t GPU_BYTES_AT_MOST = 3072u * 1024 * 1024;
+constexpr size_t GPU_BYTES_AT_MOST_SHARED = 1536u * 1024 * 1024;
+size_t _card_at_most = GPU_BYTES_AT_MOST;
+/** Not drawn for so long, a thing may be let go of when the card holds more than _card_budget. */
+constexpr std::chrono::seconds CARD_KEPT_SECONDS{20};
+/** When each value of _card_clock began (TrimCard()), the oldest first: how long ago a thing was drawn last. */
+std::deque<std::pair<uint64_t, std::chrono::steady_clock::time_point>> _card_clock_times;
 /* The rows of a frame of pictures drawn and read back at once (DrawPicturesOnCard()): more of
  * them in more frames -- one picture taller has a frame of its own. A batch on 2048 x 10378 at once (the rig zoomed in
  * by the town, zink), its frame some 190 MB on the card and its 85 MB read back in one go, the player's phone sharing
@@ -2936,10 +2949,14 @@ bool StartCard(std::string &why, std::string &describe)
 	/* A card whose memory is the system's keeps less (GPU_BYTES_KEPT_SHARED). */
 	const std::string_view name = renderer != nullptr ? renderer : "";
 	_card_budget = GPU_BYTES_KEPT;
+	_card_at_most = GPU_BYTES_AT_MOST;
 	for (std::string_view shared : {"Mali", "Adreno", "PowerVR", "Vortek", "virgl", "llvmpipe", "softpipe"}) {
-		if (name.find(shared) != std::string_view::npos) _card_budget = GPU_BYTES_KEPT_SHARED;
+		if (name.find(shared) != std::string_view::npos) {
+			_card_budget = GPU_BYTES_KEPT_SHARED;
+			_card_at_most = GPU_BYTES_AT_MOST_SHARED;
+		}
 	}
-	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}, keeps up to {} MB{}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target, _card_budget >> 20, _frame_programs ? "" : ", the view from the eyes in parts");
+	describe = fmt::format("{}, OpenGL {}, textures up to {}, pictures up to {}, over {} MB lets go of what was not drawn for {} s, holds {} MB at most{}", renderer != nullptr ? renderer : "?", version, _max_texture, _max_target, _card_budget >> 20, CARD_KEPT_SECONDS.count(), _card_at_most >> 20, _frame_programs ? "" : ", the view from the eyes in parts");
 	return true;
 }
 
@@ -3039,25 +3056,44 @@ void EndCard()
 	EndContext();
 }
 
-/** Let go of what the card holds the longest not drawn, till it holds three quarters of what it keeps at most (_card_budget). */
+/**
+ * Let go of what the card holds and did not draw for CARD_KEPT_SECONDS, the longest not drawn first, when it holds more
+ * than _card_budget, till it holds three quarters of that: what the scene draws stays however much it is. Over
+ * _card_at_most all not drawn in this picture may go.
+ */
 void TrimCard()
 {
+	/* When this value of the clock began; the last one that began CARD_KEPT_SECONDS ago or more. */
+	const auto now = std::chrono::steady_clock::now();
+	if (_card_clock_times.empty() || _card_clock_times.back().first != _card_clock) _card_clock_times.emplace_back(_card_clock, now);
+	uint64_t old_clock = 0;
+	bool any_old = false;
+	while (_card_clock_times.size() > 1 && now - _card_clock_times[1].second >= CARD_KEPT_SECONDS) _card_clock_times.pop_front();
+	if (now - _card_clock_times.front().second >= CARD_KEPT_SECONDS) {
+		old_clock = _card_clock_times.front().first;
+		any_old = true;
+	}
 	if (_card_bytes <= _card_budget) return;
+	const bool too_much = _card_bytes > _card_at_most;
+	if (!too_much && !any_old) return;
+	const size_t down_to = (too_much ? _card_at_most : _card_budget) / 4 * 3;
+	auto may_go = [&](uint64_t used) { return used < _card_clock && (too_much || used < old_clock); };
 	struct Held {
 		uint64_t used;
 		int kind;
 		uint64_t uid;
 	};
 	std::vector<Held> held;
-	for (const auto &[uid, s] : _card_shapes) if (s.used < _card_clock) held.push_back({s.used, 0, uid});
-	for (const auto &[uid, i] : _card_indices) if (i.used < _card_clock) held.push_back({i.used, 1, uid});
-	for (const auto &[uid, t] : _card_textures) if (t.used < _card_clock) held.push_back({t.used, 2, uid});
-	for (const auto &[uid, b] : _card_buildings) if (b.used < _card_clock) held.push_back({b.used, 3, uid});
+	for (const auto &[uid, s] : _card_shapes) if (may_go(s.used)) held.push_back({s.used, 0, uid});
+	for (const auto &[uid, i] : _card_indices) if (may_go(i.used)) held.push_back({i.used, 1, uid});
+	for (const auto &[uid, t] : _card_textures) if (may_go(t.used)) held.push_back({t.used, 2, uid});
+	for (const auto &[uid, b] : _card_buildings) if (may_go(b.used)) held.push_back({b.used, 3, uid});
+	if (held.empty()) return;
 	std::ranges::sort(held, [](const Held &a, const Held &b) { return a.used < b.used; });
-	Step(fmt::format("uvolneni karty ({} MB)", _card_bytes >> 20));
+	Step(fmt::format("uvolneni karty ({} MB{})", _card_bytes >> 20, too_much ? ", nad nejvyssi mez" : ""));
 	_card_trims++;
 	for (const Held &h : held) {
-		if (_card_bytes <= _card_budget / 4 * 3) break;
+		if (_card_bytes <= down_to) break;
 		if (h.kind == 0) {
 			GpuShape &s = _card_shapes[h.uid];
 			gl.glDeleteVertexArrays(1, &s.vao);
