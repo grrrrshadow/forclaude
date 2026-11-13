@@ -19,6 +19,9 @@ of rail_cmd.cpp), our own geometry and our own pictures. Written beside this scr
   kolej_prejezd_beton.glb   (9.2 m along the track) concrete panels as high as the rails' heads 4.4 m across the track,
                             the grooves inside the rails' heads in them, a ramp of asphalt down to the road 2.5 m each
                             side (the road vehicles over it lifted so, ThreeDRoadOverTrack())
+  kolej_*_siroka.glb        each of them WIDE (1.2) times as wide across, as high and as long: for the vehicles at the
+                            original game's size (the player's test9: "make the rails wider, as wide as the original
+                            rails when the original size is on ... and the smaller ones narrow"; ThreeDTrackWide())
 
 glTF's Y up. Along +X, centred on the origin along and across (Z); its foot at Y 0 on the ground at its middle (a
 slope's half way up). The embankment one block 0.12 m high and 3.4 m across: its top and its two sides, no ends (the next
@@ -44,6 +47,7 @@ TILE_M = 14.83765                  # the game's tile, metres (OBJECT_UNITS_PER_M
 DIAGONAL_M = TILE_M / math.sqrt(2) # a diagonal piece: half the tile's diagonal
 LEVEL_MAP_M = 3.0                  # a level of the map (OBJECT_HEIGHT_PER_METRE)
 LEVEL_EYE_M = 5.0                  # a level from the eyes (EYE_LEVEL_STRETCH)
+WIDE = 1.2                         # the wide track's: as the vehicles at the original size (ObjectScale())
 GAUGE = 1.435
 BED_H = 0.12                       # a low embankment, to walk over
 BED_W = 3.4
@@ -347,15 +351,24 @@ def write(path, mesh, name, pictures):
     print(f'{os.path.basename(path)}: {triangles} triangles, {len(out)} bytes')
 
 
+def widen(factor):
+    """Every measure across the track so many times (the wide track): the gauge, the embankment, the sleepers' length,
+    the crossing's panels; the heights, the rails' own width and the lengths along as they are."""
+    global GAUGE, BED_W, SLEEPER_L, PANEL_HALF
+    GAUGE, BED_W, SLEEPER_L, PANEL_HALF = 1.435 * factor, 3.4 * factor, 2.6 * factor, 2.2 * factor
+
+
 def main():
-    for kind in ('drevo', 'beton'):
-        for name, length, climb in (('rovna', TILE_M, 0.0), ('sikma', DIAGONAL_M, 0.0), ('svah', TILE_M, LEVEL_MAP_M), ('svah_oci', TILE_M, LEVEL_EYE_M)):
-            full = f'kolej_{name}_{kind}'
-            write(os.path.join(HERE, full + '.glb'), piece(length, climb, kind), full, {'nasep': top_png(length, kind), 'prazec': sleeper_png(kind)})
-        full = f'kolej_pul_{kind}'
-        write(os.path.join(HERE, full + '.glb'), piece(TILE_M / 2, 0.0, kind), full, {'nasep': top_png(TILE_M / 2, kind), 'prazec': sleeper_png(kind)})
-        full = f'kolej_prejezd_{kind}'
-        write(os.path.join(HERE, full + '.glb'), crossing(TILE_M, kind), full, {'nasep': top_png(TILE_M, kind), 'prazec': sleeper_png(kind), 'panel': panel_png(2 * ROAD_HALF)})
+    for suffix, factor in (('', 1.0), ('_siroka', WIDE)):
+        widen(factor)
+        for kind in ('drevo', 'beton'):
+            for name, length, climb in (('rovna', TILE_M, 0.0), ('sikma', DIAGONAL_M, 0.0), ('svah', TILE_M, LEVEL_MAP_M), ('svah_oci', TILE_M, LEVEL_EYE_M)):
+                full = f'kolej_{name}_{kind}{suffix}'
+                write(os.path.join(HERE, full + '.glb'), piece(length, climb, kind), full, {'nasep': top_png(length, kind), 'prazec': sleeper_png(kind)})
+            full = f'kolej_pul_{kind}{suffix}'
+            write(os.path.join(HERE, full + '.glb'), piece(TILE_M / 2, 0.0, kind), full, {'nasep': top_png(TILE_M / 2, kind), 'prazec': sleeper_png(kind)})
+            full = f'kolej_prejezd_{kind}{suffix}'
+            write(os.path.join(HERE, full + '.glb'), crossing(TILE_M, kind), full, {'nasep': top_png(TILE_M, kind), 'prazec': sleeper_png(kind), 'panel': panel_png(2 * ROAD_HALF)})
     print(f'hlava kolejnice {RAIL_TOP_M:.3f} m nad zemi, sikmy kus {DIAGONAL_M:.2f} m')
 
 

@@ -2102,6 +2102,12 @@ static void RoadVehPullChain(RoadVehicle *v)
 		u->x_pos = x;
 		u->y_pos = y;
 		if ((IsTunnelTile(v->tile) && RoadVehFreeInTube(u, v->tile)) || (IsValidTile(was) && IsTunnelTile(was) && RoadVehFreeInTube(u, was))) continue;
+		/* Out of the game's way through a bridge or a tunnel (the lorry driven freely once out of it, its trailer still
+		 * in it): no longer in its wormhole, or the game would ask the bridge under it how fast it may go, and there is
+		 * none (the player's crash of test9, GetBridgeType() while driving a car). Along the piece ahead of it. */
+		if (u->state == RVSB_WORMHOLE) {
+			u->state = prev->state != RVSB_WORMHOLE ? prev->state : to_underlying(DiagDirToDiagTrackdir(DirToDiagDir(u->direction)));
+		}
 		u->tile = TileVirtXY(x, y);
 		u->UpdatePosition();
 		RoadVehFreeHeight(u);

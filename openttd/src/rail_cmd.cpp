@@ -2584,8 +2584,49 @@ static int GetJunctionGroundSpriteOffset(TrackBits track)
 
 /** Our track's rails' tops over the ground, metres (objekty/nase/koleje.py RAIL_TOP_M): the trains raised so much in 3D. */
 static constexpr double THREE_D_RAIL_TOP_M = 0.372;
-/** Half the width of our track's embankment, metres (koleje.py BED_W): the box a piece fills. */
+/** Half the width of our track's embankment, metres (koleje.py BED_W): the box a piece fills; the narrow track's. */
 static constexpr double THREE_D_TRACK_HALF_M = 1.7;
+
+/**
+ * Whether our track is the wide one (koleje.py kolej_*_siroka: 1.2 times as wide across): with the vehicles drawn from
+ * 3D objects at the original game's size (the player's test9: "make the rails wider, as wide as the original rails when
+ * we have the original size on in the window of the graphics; when I put the smaller ones, the rails and the 3D models
+ * will be smaller, to fit the smaller scale of CZTR"), the narrow one with the smaller ones (as CZTR's).
+ */
+bool ThreeDTrackWide()
+{
+	return _settings_game.vehicle.object_original_size && GetThreeDFigure("kolej_rovna_drevo_siroka") != nullptr;
+}
+
+/** How many times as wide across our track is as the narrow one (ThreeDTrackWide(); koleje.py WIDE). */
+double ThreeDTrackWidth()
+{
+	return ThreeDTrackWide() ? 1.2 : 1.0;
+}
+
+/** Half the width of our track's embankment now, metres (ThreeDTrackWidth()). */
+static double ThreeDTrackHalfM()
+{
+	return THREE_D_TRACK_HALF_M * ThreeDTrackWidth();
+}
+
+/** A piece of our track by its narrow one's name (koleje.py): the wide one's when the track is wide (ThreeDTrackWide()). */
+static std::string_view ThreeDTrackName(std::string_view narrow)
+{
+	static constexpr std::pair<std::string_view, std::string_view> WIDE[] = {
+		{"kolej_rovna_drevo", "kolej_rovna_drevo_siroka"}, {"kolej_rovna_beton", "kolej_rovna_beton_siroka"},
+		{"kolej_sikma_drevo", "kolej_sikma_drevo_siroka"}, {"kolej_sikma_beton", "kolej_sikma_beton_siroka"},
+		{"kolej_svah_drevo", "kolej_svah_drevo_siroka"}, {"kolej_svah_beton", "kolej_svah_beton_siroka"},
+		{"kolej_svah_oci_drevo", "kolej_svah_oci_drevo_siroka"}, {"kolej_svah_oci_beton", "kolej_svah_oci_beton_siroka"},
+		{"kolej_pul_drevo", "kolej_pul_drevo_siroka"}, {"kolej_pul_beton", "kolej_pul_beton_siroka"},
+		{"kolej_prejezd_drevo", "kolej_prejezd_drevo_siroka"}, {"kolej_prejezd_beton", "kolej_prejezd_beton_siroka"},
+	};
+	if (!ThreeDTrackWide()) return narrow;
+	for (const auto &[n, w] : WIDE) {
+		if (n == narrow) return GetThreeDFigure(w) != nullptr ? w : narrow;
+	}
+	return narrow;
+}
 
 /** How finely the centre line of an arc is followed where one stands on its embankment (ThreeDTrackStandOver()), world units: a metre. */
 static constexpr double THREE_D_ARC_STEP = OBJECT_UNITS_PER_METRE;
@@ -2679,7 +2720,7 @@ static constexpr double THREE_D_TRACK_STAND_M = 0.18;
 double ThreeDTrackStandOver(TileIndex tile, double lx, double ly)
 {
 	if (!ThreeDTrackShownOn(tile)) return 0.0;
-	const double half = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
+	const double half = ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE;
 	/* A round piece (the view from the eyes draws the round curves when they are on): along its arc. */
 	const bool round = RoundTrackEnabled() && IsRoundTrackTile(tile);
 	const double wx = TileX(tile) * TILE_SIZE + lx, wy = TileY(tile) * TILE_SIZE + ly;
@@ -2943,11 +2984,11 @@ static bool DrawThreeDTrack(TileInfo *ti, TrackBits track)
 	}
 
 	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
-	const std::string_view straight = concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo";
-	const std::string_view diagonal = concrete ? "kolej_sikma_beton" : "kolej_sikma_drevo";
-	const std::string_view slope = eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo");
+	const std::string_view straight = ThreeDTrackName(concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	const std::string_view diagonal = ThreeDTrackName(concrete ? "kolej_sikma_beton" : "kolej_sikma_drevo");
+	const std::string_view slope = ThreeDTrackName(eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo"));
 	const double ox = TileX(ti->tile) * TILE_SIZE, oy = TileY(ti->tile) * TILE_SIZE;
-	const double half = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
+	const double half = ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE;
 	const int rails = std::max(1, static_cast<int>(std::lround(THREE_D_RAIL_TOP_M * OBJECT_HEIGHT_PER_METRE)));
 
 	/* A piece with its middle at (x, y), from it to its end (ax, ay): in the turned view in its box (along it to its
@@ -3019,8 +3060,9 @@ double ThreeDRoadOverTrack(TileIndex tile, double x, double y)
 	const double mx = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, my = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
 	if (std::abs(along_x ? x - mx : y - my) / OBJECT_UNITS_PER_METRE > THREE_D_CROSSING_ROAD_HALF_M) return 0.0;
 	const double d = std::abs(along_x ? y - my : x - mx) / OBJECT_UNITS_PER_METRE;
-	if (d <= THREE_D_PANEL_HALF_M) return THREE_D_RAIL_TOP_M;
-	return THREE_D_RAIL_TOP_M * std::max(0.0, 1.0 - (d - THREE_D_PANEL_HALF_M) / THREE_D_RAMP_M);
+	const double panel = THREE_D_PANEL_HALF_M * ThreeDTrackWidth();
+	if (d <= panel) return THREE_D_RAIL_TOP_M;
+	return THREE_D_RAIL_TOP_M * std::max(0.0, 1.0 - (d - panel) / THREE_D_RAMP_M);
 }
 
 /** How high our track's box reaches on the map, units of height: to its rails' tops. */
@@ -3197,7 +3239,7 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	if (crossing && GetThreeDFigure("kolej_prejezd_drevo") == nullptr) return false;
 	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
 	const bool half = door != DiagDirection::Invalid;
-	const std::string_view name = crossing ? (concrete ? "kolej_prejezd_beton" : "kolej_prejezd_drevo") : half ? (concrete ? "kolej_pul_beton" : "kolej_pul_drevo") : (concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo");
+	const std::string_view name = ThreeDTrackName(crossing ? (concrete ? "kolej_prejezd_beton" : "kolej_prejezd_drevo") : half ? (concrete ? "kolej_pul_beton" : "kolej_pul_drevo") : (concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo"));
 	/* Its middle: the tile's, a depot's half way from its door to it. */
 	double mx = TILE_SIZE / 2.0, my = TILE_SIZE / 2.0;
 	if (half) {
@@ -3207,7 +3249,7 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	}
 	const double x = TileX(ti->tile) * TILE_SIZE + mx, y = TileY(ti->tile) * TILE_SIZE + my;
 	/* Across it its embankment, a crossing's panels and ramps. */
-	const double across = (crossing ? THREE_D_PANEL_HALF_M + THREE_D_RAMP_M : THREE_D_TRACK_HALF_M) * OBJECT_UNITS_PER_METRE;
+	const double across = (crossing ? THREE_D_PANEL_HALF_M * ThreeDTrackWidth() + THREE_D_RAMP_M : ThreeDTrackHalfM()) * OBJECT_UNITS_PER_METRE;
 	PutThreeDStraight(ti, name, axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, half ? TILE_SIZE / 4.0 : TILE_SIZE / 2.0, across, ti->z, ThreeDRailsTall());
 	/* A level crossing's AŽD posts with their lights and barriers; a station's track ending at its edge, its buffer stop. */
 	if (crossing) DrawThreeDCrossingPosts(ti, axis, eye);
@@ -3219,7 +3261,7 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 /** The straight piece of our track along a way (koleje.py kolej_rovna_*): wooden sleepers, concrete on an electrified railway. */
 static std::string_view ThreeDStraightName(RailType rt)
 {
-	return HasRailCatenary(rt) ? "kolej_rovna_beton" : "kolej_rovna_drevo";
+	return ThreeDTrackName(HasRailCatenary(rt) ? "kolej_rovna_beton" : "kolej_rovna_drevo");
 }
 
 /**
@@ -3244,14 +3286,14 @@ bool DrawThreeDTrackBridgeHead(const TileInfo *ti)
 	const int out_z = GetSlopePixelZ(static_cast<int>(ox + (axis == Axis::X ? out : TILE_SIZE / 2)), static_cast<int>(oy + (axis == Axis::X ? TILE_SIZE / 2 : out)), true);
 	const bool rises = bz - out_z >= static_cast<int>(TILE_HEIGHT) / 2;
 	const RailType rt = GetRailType(ti->tile);
-	const double x = ox + TILE_SIZE / 2.0, y = oy + TILE_SIZE / 2.0, across = THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE;
+	const double x = ox + TILE_SIZE / 2.0, y = oy + TILE_SIZE / 2.0, across = ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE;
 	/* The deck it lies on: its catenary's ground. */
 	TileInfo deck = *ti;
 	deck.tileh = SLOPE_FLAT;
 	deck.z = bz;
 	if (rises) {
 		const bool concrete = HasRailCatenary(rt);
-		const std::string_view name = eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo");
+		const std::string_view name = ThreeDTrackName(eye ? (concrete ? "kolej_svah_oci_beton" : "kolej_svah_oci_drevo") : (concrete ? "kolej_svah_beton" : "kolej_svah_drevo"));
 		/* Its middle half a level under the bridge, its +x up into it. */
 		const float facing = dir == DiagDirection::SW ? 0.0f : dir == DiagDirection::SE ? 90.0f : dir == DiagDirection::NE ? 180.0f : 270.0f;
 		PutThreeDStraight(ti, name, axis, x, y, bz - static_cast<int>(TILE_HEIGHT) / 2, facing, TILE_SIZE / 2.0, across, bz - static_cast<int>(TILE_HEIGHT), ThreeDRailsTall() + static_cast<int>(TILE_HEIGHT));
@@ -3278,7 +3320,7 @@ void DrawThreeDTrackOverBridge(const TileInfo *ti, TileIndex south)
 	const Axis axis = GetBridgeAxis(ti->tile);
 	const int bz = GetBridgePixelHeight(south);
 	const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
-	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(south)), axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE, bz, ThreeDRailsTall());
+	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(south)), axis, x, y, bz, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE, bz, ThreeDRailsTall());
 	if (!ThreeDCatenaryOn(south)) return;
 	TileInfo deck = *ti;
 	deck.tileh = SLOPE_FLAT;
@@ -3301,7 +3343,7 @@ bool DrawThreeDTrackTunnel(const TileInfo *ti)
 	const DiagDirection dir = GetTunnelBridgeDirection(ti->tile);
 	const Axis axis = DiagDirToAxis(dir);
 	const double x = TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, y = TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0;
-	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(ti->tile)), axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, THREE_D_TRACK_HALF_M * OBJECT_UNITS_PER_METRE, ti->z, ThreeDRailsTall());
+	PutThreeDStraight(ti, ThreeDStraightName(GetRailType(ti->tile)), axis, x, y, ti->z, axis == Axis::X ? 0.0f : 90.0f, TILE_SIZE / 2.0, ThreeDTrackHalfM() * OBJECT_UNITS_PER_METRE, ti->z, ThreeDRailsTall());
 	if (!ThreeDCatenaryOn(ti->tile)) return true;
 	TileInfo floor = *ti;
 	floor.tileh = SLOPE_FLAT;

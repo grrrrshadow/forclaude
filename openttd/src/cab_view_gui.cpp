@@ -243,8 +243,6 @@ void CabLetGo(const Vehicle *v)
 
 /** Down held so long with the vehicle stopped: it goes backwards (CabArrows::Drive()). */
 static constexpr int CAB_BACKWARDS_HOLD_MS = 800;
-/** Up pressed twice within this many milliseconds: full speed, on by itself (CabArrows::Drive()). */
-static constexpr int CAB_DOUBLE_TAP_MS = 400;
 /** Up pressed and the vehicle standing so long: why, into jizda.log (CabStandingRecord()). */
 static constexpr int CAB_STILL_MS = 2000;
 /** And no more lines than so many in it. */
@@ -387,17 +385,27 @@ void CabArrows::Drive(const Vehicle *v, DirectionKeys now, int ms)
 		/* Turning and an aircraft's height: about seven steps a second (a quarter turn held a second and a quarter);
 		 * the speed three. */
 		const int again = key == DirectionKey::Left || key == DirectionKey::Right || flying ? 150 : 300;
-		if (!this->held.Test(key) && key == DirectionKey::Up && !flying && !v->vehstatus.Test(VehState::Stopped) && this->up_tapped < CAB_DOUBLE_TAP_MS && !(backwards_too && v->cab_reverse)) {
-			/* Up the second time in a row: full speed (no limit), kept with the arrow let go, till braked. */
-			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
-			this->done = fmt::format("nahoru dvakrat: plna rychlost (omezeni {})", v->cab_speed_limit);
-			this->up_tapped = INT_MAX;
-			left = INT_MAX;
-		} else if (!this->held.Test(key)) {
+		if (!this->held.Test(key)) {
 			if (key == DirectionKey::Up) this->up_tapped = 0;
 			left = arrow(key) ? again + 150 : INT_MAX;
 		} else if (left != INT_MAX && (left -= ms) <= 0) {
 			left = arrow(key) ? again : INT_MAX;
+		}
+	}
+	/* Ctrl+Up (the first person's OnKeyPress()): full speed (no limit), kept with the arrow let go, till braked -- once
+	 * it goes (a stopped one is started by the Up held with Ctrl); not up in the air, nor backwards. Up pressed twice
+	 * no longer does it (the player's test9: "now it is under Ctrl and the arrow"). */
+	if (this->full_asked) {
+		if (v == nullptr || !mine || flying || (backwards_too && v->cab_reverse)) {
+			this->full_asked = false;
+		} else if (!v->vehstatus.Test(VehState::Stopped)) {
+			Command<Commands::SetCabSpeedLimit>::Post(v->tile, v->index, static_cast<uint16_t>(0));
+			this->done = fmt::format("ctrl nahoru: plna rychlost (omezeni {})", v->cab_speed_limit);
+			this->full_asked = false;
+			this->repeat_in[to_underlying(DirectionKey::Up)] = INT_MAX;
+		} else if (this->up_tapped > 1500) {
+			/* Stopped still a while after the Up pressed with Ctrl (which starts it): nothing asked any more. */
+			this->full_asked = false;
 		}
 	}
 	/* Down held with it stopped: backwards after a while; backwards and Down let go: it stops. */

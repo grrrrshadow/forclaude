@@ -11,6 +11,8 @@
 
 #include "stdafx.h"
 #include "three_d_objects.h"
+#include "three_d_witches.h"
+#include "object_base.h"
 #include "simtrains.h"
 #include "beamng.h"
 #include "industry.h"
@@ -67,6 +69,8 @@
 #include "timer/timer.h"
 #include "timer/timer_window.h"
 #include "timer/timer_game_calendar.h"
+#include "timer/timer_game_tick.h"
+#include "openttd.h"
 #include "settings_type.h"
 #include "error.h"
 #include "strings_func.h"
@@ -270,6 +274,9 @@ static std::array<std::optional<ThreeDStationPiece>, to_underlying(ThreeDStation
 static std::map<std::pair<int, int>, size_t> _three_d_depots;
 /** The lighthouses' objects (ReadLighthouse()), objects in _three_d_objects: one of them on each lighthouse's tile (GetThreeDLighthouse()). */
 static std::vector<size_t> _three_d_lighthouses;
+/** The rig ('test3d majak paprsek <sign> <phase>'): which way the beams turn and from where, against the reflector's. */
+int _lighthouse_beam_sign = 1;
+double _lighthouse_beam_phase = 0;
 /** The stations' objects (MakeStationObjects()) by the kind and the way (an axis, a bay's entrance): objects in _three_d_objects. */
 static std::map<std::pair<ThreeDStationKind, int>, size_t> _three_d_station_objects;
 
@@ -5166,9 +5173,13 @@ static bool LazyPending(const void *of);
  */
 const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete)
 {
-	/* The straight piece's measures (koleje.py), metres. */
-	static constexpr double BED_H = 0.12, BED_W = 3.4, SLEEPER_L = 2.6, SLEEPER_OVER = 0.06, PLATE = 0.02;
-	static constexpr double GAUGE = 1.435, RAIL_W = 0.072, RAIL_TALL = 0.172;
+	/* The straight piece's measures (koleje.py), metres; across as wide as the track is (ThreeDTrackWidth(): the wide
+	 * one with the vehicles at the original size), its pictures the same (the wide piece's are the narrow one's
+	 * stretched across). */
+	const double width = ThreeDTrackWidth();
+	static constexpr double BED_H = 0.12, SLEEPER_OVER = 0.06, PLATE = 0.02;
+	static constexpr double RAIL_W = 0.072, RAIL_TALL = 0.172;
+	const double BED_W = 3.4 * width, SLEEPER_L = 2.6 * width, GAUGE = 1.435 * width;
 	static constexpr int SLEEPERS_A_TILE = 25; // round(the tile's 14.84 m / 0.6)
 	static constexpr double TEX_W = 88, TEX_SIDE = 4; // the bed's picture: a side, the top (80), the other side
 	const double sleeper_w = concrete ? 0.28 : 0.26;
@@ -5187,6 +5198,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 	mix(tile.base());
 	mix(to_underlying(track));
 	mix(concrete ? 1 : 0);
+	mix(static_cast<uint64_t>(std::lround(width * 100)));
 	for (const RoundTrackPoint &p : line) {
 		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.x * 64))));
 		mix(static_cast<uint64_t>(static_cast<int64_t>(std::lround(p.y * 64))));
@@ -5236,7 +5248,7 @@ const ThreeDObject *GetThreeDTrackArc(TileIndex tile, Track track, bool concrete
 
 	auto made = std::make_unique<ThreeDObject>();
 	ThreeDObject &o = *made;
-	o.name = fmt::format("kolej_oblouk_{}_{}", tile.base(), to_underlying(track));
+	o.name = fmt::format("kolej_oblouk_{}_{}{}", tile.base(), to_underlying(track), width > 1.0 ? "_siroka" : "");
 	o.variants = 0; // no house's
 	o.tiles_x = o.tiles_y = 1;
 	/* Its pictures, all its other materials' (none its own): 1 the bed's, 2 the sleeper's, 3 the rails', 4 their heads'. */
@@ -5943,6 +5955,13 @@ static void TakeFlatFloors(ThreeDObject &obj)
 }
 
 /**
+ * The material of the two beams of a lighthouse's file under its reflector's night ("paprsek": cylinders 30 m long,
+ * see-through), left out: the player's test9, "it is a cylinder like a laser, a normal light widens and fades; the
+ * witches have a nice light they shine on the ground with" -- our cones of light instead (AddThreeDLighthouseLights()).
+ */
+static const std::vector<std::string> LIGHTHOUSE_MODEL_BEAMS{"paprsek"};
+
+/**
  * A lighthouse (the colleague's objekty/majaky, hra/3d/MAJAKY-PRO-HRU.md; the player, 10. 11.: "go do the lighthouses"):
  * its file an add-on without the node that turns ("otaceni" "uzel", the reflector with its night), its foot in the
  * middle of the tile as it is made (+x forward, the door to south-west); the reflector a figure of its own that turns
@@ -5975,6 +5994,11 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 	ThreeDObject obj;
 	obj.name = "majak/" + name;
 	obj.variants = 0;
+	/* Its beams of light from the lamp, turning with the reflector (AddThreeDLighthouseLights()). */
+	if (!spin_node.empty() && spin_z > 0) {
+		obj.beam_z_m = spin_z;
+		obj.beam_spin_ticks = std::clamp(static_cast<int>(std::lround(e.at("otaceni").value("otacka_s", 10.0) * 1000.0 / MILLISECONDS_PER_TICK)), 1, 100000);
+	}
 	obj.flat_floors = true;
 	const float middle = static_cast<float>(TILE_SIZE / OBJECT_UNITS_PER_METRE / 2.0);
 	ThreeDObjectFigure itself;
@@ -6023,6 +6047,8 @@ static void ReadLighthouse(const nlohmann::json &e, const std::string &folder)
 			GlbReadOptions lo;
 			lo.all_nodes = true;
 			lo.only_node = spin_night;
+			/* Without its beams (LIGHTHOUSE_MODEL_BEAMS: our cones instead), its middle the lenses' glow's. */
+			lo.skip_materials = &LIGHTHOUSE_MODEL_BEAMS;
 			if (ReadGlbMesh(path, lit, lo) && lit.pos.size() >= 3) {
 				float low = lit.pos[2], high = lit.pos[2];
 				for (size_t i = 2; i < lit.pos.size(); i += 3) {
@@ -6747,6 +6773,7 @@ static void ReadThreeDVehicleObjects()
 						lit.name = e.value("jmeno", e.at("soubor").get<std::string>()) + "/reflektor_noc";
 						lit.thing = true;
 						lit.only_node = o.at("noc_uzel").get<std::string>();
+						lit.skip_materials = LIGHTHOUSE_MODEL_BEAMS;
 						lit.to_ground = true;
 						lit.spin_ticks = fig.spin_ticks;
 						std::copy(std::begin(fig.spin_axis), std::end(fig.spin_axis), std::begin(lit.spin_axis));
@@ -12599,6 +12626,136 @@ const ThreeDObject *GetThreeDLighthouse(TileIndex tile)
 	if (!_three_d_objects_read || _three_d_lighthouses.empty() || !IsValidTile(tile) || !IsTileType(tile, TileType::Object) || GetObjectType(tile) != OBJECT_LIGHTHOUSE) return nullptr;
 	return &_three_d_objects[_three_d_lighthouses[(TileX(tile) * 7 + TileY(tile) * 13) % _three_d_lighthouses.size()]];
 }
+
+/** How many steps a turn of a lighthouse's beams on the map goes in: as its reflector's picture (SPIN_STEPS of three_d_vehicle_object.cpp). */
+static constexpr int LIGHTHOUSE_BEAM_STEPS = 24;
+
+/** Where a lighthouse's reflector is in its turn on the map (LIGHTHOUSE_BEAM_STEPS), by the game's tick. */
+static int LighthouseBeamStep(const ThreeDObject &lh)
+{
+	return static_cast<int>((TimerGameTick::counter % lh.beam_spin_ticks) * LIGHTHOUSE_BEAM_STEPS / lh.beam_spin_ticks);
+}
+
+/**
+ * The two beams of a lighthouse turned so far (AddThreeDLighthouseLights()).
+ * @param turn radians the reflector has turned from its file's way
+ */
+static void LighthouseBeams(TileIndex tile, const ThreeDObject &lh, double turn, std::vector<ThreeDWitchLight> &out)
+{
+	static constexpr double REACH_M = 160.0;      ///< how far each beam shines
+	static constexpr double HALF_ANGLE_DEG = 6.0; ///< half the angle of its cone
+	static constexpr double DOWN_DEG = 9.0;       ///< how far down from the level it points: it falls on the land a hundred metres off
+	static constexpr double OUT_M = 4.2;          ///< where it starts, out from the lamp: past the gallery's railing
+	static constexpr double OVER_M = 0.4;         ///< and over the lamp
+	const Colour colour(255, 237, 178);
+	const double down = std::tan(DOWN_DEG * M_PI / 180.0), len = std::sqrt(1.0 + down * down);
+	const double cx = TileX(tile) * TILE_SIZE + TILE_SIZE / 2.0, cy = TileY(tile) * TILE_SIZE + TILE_SIZE / 2.0;
+	const double foot = GetTileMaxPixelZ(tile);
+	for (const double side : {0.0, M_PI}) {
+		const double a = _lighthouse_beam_sign * turn + side + _lighthouse_beam_phase;
+		ThreeDWitchLight &l = out.emplace_back();
+		l.torch = true;
+		l.dx = std::cos(a) / len;
+		l.dy = std::sin(a) / len;
+		l.dz = -down / len;
+		l.x = cx + std::cos(a) * OUT_M * OBJECT_UNITS_PER_METRE;
+		l.y = cy + std::sin(a) * OUT_M * OBJECT_UNITS_PER_METRE;
+		l.z = foot + (lh.beam_z_m + OVER_M) * OBJECT_HEIGHT_PER_METRE;
+		l.reach = REACH_M * OBJECT_UNITS_PER_METRE;
+		l.half_angle = HALF_ANGLE_DEG * M_PI / 180.0;
+		l.colour = colour;
+		/* Where it falls on the land, within its reach (as a witch's torch, LightsOf()). */
+		const double over = (l.z - FirstPersonGroundZ(l.x, l.y)) / OBJECT_HEIGHT_PER_METRE * OBJECT_UNITS_PER_METRE;
+		const double ground = over / down * len;
+		l.ground = over > 0 && ground < l.reach ? ground : 0;
+	}
+}
+
+/**
+ * The beams of the lighthouses at night (the player's test9: "the lighthouses have a silly light, put a cone there as the
+ * witches shine on the ground, the light could fade in the distance", "it shines on the concrete railing, put the light a
+ * bit higher", "it is a cylinder like a laser, a normal light widens and fades"): two cones from each lamp, opposite,
+ * turning with its reflector, a little down from the level so that each falls on the land a hundred metres off; as the
+ * witches' torches (ThreeDWitchLight), drawn on the map and from the eyes as theirs are. Each starts out past the
+ * lantern's gallery, a little over the lamp, so that it does not light its railing. On the map in steps as its
+ * reflector's picture turns (LIGHTHOUSE_BEAM_STEPS; the map drawn again where they were and are at each step,
+ * _lighthouse_beams_timer), from the eyes smoothly as its reflector there.
+ * @param eye of the view from an eye, else of the map
+ * @param out the lights, the witches' and the saucers' (GetThreeDWitchLights())
+ */
+void AddThreeDLighthouseLights(bool eye, std::vector<ThreeDWitchLight> &out)
+{
+	if (!IsNightNow() || !_three_d_objects_read || _three_d_lighthouses.empty()) return;
+	for (const Object *o : Object::Iterate()) {
+		if (o->type != OBJECT_LIGHTHOUSE) continue;
+		const TileIndex tile = o->location.tile;
+		const ThreeDObject *lh = GetThreeDLighthouse(tile);
+		if (lh == nullptr || lh->beam_z_m < 0 || lh->beam_spin_ticks <= 0) continue;
+		/* Its reflector's turn now (the figure's, viewport.cpp and three_d_vehicle_object.cpp: the same tick), the
+		 * model's beams along its x. */
+		const double turn = eye ? (TimerGameTick::counter % lh->beam_spin_ticks) * 2 * M_PI / lh->beam_spin_ticks : LighthouseBeamStep(*lh) * 2 * M_PI / LIGHTHOUSE_BEAM_STEPS;
+		LighthouseBeams(tile, *lh, turn, out);
+	}
+}
+
+/** The map drawn again where a lighthouse's beams are at a step of their turn (as a witch's, MarkDirty() of three_d_witches.cpp). */
+static void MarkLighthouseBeamsDirty(TileIndex tile, const ThreeDObject &lh, int step)
+{
+	std::vector<ThreeDWitchLight> beams;
+	LighthouseBeams(tile, lh, step * 2 * M_PI / LIGHTHOUSE_BEAM_STEPS, beams);
+	const double up = OBJECT_HEIGHT_PER_METRE / OBJECT_UNITS_PER_METRE;
+	for (const ThreeDWitchLight &l : beams) {
+		const double len = l.ground > 0 ? l.ground : l.reach, r = len * std::tan(l.half_angle) * 1.3 + 2;
+		const double ex = l.x + l.dx * len, ey = l.y + l.dy * len, ez = l.z + l.dz * len * up;
+		DirtyPlace place;
+		place.kind = DirtyPlace::Kind::Box;
+		place.mover = true;
+		place.x0 = std::min(l.x - 2, ex - r);
+		place.x1 = std::max(l.x + 2, ex + r);
+		place.y0 = std::min(l.y - 2, ey - r);
+		place.y1 = std::max(l.y + 2, ey + r);
+		place.z0 = std::max(0.0, std::min(l.z, ez) - r * up);
+		place.z1 = std::max(l.z, ez) + 2 * up;
+		DirtyPlaceScope scope(place);
+		int left = INT_MAX, top = INT_MAX, right = INT_MIN, bottom = INT_MIN;
+		for (double x : {place.x0, place.x1}) {
+			for (double y : {place.y0, place.y1}) {
+				for (double z : {place.z0, place.z1}) {
+					const Point pt = RemapCoords(static_cast<int>(x), static_cast<int>(y), static_cast<int>(z));
+					left = std::min(left, pt.x);
+					right = std::max(right, pt.x);
+					top = std::min(top, pt.y);
+					bottom = std::max(bottom, pt.y);
+				}
+			}
+		}
+		MarkAllViewportsDirty(left - 2 * ZOOM_BASE, top - 2 * ZOOM_BASE, right + 2 * ZOOM_BASE, bottom + 2 * ZOOM_BASE);
+	}
+}
+
+/** Each lighthouse's step of its beams on the map last drawn (_lighthouse_beams_timer); none by day. */
+static std::map<TileIndex, int> _lighthouse_beam_steps;
+
+/** Every tick: where a lighthouse's beams went on a step, the map drawn again where they were and where they are. */
+static const IntervalTimer<TimerGameTick> _lighthouse_beams_timer({TimerGameTick::Priority::None, 1}, [](auto) {
+	const bool on = _game_mode == GameMode::Normal && IsNightNow() && _three_d_objects_read && !_three_d_lighthouses.empty();
+	if (!on) {
+		_lighthouse_beam_steps.clear();
+		return;
+	}
+	for (const Object *o : Object::Iterate()) {
+		if (o->type != OBJECT_LIGHTHOUSE) continue;
+		const TileIndex tile = o->location.tile;
+		const ThreeDObject *lh = GetThreeDLighthouse(tile);
+		if (lh == nullptr || lh->beam_z_m < 0 || lh->beam_spin_ticks <= 0) continue;
+		const int step = LighthouseBeamStep(*lh);
+		auto [it, added] = _lighthouse_beam_steps.try_emplace(tile, step);
+		if (!added && it->second == step) continue;
+		if (!added) MarkLighthouseBeamsDirty(tile, *lh, it->second);
+		MarkLighthouseBeamsDirty(tile, *lh, step);
+		it->second = step;
+	}
+});
 
 const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin)
 {

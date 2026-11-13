@@ -14765,8 +14765,10 @@ static void CabDrawTube(const CabCanvas &cv, const CabEye &eye, const CabTunnel 
 	const bool concrete = ours && HasRailCatenary(GetRailType(t.a));
 	const bool wired = concrete && !_settings_game.vehicle.disable_elrails && ThreeDGroupShown(ThreeDGroup::Catenary);
 	const double upm = OBJECT_UNITS_PER_METRE, hpm = OBJECT_HEIGHT_PER_METRE;
-	const double bed_c = 1.7 * upm, bed_h = 0.12 * hpm, sleeper_l = 1.3 * upm, sleeper_w = (concrete ? 0.14 : 0.13) * upm, sleeper_top = 0.18 * hpm;
-	const double rail_c = (1.435 / 2 + 0.036) * upm, rail_w = 0.036 * upm, rail_foot = 0.2 * hpm, rail_top = 0.372 * hpm, wire_z = 4.4 * hpm;
+	/* As wide across as our track is (ThreeDTrackWidth(): the wide one with the vehicles at the original size). */
+	const double wide = ours ? ThreeDTrackWidth() : 1.0;
+	const double bed_c = 1.7 * wide * upm, bed_h = 0.12 * hpm, sleeper_l = 1.3 * wide * upm, sleeper_w = (concrete ? 0.14 : 0.13) * upm, sleeper_top = 0.18 * hpm;
+	const double rail_c = (1.435 * wide / 2 + 0.036) * upm, rail_w = 0.036 * upm, rail_foot = 0.2 * hpm, rail_top = 0.372 * hpm, wire_z = 4.4 * hpm;
 	const Colour ballast(112, 106, 98), sleeper = concrete ? Colour(168, 166, 160) : Colour(70, 53, 41), rail_side(97, 66, 48), contact(92, 70, 52);
 	/* Its walls of one material the whole tunnel (CabTunnelWallTexture()), by its ends; the rig's when it asks. */
 	const uint32_t which = EyeWallHash(static_cast<uint32_t>(std::min(t.a.base(), t.b.base())) * 2654435761u + 0x7E11u);
@@ -16919,7 +16921,7 @@ static bool WayKeepsOff(TileIndex tile, Slope slope, std::vector<WayPiece> &way)
 		return a == Axis::X ? !y_axis : !x_axis;
 	};
 	auto track = [&](Track t) {
-		const double keep = CAB_WAY_TRACK_HALF + CAB_TUFT_HALF;
+		const double keep = CAB_WAY_TRACK_HALF * ThreeDTrackWidth() + CAB_TUFT_HALF;
 		switch (t) {
 			case Track::X: way.push_back({0, m, h, m, keep}); break;
 			case Track::Y: way.push_back({m, 0, m, h, keep}); break;
@@ -17397,9 +17399,13 @@ static std::vector<EyeGlow> CollectEyeNightGlows(const CabEye &eye, const Vehicl
 		}
 		glow(l.x, l.y, l.z, 0.25, l.colour, 1.0, 1.0, true);
 		const double len = l.ground > 0 ? l.ground : l.reach, spread = std::tan(l.half_angle);
-		for (int k = 1; k <= 16; k++) {
-			const double s = len * k / 16, r = std::max(0.2, s * spread);
-			glow(l.x + l.dx * s, l.y + l.dy * s, l.z + l.dz * s * up, r, l.colour, 0.1 * (1.0 - k / 18.0), 1.0, true, r);
+		/* A long beam (a lighthouse's, AddThreeDLighthouseLights()) more glows, closer where it is narrow, as bright in
+		 * all: else a row of beads (the player's test9). A witch's as ever. */
+		const int n = std::clamp(static_cast<int>(len / OBJECT_UNITS_PER_METRE / 3.0), 16, 64);
+		const bool long_beam = n > 16;
+		for (int k = 1; k <= n; k++) {
+			const double f = static_cast<double>(k) / n, s = len * (long_beam ? f * f : f), r = std::max(0.2, s * spread);
+			glow(l.x + l.dx * s, l.y + l.dy * s, l.z + l.dz * s * up, r, l.colour, 0.1 * 16.0 / n * (1.0 - f * 16.0 / 18.0), 1.0, true, r);
 		}
 		if (l.ground > 0) glow(l.x + l.dx * len, l.y + l.dy * len, l.z + l.dz * len * up, len * spread * 1.2, l.colour, 0.45, 0.4, true, len * spread * 1.2);
 	}

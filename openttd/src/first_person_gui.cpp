@@ -117,8 +117,6 @@ static constexpr int FIRST_PERSON_SIDESTEPS = 6;
 /** How often it moves and the picture is made, milliseconds. */
 static constexpr int FIRST_PERSON_TICK_MS = 40;
 static constexpr double FIRST_PERSON_DIVE_M_S = 1.0; ///< a submarine goes up or down so fast, metres a second (DiveTowards())
-/** An arrow pressed twice within this many seconds: the walker walks on by itself (the player, 21. 10.). */
-static constexpr double FIRST_PERSON_DOUBLE_TAP_S = 0.4;
 /** How long taking a weapon out or putting it away takes, and a swing of it, seconds. */
 static constexpr double FIRST_PERSON_DRAW_S = 0.35;
 static constexpr double FIRST_PERSON_SWING_S = 0.6;
@@ -775,14 +773,13 @@ struct FirstPersonWindow : Window {
 	bool full = false;                    ///< over the whole screen, between the toolbar and the status bar
 	Rect before_full{};                   ///< where it was before that
 	bool running = false;                 ///< runs instead of walking (also while Shift is held)
-	int walk_on = 0;                      ///< walks on by itself, 1 ahead, -1 back (Up or Down pressed twice), 0 not
+	int walk_on = 0;                      ///< walks on by itself, 1 ahead, -1 back (Ctrl+Up, Ctrl+Down), 0 not
 	bool walk_held[3] = {};               ///< Up, Down, Left or Right held at the last step (their presses, Walk())
 	double turn_held = 0;                 ///< how long Left or Right has been held, seconds, for the turn speed's run-up
 	double seen_heading = 0;              ///< the heading and the pitch at the last picture, for the look ahead (Step())
 	double seen_pitch = 0;
 	double look_ahead_heading = 0;        ///< the look ahead the picture is made with (Step()), radians
 	double look_ahead_pitch = 0;
-	double walk_tapped[2] = {FIRST_PERSON_DOUBLE_TAP_S, FIRST_PERSON_DOUBLE_TAP_S}; ///< seconds since Up, Down was pressed
 	bool weapon_out = false;              ///< the weapon taken out (F, or its key), in the hand
 	int weapon = 0;                       ///< the weapon in the hand or put away (_first_person_weapons)
 	int wanted = 0;                       ///< the weapon asked for (its key): the one in the hand is put away first
@@ -1714,41 +1711,29 @@ struct FirstPersonWindow : Window {
 	}
 
 	/**
-	 * Up or Down pressed twice in a row: the walker walks on that way without the key held, till Up or Down is pressed
-	 * again (the player, 21. 10.: "when I press the arrow twice, I walk and do not have to hold it"), or Left or Right
-	 * (the player, 22. 10.: "left, right turn the walking without the arrow off").
+	 * Walking on by itself (Ctrl+Up, Ctrl+Down: OnKeyPress()) stops when Up or Down is pressed again, or Left or Right
+	 * (the player, 22. 10.: "left, right turn the walking without the arrow off"). Up or Down pressed twice no longer
+	 * starts it (the player's test9: "now it is under Ctrl and the arrow, pressing the arrow twice is not needed").
 	 * @param up Up (or W) held now
 	 * @param down Down (or S) held now
 	 * @param side Left or Right (or A or D) held now
-	 * @param dt seconds since the last step
 	 */
-	void WalkOn(bool up, bool down, bool side, double dt)
+	void WalkOn(bool up, bool down, bool side)
 	{
 		if (side && !this->walk_held[2]) this->walk_on = 0;
 		this->walk_held[2] = side;
 		const bool held[2] = {up, down};
 		for (int k = 0; k < 2; k++) {
-			this->walk_tapped[k] = std::min(this->walk_tapped[k] + dt, FIRST_PERSON_DOUBLE_TAP_S);
 			const bool pressed = held[k] && !this->walk_held[k];
 			this->walk_held[k] = held[k];
-			if (!pressed) continue;
-			if (this->walk_on != 0) {
-				/* Walking on: a press stops it, and is not the first of two again. */
-				this->walk_on = 0;
-				this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
-			} else if (this->walk_tapped[k] < FIRST_PERSON_DOUBLE_TAP_S) {
-				this->walk_on = k == 0 ? 1 : -1;
-				this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
-			} else {
-				this->walk_tapped[k] = 0;
-			}
+			if (pressed) this->walk_on = 0;
 		}
 	}
 
 	/**
 	 * A step of the walker: the arrows held while they are its window's (ArrowsWindow(): the player, 17. 10.: "the
 	 * arrows always to that window, not to the map"), W, A, S and D while its window has the focus; on by itself after
-	 * Up or Down pressed twice (WalkOn()).
+	 * Ctrl+Up or Ctrl+Down (WalkOn()).
 	 */
 	void Walk(double dt)
 	{
@@ -1757,7 +1742,7 @@ struct FirstPersonWindow : Window {
 		/* The keys not the walker's any more (the map or another window has them): it stops. */
 		if (ArrowsWindow() != this && _focused_window != this) this->walk_on = 0;
 		this->WalkOn(arrows.Test(DirectionKey::Up) || wasd.Test(DirectionKey::Up), arrows.Test(DirectionKey::Down) || wasd.Test(DirectionKey::Down),
-				arrows.Any({DirectionKey::Left, DirectionKey::Right}) || wasd.Any({DirectionKey::Left, DirectionKey::Right}), dt);
+				arrows.Any({DirectionKey::Left, DirectionKey::Right}) || wasd.Any({DirectionKey::Left, DirectionKey::Right}));
 		if (arrows.Any({DirectionKey::Left, DirectionKey::Right})) {
 			this->turn_held = std::min(this->turn_held + dt, FIRST_PERSON_TURN_RAMP_S);
 		} else {
@@ -2619,15 +2604,19 @@ struct FirstPersonWindow : Window {
 			this->Close();
 			return EventState::Handled;
 		}
-		/* Ctrl+Up, Ctrl+Down: walks on that way without the key held, as Up or Down pressed twice (WalkOn()) -- told by
-		 * the key's own press, not by how it is held at the next step: on the player's phone the steps were too far
-		 * apart for two quick presses to be seen (#300, 25. 10.: "pressing the arrow twice still does not walk on, let us
-		 * try Ctrl+Up"). The arrow held with it is not a press that stops it again. */
+		/* Ctrl+Up, Ctrl+Down: walks on that way without the key held (WalkOn()) -- told by the key's own press, not by
+		 * how it is held at the next step: on the player's phone the steps were too far apart for two quick presses to be
+		 * seen (#300, 25. 10.: "let us try Ctrl+Up"). The arrow held with it is not a press that stops it again. Driving,
+		 * Ctrl+Up: full speed, on by itself (CabArrows::full_asked; the player's test9: "or driving, so that the car goes
+		 * on"). */
 		if (keycode == (WKC_CTRL | WKC_UP) || keycode == (WKC_CTRL | WKC_DOWN)) {
 			const int k = keycode == (WKC_CTRL | WKC_UP) ? 0 : 1;
+			if (this->Riding() != nullptr) {
+				if (k == 0) this->arrows.full_asked = true;
+				return EventState::Handled;
+			}
 			this->walk_on = k == 0 ? 1 : -1;
 			this->walk_held[k] = true;
-			this->walk_tapped[k] = FIRST_PERSON_DOUBLE_TAP_S;
 			return EventState::Handled;
 		}
 		/* In a train of MSTS with the keys of MSTS chosen: its desk's keys first -- W and S its reverser, A and D its

@@ -1464,9 +1464,21 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 		 * as from the eyes: the tunnel's ground sprites -- the hill and the portal's foot drawn into them for the original
 		 * view -- laid flat in the turned view were a grey smear where the road goes in. A tunnel of trams alone as it was. */
 		const bool road_mouth = transport_type == TransportType::Road && GetRoadTypeRoad(ti->tile) != INVALID_ROADTYPE && DrawThreeDTunnelEntrance(ti, false);
+		/* A railway tunnel's the same stones with our 3D track into it (the player's test9: "the railway tunnels have no
+		 * picture of the entrance from above at all, they have the original sprites"; from the eyes the same portal,
+		 * CabDrawPortal()): the ground under the track flat, its hill and portal's foot of the original view left out as
+		 * the road's; our 3D track in it, or the game's straight track's sprite (3D track off from above). Not with a rail
+		 * set's own portal. */
+		const bool rail_mouth = transport_type == TransportType::Rail && railtype_overlay == 0 && DrawThreeDTunnelEntrance(ti, false);
+		/* The road's ground a straight road's also from the eyes, where the portal is the eyes' own (CabDrawPortal()):
+		 * a road set's tunnel ground (CZTR's) has the hill and the portal's foot drawn into it for the original view, and
+		 * laid flat from the eyes it was a wedge of grass between the road outside and the road in the tunnel, on the
+		 * side its picture has the hill (the player's test9: "only north-east to south-west, only from one side, there is
+		 * a gap between the road in the tunnel and the road outside"). */
+		const bool flat_road = transport_type == TransportType::Road && GetRoadTypeRoad(ti->tile) != INVALID_ROADTYPE && (road_mouth || ViewportDrawingEye());
 		if (ship_mouth) {
 			/* Drawn: the wall's helper boxes still sort what is beside the tunnel. */
-		} else if (road_mouth) {
+		} else if (flat_road) {
 			/* The road's own ground (DrawRoadOverlays() below lays a road set's surface over it), as a straight road's. */
 			const RoadTypeInfo *rti = GetRoadTypeInfo(GetRoadTypeRoad(ti->tile));
 			const bool snow = HasTunnelBridgeSnowOrDesert(ti->tile);
@@ -1475,6 +1487,20 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 				DrawGroundSprite(snow ? SPR_FLAT_SNOW_DESERT_TILE : SPR_FLAT_GRASS_TILE, PAL_NONE);
 			} else {
 				DrawGroundSprite(SPR_ROAD_Y + axis_offset + (snow ? 19 : 0), PAL_NONE);
+			}
+		} else if (rail_mouth) {
+			const RailTypeInfo *rti = GetRailTypeInfo(GetRailType(ti->tile));
+			const bool snow = HasTunnelBridgeSnowOrDesert(ti->tile);
+			const bool along_x = DiagDirToAxis(tunnelbridge_direction) == Axis::X;
+			if (three_d || rti->UsesOverlay()) {
+				DrawGroundSprite(snow ? SPR_FLAT_SNOW_DESERT_TILE : SPR_FLAT_GRASS_TILE, PAL_NONE);
+				if (!three_d) {
+					const SpriteID overlay = GetCustomRailSprite(rti, ti->tile, RailSpriteType::Overlay);
+					if (overlay != 0) DrawGroundSprite(overlay + (along_x ? RTO_X : RTO_Y), PAL_NONE);
+				}
+			} else {
+				/* The plain rail tile's straight track with its ground (DrawTrackBits()), on snow as there (snow_offset). */
+				DrawGroundSprite(rti->base_sprites.track_y + (along_x ? 1 : 0) + (snow ? rti->snow_offset : 0), PAL_NONE);
 			}
 		} else if (three_d && railtype_overlay == 0) {
 			DrawGroundSprite(SPR_RAILTYPE_TUNNEL_BASE + (HasTunnelBridgeSnowOrDesert(ti->tile) ? 8 : 0) + to_underlying(tunnelbridge_direction) * 2, PAL_NONE);
@@ -1492,7 +1518,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 
 			/* Road underlay takes precedence over tram; with the mouth in 3D a straight road's (above), not the tunnel's. */
 			if (road_rti != nullptr) {
-				if (road_rti->UsesOverlay() && !road_mouth) {
+				if (road_rti->UsesOverlay() && !flat_road) {
 					SpriteID ground = GetCustomRoadSprite(road_rti, ti->tile, RoadSpriteType::Tunnel);
 					if (ground != 0) {
 						DrawGroundSprite(ground + to_underlying(tunnelbridge_direction), PAL_NONE);
@@ -1551,7 +1577,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 				}
 			}
 
-			if (HasRailCatenaryDrawn(GetRailType(ti->tile))) {
+			if (HasRailCatenaryDrawn(GetRailType(ti->tile)) && !(rail_mouth && three_d)) {
 				/* Maybe draw pylons on the entry side */
 				DrawRailCatenary(ti);
 
@@ -1565,7 +1591,7 @@ static void DrawTile_TunnelBridge(TileInfo *ti)
 		if (railtype_overlay != 0 && !catenary) StartSpriteCombine();
 
 		/* A road tunnel's mouth in 3D in the turned view (above): its portal's sprite left out. */
-		if (!ship_mouth && !road_mouth) AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
+		if (!ship_mouth && !road_mouth && !rail_mouth) AddSortableSpriteToDraw(image + 1, PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 		/* Draw railtype tunnel portal overlay if defined. */
 		if (railtype_overlay != 0) AddSortableSpriteToDraw(railtype_overlay + to_underlying(tunnelbridge_direction), PAL_NONE, *ti, roof_bounds[tunnelbridge_direction], false);
 

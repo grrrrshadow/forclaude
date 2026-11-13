@@ -335,6 +335,8 @@ struct ThreeDObject {
 	std::vector<std::array<float, 5>> walkways; ///< a ship depot's ("lavky", ReadDepot()): each its x and y from, x and y to and its height, world units from the depot's north corner, turned with it
 	bool is_interior = false;                 ///< an interior: read with all its nodes, its floors ("podlaha") walked on, nothing solid but its walls
 	bool depot = false;                       ///< a depot (MakeDepots()): its scene read whole and solid, without the wings of its doors (its gates open)
+	double beam_z_m = -1;                     ///< a lighthouse's: how high its lamp is over its foot, metres (its beams, AddThreeDLighthouseLights()); -1 none
+	int beam_spin_ticks = 0;                  ///< a lighthouse's: ticks of a turn of its reflector, its beams with it
 	bool no_see_through = false;              ///< read without its see-through triangles (a material "BLEND", a lighthouse's lantern glass): the buildings are drawn opaque, the reflector in it hidden
 	bool flat_floors = false;                 ///< its flat faces looking up its floors (a lighthouse's stairs, landings, gallery and roof, TakeFlatFloors()): walked on (FloorAt()), in no one's way
 	int8_t scene_turns = -1;                  ///< a part of the forest with a clearing: its whole scene read, turned by so many quarter turns (ReadGlbScene())
@@ -1504,6 +1506,10 @@ const ThreeDObject *GetThreeDDepot(TileIndex tile, TileIndex &origin);
  * @return nullptr: another tile, or the sets have no lighthouse
  */
 const ThreeDObject *GetThreeDLighthouse(TileIndex tile);
+bool ThreeDTrackWide();
+double ThreeDTrackWidth();
+struct ThreeDWitchLight;
+void AddThreeDLighthouseLights(bool eye, std::vector<ThreeDWitchLight> &out);
 /**
  * The wing of a door of a depot as it stands now (GetThreeDDepot()): a gate open out while a vehicle is on the depot's
  * tile and not hidden in it (coming in, going out), else shut; a door for people always shut (the player, 10. 11.:

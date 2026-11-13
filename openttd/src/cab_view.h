@@ -121,7 +121,8 @@ struct CabArrows {
 	std::array<int, 4> repeat_in{}; ///< for each arrow held, milliseconds till it does it again
 	bool route = true;              ///< it goes its route (CabToggleRoute()): an arrow pressed takes the wheel
 	int free_wait = 0;              ///< milliseconds till the wheel is taken again, as the command takes its time
-	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (twice in a row: full speed, Drive())
+	int up_tapped = INT_MAX;        ///< milliseconds since Up was last pressed (its record of standing, Drive())
+	bool full_asked = false;        ///< Ctrl+Up pressed: full speed, kept with the arrow let go, till braked (Drive())
 	int still_ms = 0;               ///< milliseconds it has stood since Up was pressed (its record, jizda.log)
 	bool still_told = false;        ///< that standing written down, till it moves
 	int down_still_ms = 0;          ///< milliseconds Down has been held with the vehicle stopped (long enough: backwards)

@@ -10052,6 +10052,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 			IConsolePrint(CC_DEFAULT, "test3d: houby:{}", shrooms);
 		}
 		IConsolePrint(CC_DEFAULT, "test3d: {}", DescribeThreeDAnimals());
+	} else if (what == "majak") {
+		/* 'majak paprsek <znamenko> <stupnu>': which way the lighthouses' beams turn (1 or -1) and from where (degrees),
+		 * against the reflector's (AddThreeDLighthouseLights()); the beams now. */
+		extern int _lighthouse_beam_sign;
+		extern double _lighthouse_beam_phase;
+		if (argv.size() > 4 && argv[2] == "paprsek") {
+			_lighthouse_beam_sign = number(3).value_or(1) < 0 ? -1 : 1;
+			_lighthouse_beam_phase = number(4).value_or(0) * M_PI / 180.0;
+		}
+		IConsolePrint(CC_DEFAULT, "test3d: majak paprsek {} {:.0f}; {}", _lighthouse_beam_sign, _lighthouse_beam_phase * 180.0 / M_PI, DescribeThreeDWitches());
 	} else if (what == "carodejnice") {
 		/* 'carodejnice [<x> <y> <stupnu> [jmeno]]': the witches flying (three_d_witches.h, only at night); with a tile one
 		 * sent from there, flying so many degrees from +x towards +y. 'carodejnice tady <stupnu> [jmeno]': one sent from
@@ -11636,6 +11646,43 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		extern std::string RigThreeDDepotMap(TileIndex tile, double feet_m);
 		const std::string m = RigThreeDDepotMap(TileXY(*x, *y), (argv.size() > 4 ? number(4).value_or(0) : 0) / 100.0);
 		for (const auto line : std::views::split(std::string_view(m), std::string_view("\n"))) IConsolePrint(CC_DEFAULT, "test3d: depomapa {}", std::string_view(line.begin(), line.end()));
+	} else if (what == "tunelyxy" && argv.size() > 3) {
+		/* 'tunelyxy <x> <y>': a hill a level high (x+4..x+8, y+4..y+8), through it a road tunnel and a railway tunnel along
+		 * x (at y+5, y+7) and along y (at x+5, x+7), a road or a track two tiles before and after each mouth (the player's
+		 * test9: "the road tunnel north-east to south-west, the first tile on both sides", "the railway tunnels have the
+		 * original sprites from above"). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		if (Company::GetIfValid(_local_company) == nullptr) {
+			extern Company *DoStartupNewCompany(bool is_ai, CompanyID company);
+			Company *made = DoStartupNewCompany(false, CompanyID::Invalid());
+			if (made != nullptr) SetLocalCompany(made->index);
+		}
+		Command<Commands::MoneyCheat>::Do(DoCommandFlag::Execute, 100000000);
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		auto at = [&](int dx, int dy) { return TileXY(*x + dx, *y + dy); };
+		auto said = [](std::string_view what, const CommandCost &r) { IConsolePrint(r.Succeeded() ? CC_DEFAULT : CC_ERROR, "test3d: tunelyxy {}: {}", what, r.Succeeded() ? std::string("postaveno") : RefusalReason(r)); };
+		Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(12, 12), at(0, 0), false, LevelMode::Level);
+		said("kopec", std::get<0>(Command<Commands::LevelLand>::Do(DoCommandFlag::Execute, at(8, 8), at(4, 4), false, LevelMode::Raise)));
+		for (int k = 0; k < 2; k++) {
+			const bool rail = k == 1;
+			const int c = rail ? 7 : 5;
+			for (const Axis axis : {Axis::X, Axis::Y}) {
+				auto t = [&](int along) { return axis == Axis::X ? at(along, c) : at(c, along); };
+				said(rail ? "zeleznicni tunel" : "silnicni tunel", Command<Commands::BuildTunnel>::Do(DoCommandFlag::Execute, t(3), rail ? TransportType::Rail : TransportType::Road, rail ? RAILTYPE_RAIL : INVALID_RAILTYPE, rail ? INVALID_ROADTYPE : ROADTYPE_ROAD));
+				for (int along : {1, 2, 9, 10}) {
+					if (rail) {
+						Command<Commands::BuildRail>::Do(DoCommandFlag::Execute, t(along), RAILTYPE_RAIL, axis == Axis::X ? Track::X : Track::Y, false);
+					} else {
+						Command<Commands::BuildRoad>::Do(DoCommandFlag::Execute, t(along), axis == Axis::X ? ROAD_X : ROAD_Y, ROADTYPE_ROAD, DisallowedRoadDirections{}, TownID::Invalid());
+					}
+				}
+				if (const TileIndex m = t(3); IsTileType(m, TileType::TunnelBridge) && IsTunnel(m)) {
+					const TileIndex end = GetOtherTunnelEnd(m);
+					IConsolePrint(CC_DEFAULT, "test3d: tunelyxy {} osa {}: {},{} az {},{}", rail ? "kolej" : "silnice", axis == Axis::X ? "x" : "y", TileX(m), TileY(m), TileX(end), TileY(end));
+				}
+			}
+		}
 	} else if (what == "lodnitunel" && argv.size() > 3) {
 		/* 'lodnitunel <x> <y>': a hill a level high, a ship tunnel through it from (x + 3, y), a canal before it from
 		 * (x - 2) and after it from (x + 9) to (x + 12) (CmdBuildTunnel() for TransportType::Water); a road tunnel beside

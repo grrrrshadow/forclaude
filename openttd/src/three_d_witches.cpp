@@ -519,6 +519,8 @@ std::vector<ThreeDWitchLight> GetThreeDWitchLights(bool eye)
 	}
 	/* And the flying saucers' (three_d_ufo.h): its rim, its beam down. */
 	AddThreeDUfoLights(eye, out);
+	/* And the lighthouses' beams (AddThreeDLighthouseLights()). */
+	AddThreeDLighthouseLights(eye, out);
 	return out;
 }
 
