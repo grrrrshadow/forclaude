@@ -11897,6 +11897,16 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		}
 		bool ok = MakeScreenshot(windows || as_is ? SC_CRASHLOG : SC_VIEWPORT, std::string(argv[2]));
 		IConsolePrint(ok ? CC_DEFAULT : CC_ERROR, "test3d: snimek {} {}", argv[2], ok ? "zapsan" : "ODMITNUTO - nezapsan");
+	} else if (what == "denik") {
+		/* 'denik': the diary's line of the turned map (snimky.log) since it was last taken, nothing drawn: what a run of
+		 * frames before it (a drag, 'posun') did. */
+		extern std::string TakeTurnedTimesForDiary(int frames);
+		const int frames = number(2).value_or(1);
+		IConsolePrint(CC_DEFAULT, "test3d: denik otocena {}", TakeTurnedTimesForDiary(frames));
+		extern std::string TakeThreeDMainKinds();
+		IConsolePrint(CC_DEFAULT, "test3d: denik hlavni vlakno nacetlo {}", TakeThreeDMainKinds());
+		IConsolePrint(CC_DEFAULT, "test3d: denik karta {}", ThreeDGpuTimes());
+		return true;
 	} else if (what == "cas") {
 		/* How long the whole screen takes to draw, ten times over, at the angle set; 'cas <n> <w> <h>' a piece of it
 		 * that big in the middle of the screen only (what a vehicle going by makes dirty). */

@@ -8634,6 +8634,9 @@ std::atomic<uint64_t> _three_d_main_made{0};        ///< The diary: the things t
 std::atomic<int64_t> _three_d_main_made_us{0};      ///< and how long, microseconds
 std::atomic<int64_t> _three_d_main_waited_us{0};    ///< how long it waited for another thread making one
 std::atomic<int64_t> _three_d_main_longest_us{0};   ///< the longest of either
+/** The diary: what kinds of things the main thread made itself (LazyKindName()), how many and how long, microseconds; under _three_d_main_kinds_mutex. */
+static std::mutex _three_d_main_kinds_mutex;
+static std::map<std::string_view, std::pair<uint64_t, int64_t>> _three_d_main_kinds;
 
 /** The next number of a shape or a texture (ThreeDUniqueId): never 0, never one given before. */
 uint64_t ThreeDUniqueId::Next()
@@ -8709,6 +8712,47 @@ bool ThreeDLazyNoWait::Missed() const
 	return _lazy_missed;
 }
 
+/** A thing of MakeOnce() for the diary (G3 of the plan of the card: what the main thread reads itself, by name). */
+static std::string_view LazyKindName(int thing)
+{
+	if (thing >= LAZY_BONES) return "kosti";
+	if (thing >= LAZY_HOUSE_PAINT) return "dum lak";
+	if (thing >= LAZY_HOUSE_READY) return "dum pripraven";
+	if (thing >= LAZY_HOUSE_MATERIAL) return "dum material";
+	if (thing >= LAZY_HOUSE_MASK) return "dum maska";
+	if (thing >= LAZY_HOUSE_SHAPE) return "dum tvar zjednoduseny";
+	if (thing >= LAZY_SIMPLER) return "tvar zjednoduseny";
+	if (thing >= LAZY_DETAIL_MASK) return "maska podrobnosti";
+	if (thing >= LAZY_ADDON_MASK) return "maska doplnku";
+	if (thing >= LAZY_TEXTURE) return "textura";
+	if (thing >= LAZY_FRAME) return "snimek";
+	switch (thing) {
+		case LAZY_SHAPE: return "tvar";
+		case LAZY_WALKING: return "chuze";
+		case LAZY_PAINT_MASK: return "maska laku";
+		case LAZY_RUST_MASK: return "maska rzi";
+		case LAZY_HOUSE_LEVELS: return "dum textura";
+		case LAZY_HOUSE_GLB: return "dum z glb";
+		case LAZY_SECOND_MASK: return "druha maska";
+		default: return "jine";
+	}
+}
+
+/** The diary: the kinds of things the main thread made itself since asked last, the most time first; started over. */
+std::string TakeThreeDMainKinds()
+{
+	std::vector<std::pair<std::string_view, std::pair<uint64_t, int64_t>>> kinds;
+	{
+		std::lock_guard lock(_three_d_main_kinds_mutex);
+		kinds.assign(_three_d_main_kinds.begin(), _three_d_main_kinds.end());
+		_three_d_main_kinds.clear();
+	}
+	std::ranges::sort(kinds, [](const auto &a, const auto &b) { return a.second.second > b.second.second; });
+	std::string s;
+	for (const auto &[name, d] : kinds) s += fmt::format("{}{} {}x {:.0f} ms", s.empty() ? "" : ", ", name, d.first, d.second / 1000.0);
+	return s.empty() ? std::string("-") : s;
+}
+
 template <typename Made, typename Make, typename Store>
 static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store &&store)
 {
@@ -8720,7 +8764,13 @@ static void MakeOnce(const void *of, int thing, Made &&made, Make &&make, Store 
 		const int64_t us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - started).count();
 		if (us < 1000) return;
 		(made_here ? _three_d_main_made_us : _three_d_main_waited_us) += us;
-		if (made_here) _three_d_main_made++;
+		if (made_here) {
+			_three_d_main_made++;
+			std::lock_guard kinds_lock(_three_d_main_kinds_mutex);
+			auto &k = _three_d_main_kinds[LazyKindName(thing)];
+			k.first++;
+			k.second += us;
+		}
 		int64_t longest = _three_d_main_longest_us.load();
 		while (us > longest && !_three_d_main_longest_us.compare_exchange_weak(longest, us)) {}
 	};

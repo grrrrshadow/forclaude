@@ -51,9 +51,10 @@ static std::string TakePicturesForDiary()
 	/* What the main thread read itself (a shape, a texture of a 3D object) or waited for: a click held up by it (#329). */
 	extern std::atomic<uint64_t> _three_d_main_made;
 	extern std::atomic<int64_t> _three_d_main_made_us, _three_d_main_waited_us, _three_d_main_longest_us;
-	std::string s = fmt::format("objektu {} ({:.0f} ms), na vlakne {} ({:.0f} ms), podoby {} ({:.0f} ms); nacteno hlavnim vlaknem {} ({:.0f} ms, cekani {:.0f} ms, nejdel {:.0f} ms); {}", _object_pictures_made, _object_picture_ms,
+	extern std::string TakeThreeDMainKinds();
+	std::string s = fmt::format("objektu {} ({:.0f} ms), na vlakne {} ({:.0f} ms), podoby {} ({:.0f} ms); nacteno hlavnim vlaknem {} ({:.0f} ms, cekani {:.0f} ms, nejdel {:.0f} ms: {}); {}", _object_pictures_made, _object_picture_ms,
 			_object_pictures_made_thread, _object_picture_thread_ms, _likeness_pictures_made, _likeness_picture_ms,
-			_three_d_main_made.exchange(0), _three_d_main_made_us.exchange(0) / 1000.0, _three_d_main_waited_us.exchange(0) / 1000.0, _three_d_main_longest_us.exchange(0) / 1000.0, ThreeDGpuTimes());
+			_three_d_main_made.exchange(0), _three_d_main_made_us.exchange(0) / 1000.0, _three_d_main_waited_us.exchange(0) / 1000.0, _three_d_main_longest_us.exchange(0) / 1000.0, TakeThreeDMainKinds(), ThreeDGpuTimes());
 	_object_picture_ms = _object_picture_thread_ms = _likeness_picture_ms = 0;
 	_object_pictures_made = _object_pictures_made_thread = _likeness_pictures_made = 0;
 	return s;

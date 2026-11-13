@@ -10,6 +10,7 @@
 /** @file three_d_vehicle_object.cpp Vehicles drawn from 3D objects (three_d_vehicle_object.h): their sprites made from the object, and the object in the turned view. */
 
 #include "stdafx.h"
+#include "core/backup_type.hpp"
 #include "three_d_vehicle_object.h"
 #include "three_d_objects.h"
 #include "three_d_gpu.h"
@@ -2953,6 +2954,10 @@ static bool AskForPicture(PictureToMake &&p)
 
 /** Drawing the map (ViewportDoDraw()): a picture not made yet has the nearest made stand in (ObjectPicture()). */
 bool _three_d_pictures_stand_in = false;
+/** The last picture asked for (ObjectPicture()) was not made and none of the object stood in: asked of the thread, nothing given. */
+static bool _picture_asked_none = false;
+/** The one asking owes the place of a picture not given (AddThreeDFigureToViewportInBox()): nothing may be given, the thread makes even the first. */
+static bool _picture_none_owed = false;
 /** The pictures given to stand in since the pictures last came, how many, and the places drawn with them, drawn again when they come. */
 static std::set<const ThreeDModelPicture *> _stand_in_pictures;
 static uint64_t _stand_ins_given = 0;
@@ -3179,6 +3184,15 @@ static const ThreeDModelPicture *ObjectPictureOf(PictureToMake p)
 			_stand_ins_given++;
 			_stand_in_pictures.insert(nearest);
 			return nearest;
+		}
+		/* None made of it at the zoom yet (the first tree of a kind a drag of the map comes to): not made here either,
+		 * the main thread would read its textures and draw it, a drag held up by it (the player's test9: "the moving
+		 * of the map by the right mouse button bit"; snimky.log: the main thread read 36 things itself, 68 ms the
+		 * longest). Asked of the thread, nothing drawn till it comes; the caller owes its place (_picture_asked_none). */
+		if (stand_in && nearest == nullptr && _picture_none_owed && AskForPicture(std::move(p))) {
+			_stand_ins_given++;
+			_picture_asked_none = true;
+			return nullptr;
 		}
 		if (_pictures_collected != nullptr) {
 			/* Collected, made with the others after (MakeThreeDPicturesAtOnce()). */
@@ -5254,6 +5268,7 @@ static std::optional<PictureToMake> FigureRequest(std::string_view name, float s
 /** A picture asked for (PictureRequest()) as it is made: now, or not waited for (later, FigureRequest()). */
 static const ThreeDModelPicture *RequestedPicture(PictureToMake p, bool later)
 {
+	_picture_asked_none = false;
 	_object_picture_may_wait = later;
 	const ThreeDModelPicture *pic = ObjectPictureOf(std::move(p));
 	_object_picture_may_wait = false;
@@ -5356,7 +5371,16 @@ bool AddThreeDFigureToViewportInBox(std::string_view name, float scale, int x, i
 	}
 	std::optional<PictureToMake> p = FigureRequest(name, scale, facing, zoom, tile, phase, &height, frame, NAN, z, x, y, &up, later, FIGURE_PICTURE_SIDE, state);
 	if (!p.has_value()) return false;
-	const ThreeDModelPicture *pic = RequestedPicture(std::move(*p), later);
+	const ThreeDModelPicture *pic = nullptr;
+	{
+		AutoRestoreBackup none_owed(_picture_none_owed, true);
+		pic = RequestedPicture(std::move(*p), later);
+	}
+	if (pic == nullptr && _picture_asked_none) {
+		/* Its first picture at the zoom made by the thread (ObjectPictureOf()): nothing of it till then, its place drawn again. */
+		OweCardPlace(x, y, z, TILE_SIZE / 2 + height, height);
+		return true;
+	}
 	if (pic == nullptr) return false;
 	if (box != nullptr) {
 		AddTurnedVehiclePicture(pic, x, y, z, (*box)[0], (*box)[1], (*box)[2], (*box)[3], (*box)[4], (*box)[5], up);
