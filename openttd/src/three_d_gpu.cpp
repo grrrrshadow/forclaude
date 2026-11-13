@@ -159,6 +159,7 @@ static const IntervalTimer<TimerWindow> _gpu_died_timer(std::chrono::seconds(2),
 	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_GPU_DIED, _gpu_died_at), {}, WarningLevel::Warning);
 });
 
+
 /* The triangles of the shapes by the parts shown (ThreeDGpuTrianglesOf()), kept for the pictures to come. */
 static std::mutex _triangles_mutex;
 static std::map<std::tuple<uint64_t, ThreeDParts, bool, bool>, std::pair<std::shared_ptr<const ThreeDGpuTriangles>, uint64_t>> _triangles_kept;
@@ -507,6 +508,10 @@ void *_video_display = nullptr;
 void *_video_context = nullptr;
 std::atomic<bool> _video_shared = false;
 std::string _gpu_describe = "not started";
+/** The card could not be started (GpuThreadMain()): why, and that the player is to be told of it; under _gpu_mutex. */
+std::string _gpu_failed_why;
+bool _gpu_failed_note = false;
+
 double _gpu_ms = 0;                 ///< the time the card took for the pictures since the last ThreeDGpuTimes()
 uint64_t _gpu_pictures = 0;         ///< and how many
 uint64_t _gpu_failed = 0;           ///< and how many it could not draw (the processor did)
@@ -2363,7 +2368,10 @@ bool StartContext(std::string &why)
 	Step("prvni kontext OpenGL (wglCreateContext, wglMakeCurrent)");
 	HGLRC first = wglCreateContext(_gpu_dc);
 	if (first == nullptr || !wglMakeCurrent(_gpu_dc, first)) {
-		why = "no context of OpenGL";
+		/* Why, as Windows tells it (the player's #361: "no context of OpenGL" and no word more, the whole game drawn
+		 * by the processor: the game's hardware acceleration had been switched off, the game's own way after a start
+		 * that did not finish, hwaccel.dat of driver.cpp). */
+		why = fmt::format("no context of OpenGL ({} failed, Windows error {})", first == nullptr ? "wglCreateContext" : "wglMakeCurrent", static_cast<uint32_t>(GetLastError()));
 		if (first != nullptr) wglDeleteContext(first);
 		return false;
 	}
@@ -2399,6 +2407,7 @@ bool StartContext(std::string &why)
 	}
 	return true;
 }
+
 
 void EndContext()
 {
@@ -6408,6 +6417,10 @@ void GpuThreadMain()
 		std::lock_guard lock(_gpu_mutex);
 		_gpu_state = ok ? GpuState::Ready : GpuState::Failed;
 		_gpu_describe = ok ? describe : "none: " + why;
+		if (!ok && !_gpu_stop) {
+			_gpu_failed_why = why;
+			_gpu_failed_note = true;
+		}
 	}
 	_gpu_done.notify_all();
 	Debug(misc, 1, "3D on the graphics card: {}", ok ? describe : "none, the processor draws (" + why + ")");
@@ -6505,6 +6518,24 @@ void GpuThreadMain()
 }
 
 } // namespace
+
+/**
+ * The player told once, in a window, that the card could not be started and why: the 3D pictures are the processor's
+ * then, slow, the vehicles their stand-in pictures (the player's #361: "the cars are not drawn in time, they use the
+ * stand-in 2D picture" -- the card had not started, the hardware acceleration being off, and nothing in the game
+ * said so).
+ */
+static const IntervalTimer<TimerWindow> _gpu_failed_timer(std::chrono::seconds(2), [](auto) {
+	std::string why;
+	{
+		std::lock_guard lock(_gpu_mutex);
+		if (!_gpu_failed_note || FindWindowById(WindowClass::MainWindow, 0) == nullptr) return;
+		_gpu_failed_note = false;
+		why = _gpu_failed_why;
+	}
+	Debug(misc, 1, "3D on the graphics card: the player told it did not start ({})", why);
+	ShowErrorMessage(GetEncodedString(STR_ERROR_THREE_D_GPU_NOT_STARTED, why), {}, WarningLevel::Warning);
+});
 
 uint32_t ThreeDGpuMesh::Glow(size_t texture) const
 {

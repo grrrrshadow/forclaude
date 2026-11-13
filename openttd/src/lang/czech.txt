@@ -6434,6 +6434,7 @@ STR_ERROR_CAN_T_CHANGE_SIGN_NAME                                :{WHITE}Nelze zm
 STR_ERROR_CAN_T_DELETE_SIGN                                     :{WHITE}Nelze smazat nápis...
 STR_ERROR_THREE_D_BOXES                                         :{WHITE}3D: {RAW_STRING}. Vše je v 3d_domy.log ve složce OpenTTD
 STR_ERROR_THREE_D_GPU_DIED                                      :{WHITE}Grafická karta minule shodila hru, u kroku: {RAW_STRING}. 3D obrázky kreslí procesor; deník je 3d_karta_minule.log ve složce OpenTTD. V Nastavení, Grafika se karta zase zapne
+STR_ERROR_THREE_D_GPU_NOT_STARTED                               :{WHITE}Grafická karta nenastartovala: {RAW_STRING}. 3D obrázky kreslí procesor, pomalu, a vozidla zůstávají na náhradních obrázcích. Zapni hardwarovou akceleraci (Možnosti hry, Grafika) a spusť hru znovu; deník je 3d_karta.log ve složce OpenTTD
 
 # Translatable comment for OpenTTD's desktop shortcut
 ###external 1
