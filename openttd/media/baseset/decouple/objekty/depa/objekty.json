@@ -143,7 +143,7 @@
     7.4,
     0.0
    ],
-   "sirka": 5.6,
+   "sirka": 9.2,
    "vyska": 4.3
   },
   "dvere": [
@@ -152,19 +152,19 @@
     "druh": "vrata",
     "pant": [
      14.15,
-     4.6
+     2.8
     ],
     "osa": "z",
     "poloha": [
      14.2,
-     6.0,
+     5.1,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 2.8,
+    "sirka": 4.6,
     "vyska": 4.3,
     "otevira_se": "ven",
     "otevreni_uhel": -100,
@@ -175,19 +175,19 @@
     "druh": "vrata",
     "pant": [
      14.15,
-     10.2
+     12.0
     ],
     "osa": "z",
     "poloha": [
      14.2,
-     8.8,
+     9.7,
      0.0
     ],
     "smer": [
      1,
      0
     ],
-    "sirka": 2.8,
+    "sirka": 4.6,
     "vyska": 4.3,
     "otevira_se": "ven",
     "otevreni_uhel": 100,
@@ -251,8 +251,8 @@
     8.56
    ]
   },
-  "trojuhelniku": 3554,
-  "poznamka": "garáž (depo silničních vozidel) ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 3554 trojúhelníků, 529 kB"
+  "trojuhelniku": 3630,
+  "poznamka": "garáž (depo silničních vozidel) ve stylu OpenGFX (hráč 2. 11.: „udělej parádní objekt depa ve stylu ottd ať to neni kostičkovaný“): jedna dlaždice, počátek v severním rohu, osy hry, metry; postavené vjezdem k +x (DIAGDIR_SW), hra ho otočí; uvnitř zavřené a prosté (interiér se domluví později); 3630 trojúhelníků, 529 kB"
  },
  {
   "druh": "depo",
