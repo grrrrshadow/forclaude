@@ -3457,6 +3457,9 @@ static bool ReadFigure(const nlohmann::json &f, ThreeDObjectFigure &fig)
 	for (int k = 0; k < 3; k++) fig.at[k] = at.at(k).get<float>();
 	fig.facing = f.value("otoceni", 0.0f);
 	fig.scale = std::clamp(f.value("meritko", 1.0f), 0.1f, 10.0f);
+	/* Standing there only at night ("kdy": "noc"; the ghost of the colleagues' graves by the lighthouses, the player,
+	 * 14. 11.: "a ghost at night by the graves"). */
+	fig.night = f.value("kdy", std::string()) == "noc";
 	return true;
 }
 

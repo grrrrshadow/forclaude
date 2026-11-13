@@ -149,6 +149,16 @@
      0.09
     ],
     "otoceni": 270
+   },
+   {
+    "postava": "strasidlo_hrobecku",
+    "poloha": [
+     -5.6,
+     0.0,
+     0.0
+    ],
+    "otoceni": 270,
+    "kdy": "noc"
    }
   ],
   "rostliny": [
@@ -388,6 +398,16 @@
      0.09
     ],
     "otoceni": 270
+   },
+   {
+    "postava": "strasidlo_hrobecku",
+    "poloha": [
+     -5.6,
+     0.0,
+     0.0
+    ],
+    "otoceni": 270,
+    "kdy": "noc"
    }
   ],
   "rostliny": [
