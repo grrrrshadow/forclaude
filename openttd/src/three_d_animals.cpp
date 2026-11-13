@@ -175,6 +175,8 @@ struct Beast {
 	double x = 0, y = 0;   ///< world units
 	double up = 0;         ///< over the ground, height units (on a roof; the flying dog)
 	double home_x = 0, home_y = 0; ///< its place
+	double stuck_x = 0, stuck_y = 0;  ///< where it was when it last got on (Unstick())
+	uint64_t stuck_since = 0;         ///< and when
 	double heading = 0;    ///< radians
 	double tx = 0, ty = 0; ///< where it goes
 	int health = 1;
@@ -1024,6 +1026,48 @@ void GraveGhost(Beast &b, const ThreeDAnimal &a, uint64_t now)
 	b.state = State::Wander;
 }
 
+/**
+ * One going somewhere that does not get on is put a little further off (the player, 14. 11.: a hare hopping on the spot
+ * for ever, a pile of logs behind it and a thing before it, on the meadow by the cabin; "let it spawn a bit further,
+ * that is better than turning"): wandering or fleeing and not 15 cm (the slowest walk goes further) from where it was STUCK_TICKS ago, it is
+ * gone from there and stands at a place it can walk on one to two tiles away, where it rests a while and picks anew.
+ * With no such place it only stands and picks anew.
+ */
+constexpr uint64_t STUCK_TICKS = 150; ///< about 4 s
+void Unstick(Beast &b, const ThreeDAnimal &a, uint64_t now)
+{
+	const bool going = (b.state == State::Wander || b.state == State::Flee) && Moves(a) && !RidesRails(b, a);
+	if (!going || std::hypot(b.x - b.stuck_x, b.y - b.stuck_y) > 0.15 * OBJECT_UNITS_PER_METRE) {
+		b.stuck_x = b.x;
+		b.stuck_y = b.y;
+		b.stuck_since = now;
+		return;
+	}
+	if (now - b.stuck_since < STUCK_TICKS) return;
+	b.stuck_since = now;
+	b.way.clear();
+	b.state = State::Idle;
+	b.until = now + 60 + InteractiveRandomRange(200);
+	for (int tries = 0; tries < 8; tries++) {
+		const double way = InteractiveRandomRange(360) * M_PI / 180.0;
+		const double r = (1.0 + InteractiveRandomRange(100) / 100.0) * TILE_SIZE;
+		double x = b.x + std::cos(way) * r, y = b.y + std::sin(way) * r;
+		if (!OnMap(x, y)) continue;
+		if (b.place == Place::Farm) {
+			if (!InFarmYard(b.farm, x, y)) continue;
+		} else if (!a.flies && (!NavNearestWalkable(x, y, 1) || !OnMap(x, y))) {
+			continue;
+		}
+		MarkDirty(b, a);
+		b.x = b.tx = x;
+		b.y = b.ty = y;
+		b.stuck_x = x;
+		b.stuck_y = y;
+		MarkDirty(b, a);
+		return;
+	}
+}
+
 void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double wx, double wy)
 {
 	if (b.place == Place::Grave && (b.state == State::Idle || b.state == State::Wander) && !b.angry) {
@@ -1035,6 +1079,7 @@ void Update(Beast &b, const ThreeDAnimal &a, uint64_t now, bool walker, double w
 		ChurchGhost(b, a, now);
 		return;
 	}
+	Unstick(b, a, now);
 	const double dist_m = walker ? std::hypot(wx - b.x, wy - b.y) / OBJECT_UNITS_PER_METRE : 1e9;
 	/* As far as it reaches as the eyes see it (EyeScaleOf()). */
 	const double reach_m = std::max(a.size[0], a.size[1]) / 2 * EyeScaleOf(a) + GAP_M;
