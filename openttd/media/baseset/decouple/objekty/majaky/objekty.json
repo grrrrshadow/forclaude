@@ -64,9 +64,9 @@
   "svetla": {
    "svitilna": {
     "barva": "FFEDB2",
-    "dosah_m": 160,
+    "dosah_m": 200,
     "uhel": 12,
-    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku za zábradlím ochozu kousek nad lampou, paprsek_NN kam míří (9° dolů); barva, dosah v metrech a úhel kužele ve stupních"
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (6° dolů, nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
    }
   },
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice, inspirace rozhledna Petra Š.)",
@@ -138,9 +138,9 @@
   "svetla": {
    "svitilna": {
     "barva": "FFEDB2",
-    "dosah_m": 160,
+    "dosah_m": 200,
     "uhel": 12,
-    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku za zábradlím ochozu kousek nad lampou, paprsek_NN kam míří (9° dolů); barva, dosah v metrech a úhel kužele ve stupních"
+    "poznamka": "dva paprsky jako svítilna čarodějnice: svitilna_NN (pod uzlem reflektor, točí se s ním) je začátek paprsku u čočky reflektoru, paprsek_NN kam míří (6° dolů, nad zábradlím ochozu); barva, dosah v metrech a úhel kužele ve stupních"
    }
   },
   "autor": "grrrrf: vlastní model predmety/majaky.py (stavebnice)",
