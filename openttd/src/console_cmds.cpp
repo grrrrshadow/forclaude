@@ -11027,6 +11027,23 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		IConsolePrint(CC_DEFAULT, "test3d: cerpadlo: depo {}, motor {} ({}) dostupny {}, koupeno {}", depot.Succeeded() ? "ok" : "NEJDE", pump.base(),
 				GetString(e->info.string_id), e->company_avail.Test(_local_company) ? "ano" : "ne", cost.Succeeded() ? "ano" : "NE");
 		return true;
+	} else if (what == "rozvod" && argv.size() > 5) {
+		/* 'rozvod <x> <y> stanice|silnice p|v': on a tile of the game's own pipeline (p) or power line (v) along x a
+		 * station's tile of that rail type, or a road across it (a level crossing). */
+		auto x = number(2), y = number(3);
+		if (!x.has_value() || !y.has_value()) return true;
+		const TileIndex at = TileXY(*x, *y);
+		const RailType rt = argv[5] == "v" ? RAILTYPE_POWER_LINE : RAILTYPE_PIPE;
+		AutoRestoreBackup cur_company(_current_company, _local_company);
+		CommandCost done;
+		if (argv[4] == "stanice") {
+			done = Command<Commands::BuildRailStation>::Do(DoCommandFlag::Execute, at, rt, Axis::X, 1, 1, STAT_CLASS_DFLT, 0, StationID::Invalid(), false);
+		} else {
+			done = Command<Commands::BuildRoadLong>::Do(DoCommandFlag::Execute, TileXY(*x, *y + 1), TileXY(*x, *y - 1), ROADTYPE_ROAD, Axis::Y, DisallowedRoadDirections{}, false, false, false);
+		}
+		UpdateSignalsInBuffer();
+		IConsolePrint(CC_DEFAULT, "test3d: rozvod {} na {},{}: {}", argv[4], *x, *y, done.Succeeded() ? "ok" : GetString(done.GetErrorMessage()));
+		return true;
 	} else if (what == "prumysly") {
 		/* 'prumysly': how many industries of each kind the map has, and of each what it takes and makes. */
 		std::map<IndustryType, int> count;

@@ -2723,7 +2723,7 @@ bool ThreeDTrackShownOn(TileIndex tile)
 	if (!ThreeDEnabled() || !IsValidTile(tile)) return false;
 	/* The game's own power line: in 3D always, whatever the rails' setting (the player, 14. 11.: "that must not be
 	 * switched off, there is nothing in place of the wires and the pipes"). */
-	const RailTypeLabel own_label = IsPlainRailTile(tile) ? GetRailTypeInfo(GetRailType(tile))->label : RailTypeLabel{};
+	const RailTypeLabel own_label = ThreeDTrackBitsOf(tile).Any() ? GetRailTypeInfo(GetRailType(tile))->label : RailTypeLabel{};
 	const bool power_line = own_label == RAILTYPE_LABEL_POWER_LINE || own_label == RAILTYPE_LABEL_PIPE; // and the pipeline
 	if (!power_line && !ThreeDGroupShown(ThreeDGroup::Rails)) return false;
 	if (!IsPlainRailTile(tile)) return ThreeDTrackOtherOn(tile);
@@ -3391,9 +3391,25 @@ bool DrawThreeDTrackOn(const TileInfo *ti, Axis axis, DiagDirection door, bool c
 	const bool eye = ViewportDrawingEye();
 	if (!eye && !ViewportDrawingTurned() && !ViewportDrawingNorthObjects()) return false;
 	if (!ThreeDTrackShownOn(ti->tile) || ti->tileh != SLOPE_FLAT) return false;
+	const bool half = door != DiagDirection::Invalid;
+	/* The game's own power line and pipeline on such a tile (the player, 14. 11.: the depot the train depot, "we save
+	 * megabytes"; the pipe under a road): no track. The power line's cables go on over it (its pylons by their turn,
+	 * none in a depot's half); the pipe lies along a station's tile, under a level crossing it is in the ground -- the
+	 * road as it is, no posts and barriers -- and into a depot it goes underground too. */
+	const RailTypeLabel own = GetRailTypeInfo(GetRailType(ti->tile))->label;
+	if (own == RAILTYPE_LABEL_POWER_LINE) {
+		if (!half) DrawThreeDPowerLine(ti, TrackBits{AxisToTrack(axis)}, SLOPE_FLAT, false, eye);
+		return true;
+	}
+	if (own == RAILTYPE_LABEL_PIPE) {
+		if (!crossing && !half) {
+			PutThreeDStraight(ti, "potrubi_rovne", axis, TileX(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, TileY(ti->tile) * TILE_SIZE + TILE_SIZE / 2.0, ti->z, axis == Axis::X ? 0.0f : 90.0f,
+					TILE_SIZE / 2.0, 0.6 * OBJECT_UNITS_PER_METRE, ti->z, std::max(1, static_cast<int>(std::lround(1.45 * OBJECT_HEIGHT_PER_METRE))));
+		}
+		return true;
+	}
 	if (crossing && GetThreeDFigure("kolej_prejezd_drevo") == nullptr) return false;
 	const bool concrete = HasRailCatenary(GetRailType(ti->tile));
-	const bool half = door != DiagDirection::Invalid;
 	const std::string_view name = ThreeDTrackName(crossing ? (concrete ? "kolej_prejezd_beton" : "kolej_prejezd_drevo") : half ? (concrete ? "kolej_pul_beton" : "kolej_pul_drevo") : (concrete ? "kolej_rovna_beton" : "kolej_rovna_drevo"));
 	/* Its middle: the tile's, a depot's half way from its door to it. */
 	double mx = TILE_SIZE / 2.0, my = TILE_SIZE / 2.0;
