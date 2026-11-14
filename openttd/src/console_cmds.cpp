@@ -188,6 +188,8 @@
 #include "thread.h"
 
 #include "three_d_shape.h"
+#include "signs_base.h"
+
 #include "safeguards.h"
 
 /* scriptfile handling */
@@ -11830,6 +11832,31 @@ static bool ConTest3D(std::span<std::string_view> argv)
 		UpdateViewportPosition(w, 0);
 		IConsolePrint(CC_DEFAULT, "test3d: les {},{}: {} stromu kolem, druh {}", TileX(best), TileY(best), most,
 				IsTileType(best, TileType::Trees) ? static_cast<int>(GetTreeType(best)) : -1);
+	} else if (what == "cedule") {
+		/* 'cedule': the signs of the map and the tiles they stand on (the player marks a place in a save with a sign). */
+		for (const Sign *si : Sign::Iterate()) {
+			IConsolePrint(CC_DEFAULT, "test3d: cedule '{}' na dlazdici {},{} (svet {},{},{})", si->name, si->x / static_cast<int>(TILE_SIZE), si->y / static_cast<int>(TILE_SIZE), si->x, si->y, si->z);
+		}
+		return true;
+	} else if (what == "mapakoleji" && argv.size() > 5) {
+		/* 'mapakoleji <x0> <y0> <x1> <y1>': the track bits of the tiles of a piece of the map, a row per y (hex; '.' no rail,
+		 * 'D' a depot, 'S' a station, 'T' a tunnel or bridge head, 'X' a level crossing). */
+		auto x0 = number(2), y0 = number(3), x1 = number(4), y1 = number(5);
+		if (!x0.has_value() || !y0.has_value() || !x1.has_value() || !y1.has_value()) return true;
+		for (int y = *y0; y <= *y1; y++) {
+			std::string row;
+			for (int x = *x0; x <= *x1; x++) {
+				const TileIndex t = TileXY(Clamp(x, 0, Map::MaxX()), Clamp(y, 0, Map::MaxY()));
+				if (IsPlainRailTile(t)) row += fmt::format(" {:02X}{}{}", GetTrackBits(t).base(), ThreeDTrackShownOn(t) ? "" : "!", GetTileSlope(t) == SLOPE_FLAT ? "" : "/");
+				else if (IsRailDepotTile(t)) row += "  D";
+				else if (IsTileType(t, TileType::Station)) row += "  S";
+				else if (IsTileType(t, TileType::TunnelBridge)) row += "  T";
+				else if (IsLevelCrossingTile(t)) row += "  X";
+				else row += "  .";
+			}
+			IConsolePrint(CC_DEFAULT, "test3d: mapakoleji y {:3}:{}", y, row);
+		}
+		return true;
 	} else if (what == "stred") {
 		auto x = number(2), y = number(3);
 		if (!x.has_value() || !y.has_value()) {

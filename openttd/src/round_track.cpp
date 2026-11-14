@@ -232,7 +232,10 @@ struct Side {
 	Vec dir;             ///< the direction of the path past that corner, the path walked forward
 	Step last{};         ///< the last piece of the straight, walked the same way as the side
 	Step beyond{};       ///< the piece past that corner, walked the same way as the side
+	double kept = 0;     ///< how much of its far end is another arc's: half the piece shared with an arc at a switch there
 };
+
+bool ForksAt(TileIndex tile, DiagDirection edge);
 
 /**
  * Walk the straight from a corner along one side.
@@ -249,7 +252,16 @@ Side WalkSide(Step first, bool backward)
 		Step n;
 		if (!NextStep(s, n)) return side;
 		Turn turn = TurnBetween(dir, n.Vector());
+		/* A switch on the straight (the player's save of 14. 11., signs '1' and '2': a diagonal of seven pieces with two
+		 * switches on it was one wide arc with the corner at its far end, up to 5 units off the pieces, while the ways
+		 * branching off it began at the pieces -- and found that arc reaching them, drawn along it, away from their
+		 * tiles): the straight way of a switch stays straight, so the straight a corner may round ends there. */
 		if (turn == Turn::Straight) {
+			if (ForksAt(n.tile, n.from) || ForksAt(s.tile, OtherEdge(s.track, s.from))) {
+				/* The way branching off there is round over this straight's last piece: half of it is that arc's. */
+				side.kept = Length(s.Vector()) / 2;
+				return side;
+			}
 			side.run += Length(n.Vector());
 			s = n;
 			continue;
@@ -270,7 +282,7 @@ Side WalkSide(Step first, bool backward)
 /** How far an arc may reach along a side: up to the next corner, half the straight (the rest is that corner's); else all of it, not past where the round curve ends. */
 double Avail(const Side &side)
 {
-	return side.corner ? side.run / 2 : side.run;
+	return side.corner ? side.run / 2 : side.run - side.kept;
 }
 
 /** Which neighbouring corner a corner makes one arc with: -1 the one before, +1 the one after, 0 none -- the nearer of those turning the same way close enough. */
@@ -420,11 +432,19 @@ bool SwitchAhead(const Step &to, const Step &from)
 	return GoesStraightOn(to.tile, edge, from.Vector() * -1.0) || ForksAt(to.tile, edge);
 }
 
-/** A side of a corner along the straight way of a switch: only its piece at the switch, and no corner past it. */
+/**
+ * A side of a corner along the straight way of a switch: only its piece at the switch, and no corner past it. Where
+ * that piece turns at its other end (the player's save of 14. 11., sign '1': one piece of straight between a switch
+ * and a corner; the corner's arc took all of it, and the branch, round over it as over a straight, began its outer
+ * rail most of a metre beside it), half of it is that corner's.
+ * @param piece the piece, walked away from the corner
+ */
 void KeepToPiece(Side &side, const Step &piece)
 {
 	side.run = std::min(side.run, Length(piece.Vector()));
 	side.corner = false;
+	Step n;
+	side.kept = NextStep(piece, n) && TurnBetween(piece.Vector(), n.Vector()) == Turn::Corner ? side.run / 2 : 0;
 }
 
 /**
@@ -469,7 +489,7 @@ bool CornerZone(const PathCorner &pc, Zone &zone, bool *main_back = nullptr, boo
 	bool behind = SwitchBehind(pc.to, pc.from), ahead = SwitchAhead(pc.to, pc.from);
 	if (main_back != nullptr) *main_back = behind;
 	if (main_fwd != nullptr) *main_fwd = ahead;
-	if (behind) KeepToPiece(back, pc.to);
+	if (behind) KeepToPiece(back, pc.to.Reversed());
 	if (ahead) KeepToPiece(fwd, pc.from);
 	int pref = Preference(back, fwd, sign);
 	if (pref == 1) {
