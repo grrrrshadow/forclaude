@@ -433,6 +433,16 @@ static std::map<std::string, std::optional<std::array<float, 3>>> _thing_places;
 /** The clock of the objects, seconds (ForgetUnusedThreeDObjects()): what was drawn when. */
 static std::atomic<uint32_t> _three_d_clock = 1;
 
+/**
+ * A building's painted texture asked for (ThreeDObject::painted): marked with the clock, so that those not asked for
+ * a while are let go of (TrimThreeDPainted()).
+ */
+static const ThreeDObjectTexture *PaintedAsked(const ThreeDObjectTexture &t)
+{
+	t.used = _three_d_clock;
+	return &t;
+}
+
 /** Mark a thing drawn now; from the threads making textures and the one making the pictures of the vehicles too, so as an atomic. */
 static inline void MarkThreeDUsed(uint32_t &used)
 {
@@ -14667,13 +14677,61 @@ static void DropPaintedTextures()
 }
 
 /** The building's texture at all its levels of detail, read from its PNG the first time (on either thread, MakeOnce()). */
-static void MakeHouseLevels(const ThreeDObject &o)
+/**
+ * Whether a building's texture has the pixels of a level: its levels finer than any drawn are let go of between the
+ * frames (TrimThreeDHouseLevels()), their sizes kept. Under _lazy_mutex.
+ */
+static bool HouseLevelHeld(const ThreeDObject &o, int level)
 {
-	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o] { return !o.levels.empty(); }, [&o] {
+	if (o.levels.empty()) return false;
+	return !o.levels[std::clamp<int>(level, 0, static_cast<int>(o.levels.size()) - 1)].px.empty();
+}
+
+/**
+ * The building's texture with the pixels of a level and the coarser ones: all its levels the first time, later the
+ * ones let go of read again of its picture (each level keeps its number for the card).
+ */
+static void MakeHouseLevels(const ThreeDObject &o, int level)
+{
+	MakeOnce(&o, LAZY_HOUSE_LEVELS, [&o, level] { return HouseLevelHeld(o, level); }, [&o] {
 		std::vector<ThreeDObjectTexture> made;
 		DecodeTextureLevels(o.png, made);
 		return made;
-	}, [&o](std::vector<ThreeDObjectTexture> made) { o.levels = std::move(made); });
+	}, [&o, level](std::vector<ThreeDObjectTexture> made) {
+		if (o.levels.empty()) {
+			o.levels = std::move(made);
+			return;
+		}
+		for (size_t i = std::clamp<int>(level, 0, static_cast<int>(o.levels.size()) - 1); i < o.levels.size() && i < made.size(); i++) {
+			if (o.levels[i].px.empty()) o.levels[i].px = std::move(made[i].px);
+		}
+	});
+}
+
+/**
+ * Between the frames: of each building's texture the levels finer than any asked for since the last time let go of --
+ * of one not asked for at all, all but those of 256 texels and less; as the vehicles' (ThreeDVehicleObject::
+ * TrimTextures()). A building kept every level from the first sight of it, its finest too: seen on the map from afar
+ * a pub held 86 MB, the buildings together up to 894 MB (the player's log of 14. 11., build #367).
+ */
+static void TrimThreeDHouseLevels()
+{
+	if (!_three_d_objects_read) return;
+	std::lock_guard lock(_lazy_mutex);
+	size_t freed = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		if (o.levels.empty()) continue;
+		int keep = static_cast<int>(o.levels.size()) - 1;
+		if (o.level_asked != INT_MAX) {
+			keep = std::clamp(o.level_asked, 0, keep);
+		} else {
+			while (keep > 0 && std::max(o.levels[keep - 1].w, o.levels[keep - 1].h) <= 256) keep--;
+		}
+		o.level_asked = INT_MAX;
+		for (int i = 0; i < keep; i++) freed += o.levels[i].px.capacity() * sizeof(uint32_t);
+		DropFinerLevels(o.levels, keep);
+	}
+	if (freed > 0) Debug(misc, 1, "3D objects: {:.1f} MB of the buildings' texture levels finer than drawn let go of", freed / (1024.0 * 1024.0));
 }
 
 const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, bool may_drop) const
@@ -14682,19 +14740,21 @@ const ThreeDObjectTexture *ThreeDObject::GetTexture(int level, uint32_t paint, b
 	/* A part placed on a tile of an original industry: the part's texture, once for all its places. */
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].GetTexture(level, paint, may_drop);
 	this->Read();
-	MakeHouseLevels(*this);
+	MakeHouseLevels(*this, level);
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	this->level_asked = std::min(this->level_asked, level);
 	const ThreeDObjectTexture *plain = &this->levels[level];
 	if (paint == 0 || this->colours.empty()) return plain;
 	if (may_drop) DropPaintedTextures();
 	const std::pair<int, uint32_t> key(level, paint);
 	MakeOnce(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, plain, paint] { return this->Painted(*plain, paint); }, [this, key](ThreeDObjectTexture t) {
 		_painted_bytes += t.px.size() * sizeof(uint32_t);
+		t.used = _three_d_clock; // new: asked for now
 		this->painted.emplace(key, std::move(t));
 	});
 	std::lock_guard lock(_lazy_mutex);
 	auto it = this->painted.find(key);
-	return it != this->painted.end() ? &it->second : plain;
+	return it != this->painted.end() ? PaintedAsked(it->second) : plain;
 }
 
 /**
@@ -14771,15 +14831,26 @@ const ThreeDObjectTexture *ThreeDObject::TryGetTexture(int level, uint32_t paint
 	MarkThreeDUsed(this->used);
 	if (this->texture_of < _three_d_objects.size() && &_three_d_objects[this->texture_of] != this) return _three_d_objects[this->texture_of].TryGetTexture(level, paint);
 	if (!this->TryRead()) return nullptr;
-	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this] { return !this->levels.empty(); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return nullptr;
+	if (!MadeOrAsked(this, LAZY_HOUSE_LEVELS, [this, level] { return HouseLevelHeld(*this, level); }, [this, level, paint] { this->GetTexture(level, paint, false); })) {
+		/* Its level let go of and being read again: the nearest coarser one it has meanwhile; nothing read yet, nothing. */
+		std::lock_guard lock(_lazy_mutex);
+		if (this->levels.empty()) return nullptr;
+		int coarser = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+		this->level_asked = std::min(this->level_asked, coarser);
+		while (coarser + 1 < static_cast<int>(this->levels.size()) && this->levels[coarser].px.empty()) coarser++;
+		if (this->levels[coarser].px.empty()) return nullptr;
+		auto it = paint == 0 || this->colours.empty() ? this->painted.end() : this->painted.find({coarser, paint});
+		return it != this->painted.end() ? PaintedAsked(it->second) : &this->levels[coarser];
+	}
 	level = std::clamp<int>(level, 0, static_cast<int>(this->levels.size()) - 1);
+	this->level_asked = std::min(this->level_asked, level);
 	const ThreeDObjectTexture *plain = &this->levels[level];
 	if (paint == 0 || this->colours.empty()) return plain;
 	const std::pair<int, uint32_t> key(level, paint);
 	if (!MadeOrAsked(this, LazyHousePaint(level, paint), [this, key] { return this->painted.contains(key); }, [this, level, paint] { this->GetTexture(level, paint, false); })) return plain;
 	std::lock_guard lock(_lazy_mutex);
 	auto it = this->painted.find(key);
-	return it != this->painted.end() ? &it->second : plain;
+	return it != this->painted.end() ? PaintedAsked(it->second) : plain;
 }
 
 /**
@@ -15083,12 +15154,12 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 	{
 		std::lock_guard lock(_lazy_mutex);
 		auto it = this->painted.find(key);
-		if (it != this->painted.end()) return &it->second;
+		if (it != this->painted.end()) return PaintedAsked(it->second);
 		int best = INT_MAX;
 		for (const auto &[k, tex] : this->painted) {
 			if (k.second != paint || std::abs(k.first - key.first) >= best) continue;
 			best = std::abs(k.first - key.first);
-			nearest = &tex;
+			nearest = PaintedAsked(tex);
 		}
 	}
 	if (nearest == nullptr) return this->GetTexture(level, paint);
@@ -15101,7 +15172,7 @@ const ThreeDObjectTexture *ThreeDObject::DrawnTexture(int level, uint32_t paint)
 	}
 	std::lock_guard lock(_lazy_mutex);
 	auto it = this->painted.find(key);
-	return it != this->painted.end() ? &it->second : nearest;
+	return it != this->painted.end() ? PaintedAsked(it->second) : nearest;
 }
 
 /** A texture of the building's triangles to draw it with now (as GetTextureOf(), by DrawnTexture()). */
@@ -15209,6 +15280,35 @@ static bool _three_d_forget_owed = false;
 uint64_t _three_d_forgets_done = 0;     ///< the diary: forgettings done since its last line
 uint64_t _three_d_forgets_put_off = 0;  ///< and put off, something holding what the objects made
 
+/**
+ * The buildings' painted textures not asked for for three quarters of a minute let go of (the player's log of
+ * 14. 11., build #367: the buildings held up to 894 MB, one pub 86 MB). A building is painted by its colours and,
+ * since the roofs' patterns, by its tiles too: a town's houses of one kind each have another paint, each paint a
+ * copy of the texture at every level seen -- kept as long as any house of the kind was in sight. What is in sight is
+ * asked for every frame; the others are painted again when they come back. Between the frames, nothing holding them.
+ */
+static void TrimThreeDPainted()
+{
+	static constexpr uint32_t KEPT_SECONDS = 45;
+	if (!_three_d_objects_read) return;
+	const uint32_t now = _three_d_clock;
+	if (now <= KEPT_SECONDS) return;
+	std::lock_guard lock(_lazy_mutex);
+	size_t freed = 0, count = 0;
+	for (const ThreeDObject &o : _three_d_objects) {
+		for (auto it = o.painted.begin(); it != o.painted.end();) {
+			if (it->second.used + KEPT_SECONDS < now) {
+				freed += it->second.px.capacity() * sizeof(uint32_t);
+				count++;
+				it = o.painted.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+	if (count > 0) Debug(misc, 1, "3D objects: {} painted textures of buildings not asked for let go of, {:.1f} MB", count, freed / (1024.0 * 1024.0));
+}
+
 static void ForgetUnusedThreeDObjectsNow()
 {
 	/* Not while the pictures of the vehicles are being made on their thread (three_d_vehicle_object.cpp) or a frame
@@ -15237,6 +15337,8 @@ static void ForgetUnusedThreeDObjectsNow()
 		for (const auto &shape : kept) joined += shape->JoinSimpler();
 		if (joined > 0) Debug(misc, 1, "3D objects: {} simpler shapes joined with finer ones", joined);
 	}
+	TrimThreeDPainted();
+	TrimThreeDHouseLevels();
 	if (_three_d_clock <= THREE_D_FORGET_AFTER || !_three_d_objects_read) return;
 	const uint32_t before = _three_d_clock - THREE_D_FORGET_AFTER;
 	size_t forgotten = 0;

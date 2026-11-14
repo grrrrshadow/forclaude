@@ -111,6 +111,7 @@ struct ThreeDObjectTexture {
 	int h = 0;
 	std::vector<uint32_t> px;
 	ThreeDUniqueId uid; ///< for the graphics card (three_d_gpu.cpp)
+	mutable uint32_t used = 0; ///< a building's painted one (ThreeDObject::painted): when it was last asked for, seconds of the clock of the objects
 	/**
 	 * Of the finest level of a texture of few colours in cells (a palette, a mask of strips; DecodeTextureLevels()):
 	 * the coarsest level whose texels drawn from are each of one cell -- a coarser one mixes the cells' colours
@@ -388,6 +389,7 @@ struct ThreeDObject {
 	float stop[3] = {};       ///< there, world units along x and y from the north corner, units of height up
 	float stop_turn = 0;      ///< facing, degrees, 0 along +x
 	mutable std::map<std::pair<int, uint32_t>, ThreeDObjectTexture> painted; ///< the texture painted, by level and paint (PaintAt())
+	mutable int level_asked = INT_MAX; ///< the finest level of its texture asked for since its finer levels were last let go of (TrimThreeDHouseLevels())
 	mutable std::array<std::shared_ptr<const ThreeDObjectShape>, THREE_D_SHAPE_LEVELS> shapes; ///< its shape simplified, by level, made the first time it is asked for (GetShape())
 	ThreeDUniqueId shape_uid; ///< its own shape's number, for the graphics card (ThreeDObjectShapeView::uid)
 	IndustryType industry = 0xFF; ///< "prumysl" ("druh": "prumysl"): the game's own industry it is, 0xFF none or one the game has not yet
