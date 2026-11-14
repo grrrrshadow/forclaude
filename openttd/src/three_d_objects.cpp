@@ -8458,13 +8458,32 @@ const ThreeDVehicleSize *GetThreeDVehicleSize(uint32_t grfid)
  * @param engine the engine (of a piece)
  * @param[out] piece which of the object's pieces it is
  */
+/**
+ * The set an engine's 3D object is of, as the indices name it ("grf"): its set's id; of one of the game's own vehicles
+ * past the original set (IsGamesOwnEngine(): the pipeline's pump) the game's own mark, "FEFFFFFF" in an index.
+ * @return false: an original vehicle, no set's
+ */
+static bool EngineObjectSet(const Engine *e, uint32_t &grfid)
+{
+	extern bool IsGamesOwnEngine(VehicleType type, uint16_t internal_id);
+	if (e == nullptr) return false;
+	if (e->grf_prop.grffile != nullptr) {
+		grfid = e->grf_prop.grfid;
+		return true;
+	}
+	if (!IsGamesOwnEngine(e->type, e->grf_prop.local_id)) return false;
+	grfid = EngineOverrideManager::GAMES_OWN_GRFID;
+	return true;
+}
+
 const ThreeDVehicleObject *GetThreeDVehicleObject(EngineID engine, int *piece)
 {
 	if (!_vehicle_objects_read) ReadThreeDVehicleObjects();
 	if (_vehicle_object_pieces.empty()) return nullptr;
 	const Engine *e = Engine::GetIfValid(engine);
-	if (e == nullptr || e->grf_prop.grffile == nullptr) return nullptr;
-	auto it = _vehicle_object_pieces.find(VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id));
+	uint32_t grfid;
+	if (!EngineObjectSet(e, grfid)) return nullptr;
+	auto it = _vehicle_object_pieces.find(VehiclePieceKey(grfid, e->type, e->grf_prop.local_id));
 	if (it == _vehicle_object_pieces.end()) return nullptr;
 	if (piece != nullptr) *piece = it->second.second;
 	return &_vehicle_objects[it->second.first];
@@ -8493,8 +8512,9 @@ std::vector<VehicleConfigAspect> GetThreeDOwnConfigAspects(EngineID engine)
 static uint64_t PieceKeyOf(const Vehicle *v)
 {
 	const Engine *e = v != nullptr ? Engine::GetIfValid(v->engine_type) : nullptr;
-	if (e == nullptr || e->grf_prop.grffile == nullptr) return 0;
-	return VehiclePieceKey(e->grf_prop.grfid, e->type, e->grf_prop.local_id);
+	uint32_t grfid;
+	if (!EngineObjectSet(e, grfid)) return 0;
+	return VehiclePieceKey(grfid, e->type, e->grf_prop.local_id);
 }
 
 /**

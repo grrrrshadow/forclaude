@@ -107,5 +107,6 @@
    "poznamka": "jako Mat ze dveří do dveří: od stání jedné budovy ÚV KSČ po silnici ke stání jiné, chvíli stojí, jede dál; po pravé straně, natočená podle směru; maják jen s jednou osobou (zatím prázdná, nebliká)"
   },
   "poznamka": "Tatra 613 VB, která jezdí sama (hráč: „hranata tam je osobak vb“, „bude jezdit jako mat, od uv ksč k jinemu uv ksč“): nátěr VB jako tatra613_vb_3d. 24000 trojúhelníků (karoserie a víko motoru), kolo zvlášť kolo_t613.glb (2 polohy × 2 boky, poloměr 0.31 m), atlas 2048 px jen barva bez světla, s normálami, okna neprůhledná, bez interiéru, motor pod víkem zůstal; délka 5.239 m"
- }
+ },
+ {"soubor": "cerpadlo_potrubi.glb", "jmeno": "cerpadlo_potrubi", "druh": "vozidlo", "typ": "vlak", "grf": "FEFFFFFF", "motor": 122, "kotva": "stred", "rozmer_m": {"delka": 3.38, "sirka": 1.3, "vyska": 1.3}, "trojuhelniku": 360, "autor": "grrrrf: vlastní model predmety/cerpadlo_potrubi.py", "licence": "GPL-2.0 (vlastní geometrie i textura)", "poznamka": "čerpadlo potrubí hry (vlastní vlakový motor hry 122 pod značkou hry, grf FEFFFFFF; hráč 14. 11.: „jednoduché válce s oknem jako maj vozidla“): objímka kolem trubky 3,2 m dlouhá a 1,1 m v průměru, příruby na koncích, modré okno v tmavém rámu po stranách a nahoře; podél +x, střed v počátku na zemi, osa 1,0 m nad zemí jako osa trubky"}
 ]
