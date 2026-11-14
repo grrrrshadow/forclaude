@@ -89,6 +89,8 @@ a v pohledu z kabiny; při pohledu na sever zůstávají sprity.
 - `auta/` – auta hry, která jezdí sama (od kolegy, grrrrf `hra/3d/objekty/auta/`, `ODPOVED-MODY-A-HRA.md`): Tatra 613 VB
   jezdí v otočeném pohledu po silnicích od stání jedné budovy ÚV KSČ ke stání jiné (`jizda`, `stani` u domu), postojí
   a jede dál. Je to výzdoba hry jako holky a Mat, ne vozidlo GRF; Tatry jako vozidla (`MAXt`) jsou mód ve svém balíčku.
+  Od 14. 11. hra vlastní kopii modelu nemá (hráč: „stačí jedna tatra v grf, naše grf vždy budou u hry přiložený“):
+  záznam samojízdné Tatry je v balíčku Tatra osobní 3D v23 a bere jeho soubory; bez balíčku nejezdí.
 - `efekty/` – efekty jako 3D objekty (od kolegy, grrrrf `hra/3d/objekty/efekty/`): ohňostroj
   nad chatkou (`ohnostroj.glb`, start a tři fáze koule, barva číslem z palety pro každou
   fázi), v otočeném pohledu; na sever zůstávají sprity.
