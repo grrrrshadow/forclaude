@@ -9291,8 +9291,37 @@ static std::shared_ptr<ThreeDVehicleShape> MeshoptSimplerShape(const ThreeDVehic
 	}
 	std::vector<uint32_t> kept(windex.size());
 	float result_error = 0;
-	const size_t count = meshopt_simplify(kept.data(), windex.data(), windex.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), 0, static_cast<float>(error),
+	size_t count = meshopt_simplify(kept.data(), windex.data(), windex.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), 0, static_cast<float>(error),
 			meshopt_SimplifyErrorAbsolute, &result_error);
+	/* From afar (a cell of 4 cm and more) where the seams stop the simplifier -- the colleague's lorries, a Tatra's 554
+	 * thousand triangles 209, 192, 185 and 182 thousand at 4 to 32 cm: a lorry a few tens of pixels long on the map
+	 * drawn of 182 thousand (the player's logs of 14. 11.: the map over a town with the lorries 5 to 9 frames a second,
+	 * the view from the eyes 2.1 million triangles a frame, most of them lorries far off) --: its corners joined in
+	 * cells of the error instead (meshoptimizer's sloppy simplifier), the triangles of each kind (texture, part,
+	 * glass, side out) and each wheel by themselves, so that a triangle keeps its kind and a wheel turns whole. Taken
+	 * where it leaves well under what the seams left. */
+	if (error >= 0.02 - 1e-9 && count > 3 * 2000) {
+		std::map<uint64_t, std::vector<uint32_t>> groups;
+		for (size_t t = 0; t < triangles; t++) {
+			const uint32_t i0 = shape.tri[t * 3];
+			const uint64_t group = static_cast<uint64_t>(wkind[windex[t * 3]]) | static_cast<uint64_t>(wheels ? shape.corner_wheel[i0] : 0) << 32;
+			std::vector<uint32_t> &g = groups[group];
+			g.insert(g.end(), {windex[t * 3], windex[t * 3 + 1], windex[t * 3 + 2]});
+		}
+		const float scale = meshopt_simplifyScale(wpos.data(), wfirst.size(), 3 * sizeof(float));
+		std::vector<uint32_t> sloppy, one;
+		for (const auto &[group, g] : groups) {
+			one.resize(g.size());
+			float group_error = 0;
+			const size_t n = meshopt_simplifySloppy(one.data(), g.data(), g.size(), wpos.data(), wfirst.size(), 3 * sizeof(float), nullptr, 0,
+					static_cast<float>(error / std::max(scale, 1e-6f)), &group_error);
+			sloppy.insert(sloppy.end(), one.begin(), one.begin() + n);
+		}
+		if (sloppy.size() * 10 < count * 6) {
+			count = sloppy.size();
+			kept = std::move(sloppy);
+		}
+	}
 	/* The triangles left, each corner the shape's of its place facing most as the triangle faces. */
 	std::vector<uint32_t> new_of(corners, UINT32_MAX);
 	auto corner = [&](uint32_t w, const double n[3]) {
