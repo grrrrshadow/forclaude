@@ -2390,6 +2390,15 @@ struct TurnedTile {
 	 * hill in front of it, whose ground covered its edge in the picture (the player, test5: "a brown strip at the
 	 * joining"). */
 	bool over = false;
+	/**
+	 * A tunnel's end with its mouth in 3D, its ground level at the foot of the slope: the way into the tunnel. Into the
+	 * south-west or the south-east the hill's tile behind it is drawn into the ground's picture after it, its edge a
+	 * level higher -- 8 pixels up, over the last quarter of this tile's level picture (the player, 14. 11.: "the road
+	 * is not drawn up to the entrance, a thin strip of grass on the last tile of the canal or the road"); drawn after
+	 * the hill instead, the road or the water lay on the hill behind the portal. Its picture is taken from the three
+	 * quarters the hill leaves and laid along the whole tile (AddTurnedTileFromBlock()).
+	 */
+	DiagDirection mouth = DiagDirection::Invalid;
 };
 
 /** Pixels of a picture facing north, from the virtual (0, 0) at its zoom; the right and the bottom edge not in it. */
@@ -6809,9 +6818,12 @@ static void AddNorthHouseObject(size_t first_parent)
  * @param x0,y0 the north corner of the tile (world units)
  * @param slope the slope of the tile
  * @param z the height of its north corner on flat ground
+ * @param mouth a tunnel's end levelled: the way into the tunnel (TurnedTile::mouth), else none
  */
-static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const DrawPixelInfo &frame, const DrawPixelInfo &big, const uint32_t *tex, int bw, int bh, int x0, int y0, Slope slope, int z)
+static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const DrawPixelInfo &frame, const DrawPixelInfo &big, const uint32_t *tex, int bw, int bh, int x0, int y0, Slope slope, int z, DiagDirection mouth = DiagDirection::Invalid)
 {
+	/* How much of the tile's picture along x and y is its own (TurnedTile::mouth): the hill's edge a level up covers a quarter, and a pixel. */
+	const double own_x = mouth == DiagDirection::SW ? 11.25 / TILE_SIZE : 1.0, own_y = mouth == DiagDirection::SE ? 11.25 / TILE_SIZE : 1.0;
 	double t0 = TurnedNow();
 	ZoomLevel zoom = frame.zoom;
 	Slope s = RemoveHalftileSlope(slope);
@@ -6826,7 +6838,7 @@ static void AddTurnedTileFromBlock(std::vector<TurnedGroundPiece> &pieces, const
 		double wz = z + ((i < 4) ? GetSlopePixelZInCorner(s, corners[i]) : static_cast<int>(GetPartialPixelZ(TILE_SIZE / 2, TILE_SIZE / 2, s)));
 		double fx, fy, cx, cy;
 		ProjectTurnedF(wx, wy, wz, fx, fy);
-		RemapCoordsF(wx, wy, wz, cx, cy);
+		RemapCoordsF(x0 + (wx - x0) * own_x, y0 + (wy - y0) * own_y, wz, cx, cy);
 		v[i].x = (fx - frame.left) * scale;
 		v[i].y = (fy - frame.top) * scale;
 		v[i].u = (cx - big.left) * scale;
@@ -8808,6 +8820,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			if (_cur_ti.tile != INVALID_TILE && _three_d_tunnel_mouth_drawn == _cur_ti.tile) {
 				t.top_slope = SLOPE_FLAT;
 				t.top_z = _cur_ti.z;
+				t.mouth = GetTunnelBridgeDirection(_cur_ti.tile);
 			}
 			_three_d_tunnel_mouth_drawn = INVALID_TILE;
 		}
@@ -9131,7 +9144,7 @@ static void ViewportDoDrawTurned(bool hole_only = false, bool ground_only = fals
 			}
 			AddTurnedTileGround(ground_laying.pieces, ground_laying.foundations, frame, t.first_sprite, t.end_sprite, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.raw_slope, t.raw_z, t.building, t.foundation, &about);
 		} else if (ground != nullptr && t.first_sprite < t.end_sprite) {
-			AddTurnedTileFromBlock(ground_laying.pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z);
+			AddTurnedTileFromBlock(ground_laying.pieces, frame, bigdpi, ground, bw, bh, t.x * TILE_SIZE, t.y * TILE_SIZE, t.top_slope, t.top_z, t.mouth);
 		}
 	}
 	/* The foundations, drawn into the pictures of their tiles' ground (and of the farther tiles beside them), taken off
