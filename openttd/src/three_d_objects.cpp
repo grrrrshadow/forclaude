@@ -7272,6 +7272,8 @@ static void ReadThreeDVehicleObjects()
 					fig.ends_beyond = std::max(0.0f, e.value("jen_konce_m", 0.0f));
 					/* Only its frames' nodes ("jen_snimky"): the torch's flame without its stick, the fire of the fireplaces. */
 					fig.frames_only = e.value("jen_snimky", false);
+					/* Its shape as it is from any distance ("bez_zjednoduseni": a lattice of thin bars). */
+					fig.keep_whole = e.value("bez_zjednoduseni", false);
 					/* Without some materials of its file ("bez_materialu"), laid along another line ("prohnuti" "z", "do"):
 					 * the fishing rods straight and bent (BendThreeDThingPoint()). */
 					if (e.contains("bez_materialu") && e.at("bez_materialu").is_array()) {
@@ -9560,6 +9562,7 @@ static std::shared_ptr<const ThreeDVehicleShape> MakeSimplerShape(const ThreeDVe
  */
 const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant) const
 {
+	if (this->keep_whole) return this;
 	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
 	/* Not waited for (ThreeDLazyNoWait; the card drawing the map's figures): the shape itself meanwhile, the simpler one
 	 * made in the background -- nothing of it missing (Missed()), drawn whole it looks the same (the player, 31. 10.:
@@ -9596,6 +9599,7 @@ const ThreeDVehicleShape *ThreeDVehicleShape::Simpler(double cell_m, bool plant)
 /** The simpler shape if it is made already; else the shape itself stands in, and the simpler one is made in the background. */
 const ThreeDVehicleShape *ThreeDVehicleShape::TrySimpler(double cell_m, bool plant) const
 {
+	if (this->keep_whole) return this;
 	if (!(cell_m >= (plant ? 2 * SIMPLER_CELL_M : SIMPLER_CELL_M)) || (!plant && this->tri.size() < 3 * SIMPLER_FEWEST)) return this;
 	const int level = std::min(SIMPLER_LEVELS - 1, static_cast<int>(std::floor(std::log2(cell_m / SIMPLER_CELL_M))));
 	const std::shared_ptr<const ThreeDVehicleShape> &made = this->simpler.shapes[level];
@@ -10265,6 +10269,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 	if (this->to_middle) key += "|m";
 	if (this->one_sided) key += "|o";
 	if (this->frames_only) key += "|j";
+	if (this->keep_whole) key += "|W";
 	for (const std::string &n : this->skip_materials) key += "|-" + n;
 	for (const auto &p : this->bend_from) key += fmt::format("|<{},{}", p[0], p[1]);
 	for (const auto &p : this->bend_to) key += fmt::format("|>{},{}", p[0], p[1]);
@@ -10890,6 +10895,7 @@ std::shared_ptr<const ThreeDVehicleShape> ThreeDVehicleObject::MakeShape(int fra
 			this->frame_prefix.empty() ? std::string() : fmt::format(" frame {}", frame), made->tri.size() / 3, wheel_triangles,
 			made->pos.size() / 3, made->nrm.empty() ? " without normals" : "", made->pngs.size(), made->x1 - made->x0, made->y1 - made->y0, made->z1 - made->z0, made->z0,
 			std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - started).count());
+	made->keep_whole = this->keep_whole;
 	ShrinkShape(*made);
 	ExtentOfAll(*made);
 	KeepVehicleShape(key, made);

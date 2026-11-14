@@ -606,6 +606,12 @@ struct ThreeDVehicleShape {
 	/** Whether a triangle of a part sits at the driver's seat: not drawn from the own cab's eye. */
 	static bool AtDriverSeat(uint8_t part) { return part == PART_DRIVER || (part >= PART_SEAT && part < PART_SEAT + ThreeDParts::COUNT); }
 
+	/**
+	 * Drawn as it is from any distance, no simpler shape of it made ("bez_zjednoduseni" of its record): a lattice of
+	 * thin bars -- the simplifier leaves out what is smaller than a cell, and of the power line's pylon far off only
+	 * its insulators and its feet were left (the player's 14. 11.: "the pylons lack their bottoms").
+	 */
+	bool keep_whole = false;
 	/** How many simpler shapes of it there may be (Simpler()): of cells of 1, 2, 4, ... 64 cm (a plant's from 2 cm). */
 	static constexpr int SIMPLER_LEVELS = 7;
 	/** The cell of the first of them, metres. */
@@ -1061,6 +1067,7 @@ struct ThreeDVehicleObject {
 	bool to_ground = false;         ///< "na_zem": its shape stands on its lowest corner (the jumping fox without the snow of her model, "bez_uzlu")
 	bool to_middle = false;         ///< "na_stred": its shape's middle (along x and y) at its origin (a node of a scene where it lies: the forest's fireplace by a tent)
 	bool one_sided = false;         ///< "jednostranne": its triangles seen only from their outer side, as glTF has them (a material not "doubleSided"), the side facing away left out where it is drawn (the concrete of a ship tunnel's mouth, whose back is under the hill)
+	bool keep_whole = false;        ///< "bez_zjednoduseni": its shape as it is from any distance (ThreeDVehicleShape::keep_whole)
 	bool frames_only = false;       ///< "jen_snimky": of its file only its frames' nodes, not the rest drawn in each (the torch's flame without its stick: the fireplaces' fire)
 	std::vector<std::string> skip_materials; ///< "bez_materialu": the triangles of its file's materials so named left out (the short rod's own float and line)
 	/**

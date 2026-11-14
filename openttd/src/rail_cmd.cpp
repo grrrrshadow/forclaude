@@ -2991,7 +2991,7 @@ static void DrawThreeDBufferStops(const TileInfo *ti, Track t, int z, bool eye);
 static void DrawThreeDPowerLine(const TileInfo *ti, TrackBits track, Slope s, bool round, bool eye)
 {
 	/* Where the cables hang, metres: aside of the line (to both sides) and up. */
-	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.74, 26.7}, {9.74, 19.77}, {5.36, 19.77}}};
+	static constexpr std::array<std::array<double, 2>, 3> CABLES{{{9.6, 25.95}, {9.6, 18.75}, {5.28, 18.68}}};
 	static constexpr double PYLON_TALL_M = 30.3, PYLON_HALF_M = 9.6;
 	static constexpr int PYLON_EVERY = 3;
 	static const uint32_t CABLE_COLOUR = Colour(40, 42, 46).data;
