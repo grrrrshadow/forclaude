@@ -4084,12 +4084,20 @@ static void EyeOrigin(const ThreeDVehicleObject *obj, const Vehicle *anchor, dou
 	y = by + back * std::sin(bf) - ahead * std::sin(facing);
 }
 
-bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out)
+bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out, bool no_wait)
 {
 	out = {};
 	int piece = 0;
 	const ThreeDVehicleObject *obj = ThreeDVehicleObjectOf(v, &piece);
-	if (obj == nullptr || obj->GetShape() == nullptr) return false;
+	if (obj == nullptr) return false;
+	if (no_wait && !_three_d_load_at_once) {
+		/* The picture from the eyes waits for no shape (the player's #363, snimky.log from the eyes: "tvar 44x 2712 ms"
+		 * read by the main thread, a hitch of 60 ms each): read in the background, nothing of the vehicle till then --
+		 * not its sprites either, they are the stand-in the player does not want to see. */
+		if (obj->TryGetShape() == nullptr) return obj->ShapeTried() ? false : true;
+	} else if (obj->GetShape() == nullptr) {
+		return false;
+	}
 	if (piece != obj->anchor) return true;
 	const bool reversed = PieceReversed(v);
 	const Vehicle *front, *last;

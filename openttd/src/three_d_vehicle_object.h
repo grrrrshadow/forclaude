@@ -76,7 +76,7 @@ struct ThreeDEyeVehicle {
 	uint64_t walk = 0;          ///< the frames of its crew that walks (WalkCode() of three_d_vehicle_object.cpp)
 	double curvature = 0;       ///< how much its way turns, radians a world unit to the left: its front wheels steer by it
 };
-bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out);
+bool GetThreeDEyeVehicle(const Vehicle *v, ThreeDEyeVehicle &out, bool no_wait = false);
 /** How level a face is to be stood on (ThreeDVehicleDeckZ()): its normal's up at least so much of it; steeper ones are walls (ThreeDVehicleBlocks()). */
 static constexpr double THREE_D_DECK_LEVEL = 0.7;
 std::optional<double> ThreeDVehicleDeckZ(const struct ThreeDVehicleObject &obj, double x, double y, double up_to);

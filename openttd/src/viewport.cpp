@@ -19500,7 +19500,7 @@ static bool CollectEyeFrame(const Vehicle *v, const FirstPersonEye *walker, int 
 		/* A vehicle drawn from its object: the object itself among the figures, at the angle it stands at -- the
 		 * sprites of its eight directions are only for what is drawn from them (the player, 16. 10.). */
 		ThreeDEyeVehicle ev;
-		if (ThreeDEnabled() && u->type != VehicleType::Effect && u->direction != Direction::Invalid && !u->vehstatus.Test(VehState::Crashed) && GetThreeDEyeVehicle(u, ev)) {
+		if (ThreeDEnabled() && u->type != VehicleType::Effect && u->direction != Direction::Invalid && !u->vehstatus.Test(VehState::Crashed) && GetThreeDEyeVehicle(u, ev, true)) {
 			if (ev.obj == nullptr) continue;
 			/* A boat with rooms the walker is aboard (the colleague's sailing yacht): its whole hull with its cabins
 			 * (ThreeDBoatRooms()); the figures on its deck and in its saloon that are there now. */
